@@ -353,9 +353,11 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   }
 
   // Offload additional charge rows
+  // NOTE: do NOT filter by filteredContainerIdSet here. These charges are explicitly assigned
+  // to a supplier via supplierId (already filtered at query level), so they belong on that
+  // supplier's statement regardless of which supplier owns the container.
+  // Post-offload charges can only be added to OFFLOADED containers, so OTW-toggle is irrelevant.
   for (const oc of allOffloadCharges as any[]) {
-    // Skip charges tied to OTW containers when toggle is off
-    if (oc.containerId != null && !filteredContainerIdSet.has(oc.containerId)) continue;
     const cc = oc.currencyCode || "USD";
     const amt = parseFloat(oc.amount || "0");
     const supplierName = supplierNameMap[oc.supplierId] || "Unknown";
@@ -1582,6 +1584,20 @@ export function registerFactorySuppliersRoutes(app: Express) {
           sql`(${factorySupplierFxTransfers.fromSupplierId} = ${supplierId} OR ${factorySupplierFxTransfers.toSupplierId} = ${supplierId})`
         ));
 
+      // Post-offload additional charges assigned to this supplier (or any of its children)
+      const offloadAdditionalChargesForSupplier = await db
+        .select({
+          supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+          amount: factoryOffloadAdditionalCharges.amount,
+          currencyCode: factoryOffloadAdditionalCharges.currencyCode,
+          fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
+        })
+        .from(factoryOffloadAdditionalCharges)
+        .where(and(
+          eq(factoryOffloadAdditionalCharges.companyId, companyId),
+          sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(supplierIds)})`
+        ));
+
       // computeBalance: TRUE BROKER BALANCE MODEL.
       // Commission from a supplier's own containers is included in the supplier's balance.
       // For brokers, their balance = only direct entries + FX-in (no child rollup).
@@ -1618,6 +1634,15 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const fx = ocCcy === "USD" ? 1 : parseFloat(c.fxRateToUsd || "1");
           return sum + oc * fx;
         }, 0);
+        // Post-offload additional charges explicitly assigned to this supplier (or children)
+        const offloadChargesValue = offloadAdditionalChargesForSupplier.reduce((sum: number, oc: any) => {
+          if (oc.supplierId !== sid) return sum;
+          const amt = parseFloat(oc.amount || "0");
+          if (amt <= 0) return sum;
+          const cc = oc.currencyCode || "USD";
+          const fx = cc === "USD" ? 1 : parseFloat(oc.fxRateToUsd || "1");
+          return sum + amt * fx;
+        }, 0);
         // FX net: FX-in transfers received minus FX-out transfers sent (in USD)
         // Use toAmountUsd for both directions — it's the actual USD value settled.
         let fxNetUsd = 0;
@@ -1632,7 +1657,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
         const supplierPayments = allPayments.filter((p: any) => p.supplierId === sid);
         const totalPaid = supplierPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amountUsd || "0"), 0);
         const voucherPaid = voucherPaidBySupplier[sid] || 0;
-        return openingBal + containerValue + ownCommission + otherChargesValue + fxNetUsd - totalPaid - voucherPaid;
+        return openingBal + containerValue + ownCommission + otherChargesValue + offloadChargesValue + fxNetUsd - totalPaid - voucherPaid;
       };
 
       // True broker balance: only the broker's own balance (NOT children aggregated in)
@@ -1723,6 +1748,22 @@ export function registerFactorySuppliersRoutes(app: Express) {
       for (const row of fxRateRows.rows as any[]) {
         configuredFxRates[row.currency_code] = parseFloat(row.rate_to_usd);
       }
+
+      // Pre-fetch all post-offload additional charges for the company so computeStats can include them.
+      // These are charges explicitly assigned to a supplier (supplierId) — distinct from container-column otherCharges.
+      const allOffloadAdditionalCharges = allSupplierIds.length > 0
+        ? await db.select({
+            supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+            amount: factoryOffloadAdditionalCharges.amount,
+            currencyCode: factoryOffloadAdditionalCharges.currencyCode,
+            fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
+          })
+          .from(factoryOffloadAdditionalCharges)
+          .where(and(
+            eq(factoryOffloadAdditionalCharges.companyId, companyId),
+            sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
+          ))
+        : [];
 
       // Helper to compute stats for a single supplier record
       const computeStats = (s: any, includeOtw: boolean = false) => {
@@ -1877,7 +1918,7 @@ export function registerFactorySuppliersRoutes(app: Express) {
           }
         }
 
-        // Other charges attributed to this supplier
+        // Other charges attributed to this supplier (container-column otherCharges)
         for (const c of containers.filter(isPayableContainer)) {
           if ((c as any).otherChargesSupplierId !== s.id) continue;
           const oc = parseFloat((c as any).otherCharges || "0");
@@ -1887,6 +1928,17 @@ export function registerFactorySuppliersRoutes(app: Express) {
           const fx = cc === "USD" ? 1 : (configuredFxRates[cc] ?? parseFloat(c.fxRateToUsd || "1"));
           byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + oc;
           byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + oc * fx;
+        }
+
+        // Post-offload additional charges explicitly assigned to this supplier
+        for (const oc of allOffloadAdditionalCharges as any[]) {
+          if (oc.supplierId !== s.id) continue;
+          const amt = parseFloat(oc.amount || "0");
+          if (amt <= 0) continue;
+          const cc = oc.currencyCode || "USD";
+          const fx = cc === "USD" ? 1 : (configuredFxRates[cc] ?? parseFloat(oc.fxRateToUsd || "1"));
+          byCurrencyNative[cc] = (byCurrencyNative[cc] || 0) + amt;
+          byCurrencyUsd[cc] = (byCurrencyUsd[cc] || 0) + amt * fx;
         }
 
         // Balance = sum of each native-currency bucket × its configured rate.
