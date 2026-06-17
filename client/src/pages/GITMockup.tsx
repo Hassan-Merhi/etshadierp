@@ -1823,7 +1823,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       const balanceRowHtml = hasBalance ? `
         <tr style="background:${balRowBg}">
           <td colspan="9" style="padding:9px 10px;font-size:11px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.06em;border:1px solid rgba(0,0,0,0.15);">
-            ${hasAdj ? "Account Balance" : "Open Balance"}
+            Account Balance
           </td>
           <td style="padding:9px 10px;font-size:14px;font-weight:800;color:#ffffff;text-align:right;border:1px solid rgba(0,0,0,0.15);">
             $${esc(fmt(Math.abs(finalBal), 0))}
@@ -1840,7 +1840,15 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       if (waTransitRows.length > 0) {
         const transitTotal = waTransitRows.reduce((s: number, r: any) => s + r.dutyFee, 0);
         let transitRowsHtml = "";
-        waTransitRows.forEach((r: any, i: number) => {
+        const sortedWaTransitRows = [...waTransitRows].sort((a: any, b: any) => {
+          const tA = (a.transporter ?? "").toLowerCase();
+          const tB = (b.transporter ?? "").toLowerCase();
+          if (tA !== tB) return tA < tB ? -1 : 1;
+          const sA = (a.supplierCode ?? a.supplierName ?? "").toLowerCase();
+          const sB = (b.supplierCode ?? b.supplierName ?? "").toLowerCase();
+          return sA < sB ? -1 : sA > sB ? 1 : 0;
+        });
+        sortedWaTransitRows.forEach((r: any, i: number) => {
           const bg = i % 2 === 0 ? "#f0f9ff" : "#e0f2fe";
           transitRowsHtml += `<tr style="background:${bg}">
             <td style="${tdTransit("left", true)}">${esc(r.containerNumber)}</td>
@@ -2525,7 +2533,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
               return (
                 <tr className={baseCls}>
                   <td colSpan={9} className="py-2 px-3 text-[11px] uppercase tracking-widest font-semibold">
-                    Open Balance
+                    Account Balance
                   </td>
                   <td className="py-2 px-3 text-right text-sm font-bold tabular-nums">
                     ${fmt(Math.abs(rawBal), 0)}
