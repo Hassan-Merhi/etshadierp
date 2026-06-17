@@ -33,7 +33,7 @@ import {
   Search, ExternalLink, CheckCircle2, XCircle, MessageSquare,
   FileSpreadsheet, LayoutGrid, List, Info, AlertCircle, ChevronDown, ChevronUp,
   ArrowUp, ArrowDown, ArrowLeftRight, ChevronsUp, RotateCcw, Pencil, Check, X as XIcon, StickyNote,
-  Building2, Layers, Loader2, MessageCircle, Trash2, Plus,
+  Building2, Layers, Loader2, MessageCircle, Trash2, Plus, Filter,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
@@ -1629,6 +1629,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   // Replace modal state
   const [replaceTarget, setReplaceTarget] = useState<{ id: number; containerNumber: string; dutyFee: number } | null>(null);
   const [replaceAmountWarning, setReplaceAmountWarning] = useState<{ oldAmount: number; newAmount: number; newContainerId: number } | null>(null);
+  const [transitTransporterFilter, setTransitTransporterFilter] = useState<string | null>(null);
 
   // ── Overpayment note (DB-backed, shared across all users) ─────────────────
   const [editingNote, setEditingNote] = useState(false);
@@ -2400,10 +2401,11 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
               const rawBal   = ledgerBalance ?? openSum;
               const isDebit  = rawBal > 0;
               const isCredit = rawBal < 0;
+              // Dr = I owe them → RED  |  Cr = they owe us → GREEN
               const baseCls  = isDebit
-                ? "bg-green-500 text-white font-bold"
+                ? "bg-red-500 text-white font-bold"
                 : isCredit
-                  ? "bg-red-500 text-white font-bold"
+                  ? "bg-green-500 text-white font-bold"
                   : "bg-yellow-400 text-yellow-950 font-bold";
               const balLabel = isDebit ? "Dr" : isCredit ? "Cr" : "";
 
@@ -2427,12 +2429,13 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
 
                 const adjAbs    = Math.abs(adjustedBalance);
                 const adjLabel  = adjustedBalance >= 0 ? "Dr" : "Cr";
+                // Dr = I owe them → RED  |  Cr = they owe us → GREEN
                 const adjRowCls = (isMismatch && !allBudgetDesignated)
                   ? "bg-red-600 text-white font-bold"
                   : adjustedBalance > 0
-                    ? "bg-green-500 text-white font-bold"
+                    ? "bg-red-500 text-white font-bold"
                     : adjustedBalance < 0
-                      ? "bg-red-500 text-white font-bold"
+                      ? "bg-green-500 text-white font-bold"
                       : "bg-yellow-400 text-yellow-950 font-bold";
                 return (
                   <tr className={adjRowCls}>
@@ -2511,25 +2514,48 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       </div>
 
       {/* ── Active / Preview rows (collapsed) ── */}
-      {activePreviewRows.length > 0 && (
+      {activePreviewRows.length > 0 && (() => {
+        const transitTransporters = [...new Set(remainingTransitRows.map(r => r.transporter).filter(Boolean))] as string[];
+        const filteredTransitRows = transitTransporterFilter
+          ? remainingTransitRows.filter(r => r.transporter === transitTransporterFilter)
+          : remainingTransitRows;
+        return (
         <>
-          <button
-            onClick={() => setShowActive(v => !v)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-sky-50 dark:bg-sky-950/20 border-t border-sky-200 dark:border-sky-800 text-xs hover-elevate"
-            data-testid={`button-toggle-active-${agentName}`}
-          >
-            <span className="font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-400">
-              In Transit —{" "}
-              {remainingTransitRows.length} container{remainingTransitRows.length !== 1 ? "s" : ""}
-              {prepaidTransitRows.length > 0 && (
-                <span className="ml-1 text-emerald-600 dark:text-emerald-400">
-                  ({prepaidTransitRows.length} prepaid)
-                </span>
-              )}
-              ,{" "}${fmt(remainingTransitRows.reduce((s, r) => s + r.dutyFee, 0), 0)} upcoming duty
-            </span>
-            {showActive ? <ChevronUp className="h-3.5 w-3.5 text-sky-600" /> : <ChevronDown className="h-3.5 w-3.5 text-sky-600" />}
-          </button>
+          <div className="flex items-center bg-sky-50 dark:bg-sky-950/20 border-t border-sky-200 dark:border-sky-800">
+            <button
+              onClick={() => setShowActive(v => !v)}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-xs hover-elevate"
+              data-testid={`button-toggle-active-${agentName}`}
+            >
+              <span className="font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-400">
+                In Transit —{" "}
+                {remainingTransitRows.length} container{remainingTransitRows.length !== 1 ? "s" : ""}
+                {prepaidTransitRows.length > 0 && (
+                  <span className="ml-1 text-emerald-600 dark:text-emerald-400">
+                    ({prepaidTransitRows.length} prepaid)
+                  </span>
+                )}
+                ,{" "}${fmt(remainingTransitRows.reduce((s, r) => s + r.dutyFee, 0), 0)} upcoming duty
+              </span>
+              {showActive ? <ChevronUp className="h-3.5 w-3.5 text-sky-600" /> : <ChevronDown className="h-3.5 w-3.5 text-sky-600" />}
+            </button>
+            {transitTransporters.length > 1 && (
+              <div className="flex items-center gap-1 pr-2" onClick={e => e.stopPropagation()}>
+                <Filter className="h-3 w-3 text-sky-500 shrink-0" />
+                <select
+                  value={transitTransporterFilter ?? ""}
+                  onChange={e => setTransitTransporterFilter(e.target.value || null)}
+                  className="text-[11px] bg-transparent border border-sky-300 dark:border-sky-700 rounded px-1.5 py-0.5 text-sky-700 dark:text-sky-300 focus:outline-none cursor-pointer"
+                  data-testid={`select-transit-transporter-${agentName}`}
+                >
+                  <option value="">All transporters</option>
+                  {transitTransporters.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
 
           {showActive && (
             <div className="overflow-x-auto border-t border-sky-200 dark:border-sky-800">
@@ -2542,14 +2568,14 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                   </tr>
                 </thead>
                 <tbody>
-                  {remainingTransitRows.length === 0 ? (
+                  {filteredTransitRows.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="py-3 px-3 text-center text-muted-foreground italic text-xs">
-                        All in-transit containers designated as prepaid.
+                        {transitTransporterFilter ? "No containers for selected transporter." : "All in-transit containers designated as prepaid."}
                       </td>
                     </tr>
                   ) : (
-                    remainingTransitRows.map((r) => {
+                    filteredTransitRows.map((r) => {
                       // Only show ↑ button if adding this container still fits in the budget
                       const canDesignate = prepaidBudget > 0 && (designatedPrepaidSum + r.dutyFee - 0.01) <= prepaidBudget;
                       return (
@@ -2588,7 +2614,8 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
             </div>
           )}
         </>
-      )}
+        );
+      })()}
     </div>
     </div>
 
