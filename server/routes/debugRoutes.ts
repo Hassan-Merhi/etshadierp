@@ -4,7 +4,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
-import { getOrCreateLedgerAccount } from "./factory/_helpers";
+import { getOrCreateLedgerAccount, recalculateOrderTotals } from "./factory/_helpers";
 import {
   inventory, stockItems, stockGroups,
   stockTransferVouchers, stockTransferItems,
@@ -29,6 +29,7 @@ import {
   insertDashboardAccountSelectionSchema,
   creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
   bales, baleProducts, baleProductCategories, storedFiles,
+  customerOrders,
 } from "@shared/schema";
 import {
   eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
@@ -1893,6 +1894,36 @@ export function registerDebugRoutes(app: Express) {
       res.json({ scanned, created, skippedExisting, errors, errorDetails });
     } catch (error: any) {
       console.error("Backfill post-offload vouchers error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Repair endpoint: recalculate grandTotal/subtotalBales for all active factory customer orders.
+  // Fixes orders where per_kg pricing resulted in $0 because totalPrice was stored as 0.
+  // Safe to run multiple times — recalculateOrderTotals deletes and re-inserts order lines each time.
+  app.post("/api/admin/recalculate-factory-order-totals", requireAuth, requireRole("Admin", "Developer"), async (req: any, res: any) => {
+    try {
+      const statuses = ['LOADING', 'PENDING_VERIFICATION', 'VERIFIED', 'FINALIZED'];
+      const orders = await db
+        .select({ id: customerOrders.id, status: customerOrders.status })
+        .from(customerOrders)
+        .where(inArray(customerOrders.status, statuses));
+
+      let done = 0, errors = 0;
+      const errorDetails: string[] = [];
+      for (const order of orders) {
+        try {
+          await recalculateOrderTotals(db, order.id);
+          done++;
+        } catch (err: any) {
+          errors++;
+          errorDetails.push(`orderId=${order.id}: ${err.message}`);
+          console.error(`[recalc-factory-totals] error on orderId=${order.id}:`, err);
+        }
+      }
+      res.json({ total: orders.length, done, errors, errorDetails });
+    } catch (error: any) {
+      console.error("Recalculate factory order totals error:", error);
       res.status(500).json({ message: error.message });
     }
   });

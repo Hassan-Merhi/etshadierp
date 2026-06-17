@@ -340,7 +340,6 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
               SELECT SUM(
                 CASE
                   WHEN col.pricing_mode = 'per_kg'
-                    AND COALESCE(col.total_price::numeric, 0) = 0
                     AND COALESCE(col.price_per_kg::numeric, 0) > 0
                     AND COALESCE(col.total_weight::numeric, 0) > 0
                   THEN col.price_per_kg::numeric * col.total_weight::numeric

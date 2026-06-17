@@ -213,6 +213,13 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
     const pricing = proformaPricing.get(line.articleCode.toLowerCase());
     const pricingMode = pricing?.pricingMode ?? 'per_bale';
     const pricePerKg = pricing?.pricePerKg ?? null;
+    const pkgRateInsert = pricePerKg ? parseFloat(pricePerKg) : 0;
+    // For per_kg lines: totalPrice = totalWeight × pricePerKg (authoritative).
+    // For per_bale lines: totalPrice = sum of priceUsed on bales.
+    const lineTotalPrice = (pricingMode === 'per_kg' && pkgRateInsert > 0 && line.totalWeight > 0)
+      ? line.totalWeight * pkgRateInsert
+      : line.totalPrice;
+    const pricePerBaleEffective = line.qty > 0 ? lineTotalPrice / line.qty : 0;
     await dbConn.insert(customerOrderLines).values({
       orderId,
       articleCode: line.articleCode,
@@ -220,8 +227,8 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
       qty: line.qty,
       weightPerBale: String(line.qty > 0 ? line.totalWeight / line.qty : 0),
       totalWeight: String(line.totalWeight),
-      pricePerBale: String(line.qty > 0 ? line.totalPrice / line.qty : 0),
-      totalPrice: String(line.totalPrice),
+      pricePerBale: String(pricePerBaleEffective),
+      totalPrice: String(lineTotalPrice),
       pricingMode,
       pricePerKg: pricePerKg ?? null,
     });
@@ -231,15 +238,14 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
   const freightAmount = charges.filter((c: any) => c.chargeType === 'FREIGHT').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
   const otherChargesTotal = charges.filter((c: any) => c.chargeType === 'OTHER').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
 
-  // Mirror the verify-page fallback: for per_kg articles where all bales still have
-  // priceUsed = 0 (scanned before proforma was linked), use proformaRate × totalWeight
-  // so that grandTotal in the list matches the price shown in the verify page.
+  // For per_kg articles: always use proformaRate × totalWeight as the authoritative price.
+  // This matches the totalPrice stored in the order lines above and the verify-page display.
   let subtotalBales = 0;
   for (const line of Object.values(grouped)) {
     const pricing = proformaPricing.get(line.articleCode.toLowerCase());
     const pricingMode = pricing?.pricingMode ?? 'per_bale';
     const pkgRate = pricing?.pricePerKg ? parseFloat(pricing.pricePerKg) : 0;
-    if (pricingMode === 'per_kg' && line.totalPrice === 0 && pkgRate > 0 && line.totalWeight > 0) {
+    if (pricingMode === 'per_kg' && pkgRate > 0 && line.totalWeight > 0) {
       subtotalBales += pkgRate * line.totalWeight;
     } else {
       subtotalBales += line.totalPrice;
