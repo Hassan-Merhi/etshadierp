@@ -1636,6 +1636,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const [docsFilter, setDocsFilter] = useState("ALL");
   const [delayedFilter, setDelayedFilter] = useState("ALL");
   const [freightFilter, setFreightFilter] = useState("ALL");
+  const [etaFilter, setEtaFilter] = useState("ALL");
+  const [notesFilter, setNotesFilter] = useState("ALL");
   const [sortOrder, setSortOrder] = useState("DEFAULT");
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -1844,6 +1846,10 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (delayedFilter === "OVERDUE" && !c.isOverdue) return false;
       if (freightFilter === "HAS_FREIGHT" && !(parseFloat(c.poFreight ?? "0") > 0)) return false;
       if (freightFilter === "NO_FREIGHT" && parseFloat(c.poFreight ?? "0") > 0) return false;
+      if (etaFilter === "HAS_ETA" && !c.eta) return false;
+      if (etaFilter === "NO_ETA" && !!c.eta) return false;
+      if (notesFilter === "WITH" && !(c.trackingDescription ?? "").trim()) return false;
+      if (notesFilter === "WITHOUT" && !!(c.trackingDescription ?? "").trim()) return false;
       if (search) {
         const q = search.toLowerCase();
         if (
@@ -1867,7 +1873,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
       if (sh !== 0) return sh;
       return a.containerNumber.localeCompare(b.containerNumber);
     });
-  }, [allContainers, companyFilter, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, freightFilter, sortOrder, search]);
+  }, [allContainers, companyFilter, transporterFilters, agentFilters, truckFilters, locationFilters, docsFilter, delayedFilter, freightFilter, etaFilter, notesFilter, sortOrder, search]);
 
   // Summary stats — follow the active filters so they match what's visible in the table
   const atSea          = filteredContainers.filter((c) => c.status === "OTW" || c.status === "Sea").length;
@@ -1901,6 +1907,8 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     setDocsFilter("ALL");
     setDelayedFilter("ALL");
     setFreightFilter("ALL");
+    setEtaFilter("ALL");
+    setNotesFilter("ALL");
     setSortOrder("DEFAULT");
     setSearch("");
   }
@@ -2427,6 +2435,32 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                   <SelectItem value="ALL">All</SelectItem>
                   <SelectItem value="YES">Delayed only</SelectItem>
                   <SelectItem value="OVERDUE">Offload Overdue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[110px] flex-1">
+              <p className="text-xs text-muted-foreground">ETA</p>
+              <Select value={etaFilter} onValueChange={setEtaFilter}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-eta">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All</SelectItem>
+                  <SelectItem value="HAS_ETA">Has ETA</SelectItem>
+                  <SelectItem value="NO_ETA">No ETA</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1 min-w-[110px] flex-1">
+              <p className="text-xs text-muted-foreground">Notes</p>
+              <Select value={notesFilter} onValueChange={setNotesFilter}>
+                <SelectTrigger className="h-8 text-xs" data-testid="select-otw-notes">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All</SelectItem>
+                  <SelectItem value="WITH">Has Notes</SelectItem>
+                  <SelectItem value="WITHOUT">No Notes</SelectItem>
                 </SelectContent>
               </Select>
             </div>
