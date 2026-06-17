@@ -129,9 +129,9 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
         .orderBy(factorySupplierFxTransfers.date)
     : [];
 
-  // Offload additional charges for any of the broker's suppliers.
-  // Uses COALESCE(charge.supplier_id, container.supplier_id) so legacy rows that were saved
-  // before the supplier_id column was wired up still resolve to the container's main supplier.
+  // Offload additional charges explicitly assigned to any of the broker's suppliers.
+  // Only rows where supplierId IS NOT NULL are included — if a charge was posted to a ledger
+  // account (loan, payable, etc.) its supplierId is null intentionally and must NOT appear here.
   const allOffloadCharges = allSupplierIds.length > 0
     ? await db.select({
         id: factoryOffloadAdditionalCharges.id,
@@ -141,13 +141,12 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
         currencyCode: factoryOffloadAdditionalCharges.currencyCode,
         fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
         createdAt: factoryOffloadAdditionalCharges.createdAt,
-        supplierId: sql<number>`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId})`,
+        supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
       })
       .from(factoryOffloadAdditionalCharges)
-      .innerJoin(factoryContainers, eq(factoryOffloadAdditionalCharges.containerId, factoryContainers.id))
       .where(and(
         eq(factoryOffloadAdditionalCharges.companyId, companyId),
-        sql`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId}) = ANY(${sqlArray(allSupplierIds)})`
+        sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
       ))
       .orderBy(factoryOffloadAdditionalCharges.createdAt)
     : [];
@@ -1587,20 +1586,19 @@ export function registerFactorySuppliersRoutes(app: Express) {
           sql`(${factorySupplierFxTransfers.fromSupplierId} = ${supplierId} OR ${factorySupplierFxTransfers.toSupplierId} = ${supplierId})`
         ));
 
-      // Post-offload additional charges assigned to this supplier (or any of its children)
-      // COALESCE(charge.supplier_id, container.supplier_id) handles legacy rows where supplier_id was null.
+      // Post-offload charges explicitly assigned to this supplier (supplierId NOT NULL).
+      // Charges posted to a ledger account have supplierId=null and must NOT appear on any supplier balance.
       const offloadAdditionalChargesForSupplier = await db
         .select({
-          supplierId: sql<number>`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId})`,
+          supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
           amount: factoryOffloadAdditionalCharges.amount,
           currencyCode: factoryOffloadAdditionalCharges.currencyCode,
           fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
         })
         .from(factoryOffloadAdditionalCharges)
-        .innerJoin(factoryContainers, eq(factoryOffloadAdditionalCharges.containerId, factoryContainers.id))
         .where(and(
           eq(factoryOffloadAdditionalCharges.companyId, companyId),
-          sql`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId}) = ANY(${sqlArray(supplierIds)})`
+          sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(supplierIds)})`
         ));
 
       // computeBalance: TRUE BROKER BALANCE MODEL.
@@ -1754,20 +1752,19 @@ export function registerFactorySuppliersRoutes(app: Express) {
         configuredFxRates[row.currency_code] = parseFloat(row.rate_to_usd);
       }
 
-      // Pre-fetch all post-offload additional charges for the company so computeStats can include them.
-      // COALESCE(charge.supplier_id, container.supplier_id) handles legacy rows where supplier_id was null.
+      // Pre-fetch post-offload charges explicitly assigned to a supplier (supplierId NOT NULL).
+      // Charges posted to a ledger account have supplierId=null and must NOT appear on any supplier balance.
       const allOffloadAdditionalCharges = allSupplierIds.length > 0
         ? await db.select({
-            supplierId: sql<number>`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId})`,
+            supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
             amount: factoryOffloadAdditionalCharges.amount,
             currencyCode: factoryOffloadAdditionalCharges.currencyCode,
             fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
           })
           .from(factoryOffloadAdditionalCharges)
-          .innerJoin(factoryContainers, eq(factoryOffloadAdditionalCharges.containerId, factoryContainers.id))
           .where(and(
             eq(factoryOffloadAdditionalCharges.companyId, companyId),
-            sql`COALESCE(${(factoryOffloadAdditionalCharges as any).supplierId}, ${factoryContainers.supplierId}) = ANY(${sqlArray(allSupplierIds)})`
+            sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
           ))
         : [];
 
