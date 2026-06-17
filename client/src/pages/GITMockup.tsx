@@ -2115,9 +2115,12 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     <div ref={cardRef} className="rounded-md border border-border overflow-hidden shadow-sm">
 
       {/* ── Agent header ── */}
-      <div className="bg-slate-800 dark:bg-slate-900 text-white px-4 py-2.5 flex items-center justify-between min-h-[2.75rem]">
-        <span className="font-bold tracking-widest text-sm uppercase">{agentName}</span>
-        <Badge className={cn("text-[10px] no-default-active-elevate shrink-0", confidenceBadge.cls)}>{confidenceBadge.label}</Badge>
+      <div className="bg-slate-800 dark:bg-slate-900 text-white px-4 py-2.5 grid min-h-[2.75rem]" style={{ gridTemplateColumns: "1fr auto 1fr" }}>
+        <span />
+        <span className="font-bold tracking-widest text-sm uppercase self-center text-center">{agentName}</span>
+        <span className="flex justify-end items-center">
+          <Badge className={cn("text-[10px] no-default-active-elevate shrink-0", confidenceBadge.cls)}>{confidenceBadge.label}</Badge>
+        </span>
       </div>
 
       {/* ── Warning banners ── */}
@@ -2536,9 +2539,10 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       {/* ── Active / Preview rows (collapsed) ── */}
       {activePreviewRows.length > 0 && (() => {
         const transitTransporters = [...new Set(remainingTransitRows.map(r => r.transporter).filter(Boolean))] as string[];
-        const filteredTransitRows = transitTransporterFilter
+        const filteredTransitRows = (transitTransporterFilter
           ? remainingTransitRows.filter(r => r.transporter === transitTransporterFilter)
-          : remainingTransitRows;
+          : remainingTransitRows
+        ).slice().sort((a, b) => (a.transporter ?? "").localeCompare(b.transporter ?? ""));
         return (
         <>
           <div className="flex items-center bg-slate-50 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-700">
