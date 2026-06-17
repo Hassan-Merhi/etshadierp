@@ -201,7 +201,7 @@ export default function FactoryPendingLoadings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/v5/stock-allocation") });
-      toast({ title: "Proforma linked", description: "The loading has been linked to the selected proforma." });
+      toast({ title: "Proforma updated", description: "The loading's proforma has been saved successfully." });
       closeLinkDialog();
     },
     onError: (err: any) => {

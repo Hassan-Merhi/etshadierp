@@ -2234,9 +2234,11 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (isNaN(orderId)) return res.status(400).json({ message: "Invalid order ID" });
 
       const { proformaId } = req.body;
-      if (!proformaId) return res.status(400).json({ message: "proformaId is required" });
-      const proformaIdInt = parseInt(proformaId);
-      if (isNaN(proformaIdInt)) return res.status(400).json({ message: "Invalid proformaId" });
+      // proformaId may be null/0 to unlink
+      const isUnlink = proformaId == null || proformaId === 0 || proformaId === "0";
+      const proformaIdInt = isUnlink ? null : parseInt(proformaId);
+      if (!isUnlink && (proformaIdInt === null || isNaN(proformaIdInt!)))
+        return res.status(400).json({ message: "Invalid proformaId" });
 
       // Confirm order exists for this company
       const [order] = await db.select().from(customerOrders)
@@ -2247,13 +2249,20 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (order.status !== "LOADING")
         return res.status(400).json({ message: "Can only link a proforma to a LOADING order" });
 
-      // Must not already be linked (V5 guard — only link previously unlinked V2/V3 orders)
-      if (order.proformaIdUsed != null)
-        return res.status(400).json({ message: "Order is already linked to a proforma" });
+      // Always wipe existing expected lines so we start fresh
+      await db.execute(sql`DELETE FROM customer_order_expected_lines WHERE order_id = ${orderId}`);
+
+      if (isUnlink) {
+        // Unlink: clear proformaIdUsed and expected lines (already deleted above)
+        await db.update(customerOrders)
+          .set({ proformaIdUsed: null })
+          .where(eq(customerOrders.id, orderId));
+        return res.json({ success: true, linked: { orderId, proformaId: null, linesBackfilled: 0 } });
+      }
 
       // Confirm proforma exists for this company
       const [proforma] = await db.select().from(customerProformas)
-        .where(and(eq(customerProformas.id, proformaIdInt), eq(customerProformas.companyId, companyId)));
+        .where(and(eq(customerProformas.id, proformaIdInt!), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
 
       // Proforma must be active
@@ -2268,17 +2277,14 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
 
       // Fetch proforma lines for expected-lines backfill
       const proformaLines = await db.select().from(customerProformaLines)
-        .where(eq(customerProformaLines.proformaId, proformaIdInt));
+        .where(eq(customerProformaLines.proformaId, proformaIdInt!));
 
-      // Link the order → proforma
+      // Link the order → proforma (re-link allowed: replaces any previous proforma)
       await db.update(customerOrders)
         .set({ proformaIdUsed: proformaIdInt })
         .where(eq(customerOrders.id, orderId));
 
-      // Backfill customer_order_expected_lines from proforma lines.
-      // ON CONFLICT DO NOTHING — idempotent and safe to call multiple times.
-      // These lines are for detail/progress only; LOADING orders do NOT
-      // contribute to expectedToLoad in the V5 formula (DRAFT-only).
+      // Insert expected lines from the new proforma
       if (proformaLines.length > 0) {
         await db.execute(
           sql`INSERT INTO customer_order_expected_lines
