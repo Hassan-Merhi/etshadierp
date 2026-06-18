@@ -1337,6 +1337,8 @@ export function registerVoucherRoutes(app: Express) {
               accountField.bankAccountId = entry.accountId;
             } else if (entry.accountType === "supplier") {
               accountField.supplierId = entry.accountId;
+            } else if (entry.accountType === "factorySupplier") {
+              accountField.factorySupplierId = entry.accountId;
             } else if (entry.accountType === "employee") {
               accountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {
@@ -1555,6 +1557,8 @@ export function registerVoucherRoutes(app: Express) {
               accountField.bankAccountId = entry.accountId;
             } else if (entry.accountType === "supplier") {
               accountField.supplierId = entry.accountId;
+            } else if (entry.accountType === "factorySupplier") {
+              accountField.factorySupplierId = entry.accountId;
             } else if (entry.accountType === "employee") {
               accountField.employeeId = entry.accountId;
             } else if (entry.accountType === "fixedAsset") {

@@ -79,7 +79,7 @@ export function registerVoucherEntryRoutes(app: Express) {
       
       // Transform entries to include accountType for the Daybook editor
       const transformedEntries = entries.map(entry => {
-        let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" = "ledger";
+        let accountType: "ledger" | "bank" | "supplier" | "factorySupplier" | "employee" | "fixedAsset" | "customer" = "ledger";
         let accountId = entry.ledgerAccountId;
         
         if (entry.bankAccountId) {
@@ -88,6 +88,9 @@ export function registerVoucherEntryRoutes(app: Express) {
         } else if (entry.supplierId) {
           accountType = "supplier";
           accountId = entry.supplierId;
+        } else if (entry.factorySupplierId) {
+          accountType = "factorySupplier";
+          accountId = entry.factorySupplierId;
         } else if (entry.employeeId) {
           accountType = "employee";
           accountId = entry.employeeId;
