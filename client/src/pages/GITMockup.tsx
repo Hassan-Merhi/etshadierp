@@ -2041,7 +2041,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const prepaidTransitSet    = useMemo(() => new Set(effectivePrepaidIds), [effectivePrepaidIds]); // eslint-disable-line react-hooks/exhaustive-deps
   const prepaidTransitRows   = useMemo(() => activePreviewRows.filter(r => prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
   const remainingTransitRows = useMemo(() => activePreviewRows.filter(r => !prepaidTransitSet.has(r.id)), [activePreviewRows, prepaidTransitSet]); // eslint-disable-line react-hooks/exhaustive-deps
-  const designatedPrepaidSum = useMemo(() => prepaidTransitRows.reduce((s, r) => s + r.dutyFee, 0), [prepaidTransitRows]);
+  const designatedPrepaidSum = useMemo(() => prepaidTransitRows.reduce((s, r) => s + Number(r.dutyFee ?? 0), 0), [prepaidTransitRows]);
 
   // ── Enhanced FIFO: payment coverage + prepaid-case full hide ─────────────
   // When the user designates in-transit containers that consume the full prepaid budget
@@ -2663,7 +2663,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
                   ) : (
                     filteredTransitRows.map((r) => {
                       // Only show ↑ button if adding this container still fits in the budget
-                      const canDesignate = prepaidBudget > 0 && (designatedPrepaidSum + r.dutyFee - 0.01) <= prepaidBudget;
+                      const canDesignate = prepaidBudget > 0 && (designatedPrepaidSum + Number(r.dutyFee ?? 0) - 0.01) <= prepaidBudget;
                       return (
                         <tr key={r.id} className="border-b bg-sky-50/30 dark:bg-sky-950/10 text-muted-foreground">
                           <td className="py-0.5 px-2 font-mono text-center">{r.containerNumber}</td>
