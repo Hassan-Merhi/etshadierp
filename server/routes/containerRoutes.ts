@@ -458,6 +458,7 @@ export function registerContainerRoutes(app: Express) {
         freightStatus,
         trackingLink,
         status,
+        blDocs,
       } = parseResult.data;
       
       const updateData: any = {};
@@ -483,6 +484,7 @@ export function registerContainerRoutes(app: Express) {
       if (freightStatus !== undefined) updateData.freightStatus = freightStatus || null;
       if (trackingLink !== undefined) updateData.trackingLink = trackingLink || null;
       if (status !== undefined) updateData.status = status;
+      if (blDocs !== undefined) updateData.blDocs = blDocs || null;
       
       await db
         .update(containers)

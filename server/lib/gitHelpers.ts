@@ -210,6 +210,7 @@ export type RawContainerRow = {
   dutyFee: string | null;
   docReceived: boolean | null;
   trackingDescription: string | null;
+  blDocs: string | null;
   docsSentDate: string | null;
   freightStatus: string | null;
   trackingLink: string | null;
@@ -288,6 +289,7 @@ export async function fetchActiveContainers(
       dutyFee: containers.dutyFee,
       docReceived: containers.docReceived,
       trackingDescription: containers.trackingDescription,
+      blDocs: containers.blDocs,
       docsSentDate: containers.docsSentDate,
       freightStatus: containers.freightStatus,
       trackingLink: containers.trackingLink,

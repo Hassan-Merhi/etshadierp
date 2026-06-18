@@ -81,6 +81,7 @@ import {
   MessageCircle,
   Send,
   Undo2,
+  SlidersHorizontal,
 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
@@ -108,6 +109,7 @@ interface EnrichedContainerRow {
   dutyFee: string | null;
   docReceived: boolean | null;
   trackingDescription: string | null;
+  blDocs: string | null;
   docsSentDate: string | null;
   freightStatus: string | null;
   trackingLink: string | null;
@@ -150,6 +152,33 @@ interface AuthUser {
   currentRole?: string | null;
   companyId?: number;
 }
+
+// ─── Column visibility config ──────────────────────────────────────────────────
+const OTW_COLS = [
+  { id: "supplier",     label: "Supplier" },
+  { id: "company",      label: "Company" },
+  { id: "shopName",     label: "Shop Name" },
+  { id: "eta",          label: "ETA" },
+  { id: "cost",         label: "Cost" },
+  { id: "freight",      label: "Freight" },
+  { id: "truckNo",      label: "Truck #" },
+  { id: "location",     label: "Location" },
+  { id: "borderDate",   label: "Border Date" },
+  { id: "maxOffload",   label: "Max Offload" },
+  { id: "delayed",      label: "Delayed" },
+  { id: "docs",         label: "Docs" },
+  { id: "docsSent",     label: "Docs Sent" },
+  { id: "transporter",  label: "Transporter" },
+  { id: "transportFee", label: "Transport Fee" },
+  { id: "agent",        label: "Agent" },
+  { id: "dutyFee",      label: "Duty Fee" },
+  { id: "notes",        label: "Notes" },
+  { id: "blDocs",       label: "BL Docs" },
+] as const;
+type OtwColId = typeof OTW_COLS[number]["id"];
+const DEFAULT_OTW_COL_VIS: Record<OtwColId, boolean> = Object.fromEntries(
+  OTW_COLS.map((c) => [c.id, true])
+) as Record<OtwColId, boolean>;
 
 // ─── Inline ETA cell ──────────────────────────────────────────────────────────
 
@@ -498,6 +527,7 @@ interface DrawerForm {
   docsSentDate: string;
   trackingLink: string;
   trackingDescription: string;
+  blDocs: string;
   shopName: string;
 }
 
@@ -516,6 +546,7 @@ function seedForm(c: EnrichedContainerRow): DrawerForm {
     docsSentDate: c.docsSentDate ?? "",
     trackingLink: c.trackingLink ?? "",
     trackingDescription: c.trackingDescription ?? "",
+    blDocs: c.blDocs ?? "",
     shopName: c.shopName ?? "",
   };
 }
@@ -772,6 +803,7 @@ function ContainerDrawer({
       docsSentDate: form.docsSentDate || null,
       trackingLink: form.trackingLink || null,
       trackingDescription: form.trackingDescription || null,
+      blDocs: form.blDocs || null,
       shopName: form.shopName || null,
     });
   }
@@ -1013,6 +1045,19 @@ function ContainerDrawer({
               onChange={(e) => set("trackingDescription", e.target.value)}
               disabled={!canEdit}
               data-testid="input-drawer-notes"
+            />
+          </div>
+
+          {/* ── BL Docs ── */}
+          <div className="space-y-1">
+            <Label className="text-xs">BL Docs</Label>
+            <Textarea
+              rows={3}
+              placeholder="BL document notes…"
+              value={form.blDocs}
+              onChange={(e) => set("blDocs", e.target.value)}
+              disabled={!canEdit}
+              data-testid="input-drawer-bl-docs"
             />
           </div>
 
@@ -1662,6 +1707,24 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const printRef     = useRef<HTMLDivElement>(null);
   const queryClient  = useQueryClient();
 
+  // ── Column visibility (per-user, persisted to localStorage) ──────────────────
+  const [colVis, setColVis] = useState<Record<OtwColId, boolean>>(DEFAULT_OTW_COL_VIS);
+  useEffect(() => {
+    if (!user?.id) return;
+    try {
+      const saved = localStorage.getItem(`otw_col_vis_${user.id}`);
+      if (saved) setColVis({ ...DEFAULT_OTW_COL_VIS, ...JSON.parse(saved) });
+    } catch {}
+  }, [user?.id]);
+  function toggleOtwCol(id: OtwColId) {
+    setColVis((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { if (user?.id) localStorage.setItem(`otw_col_vis_${user.id}`, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }
+  const otwHiddenCount = OTW_COLS.filter((c) => !colVis[c.id]).length;
+
   const allowedRoles = ["Admin", "Developer", "Owner"];
   const effectiveRole = user?.currentRole ?? user?.role ?? "";
   const isAllowed = allowedRoles.includes(effectiveRole);
@@ -2080,6 +2143,37 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             <ChevronDown className={cn("h-3.5 w-3.5 ml-1 transition-transform", showFilters && "rotate-180")} />
           </Button>
 
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="default" data-testid="button-otw-columns">
+                <SlidersHorizontal className="h-4 w-4 mr-1" />
+                Columns
+                {otwHiddenCount > 0 && (
+                  <span className="ml-1 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 leading-none">
+                    {otwHiddenCount}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-52 p-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">Show / Hide Columns</p>
+              <div className="space-y-0.5">
+                {OTW_COLS.map((col) => (
+                  <label
+                    key={col.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer text-sm"
+                    data-testid={`col-toggle-otw-${col.id}`}
+                  >
+                    <Checkbox
+                      checked={colVis[col.id]}
+                      onCheckedChange={() => toggleOtwCol(col.id)}
+                    />
+                    {col.label}
+                  </label>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
 
           {/* ── Track All Now — visible standalone button ── */}
           {isAllowed && (
@@ -2530,24 +2624,25 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
               <TableRow className="!bg-amber-100 dark:!bg-amber-900/40">
                 <TableHead className="w-8">#</TableHead>
                 <TableHead>Container #</TableHead>
-                <TableHead>Supplier</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Shop Name</TableHead>
-                <TableHead>ETA</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
-                <TableHead className="text-right">Freight</TableHead>
-                <TableHead>Truck #</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Border Date</TableHead>
-                <TableHead>Max Offload</TableHead>
-                <TableHead>Delayed</TableHead>
-                <TableHead>Docs</TableHead>
-                <TableHead>Docs Sent</TableHead>
-                <TableHead>Transporter</TableHead>
-                <TableHead className="text-right">Transport Fee</TableHead>
-                <TableHead>Agent</TableHead>
-                <TableHead className="text-right">Duty Fee</TableHead>
-                <TableHead>Notes</TableHead>
+                {colVis.supplier && <TableHead>Supplier</TableHead>}
+                {colVis.company && <TableHead>Company</TableHead>}
+                {colVis.shopName && <TableHead>Shop Name</TableHead>}
+                {colVis.eta && <TableHead>ETA</TableHead>}
+                {colVis.cost && <TableHead className="text-right">Cost</TableHead>}
+                {colVis.freight && <TableHead className="text-right">Freight</TableHead>}
+                {colVis.truckNo && <TableHead>Truck #</TableHead>}
+                {colVis.location && <TableHead>Location</TableHead>}
+                {colVis.borderDate && <TableHead>Border Date</TableHead>}
+                {colVis.maxOffload && <TableHead>Max Offload</TableHead>}
+                {colVis.delayed && <TableHead>Delayed</TableHead>}
+                {colVis.docs && <TableHead>Docs</TableHead>}
+                {colVis.docsSent && <TableHead>Docs Sent</TableHead>}
+                {colVis.transporter && <TableHead>Transporter</TableHead>}
+                {colVis.transportFee && <TableHead className="text-right">Transport Fee</TableHead>}
+                {colVis.agent && <TableHead>Agent</TableHead>}
+                {colVis.dutyFee && <TableHead className="text-right">Duty Fee</TableHead>}
+                {colVis.notes && <TableHead>Notes</TableHead>}
+                {colVis.blDocs && <TableHead>BL Docs</TableHead>}
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -2578,60 +2673,97 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                     >
                       <TableCell className="text-muted-foreground">{i + 1}</TableCell>
                       <TableCell className="font-mono font-medium">{c.containerNumber}</TableCell>
-                      <TableCell className="font-mono text-center">
-                        {c.supplierCode ?? <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>{c.companyName}</TableCell>
-                      <TableCell>
-                        <InlineTextCell id={c.id} field="shopName" value={c.shopName} width="100px" />
-                      </TableCell>
-                      <TableCell><EtaCell container={c} fmtDate={fmtDate} /></TableCell>
-                      <TableCell className="text-right font-medium">
-                        {c.grandTotal ? `$${fmt(parseNum(c.grandTotal))}` : "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {c.poFreight && parseNum(c.poFreight) > 0
-                          ? `$${fmt(parseNum(c.poFreight))}`
-                          : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        <InlineTextCell id={c.id} field="numberPlate" value={c.numberPlate} mono width="90px" />
-                      </TableCell>
-                      <TableCell>
-                        <InlineTextCell id={c.id} field="trackingLocation" value={c.trackingLocation} width="100px" />
-                      </TableCell>
-                      <TableCell>
-                        <InlineDateCell id={c.id} field="borderDate" value={c.borderDate} />
-                      </TableCell>
-                      <TableCell className={c.isOverdue ? "text-red-600 font-medium" : ""}>
-                        {fmtDate(c.maxOffloadDate)}
-                      </TableCell>
-                      <TableCell>
-                        {c.daysDelayed && c.daysDelayed > 0
-                          ? <span className="text-red-600 font-medium">-{c.daysDelayed}d</span>
-                          : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell>
-                        <InlineBoolCell id={c.id} field="docReceived" value={c.docReceived} />
-                      </TableCell>
-                      <TableCell>
-                        <InlineDateCell id={c.id} field="docsSentDate" value={c.docsSentDate} />
-                      </TableCell>
-                      <TableCell>
-                        <InlineTransporterCell id={c.id} value={c.transporter} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <InlineNumberCell id={c.id} field="transportFee" value={c.transportFee} />
-                      </TableCell>
-                      <TableCell>
-                        <InlineTextCell id={c.id} field="agent" value={c.agent} width="80px" />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <InlineNumberCell id={c.id} field="dutyFee" value={c.dutyFee} />
-                      </TableCell>
-                      <TableCell className="max-w-28 truncate text-muted-foreground">
-                        <InlineTextCell id={c.id} field="trackingDescription" value={c.trackingDescription} width="120px" />
-                      </TableCell>
+                      {colVis.supplier && (
+                        <TableCell className="font-mono text-center">
+                          {c.supplierCode ?? <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                      )}
+                      {colVis.company && <TableCell>{c.companyName}</TableCell>}
+                      {colVis.shopName && (
+                        <TableCell>
+                          <InlineTextCell id={c.id} field="shopName" value={c.shopName} width="100px" />
+                        </TableCell>
+                      )}
+                      {colVis.eta && <TableCell><EtaCell container={c} fmtDate={fmtDate} /></TableCell>}
+                      {colVis.cost && (
+                        <TableCell className="text-right font-medium">
+                          {c.grandTotal ? `$${fmt(parseNum(c.grandTotal))}` : "—"}
+                        </TableCell>
+                      )}
+                      {colVis.freight && (
+                        <TableCell className="text-right text-muted-foreground">
+                          {c.poFreight && parseNum(c.poFreight) > 0
+                            ? `$${fmt(parseNum(c.poFreight))}`
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                      )}
+                      {colVis.truckNo && (
+                        <TableCell>
+                          <InlineTextCell id={c.id} field="numberPlate" value={c.numberPlate} mono width="90px" />
+                        </TableCell>
+                      )}
+                      {colVis.location && (
+                        <TableCell>
+                          <InlineTextCell id={c.id} field="trackingLocation" value={c.trackingLocation} width="100px" />
+                        </TableCell>
+                      )}
+                      {colVis.borderDate && (
+                        <TableCell>
+                          <InlineDateCell id={c.id} field="borderDate" value={c.borderDate} />
+                        </TableCell>
+                      )}
+                      {colVis.maxOffload && (
+                        <TableCell className={c.isOverdue ? "text-red-600 font-medium" : ""}>
+                          {fmtDate(c.maxOffloadDate)}
+                        </TableCell>
+                      )}
+                      {colVis.delayed && (
+                        <TableCell>
+                          {c.daysDelayed && c.daysDelayed > 0
+                            ? <span className="text-red-600 font-medium">-{c.daysDelayed}d</span>
+                            : <span className="text-muted-foreground">—</span>}
+                        </TableCell>
+                      )}
+                      {colVis.docs && (
+                        <TableCell>
+                          <InlineBoolCell id={c.id} field="docReceived" value={c.docReceived} />
+                        </TableCell>
+                      )}
+                      {colVis.docsSent && (
+                        <TableCell>
+                          <InlineDateCell id={c.id} field="docsSentDate" value={c.docsSentDate} />
+                        </TableCell>
+                      )}
+                      {colVis.transporter && (
+                        <TableCell>
+                          <InlineTransporterCell id={c.id} value={c.transporter} />
+                        </TableCell>
+                      )}
+                      {colVis.transportFee && (
+                        <TableCell className="text-right">
+                          <InlineNumberCell id={c.id} field="transportFee" value={c.transportFee} />
+                        </TableCell>
+                      )}
+                      {colVis.agent && (
+                        <TableCell>
+                          <InlineTextCell id={c.id} field="agent" value={c.agent} width="80px" />
+                        </TableCell>
+                      )}
+                      {colVis.dutyFee && (
+                        <TableCell className="text-right">
+                          <InlineNumberCell id={c.id} field="dutyFee" value={c.dutyFee} />
+                        </TableCell>
+                      )}
+                      {colVis.notes && (
+                        <TableCell className="max-w-28 truncate text-muted-foreground">
+                          <InlineTextCell id={c.id} field="trackingDescription" value={c.trackingDescription} width="120px" />
+                        </TableCell>
+                      )}
+                      {colVis.blDocs && (
+                        <TableCell className="max-w-28 truncate text-muted-foreground">
+                          <InlineTextCell id={c.id} field="blDocs" value={c.blDocs} width="120px" />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Button
                           size="icon"
