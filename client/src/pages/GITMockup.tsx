@@ -1609,7 +1609,13 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const setAllPrepaidMutation = useMutation({
     mutationFn: (containerIds: number[]) =>
       apiRequest("POST", `/api/git/agent-prepaid/${companyId}/${encodeURIComponent(agent.agentName)}/set-all`, { containerIds }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: prepaidQKey }),
+    onSuccess: (_data, containerIds) => {
+      queryClient.invalidateQueries({ queryKey: prepaidQKey });
+      const prev = effectivePrepaidIds.length;
+      if (containerIds.length > prev) {
+        toast({ title: "Container designated as prepaid", description: "It now appears at the top of the list with a Prepaid badge." });
+      }
+    },
     onError: (e: any) => toast({ title: "Failed to update prepaid", description: e.message, variant: "destructive" }),
   });
 
