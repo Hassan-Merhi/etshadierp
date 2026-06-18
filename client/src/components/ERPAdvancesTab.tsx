@@ -800,15 +800,13 @@ function WorkerDeductionsView() {
   const [filterWorker, setFilterWorker] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const companyParam = selectedCompany?.id ? `?companyId=${selectedCompany.id}` : "";
   const { data: deductions, isLoading } = useQuery<WorkerDeductionRow[]>({
-    queryKey: ["/api/factory/worker-deductions", selectedCompany?.id],
+    queryKey: ["/api/factory/worker-deductions"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/worker-deductions${companyParam}`, { credentials: "include" });
+      const res = await fetch(`/api/factory/worker-deductions`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load deductions");
       return res.json();
     },
-    enabled: !!selectedCompany?.id,
   });
 
   const deleteMutation = useMutation({
@@ -824,7 +822,7 @@ function WorkerDeductionsView() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-deductions", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-deductions"] });
       toast({ title: "Deduction deleted" });
     },
     onError: (e: any) => {
