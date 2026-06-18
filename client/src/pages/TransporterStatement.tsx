@@ -655,7 +655,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                 </SelectTrigger>
                 <SelectContent>
                   {transporters.length === 0 && (
-                    <SelectItem value="__none__" disabled>No Loans accounts found</SelectItem>
+                    <SelectItem value="__none__" disabled>No active OTW transporters with matching accounts</SelectItem>
                   )}
                   {transporters.map((t) => (
                     <SelectItem key={t.id} value={String(t.id)} data-testid={`option-transporter-${t.id}`}>

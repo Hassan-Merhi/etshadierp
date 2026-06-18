@@ -29,29 +29,36 @@ function extractContainerNumber(text: string | null | undefined): string | null 
 export function registerTransporterStatementRoutes(app: Express) {
 
   // GET /api/transporter-statement/transporters
+  // Returns only Loans accounts whose name matches a transporter currently
+  // used in an active OTW container for this company (case-insensitive).
   app.get("/api/transporter-statement/transporters", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const accounts = await db
-        .select({
-          id: ledgerAccounts.id,
-          name: ledgerAccounts.name,
-          code: ledgerAccounts.code,
-          accountType: ledgerAccounts.accountType,
-          openingBalance: ledgerAccounts.openingBalance,
-          openingBalanceSide: ledgerAccounts.openingBalanceSide,
-        })
-        .from(ledgerAccounts)
-        .where(and(
-          eq(ledgerAccounts.companyId, companyId),
-          eq(ledgerAccounts.accountType, "Loans"),
-          isNull(ledgerAccounts.deletedAt),
-        ))
-        .orderBy(asc(ledgerAccounts.name));
+      const result = await db.execute(sql`
+        SELECT DISTINCT
+          la.id,
+          la.name,
+          la.code,
+          la.account_type  AS "accountType",
+          la.opening_balance       AS "openingBalance",
+          la.opening_balance_side  AS "openingBalanceSide"
+        FROM ledger_accounts la
+        WHERE la.company_id = ${companyId}
+          AND la.account_type = 'Loans'
+          AND la.deleted_at IS NULL
+          AND EXISTS (
+            SELECT 1
+            FROM containers c
+            WHERE c.company_id = ${companyId}
+              AND LOWER(TRIM(c.transporter)) = LOWER(TRIM(la.name))
+              AND c.status NOT IN ('OFFLOADED','CLOSED','COMPLETED')
+          )
+        ORDER BY la.name
+      `);
 
-      res.json(accounts);
+      res.json(result.rows);
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
