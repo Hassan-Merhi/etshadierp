@@ -567,7 +567,11 @@ function AuthenticatedApp() {
 
   const navigateToParent = useCallback(() => {
     const parent = getParentRoute(window.location.pathname);
-    if (parent) setLocation(parent);
+    if (parent) {
+      setLocation(parent);
+    } else if (window.history.length > 1) {
+      window.history.back();
+    }
   }, [setLocation]);
 
   const handleGoBack = useCallback(() => {
