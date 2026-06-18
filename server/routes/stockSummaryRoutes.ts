@@ -80,20 +80,43 @@ export function registerStockSummaryRoutes(app: Express) {
                           'July', 'August', 'September', 'October', 'November', 'December'];
       
       // Query all relevant transactions for this stock item in the year
-      // 1. PO Line Items (Inwards - container imports)
-      const poInwards = await db
+      // 1. Container Offloads (Inwards) — use containerOffloadItems.totalValue (exact inventory value).
+      // Primary: containerOffloadItems stores the exact dollar amount that was written to inventory,
+      // including PO freight via container.chargesTotal which additionalCostPerBale alone misses.
+      const modernPoInwards = await db
         .select({
-          month: sql<number>`EXTRACT(MONTH FROM ${purchaseOrders.createdAt})`,
-          quantity: poLineItems.quantity,
-          rate: poLineItems.rate,
-          lineTotal: poLineItems.lineTotal,
+          offloadId: containerOffloads.id,
+          month: sql<number>`EXTRACT(MONTH FROM ${containerOffloads.offloadedAt})`,
+          quantity: containerOffloadItems.quantity,
+          totalValue: containerOffloadItems.totalValue,
         })
-        .from(poLineItems)
-        .innerJoin(purchaseOrders, eq(poLineItems.poId, purchaseOrders.id))
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .innerJoin(containerOffloadItems, eq(containerOffloadItems.offloadId, containerOffloads.id))
+        .where(and(
+          eq(containerOffloadItems.stockItemId, stockItemId),
+          eq(containers.companyId, companyId),
+          sql`EXTRACT(YEAR FROM ${containerOffloads.offloadedAt}) = ${year}`
+        ));
+
+      // Legacy fallback: older offloads without containerOffloadItems records
+      const modernPoOffloadIds = new Set(modernPoInwards.map(r => r.offloadId));
+      const legacyPoInwards = await db
+        .select({
+          offloadId: containerOffloads.id,
+          month: sql<number>`EXTRACT(MONTH FROM ${containerOffloads.offloadedAt})`,
+          quantity: poLineItems.quantity,
+          lineTotal: poLineItems.lineTotal,
+          additionalCostPerBale: containerOffloads.additionalCostPerBale,
+        })
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .innerJoin(purchaseOrders, eq(purchaseOrders.containerId, containers.id))
+        .innerJoin(poLineItems, eq(poLineItems.poId, purchaseOrders.id))
         .where(and(
           eq(poLineItems.stockItemId, stockItemId),
-          eq(purchaseOrders.companyId, companyId),
-          sql`EXTRACT(YEAR FROM ${purchaseOrders.createdAt}) = ${year}`
+          eq(containers.companyId, companyId),
+          sql`EXTRACT(YEAR FROM ${containerOffloads.offloadedAt}) = ${year}`
         ));
       
       // 2. Credit / Debit Note Items (company-wide, all locations)
@@ -159,11 +182,22 @@ export function registerStockSummaryRoutes(app: Express) {
         monthBuckets[m] = { inQty: 0, inVal: 0, outQty: 0, outVal: 0 };
       }
       
-      // Process PO Inwards
-      for (const row of poInwards) {
+      // Process Container Offload Inwards — modern method (exact inventory values)
+      for (const row of modernPoInwards) {
         const month = Number(row.month);
         monthBuckets[month].inQty += parseFloat(row.quantity);
-        monthBuckets[month].inVal += parseFloat(row.lineTotal);
+        monthBuckets[month].inVal += parseFloat(row.totalValue);
+      }
+
+      // Legacy fallback — older offloads without containerOffloadItems records
+      for (const row of legacyPoInwards) {
+        if (modernPoOffloadIds.has(row.offloadId)) continue;
+        const month = Number(row.month);
+        const qty = parseFloat(row.quantity);
+        const baseValue = parseFloat(row.lineTotal);
+        const additionalCost = parseFloat(row.additionalCostPerBale || "0") * qty;
+        monthBuckets[month].inQty += qty;
+        monthBuckets[month].inVal += baseValue + additionalCost;
       }
       
       // Process Credit / Debit Notes
@@ -893,8 +927,39 @@ export function registerStockSummaryRoutes(app: Express) {
       }
 
       // 5. Container Offloads at this location (Inwards - from PO imports)
-      const containerOffloadData = await db
+      // Primary: use containerOffloadItems.totalValue — the exact dollar amount written to inventory.
+      // This avoids the discrepancy between poLineItems.lineTotal + additionalCostPerBale and the
+      // actual landed cost (which also includes PO freight via container.chargesTotal).
+      const modernOffloadData = await db
         .select({
+          offloadId: containerOffloads.id,
+          month: sql<number>`EXTRACT(MONTH FROM ${containerOffloads.offloadedAt})`,
+          quantity: containerOffloadItems.quantity,
+          totalValue: containerOffloadItems.totalValue,
+        })
+        .from(containerOffloads)
+        .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
+        .innerJoin(containerOffloadItems, eq(containerOffloadItems.offloadId, containerOffloads.id))
+        .where(and(
+          eq(containerOffloadItems.stockItemId, stockItemId),
+          eq(containers.companyId, companyId),
+          eq(containerOffloads.locationId, locationId),
+          sql`EXTRACT(YEAR FROM ${containerOffloads.offloadedAt}) = ${year}`
+        ));
+
+      // Track which offload IDs were handled by the modern method to avoid double-counting
+      const modernOffloadIds = new Set(modernOffloadData.map(r => r.offloadId));
+
+      for (const row of modernOffloadData) {
+        const month = Number(row.month);
+        monthBuckets[month].inQty += parseFloat(row.quantity);
+        monthBuckets[month].inVal += parseFloat(row.totalValue);
+      }
+
+      // Legacy fallback: for older offloads without containerOffloadItems records
+      const legacyOffloadData = await db
+        .select({
+          offloadId: containerOffloads.id,
           month: sql<number>`EXTRACT(MONTH FROM ${containerOffloads.offloadedAt})`,
           quantity: poLineItems.quantity,
           lineTotal: poLineItems.lineTotal,
@@ -910,16 +975,16 @@ export function registerStockSummaryRoutes(app: Express) {
           eq(containerOffloads.locationId, locationId),
           sql`EXTRACT(YEAR FROM ${containerOffloads.offloadedAt}) = ${year}`
         ));
-      
-      for (const row of containerOffloadData) {
+
+      for (const row of legacyOffloadData) {
+        // Skip offloads already handled by the modern containerOffloadItems method
+        if (modernOffloadIds.has(row.offloadId)) continue;
         const month = Number(row.month);
         const qty = parseFloat(row.quantity);
         const baseValue = parseFloat(row.lineTotal);
         const additionalCost = parseFloat(row.additionalCostPerBale || "0") * qty;
-        const landedValue = baseValue + additionalCost;
-        
         monthBuckets[month].inQty += qty;
-        monthBuckets[month].inVal += landedValue;
+        monthBuckets[month].inVal += baseValue + additionalCost;
       }
       
       // Get ACTUAL current inventory for this location and item (source of truth)
