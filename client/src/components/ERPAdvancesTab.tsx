@@ -796,6 +796,7 @@ function WorkerDeductionsView() {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
+  const { toast } = useToast();
   const [filterWorker, setFilterWorker] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
@@ -808,6 +809,27 @@ function WorkerDeductionsView() {
       return res.json();
     },
     enabled: !!selectedCompany?.id,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({ workerId, id }: { workerId: number; id: number }) => {
+      const res = await fetch(`/api/factory/workers/${workerId}/deductions/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to delete deduction");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/worker-deductions", selectedCompany?.id] });
+      toast({ title: "Deduction deleted" });
+    },
+    onError: (e: any) => {
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const workers = useMemo(() => {
@@ -927,12 +949,13 @@ function WorkerDeductionsView() {
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Recorded</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     No deductions found
                   </TableCell>
                 </TableRow>
@@ -951,6 +974,19 @@ function WorkerDeductionsView() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {fmtDate(d.createdAt)}
+                  </TableCell>
+                  <TableCell>
+                    {!d.applied && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        data-testid={`button-delete-deduction-${d.id}`}
+                        disabled={deleteMutation.isPending}
+                        onClick={() => deleteMutation.mutate({ workerId: d.workerId, id: d.id })}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

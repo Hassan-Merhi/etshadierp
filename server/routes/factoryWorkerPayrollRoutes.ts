@@ -1235,7 +1235,7 @@ export function registerFactoryWorkerPayrollRoutes(app: Express) {
   // GET /api/factory/worker-deductions - All deductions for company (joined with worker name)
   app.get("/api/factory/worker-deductions", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = getFactoryCompanyId(req);
+      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const rows = await db
         .select({
