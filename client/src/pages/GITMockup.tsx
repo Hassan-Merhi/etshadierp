@@ -1763,21 +1763,68 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
       // ── manual adjustment / balance values (must be computed before openRowsHtml) ─
       const netAdj     = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
       const hasAdj     = adjustments.length > 0;
-      const displayBal = ledgerBalance ?? openSum;
-      const adjustedBal = displayBal + netAdj;
-      const adjIsDebit  = adjustedBal >= 0;
       const waOpenSum   = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
+      const displayBal = ledgerBalance ?? waOpenSum;
+      // Adjustment rows are informational only — ledger balance is authoritative, do NOT add netAdj
+      const adjustedBal = displayBal;
+      const adjIsDebit  = adjustedBal >= 0;
       const waMismatch  = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
       const isReconciledWa = hasAdj && hasBalance && Math.abs(adjustedBal) <= 0.01;
 
+      // ── Prepaid transit logic (mirrors component render) ──────────────────
+      const waPrepaidSet   = new Set<number>(dbPrepaidIds);
+      const waPrepaidRows  = activePreviewRows.filter((r: any) => waPrepaidSet.has(r.id));
+      const waRemainingRows = activePreviewRows.filter((r: any) => !waPrepaidSet.has(r.id));
+      const designatedPrepaidSum = waPrepaidRows.reduce((s: number, r: any) => s + Number(r.dutyFee ?? 0), 0);
+      const waPrepaidBudget = Math.max(0, ledgerBalance ?? 0);
+      const minOpenRem = cbAllOpenPartial.length > 0
+        ? Math.min(...cbAllOpenPartial.map(r => r.remainingAmount).filter(a => a > 0.01))
+        : Infinity;
+      const allBudgetDesignated = designatedPrepaidSum > 0
+        && waPrepaidBudget > 0
+        && (designatedPrepaidSum >= waPrepaidBudget - 0.01
+            || (waPrepaidBudget - designatedPrepaidSum) <= (isFinite(minOpenRem) ? minOpenRem : 0)
+            || Math.abs((designatedPrepaidSum + netAdj) - waPrepaidBudget) <= 1.0);
+      const enhancedRem = allBudgetDesignated
+        ? (agent.offloadedDutyTotal ?? 0) * 2 + 1
+        : cbRemainder + designatedPrepaidSum;
+      let _waEnhRem = enhancedRem;
+      const enhancedAllocated = openAndPartial.map((row: ApiAllocatedRow) => {
+        const needed = row.remainingAmount;
+        if (needed <= 0) return { ...row, allocationStatus: "Cleared" as ApiAllocStatus };
+        if (_waEnhRem >= needed) { _waEnhRem -= needed; return { ...row, clearedAmount: row.dutyFee, remainingAmount: 0, allocationStatus: "Cleared" as ApiAllocStatus }; }
+        else if (_waEnhRem > 0) { const extra = _waEnhRem; _waEnhRem = 0; return { ...row, clearedAmount: row.clearedAmount + extra, remainingAmount: row.remainingAmount - extra, allocationStatus: "Partially Cleared" as ApiAllocStatus }; }
+        return row;
+      });
+      const enhancedCoveredIds = new Set(enhancedAllocated.filter((r: ApiAllocatedRow) => r.clearedAmount >= r.dutyFee).map((r: ApiAllocatedRow) => r.id));
+      const waVisibleOpenPartial = openAndPartial.filter((r: ApiAllocatedRow) => !enhancedCoveredIds.has(r.id));
+
       // ── open/partial rows ─────────────────────────────────────────────────
       let openRowsHtml = "";
-      if (openAndPartial.length === 0) {
+      const totalTopRows = waPrepaidRows.length + waVisibleOpenPartial.length;
+      if (totalTopRows === 0) {
         openRowsHtml = `<tr><td colspan="11" style="padding:16px;text-align:center;color:#6b7280;font-style:italic;font-size:11px;border:1px solid #e5e7eb;">No open containers — account fully cleared.</td></tr>`;
-      } else if (isReconciledWa) {
+      } else if (isReconciledWa && waPrepaidRows.length === 0) {
         openRowsHtml = `<tr><td colspan="11" style="padding:16px;text-align:center;color:#065f46;font-style:italic;font-size:11px;border:1px solid #a7f3d0;background:#d1fae5;">All containers reconciled by manual entries — no outstanding balance.</td></tr>`;
       } else {
-        openAndPartial.forEach((r, i) => {
+        // Prepaid transit rows shown first (green "Prepaid" badge)
+        waPrepaidRows.forEach((r: any) => {
+          openRowsHtml += `<tr style="background:#d1fae5">
+            <td style="${tdOpen("left", true)}">${esc(r.containerNumber)}</td>
+            <td style="${tdOpen()}">${esc(r.supplierCode ?? r.supplierName ?? "—")}</td>
+            <td style="${tdOpen()}">${esc(r.numberPlate ?? "—")}</td>
+            <td style="${tdOpen("center", false, "#059669")};font-style:italic;">In Transit</td>
+            <td style="${tdOpen()}">${esc(fmtD(r.borderDate))}</td>
+            <td style="${tdOpen()}">${esc(r.transporter ?? "—")}</td>
+            <td style="${tdOpen()}">${esc(r.location ?? "—")}</td>
+            <td style="${tdOpen("right", true)}">${esc("$" + fmt(r.dutyFee, 0))}</td>
+            <td style="${tdOpen("right", false, "#9ca3af")}">—</td>
+            <td style="${tdOpen("right", true)}">${esc("$" + fmt(r.dutyFee, 0))}</td>
+            <td style="${tdOpen("center", false, "#059669")};font-weight:700;">Prepaid</td>
+          </tr>`;
+        });
+        // Open / partial offloaded rows (hide those fully covered by payment + prepaid)
+        waVisibleOpenPartial.forEach((r, i) => {
           const isPartial = r.allocationStatus === "Partially Cleared";
           const bg = isPartial ? "#fffbeb" : (i % 2 === 0 ? "#ffffff" : "#f9fafb");
           const statusColor = isPartial ? "#b45309" : "#374151";
@@ -1839,10 +1886,11 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         </tr>` : "";
 
       // ── in-transit section ────────────────────────────────────────────────
+      // Use remainingTransitRows (excludes prepaid containers shown in top table)
       let transitHtml = "";
       const waTransitRows = transitTransporterFilter
-        ? activePreviewRows.filter((r: any) => r.transporter === transitTransporterFilter)
-        : activePreviewRows;
+        ? waRemainingRows.filter((r: any) => r.transporter === transitTransporterFilter)
+        : waRemainingRows;
       if (waTransitRows.length > 0) {
         const transitTotal = waTransitRows.reduce((s: number, r: any) => s + r.dutyFee, 0);
         let transitRowsHtml = "";
@@ -1871,7 +1919,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
         transitHtml = `
           <div style="background:#1e293b;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;margin-top:2px;">
             <span style="font-size:12px;font-weight:700;color:#f8fafc;text-transform:uppercase;letter-spacing:0.08em;">
-              In Transit — ${waTransitRows.length} Container${waTransitRows.length !== 1 ? "s" : ""}
+              In Transit — ${waTransitRows.length} Container${waTransitRows.length !== 1 ? "s" : ""}${waPrepaidRows.length > 0 ? ` (${waPrepaidRows.length} Prepaid)` : ""}
             </span>
             <span style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:0.04em;">
               $${fmt(transitTotal, 0)} Upcoming Duty
@@ -1953,7 +2001,7 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
     } finally {
       setWaSending(false);
     }
-  }, [agent, toast, adjustments, transitTransporterFilter]);
+  }, [agent, toast, adjustments, transitTransporterFilter, dbPrepaidIds]);
 
   const {
     agentName, matchConfidence, ledgerAccountName,
