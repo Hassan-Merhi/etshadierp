@@ -225,7 +225,7 @@ export default function FactoryInvoices() {
   };
 
   // Column count for colspan calculations
-  const colCount = 11 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
+  const colCount = 10 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
 
   const fmtKg = (val: string | number | null | undefined) => {
     const n = parseFloat(String(val ?? "0"));
@@ -345,8 +345,7 @@ export default function FactoryInvoices() {
                 <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bales</TableHead>
                 <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Weight</TableHead>
                 <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Remaining</TableHead>
-                <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Surcharge</TableHead>
-                <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Other Charges</TableHead>
+                <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Extras</TableHead>
                 {!hideTotalsUsd && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total</TableHead>}
                 <TableHead className="w-[120px] text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</TableHead>
               </TableRow>
@@ -419,15 +418,24 @@ export default function FactoryInvoices() {
                             <span className="text-green-600 dark:text-green-400 font-medium">Done</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm" data-testid={`text-surcharge-${order.id}`}>
-                          {parseFloat(order.freightAmount || "0") > 0
-                            ? <span className="text-blue-600 dark:text-blue-400">${parseFloat(order.freightAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                            : <span className="text-muted-foreground/40">—</span>}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-sm" data-testid={`text-other-charges-${order.id}`}>
-                          {parseFloat(order.otherChargesTotal || "0") > 0
-                            ? <span className="text-purple-600 dark:text-purple-400">${parseFloat(order.otherChargesTotal).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                            : <span className="text-muted-foreground/40">—</span>}
+                        <TableCell className="text-right font-mono text-sm" data-testid={`text-extras-${order.id}`}>
+                          {parseFloat(order.freightAmount || "0") <= 0 && parseFloat(order.otherChargesTotal || "0") <= 0
+                            ? <span className="text-muted-foreground/40">—</span>
+                            : <div className="flex flex-col items-end gap-0.5">
+                                {parseFloat(order.freightAmount || "0") > 0 && (
+                                  <span className="text-blue-600 dark:text-blue-400">
+                                    ${parseFloat(order.freightAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    <span className="text-muted-foreground/60 text-xs ml-1">freight</span>
+                                  </span>
+                                )}
+                                {parseFloat(order.otherChargesTotal || "0") > 0 && (
+                                  <span className="text-purple-600 dark:text-purple-400">
+                                    ${parseFloat(order.otherChargesTotal).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                                    <span className="text-muted-foreground/60 text-xs ml-1">other</span>
+                                  </span>
+                                )}
+                              </div>
+                          }
                         </TableCell>
                         {!hideTotalsUsd && (
                           <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
@@ -575,7 +583,6 @@ export default function FactoryInvoices() {
                             <span className="text-green-600 dark:text-green-400">Done</span>
                           )}
                         </TableCell>
-                        <TableCell />
                         <TableCell />
                         {!hideTotalsUsd && (
                           <TableCell className="text-right font-mono">
