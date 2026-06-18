@@ -1373,10 +1373,12 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       }
       await db.transaction(async (tx: any) => {
         await tx.delete(factoryUserPageAccess)
-          .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
+          .where(eq(factoryUserPageAccess.userId, userId));
         await tx.delete(factoryUserProfiles)
-          .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
-        await tx.update(users).set({ active: false }).where(eq(users.id, userId));
+          .where(eq(factoryUserProfiles.userId, userId));
+        await tx.delete(userCompanyRoles)
+          .where(eq(userCompanyRoles.userId, userId));
+        await tx.delete(users).where(eq(users.id, userId));
       });
       res.json({ message: "User removed successfully" });
     } catch (error: any) {
