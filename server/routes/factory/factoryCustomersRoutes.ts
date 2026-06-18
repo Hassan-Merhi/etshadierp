@@ -129,6 +129,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
             eq(vouchers.companyId, companyId),
             sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
             sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
+            sql`${vouchers.optional} IS NOT TRUE`,
           ))
           .where(inArray(voucherEntries.ledgerAccountId as any, ledgerAccountIds))
           .groupBy(voucherEntries.ledgerAccountId);
@@ -153,6 +154,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
             eq(vouchers.companyId, companyId),
             sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
             sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
+            sql`${vouchers.optional} IS NOT TRUE`,
           ))
           .where(and(
             inArray(voucherEntries.customerId as any, customerIds),
@@ -423,6 +425,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
           debitAmount: voucherEntries.debitAmount,
           creditAmount: voucherEntries.creditAmount,
           narration: voucherEntries.narration,
+          optional: vouchers.optional,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, and(
@@ -436,6 +439,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       // Convert to unified row format matching customerBalances shape
       for (const ve of rawVoucherRows) {
+        if (ve.optional) continue; // optional vouchers don't affect the balance
         voucherRows.push({
           id: `ve-${ve.id}`,
           customerId,
@@ -589,12 +593,13 @@ export function registerFactoryCustomersRoutes(app: Express) {
         voucherNumber: vouchers.voucherNumber, voucherType: vouchers.voucherType,
         voucherDate: vouchers.voucherDate, description: vouchers.description,
         debitAmount: voucherEntries.debitAmount, creditAmount: voucherEntries.creditAmount,
-        narration: voucherEntries.narration,
+        narration: voucherEntries.narration, optional: vouchers.optional,
       }).from(voucherEntries)
         .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), eq(vouchers.companyId, companyId),
           sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`, sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`))
         .where(voucherCondPdf).orderBy(vouchers.voucherDate, voucherEntries.id);
       for (const ve of rawVePdf) {
+        if (ve.optional) continue; // optional vouchers don't affect the balance
         voucherRowsPdf.push({
           transactionDate: ve.voucherDate, transactionType: ve.voucherType || "VOUCHER",
           referenceType: "VOUCHER", referenceNumber: ve.voucherNumber,
@@ -1007,12 +1012,13 @@ export function registerFactoryCustomersRoutes(app: Express) {
         voucherNumber: vouchers.voucherNumber, voucherType: vouchers.voucherType,
         voucherDate: vouchers.voucherDate, description: vouchers.description,
         debitAmount: voucherEntries.debitAmount, creditAmount: voucherEntries.creditAmount,
-        narration: voucherEntries.narration,
+        narration: voucherEntries.narration, optional: vouchers.optional,
       }).from(voucherEntries)
         .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), eq(vouchers.companyId, companyId),
           sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`, sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`))
         .where(voucherCondXlsx).orderBy(vouchers.voucherDate, voucherEntries.id);
       for (const ve of rawVeXlsx) {
+        if (ve.optional) continue; // optional vouchers don't affect the balance
         voucherRowsXlsx.push({
           transactionDate: ve.voucherDate, transactionType: ve.voucherType || "VOUCHER",
           referenceType: "VOUCHER", referenceNumber: ve.voucherNumber,
