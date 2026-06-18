@@ -959,7 +959,7 @@ export default function DailyProductionReport() {
         <TabsList className="mx-4 mt-3 mb-0 flex-shrink-0 w-fit" data-testid="tabs-production-analytics">
           <TabsTrigger value="otw-tracking" data-testid="tab-otw-tracking">OTW Tracking</TabsTrigger>
           <TabsTrigger value="production" data-testid="tab-production">Production</TabsTrigger>
-          <TabsTrigger value="snapshot" data-testid="tab-snapshot">Financial Snapshot</TabsTrigger>
+          <TabsTrigger value="snapshot" data-testid="tab-snapshot" className="hidden">Financial Snapshot</TabsTrigger>
           <TabsTrigger value="ledger" data-testid="tab-ledger">Bale Ledger</TabsTrigger>
           <TabsTrigger value="shipping" data-testid="tab-shipping">Shipping Containers</TabsTrigger>
           <TabsTrigger value="sheets" data-testid="tab-sheets">Factory Sheets</TabsTrigger>
@@ -1660,8 +1660,8 @@ export default function DailyProductionReport() {
       </ExpandableCard>
         </TabsContent>
 
-        {/* ── Financial Snapshot tab ── */}
-        <TabsContent value="snapshot" className="flex-1 overflow-hidden mt-0 data-[state=inactive]:hidden">
+        {/* ── Financial Snapshot tab ── (hidden) */}
+        <TabsContent value="snapshot" className="hidden">
           <FactoryFinancialSnapshot />
         </TabsContent>
 
