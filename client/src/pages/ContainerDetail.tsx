@@ -710,7 +710,8 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   if (isSupplierPartner) {
     const spFmt = (v: any) => {
       const n = parseFloat(String(v ?? "0"));
-      return isNaN(n) ? "$0.00" : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const isWhole = Math.abs(n) % 1 === 0;
+    return isNaN(n) ? "$0" : `$${n.toLocaleString("en-US", { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
     };
 
     if (spDetailLoading) {
@@ -950,6 +951,13 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       return sum + parseFloat(item.quantity || "0");
     }, 0);
   }, 0);
+
+  // Format quantity: strip trailing zeros (e.g. "7.000" → "7", "2.500" → "2.5")
+  const fmtQty = (q: string | number | null | undefined) => {
+    const n = parseFloat(String(q ?? "0"));
+    if (isNaN(n)) return "0";
+    return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 3 });
+  };
 
   return (
     <div className="space-y-5 p-3 sm:p-0">
@@ -1218,7 +1226,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                     {po.items.map((item: any) => (
                       <TableRow key={item.id} data-testid={`row-item-${item.id}`} className="text-sm">
                         <TableCell className="font-medium py-2">{item.itemName}</TableCell>
-                        <TableCell className="text-right tabular-nums py-2 text-muted-foreground">{item.quantity}</TableCell>
+                        <TableCell className="text-right tabular-nums py-2 text-muted-foreground">{fmtQty(item.quantity)}</TableCell>
                         <TableCell className="text-right tabular-nums py-2 text-muted-foreground">{formatAmount(item.rate)}</TableCell>
                         <TableCell className="text-right tabular-nums py-2 font-semibold">{formatAmount(item.lineTotal)}</TableCell>
                       </TableRow>
@@ -1233,7 +1241,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                   <div key={item.id} className="px-4 py-3 text-sm" data-testid={`row-item-${item.id}`}>
                     <p className="font-medium mb-1.5">{item.itemName}</p>
                     <div className="grid grid-cols-3 gap-2 text-muted-foreground text-xs">
-                      <div><span className="block">Qty</span><span className="font-mono font-medium text-foreground">{item.quantity}</span></div>
+                      <div><span className="block">Qty</span><span className="font-mono font-medium text-foreground">{fmtQty(item.quantity)}</span></div>
                       <div><span className="block">Rate</span><span className="font-mono font-medium text-foreground">{formatAmount(item.rate)}</span></div>
                       <div><span className="block">Total</span><span className="font-mono font-semibold text-foreground">{formatAmount(item.lineTotal)}</span></div>
                     </div>
@@ -1289,6 +1297,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               <span className="tabular-nums font-medium">{formatAmount(chargesTotal)}</span>
             </div>
           )}
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Total Qty</span>
+            <span className="tabular-nums font-medium">{fmtQty(totalBales)}</span>
+          </div>
           <div className="flex justify-between pt-2 border-t font-bold">
             <span>Grand Total</span>
             <span className="tabular-nums text-base">{formatAmount(grandTotal)}</span>
@@ -1656,10 +1668,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                         <TableCell className="font-mono text-xs">{row.barcode}</TableCell>
                         <TableCell className="text-sm">{row.itemName || "—"}</TableCell>
                         <TableCell className="text-sm">
-                          {row.currentRate != null ? row.currentRate.toFixed(2) : "—"}
+                          {row.currentRate != null ? formatAmount(row.currentRate) : "—"}
                         </TableCell>
                         <TableCell className="text-sm font-medium">
-                          {row.newRate != null ? row.newRate.toFixed(2) : "—"}
+                          {row.newRate != null ? formatAmount(row.newRate) : "—"}
                         </TableCell>
                         <TableCell>
                           {row.status === "will_update" && <Badge variant="default" data-testid={`status-preview-${i}`}>Will Update</Badge>}
