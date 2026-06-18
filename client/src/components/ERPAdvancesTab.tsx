@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
+import { useCompany } from "@/contexts/CompanyContext";
 
 interface AdvanceRecord {
   id: number;
@@ -794,11 +795,19 @@ interface WorkerDeductionRow {
 function WorkerDeductionsView() {
   const { formatDisplayDate } = useDateFormat();
   const { formatAmount } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
   const [filterWorker, setFilterWorker] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
+  const companyParam = selectedCompany?.id ? `?companyId=${selectedCompany.id}` : "";
   const { data: deductions, isLoading } = useQuery<WorkerDeductionRow[]>({
-    queryKey: ["/api/factory/worker-deductions"],
+    queryKey: ["/api/factory/worker-deductions", selectedCompany?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/factory/worker-deductions${companyParam}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load deductions");
+      return res.json();
+    },
+    enabled: !!selectedCompany?.id,
   });
 
   const workers = useMemo(() => {
