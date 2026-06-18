@@ -32,7 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, ChevronDown, Download, Building2, GitCompare } from "lucide-react";
+import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, ChevronDown, Download, Building2, GitCompare, GitMerge } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -88,6 +88,7 @@ interface DailySummary {
   itemCount: number;
   totalQty: number;
   isCreditSale: boolean;
+  hasMixedSales: boolean; // true when credit + normal are merged together
   items: SalesReportItem[];
 }
 
@@ -156,6 +157,7 @@ export default function SalesReport() {
   const [searchTerm, setSearchTerm] = useState("");
   const [grouping, setGrouping] = useState<GroupingType>("daily");
   const [profitFilter, setProfitFilter] = useState<ProfitFilter>("all");
+  const [mergeView, setMergeView] = useState(false);
   const [isMultiCompanyMode, setIsMultiCompanyMode] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [selectedRowDate, setSelectedRowDate] = useState<string | null>(null);
@@ -275,8 +277,8 @@ export default function SalesReport() {
     }
 
     const isCredit = item.isCreditSale === true;
-    // Separate group key so credit and cash rows never merge
-    const groupKey = isCredit ? `${dateKey}-credit` : dateKey;
+    // In merge view combine credit + cash; otherwise keep them separate
+    const groupKey = (!mergeView && isCredit) ? `${dateKey}-credit` : dateKey;
 
     // Filter by search term
     if (searchTerm) {
@@ -305,6 +307,10 @@ export default function SalesReport() {
       existing.itemCount += 1;
       existing.totalQty += qty;
       existing.items.push(item);
+      // If we're merging and this row mixes credit + cash, flag it
+      if (mergeView && existing.isCreditSale !== isCredit) {
+        existing.hasMixedSales = true;
+      }
     } else {
       acc.push({
         date: groupKey,
@@ -318,6 +324,7 @@ export default function SalesReport() {
         itemCount: 1,
         totalQty: qty,
         isCreditSale: isCredit,
+        hasMixedSales: false,
         items: [item],
       });
     }
@@ -328,11 +335,11 @@ export default function SalesReport() {
   // Sort by date descending (most recent first)
   groupedData.sort((a, b) => b.date.localeCompare(a.date));
 
-  // Apply profit filter
+  // Apply profit filter — always based on cost profit (the real P&L metric)
   const filteredGroupedData = groupedData.filter(group => {
     if (profitFilter === "all") return true;
-    if (profitFilter === "positive") return group.configuredProfit >= 0;
-    if (profitFilter === "negative") return group.configuredProfit < 0;
+    if (profitFilter === "positive") return group.costProfit >= 0;
+    if (profitFilter === "negative") return group.costProfit < 0;
     return true;
   });
 
@@ -412,7 +419,10 @@ export default function SalesReport() {
     if (selectedLocations.length === 1) params.set("locationId", selectedLocations[0]);
     if (selectedStockGroups.length === 1) params.set("stockGroupId", selectedStockGroups[0]);
     if (searchTerm) params.set("searchTerm", searchTerm);
-    params.set("isCreditSale", summary.isCreditSale ? "true" : "false");
+    // Merged rows contain both credit and cash — omit the param so detail shows all
+    if (!summary.hasMixedSales) {
+      params.set("isCreditSale", summary.isCreditSale ? "true" : "false");
+    }
     if (isMultiCompanyMode) {
       params.set("allCompanies", "true");
       if (selectedCompanies.length > 0) params.set("companyFilter", selectedCompanies.join(","));
@@ -679,6 +689,18 @@ export default function SalesReport() {
           </SelectContent>
         </Select>
 
+        {/* Merge view toggle */}
+        <Button
+          variant={mergeView ? "default" : "outline"}
+          size="sm"
+          onClick={() => setMergeView(v => !v)}
+          className="gap-1.5"
+          data-testid="button-merge-view"
+        >
+          <GitMerge className="w-4 h-4" />
+          Merged
+        </Button>
+
         {/* Locations multi-select */}
         <Popover>
           <PopoverTrigger asChild>
@@ -818,9 +840,11 @@ export default function SalesReport() {
                       <TableCell className="font-medium py-3">
                         <div className="flex items-center gap-2">
                           {group.displayDate}
-                          {group.isCreditSale && (
+                          {group.hasMixedSales ? (
+                            <Badge variant="secondary" className="text-xs no-default-active-elevate bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">Credit + Cash</Badge>
+                          ) : group.isCreditSale ? (
                             <Badge variant="secondary" className="text-xs no-default-active-elevate bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Credit</Badge>
-                          )}
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatNumber(group.itemCount, 0)}</TableCell>
