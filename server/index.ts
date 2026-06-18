@@ -4195,6 +4195,8 @@ END $$`,
     // Per-kg pricing on order lines (June 2026)
     `ALTER TABLE customer_order_lines ADD COLUMN IF NOT EXISTS pricing_mode text NOT NULL DEFAULT 'per_bale'`,
     `ALTER TABLE customer_order_lines ADD COLUMN IF NOT EXISTS price_per_kg decimal(20,4)`,
+    // Hide individual loadings from the list (June 2026)
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN NOT NULL DEFAULT FALSE`,
     ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

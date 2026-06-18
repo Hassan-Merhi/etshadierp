@@ -321,6 +321,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       if (req.query.customerId) conditions.push(eq(customerOrders.customerId, parseOptionalId(req.query.customerId)));
       if (req.query.status) conditions.push(eq(customerOrders.status, req.query.status));
       if (req.query.proformaId) conditions.push(eq(customerOrders.proformaIdUsed, parseOptionalId(req.query.proformaId)));
+      if (req.query.showHidden !== "1") conditions.push(eq(customerOrders.isHidden, false));
 
       const orders = await db
         .select({
@@ -335,6 +336,7 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
           subtotalBales: customerOrders.subtotalBales,
           freightAmount: customerOrders.freightAmount,
           otherChargesTotal: customerOrders.otherChargesTotal,
+          isHidden: customerOrders.isHidden,
           grandTotal: sql<string>`(
             COALESCE((
               SELECT SUM(
@@ -467,6 +469,21 @@ export function registerFactoryCustomerOrderRoutes(app: Express) {
       res.json({ ...order, lines, bales, charges });
     } catch (error: any) {
       console.error("Error fetching customer order:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/factory/customer-orders/:id/hidden", requireAuth, async (req: any, res: any) => {
+    try {
+      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const id = parseId(req.params.id);
+      if (id === null) return res.status(400).json({ message: "Invalid id" });
+      const { isHidden } = req.body;
+      if (typeof isHidden !== "boolean") return res.status(400).json({ message: "isHidden must be boolean" });
+      await db.update(customerOrders).set({ isHidden }).where(and(eq(customerOrders.id, id), eq(customerOrders.companyId, companyId)));
+      res.json({ success: true });
+    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });

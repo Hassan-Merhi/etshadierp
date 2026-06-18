@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import { Eye, Trash2, RotateCcw, Download, FileSpreadsheet, FileText, Package, Container, ChevronRight, ChevronDown } from "lucide-react";
+import { Eye, EyeOff, Trash2, RotateCcw, Download, FileSpreadsheet, FileText, Package, Container, ChevronRight, ChevronDown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +57,7 @@ interface CustomerOrder {
   containerNumber?: string | null;
   proformaName?: string | null;
   destination?: string | null;
+  isHidden?: boolean;
 }
 
 type StatusFilter = "LOADING" | "PENDING" | "VERIFIED" | "FINALIZED" | "ALL";
@@ -70,6 +71,7 @@ export default function FactoryInvoices() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("LOADING");
   const [customerFilter, setCustomerFilter] = useState<string>("all");
   const [expandedCustomers, setExpandedCustomers] = useState<Set<number>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
 
   const toggleCustomer = (customerId: number) => {
     setExpandedCustomers(prev => {
@@ -92,10 +94,26 @@ export default function FactoryInvoices() {
 
   const queryParams = new URLSearchParams();
   if (customerFilter !== "all") queryParams.set("customerId", customerFilter);
+  if (showHidden) queryParams.set("showHidden", "1");
   const queryString = queryParams.toString();
 
   const { data: allOrders = [], isLoading, isError } = useQuery<CustomerOrder[]>({
-    queryKey: [`/api/factory/customer-orders${queryString ? `?${queryString}` : ""}`, customerFilter],
+    queryKey: [`/api/factory/customer-orders${queryString ? `?${queryString}` : ""}`, customerFilter, showHidden],
+  });
+
+  const hideMutation = useMutation({
+    mutationFn: async ({ orderId, isHidden }: { orderId: number; isHidden: boolean }) => {
+      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/hidden`, { isHidden });
+      if (!res.ok) throw new Error("Failed to update");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
+    },
+    onError: (error: any) => {
+      if (error?._handledGlobally) return;
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteMutation = useMutation({
@@ -207,7 +225,7 @@ export default function FactoryInvoices() {
   };
 
   // Column count for colspan calculations
-  const colCount = 9 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
+  const colCount = 11 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
 
   const fmtKg = (val: string | number | null | undefined) => {
     const n = parseFloat(String(val ?? "0"));
@@ -263,20 +281,33 @@ export default function FactoryInvoices() {
             </Button>
           </div>
 
-          <div className="w-52">
-            <Select value={customerFilter} onValueChange={setCustomerFilter}>
-              <SelectTrigger data-testid="select-customer-filter">
-                <SelectValue placeholder="All customers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Customers</SelectItem>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
-                    {c.legalName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={showHidden ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setShowHidden(v => !v)}
+              data-testid="button-toggle-show-hidden"
+              className="text-xs px-3 gap-1.5"
+              title={showHidden ? "Hide hidden loadings" : "Show hidden loadings"}
+            >
+              {showHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              {showHidden ? "Showing hidden" : "Show hidden"}
+            </Button>
+            <div className="w-52">
+              <Select value={customerFilter} onValueChange={setCustomerFilter}>
+                <SelectTrigger data-testid="select-customer-filter">
+                  <SelectValue placeholder="All customers" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Customers</SelectItem>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
+                      {c.legalName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
@@ -314,6 +345,8 @@ export default function FactoryInvoices() {
                 <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bales</TableHead>
                 <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Weight</TableHead>
                 <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Remaining</TableHead>
+                <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Surcharge</TableHead>
+                <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Other Charges</TableHead>
                 {!hideTotalsUsd && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total</TableHead>}
                 <TableHead className="w-[120px] text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</TableHead>
               </TableRow>
@@ -340,7 +373,7 @@ export default function FactoryInvoices() {
                     return (
                       <TableRow
                         key={order.id}
-                        className="cursor-pointer"
+                        className={`cursor-pointer ${order.isHidden ? "opacity-50" : ""}`}
                         onClick={() => handleRowClick(order)}
                         data-testid={`row-order-${order.id}`}
                       >
@@ -386,6 +419,16 @@ export default function FactoryInvoices() {
                             <span className="text-green-600 dark:text-green-400 font-medium">Done</span>
                           )}
                         </TableCell>
+                        <TableCell className="text-right font-mono text-sm" data-testid={`text-surcharge-${order.id}`}>
+                          {parseFloat(order.freightAmount || "0") > 0
+                            ? <span className="text-blue-600 dark:text-blue-400">${parseFloat(order.freightAmount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                            : <span className="text-muted-foreground/40">—</span>}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm" data-testid={`text-other-charges-${order.id}`}>
+                          {parseFloat(order.otherChargesTotal || "0") > 0
+                            ? <span className="text-purple-600 dark:text-purple-400">${parseFloat(order.otherChargesTotal).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                            : <span className="text-muted-foreground/40">—</span>}
+                        </TableCell>
                         {!hideTotalsUsd && (
                           <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
                             ${parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
@@ -393,6 +436,15 @@ export default function FactoryInvoices() {
                         )}
                         <TableCell>
                           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title={order.isHidden ? "Unhide loading" : "Hide loading"}
+                              data-testid={`button-hide-order-${order.id}`}
+                              onClick={() => hideMutation.mutate({ orderId: order.id, isHidden: !order.isHidden })}
+                            >
+                              {order.isHidden ? <Eye className="h-4 w-4 text-muted-foreground" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+                            </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="icon" data-testid={`button-download-${order.id}`} title="Download Invoice">
@@ -523,6 +575,8 @@ export default function FactoryInvoices() {
                             <span className="text-green-600 dark:text-green-400">Done</span>
                           )}
                         </TableCell>
+                        <TableCell />
+                        <TableCell />
                         {!hideTotalsUsd && (
                           <TableCell className="text-right font-mono">
                             ${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}

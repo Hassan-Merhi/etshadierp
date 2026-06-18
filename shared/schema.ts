@@ -3476,6 +3476,7 @@ export const customerOrders = pgTable("customer_orders", {
   loadingFinalizedAt: timestamp("loading_finalized_at"),
   locationId: integer("location_id").references(() => locations.id, { onDelete: "restrict" }),
   dispatchBatchId: integer("dispatch_batch_id"),
+  isHidden: boolean("is_hidden").notNull().default(false),
   deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
