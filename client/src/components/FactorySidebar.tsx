@@ -221,7 +221,8 @@ export function useFactoryVisibleSections(user?: any): {
       }),
     })).filter(s => s.items.length > 0);
 
-  return { sections, isPinnedVisible, isAdmin, isDeveloper };
+  const isPrivileged = isAdmin || (myAccess?.fullAccess === true);
+  return { sections, isPinnedVisible, isAdmin, isDeveloper, isPrivileged };
 }
 
 export function FactorySidebar({ user }: { user?: any }) {
@@ -248,7 +249,7 @@ export function FactorySidebar({ user }: { user?: any }) {
     prevUnreadRef.current = count;
   }, [chatUnread?.count]);
 
-  const { sections: visibleSections, isPinnedVisible, isAdmin, isDeveloper } = useFactoryVisibleSections(user);
+  const { sections: visibleSections, isPinnedVisible, isAdmin, isDeveloper, isPrivileged } = useFactoryVisibleSections(user);
 
   const { openSections, toggleSection } = useOpenSections(visibleSections);
 
@@ -315,7 +316,7 @@ export function FactorySidebar({ user }: { user?: any }) {
         )}
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
-          {isDeveloper && <SidebarFlatLink href="/factory/spreadsheet" icon={TableProperties} label="Spreadsheet" testId="link-factory-spreadsheet" />}
+          {isPrivileged && <SidebarFlatLink href="/factory/spreadsheet" icon={TableProperties} label="Spreadsheet" testId="link-factory-spreadsheet" />}
           <SidebarFlatLink href="/factory/chat" icon={MessageCircle} label="Chat" color={NAV_COLOR.pinned} badge={chatUnread?.count} testId="link-factory-chat" />
           {conflictCount > 0 && (
             <a
