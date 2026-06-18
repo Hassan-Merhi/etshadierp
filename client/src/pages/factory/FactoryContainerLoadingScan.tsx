@@ -1310,6 +1310,11 @@ export default function FactoryContainerLoadingScan() {
                           <div className="text-red-700 dark:text-red-400">
                             {code}
                           </div>
+                          {groupedBalesMap[code]?.baleName && (
+                            <div className="text-red-700 dark:text-red-400 text-[10px] font-sans">
+                              {groupedBalesMap[code].baleName}
+                            </div>
+                          )}
                           <div className="text-red-500 dark:text-red-500 text-[10px]">
                             Not on proforma
                           </div>
@@ -1762,6 +1767,11 @@ export default function FactoryContainerLoadingScan() {
                             <div className="font-mono text-xs text-red-700 dark:text-red-400">
                               {code}
                             </div>
+                            {groupedBalesMap[code]?.baleName && (
+                              <div className="text-red-700 dark:text-red-400 text-xs font-sans font-normal">
+                                {groupedBalesMap[code].baleName}
+                              </div>
+                            )}
                             <div className="text-red-500 text-xs">
                               Not on proforma
                             </div>
