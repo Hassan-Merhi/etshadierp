@@ -1237,7 +1237,7 @@ function AuthenticatedApp() {
                     <Route path="/factory/pos" component={FactoryPOS} />
                     <Route path="/factory/bale-ledger">{() => <Redirect to="/factory/production-report" />}</Route>
                     <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
-                    {user?.role === "Developer" && <Route path="/factory/spreadsheet" component={SpreadsheetEditor} />}
+                    {(user?.role === "Admin" || user?.role === "Developer" || myAccess?.fullAccess) && <Route path="/factory/spreadsheet" component={SpreadsheetEditor} />}
                     <Route path="/factory/chat" component={Chat} />
                     <Route path="/factory/conflicts" component={ConflictCenter} />
                     {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/settings" component={Settings} />}
