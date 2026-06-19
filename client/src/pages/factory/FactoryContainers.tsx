@@ -2199,6 +2199,23 @@ export default function FactoryContainers() {
                 </div>
               </div>
 
+              {/* Live total value preview */}
+              {(() => {
+                const rate = parseFloat(formData.ratePerKg || "0");
+                const kg = parseFloat(formData.totalKg || "0");
+                if (!rate || !kg || isNaN(rate) || isNaN(kg)) return null;
+                const total = rate * kg;
+                return (
+                  <div className="flex items-center justify-between rounded-md bg-muted/50 border px-3 py-2 text-sm" data-testid="text-edit-container-value-preview">
+                    <span className="text-muted-foreground">Estimated total value</span>
+                    <span className="font-semibold font-mono tabular-nums">
+                      ${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <span className="text-xs text-muted-foreground font-normal ml-1.5">({rate.toLocaleString("en-US", { maximumFractionDigits: 7 })} × {kg.toLocaleString("en-US", { maximumFractionDigits: 2 })} kg)</span>
+                    </span>
+                  </div>
+                );
+              })()}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label>Currency</Label>
