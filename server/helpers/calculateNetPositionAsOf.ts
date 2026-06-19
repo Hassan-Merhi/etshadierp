@@ -39,31 +39,51 @@ export async function calculateNetPositionAsOf(
   const companyRow = await storage.getCompanyById(companyId);
   const isSupplierPartner = (companyRow as any)?.companyType === "supplier_partner";
 
-  // Push the summation to PostgreSQL — avoids transferring every individual
-  // entry row over the wire. The index vouchers_company_date_idx covers the
-  // WHERE clause; GROUP BY collapses millions of rows to one per account/
-  // supplier/employee combination before the result leaves the DB.
-  const grouped = await db.execute(sql`
-    SELECT
-      ve.ledger_account_id,
-      ve.supplier_id,
-      ve.employee_id,
-      SUM(CAST(ve.debit_amount  AS numeric)) AS total_debit,
-      SUM(CAST(ve.credit_amount AS numeric)) AS total_credit
-    FROM voucher_entries ve
-    INNER JOIN vouchers v ON ve.voucher_id = v.id
-    WHERE v.company_id  = ${companyId}
-      AND v.optional    = false
-      AND v.deleted_at  IS NULL
-      AND v.voucher_date <= ${toDate}
-    GROUP BY ve.ledger_account_id, ve.supplier_id, ve.employee_id
-  `);
+  // Two separate aggregation queries — same rationale as the net-profit route:
+  //
+  //   acctGrouped  — filters by ACCOUNT's company_id so that ledger accounts
+  //                  migrated between companies show their full balance in the
+  //                  destination company even when their vouchers weren't moved.
+  //
+  //   suppGrouped  — filters by VOUCHER's company_id for supplier/employee
+  //                  balances, which are always booked to the voucher's company.
+  const [acctGrouped, suppGrouped] = await Promise.all([
+    db.execute(sql`
+      SELECT
+        ve.ledger_account_id,
+        SUM(CAST(ve.debit_amount  AS numeric)) AS total_debit,
+        SUM(CAST(ve.credit_amount AS numeric)) AS total_credit
+      FROM voucher_entries ve
+      INNER JOIN vouchers v ON ve.voucher_id = v.id
+      INNER JOIN ledger_accounts la ON ve.ledger_account_id = la.id
+      WHERE la.company_id   = ${companyId}
+        AND v.optional      = false
+        AND v.deleted_at    IS NULL
+        AND v.voucher_date <= ${toDate}
+      GROUP BY ve.ledger_account_id
+    `),
+    db.execute(sql`
+      SELECT
+        ve.supplier_id,
+        ve.employee_id,
+        SUM(CAST(ve.debit_amount  AS numeric)) AS total_debit,
+        SUM(CAST(ve.credit_amount AS numeric)) AS total_credit
+      FROM voucher_entries ve
+      INNER JOIN vouchers v ON ve.voucher_id = v.id
+      WHERE v.company_id    = ${companyId}
+        AND v.optional      = false
+        AND v.deleted_at    IS NULL
+        AND v.voucher_date <= ${toDate}
+        AND (ve.supplier_id IS NOT NULL OR ve.employee_id IS NOT NULL)
+      GROUP BY ve.supplier_id, ve.employee_id
+    `),
+  ]);
 
   const accountBalances  = new Map<number, { debit: number; credit: number }>();
   const supplierBalances = new Map<number, { debit: number; credit: number }>();
   const employeeBalances = new Map<number, { debit: number; credit: number }>();
 
-  for (const row of grouped.rows as any[]) {
+  for (const row of acctGrouped.rows as any[]) {
     const d = parseFloat(row.total_debit  || "0");
     const c = parseFloat(row.total_credit || "0");
     if (row.ledger_account_id != null) {
@@ -71,6 +91,10 @@ export async function calculateNetPositionAsOf(
       const cur = accountBalances.get(id) || { debit: 0, credit: 0 };
       accountBalances.set(id, { debit: cur.debit + d, credit: cur.credit + c });
     }
+  }
+  for (const row of suppGrouped.rows as any[]) {
+    const d = parseFloat(row.total_debit  || "0");
+    const c = parseFloat(row.total_credit || "0");
     if (row.supplier_id != null) {
       const id  = Number(row.supplier_id);
       const cur = supplierBalances.get(id) || { debit: 0, credit: 0 };

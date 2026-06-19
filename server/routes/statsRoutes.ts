@@ -96,13 +96,27 @@ export function registerStatsRoutes(app: Express) {
         voucherConditions.push(lte(vouchers.voucherDate, toDate));
       }
 
-      // Fire all four independent DB queries in parallel instead of serially.
+      // Fire all independent DB queries in parallel.
       // getCompanyById, getAllLedgerAccounts, the big JOIN, and getParentCompanyId
       // share no dependencies — running them concurrently cuts wall-clock time to
       // max(individual latencies) rather than their sum.
-      const [companyRecord, companyAccounts, companyEntries, parentCompanyId] = await Promise.all([
+      //
+      // NOTE: We use TWO separate entry queries:
+      //   1. ledgerAccEntries  — filters by ACCOUNT's companyId (via JOIN on ledger_accounts).
+      //      This ensures migrated accounts show their full balance in the destination company
+      //      even when some of their vouchers were not moved (shared vouchers).
+      //   2. companyEntries    — filters by VOUCHER's companyId.
+      //      Used only for supplier and employee balances, which are always in the voucher's company.
+      const voucherNonAcctConditions: any[] = [
+        eq(vouchers.optional, false),
+        isNull(vouchers.deletedAt),
+      ];
+      if (toDate) voucherNonAcctConditions.push(lte(vouchers.voucherDate, toDate));
+
+      const [companyRecord, companyAccounts, companyEntries, ledgerAccEntries, parentCompanyId] = await Promise.all([
         storage.getCompanyById(companyId),
         storage.getAllLedgerAccounts(companyId, true),
+        // Supplier + employee entries: scoped to the voucher's company
         db.select({
           ledgerAccountId: voucherEntries.ledgerAccountId,
           supplierId:      voucherEntries.supplierId,
@@ -114,13 +128,30 @@ export function registerStatsRoutes(app: Express) {
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(and(...voucherConditions))
           .execute(),
+        // Ledger account entries: scoped to the ACCOUNT's company so that accounts
+        // migrated between companies carry their full balance to the new company.
+        db.select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          debitAmount:     voucherEntries.debitAmount,
+          creditAmount:    voucherEntries.creditAmount,
+        })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+          .where(and(
+            eq(ledgerAccounts.companyId, companyId),
+            ...voucherNonAcctConditions,
+          ))
+          .execute(),
         storage.getParentCompanyId(),
       ]);
       const companyBaseCurrency = companyRecord?.baseCurrency || "USD";
 
-      // Calculate balances for each ledger account (debit/credit totals)
+      // Calculate balances for each ledger account using the account-scoped query.
+      // This correctly attributes migrated accounts to their new company regardless
+      // of which company their voucher containers are registered to.
       const accountBalances = new Map<number, { debit: number; credit: number }>();
-      for (const entry of companyEntries) {
+      for (const entry of ledgerAccEntries) {
         if (entry.ledgerAccountId) {
           const debit = parseFloat(entry.debitAmount || "0");
           const credit = parseFloat(entry.creditAmount || "0");
@@ -790,9 +821,18 @@ export function registerStatsRoutes(app: Express) {
       ];
       if (toDate) voucherConds.push(lte(vouchers.voucherDate, toDate));
 
-      // Single JOIN — no large IN-clause on voucher IDs
-      const companyEntries = await db
-        .select({
+      const voucherAcctConds: any[] = [
+        eq(vouchers.optional, false),
+        isNull(vouchers.deletedAt),
+      ];
+      if (toDate) voucherAcctConds.push(lte(vouchers.voucherDate, toDate));
+
+      // Two separate queries — see net-profit route for rationale:
+      // companyEntries  → supplier/employee balances (scoped to voucher's company)
+      // ledgerAccEntries → ledger account balances (scoped to account's company so
+      //                    migrated accounts appear correctly in the destination)
+      const [companyEntries, ledgerAccEntries] = await Promise.all([
+        db.select({
           ledgerAccountId: voucherEntries.ledgerAccountId,
           supplierId:      voucherEntries.supplierId,
           employeeId:      voucherEntries.employeeId,
@@ -802,15 +842,28 @@ export function registerStatsRoutes(app: Express) {
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(and(...voucherConds))
-        .execute();
+        .execute(),
+        db.select({
+          ledgerAccountId: voucherEntries.ledgerAccountId,
+          debitAmount:     voucherEntries.debitAmount,
+          creditAmount:    voucherEntries.creditAmount,
+        })
+        .from(voucherEntries)
+        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+        .where(and(eq(ledgerAccounts.companyId, companyId), ...voucherAcctConds))
+        .execute(),
+      ]);
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       const supplierBalances = new Map<number, { debit: number; credit: number }>();
-      for (const e of companyEntries as any[]) {
+      for (const e of ledgerAccEntries as any[]) {
         if (e.ledgerAccountId) {
           const cur = accountBalances.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
           accountBalances.set(e.ledgerAccountId, { debit: cur.debit + parseFloat(e.debitAmount || "0"), credit: cur.credit + parseFloat(e.creditAmount || "0") });
         }
+      }
+      for (const e of companyEntries as any[]) {
         if (e.supplierId) {
           const cur = supplierBalances.get(e.supplierId) || { debit: 0, credit: 0 };
           supplierBalances.set(e.supplierId, { debit: cur.debit + parseFloat(e.debitAmount || "0"), credit: cur.credit + parseFloat(e.creditAmount || "0") });
