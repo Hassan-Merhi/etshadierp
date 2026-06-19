@@ -1087,7 +1087,6 @@ export default function FactoryPendingInvoiceVerify() {
                               className={`mr-2 h-4 w-4 shrink-0 ${String(acct.id) === chargeLedgerAccountId ? "opacity-100" : "opacity-0"}`}
                             />
                             <span className="flex-1 truncate">{acct.name}</span>
-                            <span className="ml-2 text-xs text-muted-foreground font-mono">{acct.code}</span>
                           </CommandItem>
                         ))}
                       </CommandGroup>
