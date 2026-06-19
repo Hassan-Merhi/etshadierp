@@ -203,6 +203,19 @@ import DailyScan from "./DailyScan";
     });
 
     const [workerCategoryFilter, setWorkerCategoryFilter] = useState("all");
+    const [workerCategoryFilterManual, setWorkerCategoryFilterManual] = useState(false);
+
+    // Auto-select "Pressing workers" category on first load
+    useEffect(() => {
+      if (workerCategoryGroups.length > 0 && !workerCategoryFilterManual) {
+        const pressing = workerCategoryGroups.find((c: any) =>
+          (c.name as string)?.toLowerCase().includes("pressing")
+        );
+        if (pressing) {
+          setWorkerCategoryFilter(String(pressing.id));
+        }
+      }
+    }, [workerCategoryGroups, workerCategoryFilterManual]);
 
     const filteredWorkers = workerCategoryFilter === "all"
       ? (workers as any[]).filter((w: any) => w.active !== false)
@@ -820,7 +833,7 @@ import DailyScan from "./DailyScan";
                 {workerCategoryGroups.length > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Filter workers by:</span>
-                    <Select value={workerCategoryFilter} onValueChange={setWorkerCategoryFilter}>
+                    <Select value={workerCategoryFilter} onValueChange={(v) => { setWorkerCategoryFilterManual(true); setWorkerCategoryFilter(v); }}>
                       <SelectTrigger className="h-8 w-44 text-xs" data-testid="select-worker-category-filter">
                         <SelectValue placeholder="All workers" />
                       </SelectTrigger>
