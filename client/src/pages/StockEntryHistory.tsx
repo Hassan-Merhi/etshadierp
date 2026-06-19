@@ -242,8 +242,22 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       wg.totalWeight += parseFloat(g.totalWeight || "0");
       wg.groups.push(g);
     }
+    // Add zero-bale entries for workers in the production plan who haven't made any bales yet
+    if (Object.keys(workerTargets).length > 0) {
+      const workerNameById = new Map<number, string>(
+        (workers as any[]).map((w: any) => [w.id, w.fullName ?? w.full_name ?? ""])
+      );
+      for (const workerIdStr of Object.keys(workerTargets)) {
+        const wid = Number(workerIdStr);
+        const key = String(wid);
+        if (!map.has(key)) {
+          const name = workerNameById.get(wid) ?? null;
+          map.set(key, { workerKey: key, workerId: wid, workerName: name, totalBales: 0, totalWeight: 0, groups: [] });
+        }
+      }
+    }
     return Array.from(map.values()).sort((a, b) => b.totalBales - a.totalBales);
-  }, [filteredGroups]);
+  }, [filteredGroups, workerTargets, workers]);
 
   // Detailed view: flat list of all bales
   const allBales = useMemo(() => filteredGroups.flatMap(g => g.bales), [filteredGroups]);
