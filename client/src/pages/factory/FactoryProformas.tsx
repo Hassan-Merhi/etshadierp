@@ -13,7 +13,7 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle, Layers, BookmarkCheck, ChevronDown, ChevronRight, Users, Package, MoreHorizontal } from "lucide-react";
+import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle, Layers, BookmarkCheck, ChevronDown, ChevronRight, Users, Package, MoreHorizontal, X } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -96,6 +96,7 @@ export default function FactoryProformas() {
   const [transferProforma, setTransferProforma] = useState<Proforma | null>(null);
   const [transferTargetCustomerId, setTransferTargetCustomerId] = useState<string>("");
   const [showInactive, setShowInactive] = useState(false);
+  const [proformaSearch, setProformaSearch] = useState("");
 
   // Excel import state
   const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
@@ -548,26 +549,50 @@ export default function FactoryProformas() {
 
       {/* ── Customer picker ──────────────────────────────────────────────── */}
       <div className="px-6 py-4 border-b bg-muted/30">
-        <div className="flex items-center gap-3 max-w-sm">
-          <Users className="h-4 w-4 text-muted-foreground shrink-0" />
-          {customersLoading ? (
-            <Skeleton className="h-9 flex-1" />
-          ) : (
-            <Select value={selectedCustomerId} onValueChange={(val) => {
-              setSelectedCustomerId(val);
-              setExpandedProformaIds(new Set());
-            }}>
-              <SelectTrigger data-testid="select-customer" className="flex-1">
-                <SelectValue placeholder="Select a customer to view proformas..." />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
-                    {c.legalName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3 min-w-[220px] flex-1 max-w-sm">
+            <Users className="h-4 w-4 text-muted-foreground shrink-0" />
+            {customersLoading ? (
+              <Skeleton className="h-9 flex-1" />
+            ) : (
+              <Select value={selectedCustomerId} onValueChange={(val) => {
+                setSelectedCustomerId(val);
+                setExpandedProformaIds(new Set());
+                setProformaSearch("");
+              }}>
+                <SelectTrigger data-testid="select-customer" className="flex-1">
+                  <SelectValue placeholder="Select a customer to view proformas..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
+                      {c.legalName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          {customerId && (
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                value={proformaSearch}
+                onChange={e => setProformaSearch(e.target.value)}
+                placeholder="Search proformas…"
+                className="pl-8 h-9 w-52 text-sm"
+                data-testid="input-proforma-search"
+              />
+              {proformaSearch && (
+                <button
+                  onClick={() => setProformaSearch("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover-elevate rounded"
+                  data-testid="button-clear-proforma-search"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>
@@ -613,44 +638,56 @@ export default function FactoryProformas() {
         {/* Proforma list */}
         {customerId && !proformasLoading && proformas.length > 0 && (
           <div className="space-y-3">
-            {/* Inactive toggle */}
+            {/* Inactive toggle + search status */}
             {(() => {
               const inactiveCount = proformas.filter(p => !p.isActive).length;
-              const visibleProformas = proformas.filter(p => p.isActive || showInactive);
+              const searchTerm = proformaSearch.trim().toLowerCase();
+              const visibleProformas = proformas
+                .filter(p => p.isActive || showInactive)
+                .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm));
               const allExpanded = visibleProformas.length > 0 && visibleProformas.every(p => expandedProformaIds.has(p.id));
               return (
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (allExpanded) {
-                        setExpandedProformaIds(new Set());
-                      } else {
-                        setExpandedProformaIds(new Set(visibleProformas.map(p => p.id)));
-                      }
-                    }}
-                    data-testid="button-expand-collapse-all"
-                    className="text-muted-foreground"
-                  >
-                    {allExpanded ? "Collapse all" : "Expand all"}
-                  </Button>
-                  {inactiveCount > 0 && (
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  {searchTerm ? (
+                    <p className="text-sm text-muted-foreground">
+                      {visibleProformas.length === 0
+                        ? `No proformas match "${proformaSearch}"`
+                        : `${visibleProformas.length} proforma${visibleProformas.length !== 1 ? "s" : ""} matching "${proformaSearch}"`}
+                    </p>
+                  ) : <div />}
+                  <div className="flex items-center gap-2 ml-auto">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowInactive(v => !v)}
-                      data-testid="button-toggle-inactive-proformas"
+                      onClick={() => {
+                        if (allExpanded) {
+                          setExpandedProformaIds(new Set());
+                        } else {
+                          setExpandedProformaIds(new Set(visibleProformas.map(p => p.id)));
+                        }
+                      }}
+                      data-testid="button-expand-collapse-all"
                       className="text-muted-foreground"
                     >
-                      {showInactive ? `Hide inactive (${inactiveCount})` : `Show inactive (${inactiveCount})`}
+                      {allExpanded ? "Collapse all" : "Expand all"}
                     </Button>
-                  )}
+                    {inactiveCount > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowInactive(v => !v)}
+                        data-testid="button-toggle-inactive-proformas"
+                        className="text-muted-foreground"
+                      >
+                        {showInactive ? `Hide inactive (${inactiveCount})` : `Show inactive (${inactiveCount})`}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })()}
 
-            {proformas.filter(p => p.isActive || showInactive).sort((a, b) => a.name.localeCompare(b.name)).map((proforma) => {
+            {proformas.filter(p => p.isActive || showInactive).filter(p => !proformaSearch.trim() || p.name.toLowerCase().includes(proformaSearch.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map((proforma) => {
               const isExpanded = expandedProformaIds.has(proforma.id);
               const totalQty = proforma.lines?.reduce((s, l) => s + l.quantity, 0) ?? 0;
               const totalWeight = proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0) ?? 0;
