@@ -150,7 +150,6 @@ function AccountMultiSelect({ accounts, selectedIds, onChange, disabled }: Accou
                       )}>
                         {selected && <Check className="h-3 w-3 text-primary-foreground" />}
                       </div>
-                      <span className="font-mono text-xs text-muted-foreground w-20 shrink-0">{a.code}</span>
                       <span className="flex-1 truncate">{a.name}</span>
                       <Badge variant="secondary" className="text-xs shrink-0">{a.accountType}</Badge>
                     </CommandItem>
