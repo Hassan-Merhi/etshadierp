@@ -4217,14 +4217,24 @@ export function registerAdminRoutes(app: Express) {
 
         const touchedVoucherIds = [...new Set(entryRows.map(r => r.voucherId))];
 
-        // A voucher is exclusive to the batch if ALL its entry accounts are in the batch
+        // A voucher is exclusive to the batch only if:
+        //   • every ledger-account entry belongs to the migrated batch, AND
+        //   • it has NO supplier entries (supplier balance must stay in source company), AND
+        //   • it has NO employee entries (employee balance must stay in source company)
         let exclusiveVoucherCount = 0;
         let sharedVoucherCount = 0;
         for (const vid of touchedVoucherIds) {
-          const allEntries = await db.select({ la: voucherEntries.ledgerAccountId })
-            .from(voucherEntries).where(eq(voucherEntries.voucherId, vid));
-          const outsideAccounts = allEntries.filter(e => e.la !== null && !batchSet.has(e.la));
-          if (outsideAccounts.length === 0) exclusiveVoucherCount++;
+          const allEntries = await db.select({
+            la:         voucherEntries.ledgerAccountId,
+            supplierId: voucherEntries.supplierId,
+            employeeId: voucherEntries.employeeId,
+          }).from(voucherEntries).where(eq(voucherEntries.voucherId, vid));
+          const isShared = allEntries.some(e =>
+            e.supplierId !== null ||
+            e.employeeId !== null ||
+            (e.la !== null && !batchSet.has(e.la as number))
+          );
+          if (!isShared) exclusiveVoucherCount++;
           else sharedVoucherCount++;
         }
 
@@ -4302,14 +4312,26 @@ export function registerAdminRoutes(app: Express) {
         accountPlans.push({ account, originalCode: account.code, finalCode, entryCount: entryRows.length, touchedVoucherIds });
       }
 
-      // Determine which vouchers are exclusive to this batch
-      // (all their entries belong to accounts in the batch)
+      // Determine which vouchers are exclusive to this batch.
+      // A voucher is exclusive only if ALL of the following are true:
+      //   • every ledger-account entry belongs to the migrated batch
+      //   • it has NO supplier entries (those must stay in the source company)
+      //   • it has NO employee entries (those must stay in the source company)
+      // Any voucher with a supplier or employee side is treated as "shared"
+      // and left in the source company so balances stay correct on both sides.
       const exclusiveVoucherIds: number[] = [];
       for (const vid of allTouchedVoucherIds) {
-        const allEntries = await db.select({ la: voucherEntries.ledgerAccountId })
-          .from(voucherEntries).where(eq(voucherEntries.voucherId, vid));
-        const outsideAccounts = allEntries.filter(e => e.la !== null && !batchSet.has(e.la));
-        if (outsideAccounts.length === 0) exclusiveVoucherIds.push(vid);
+        const allEntries = await db.select({
+          la:         voucherEntries.ledgerAccountId,
+          supplierId: voucherEntries.supplierId,
+          employeeId: voucherEntries.employeeId,
+        }).from(voucherEntries).where(eq(voucherEntries.voucherId, vid));
+        const isShared = allEntries.some(e =>
+          e.supplierId !== null ||
+          e.employeeId !== null ||
+          (e.la !== null && !batchSet.has(e.la as number))
+        );
+        if (!isShared) exclusiveVoucherIds.push(vid);
       }
 
       // ── Execute everything in one atomic transaction ────────────────────────
