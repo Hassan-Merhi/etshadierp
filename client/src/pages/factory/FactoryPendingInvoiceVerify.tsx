@@ -650,17 +650,24 @@ export default function FactoryPendingInvoiceVerify() {
             <CardTitle className="text-lg">Proforma vs Loaded</CardTitle>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-muted-foreground">Filter:</span>
-              {(["OVER_LOADED", "UNDER_LOADED", "MISSING_FROM_LOADED"] as const).map((s) => {
-                const labels: Record<string, string> = { OVER_LOADED: "Overloaded", UNDER_LOADED: "Under-loaded", MISSING_FROM_LOADED: "Missing" };
+              {(["OVER_LOADED", "UNDER_LOADED", "MISSING_FROM_LOADED", "LOADED_NOT_IN_PROFORMA"] as const).map((s) => {
+                const labels: Record<string, string> = {
+                  OVER_LOADED: "Overloaded",
+                  UNDER_LOADED: "Under-loaded",
+                  MISSING_FROM_LOADED: "Missing",
+                  LOADED_NOT_IN_PROFORMA: "Not Requested",
+                };
                 const colors: Record<string, string> = {
                   OVER_LOADED: "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700",
                   UNDER_LOADED: "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700",
                   MISSING_FROM_LOADED: "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700",
+                  LOADED_NOT_IN_PROFORMA: "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700",
                 };
                 const activeColors: Record<string, string> = {
                   OVER_LOADED: "bg-green-600 text-white border-green-600",
                   UNDER_LOADED: "bg-yellow-500 text-white border-yellow-500",
                   MISSING_FROM_LOADED: "bg-red-600 text-white border-red-600",
+                  LOADED_NOT_IN_PROFORMA: "bg-orange-500 text-white border-orange-500",
                 };
                 const active = statusFilter.has(s);
                 return (
@@ -696,42 +703,67 @@ export default function FactoryPendingInvoiceVerify() {
           {(() => {
             const comparisonMap = new Map<string, ComparisonItem>();
             (verification?.comparison || []).forEach((c) => comparisonMap.set(c.articleCode, c));
-            const filteredProformaLines = (verification?.proformaLines || []).filter((line) => {
+
+            // Proforma lines that are not a perfect match
+            const mismatchedProformaLines = (verification?.proformaLines || []).filter((line) => {
               const cmp = comparisonMap.get(line.articleCode);
               return !cmp || cmp.status !== "MATCH";
             });
+
+            // Items loaded but never requested in the proforma
+            const proformaCodes = new Set((verification?.proformaLines || []).map((l) => l.articleCode));
+            const loadedNotRequested = (verification?.comparison || []).filter(
+              (c) => c.status === "LOADED_NOT_IN_PROFORMA" && !proformaCodes.has(c.articleCode)
+            );
+
+            type LeftRow =
+              | { kind: "proforma"; line: typeof mismatchedProformaLines[0]; status: ComparisonItem["status"] | undefined }
+              | { kind: "extra"; cmp: ComparisonItem };
+
+            const statusSortOrder = (s: string | undefined) => {
+              if (s === "OVER_LOADED") return 0;
+              if (s === "UNDER_LOADED") return 1;
+              if (s === "LOADED_NOT_IN_PROFORMA") return 2;
+              return 3;
+            };
+
+            const allLeftRows: LeftRow[] = [
+              ...mismatchedProformaLines.map((line) => ({
+                kind: "proforma" as const,
+                line,
+                status: comparisonMap.get(line.articleCode)?.status,
+              })),
+              ...loadedNotRequested.map((cmp) => ({ kind: "extra" as const, cmp })),
+            ]
+              .sort((a, b) => {
+                const sa = a.kind === "proforma" ? a.status : a.cmp.status;
+                const sb = b.kind === "proforma" ? b.status : b.cmp.status;
+                return statusSortOrder(sa) - statusSortOrder(sb);
+              })
+              .filter((row) => {
+                if (statusFilter.size === 0) return true;
+                const s = row.kind === "proforma" ? row.status : row.cmp.status;
+                return s ? statusFilter.has(s) : false;
+              });
+
             const getProformaRowClass = (articleCode: string) => {
               const cmp = comparisonMap.get(articleCode);
               if (!cmp) return "";
               if (cmp.status === "UNDER_LOADED" || cmp.status === "MISSING_FROM_LOADED")
-                return "bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800";
+                return "bg-red-50 dark:bg-red-950";
               if (cmp.status === "OVER_LOADED")
-                return "bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800";
+                return "bg-green-50 dark:bg-green-950";
               return "";
             };
-
-            const statusSortOrder = (status: string | undefined) => {
-              if (status === "OVER_LOADED") return 0;
-              if (status === "UNDER_LOADED") return 1;
-              return 2; // MISSING_FROM_LOADED or unknown
-            };
-            const sortedProformaLines = [...filteredProformaLines]
-              .sort((a, b) => {
-                const sa = comparisonMap.get(a.articleCode)?.status;
-                const sb = comparisonMap.get(b.articleCode)?.status;
-                return statusSortOrder(sa) - statusSortOrder(sb);
-              })
-              .filter((line) => {
-                if (statusFilter.size === 0) return true;
-                const status = comparisonMap.get(line.articleCode)?.status;
-                return status ? statusFilter.has(status) : false;
-              });
 
             return (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Expected <span className="text-muted-foreground font-normal">(mismatches only)</span></h3>
-                  {sortedProformaLines.length > 0 ? (
+                  <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">
+                    Proforma Expected{" "}
+                    <span className="text-muted-foreground font-normal">(mismatches only)</span>
+                  </h3>
+                  {allLeftRows.length > 0 ? (
                     <Table wrapperClassName="max-h-[50vh] overflow-auto">
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow>
@@ -745,12 +777,40 @@ export default function FactoryPendingInvoiceVerify() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sortedProformaLines.map((line, i) => {
+                        {allLeftRows.map((row, i) => {
+                          if (row.kind === "extra") {
+                            const { cmp } = row;
+                            return (
+                              <TableRow
+                                key={`extra-${cmp.articleCode}`}
+                                className="bg-orange-50 dark:bg-orange-950/40"
+                                data-testid={`row-proforma-${cmp.articleCode}`}
+                              >
+                                <TableCell className="font-mono text-sm">{cmp.articleCode}</TableCell>
+                                <TableCell className="text-sm">{cmp.productName}</TableCell>
+                                <TableCell className="text-right font-mono text-muted-foreground">0</TableCell>
+                                <TableCell className="text-right font-mono">{cmp.loadedQty}</TableCell>
+                                <TableCell className="text-right font-mono">
+                                  <span className="text-orange-600 dark:text-orange-400 font-medium">
+                                    +{fmtNum(cmp.loadedQty)}
+                                  </span>
+                                </TableCell>
+                                <TableCell>{getStatusBadge(cmp.status)}</TableCell>
+                                <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
+                              </TableRow>
+                            );
+                          }
+
+                          const { line } = row;
                           const cmp = comparisonMap.get(line.articleCode);
                           const loaded = cmp?.loadedQty ?? 0;
                           const remaining = line.expectedQty - loaded;
                           return (
-                            <TableRow key={i} className={getProformaRowClass(line.articleCode)} data-testid={`row-proforma-${line.articleCode}`}>
+                            <TableRow
+                              key={i}
+                              className={getProformaRowClass(line.articleCode)}
+                              data-testid={`row-proforma-${line.articleCode}`}
+                            >
                               <TableCell className="font-mono text-sm" data-testid={`text-proforma-article-${line.articleCode}`}>
                                 {line.articleCode}
                               </TableCell>
@@ -793,7 +853,9 @@ export default function FactoryPendingInvoiceVerify() {
                       </TableBody>
                     </Table>
                   ) : (
-                    <p className="text-sm text-muted-foreground" data-testid="text-no-proforma-mismatches">All proforma items matched - no mismatches</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-proforma-mismatches">
+                      All proforma items matched - no mismatches
+                    </p>
                   )}
                 </div>
 
