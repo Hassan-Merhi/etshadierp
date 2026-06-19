@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, keyStartsWith } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -14,7 +16,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, DollarSign, RefreshCw } from "lucide-react";
+import { ArrowLeft, Check, ChevronsUpDown, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, DollarSign, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -135,6 +137,7 @@ export default function FactoryPendingInvoiceVerify() {
   const [chargeAmount, setChargeAmount] = useState("");
   const [chargeType, setChargeType] = useState("FREIGHT");
   const [chargeLedgerAccountId, setChargeLedgerAccountId] = useState<string>("");
+  const [chargeAccountOpen, setChargeAccountOpen] = useState(false);
 
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showReturnDialog, setShowReturnDialog] = useState(false);
@@ -968,18 +971,51 @@ export default function FactoryPendingInvoiceVerify() {
                 />
               )}
 
-              <Select value={chargeLedgerAccountId} onValueChange={setChargeLedgerAccountId}>
-                <SelectTrigger data-testid="select-charge-account">
-                  <SelectValue placeholder={chargeType !== "FREIGHT" ? "Select account (required)..." : "Select account (optional)..."} />
-                </SelectTrigger>
-                <SelectContent>
-                  {ledgerAccounts.map((acct) => (
-                    <SelectItem key={acct.id} value={String(acct.id)} data-testid={`option-account-${acct.id}`}>
-                      {acct.name} <span className="text-muted-foreground text-xs">({acct.code})</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={chargeAccountOpen} onOpenChange={setChargeAccountOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={chargeAccountOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="select-charge-account"
+                  >
+                    <span className="truncate text-left">
+                      {chargeLedgerAccountId
+                        ? (ledgerAccounts.find((a) => String(a.id) === chargeLedgerAccountId)?.name ?? "Select account...")
+                        : (chargeType !== "FREIGHT" ? "Select account (required)..." : "Select account (optional)...")}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[320px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search accounts..." data-testid="input-charge-account-search" />
+                    <CommandList>
+                      <CommandEmpty>No account found.</CommandEmpty>
+                      <CommandGroup>
+                        {ledgerAccounts.map((acct) => (
+                          <CommandItem
+                            key={acct.id}
+                            value={`${acct.name} ${acct.code}`}
+                            onSelect={() => {
+                              setChargeLedgerAccountId(String(acct.id));
+                              setChargeAccountOpen(false);
+                            }}
+                            data-testid={`option-account-${acct.id}`}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 shrink-0 ${String(acct.id) === chargeLedgerAccountId ? "opacity-100" : "opacity-0"}`}
+                            />
+                            <span className="flex-1 truncate">{acct.name}</span>
+                            <span className="ml-2 text-xs text-muted-foreground font-mono">{acct.code}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
               {chargeType !== "FREIGHT" && !chargeLedgerAccountId && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">A ledger account is required so the charge posts to accounting.</p>
               )}
