@@ -412,11 +412,16 @@ export default function FactoryPendingInvoiceVerify() {
       if (!res.ok) throw new Error("Failed to fetch preview");
       const data = await res.json();
 
-      // Check for items with no price set
+      // Check for items with no price set — use totalPrice as the source of truth
+      // (pricePerBale can be "0" for per-kg items even when they DO have a price)
       const zeroPrice = (verification?.loadedItems ?? []).filter((item) => {
-        const price = parseFloat(item.pricePerBale || "0");
+        const totalPrice = item.totalPrice ?? 0;
         const priceKg = item.pricePerKg ?? 0;
-        return item.pricingMode === "per_kg" ? priceKg === 0 : price === 0;
+        // Also estimate per-kg total in case bales were loaded before repricing
+        const estimatedTotal = item.pricingMode === "per_kg" && priceKg > 0 && item.totalWeight > 0
+          ? priceKg * item.totalWeight
+          : 0;
+        return totalPrice === 0 && estimatedTotal === 0;
       });
 
       if (zeroPrice.length > 0) {
@@ -887,7 +892,10 @@ export default function FactoryPendingInvoiceVerify() {
                             ? (group.totalPrice > 0 && group.totalWeight > 0
                                 ? group.totalPrice / group.totalWeight
                                 : pkgRate)
-                            : parseFloat(group.pricePerBale || "0");
+                            : (parseFloat(group.pricePerBale || "0") ||
+                               (group.totalPrice > 0 && group.qty > 0
+                                 ? group.totalPrice / group.qty
+                                 : 0));
                           const displayTotal = isPerKg && group.totalPrice === 0 && pkgRate > 0 && group.totalWeight > 0
                             ? pkgRate * group.totalWeight
                             : group.totalPrice;
