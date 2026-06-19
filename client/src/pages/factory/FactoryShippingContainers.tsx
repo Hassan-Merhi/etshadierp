@@ -319,6 +319,8 @@ function DocumentsModal({
   const { data: docs = [], isLoading } = useQuery<ShippingDocument[]>({
     queryKey: docsKey,
     enabled: open && rowId !== null,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const uploadMutation = useMutation({
