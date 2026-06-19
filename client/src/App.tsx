@@ -248,7 +248,7 @@ const IntercompanyRequests  = lazy(() => import("@/pages/IntercompanyRequests"))
 import { CommandPalette } from "@/components/CommandPalette";
 import { AppTopBar } from "@/components/AppTopBar";
 import { UserNotesPanel } from "@/components/UserNotesPanel";
-import { KeyboardShortcuts } from "@/components/KeyboardShortcuts";
+import { KeyboardShortcuts, KeyboardShortcutsButton } from "@/components/KeyboardShortcuts";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ArrowLeft } from "lucide-react";
 import {
@@ -1295,6 +1295,7 @@ function AuthenticatedApp() {
               onLogout={handleLogout}
               onSearchOpen={() => setPaletteOpen(true)}
               showSearch={user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer"}
+              extraActions={<KeyboardShortcutsButton />}
             />
             <OfflineBanner />
             <main className="flex-1 overflow-y-auto p-3 sm:p-6">

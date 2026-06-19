@@ -6,6 +6,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Keyboard } from "lucide-react";
 
 const isMac = typeof navigator !== "undefined" &&
   /Mac|iPod|iPhone|iPad/.test(navigator.platform);
@@ -19,6 +21,19 @@ interface ShortcutGroup {
 }
 
 const SHORTCUT_GROUPS: ShortcutGroup[] = [
+  {
+    label: "ERP Quick Nav",
+    shortcuts: [
+      { keys: ["T"], description: "Tracking" },
+      { keys: ["D"], description: "Dashboard" },
+      { keys: ["A"], description: "Accounts" },
+      { keys: ["V"], description: "Vouchers" },
+      { keys: ["I"], description: "Inventory" },
+      { keys: ["S"], description: "Settings" },
+      { keys: ["P"], description: "Parties" },
+      { keys: ["C"], description: "Containers" },
+    ],
+  },
   {
     label: "Navigation",
     shortcuts: [
@@ -106,9 +121,33 @@ function ShortcutsDialog({
   );
 }
 
+export function openKeyboardShortcutsDialog() {
+  document.dispatchEvent(new CustomEvent("show-keyboard-shortcuts"));
+}
+
+export function KeyboardShortcutsButton() {
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={openKeyboardShortcutsDialog}
+      data-testid="button-keyboard-shortcuts"
+      title="Keyboard shortcuts (?)"
+    >
+      <Keyboard className="h-4 w-4" />
+    </Button>
+  );
+}
+
 export function KeyboardShortcuts() {
   const [open, setOpen] = useState(false);
   const [, navigate] = useLocation();
+
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    document.addEventListener("show-keyboard-shortcuts", handler);
+    return () => document.removeEventListener("show-keyboard-shortcuts", handler);
+  }, []);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -160,12 +199,23 @@ export function KeyboardShortcuts() {
       }
 
       // Alt/Option+1/2/3 navigation
-      // Use e.code ("Digit1" etc.) instead of e.key so this fires correctly on Mac,
-      // where Option+1 sets e.key to "¡" rather than "1".
       if (e.altKey && !e.ctrlKey && !e.metaKey) {
         if (e.code === "Digit1") { e.preventDefault(); navigate("/"); return; }
         if (e.code === "Digit2") { e.preventDefault(); navigate("/factory/stock-entry"); return; }
         if (e.code === "Digit3") { e.preventDefault(); navigate("/properties/rental/warehouses"); return; }
+      }
+
+      // ERP single-key quick nav (no modifiers)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        const key = e.key.toLowerCase();
+        if (key === "t") { e.preventDefault(); navigate("/tracking"); return; }
+        if (key === "d") { e.preventDefault(); navigate("/financial-overview"); return; }
+        if (key === "a") { e.preventDefault(); navigate("/accounts"); return; }
+        if (key === "v") { e.preventDefault(); navigate("/vouchers"); return; }
+        if (key === "i") { e.preventDefault(); navigate("/inventory"); return; }
+        if (key === "s") { e.preventDefault(); navigate("/settings"); return; }
+        if (key === "p") { e.preventDefault(); navigate("/parties"); return; }
+        if (key === "c") { e.preventDefault(); navigate("/containers-otw"); return; }
       }
     },
     [open, navigate],
