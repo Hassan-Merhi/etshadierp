@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Save, Loader2, CheckCircle, CheckCircle2, Plus, Trash2, Container, SlidersHorizontal, BookmarkCheck } from "lucide-react";
+import { AlertTriangle, Save, Loader2, CheckCircle, CheckCircle2, Plus, Trash2, Container, SlidersHorizontal, BookmarkCheck, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -81,6 +81,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const [hideNonPositive, setHideNonPositive]     = useState(false);
   const [showNegativeOnly, setShowNegativeOnly]   = useState(false);
   const [showGarbageWipers, setShowGarbageWipers] = useState(false);
+  const [articleSearch, setArticleSearch]         = useState("");
   const draftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const qtyRefs    = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -104,6 +105,7 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
       setHideNonPositive(false);
       setShowNegativeOnly(false);
       setShowGarbageWipers(false);
+      setArticleSearch("");
     }
   }, [open]);
 
@@ -425,10 +427,21 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
   const negativeCount = articleRows.filter(r => r.freeToPromise < 0).length;
 
   const visibleRows = (() => {
-    if (showNegativeOnly) return articleRows.filter(r => r.freeToPromise < 0);
+    if (showNegativeOnly) {
+      let base = articleRows.filter(r => r.freeToPromise < 0);
+      if (articleSearch.trim()) {
+        const q = articleSearch.toLowerCase();
+        base = base.filter(r => r.productName.toLowerCase().includes(q) || r.articleCode.toLowerCase().includes(q));
+      }
+      return base;
+    }
     let base = showZeroItems ? articleRows : articleRows.filter(r => r.stockAvailable > 0 || r.expectedToLoad > 0);
     if (hideNonPositive) base = base.filter(r => r.freeToPromise > 0);
     if (!showGarbageWipers) base = base.filter(r => !isGarbageOrWipers(r) || (quantities[r.articleCode] && parseInt(quantities[r.articleCode]) > 0));
+    if (articleSearch.trim()) {
+      const q = articleSearch.toLowerCase();
+      base = base.filter(r => r.productName.toLowerCase().includes(q) || r.articleCode.toLowerCase().includes(q));
+    }
     return base;
   })();
 
@@ -673,6 +686,29 @@ export default function CreateProformaV5Drawer({ open, onClose, articleRows, onS
             <p className="text-xs text-destructive">{errors.lines}</p>
           </div>
         )}
+
+        {/* Search bar */}
+        <div className="px-5 py-2 border-b shrink-0">
+          <div className="relative max-w-xs">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={articleSearch}
+              onChange={e => setArticleSearch(e.target.value)}
+              placeholder="Search product or code…"
+              className="pl-8 h-8 text-sm"
+              data-testid="input-v5-create-search"
+            />
+            {articleSearch && (
+              <button
+                onClick={() => setArticleSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover-elevate rounded"
+                data-testid="button-v5-create-clear-search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Table */}
         <div className="flex-1 overflow-auto">

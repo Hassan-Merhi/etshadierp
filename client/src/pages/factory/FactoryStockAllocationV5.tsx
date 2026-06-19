@@ -2,7 +2,7 @@ import { useState, useMemo, Fragment, useCallback, useEffect, useRef } from "rea
 import { useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2, FileDown, RotateCcw } from "lucide-react";
+import { Loader2, RefreshCw, AlertTriangle, Plus, ChevronDown, ChevronRight, Container, CheckCircle2, Lock, Pencil, X, Link2, FileDown, RotateCcw, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -89,6 +89,7 @@ export default function FactoryStockAllocationV5() {
   const [showNegativeOnly, setShowNegativeOnly] = useState(false);
   const [showGarbageWipers, setShowGarbageWipers] = useState(false);
   const [refreshFlash, setRefreshFlash]         = useState(false);
+  const [searchQuery, setSearchQuery]           = useState("");
 
   /* ── Export dialog state ─────────────────────────────────────────────────── */
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
@@ -374,7 +375,13 @@ export default function FactoryStockAllocationV5() {
   const allRows = (query.data?.rows ?? []).slice().sort((a, b) => a.productName.localeCompare(b.productName));
   const garbageWipersCount = allRows.filter(isGarbageOrWipers).length;
   const filteredRows = showGarbageWipers ? allRows : allRows.filter(r => !isGarbageOrWipers(r));
-  const rows = showNegativeOnly ? filteredRows.filter(r => r.freeToPromise < 0) : filteredRows;
+  const negativeFilteredRows = showNegativeOnly ? filteredRows.filter(r => r.freeToPromise < 0) : filteredRows;
+  const rows = searchQuery.trim()
+    ? negativeFilteredRows.filter(r => {
+        const q = searchQuery.toLowerCase();
+        return r.productName.toLowerCase().includes(q) || r.articleCode.toLowerCase().includes(q);
+      })
+    : negativeFilteredRows;
   const totals  = query.data?.totals;
 
   // Auto-expand rows that contain the focused proforma, then scroll to first match
@@ -542,6 +549,25 @@ export default function FactoryStockAllocationV5() {
           )}
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search product or code…"
+              className="pl-8 h-9 w-52 text-sm"
+              data-testid="input-v5-search"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover-elevate rounded"
+                data-testid="button-v5-clear-search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           <Button
             variant={hideZero ? "default" : "outline"}
             size="sm"
