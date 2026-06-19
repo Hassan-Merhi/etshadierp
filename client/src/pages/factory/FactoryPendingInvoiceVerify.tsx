@@ -145,6 +145,9 @@ export default function FactoryPendingInvoiceVerify() {
   const [showFinalizePreview, setShowFinalizePreview] = useState(false);
   const [finalizePreview, setFinalizePreview] = useState<FinalizePreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [showPriceWarning, setShowPriceWarning] = useState(false);
+  const [unpricedItems, setUnpricedItems] = useState<string[]>([]);
+  const [pendingFinalizeData, setPendingFinalizeData] = useState<FinalizePreview | null>(null);
   const [showFixBalesDialog, setShowFixBalesDialog] = useState(false);
   const [invoiceDate, setInvoiceDate] = useState(new Date().toLocaleDateString("en-CA"));
 
@@ -408,8 +411,22 @@ export default function FactoryPendingInvoiceVerify() {
       const res = await fetch(`/api/factory/customer-orders/${orderId}/finalize-preview`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch preview");
       const data = await res.json();
-      setFinalizePreview(data);
-      setShowFinalizePreview(true);
+
+      // Check for items with no price set
+      const zeroPrice = (verification?.loadedItems ?? []).filter((item) => {
+        const price = parseFloat(item.pricePerBale || "0");
+        const priceKg = item.pricePerKg ?? 0;
+        return item.pricingMode === "per_kg" ? priceKg === 0 : price === 0;
+      });
+
+      if (zeroPrice.length > 0) {
+        setUnpricedItems(zeroPrice.map((item) => item.productName));
+        setPendingFinalizeData(data);
+        setShowPriceWarning(true);
+      } else {
+        setFinalizePreview(data);
+        setShowFinalizePreview(true);
+      }
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
@@ -1174,6 +1191,54 @@ export default function FactoryPendingInvoiceVerify() {
                 Confirm Return
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Price warning dialog ─────────────────────────────────────────── */}
+      <Dialog open={showPriceWarning} onOpenChange={setShowPriceWarning}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Items with No Price
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              The following {unpricedItems.length === 1 ? "item has" : "items have"} no price set. The invoice will be created with a $0 value for {unpricedItems.length === 1 ? "it" : "them"}.
+            </p>
+            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 divide-y divide-amber-200 dark:divide-amber-800">
+              {unpricedItems.map((name, i) => (
+                <div key={i} className="flex items-center gap-2 px-3 py-2">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <span className="text-sm font-medium text-amber-900 dark:text-amber-200">{name}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Go back to set prices, or proceed anyway if this is intentional.
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-1">
+            <Button
+              variant="outline"
+              onClick={() => setShowPriceWarning(false)}
+              data-testid="button-price-warning-back"
+            >
+              Go Back &amp; Fix Prices
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setShowPriceWarning(false);
+                setFinalizePreview(pendingFinalizeData);
+                setShowFinalizePreview(true);
+              }}
+              data-testid="button-price-warning-proceed"
+            >
+              Proceed Anyway
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
