@@ -182,7 +182,7 @@ function ErpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => v
           <FormField control={form.control} name="ratePerKg" render={({ field }) => (
             <FormItem>
               <FormLabel>Rate ($/kg) *</FormLabel>
-              <FormControl><Input {...field} type="number" step="0.01" placeholder="0.36" data-testid="input-rate-per-kg" /></FormControl>
+              <FormControl><Input {...field} type="number" step="any" placeholder="0.3600000" data-testid="input-rate-per-kg" /></FormControl>
               <FormMessage />
             </FormItem>
           )} />
