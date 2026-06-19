@@ -13,44 +13,44 @@ const isMac = typeof navigator !== "undefined" &&
   /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
 const MOD_KEY = isMac ? "⌘" : "Ctrl";
-const ALT_KEY = isMac ? "⌥" : "Alt";
+const ALT = isMac ? "⌥" : "Alt";
 
 interface ShortcutDef { keys: string[]; description: string }
 interface ShortcutGroup { label: string; shortcuts: ShortcutDef[] }
 
 const ERP_NAV_SHORTCUTS: ShortcutDef[] = [
-  { keys: ["T"], description: "Tracking" },
-  { keys: ["D"], description: "Dashboard" },
-  { keys: ["A"], description: "Accounts" },
-  { keys: ["V"], description: "Vouchers" },
-  { keys: ["I"], description: "Inventory" },
-  { keys: ["S"], description: "Settings" },
-  { keys: ["P"], description: "Parties" },
-  { keys: ["C"], description: "Containers" },
+  { keys: [ALT, "T"], description: "Tracking" },
+  { keys: [ALT, "D"], description: "Dashboard" },
+  { keys: [ALT, "A"], description: "Accounts" },
+  { keys: [ALT, "V"], description: "Vouchers" },
+  { keys: [ALT, "I"], description: "Inventory" },
+  { keys: [ALT, "S"], description: "Settings" },
+  { keys: [ALT, "P"], description: "Parties" },
+  { keys: [ALT, "C"], description: "Containers" },
 ];
 
 const FACTORY_NAV_SHORTCUTS: ShortcutDef[] = [
-  { keys: ["O"], description: "Overview" },
-  { keys: ["D"], description: "Daybook" },
-  { keys: ["A"], description: "Accounts" },
-  { keys: ["S"], description: "Stock Allocation" },
-  { keys: ["R"], description: "Raw Materials" },
-  { keys: ["B"], description: "Bale Explorer" },
-  { keys: ["I"], description: "Invoicing" },
-  { keys: ["L"], description: "Loading" },
-  { keys: ["L", "I"], description: "Location Inventory" },
-  { keys: ["C"], description: "Containers" },
-  { keys: ["P"], description: "Parties" },
-  { keys: ["V"], description: "Vouchers" },
+  { keys: [ALT, "O"], description: "Overview" },
+  { keys: [ALT, "D"], description: "Daybook" },
+  { keys: [ALT, "A"], description: "Accounts" },
+  { keys: [ALT, "S"], description: "Stock Allocation" },
+  { keys: [ALT, "R"], description: "Raw Materials" },
+  { keys: [ALT, "B"], description: "Bale Explorer" },
+  { keys: [ALT, "I"], description: "Invoicing" },
+  { keys: [ALT, "L"], description: "Loading" },
+  { keys: [ALT, "L", "I"], description: "Location Inventory" },
+  { keys: [ALT, "C"], description: "Containers" },
+  { keys: [ALT, "P"], description: "Parties" },
+  { keys: [ALT, "V"], description: "Vouchers" },
 ];
 
 const GLOBAL_SHORTCUTS: ShortcutGroup[] = [
   {
     label: "Mode Switching",
     shortcuts: [
-      { keys: [ALT_KEY, "1"], description: "Go to ERP / Business OS" },
-      { keys: [ALT_KEY, "2"], description: "Go to Factory" },
-      { keys: [ALT_KEY, "3"], description: "Go to Properties" },
+      { keys: [ALT, "1"], description: "Go to ERP / Business OS" },
+      { keys: [ALT, "2"], description: "Go to Factory" },
+      { keys: [ALT, "3"], description: "Go to Properties" },
     ],
   },
   {
@@ -65,7 +65,6 @@ const GLOBAL_SHORTCUTS: ShortcutGroup[] = [
     label: "Help",
     shortcuts: [
       { keys: ["?"], description: "Show this shortcuts panel" },
-      { keys: ["Esc"], description: "Close panel / dialog" },
     ],
   },
 ];
@@ -85,7 +84,11 @@ function ShortcutRow({ s }: { s: ShortcutDef }) {
       <span className="flex items-center gap-1 shrink-0">
         {s.keys.map((k, i) => (
           <span key={i} className="flex items-center gap-1">
-            {i > 0 && <span className="text-[0.65rem] text-muted-foreground">then</span>}
+            {i > 0 && (
+              <span className="text-[0.65rem] text-muted-foreground">
+                {i === s.keys.length - 1 && s.keys.length > 2 ? "then" : "+"}
+              </span>
+            )}
             <KeyBadge>{k}</KeyBadge>
           </span>
         ))}
@@ -94,7 +97,15 @@ function ShortcutRow({ s }: { s: ShortcutDef }) {
   );
 }
 
-function ShortcutsDialog({ open, onClose, isFactory }: { open: boolean; onClose: () => void; isFactory: boolean }) {
+function ShortcutsDialog({
+  open,
+  onClose,
+  isFactory,
+}: {
+  open: boolean;
+  onClose: () => void;
+  isFactory: boolean;
+}) {
   const modeGroup: ShortcutGroup = isFactory
     ? { label: "Factory Quick Nav", shortcuts: FACTORY_NAV_SHORTCUTS }
     : { label: "ERP Quick Nav", shortcuts: ERP_NAV_SHORTCUTS };
@@ -114,7 +125,9 @@ function ShortcutsDialog({ open, onClose, isFactory }: { open: boolean; onClose:
                 {group.label}
               </p>
               <div className="space-y-2">
-                {group.shortcuts.map((s) => <ShortcutRow key={s.description} s={s} />)}
+                {group.shortcuts.map((s) => (
+                  <ShortcutRow key={s.description} s={s} />
+                ))}
               </div>
             </div>
           ))}
@@ -150,7 +163,7 @@ export function KeyboardShortcuts() {
   const [location, navigate] = useLocation();
   const isFactory = location.startsWith("/factory");
 
-  // For the L → L+I chord: track pending L press
+  // L chord: Alt+L → wait for I to go to Location Inventory, else go to Loadings
   const pendingLRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const awaitingIRef = useRef(false);
 
@@ -181,47 +194,47 @@ export function KeyboardShortcuts() {
         return;
       }
 
-      if (isTyping) return;
+      // Non-Alt shortcuts that still work while typing elsewhere are excluded below
+      if (!e.altKey) {
+        if (isTyping) return;
 
-      // Show shortcuts dialog
-      if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        setOpen((v) => !v);
+        if (e.key === "?" && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          setOpen((v) => !v);
+          return;
+        }
+
+        if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+          e.preventDefault();
+          document.querySelector<HTMLInputElement>(
+            'input[type="search"], input[placeholder*="earch"], input[data-testid*="search"], input[data-testid*="Search"]',
+          )?.focus();
+          return;
+        }
+
+        if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          document.querySelector<HTMLInputElement>(
+            'input[type="search"], input[placeholder*="earch"], input[data-testid*="search"], input[data-testid*="Search"]',
+          )?.focus();
+          return;
+        }
         return;
       }
 
-      // Ctrl/Cmd+K → focus search
-      if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
-        e.preventDefault();
-        document.querySelector<HTMLInputElement>(
-          'input[type="search"], input[placeholder*="earch"], input[data-testid*="search"], input[data-testid*="Search"]',
-        )?.focus();
-        return;
-      }
-
-      // / → focus search
-      if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        document.querySelector<HTMLInputElement>(
-          'input[type="search"], input[placeholder*="earch"], input[data-testid*="search"], input[data-testid*="Search"]',
-        )?.focus();
-        return;
-      }
-
-      // Alt+1/2/3 mode switching
-      if (e.altKey && !e.ctrlKey && !e.metaKey) {
-        if (e.code === "Digit1") { e.preventDefault(); clearLChord(); navigate("/"); return; }
-        if (e.code === "Digit2") { e.preventDefault(); clearLChord(); navigate("/factory/stock-entry"); return; }
-        if (e.code === "Digit3") { e.preventDefault(); clearLChord(); navigate("/properties/rental/warehouses"); return; }
-      }
-
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // ── All Alt+ shortcuts below ─────────────────────────────────────────────
+      if (e.ctrlKey || e.metaKey) return; // ignore Ctrl+Alt / Cmd+Alt combos
 
       const key = e.key.toLowerCase();
 
+      // Mode switching — Alt+1/2/3
+      if (e.code === "Digit1") { e.preventDefault(); clearLChord(); navigate("/"); return; }
+      if (e.code === "Digit2") { e.preventDefault(); clearLChord(); navigate("/factory/stock-entry"); return; }
+      if (e.code === "Digit3") { e.preventDefault(); clearLChord(); navigate("/properties/rental/warehouses"); return; }
+
       // ── Factory quick-nav ────────────────────────────────────────────────────
       if (isFactory) {
-        // L+I chord: if awaiting I after L, resolve immediately
+        // L chord: if awaiting I, check now
         if (awaitingIRef.current) {
           if (key === "i") {
             e.preventDefault();
@@ -229,15 +242,13 @@ export function KeyboardShortcuts() {
             navigate("/factory/location-inventory");
             return;
           }
-          // Any other key cancels the chord and fires L now
           clearLChord();
-          // fall through to handle the new key
+          // fall through to handle new key
         }
 
         if (key === "l") {
           e.preventDefault();
           awaitingIRef.current = true;
-          // After 700 ms with no I, navigate to loadings
           pendingLRef.current = setTimeout(() => {
             awaitingIRef.current = false;
             navigate("/factory/sales/loadings");
@@ -276,7 +287,6 @@ export function KeyboardShortcuts() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // Cleanup chord on unmount
   useEffect(() => () => clearLChord(), [clearLChord]);
 
   return <ShortcutsDialog open={open} onClose={() => setOpen(false)} isFactory={isFactory} />;
