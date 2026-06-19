@@ -1266,30 +1266,25 @@ export default function FactoryPendingInvoiceVerify() {
 
       {/* ── Price warning dialog ─────────────────────────────────────────── */}
       <Dialog open={showPriceWarning} onOpenChange={setShowPriceWarning}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="max-w-md flex flex-col max-h-[80vh]">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Items with No Price
+              {unpricedItems.length} {unpricedItems.length === 1 ? "Item" : "Items"} with No Price
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              The following {unpricedItems.length === 1 ? "item has" : "items have"} no price set. The invoice will be created with a $0 value for {unpricedItems.length === 1 ? "it" : "them"}.
-            </p>
-            <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 divide-y divide-amber-200 dark:divide-amber-800">
-              {unpricedItems.map((name, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-2">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                  <span className="text-sm font-medium text-amber-900 dark:text-amber-200">{name}</span>
-                </div>
-              ))}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Go back to set prices, or proceed anyway if this is intentional.
-            </p>
+          <p className="text-sm text-muted-foreground shrink-0">
+            These items have no price — the invoice will be $0 for them. Go back to fix prices, or proceed anyway.
+          </p>
+          <div className="overflow-y-auto rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 divide-y divide-amber-200 dark:divide-amber-800 min-h-0">
+            {unpricedItems.map((name, i) => (
+              <div key={i} className="flex items-center gap-2 px-3 py-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                <span className="text-sm font-medium text-amber-900 dark:text-amber-200">{name}</span>
+              </div>
+            ))}
           </div>
-          <div className="flex items-center justify-end gap-2 pt-1">
+          <div className="flex items-center justify-end gap-2 pt-1 shrink-0">
             <Button
               variant="outline"
               onClick={() => setShowPriceWarning(false)}
