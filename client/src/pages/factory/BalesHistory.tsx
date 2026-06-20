@@ -457,7 +457,9 @@ export default function BalesHistory() {
     if (batchFilter !== "all" && String(bale.mixBatchId) !== batchFilter) return false;
     if (statusFilter !== "all" && bale.status !== statusFilter) return false;
 
-    if (dateFilter) {
+    // When the user is actively searching by text, skip the date filter so
+    // bales from any date are included (e.g. searching an old reference number).
+    if (dateFilter && !searchTerm) {
       const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString('en-CA') : null;
       if (baleDate !== dateFilter) return false;
     }
