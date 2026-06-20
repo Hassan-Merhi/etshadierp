@@ -1356,7 +1356,12 @@ export function registerFactoryEmployeesPosRoutes(app: Express) {
         const waste = isWasteProduct(bale.productId, bale.articleCode);
 
         if (bale.status === "SOLD") {
-          addToBucket(buckets.sold, key, label, bale);
+          if (pendingOrderBaleIds.has(Number(bale.id))) {
+            // SOLD but still linked to a PENDING_VERIFICATION or VERIFIED order (not yet shipped/finalized)
+            addToBucket(buckets.pendingLoading, key, label, bale);
+          } else {
+            addToBucket(buckets.sold, key, label, bale);
+          }
         } else if (bale.status === "DISPATCHED" && bale.wasteDispatchId) {
           addToBucket(buckets.wasteDispatched, key, label, bale);
         } else if (bale.status === "RESERVED_FOR_ORDER") {
