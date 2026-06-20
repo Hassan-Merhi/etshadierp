@@ -2179,7 +2179,7 @@ export function registerRentalRoutes(
             }).returning();
             voucherId = v.id;
 
-            const expenseId = await findOrCreateLedgerAccount(tx, companyId, rentExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+            const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
             await tx.insert(voucherEntries).values([
               { voucherId: v.id, ledgerAccountId: expenseId,          debitAmount: data.amount, creditAmount: "0", narration },
               { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
@@ -2395,7 +2395,7 @@ export function registerRentalRoutes(
                 description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
               }).returning();
               voucherId = v.id;
-              const expenseId = await findOrCreateLedgerAccount(tx, companyId, rentExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+              const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
               await tx.insert(voucherEntries).values([
                 { voucherId: v.id, ledgerAccountId: expenseId,          debitAmount: data.amount, creditAmount: "0", narration },
                 { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
