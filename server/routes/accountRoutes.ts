@@ -178,15 +178,38 @@ export function registerAccountRoutes(app: Express) {
         ...(balEndDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${balEndDate}`] : []),
       ];
 
-      const companyVouchers = await db
-        .select({ id: vouchers.id })
-        .from(vouchers)
-        .where(and(...voucherDateConditions))
-        .execute();
+      // Ledger account IDs that belong to this company (already fetched above)
+      const ledgerIds = ledgers.map((a) => a.id);
+
+      // For ledger accounts: query entries across ALL companies' vouchers so that
+      // migrated accounts include entries from shared vouchers that stayed in the
+      // source company (avoids a wrong/zero balance after account migration).
+      const crossCompanyLedgerConditions: any[] = [
+        eq(vouchers.optional, false),
+        isNull(vouchers.deletedAt),
+        isNotNull(voucherEntries.ledgerAccountId),
+        ...(balStartDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${balStartDate}`] : []),
+        ...(balEndDate ? [sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${balEndDate}`] : []),
+        ...(ledgerIds.length > 0 ? [inArray(voucherEntries.ledgerAccountId as any, ledgerIds)] : [sql`1=0`]),
+      ];
+
+      // Run both fetches in parallel
+      const [companyVouchers, crossCompanyLedgerEntries] = await Promise.all([
+        db.select({ id: vouchers.id }).from(vouchers).where(and(...voucherDateConditions)),
+        ledgerIds.length > 0
+          ? db.select({
+              ledgerAccountId: voucherEntries.ledgerAccountId,
+              debitAmount: voucherEntries.debitAmount,
+              creditAmount: voucherEntries.creditAmount,
+            }).from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(and(...crossCompanyLedgerConditions))
+          : Promise.resolve([]),
+      ]);
 
       const companyVoucherIds = companyVouchers.map((v) => v.id);
 
-      // Get all voucher entries for this company
+      // Get all voucher entries for this company (needed for bank / asset / employee / supplier balances)
       const allEntries =
         companyVoucherIds.length > 0
           ? await db
@@ -197,10 +220,19 @@ export function registerAccountRoutes(app: Express) {
           : [];
 
       // Group entries by account type and calculate balances
-      const ledgerBalances = new Map<
-        number,
-        { debits: number; credits: number }
-      >();
+      // Ledger balances use the cross-company query so migrated accounts are correct.
+      const ledgerBalances = new Map<number, { debits: number; credits: number }>();
+      for (const entry of crossCompanyLedgerEntries) {
+        if (!entry.ledgerAccountId) continue;
+        const debit = parseFloat((entry as any).debitAmount || "0");
+        const credit = parseFloat((entry as any).creditAmount || "0");
+        const existing = ledgerBalances.get(entry.ledgerAccountId) || { debits: 0, credits: 0 };
+        ledgerBalances.set(entry.ledgerAccountId, {
+          debits: existing.debits + debit,
+          credits: existing.credits + credit,
+        });
+      }
+
       const bankBalances = new Map<
         number,
         { debits: number; credits: number }
@@ -219,16 +251,7 @@ export function registerAccountRoutes(app: Express) {
         const debit = parseFloat(entry.debitAmount || "0");
         const credit = parseFloat(entry.creditAmount || "0");
 
-        if (entry.ledgerAccountId) {
-          const existing = ledgerBalances.get(entry.ledgerAccountId) || {
-            debits: 0,
-            credits: 0,
-          };
-          ledgerBalances.set(entry.ledgerAccountId, {
-            debits: existing.debits + debit,
-            credits: existing.credits + credit,
-          });
-        }
+        // Ledger balances are already handled by the cross-company query above
 
         if (entry.bankAccountId) {
           const existing = bankBalances.get(entry.bankAccountId) || {
