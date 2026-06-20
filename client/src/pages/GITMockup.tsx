@@ -1609,14 +1609,25 @@ function AgentCard({ agent, companyId, waGroupChatId }: { agent: AgentDutySummar
   const setAllPrepaidMutation = useMutation({
     mutationFn: (containerIds: number[]) =>
       apiRequest("POST", `/api/git/agent-prepaid/${companyId}/${encodeURIComponent(agent.agentName)}/set-all`, { containerIds }),
-    onSuccess: (_data, containerIds) => {
+    onMutate: async (containerIds) => {
+      await queryClient.cancelQueries({ queryKey: prepaidQKey });
+      const previous = queryClient.getQueryData(prepaidQKey);
+      queryClient.setQueryData(prepaidQKey, { designations: containerIds.map(id => ({ containerId: id })) });
+      return { previous };
+    },
+    onSuccess: (_data, containerIds, context) => {
       queryClient.invalidateQueries({ queryKey: prepaidQKey });
-      const prev = effectivePrepaidIds.length;
+      const prev = (context?.previous as { designations: { containerId: number }[] } | undefined)?.designations?.length ?? 0;
       if (containerIds.length > prev) {
         toast({ title: "Container designated as prepaid", description: "It now appears at the top of the list with a Prepaid badge." });
       }
     },
-    onError: (e: any) => toast({ title: "Failed to update prepaid", description: e.message, variant: "destructive" }),
+    onError: (e: any, _vars, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(prepaidQKey, context.previous);
+      }
+      toast({ title: "Failed to update prepaid", description: e.message, variant: "destructive" });
+    },
   });
 
   const replacePrepaidMutation = useMutation({
