@@ -773,9 +773,9 @@ export function registerFactoryStockRoutes(app: Express) {
           )
         );
 
-      // Find which of these IN_STOCK bales are currently scanned into a LOADING order.
-      // V5 orders keep bales IN_STOCK during loading (unlike V2/V3 which flip to RESERVED_FOR_ORDER),
-      // so we cross-reference customer_order_bales → customer_orders to detect them.
+      // Find which of these IN_STOCK bales are currently in an active order
+      // (LOADING, PENDING_VERIFICATION, or VERIFIED). This matches the Bale Ledger's
+      // "Pending Loading / Verified" definition so the two pages stay in sync.
       const baleIds = bales.map((b) => b.id);
       const loadingBaleIds = new Set<number>();
       if (baleIds.length > 0) {
@@ -785,7 +785,11 @@ export function registerFactoryStockRoutes(app: Express) {
           .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
           .where(
             and(
-              eq(customerOrders.status, "LOADING"),
+              or(
+                eq(customerOrders.status, "LOADING"),
+                eq(customerOrders.status, "PENDING_VERIFICATION"),
+                eq(customerOrders.status, "VERIFIED"),
+              ),
               inArray(customerOrderBales.baleId, baleIds),
             )
           );
@@ -978,7 +982,7 @@ export function registerFactoryStockRoutes(app: Express) {
           )
         );
 
-      // Exclude bales already scanned into a LOADING order (V5 orders keep bales IN_STOCK during loading)
+      // Exclude bales in active orders: LOADING, PENDING_VERIFICATION, or VERIFIED
       const allLocationBaleIds = allLocationBales.map(b => b.id);
       const loadingBaleIdsExport = new Set<number>();
       if (allLocationBaleIds.length > 0) {
@@ -988,7 +992,11 @@ export function registerFactoryStockRoutes(app: Express) {
           .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
           .where(
             and(
-              eq(customerOrders.status, "LOADING"),
+              or(
+                eq(customerOrders.status, "LOADING"),
+                eq(customerOrders.status, "PENDING_VERIFICATION"),
+                eq(customerOrders.status, "VERIFIED"),
+              ),
               inArray(customerOrderBales.baleId, allLocationBaleIds),
             )
           );
@@ -1329,7 +1337,7 @@ export function registerFactoryStockRoutes(app: Express) {
         )
         .orderBy(factoryBales.erpLocationId, factoryBales.productName);
 
-      // Exclude bales already scanned into a LOADING order (V5 orders keep bales IN_STOCK during loading)
+      // Exclude bales in active orders: LOADING, PENDING_VERIFICATION, or VERIFIED
       const allBaleIdsRaw = allBalesRaw.map(b => b.id);
       const loadingBaleIdsAll = new Set<number>();
       if (allBaleIdsRaw.length > 0) {
@@ -1339,7 +1347,11 @@ export function registerFactoryStockRoutes(app: Express) {
           .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
           .where(
             and(
-              eq(customerOrders.status, "LOADING"),
+              or(
+                eq(customerOrders.status, "LOADING"),
+                eq(customerOrders.status, "PENDING_VERIFICATION"),
+                eq(customerOrders.status, "VERIFIED"),
+              ),
               inArray(customerOrderBales.baleId, allBaleIdsRaw),
             )
           );
