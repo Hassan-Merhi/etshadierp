@@ -95,7 +95,7 @@ function applySortProducts(items: FactoryBaleProduct[], field: SortField, dir: S
       case "name": cmp = a.productName.localeCompare(b.productName); break;
       case "bales": cmp = a.baleCount - b.baleCount; break;
       case "kg": cmp = a.totalWeight - b.totalWeight; break;
-      case "value": cmp = (a.baleCount * parseFloat(a.sellingPrice || "0")) - (b.baleCount * parseFloat(b.sellingPrice || "0")); break;
+      case "value": cmp = ((a.baleCount - (a.loadingCount ?? 0)) * parseFloat(a.sellingPrice || "0")) - ((b.baleCount - (b.loadingCount ?? 0)) * parseFloat(b.sellingPrice || "0")); break;
     }
     return dir === "desc" ? -cmp : cmp;
   });
@@ -590,7 +590,7 @@ export default function FactoryLocationInventory() {
     group.baleCount += item.baleCount;
     group.totalWeight += item.totalWeight;
     group.totalCost += item.totalCost;
-    group.totalSellValue += item.baleCount * parseFloat(item.sellingPrice || "0");
+    group.totalSellValue += (item.baleCount - (item.loadingCount ?? 0)) * parseFloat(item.sellingPrice || "0");
     group.productCount += 1;
     group.products.push(item);
     return groups;
@@ -1240,17 +1240,17 @@ export default function FactoryLocationInventory() {
 
   const statsBales = activeInventoryData.reduce((s, p) => s + p.baleCount - (p.loadingCount ?? 0), 0);
   const statsKg = activeInventoryData.reduce((s, p) => s + p.totalWeight, 0);
-  const statsCostValue = activeInventoryData.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
-  const statsSellValue = activeInventoryData.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
+  const statsCostValue = activeInventoryData.reduce((s, p) => s + (p.baleCount - (p.loadingCount ?? 0)) * p.productionPrice, 0);
+  const statsSellValue = activeInventoryData.reduce((s, p) => s + (p.baleCount - (p.loadingCount ?? 0)) * parseFloat(p.sellingPrice || "0"), 0);
 
   const totalBales = regularProducts.reduce((s, p) => s + p.baleCount - (p.loadingCount ?? 0), 0);
   const totalKg = regularProducts.reduce((s, p) => s + p.totalWeight, 0);
-  const totalSellValue = regularProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
-  const totalProdValue = regularProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
+  const totalSellValue = regularProducts.reduce((s, p) => s + (p.baleCount - (p.loadingCount ?? 0)) * parseFloat(p.sellingPrice || "0"), 0);
+  const totalProdValue = regularProducts.reduce((s, p) => s + (p.baleCount - (p.loadingCount ?? 0)) * p.productionPrice, 0);
   const spTotalBales = specialProducts.reduce((s, p) => s + p.baleCount - (p.loadingCount ?? 0), 0);
   const spTotalKg = specialProducts.reduce((s, p) => s + p.totalWeight, 0);
-  const spTotalSellValue = specialProducts.reduce((s, p) => s + p.baleCount * parseFloat(p.sellingPrice || "0"), 0);
-  const spTotalProdValue = specialProducts.reduce((s, p) => s + p.baleCount * p.productionPrice, 0);
+  const spTotalSellValue = specialProducts.reduce((s, p) => s + (p.baleCount - (p.loadingCount ?? 0)) * parseFloat(p.sellingPrice || "0"), 0);
+  const spTotalProdValue = specialProducts.reduce((s, p) => s + (p.baleCount - (p.loadingCount ?? 0)) * p.productionPrice, 0);
 
   const colSpan = 2 + (proformaMode ? 2 : 0) + (hideSellingPrice ? 0 : 4) + (proformaMode ? 0 : 1);
 
@@ -1309,9 +1309,9 @@ export default function FactoryLocationInventory() {
         )}
         <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
         {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
-        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</td>}
+        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount((prod.baleCount - (prod.loadingCount ?? 0)) * parseFloat(prod.sellingPrice || "0"))}</td>}
         {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.productionPrice)}</td>}
-        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.baleCount * prod.productionPrice)}</td>}
+        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount((prod.baleCount - (prod.loadingCount ?? 0)) * prod.productionPrice)}</td>}
         <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
         {!proformaMode && (
           <td className="px-1 text-center">
@@ -1375,7 +1375,7 @@ export default function FactoryLocationInventory() {
           </div>
           <div className="text-right"><span className="text-muted-foreground">Wt/Bale: </span><span className="font-mono">{fmt(weightPerBale)} KG</span></div>
           <div><span className="text-muted-foreground">Total KG: </span><span className="font-mono">{fmt(prod.totalWeight)}</span></div>
-          {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount(prod.baleCount * parseFloat(prod.sellingPrice || "0"))}</span></div>}
+          {!hideSellingPrice && <div className="text-right"><span className="text-muted-foreground">Sell Value: </span><span className="font-mono font-medium">{formatAmount((prod.baleCount - (prod.loadingCount ?? 0)) * parseFloat(prod.sellingPrice || "0"))}</span></div>}
         </div>
         {proformaMode && isSelected && selection && (
           <div className="mt-2 pt-2 border-t flex items-center gap-2 flex-wrap">
