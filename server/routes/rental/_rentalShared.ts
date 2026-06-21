@@ -1,0 +1,950 @@
+import { parseId, parseOptionalId } from "../../lib/parseId";
+import { logAudit } from "../_helpers";
+import type { Express, Request, Response } from "express";
+import { db } from "../../db";
+import { requireAuth } from "../../auth";
+import { getClientDate } from "../../lib/dateUtils";
+import {
+  propertyUnits,
+  propertyContracts,
+  propertyMonthlyLedger,
+  propertyPayments,
+  insertPropertyUnitSchema,
+  insertPropertyContractSchema,
+  ledgerAccounts,
+  vouchers,
+  voucherEntries,
+  rentalAutoTransferConfigs,
+  interCompanyTransfers,
+  companies,
+} from "@shared/schema";
+import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
+import { z } from "zod";
+
+type RentalModule = "PROPERTIES" | "ERP" | "FACTORY";
+
+
+export function getCompanyId(req: Request): number | null {
+  return req.session.currentCompanyId ?? null;
+}
+
+export async function findOrCreateLedgerAccount(
+  tx: any,
+  companyId: number,
+  name: string,
+  accountType: "Income" | "Liability" | "Indirect Expense" | "Indirect Income" | "Intercompany" | "Asset",
+  codePrefix: string,
+  subType?: string,
+): Promise<number> {
+  // Race-safe: INSERT ... ON CONFLICT DO NOTHING, then SELECT.
+  // The unique index uq_ledger_accounts_company_name_active prevents duplicates
+  // even when multiple transactions run in parallel (e.g. page-load batch accruals).
+  const code = `${codePrefix}-${Date.now()}`;
+  await tx.execute(sql`
+    INSERT INTO ledger_accounts (company_id, code, name, account_type, sub_type, active)
+    VALUES (${companyId}, ${code}, ${name}, ${accountType}, ${subType ?? null}, true)
+    ON CONFLICT (company_id, name) WHERE deleted_at IS NULL DO NOTHING
+  `);
+  const [account] = await tx.select().from(ledgerAccounts).where(and(
+    eq(ledgerAccounts.companyId, companyId),
+    eq(ledgerAccounts.name, name),
+    isNull(ledgerAccounts.deletedAt),
+  ));
+  // Patch type/subType if the existing row has stale values
+  const needsPatch =
+    account.accountType !== accountType ||
+    (subType !== undefined && account.subType !== subType);
+  if (needsPatch) {
+    await tx.update(ledgerAccounts)
+      .set({ accountType, ...(subType !== undefined ? { subType } : {}) })
+      .where(eq(ledgerAccounts.id, account.id));
+  }
+  return account.id;
+}
+
+// ── Auto-transfer helper ──────────────────────────────────────────────────────
+// Called after a payment is committed. Looks up the auto-transfer config for
+// this company/module and, if enabled, posts two vouchers (one per company)
+// using the same TRANSFER-CLEARING pattern as /api/simple-company-transfer.
+export async function maybeRunAutoTransfer(
+  companyId: number,
+  module: RentalModule,
+  fromLedgerAccountId: number,
+  amount: string,
+  transferDate: string,
+  unitLabel: string,
+  sourcePaymentId?: number,
+  notes?: string,
+) {
+  try {
+    // Fetch ALL active rules for this company+module
+    const configs = await db.select().from(rentalAutoTransferConfigs).where(and(
+      eq(rentalAutoTransferConfigs.companyId, companyId),
+      eq(rentalAutoTransferConfigs.module, module),
+      eq(rentalAutoTransferConfigs.enabled, true),
+    ));
+    if (configs.length === 0) return;
+
+    const [fromCompany] = await db.select().from(companies).where(eq(companies.id, companyId));
+    if (!fromCompany) return;
+
+    // Get or create TRANSFER-CLEARING account in a company
+    async function getOrCreateClearing(cid: number) {
+      const [existing] = await db.select().from(ledgerAccounts).where(and(
+        eq(ledgerAccounts.companyId, cid),
+        eq(ledgerAccounts.code, "TRANSFER-CLEARING"),
+        isNull(ledgerAccounts.deletedAt),
+      ));
+      if (existing) return existing;
+      const [created] = await db.insert(ledgerAccounts).values({
+        companyId: cid, code: "TRANSFER-CLEARING", name: "Transfer Clearing",
+        accountType: "Equity", active: true,
+      }).returning();
+      return created;
+    }
+
+    const fromClearing = await getOrCreateClearing(companyId);
+
+    // Find the FIRST rule that matches the source account.
+    // Rules with a specific sourceCashAccountIds list take precedence; fallback to the
+    // first rule with an empty filter only when no specific rule matched.
+    const specificMatch = configs.find(c => {
+      const ids = (c.sourceCashAccountIds ?? []) as number[];
+      return ids.length > 0 && ids.includes(fromLedgerAccountId);
+    });
+    const fallbackMatch = configs.find(c => {
+      const ids = (c.sourceCashAccountIds ?? []) as number[];
+      return ids.length === 0;
+    });
+    const cfg = specificMatch ?? fallbackMatch;
+    if (!cfg) return;
+
+    // Only one transfer per payment — use the matched rule.
+    {
+      const [toCompany] = await db.select().from(companies).where(eq(companies.id, cfg.destCompanyId));
+      if (!toCompany) return;
+
+      const toClearing = await getOrCreateClearing(cfg.destCompanyId);
+      const baseDesc = `Auto rent transfer - ${unitLabel}`;
+      const desc = notes ? `${baseDesc} - ${notes}` : baseDesc;
+      const txId = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+      const outNarration = notes
+        ? `Transfer out to ${toCompany.name} - ${notes}`
+        : `Transfer out to ${toCompany.name}`;
+      const inNarration = notes
+        ? `Transfer in from ${fromCompany.name} - ${notes}`
+        : `Transfer in from ${fromCompany.name}`;
+
+      // Voucher in FROM company (Payment — money leaves)
+      const [fromVoucher] = await db.insert(vouchers).values({
+        companyId, voucherNumber: `TR-OUT-${txId}`,
+        voucherType: "Payment", voucherDate: transferDate as any,
+        description: `${desc} → ${toCompany.name}`, totalAmount: amount, optional: false,
+      }).returning();
+      await db.insert(voucherEntries).values([
+        { voucherId: fromVoucher.id, ledgerAccountId: fromClearing.id, debitAmount: amount,  creditAmount: "0", narration: outNarration },
+        { voucherId: fromVoucher.id, ledgerAccountId: fromLedgerAccountId, debitAmount: "0", creditAmount: amount, narration: outNarration },
+      ]);
+
+      // Voucher in TO company (Receipt — money arrives)
+      // DR destLedgerAccountId (cash/account receives money), CR toClearing (clearing settled)
+      const [toVoucher] = await db.insert(vouchers).values({
+        companyId: cfg.destCompanyId, voucherNumber: `TR-IN-${txId}`,
+        voucherType: "Receipt", voucherDate: transferDate as any,
+        description: notes ? `Transfer from ${fromCompany.name} - ${notes}` : `Transfer from ${fromCompany.name}`,
+        totalAmount: amount, optional: false,
+      }).returning();
+      await db.insert(voucherEntries).values([
+        { voucherId: toVoucher.id, ledgerAccountId: cfg.destLedgerAccountId, debitAmount: amount, creditAmount: "0",   narration: inNarration },
+        { voucherId: toVoucher.id, ledgerAccountId: toClearing.id,           debitAmount: "0",   creditAmount: amount, narration: inNarration },
+      ]);
+
+      // Record link (sourcePaymentId links this transfer back to the originating payment)
+      await db.insert(interCompanyTransfers).values({
+        transferType: "Cash",
+        fromCompanyId: companyId, toCompanyId: cfg.destCompanyId,
+        transferDate: transferDate as any, amount,
+        fromLedgerAccountId, toLedgerAccountId: cfg.destLedgerAccountId,
+        fromVoucherId: fromVoucher.id, toVoucherId: toVoucher.id,
+        description: desc,
+        sourcePaymentId: sourcePaymentId ?? null,
+      });
+    }
+  } catch (err) {
+    console.error("[RentalAutoTransfer] failed:", err);
+  }
+}
+
+export async function ensureMonthlyLedgerRows(contractId: number) {
+  const [contract] = await db.select().from(propertyContracts).where(eq(propertyContracts.id, contractId));
+  if (!contract || contract.status !== "ACTIVE") return;
+
+  const start = new Date(contract.startDate as any);
+  const startYear = start.getUTCFullYear();
+  const startMonth = start.getUTCMonth() + 1;
+  const billingDay = start.getUTCDate(); // day-of-month the tenant started = monthly billing day
+  const now = new Date();
+  const curYear = now.getUTCFullYear();
+  const curMonth = now.getUTCMonth() + 1;
+  const curDay = now.getUTCDate();
+
+  // If today is before the billing day, remove any unpaid current-month row that was
+  // created prematurely (e.g. by the old code or after a startDate edit).
+  if (curDay < billingDay) {
+    await db.delete(propertyMonthlyLedger).where(
+      and(
+        eq(propertyMonthlyLedger.contractId, contract.id),
+        eq(propertyMonthlyLedger.year, curYear),
+        eq(propertyMonthlyLedger.month, curMonth),
+        sql`${propertyMonthlyLedger.paidAmount} = '0'`,
+      )
+    );
+  }
+
+  const periods: Array<{ year: number; month: number }> = [];
+  let y = startYear, m = startMonth;
+  // Include a period if it is a past month, OR if it is the current month AND today's
+  // day-of-month has reached the tenant's billing day (so a tenant starting on the 15th
+  // won't have the current month's charge appear until the 15th).
+  while (
+    y < curYear ||
+    (y === curYear && m < curMonth) ||
+    (y === curYear && m === curMonth && curDay >= billingDay)
+  ) {
+    periods.push({ year: y, month: m });
+    m++; if (m > 12) { m = 1; y++; }
+    if (periods.length > 600) break;
+  }
+  if (periods.length === 0) return;
+
+  await db.insert(propertyMonthlyLedger).values(
+    periods.map(p => ({
+      companyId: contract.companyId,
+      module: contract.module,
+      contractId: contract.id,
+      unitId: contract.unitId,
+      year: p.year,
+      month: p.month,
+      expectedAmount: contract.rentalAmount,
+      paidAmount: "0",
+    }))
+  ).onConflictDoNothing({
+    target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
+  });
+}
+
+// ── Oldest unpaid month finder ─────────────────────────────────────────────
+// Returns the earliest past-or-current month for this contract that still has
+// an outstanding balance.  Falls back to (fallbackYear, fallbackMonth) when
+// every recorded month is fully paid.
+export async function findEarliestOutstandingMonth(
+  contractId: number,
+  fallbackYear: number,
+  fallbackMonth: number,
+): Promise<{ year: number; month: number }> {
+  const rows = await db
+    .select({
+      year:           propertyMonthlyLedger.year,
+      month:          propertyMonthlyLedger.month,
+      paidAmount:     propertyMonthlyLedger.paidAmount,
+      expectedAmount: propertyMonthlyLedger.expectedAmount,
+    })
+    .from(propertyMonthlyLedger)
+    .where(eq(propertyMonthlyLedger.contractId, contractId))
+    .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
+
+  const now = new Date();
+  const nowYear  = now.getUTCFullYear();
+  const nowMonth = now.getUTCMonth() + 1;
+
+  for (const row of rows) {
+    // Only consider past and current months (not future prepaid months)
+    const isPastOrCurrent =
+      row.year < nowYear || (row.year === nowYear && row.month <= nowMonth);
+    if (!isPastOrCurrent) continue;
+
+    const outstanding =
+      Math.max(0, parseFloat(row.expectedAmount as string) - parseFloat(row.paidAmount as string));
+    if (outstanding > 0.005) {
+      return { year: row.year, month: row.month };
+    }
+  }
+
+  return { year: fallbackYear, month: fallbackMonth };
+}
+
+// ── Smart allocation builder ───────────────────────────────────────────────
+// Builds the list of (year, month, chunk) allocations for a payment, starting
+// from (startYear, startMonth) but SKIPPING any month that is already fully
+// paid or fully prepaid, so the payment cascades to the next unpaid month.
+//
+// "Fully paid" rules:
+//   • Current / past month  → paidAmount >= expectedAmount (standard due month)
+//   • Future month          → paidAmount >= rentalAmount   (already prepaid in full)
+export async function buildAllocations(
+  contractId: number,
+  startYear: number,
+  startMonth: number,
+  totalAmount: number,
+  rentalAmount: number,
+): Promise<Array<{ year: number; month: number; chunk: string }>> {
+  // Load all existing ledger rows for this contract so we can check balances
+  const existingRows = await db
+    .select({
+      year: propertyMonthlyLedger.year,
+      month: propertyMonthlyLedger.month,
+      paidAmount: propertyMonthlyLedger.paidAmount,
+      expectedAmount: propertyMonthlyLedger.expectedAmount,
+    })
+    .from(propertyMonthlyLedger)
+    .where(eq(propertyMonthlyLedger.contractId, contractId));
+
+  const ledgerMap = new Map<string, { paid: number; expected: number }>();
+  for (const row of existingRows) {
+    ledgerMap.set(`${row.year}-${row.month}`, {
+      paid: parseFloat(row.paidAmount as string),
+      expected: parseFloat(row.expectedAmount as string),
+    });
+  }
+
+  const now = new Date();
+  const nowYear = now.getUTCFullYear();
+  const nowMonth = now.getUTCMonth() + 1;
+
+  const allocations: Array<{ year: number; month: number; chunk: string }> = [];
+  let remaining = totalAmount;
+  let ay = startYear, am = startMonth;
+  let skipped = 0; // guard against infinite loops of already-paid months
+
+  while (remaining > 0.005) {
+    const isFuture = ay > nowYear || (ay === nowYear && am > nowMonth);
+    const existing = ledgerMap.get(`${ay}-${am}`);
+
+    let outstanding: number;
+    if (existing) {
+      if (isFuture) {
+        // Future prepaid month: compare against contract rental amount
+        outstanding = Math.max(0, rentalAmount - existing.paid);
+      } else {
+        // Current / past due month: compare against its expected amount
+        outstanding = Math.max(0, existing.expected - existing.paid);
+      }
+    } else {
+      // No ledger row yet — full capacity available
+      outstanding = rentalAmount > 0 ? rentalAmount : remaining;
+    }
+
+    if (outstanding <= 0.005) {
+      // Already fully paid — skip this month and try the next
+      am++; if (am > 12) { am = 1; ay++; }
+      skipped++;
+      if (skipped > 500) break; // absolute safety cap
+      continue;
+    }
+
+    skipped = 0; // reset skip counter once we found an allocatable month
+    const chunk = Math.min(remaining, outstanding);
+    allocations.push({ year: ay, month: am, chunk: chunk.toFixed(2) });
+    remaining = Math.round((remaining - chunk) * 100) / 100;
+    am++; if (am > 12) { am = 1; ay++; }
+    if (allocations.length >= 120) break; // safety cap ~10 years
+  }
+
+  return allocations;
+}
+
+export async function ensureMonthlyForCompany(companyId: number, module: RentalModule) {
+  const active = await db
+    .select({ id: propertyContracts.id })
+    .from(propertyContracts)
+    .where(and(
+      eq(propertyContracts.companyId, companyId),
+      eq(propertyContracts.module, module),
+      eq(propertyContracts.status, "ACTIVE"),
+    ));
+  for (const c of active) await ensureMonthlyLedgerRows(c.id);
+}
+
+/**
+ * Posts accrual journal vouchers (Dr Rent Expense / Cr Accrued Rent Payable) for
+ * all unpaid ERP SHOP ledger rows where:
+ *   - accrualVoucherId IS NULL (not yet accrued)
+ *   - paidAmount < expectedAmount (still has an outstanding balance)
+ *
+ * Scoped to ERP module + SHOP unit type only. Safe to call for any contract —
+ * it returns 0 immediately if the contract is not an ERP SHOP contract.
+ *
+ * Returns { accrued, skipped } where accrued = newly-posted rows,
+ * skipped = due+unpaid rows that already had an accrual (nothing to do).
+ */
+export async function postRentAccrualForContract(
+  contractId: number,
+  shopExpenseAccountName: string,
+): Promise<{ accrued: number; skipped: number }> {
+  // Load contract and verify it is an ERP contract
+  const [contract] = await db.select().from(propertyContracts)
+    .where(and(eq(propertyContracts.id, contractId), eq(propertyContracts.module, "ERP")));
+  if (!contract) return { accrued: 0, skipped: 0 };
+
+  // Verify the unit is SHOP type
+  const [unit] = await db.select({ unitType: propertyUnits.unitType })
+    .from(propertyUnits)
+    .where(eq(propertyUnits.id, contract.unitId));
+  if (!unit || unit.unitType !== "SHOP") return { accrued: 0, skipped: 0 };
+
+  return postRentAccrualForCompany(contract.companyId, shopExpenseAccountName);
+}
+
+/**
+ * Posts ONE combined accrual journal (Dr Rent Expense / Cr Accrued Rent Payable)
+ * for ALL active ERP SHOP contracts of the company that have due, unpaid, unaccrued
+ * ledger rows.
+ *
+ * All rows that are newly accrued point to the same voucher ID so the daybook
+ * shows a single journal entry instead of one per unit/month.
+ *
+ * Returns { accrued: N, skipped: M } where:
+ *   accrued = number of ledger rows newly stamped with the combined voucher
+ *   skipped = due+unpaid rows already accrued in a prior run
+ */
+export async function postRentAccrualForCompany(
+  companyId: number,
+  shopExpenseAccountName: string,
+  moduleParam: string = "ERP",
+  incomeAccountName: string = "Rental Income",
+): Promise<{ accrued: number; skipped: number }> {
+  // Load all active SHOP contracts owned by this company for the given module
+  const shopContracts = await db
+    .select({
+      id: propertyContracts.id,
+      unitId: propertyContracts.unitId,
+      unitNumber: propertyUnits.unitNumber,
+      startDate: propertyContracts.startDate,
+      currency: propertyContracts.currency,
+    })
+    .from(propertyContracts)
+    .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
+    .where(and(
+      eq(propertyContracts.companyId, companyId),
+      eq(propertyContracts.module, moduleParam as any),
+      eq(propertyContracts.status, "ACTIVE"),
+      eq(propertyUnits.unitType, "SHOP"),
+    ));
+
+  // Also load shared contracts — units rented FROM another company (linkedCompanyId = this company).
+  // These always appear in the Shops view regardless of their unit type, so they should
+  // be accrued the same way (Dr Rent Expense / Cr Accrued Rent Payable).
+  const sharedContracts = await db
+    .select({
+      id: propertyContracts.id,
+      unitId: propertyContracts.unitId,
+      unitNumber: propertyUnits.unitNumber,
+      startDate: propertyContracts.startDate,
+      currency: propertyContracts.currency,
+    })
+    .from(propertyContracts)
+    .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
+    .where(and(
+      eq(propertyContracts.linkedCompanyId, companyId),
+      eq(propertyContracts.status, "ACTIVE"),
+    ));
+
+  // Deduplicate in case a contract somehow appears in both (shouldn't happen, but be safe)
+  const seen = new Set<number>();
+  const allContracts = [...shopContracts, ...sharedContracts].filter(c => {
+    if (seen.has(c.id)) return false;
+    seen.add(c.id);
+    return true;
+  });
+
+  // If there are no SHOP/shared contracts, pass 1 and pass 2 will no-op via
+  // their own guards (contractIds.length === 0), but pass 3 (landlord deferred)
+  // must still run for landlord-only companies.
+
+  // Determine the dominant currency for this batch of contracts (fallback USD).
+  const currencyCount = new Map<string, number>();
+  for (const c of allContracts) {
+    const cur = c.currency || "USD";
+    currencyCount.set(cur, (currencyCount.get(cur) ?? 0) + 1);
+  }
+  const batchCurrency = currencyCount.size > 0
+    ? [...currencyCount.entries()].sort((a, b) => b[1] - a[1])[0][0]
+    : "USD";
+
+  const contractIds = allContracts.map(c => c.id);
+
+  // Unit name (display label) keyed by unitId
+  const unitNameById = new Map(allContracts.map(c => [c.unitId, c.unitNumber]));
+
+  // Billing day (day-of-month) keyed by contractId
+  const billingDayByContract = new Map(
+    allContracts.map(c => [c.id, new Date(c.startDate as any).getUTCDate()])
+  );
+
+  const now = new Date();
+  const curYear  = now.getUTCFullYear();
+  const curMonth = now.getUTCMonth() + 1;
+  const curDay   = now.getUTCDate();
+
+  // isDue is defined here (outer scope) so pass 2 can use it even when
+  // contractIds is empty (landlord-only company case).
+  const isDue = (row: { year: number; month: number; contractId: number }) => {
+    const billingDay = billingDayByContract.get(row.contractId) ?? 1;
+    if (row.year < curYear) return true;
+    if (row.year === curYear && row.month < curMonth) return true;
+    if (row.year === curYear && row.month === curMonth && curDay >= billingDay) return true;
+    return false;
+  };
+
+  let accrued = 0;
+  let alreadyDone = 0;
+
+  // ── Pass 1: Standard accrual for SHOP/shared contracts ────────────────────
+  // Skipped entirely if this company has no SHOP/shared contracts (contractIds empty).
+  // Pass 2 (tenant prepaid) and Pass 3 (landlord deferred) run independently below.
+  if (contractIds.length > 0) {
+    // Fetch ALL rows that have no accrual voucher yet (paid OR unpaid).
+    // Exclude prepaid rows — pass 2 handles those exclusively to avoid double-counting.
+    const allUnaccrued = await db.select()
+      .from(propertyMonthlyLedger)
+      .where(and(
+        inArray(propertyMonthlyLedger.contractId, contractIds),
+        isNull(propertyMonthlyLedger.accrualVoucherId),
+        eq(propertyMonthlyLedger.usedPrepaidAccount, false),
+        eq(propertyMonthlyLedger.usedAdvanceAccount, false),
+        sql`${propertyMonthlyLedger.expectedAmount}::numeric > 0`,
+      ));
+
+    // Compute contract-level net outstanding so we don't accrue for contracts
+    // that are fully covered by advance payments (outstanding ≤ 0).
+    const unaccruedContractIds = [...new Set(allUnaccrued.map(r => r.contractId))];
+    const contractsWithPositiveOutstanding = new Set<number>();
+    if (unaccruedContractIds.length > 0) {
+      const outstandingRows = await db.select({
+        contractId: propertyMonthlyLedger.contractId,
+        expected: sql<string>`COALESCE(SUM(
+          CASE WHEN (
+            ${propertyMonthlyLedger.year} < ${curYear}
+            OR (${propertyMonthlyLedger.year} = ${curYear} AND ${propertyMonthlyLedger.month} <= ${curMonth})
+          ) THEN ${propertyMonthlyLedger.expectedAmount}::numeric ELSE 0 END
+        ), 0)`,
+        paid: sql<string>`COALESCE(SUM(${propertyMonthlyLedger.paidAmount}::numeric), 0)`,
+      })
+        .from(propertyMonthlyLedger)
+        .where(inArray(propertyMonthlyLedger.contractId, unaccruedContractIds))
+        .groupBy(propertyMonthlyLedger.contractId);
+
+      for (const r of outstandingRows) {
+        if (Number(r.expected) - Number(r.paid) > 0.005) {
+          contractsWithPositiveOutstanding.add(r.contractId);
+        }
+      }
+    }
+
+    // Count already-accrued rows for the "skipped" response metric
+    const allAccruedForSkip = await db.select({ id: propertyMonthlyLedger.id })
+      .from(propertyMonthlyLedger)
+      .where(and(
+        inArray(propertyMonthlyLedger.contractId, contractIds),
+        isNotNull(propertyMonthlyLedger.accrualVoucherId),
+      ));
+    alreadyDone = allAccruedForSkip.length;
+
+    const pendingRows = allUnaccrued.filter(r =>
+      isDue(r) && contractsWithPositiveOutstanding.has(r.contractId),
+    );
+
+    console.log(`[postRentAccrual] company=${companyId} unaccrued=${allUnaccrued.length} pendingDue=${pendingRows.length} alreadyDone=${alreadyDone} curYear=${curYear} curMonth=${curMonth} curDay=${curDay} contractsWithPositiveOutstanding=${contractsWithPositiveOutstanding.size}`);
+    if (pendingRows.length > 0) {
+      console.log(`[postRentAccrual] pendingRows sample:`, JSON.stringify(pendingRows.slice(0, 3).map(r => ({ id: r.id, year: r.year, month: r.month, contractId: r.contractId, paid: r.paidAmount, expected: r.expectedAmount }))));
+    }
+
+    // ── Pass 1 transaction ──
+    if (pendingRows.length > 0) {
+    try {
+    await db.transaction(async (tx) => {
+      // Lock ALL pending rows in one shot — SKIP LOCKED guards against races.
+      // Use IN (...) with a literal id list (all values are trusted integers from
+      // the DB) rather than ANY($n::int[]) — Drizzle does not serialize a JS
+      // array through the sql`` tag in a way pg accepts with ::int[] casting.
+      const pendingIds = pendingRows.map(r => r.id);
+      const idListSql = pendingIds.join(","); // safe: all are DB integers
+      const lockResult = await tx.execute(sql.raw(
+        `SELECT id, expected_amount, paid_amount, unit_id, month, year
+         FROM property_monthly_ledger
+         WHERE id IN (${idListSql})
+           AND accrual_voucher_id IS NULL
+           AND expected_amount::numeric > 0
+           AND used_advance_account = false
+         FOR UPDATE SKIP LOCKED`,
+      ));
+
+      if (!lockResult.rows || lockResult.rows.length === 0) return;
+
+      type LockedRow = {
+        id: number; expected_amount: string; paid_amount: string;
+        unit_id: number; month: number; year: number;
+      };
+      const lockedRows = lockResult.rows as LockedRow[];
+
+      type Entry = { id: number; amount: number; unitId: number; month: number; year: number };
+      const entries: Entry[] = [];
+      for (const locked of lockedRows) {
+        // Accrue only the UNPAID portion (expectedAmount − paidAmount).
+        //
+        // When payment is made AFTER accrual the flow is:
+        //   Accrual:  Dr Rent Expense / Cr Accrued Rent Payable  (full expected)
+        //   Payment:  Dr Accrued Rent Payable / Cr Cash           (full paid)
+        // → at accrual time paid_amount = 0, so we accrue the full expected amount ✓
+        //
+        // When payment is made BEFORE accrual the flow is:
+        //   Payment:  Dr Rent Expense / Cr Cash  (isAccrued=false path, no AP entry)
+        //   Accrual:  should only record the REMAINING unpaid portion
+        // → using (expected − paid) avoids creating phantom AP balance ✓
+        const expected = Number(locked.expected_amount);
+        const paid     = Number(locked.paid_amount || "0");
+        const amount   = expected - paid;
+        if (amount <= 0) continue;
+        entries.push({
+          id:     Number(locked.id),
+          amount,
+          unitId: Number(locked.unit_id),
+          month:  Number(locked.month),
+          year:   Number(locked.year),
+        });
+      }
+      if (entries.length === 0) return;
+
+      const totalAmount = entries.reduce((s, e) => s + e.amount, 0);
+
+      const expenseAccountId = await findOrCreateLedgerAccount(
+        tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP",
+      );
+      const liabilityAccountId = await findOrCreateLedgerAccount(
+        tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY",
+      );
+
+      // Build a period label for the voucher description
+      const months = [...new Set(
+        entries.map(e => `${String(e.month).padStart(2, "0")}/${e.year}`)
+      )].sort();
+      const periodLabel = months.length === 1
+        ? months[0]
+        : `${months[0]}–${months[months.length - 1]}`;
+      const voucherDesc = `Rent accrual - ${companyId} - ${periodLabel}`;
+
+      // ONE voucher for all rows
+      const [v] = await tx.insert(vouchers).values({
+        companyId,
+        voucherNumber: `ACCR-RENT-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        voucherType:  "Journal",
+        voucherDate:  new Date().toISOString().slice(0, 10) as any,
+        description:  voucherDesc,
+        totalAmount:  String(totalAmount),
+        currency:     batchCurrency,
+        sourceModule: moduleParam as any,
+      }).returning();
+
+      // One debit entry per row so the journal is traceable by unit + month
+      const debitEntries = entries.map(e => ({
+        voucherId:        v.id,
+        ledgerAccountId:  expenseAccountId,
+        debitAmount:      String(e.amount),
+        creditAmount:     "0",
+        narration:        `Rent accrual - ${unitNameById.get(e.unitId) ?? `unit${e.unitId}`} - ${String(e.month).padStart(2, "0")}/${e.year}`,
+      }));
+
+      // One combined credit to Accrued Rent Payable
+      await tx.insert(voucherEntries).values([
+        ...debitEntries,
+        {
+          voucherId:       v.id,
+          ledgerAccountId: liabilityAccountId,
+          debitAmount:     "0",
+          creditAmount:    String(totalAmount),
+          narration:       voucherDesc,
+        },
+      ]);
+
+      // Stamp every locked row with the single voucher ID
+      await tx.update(propertyMonthlyLedger)
+        .set({ accrualVoucherId: v.id })
+        .where(inArray(propertyMonthlyLedger.id, entries.map(e => e.id)));
+
+      accrued += entries.length;
+    });
+  } catch (e: any) {
+    // Log the full error — Drizzle formats errors as "Failed query:\n<SQL>\n<pg error>",
+    // so split("\n")[0] always shows the useless header.  Log all lines instead.
+    const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+    console.error(`[ERP/rental] batch accrual failed company ${companyId}: ${detail}`);
+    // intentional fall-through: partial failure logged, continue to recognition passes
+  }
+  } // end if (pendingRows.length > 0)
+  } // end if (contractIds.length > 0) — Pass 1
+
+  // ── Pass 1.5: Advance Rent Paid recognition ───────────────────────────────
+  // When a payment is made for a current/due month BEFORE the accrual runs,
+  // the payment uses Dr Advance Rent Paid / Cr Cash (visible in Net Position).
+  // Pass 1.5 recognises the expense: Dr Rent Expense / Cr Advance Rent Paid.
+  // Any remaining unpaid portion is also credited to Accrued Rent Payable.
+  if (contractIds.length > 0) {
+    try {
+      const advanceRows = await db.select()
+        .from(propertyMonthlyLedger)
+        .where(and(
+          inArray(propertyMonthlyLedger.contractId, contractIds),
+          isNull(propertyMonthlyLedger.accrualVoucherId),
+          eq(propertyMonthlyLedger.usedAdvanceAccount, true),
+          sql`${propertyMonthlyLedger.expectedAmount}::numeric > 0`,
+        ));
+      const dueAdvanceRows = advanceRows.filter(r => isDue(r));
+      if (dueAdvanceRows.length > 0) {
+        await db.transaction(async (tx) => {
+          const pendingIds15 = dueAdvanceRows.map(r => r.id);
+          const idListSql15 = pendingIds15.join(",");
+          const lock15 = await tx.execute(sql.raw(
+            `SELECT id, expected_amount, paid_amount, unit_id, month, year
+             FROM property_monthly_ledger
+             WHERE id IN (${idListSql15})
+               AND accrual_voucher_id IS NULL
+               AND used_advance_account = true
+             FOR UPDATE SKIP LOCKED`,
+          ));
+          if (!lock15.rows || lock15.rows.length === 0) return;
+          type LR15 = { id: number; expected_amount: string; paid_amount: string; unit_id: number; month: number; year: number };
+          const locked15 = lock15.rows as LR15[];
+
+          const expenseAcctId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+          const advanceAcctId = await findOrCreateLedgerAccount(tx, companyId, "Advance Rent Paid", "Asset", "ADV-RENT-PAID");
+          const liabilityAcctId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
+
+          const months15 = [...new Set(locked15.map(r => `${String(Number(r.month)).padStart(2,"0")}/${r.year}`))].sort();
+          const period15 = months15.length === 1 ? months15[0] : `${months15[0]}–${months15[months15.length-1]}`;
+          const desc15 = `Advance rent recognition - ${companyId} - ${period15}`;
+
+          let totalExpense15 = 0;
+          let totalAdvCredit15 = 0;
+          let totalApCredit15 = 0;
+          const debitEntries15: any[] = [];
+
+          for (const r of locked15) {
+            const expected = Number(r.expected_amount);
+            const paid = Number(r.paid_amount || "0");
+            const advCredit = Math.min(paid, expected);
+            const apCredit = Math.max(0, expected - paid);
+            const narr15 = `Advance rent recognition - unit${r.unit_id} - ${String(Number(r.month)).padStart(2,"0")}/${r.year}`;
+            debitEntries15.push({ ledgerAccountId: expenseAcctId, debitAmount: String(expected), creditAmount: "0", narration: narr15 });
+            totalExpense15 += expected;
+            totalAdvCredit15 += advCredit;
+            totalApCredit15 += apCredit;
+          }
+
+          const [v15] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `ADV-REC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            voucherType: "Journal",
+            voucherDate: new Date().toISOString().slice(0, 10) as any,
+            description: desc15,
+            totalAmount: String(totalExpense15),
+            currency: batchCurrency,
+            sourceModule: moduleParam as any,
+          }).returning();
+
+          const allEntries15: any[] = debitEntries15.map(e => ({ ...e, voucherId: v15.id }));
+          if (totalAdvCredit15 > 0.005) {
+            allEntries15.push({ voucherId: v15.id, ledgerAccountId: advanceAcctId, debitAmount: "0", creditAmount: String(totalAdvCredit15), narration: desc15 });
+          }
+          if (totalApCredit15 > 0.005) {
+            allEntries15.push({ voucherId: v15.id, ledgerAccountId: liabilityAcctId, debitAmount: "0", creditAmount: String(totalApCredit15), narration: desc15 });
+          }
+          await tx.insert(voucherEntries).values(allEntries15);
+          await tx.update(propertyMonthlyLedger)
+            .set({ accrualVoucherId: v15.id })
+            .where(inArray(propertyMonthlyLedger.id, locked15.map(r => Number(r.id))));
+          accrued += locked15.length;
+        });
+      }
+    } catch (e: any) {
+      const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+      console.error(`[ERP/rental] advance recognition pass failed company ${companyId}: ${detail}`);
+    }
+  } // end Pass 1.5
+
+  // ── Pass 2: Tenant prepaid rent recognition ──────────────────────────────
+  // For rows where usedPrepaidAccount=true, accrualVoucherId IS NULL, and isDue:
+  //   Dr Rent Expense (expectedAmount)
+  //     Cr Prepaid Rent          (paidAmount  — reverses the asset)
+  //     Cr Accrued Rent Payable  (unpaidPortion, if any — normal liability for remainder)
+  // Using paidAmount (not expectedAmount) for the Prepaid Rent credit ensures we
+  // never over-credit the asset for partial advance payments.
+  if (contractIds.length > 0) {
+    try {
+      const prepaidUnaccrued = await db.select()
+        .from(propertyMonthlyLedger)
+        .where(and(
+          inArray(propertyMonthlyLedger.contractId, contractIds),
+          isNull(propertyMonthlyLedger.accrualVoucherId),
+          eq(propertyMonthlyLedger.usedPrepaidAccount, true),
+        ));
+      const duePrepaid = prepaidUnaccrued.filter(r => isDue(r));
+      if (duePrepaid.length > 0) {
+        await db.transaction(async (tx) => {
+          const expenseId    = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+          const prepaidId    = await findOrCreateLedgerAccount(tx, companyId, "Prepaid Rent", "Asset", "PREP-RENT");
+          const liabilityId  = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
+
+          const months = [...new Set(duePrepaid.map(r => `${String(r.month).padStart(2,"0")}/${r.year}`))].sort();
+          const periodLabel = months.length === 1 ? months[0] : `${months[0]}–${months[months.length-1]}`;
+
+          // Total expense to recognize = full expected rent (prepaid portion + any outstanding)
+          const totalExpected = duePrepaid.reduce((s, r) => s + Number(r.expectedAmount), 0);
+          const totalPaid     = duePrepaid.reduce((s, r) => s + Math.min(Number(r.paidAmount), Number(r.expectedAmount)), 0);
+          const totalUnpaid   = Math.max(0, totalExpected - totalPaid);
+
+          const vDesc = `Prepaid rent recognized - ${companyId} - ${periodLabel}`;
+          const [v] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `PREP-RENT-REC-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+            voucherType: "Journal",
+            voucherDate: new Date().toISOString().slice(0,10) as any,
+            description: vDesc,
+            totalAmount: String(totalExpected),
+            currency: batchCurrency,
+            sourceModule: moduleParam as any,
+          }).returning();
+
+          // One debit line per row (Rent Expense = full expected)
+          const entries: any[] = duePrepaid.map(r => {
+            const rowLabel = `${unitNameById.get(r.unitId) ?? `unit${r.unitId}`} - ${String(r.month).padStart(2,"0")}/${r.year}`;
+            return {
+              voucherId: v.id,
+              ledgerAccountId: expenseId,
+              debitAmount: String(Number(r.expectedAmount)),
+              creditAmount: "0",
+              narration: `Prepaid rent recognized - ${rowLabel}`,
+            };
+          });
+
+          // Credit Prepaid Rent for the portion already paid in advance
+          if (totalPaid > 0.005) {
+            entries.push({ voucherId: v.id, ledgerAccountId: prepaidId, debitAmount: "0", creditAmount: totalPaid.toFixed(2), narration: vDesc });
+          }
+          // Credit Accrued Rent Payable for the remainder (partial-prepay case)
+          if (totalUnpaid > 0.005) {
+            entries.push({ voucherId: v.id, ledgerAccountId: liabilityId, debitAmount: "0", creditAmount: totalUnpaid.toFixed(2), narration: vDesc });
+          }
+
+          await tx.insert(voucherEntries).values(entries);
+          await tx.update(propertyMonthlyLedger)
+            .set({ accrualVoucherId: v.id })
+            .where(inArray(propertyMonthlyLedger.id, duePrepaid.map(r => r.id)));
+          accrued += duePrepaid.length;
+        });
+      }
+    } catch (e: any) {
+      const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+      console.error(`[ERP/rental] prepaid recognition failed company ${companyId}: ${detail}`);
+    }
+  }
+
+  // ── Pass 3: Landlord deferred revenue recognition ─────────────────────────
+  // For rows where usedPrepaidAccount=true, accrualVoucherId IS NULL, and isDue:
+  //   Dr Deferred Rent Revenue / Cr Rent Income
+  try {
+    const landlordContracts = await db
+      .select({
+        id: propertyContracts.id,
+        unitId: propertyContracts.unitId,
+        unitNumber: propertyUnits.unitNumber,
+        startDate: propertyContracts.startDate,
+        currency: propertyContracts.currency,
+      })
+      .from(propertyContracts)
+      .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
+      .where(and(
+        eq(propertyContracts.companyId, companyId),
+        eq(propertyContracts.module, moduleParam as any),
+        eq(propertyContracts.status, "ACTIVE"),
+        ne(propertyUnits.unitType, "SHOP"),
+      ));
+    if (landlordContracts.length > 0) {
+      const landlordIds = landlordContracts.map(c => c.id);
+      const landlordUnitNames = new Map(landlordContracts.map(c => [c.unitId, c.unitNumber]));
+      const landlordBillingDay = new Map(landlordContracts.map(c => [c.id, new Date(c.startDate as any).getUTCDate()]));
+      const isLandlordDue = (row: { year: number; month: number; contractId: number }) => {
+        const bd = landlordBillingDay.get(row.contractId) ?? 1;
+        if (row.year < curYear) return true;
+        if (row.year === curYear && row.month < curMonth) return true;
+        if (row.year === curYear && row.month === curMonth && curDay >= bd) return true;
+        return false;
+      };
+      const deferredUnaccrued = await db.select()
+        .from(propertyMonthlyLedger)
+        .where(and(
+          inArray(propertyMonthlyLedger.contractId, landlordIds),
+          isNull(propertyMonthlyLedger.accrualVoucherId),
+          eq(propertyMonthlyLedger.usedPrepaidAccount, true),
+        ));
+      const dueDeferred = deferredUnaccrued.filter(r => isLandlordDue(r));
+      if (dueDeferred.length > 0) {
+        const lCurrCount = new Map<string, number>();
+        for (const c of landlordContracts) {
+          const cur = c.currency || "USD";
+          lCurrCount.set(cur, (lCurrCount.get(cur) ?? 0) + 1);
+        }
+        const lBatchCurrency = [...lCurrCount.entries()].sort((a, b) => b[1] - a[1])[0][0];
+        await db.transaction(async (tx) => {
+          // Recognize only the collected (deferred) portion — paidAmount, not expectedAmount.
+          // Uncollected rent has no deferred account entry, so no recognition needed for it.
+          const totalDeferred = dueDeferred.reduce(
+            (s, r) => s + Math.min(Number(r.paidAmount), Number(r.expectedAmount)), 0
+          );
+          if (totalDeferred < 0.005) return; // nothing to recognize
+          const incomeId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
+          const deferredId = await findOrCreateLedgerAccount(tx, companyId, "Deferred Rent Revenue", "Liability", "DEF-RENT-REV");
+          const months = [...new Set(dueDeferred.map(r => `${String(r.month).padStart(2,"0")}/${r.year}`))].sort();
+          const periodLabel = months.length === 1 ? months[0] : `${months[0]}–${months[months.length-1]}`;
+          const vDesc = `Deferred rent recognized - ${companyId} - ${periodLabel}`;
+          const [v] = await tx.insert(vouchers).values({
+            companyId,
+            voucherNumber: `DEF-RENT-REC-${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+            voucherType: "Journal",
+            voucherDate: new Date().toISOString().slice(0,10) as any,
+            description: vDesc,
+            totalAmount: String(totalDeferred),
+            currency: lBatchCurrency,
+            sourceModule: moduleParam as any,
+          }).returning();
+          // One debit line per row for only the deferred (collected) portion
+          const debitEntries = dueDeferred
+            .map(r => ({
+              amount: Math.min(Number(r.paidAmount), Number(r.expectedAmount)),
+              label: `${landlordUnitNames.get(r.unitId) ?? `unit${r.unitId}`} - ${String(r.month).padStart(2,"0")}/${r.year}`,
+            }))
+            .filter(e => e.amount > 0.005)
+            .map(e => ({
+              voucherId: v.id,
+              ledgerAccountId: deferredId,
+              debitAmount: e.amount.toFixed(2),
+              creditAmount: "0",
+              narration: `Deferred rent recognized - ${e.label}`,
+            }));
+          await tx.insert(voucherEntries).values([
+            ...debitEntries,
+            { voucherId: v.id, ledgerAccountId: incomeId, debitAmount: "0", creditAmount: totalDeferred.toFixed(2), narration: vDesc },
+          ]);
+          await tx.update(propertyMonthlyLedger)
+            .set({ accrualVoucherId: v.id })
+            .where(inArray(propertyMonthlyLedger.id, dueDeferred.map(r => r.id)));
+        });
+      }
+    }
+  } catch (e: any) {
+    const detail = (e.message ?? String(e)).replace(/\n/g, " | ");
+    console.error(`[ERP/rental] deferred recognition failed company ${companyId}: ${detail}`);
+  }
+
+  return { accrued, skipped: alreadyDone };
+}
