@@ -1,0 +1,362 @@
+  import { useState, useEffect, useRef } from "react";
+  import { useConnectivity } from "@/contexts/ConnectivityContext";
+  import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+  import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
+  import { useForm } from "react-hook-form";
+  import { zodResolver } from "@hookform/resolvers/zod";
+  import { z } from "zod";
+  import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+  import { Button } from "@/components/ui/button";
+  import { Input } from "@/components/ui/input";
+  import { Label } from "@/components/ui/label";
+  import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+  } from "@/components/ui/dialog";
+  import { Alert, AlertDescription } from "@/components/ui/alert";
+  import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+  } from "@/components/ui/alert-dialog";
+  import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+  } from "@/components/ui/form";
+  import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+  } from "@/components/ui/select";
+  import { Checkbox } from "@/components/ui/checkbox";
+  import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+  } from "@/components/ui/table";
+  import { Badge } from "@/components/ui/badge";
+  import { Skeleton } from "@/components/ui/skeleton";
+  import { Switch } from "@/components/ui/switch";
+  
+  import { useToast } from "@/hooks/use-toast";
+  import { useMutation, useQuery } from "@tanstack/react-query";
+  import { queryClient, apiRequest } from "@/lib/queryClient";
+  import { useAppMode } from "@/contexts/AppModeContext";
+  import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
+  import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers } from "lucide-react";
+import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
+  import { Link } from "wouter";
+  import { useDateFormat } from "@/contexts/DateFormatContext";
+  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, FEATURE_PAGE_INFO, type FeatureKey } from "@shared/schema";
+  import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
+  import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
+  import { useCompany } from "@/contexts/CompanyContext";
+  import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
+  import { formatNumber } from "@/lib/formatNumber";
+  
+  const userFormSchema = insertUserSchema;
+  const companyFormSchema = insertCompanySchema;
+  const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+    (data) => {
+      // If role is POS, assignedLocationId must be present
+      if (data.role === "POS" && !data.assignedLocationId) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "POS roles require an assigned location",
+      path: ["assignedLocationId"],
+    }
+  );
+  
+  type UserFormData = z.infer<typeof userFormSchema>;
+  type CompanyFormData = z.infer<typeof companyFormSchema>;
+  type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+
+
+export function fmtDate(d: string) {
+  const dt = new Date(d);
+  return dt.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    + " " + dt.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+}
+
+export function fieldLabel(key: string) {
+  return key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()).trim();
+}
+
+export function fmtValue(v: any): string {
+  if (v === null || v === undefined) return "—";
+  if (typeof v === "boolean") return v ? "Yes" : "No";
+  if (Array.isArray(v)) return `(${v.length} item${v.length !== 1 ? "s" : ""})`;
+  if (typeof v === "object") {
+    const keys = Object.keys(v);
+    if (keys.length === 0) return "—";
+    const preview = keys.slice(0, 3).map(k => `${fieldLabel(k)}: ${String(v[k] ?? "—")}`).join(", ");
+    return keys.length > 3 ? `${preview}, +${keys.length - 3} more` : preview;
+  }
+  const s = String(v);
+  // try to detect ISO date strings
+  if (/^\d{4}-\d{2}-\d{2}T/.test(s)) {
+    try { return new Date(s).toLocaleString(); } catch { return s; }
+  }
+  return s;
+}
+
+export function getRecordLabel(log: any): string {
+  if (log.recordIdentifier) {
+    const id = log.recordIdentifier as string;
+    // already short (e.g. PAYMENT-123, INV-456) — return as-is unless very long
+    if (id.length <= 40) return id;
+    return id.slice(0, 38) + "…";
+  }
+  if (log.recordId) return `${log.tableName} #${log.recordId}`;
+  return log.tableName;
+}
+
+// Returns true for keys that carry pre-formatted item-diff strings
+function isItemDiffKey(field: string): boolean {
+  return /^item_(added|removed|changed)_/.test(field);
+}
+
+export function getDetailsSentence(log: any): string {
+  const c = log.changes || {};
+  const vType =
+    c.voucherType?.new ?? c.voucherType?.old ??
+    c.type?.new ?? c.type?.old ?? "";
+  const module = tableShortName(log.tableName).replace(/s$/, "");
+  const typePart = vType ? `${vType} ${module}` : module;
+  const ref = log.recordIdentifier ?? (log.recordId ? `#${log.recordId}` : "");
+  const refPart = ref ? ` ${ref}` : "";
+
+  if (log.action === "create") {
+    const amt = c.amount?.new
+      ? ` — ${parseFloat(c.amount.new).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+      : "";
+    return `Created ${typePart}${refPart}${amt}.`;
+  }
+
+  if (log.action === "delete") {
+    if (!c || Object.keys(c).length === 0)
+      return `Deleted ${typePart}${refPart}. Details not captured in this log.`;
+    const amt = c.amount?.old
+      ? ` — ${parseFloat(c.amount.old).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+      : "";
+    return `Deleted ${typePart}${refPart}${amt}.`;
+  }
+
+  // update — 1. item-level diff keys (pre-formatted readable strings)
+  for (const [key, vals] of Object.entries(c)) {
+    if (isItemDiffKey(key)) {
+      const v = vals as any;
+      const txt = (v?.new ?? v?.old ?? "") as string;
+      if (txt) return txt;
+    }
+  }
+
+  // update — 2. first meaningful scalar change (skip same-value fields)
+  const SKIP = new Set(["entries", "voucherType", "voucherNumber"]);
+  for (const [key, vals] of Object.entries(c)) {
+    if (SKIP.has(key) || isItemDiffKey(key)) continue;
+    const v = vals as any;
+    const oldFmt = fmtBusinessValue(key, v?.old);
+    const newFmt = fmtBusinessValue(key, v?.new);
+    if (oldFmt === newFmt) continue;
+    const label = BUSINESS_FIELD_LABELS[key] ?? fieldLabel(key);
+    if (v?.old !== undefined && v?.new !== undefined) {
+      return `Changed ${typePart}${refPart} ${label.toLowerCase()} from ${oldFmt} to ${newFmt}.`;
+    }
+  }
+
+  // No meaningful changes detected
+  return `Updated ${typePart}${refPart}.`;
+}
+
+// Keep legacy name as alias so any other callers are not broken
+export const getChangesSummary = getDetailsSentence;
+
+export function tableShortName(t: string) {
+  return t.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// ── Entries mini-table (for voucher entry snapshots) ──────────────────────────
+function EntriesTable({ entries }: { entries: any[] }) {
+  if (!Array.isArray(entries) || entries.length === 0) return null;
+  return (
+    <div className="overflow-x-auto rounded-md border">
+      <table className="text-xs w-full">
+        <thead>
+          <tr className="border-b bg-muted/40">
+            <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Account</th>
+            <th className="text-right px-2 py-1.5 text-muted-foreground font-medium">Debit</th>
+            <th className="text-right px-2 py-1.5 text-muted-foreground font-medium">Credit</th>
+            <th className="text-left px-2 py-1.5 text-muted-foreground font-medium">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((e: any, i: number) => (
+            <tr key={i} className="border-b last:border-0">
+              <td className="px-2 py-1">{e.account ?? "—"}</td>
+              <td className={`text-right px-2 py-1 ${parseFloat(e.debit) > 0 ? "font-medium" : "text-muted-foreground"}`}>
+                {parseFloat(e.debit) > 0 ? e.debit : "—"}
+              </td>
+              <td className={`text-right px-2 py-1 ${parseFloat(e.credit) > 0 ? "font-medium" : "text-muted-foreground"}`}>
+                {parseFloat(e.credit) > 0 ? e.credit : "—"}
+              </td>
+              <td className="px-2 py-1 text-muted-foreground">{e.narration ?? ""}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Detail Dialog helpers ──────────────────────────────────────────────────────
+
+const BUSINESS_FIELD_LABELS: Record<string, string> = {
+  voucherType: "Voucher Type",
+  date: "Date",
+  amount: "Amount",
+  description: "Description",
+  narration: "Narration",
+  location: "Location",
+  optional: "Status",
+  ledgerAccount: "Ledger Account",
+  debitAccount: "Debit Account",
+  creditAccount: "Credit Account",
+  cashAccount: "Cash / Bank Account",
+  customer: "Customer",
+  supplier: "Supplier",
+  paymentMethod: "Payment Method",
+  currency: "Currency",
+  exchangeRate: "Exchange Rate",
+  sourceLocation: "Source Location",
+  destinationLocation: "Destination Location",
+  company: "Company",
+  reference: "Reference",
+  name: "Name",
+  status: "Status",
+  type: "Type",
+  balance: "Balance",
+  phone: "Phone",
+  email: "Email",
+  address: "Address",
+  contactPerson: "Contact Person",
+  notes: "Notes",
+  paymentTerms: "Payment Terms",
+  taxNumber: "Tax Number",
+  code: "Code",
+  unit: "Unit",
+  category: "Category",
+  quantity: "Quantity",
+  unitPrice: "Unit Price",
+  total: "Total",
+};
+
+function isLikelyTechnical(field: string, vals: any): boolean {
+  if (/Id$|_id$|Ids$/.test(field)) return true;
+  const v = (vals as any)?.old ?? (vals as any)?.new;
+  if (v !== null && typeof v === "object" && !Array.isArray(v)) return true;
+  return false;
+}
+
+function fmtBusinessValue(field: string, value: any): string {
+  if (value === null || value === undefined) return "—";
+  if (field === "optional") return value ? "Optional" : "Active";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (field === "amount" || field === "balance" || field === "total" || field === "unitPrice") {
+    const n = parseFloat(String(value));
+    if (!isNaN(n)) return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (field === "exchangeRate" || field === "quantity") {
+    const n = parseFloat(String(value));
+    if (!isNaN(n)) return n.toLocaleString();
+  }
+  if (field === "date" || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(String(value)))) {
+    try {
+      const d = new Date(String(value));
+      if (!isNaN(d.getTime())) return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    } catch { /* fall through */ }
+  }
+  if (Array.isArray(value)) return `(${value.length} item${value.length !== 1 ? "s" : ""})`;
+  if (typeof value === "object") {
+    const keys = Object.keys(value);
+    if (keys.length === 0) return "—";
+    const preview = keys.slice(0, 3).map(k => `${fieldLabel(k)}: ${String((value as any)[k] ?? "—")}`).join(", ");
+    return keys.length > 3 ? `${preview}, +${keys.length - 3} more` : preview;
+  }
+  return String(value);
+}
+
+function getHeaderSentence(log: any): string {
+  const changes = log.changes || {};
+  const user =
+    log.username && log.username !== "unknown"
+      ? log.username
+      : log.userId
+        ? `User #${log.userId.slice(0, 8)}`
+        : "Unknown user";
+  const verb = log.action === "create" ? "created" : log.action === "delete" ? "deleted" : "updated";
+  const vType = changes.voucherType?.new ?? changes.voucherType?.old ?? changes.type?.new ?? changes.type?.old ?? "";
+  const module = tableShortName(log.tableName).replace(/s$/, "");
+  const typePart = vType ? `${vType} ${module.toLowerCase()}` : module.toLowerCase();
+  const ref = log.recordIdentifier ?? (log.recordId ? `#${log.recordId}` : "");
+  return `${user} ${verb} ${typePart}${ref ? ` ${ref}` : ""} on ${fmtDate(log.createdAt)}.`;
+}
+
+function fmtEntryAmount(v: string | number): string {
+  const n = parseFloat(String(v));
+  return isNaN(n) ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function compareEntries(oldArr: any[], newArr: any[]) {
+  const oldMap = new Map<string, any>(oldArr.map(e => [e.account, e]));
+  const newMap = new Map<string, any>(newArr.map(e => [e.account, e]));
+  const added: any[] = [];
+  const removed: any[] = [];
+  const changed: Array<{ account: string; old: any; new: any }> = [];
+  for (const [account, entry] of newMap) {
+    if (!oldMap.has(account)) {
+      added.push(entry);
+    } else {
+      const old = oldMap.get(account)!;
+      if (
+        parseFloat(old.debit || "0") !== parseFloat(entry.debit || "0") ||
+        parseFloat(old.credit || "0") !== parseFloat(entry.credit || "0") ||
+        (old.narration ?? "") !== (entry.narration ?? "")
+      ) {
+        changed.push({ account, old, new: entry });
+      }
+    }
+  }
+  for (const [account, entry] of oldMap) {
+    if (!newMap.has(account)) removed.push(entry);
+  }
+  return { added, removed, changed };
+}
+
+// ── Detail Dialog ──────────────────────────────────────────────────────────────
+
+export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void }) {

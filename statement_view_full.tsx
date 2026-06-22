@@ -1,0 +1,1400 @@
+  if (statementSupplierId) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              setStatementSupplierId(null);
+              if (statementReturnToParent) {
+                setStatementReturnToParent(false);
+                // parentViewSupplierId is already set — stay in parent view
+              }
+            }}
+            data-testid="button-back-suppliers"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-statement-supplier-name">
+                {statementData?.supplier?.name || allSuppliers.find(s => s.id === statementSupplierId)?.name || "Supplier Statement"}
+              </h1>
+              {statementData?.supplier?.parentId ? (
+                <Badge variant="outline" className="text-xs">
+                  <Link2 className="h-3 w-3 mr-1" />
+                  Linked Supplier
+                </Badge>
+              ) : statementData?.supplier && !statementData.supplier.parentId && subAccountsByParent[statementData.supplier.id]?.length ? (
+                <Badge variant="secondary" className="text-xs">
+                  <Building2 className="h-3 w-3 mr-1" />
+                  Broker
+                </Badge>
+              ) : null}
+            </div>
+            <p className="text-muted-foreground text-sm">Settlement Statement</p>
+          </div>
+          {!isBrokerStatement && statementData && (
+            <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-supplier-include-otw">
+              <Switch
+                checked={supplierIncludeOtw}
+                onCheckedChange={setSupplierIncludeOtw}
+                data-testid="switch-supplier-include-otw"
+              />
+              <span className="text-xs font-normal text-muted-foreground">Include OTW containers</span>
+            </label>
+          )}
+        </div>
+
+        {statementLoading ? (
+          <div className="space-y-4">
+            <div className="text-center py-8 text-muted-foreground">
+              <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm">Loading statement...</p>
+            </div>
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : statementError ? (
+          <div className="rounded-xl border p-8 text-center text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">Could not load statement</p>
+              <p className="text-sm mt-1">Please go back and try again</p>
+          </div>
+        ) : statementData ? (
+          <>
+            {(() => {
+              const activeSt = (statementData.statement || []).filter((c: any) => c.status !== "OFFLOADED");
+              const activeContainerCount = activeSt.length;
+              const activeKg = activeSt.reduce((sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"), 0);
+              const currencyGroups: any[] = statementData.currencyGroups || [];
+
+              // Broker: aggregate linked supplier net balances by currency
+              const linkedGroups: any[] = statementData.linkedSupplierGroups || [];
+              const linkedBalMap: Record<string, number> = {};
+              if (isBrokerStatement) {
+                for (const lg of linkedGroups) {
+                  for (const cg of (lg.currencyGroups || [])) {
+                    const val = parseFloat(cg.netPayable || "0");
+                    if (Math.abs(val) > 0.005) {
+                      linkedBalMap[cg.currencyCode] = (linkedBalMap[cg.currencyCode] || 0) + val;
+                    }
+                  }
+                }
+              }
+
+              // Own currency net balances
+              const ownMap: Record<string, { own: number; totalFreight: number }> = {};
+              for (const g of currencyGroups) {
+                const cc = g.currencyCode;
+                if (!ownMap[cc]) ownMap[cc] = { own: 0, totalFreight: 0 };
+                ownMap[cc].own += parseFloat(g.netPayable || "0");
+                ownMap[cc].totalFreight += parseFloat(g.totalFreight || "0");
+              }
+
+              // KPI entries for the "Broker Net Balance" primary section
+              const ownKpiEntries = Object.entries(ownMap).filter(([, v]) => Math.abs(v.own) > 0.005);
+              // KPI entries for "Linked Exposure" secondary section
+              const linkedKpiEntries = Object.entries(linkedBalMap).filter(([, v]) => Math.abs(v) > 0.005);
+
+              // Issues
+              const issues: Array<{ kind: "warn" | "info"; msg: string }> = [];
+              if (isBrokerStatement) {
+                for (const lg of linkedGroups) {
+                  for (const cg of (lg.currencyGroups || [])) {
+                    const bal = parseFloat(cg.netPayable || "0");
+                    if (bal > 0.005) {
+                      const pfx = cg.currencyCode !== "USD" ? `${cg.currencyCode} ` : "$";
+                      issues.push({ kind: "warn", msg: `${lg.supplierName}: ${pfx}${formatNum(String(bal.toFixed(2)))} unsettled` });
+                    }
+                  }
+                }
+              }
+              for (const g of currencyGroups) {
+                const bal = parseFloat(g.netPayable || "0");
+                if (bal > 0.005) {
+                  const cc = g.currencyCode;
+                  const pfx = cc !== "USD" ? `${cc} ` : "$";
+                  issues.push({ kind: "warn", msg: `Broker ${cc} pool: ${pfx}${formatNum(String(bal.toFixed(2)))} unsettled` });
+                }
+              }
+
+              const renderBalCard = (cc: string, bal: number, label: string, testId: string, freight?: number) => {
+                const isOverpaid = bal < -0.005;
+                const isSettled = Math.abs(bal) <= 0.005;
+                const ccPrefix = cc !== "USD" ? `${cc} ` : "$";
+                return (
+                  <div key={`${testId}-${cc}`} className="rounded-xl border p-4">
+                      <div className="text-xs text-muted-foreground font-medium">{cc} {label}</div>
+                      <div
+                        className={`text-xl font-bold mt-1 tabular-nums ${isSettled ? "text-muted-foreground" : isOverpaid ? "text-green-600 dark:text-green-400" : ""}`}
+                        data-testid={`${testId}-${cc}`}
+                      >
+                        {isSettled ? (
+                          <>{ccPrefix}— <span className="text-sm font-normal">Settled</span></>
+                        ) : isOverpaid ? (
+                          <>{ccPrefix}{formatNum(String(Math.abs(bal).toFixed(2)))} <span className="text-sm font-normal">CR</span></>
+                        ) : (
+                          <>{ccPrefix}{formatNum(String(bal.toFixed(2)))}</>
+                        )}
+                      </div>
+                      {freight && freight > 0.005 && (
+                        <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
+                          incl. {ccPrefix}{formatNum(String(freight.toFixed(2)))} freight
+                        </div>
+                      )}
+                  </div>
+                );
+              };
+
+              return (
+                <>
+
+                  {/* Non-broker: simple KPI grid */}
+                  {!isBrokerStatement && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+                      <div className="rounded-xl border p-4">
+                          <div className="text-xs text-muted-foreground">Active Containers</div>
+                          <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
+                            {activeContainerCount}
+                            {statementData.summary.totalContainers > activeContainerCount && (
+                              <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
+                            )}
+                          </div>
+                      </div>
+                      <div className="rounded-xl border p-4">
+                          <div className="text-xs text-muted-foreground">Active Weight</div>
+                          <div className="text-xl font-bold mt-1" data-testid="text-statement-total-kg">
+                            {formatKg(String(activeKg.toFixed(3)))}
+                          </div>
+                      </div>
+                      {Object.entries(ownMap).filter(([, v]) => Math.abs(v.own) > 0.005).length === 0 ? (
+                        <div className="rounded-xl border p-4">
+                            <div className="text-xs text-muted-foreground">Net Balance</div>
+                            <div className="text-xl font-bold mt-1 text-muted-foreground" data-testid="text-statement-total-owed">
+                              $— <span className="text-sm font-normal">Settled</span>
+                            </div>
+                        </div>
+                      ) : (
+                        Object.entries(ownMap).filter(([, v]) => Math.abs(v.own) > 0.005).map(([cc, v]) =>
+                          renderBalCard(cc, v.own, "Net Balance", "text-statement-balance", v.totalFreight)
+                        )
+                      )}
+                    </div>
+                  )}
+
+
+                </>
+              );
+            })()}
+
+            {statementData.supplier && !isBrokerStatement && (
+              <div className="rounded-xl border overflow-hidden">
+                <div
+                  className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 cursor-pointer hover-elevate"
+                  onClick={() => toggleStmtSection("supplierDetails")}
+                >
+                  <span className="text-sm font-semibold">Supplier Details</span>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("supplierDetails") ? "" : "rotate-180"}`} />
+                </div>
+                {!collapsedStmtSections.has("supplierDetails") && <div className="p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    {statementData.supplier.contactPerson && (
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span>{statementData.supplier.contactPerson}</span>
+                      </div>
+                    )}
+                    {statementData.supplier.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span>{statementData.supplier.phone}</span>
+                      </div>
+                    )}
+                    {statementData.supplier.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span>{statementData.supplier.email}</span>
+                      </div>
+                    )}
+                    {statementData.supplier.address && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span>{statementData.supplier.address}</span>
+                      </div>
+                    )}
+                    {statementData.supplier.notes && (
+                      <div className="flex items-start gap-2 sm:col-span-2">
+                        <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                        <span className="text-muted-foreground">{statementData.supplier.notes}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>}
+              </div>
+            )}
+
+            {statementData.currencyGroups && (statementData.currencyGroups.length > 1 || (statementData.currencyGroups.length === 1 && statementData.currencyGroups[0].currencyCode !== "USD")) && (
+              <div className="rounded-xl border overflow-hidden">
+                <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-3 border-b bg-muted/20">
+                    <span
+                      className="flex items-center gap-2 cursor-pointer hover-elevate rounded px-1 py-0.5 flex-1"
+                      onClick={() => toggleStmtSection("currencyPools")}
+                    >
+                      <Globe className="h-4 w-4" />
+                      <span className="text-sm font-semibold">Currency Pools</span>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("currencyPools") ? "" : "rotate-180"}`} />
+                    </span>
+                    {statementData.currencyGroups.some(g => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0)) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const firstNonUsd = statementData.currencyGroups.find(g => g.currencyCode !== "USD" && (parseFloat(g.netPayable) > 0 || parseFloat(g.totalCommission) > 0));
+                          if (firstNonUsd && statementSupplierId) {
+                            const hasBalance = parseFloat(firstNonUsd.netPayable) > 0;
+                            setFxSourceType(hasBalance ? "supplier" : "commission");
+                            const toId = statementData.supplier.parentId || statementSupplierId;
+                            openFxConversionDialog(statementSupplierId, toId, firstNonUsd.currencyCode, hasBalance ? firstNonUsd.netPayable : "0", firstNonUsd.totalCommission);
+                          }
+                        }}
+                        data-testid="button-fx-convert"
+                      >
+                        <ArrowRightLeft className="h-3.5 w-3.5 mr-1.5" />
+                        {statementData.supplier.parentId ? "Settle FX to Broker" : "Settle FX to EUR"}
+                      </Button>
+                    )}
+                </div>
+                {!collapsedStmtSections.has("currencyPools") && <div>
+                  <div className="table-responsive">
+                    <Table>
+                      <TableHeader className="sticky top-0 z-30">
+                        <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                          <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Currency</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Containers</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Total Weight</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Gross Value</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Commission</TableHead>
+                          <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Net Payable</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {statementData.currencyGroups.map((group) => {
+                          const hasFreight = parseFloat(group.totalFreight || "0") > 0.005;
+                          const hasCommission = parseFloat(group.totalCommission) > 0.005;
+                          const noContainers = group.containers.length === 0;
+                          const isCommissionOnly = noContainers && hasCommission && !hasFreight;
+                          const isFreightOnly = noContainers && hasFreight && !hasCommission;
+                          const isCrossFreightPool = noContainers && hasFreight; // freight ± commission, no containers
+                          const netPay = parseFloat(group.netPayable);
+                          const isOverpaid = netPay < -0.005;
+                          const ccPrefix = group.currencyCode !== "USD" ? `${group.currencyCode} ` : "$";
+                          // Auto-settled: cross-currency freight already reflected in parent broker's pool
+                          const autoSettledFreight = parseFloat((group as any).autoSettledFreight || "0");
+                          const isAutoSettled = autoSettledFreight > 0.005 && Math.abs(netPay) <= 0.005;
+                          return (
+                          <TableRow key={group.currencyCode}>
+                            <TableCell className="font-semibold">
+                              <Badge variant="outline">{group.currencyCode}</Badge>
+                              {isCommissionOnly && <span className="ml-2 text-xs text-muted-foreground">Commission</span>}
+                              {isFreightOnly && !isAutoSettled && <span className="ml-2 text-xs text-muted-foreground">Freight</span>}
+                              {isCrossFreightPool && hasCommission && !isAutoSettled && <span className="ml-2 text-xs text-muted-foreground">Freight + Commission</span>}
+                              {isAutoSettled && <span className="ml-2 text-xs text-muted-foreground">Freight · In broker pool</span>}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{isCrossFreightPool ? "—" : group.containers.length}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums">{isCrossFreightPool ? "—" : formatKg(group.totalKg)}</TableCell>
+                            <TableCell className="text-right text-sm tabular-nums font-medium">
+                              {isCrossFreightPool ? (() => {
+                                const totalFreight = parseFloat(group.totalFreight || "0");
+                                if (isAutoSettled) {
+                                  return <span className="text-muted-foreground">{ccPrefix}{formatNum(String(totalFreight.toFixed(2)))}</span>;
+                                }
+                                const remComm = parseFloat(group.remainingCommission || group.totalCommission || "0");
+                                const remainingFreight = Math.max(0, netPay - remComm);
+                                const freightSettled = remainingFreight < totalFreight - 0.005;
+                                return (
+                                  <span className="text-orange-600 dark:text-orange-400">
+                                    {freightSettled ? (
+                                      <>
+                                        {ccPrefix}{formatNum(String(remainingFreight.toFixed(2)))}
+                                        <span className="text-xs text-muted-foreground ml-1 line-through">
+                                          {formatNum(String(totalFreight.toFixed(2)))}
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <>{ccPrefix}{formatNum(String(totalFreight.toFixed(2)))}</>
+                                    )}
+                                  </span>
+                                );
+                              })() : `${ccPrefix}${formatNum(group.totalValue)}`}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums text-destructive">
+                              {parseFloat(group.totalCommission) > 0 ? (
+                                <span>
+                                  {ccPrefix}{formatNum(group.remainingCommission ?? group.totalCommission)}
+                                  {group.remainingCommission != null && parseFloat(group.remainingCommission) < parseFloat(group.totalCommission) && (
+                                    <span className="text-xs text-muted-foreground ml-1 line-through">
+                                      {formatNum(group.totalCommission)}
+                                    </span>
+                                  )}
+                                </span>
+                              ) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right text-sm tabular-nums font-bold">
+                              {isAutoSettled ? (
+                                <span className="text-muted-foreground text-sm font-normal">In broker pool</span>
+                              ) : isOverpaid ? (
+                                <span className="text-green-600 dark:text-green-400">{ccPrefix}{formatNum(String(Math.abs(netPay)))} CR</span>
+                              ) : (
+                                <>{ccPrefix}{formatNum(group.netPayable)}</>
+                              )}
+                              {!isAutoSettled && (group.currencyCode !== "USD" || isCommissionOnly || isCrossFreightPool) && (netPay > 0 || hasCommission) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="ml-2 h-6 px-2 text-xs"
+                                  onClick={() => {
+                                    const hasBalance = netPay > 0;
+                                    const netPayStr = hasBalance ? group.netPayable : "0";
+                                    const toSupId = statementData.supplier.parentId || statementSupplierId!;
+                                    let form: Record<string, any>;
+                                    let sourceType: string;
+                                    if (isCrossFreightPool) {
+                                      form = {
+                                        fromSupplierId: statementSupplierId!,
+                                        toSupplierId: toSupId,
+                                        selectedCurrency: group.currencyCode,
+                                        amount: netPayStr,
+                                        availableBalance: netPayStr,
+                                        supplierBalance: netPayStr,
+                                        commissionBalance: group.totalCommission,
+                                        fxRateToUsd: group.currencyCode === "USD" ? "1" : "",
+                                        date: today,
+                                        notes: hasCommission ? "Freight + commission settlement" : "Freight settlement",
+                                      };
+                                      sourceType = hasCommission ? "both" : "supplier";
+                                    } else {
+                                      form = {
+                                        fromSupplierId: statementSupplierId!,
+                                        toSupplierId: toSupId,
+                                        selectedCurrency: group.currencyCode,
+                                        amount: hasBalance ? group.netPayable : group.totalCommission,
+                                        availableBalance: hasBalance ? group.netPayable : group.totalCommission,
+                                        supplierBalance: hasBalance ? group.netPayable : "0",
+                                        commissionBalance: group.totalCommission,
+                                        fxRateToUsd: group.currencyCode === "USD" ? "1" : "",
+                                        date: today,
+                                        notes: "",
+                                      };
+                                      sourceType = hasBalance ? "supplier" : "commission";
+                                    }
+                                    setFxConversionForm(form);
+                                    setFxSourceType(sourceType);
+                                    setFxConversionOpen(true);
+                                  }}
+                                  data-testid={`button-convert-${group.currencyCode}`}
+                                >
+                                  {isFreightOnly ? "Settle Freight" : isCommissionOnly ? "Settle Commission" : isCrossFreightPool ? "Settle" : "Settle FX"}
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>}
+              </div>
+            )}
+
+            {/* ── Broker Activity Ledger (consolidated) ── */}
+            {isBrokerStatement && (
+              <div className="rounded-xl border overflow-hidden">
+                <div className="flex items-center justify-between gap-2 flex-wrap px-4 py-3 border-b bg-muted/20">
+                    <span
+                      className="flex items-center gap-2 cursor-pointer hover-elevate rounded px-1 py-0.5 flex-1"
+                      onClick={() => toggleStmtSection("brokerActivityLedger")}
+                    >
+                      <BookOpen className="h-4 w-4" />
+                      <span className="text-sm font-semibold">Broker Activity Ledger</span>
+                      <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("brokerActivityLedger") ? "" : "rotate-180"}`} />
+                    </span>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-broker-include-otw">
+                        <Switch
+                          checked={brokerIncludeOtw}
+                          onCheckedChange={setBrokerIncludeOtw}
+                          data-testid="switch-broker-include-otw"
+                        />
+                        <span className="text-xs font-normal text-muted-foreground">Include OTW containers</span>
+                      </label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const url = `/api/factory/suppliers/${statementSupplierId}/broker-statement/export?includeOtw=${brokerIncludeOtw}`;
+                          window.open(url, "_blank");
+                        }}
+                        data-testid="button-export-broker-statement"
+                      >
+                        <FileText className="h-3.5 w-3.5 mr-1.5" />
+                        Export Excel
+                      </Button>
+                    </div>
+                </div>
+                {!collapsedStmtSections.has("brokerActivityLedger") && (
+                  <p className="text-xs text-muted-foreground px-4 pt-3 pb-0">
+                    All transactions affecting the broker's own balance — containers, settlements, FX transfers received, and commissions.
+                    Grouped by currency. Does not include linked supplier activity.
+                  </p>
+                )}
+                {!collapsedStmtSections.has("brokerActivityLedger") && <div className="space-y-6 p-4 pt-2">
+                  {brokerStatementLoading ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                    </div>
+                  ) : brokerStatement?.currencyLedgers?.length > 0 ? (
+                    brokerStatement.currencyLedgers.map((section: any) => {
+                      const typeLabel: Record<string, string> = {
+                        container: "Container", payment: "Payment",
+                        fx_out: "FX Out", fx_in: "FX In", commission: "Commission", other_charge: "Other Charge",
+                        freight: "Freight", opening_balance: "Opening Bal",
+                      };
+                      const typeBadgeVariant = (t: string): "outline"|"secondary"|"default"|"destructive" => {
+                        if (t === "payment") return "secondary";
+                        if (t === "fx_out" || t === "fx_in") return "default";
+                        if (t === "commission") return "destructive";
+                        return "outline";
+                      };
+                      const typeColor = (t: string) => {
+                        if (t === "payment") return "text-green-600 dark:text-green-400";
+                        if (t === "fx_out") return "text-amber-600 dark:text-amber-400";
+                        if (t === "fx_in") return "text-blue-600 dark:text-blue-400";
+                        if (t === "commission") return "text-destructive";
+                        if (t === "other_charge") return "text-purple-600 dark:text-purple-400";
+                        if (t === "freight") return "text-orange-600 dark:text-orange-400";
+                        return "";
+                      };
+                      const ledgerKey = `ledger-${section.currencyCode}`;
+                      const ledgerCollapsed = collapsedStmtSections.has(ledgerKey);
+                      return (
+                        <div key={section.currencyCode} className="space-y-2">
+                          <button
+                            className="flex items-center gap-2 w-full text-left hover-elevate rounded-md px-1 py-0.5"
+                            onClick={() => toggleStmtSection(ledgerKey)}
+                            data-testid={`button-ledger-toggle-${section.currencyCode}`}
+                          >
+                            <Badge variant={section.isBrokerPool ? "default" : "secondary"} className="text-sm px-3 py-1 font-bold">
+                              {section.currencyCode}
+                            </Badge>
+                            {section.isBrokerPool ? (
+                              <span className="text-xs text-muted-foreground flex-1">Broker USD Pool — received from FX settlements &amp; transfers</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground flex-1">
+                                {section.totalContainers} container{section.totalContainers !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                            <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform flex-shrink-0 ${ledgerCollapsed ? "" : "rotate-180"}`} />
+                          </button>
+                          {!ledgerCollapsed && <div className="table-responsive rounded-md border">
+                            <Table>
+                              <TableHeader className="sticky top-0 z-30 bg-background">
+                                <TableRow className="bg-muted/50">
+                                  <TableHead className="text-xs h-8">Date</TableHead>
+                                  <TableHead className="text-xs h-8">Type</TableHead>
+                                  <TableHead className="text-xs h-8">Description</TableHead>
+                                  <TableHead className="text-xs h-8 text-right">Amount ({section.currencyCode})</TableHead>
+                                  <TableHead className="text-xs h-8 text-right">{section.isBrokerPool ? "Pool Balance" : "Balance"}</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {section.rows.filter((row: any) => row.type !== "payment").map((row: any, idx: number) => {
+                                  const balVal = row.runningBalance;
+                                  const balPositive = balVal > 0;
+                                  const balNegative = balVal < 0;
+                                  const balColor = section.isBrokerPool
+                                    ? (balPositive ? "text-green-600 dark:text-green-400" : balNegative ? "text-red-600 dark:text-red-400" : "text-muted-foreground")
+                                    : (balPositive ? "text-red-600 dark:text-red-400" : balNegative ? "text-green-600 dark:text-green-400" : "text-muted-foreground");
+                                  const balLabel = section.isBrokerPool
+                                    ? (balPositive ? "Rcvd" : balNegative ? "Owed" : "")
+                                    : (balPositive ? "CR" : balNegative ? "DR" : "");
+                                  return (
+                                  <TableRow key={`${row.ref}-${idx}`} className="text-xs">
+                                    <TableCell className="py-1.5 whitespace-nowrap text-muted-foreground">
+                                      {row.date ? formatDate(row.date) : "—"}
+                                    </TableCell>
+                                    <TableCell className="py-1.5">
+                                      <Badge variant={typeBadgeVariant(row.type)} className="text-xs py-0 font-normal">
+                                        {typeLabel[row.type] || row.type}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-1.5 max-w-[260px] font-medium">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span className="truncate">{row.description}</span>
+                                        {row.isOtw && (
+                                          <Badge variant="outline" className="text-[10px] py-0 px-1.5 shrink-0 text-amber-600 dark:text-amber-400 border-amber-400 dark:border-amber-600">
+                                            OTW
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className={`py-1.5 text-right tabular-nums font-medium ${typeColor(row.type)}`}>
+                                      {row.amount < 0 ? "−" : ""}{section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(row.amount).toFixed(2)))}
+                                    </TableCell>
+                                    <TableCell className={`py-1.5 text-right tabular-nums font-medium text-xs ${balColor}`}>
+                                      {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(balVal).toFixed(2)))}
+                                      <span className="ml-1 opacity-70">{balLabel}</span>
+                                    </TableCell>
+                                  </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>}
+                          {/* Section totals — always visible */}
+                          <div className="flex justify-end">
+                            <div className="text-xs space-y-0.5 text-right min-w-56 pr-1">
+                              {!section.isBrokerPool && parseFloat(section.totalValue) > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>Gross Value</span>
+                                  <span className="tabular-nums font-medium text-foreground">
+                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalValue)}
+                                  </span>
+                                </div>
+                              )}
+                              {parseFloat(section.totalOtherCharges || "0") > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>Other Charges</span>
+                                  <span className="tabular-nums text-purple-600 dark:text-purple-400">
+                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalOtherCharges)}
+                                  </span>
+                                </div>
+                              )}
+                              {parseFloat(section.totalFreight || "0") > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>Freight</span>
+                                  <span className="tabular-nums text-orange-600 dark:text-orange-400">
+                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalFreight)}
+                                  </span>
+                                </div>
+                              )}
+                              {parseFloat(section.totalPaid) > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>Paid</span>
+                                  <span className="tabular-nums text-green-600 dark:text-green-400">
+                                    − {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalPaid)}
+                                  </span>
+                                </div>
+                              )}
+                              {parseFloat(section.totalFxOut) > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>FX Out</span>
+                                  <span className="tabular-nums text-amber-600 dark:text-amber-400">
+                                    − {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(section.totalFxOut)}
+                                  </span>
+                                </div>
+                              )}
+                              {parseFloat(section.totalFxIn) > 0 && (
+                                <div className="flex justify-between gap-6 text-muted-foreground">
+                                  <span>FX In {section.isBrokerPool ? "(Received)" : ""}</span>
+                                  <span className="tabular-nums text-blue-600 dark:text-blue-400">
+                                    + ${formatNum(String(parseFloat(section.totalFxIn).toFixed(2)))}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="flex justify-between gap-6 border-t pt-1">
+                                <span className="font-semibold">{section.isBrokerPool ? "Pool Balance" : "Net Balance"}</span>
+                                {section.isBrokerPool ? (
+                                  <span className={`tabular-nums font-bold ${parseFloat(section.netBalance) > 0 ? "text-green-600 dark:text-green-400" : parseFloat(section.netBalance) < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                                    ${formatNum(String(Math.abs(parseFloat(section.netBalance)).toFixed(2)))}
+                                    <span className="ml-1 font-normal opacity-80">{parseFloat(section.netBalance) > 0 ? "Rcvd" : parseFloat(section.netBalance) < 0 ? "Owed" : ""}</span>
+                                  </span>
+                                ) : (
+                                  <span className={`tabular-nums font-bold ${parseFloat(section.netBalance) > 0 ? "text-red-600 dark:text-red-400" : parseFloat(section.netBalance) < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                    {section.currencyCode !== "USD" ? `${section.currencyCode} ` : "$"}{formatNum(String(Math.abs(parseFloat(section.netBalance)).toFixed(2)))}
+                                    <span className="ml-1 font-normal opacity-80">{parseFloat(section.netBalance) > 0 ? "CR" : parseFloat(section.netBalance) < 0 ? "DR" : ""}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">No data found for this broker.</p>
+                  )}
+                </div>}
+              </div>
+            )}
+
+            {/* Unified Activity Ledger — Phase 4: merges Containers, Payments, FX Settlements, Commissions */}
+            {!isBrokerStatement && <div className="rounded-xl border overflow-hidden">
+              <div
+                className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 cursor-pointer hover-elevate"
+                onClick={() => toggleStmtSection("activityLedger")}
+              >
+                <span className="flex items-center gap-2 flex-1">
+                    <Package className="h-4 w-4" />
+                    <span className="text-sm font-semibold">Activity Ledger</span>
+                    <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("activityLedger") ? "" : "rotate-180"}`} />
+                </span>
+              </div>
+              {!collapsedStmtSections.has("activityLedger") && <div className="p-4">
+                {(() => {
+                  type RowType = "purchase" | "payment" | "fx" | "commission" | "other_charge" | "freight";
+                  const srcLabel: Record<string, string> = { supplier: "Balance", commission: "Commission", both: "Both" };
+
+                  // Determine the supplier's primary currency from their containers
+                  const stmts: any[] = statementData.statement || [];
+                  const primaryCc = (() => {
+                    if (stmts.length === 0) return "USD";
+                    const counts: Record<string, number> = {};
+                    for (const s of stmts) { const c = s.currencyCode || "USD"; counts[c] = (counts[c] || 0) + 1; }
+                    const nonUsd = Object.entries(counts).filter(([c]) => c !== "USD").sort((a, b) => b[1] - a[1]);
+                    return nonUsd.length > 0 ? nonUsd[0][0] : "USD";
+                  })();
+
+                  // Weighted-average FX rate (primary currency → USD) from container data
+                  const avgFxRate = (() => {
+                    const relevant = stmts.filter((s: any) => (s.currencyCode || "USD") === primaryCc && parseFloat(s.fxRateToUsd || "0") > 0);
+                    if (relevant.length === 0) return 1;
+                    const totalVal = relevant.reduce((s: number, r: any) => s + parseFloat(r.value || "0"), 0);
+                    if (totalVal === 0) return parseFloat(relevant[0].fxRateToUsd || "1");
+                    return relevant.reduce((s: number, r: any) => s + parseFloat(r.value || "0") * parseFloat(r.fxRateToUsd || "1"), 0) / totalVal;
+                  })();
+
+                  // Convert any amount in any currency to primary currency for running balance
+                  const toNative = (amount: number, currencyCode: string, fxToUsd: number = 1): number => {
+                    if (currencyCode === primaryCc) return amount;
+                    const usd = currencyCode === "USD" ? amount : amount * fxToUsd;
+                    return primaryCc === "USD" ? usd : usd / avgFxRate;
+                  };
+
+                  const allRows: Array<{
+                    key: string; date: string | null; type: RowType;
+                    ref: string; detail: string; amount: string; amountIsNeg: boolean;
+                    status?: string; notes?: string | null; optional?: boolean; onDelete?: () => void; onEdit?: () => void;
+                    nativeImpact: number;
+                    rowCc: string; rowNativeAmt: number;
+                    conversionNote?: string | null;
+                  }> = [
+                    ...stmts.flatMap((e: any) => {
+                      const rawVal = parseFloat(e.value || "0");
+                      const fxRate = parseFloat(e.fxRateToUsd || "1") || 1;
+                      const cc = e.currencyCode || "USD";
+                      const freightAmt = parseFloat(e.freight || "0");
+                      const freightCc = e.freightCurrencyCode || cc;
+                      const sameCcFreight = freightAmt > 0 && freightCc === cc;
+                      // Goods-only value (server's `value` includes same-currency freight — subtract it for the purchase row)
+                      const goodsVal = sameCcFreight ? rawVal - freightAmt : rawVal;
+                      const dispGoodsAmt = cc !== "USD" ? `${cc} ${formatNum(String(goodsVal.toFixed(2)))}` : `$${formatNum(String(goodsVal.toFixed(2)))}`;
+                      const commAmt = parseFloat((e as any).commissionAmount || "0");
+                      const commCc = (e as any).commissionCurrencyCode || cc;
+                      const purchaseRow = {
+                        key: `c-${e.id}`,
+                        date: e.date,
+                        type: "purchase" as RowType,
+                        ref: e.containerNumber,
+                        detail: e.origin || "",
+                        amount: dispGoodsAmt,
+                        amountIsNeg: false,
+                        status: e.status,
+                        notes: e.notes || null,
+                        nativeImpact: toNative(goodsVal, cc, fxRate),
+                        rowCc: cc, rowNativeAmt: goodsVal,
+                      };
+                      const rows: typeof purchaseRow[] = [purchaseRow];
+                      // Same-currency freight → separate Freight row in child's ledger
+                      if (sameCcFreight) {
+                        const dispFreightAmt = freightCc !== "USD" ? `${freightCc} ${formatNum(String(freightAmt.toFixed(2)))}` : `$${formatNum(String(freightAmt.toFixed(2)))}`;
+                        rows.push({
+                          key: `f-${e.id}`,
+                          date: e.date,
+                          type: "freight" as RowType,
+                          ref: e.containerNumber,
+                          detail: "",
+                          amount: dispFreightAmt,
+                          amountIsNeg: false,
+                          status: undefined,
+                          notes: null,
+                          nativeImpact: toNative(freightAmt, freightCc, fxRate),
+                          rowCc: freightCc, rowNativeAmt: freightAmt,
+                        });
+                      }
+                      // Commission → its own row (attributable to the supplier's balance)
+                      if (commAmt > 0) {
+                        const dispCommAmt = commCc !== "USD" ? `${commCc} ${formatNum(String(commAmt.toFixed(2)))}` : `$${formatNum(String(commAmt.toFixed(2)))}`;
+                        rows.push({
+                          key: `comm-${e.id}`,
+                          date: e.date,
+                          type: "commission" as RowType,
+                          ref: e.containerNumber,
+                          detail: "",
+                          amount: dispCommAmt,
+                          amountIsNeg: false,
+                          status: undefined,
+                          notes: null,
+                          nativeImpact: toNative(commAmt, commCc, fxRate),
+                          rowCc: commCc, rowNativeAmt: commAmt,
+                        });
+                      }
+                      return rows;
+                    }),
+                    ...(statementData.payments || []).filter((p: any) => {
+                      const cc = p.currencyCode || "USD";
+                      return cc === primaryCc;
+                    }).map((p: any) => {
+                      const cc = p.currencyCode || "USD";
+                      const amt = parseFloat(p.amount || "0");
+                      const fxRate = parseFloat(p.fxRateToUsd || "1") || 1;
+                      const dispAmt = cc !== "USD" ? `${cc} ${formatNum(String(amt.toFixed(2)))}` : `$${formatNum(String(amt.toFixed(2)))}`;
+                      const isCrossCurrency = cc !== primaryCc;
+                      const nativeAmt = toNative(amt, cc, fxRate);
+                      // For display: compute the conversion rate in a human-readable direction
+                      let conversionNote: string | null = null;
+                      if (isCrossCurrency && primaryCc !== "USD" && cc === "USD") {
+                        // USD payment → EUR supplier: 1 USD = (1/avgFxRate) EUR
+                        const rateDisplay = avgFxRate > 0 ? (1 / avgFxRate).toFixed(4) : "?";
+                        const nativeDisp = `${primaryCc} ${formatNum(String(nativeAmt.toFixed(2)))}`;
+                        conversionNote = `@ 1 USD = ${rateDisplay} ${primaryCc} → ${nativeDisp}`;
+                      } else if (isCrossCurrency) {
+                        const nativeDisp = primaryCc !== "USD" ? `${primaryCc} ${formatNum(String(nativeAmt.toFixed(2)))}` : `$${formatNum(String(nativeAmt.toFixed(2)))}`;
+                        conversionNote = `→ ${nativeDisp} in ${primaryCc}`;
+                      }
+                      return {
+                        key: `p-${p.id}`,
+                        date: p.date,
+                        type: "payment" as RowType,
+                        ref: "Payment",
+                        detail: "",
+                        amount: dispAmt,
+                        amountIsNeg: false,
+                        notes: p.notes,
+                        onDelete: () => { wrapAdminAction(() => setPendingDelete(() => () => deletePaymentMutation.mutate(p.id)), "Delete Payment"); },
+                        nativeImpact: -nativeAmt,
+                        rowCc: primaryCc,
+                        rowNativeAmt: isCrossCurrency ? 0 : -amt,
+                        conversionNote,
+                      };
+                    }),
+                    ...(statementData.ledger || [])
+                      .filter((e: any) => e.type === "payment" && typeof e.key === "string" && e.key.startsWith("vp-"))
+                      .map((vp: any) => {
+                        const rawAmt = String(vp.amount || "0").replace(/[^0-9.]/g, "");
+                        const usdAmt = parseFloat(rawAmt) || 0;
+                        const isOptional = !!vp.optional;
+                        const vpNativeAmt = toNative(usdAmt, "USD");
+                        const vpIsCross = primaryCc !== "USD" && !isOptional;
+                        let vpConversionNote: string | null = null;
+                        if (vpIsCross) {
+                          const rateDisplay = avgFxRate > 0 ? (1 / avgFxRate).toFixed(4) : "?";
+                          const nativeDisp = `${primaryCc} ${formatNum(String(vpNativeAmt.toFixed(2)))}`;
+                          vpConversionNote = `@ 1 USD = ${rateDisplay} ${primaryCc} → ${nativeDisp}`;
+                        }
+                        return {
+                          key: vp.key,
+                          date: vp.date,
+                          type: "payment" as RowType,
+                          ref: vp.ref || "Voucher Payment",
+                          detail: vp.detail || "Payment Voucher",
+                          amount: `$${formatNum(String(usdAmt))}`,
+                          amountIsNeg: !isOptional,
+                          optional: isOptional,
+                          notes: vp.notes || null,
+                          nativeImpact: isOptional ? 0 : -vpNativeAmt,
+                          rowCc: primaryCc,
+                          rowNativeAmt: isOptional ? 0 : (vpIsCross ? 0 : -usdAmt),
+                          conversionNote: vpConversionNote,
+                        };
+                      }),
+                    ...(statementData.fxTransfers || []).map((t: any) => {
+                      const isOut = t.fromSupplierId === statementSupplierId;
+                      const isSelf = t.fromSupplierId === t.toSupplierId;
+                      const counterparty = isOut ? (t.toSupplierName || "Broker") : (t.fromSupplierName || "Linked");
+                      const fromAmt = parseFloat(t.fromAmount || "0");
+                      const fromCc = t.fromCurrencyCode || "USD";
+                      const toUsd = parseFloat(t.toAmountUsd || "0");
+                      return {
+                        key: `f-${t.id}`,
+                        date: t.date,
+                        type: "fx" as RowType,
+                        ref: isSelf ? `FX Settlement` : (isOut ? `FX → ${counterparty}` : `FX ← ${counterparty}`),
+                        detail: isOut
+                          ? `${fromCc !== "USD" ? `${fromCc} ` : "$"}${formatNum(String(fromAmt))} → $${formatNum(String(toUsd.toFixed(2)))}${t.sourceType ? ` · ${srcLabel[t.sourceType] || t.sourceType}` : ""}`
+                          : `+$${formatNum(String(toUsd.toFixed(2)))}`,
+                        amount: isOut
+                          ? `${fromCc !== "USD" ? `${fromCc} ` : "$"}${formatNum(String(fromAmt))}`
+                          : `$${formatNum(String(toUsd.toFixed(2)))}`,
+                        amountIsNeg: isOut,
+                        notes: t.notes,
+                        nativeImpact: isOut ? -toNative(fromAmt, fromCc, toUsd / (fromAmt || 1)) : 0,
+                        rowCc: isOut ? fromCc : "USD", rowNativeAmt: isOut ? -fromAmt : toUsd,
+                        onDelete: () => { wrapAdminAction(() => setPendingDelete(() => () => deleteFxTransferMutation.mutate(t.id)), "Delete FX Transfer"); },
+                      };
+                    }),
+                    ...(statementData.offloadCharges || []).map((oc: any) => {
+                      const cc = oc.currencyCode || "USD";
+                      const amt = parseFloat(oc.amount || "0");
+                      const fxRate = parseFloat(oc.fxRateToUsd || "1");
+                      return {
+                        key: `oac-${oc.id}`,
+                        date: oc.createdAt ? new Date(oc.createdAt).toLocaleDateString('en-CA') : null,
+                        type: "other_charge" as RowType,
+                        ref: "Other Charge",
+                        detail: oc.description || "",
+                        amount: cc !== "USD" ? `${cc} ${formatNum(String(amt))}` : `$${formatNum(String(amt))}`,
+                        amountIsNeg: false,
+                        notes: null,
+                        nativeImpact: toNative(amt, cc, fxRate),
+                        rowCc: cc, rowNativeAmt: amt,
+                      };
+                    }),
+                    ...(statementData.obCommissions || []).map((oc: any) => ({
+                      key: `oc-${oc.rawStockId}`,
+                      date: oc.date,
+                      type: "commission" as RowType,
+                      ref: oc.containerNumber,
+                      detail: oc.personName || "",
+                      amount: `${oc.currencyCode !== "USD" ? `${oc.currencyCode} ${formatNum(oc.amount)}` : `$${formatNum(oc.amount)}`}`,
+                      amountIsNeg: true,
+                      notes: null,
+                      onEdit: () => setEditObComm({ rawStockId: oc.rawStockId, amount: oc.amount, currencyCode: oc.currencyCode, personName: oc.personName || "", notes: "" }),
+                      onDelete: () => { wrapAdminAction(() => setPendingDelete(() => () => deleteObCommissionMutation.mutate(oc.rawStockId)), "Delete Commission"); },
+                      nativeImpact: -toNative(parseFloat(oc.amount || "0"), oc.currencyCode || "USD"),
+                      rowCc: oc.currencyCode || "USD", rowNativeAmt: -parseFloat(oc.amount || "0"),
+                    })),
+                  ].sort((a, b) => {
+                    const da = a.date ? new Date(a.date).getTime() : 0;
+                    const db = b.date ? new Date(b.date).getTime() : 0;
+                    return da - db;
+                  });
+
+                  // Date-filter helpers for the activity ledger
+                  const _sfToday = format(new Date(), "yyyy-MM-dd");
+                  const _sfYesterday = format(new Date(Date.now() - 86400000), "yyyy-MM-dd");
+                  const _sfNow = new Date();
+                  const displayedRows = statDateFilter === "all" ? allRows
+                    : statDateFilter === "today" ? allRows.filter(r => r.date && format(new Date(r.date), "yyyy-MM-dd") === _sfToday)
+                    : statDateFilter === "yesterday" ? allRows.filter(r => r.date && format(new Date(r.date), "yyyy-MM-dd") === _sfYesterday)
+                    : statDateFilter === "this_month" ? allRows.filter(r => {
+                        if (!r.date) return false;
+                        const d = new Date(r.date);
+                        return d.getFullYear() === _sfNow.getFullYear() && d.getMonth() === _sfNow.getMonth();
+                      })
+                    : allRows.filter(r => {
+                        if (!r.date) return false;
+                        return new Date(r.date).getFullYear() === _sfNow.getFullYear();
+                      });
+
+                  // KPIs from filtered rows
+                  const sfTotalPurchases = displayedRows.filter(r => r.type === "purchase").reduce((s, r) => s + r.rowNativeAmt, 0);
+                  const sfTotalPayments = displayedRows.filter(r => r.type === "payment").reduce((s, r) => s + Math.abs(r.rowNativeAmt), 0);
+                  const sfPurchasesQty = displayedRows.filter(r => r.type === "purchase").length;
+                  const sfTxCount = displayedRows.length;
+
+                  // Compute per-row running balance in each row's native currency (oldest → newest, using ALL rows so balance is always correct)
+                  const balanceByKey: Record<string, { cc: string; bal: number }> = {};
+                  const currencyRunning: Record<string, number> = {};
+                  for (const r of allRows) {
+                    const cc = r.rowCc;
+                    currencyRunning[cc] = (currencyRunning[cc] || 0) + r.rowNativeAmt;
+                    balanceByKey[r.key] = { cc, bal: currencyRunning[cc] };
+                  }
+                  // Final per-currency totals (for summary rows at bottom)
+                  const currencyTotals = { ...currencyRunning };
+
+                  const typeBadge = (type: RowType) => {
+                    if (type === "purchase") return <Badge variant="outline" className="text-xs font-normal">Purchase</Badge>;
+                    if (type === "payment") return <Badge variant="secondary" className="text-xs font-normal">Payment</Badge>;
+                    if (type === "fx") return <Badge className="text-xs font-normal bg-blue-500 dark:bg-blue-600">FX</Badge>;
+                    if (type === "other_charge") return <Badge className="text-xs font-normal bg-purple-500 dark:bg-purple-700">Other Charge</Badge>;
+                    if (type === "freight") return <Badge className="text-xs font-normal bg-orange-500 dark:bg-orange-600">Freight</Badge>;
+                    if (type === "commission") return <Badge className="text-xs font-normal bg-indigo-500 dark:bg-indigo-600">Commission</Badge>;
+                    return <Badge variant="outline" className="text-xs font-normal">{type}</Badge>;
+                  };
+
+                  if (allRows.length === 0) return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                      <p className="text-lg font-medium">No activity yet</p>
+                    </div>
+                  );
+
+                  const fmtCcAmt = (cc: string, amt: number) =>
+                    cc !== "USD" ? `${cc} ${formatNum(String(Math.abs(amt).toFixed(2)))}` : `$${formatNum(String(Math.abs(amt).toFixed(2)))}`;
+
+                  // Final balance across all currencies (for Balance KPI)
+                  const finalBalanceStr = Object.entries(currencyTotals)
+                    .filter(([, v]) => Math.abs(v) > 0.005)
+                    .map(([cc, v]) => fmtCcAmt(cc, v) + (v > 0 ? " CR" : " DR"))
+                    .join(" / ") || "—";
+
+                  return (
+                    <div className="space-y-3">
+                      {/* KPI cards */}
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Total Purchases</p>
+                          <p className="font-mono font-semibold text-sm">{fmtCcAmt(primaryCc, sfTotalPurchases)}</p>
+                        </div>
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Total Payments</p>
+                          <p className="font-mono font-semibold text-sm text-green-600 dark:text-green-400">{fmtCcAmt(primaryCc, sfTotalPayments)}</p>
+                        </div>
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Purchases Qty</p>
+                          <p className="font-semibold text-sm">{sfPurchasesQty}</p>
+                        </div>
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Transactions</p>
+                          <p className="font-semibold text-sm">{sfTxCount}</p>
+                        </div>
+                        <div className="rounded-lg border bg-muted/30 px-3 py-2">
+                          <p className="text-xs text-muted-foreground mb-1">Balance</p>
+                          <p className="font-mono font-semibold text-sm tabular-nums">{finalBalanceStr}</p>
+                        </div>
+                      </div>
+
+                      {/* Date filter buttons */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {(["all", "today", "yesterday", "this_month", "this_year"] as const).map((f) => (
+                          <Button
+                            key={f}
+                            variant={statDateFilter === f ? "default" : "outline"}
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => setStatDateFilter(f)}
+                            data-testid={`button-stat-date-filter-${f}`}
+                          >
+                            {f === "all" ? "All" : f === "today" ? "Today" : f === "yesterday" ? "Yesterday" : f === "this_month" ? "This Month" : "This Year"}
+                          </Button>
+                        ))}
+                        {statDateFilter !== "all" && (
+                          <span className="ml-1 text-xs text-muted-foreground">{sfTxCount} result{sfTxCount !== 1 ? "s" : ""}</span>
+                        )}
+                      </div>
+
+                      <div className="table-responsive">
+                      <Table>
+                        <TableHeader className="sticky top-0 z-30">
+                          <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Date</TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Type</TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Reference</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Amount</TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Balance</TableHead>
+                            <TableHead className="w-8 py-2" />
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {displayedRows.map(row => {
+                            const balEntry = balanceByKey[row.key];
+                            const balCc = balEntry?.cc ?? row.rowCc;
+                            const bal = balEntry?.bal ?? 0;
+                            return (
+                            <TableRow key={row.key} data-testid={row.type === "purchase" ? `row-statement-${row.key}` : undefined}>
+                              <TableCell className="whitespace-nowrap text-sm">{formatDate(row.date || "")}</TableCell>
+                              <TableCell>{typeBadge(row.type)}</TableCell>
+                              <TableCell className="text-sm font-medium">
+                                <div className="flex flex-col gap-0.5">
+                                  <div className="flex items-center gap-1 flex-wrap">
+                                    <span>{row.ref}</span>
+                                    {row.status && <Badge variant={statusColor(row.status)} className="text-xs ml-1">{statusDisplayLabel(row.status)}</Badge>}
+                                  </div>
+
+                                  {row.detail && (
+                                    <span className="text-xs text-muted-foreground font-normal">{row.detail}</span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              <TableCell className={`text-right text-sm tabular-nums font-medium ${row.optional ? "text-muted-foreground line-through" : row.type === "payment" ? "text-green-600 dark:text-green-400" : row.type === "purchase" || row.type === "freight" || row.type === "commission" ? "text-red-600 dark:text-red-400" : row.amountIsNeg ? "text-destructive" : ""}`}>
+                                {row.type !== "payment" && row.type !== "purchase" && row.type !== "freight" && row.type !== "commission" && row.amountIsNeg ? "−" : ""}{row.amount}
+                                {!row.optional && (row.type === "purchase" || row.type === "freight" || row.type === "commission") && <span className="ml-1 text-xs font-normal opacity-70">CR</span>}
+                                {!row.optional && row.type === "payment" && <span className="ml-1 text-xs font-normal opacity-70">DR</span>}
+                                {row.optional && <span className="ml-1 text-xs font-normal opacity-70">(Optional)</span>}
+                              </TableCell>
+                              <TableCell className={`text-right text-sm tabular-nums font-medium ${bal > 0 ? "text-red-600 dark:text-red-400" : bal < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                {fmtCcAmt(balCc, bal)}{bal > 0 ? " CR" : bal < 0 ? " DR" : ""}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {row.onEdit && (
+                                    <Button variant="ghost" size="icon" onClick={row.onEdit}>
+                                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                                    </Button>
+                                  )}
+                                  {row.onDelete && (
+                                    <Button variant="ghost" size="icon" onClick={row.onDelete}>
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ); })}
+                          {/* Currency totals summary rows */}
+                          {Object.entries(currencyTotals).filter(([, v]) => v !== 0).map(([cc, total]) => (
+                            <TableRow key={`total-${cc}`} className="border-t-2 bg-muted/30">
+                              <TableCell colSpan={3} className="text-sm font-semibold text-muted-foreground">
+                                {cc} Net Balance
+                              </TableCell>
+                              <TableCell />
+                              <TableCell className={`text-right text-sm tabular-nums font-bold ${total > 0 ? "text-red-600 dark:text-red-400" : total < 0 ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}>
+                                {fmtCcAmt(cc, total)}{total > 0 ? " CR" : total < 0 ? " DR" : ""}
+                              </TableCell>
+                              <TableCell />
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                      {/* Overpayment callout — shown when any currency bucket is negative (paid more than owed) */}
+                      {Object.entries(currencyTotals).some(([, v]) => v < -0.005) && (
+                        <div className="mt-3 rounded-md border border-amber-400 dark:border-amber-500 bg-amber-50 dark:bg-amber-950/40 px-4 py-3 flex flex-col gap-1">
+                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-400">Overpayment detected</p>
+                          {Object.entries(currencyTotals).filter(([, v]) => v < -0.005).map(([cc, total]) => (
+                            <p key={cc} className="text-sm text-amber-700 dark:text-amber-300 tabular-nums">
+                              {fmtCcAmt(cc, Math.abs(total))} {cc} overpaid (excess credit on account)
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    </div>
+                  );
+                })()}
+              </div>}
+            </div>}
+
+          </>
+        ) : null}
+
+        {/* FX Settlement Dialog — internal settlement: linked supplier foreign currency → broker USD bucket */}
+        <Dialog open={fxConversionOpen} onOpenChange={(open) => { if (!open) setFxConversionOpen(false); }}>
+          <DialogContent className="max-w-md">
+            {(() => {
+              const isSelf = fxConversionForm.toSupplierId === fxConversionForm.fromSupplierId;
+              return (
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-4 w-4" />
+                    {fxConversionForm.selectedCurrency === "USD"
+                      ? (parseFloat(fxConversionForm.commissionBalance || "0") > 0
+                          ? (isSelf ? "Settle Commission to EUR" : "Transfer Commission to Broker")
+                          : (isSelf ? "Settle Freight to EUR" : "Transfer Freight to Broker"))
+                      : (isSelf ? `FX Settlement to EUR` : "FX Settlement to Broker (EUR)")}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {fxConversionForm.selectedCurrency === "USD"
+                      ? parseFloat(fxConversionForm.commissionBalance || "0") > 0
+                        ? (isSelf
+                            ? "Direct settlement: records this USD commission as settled. Not a voucher payment."
+                            : "Direct transfer: moves this USD commission from the linked supplier to the broker at 1:1 rate. Not a voucher payment.")
+                        : (isSelf
+                            ? "Direct settlement: records this USD freight obligation as settled. Not a voucher payment."
+                            : "Direct transfer: moves this USD freight obligation from the linked supplier to the broker at 1:1 rate. Not a voucher payment.")
+                      : (isSelf
+                          ? "Internal settlement: records the USD amount paid to settle this supplier's foreign currency balance. Not a voucher payment."
+                          : "Internal settlement: records the USD cost of settling this linked supplier's foreign currency balance into the broker's pool. Not a voucher payment.")}
+                  </DialogDescription>
+                </DialogHeader>
+              );
+            })()}
+            <div className="space-y-4">
+              {/* Source type selector */}
+              <div>
+                <Label className="text-xs text-muted-foreground mb-1 block">Settlement Source</Label>
+                <div className="flex gap-2">
+                  {(["supplier", "commission", "both"] as const).map(t => {
+                    const labels: Record<string, string> = { supplier: "Supplier Balance", commission: "Commission", both: "Both" };
+                    const getAvail = (src: string) => {
+                      const s = parseFloat(fxConversionForm.supplierBalance || "0");
+                      const c = parseFloat(fxConversionForm.commissionBalance || "0");
+                      if (src === "supplier") return s.toFixed(2);
+                      if (src === "commission") return c.toFixed(2);
+                      return (s + c).toFixed(2);
+                    };
+                    return (
+                      <Button
+                        key={t}
+                        type="button"
+                        variant={fxSourceType === t ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => {
+                          setFxSourceType(t);
+                          const newAvail = getAvail(t);
+                          setFxConversionForm(prev => ({ ...prev, availableBalance: newAvail, amount: newAvail }));
+                        }}
+                        data-testid={`fx-source-${t}`}
+                      >
+                        {labels[t]}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 grid grid-cols-2 gap-x-4 text-xs text-muted-foreground">
+                  <span>Supplier net: <span className="font-medium text-foreground">{parseFloat(fxConversionForm.supplierBalance || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency}</span></span>
+                  <span>Commission: <span className="font-medium text-foreground">{parseFloat(fxConversionForm.commissionBalance || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency}</span></span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50">
+                <Globe className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="text-sm font-medium">{fxConversionForm.selectedCurrency} balance being settled</span>
+              </div>
+
+              <div>
+                <Label>Amount ({fxConversionForm.selectedCurrency})</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  min="0"
+                  placeholder="0.00"
+                  value={fxConversionForm.amount}
+                  onChange={(e) => setFxConversionForm(prev => ({ ...prev, amount: e.target.value }))}
+                  data-testid="input-fx-amount"
+                />
+                {(() => {
+                  const avail = parseFloat(fxConversionForm.availableBalance || "0");
+                  const entered = parseFloat(fxConversionForm.amount || "0");
+                  const exceeds = entered > avail + 0.005;
+                  const remaining = avail - entered;
+                  return (
+                    <p className="text-xs mt-1 text-muted-foreground">
+                      Balance: {avail.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency}
+                      {exceeds && (
+                        <span className="ml-1 text-amber-600 dark:text-amber-400">
+                          — overpayment of {Math.abs(remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {fxConversionForm.selectedCurrency} (remaining will show as CR)
+                        </span>
+                      )}
+                    </p>
+                  );
+                })()}
+              </div>
+
+              {fxConversionForm.selectedCurrency === "USD" ? (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 text-sm text-muted-foreground">
+                  <span>Rate: <span className="font-medium text-foreground">1 USD = 1 USD</span> (direct transfer, no FX conversion)</span>
+                </div>
+              ) : (
+                <div>
+                  <Label>Exchange Rate (USD per 1 {fxConversionForm.selectedCurrency})</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    min="0"
+                    placeholder={`e.g. 1.10 (USD per 1 ${fxConversionForm.selectedCurrency})`}
+                    value={fxConversionForm.fxRateToUsd}
+                    onChange={(e) => setFxConversionForm(prev => ({ ...prev, fxRateToUsd: e.target.value }))}
+                    data-testid="input-fx-rate"
+                  />
+                  {fxConversionForm.amount && fxConversionForm.fxRateToUsd && parseFloat(fxConversionForm.fxRateToUsd) > 0 && parseFloat(fxConversionForm.amount) > 0 && (
+                    <p className="text-sm font-medium mt-1.5 text-primary">
+                      = ${(parseFloat(fxConversionForm.amount) * parseFloat(fxConversionForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Entry Date</Label>
+                  <Input
+                    type="date"
+                    value={fxConversionForm.date}
+                    onChange={(e) => setFxConversionForm(prev => ({ ...prev, date: e.target.value }))}
+                    data-testid="input-fx-date"
+                  />
+                </div>
+                <div>
+                  <Label>Effective Date <span className="text-muted-foreground">(optional)</span></Label>
+                  <Input
+                    type="date"
+                    value={fxConversionForm.effectiveDate}
+                    onChange={(e) => setFxConversionForm(prev => ({ ...prev, effectiveDate: e.target.value }))}
+                    data-testid="input-fx-effective-date"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label>Notes</Label>
+                <Input
+                  placeholder="Conversion note"
+                  value={fxConversionForm.notes}
+                  onChange={(e) => setFxConversionForm(prev => ({ ...prev, notes: e.target.value }))}
+                  data-testid="input-fx-notes"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFxConversionOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => wrapAdminAction(() => {
+                  fxConversionMutation.mutate({
+                    ...fxConversionForm,
+                    sourceType: fxSourceType,
+                  } as any);
+                }, "Record FX Conversion")}
+                disabled={
+                  !fxConversionForm.amount ||
+                  !fxConversionForm.fxRateToUsd ||
+                  parseFloat(fxConversionForm.amount) <= 0 ||
+                  parseFloat(fxConversionForm.fxRateToUsd) <= 0 ||
+                  fxConversionMutation.isPending
+                }
+                data-testid="button-submit-fx-conversion"
+              >
+                {fxConversionMutation.isPending ? "Recording..." : fxConversionForm.selectedCurrency === "USD" ? "Record Transfer" : "Record Settlement"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete confirmation for FX transfers (must live inside this early-return block) */}
+        <DeleteConfirmDialog
+          open={!!pendingDelete}
+          onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+          onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+        />
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  // Overpayment computation for the payment dialog
+  const _payFxR = parseFloat(paymentForm.fxRateToUsd) || 1;
+  const _payAmt = parseFloat(paymentForm.amount) || 0;
+  const paymentAmtUsd = paymentForm.currencyCode === "USD" ? _payAmt : _payAmt / _payFxR;
+  const paymentSelectedSup = paymentDialogSupplier
+    ? (paymentForm.supplierId === paymentDialogSupplier.id
+        ? paymentDialogSupplier
+        : (suppliers || []).find((s: any) => s.id === paymentForm.supplierId) ?? paymentDialogSupplier)
+    : null;
+  const paymentBalanceUsd = parseFloat(paymentSelectedSup?.totalValue || "0");
+  const isOverpayment = _payAmt > 0 && paymentAmtUsd > paymentBalanceUsd + 0.005;
+  const overpaymentUsd = isOverpayment ? paymentAmtUsd - paymentBalanceUsd : 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <PageHeader title="Brokers &amp; Suppliers" />
+          <p className="text-muted-foreground mt-1">
+            {brokerCount > 0 && `${brokerCount} broker${brokerCount !== 1 ? "s" : ""}`}
+            {brokerCount > 0 && standaloneCount > 0 && " · "}
+            {standaloneCount > 0 && `${standaloneCount} standalone`}
+            {inactiveSuppliers.length > 0 && ` · ${inactiveSuppliers.length} inactive`}
+          </p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          {inactiveSuppliers.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowInactive(!showInactive)}
+              data-testid="button-toggle-inactive"
+            >
+              {showInactive ? "Hide Inactive" : "Show Inactive"}
+            </Button>
+          )}
+          <Button
+            onClick={() => { resetForm(); setCreateOpen(true); }}
+            data-testid="button-add-factory-supplier"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Supplier
+          </Button>
+        </div>
+      </div>
+
+      {/* Filter bar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={activeFilter} onValueChange={(v) => setActiveFilter(v as SupplierFilter)}>
+          <SelectTrigger className="w-44" data-testid="filter-dropdown">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="brokers">Brokers</SelectItem>
+            <SelectItem value="standalone">Standalone</SelectItem>
+            <SelectItem value="with-balance">With Balance</SelectItem>
+            <SelectItem value="zero-balance">Zero Balance</SelectItem>
+            <SelectItem value="has-foreign">Has Foreign Currency</SelectItem>
+            <SelectItem value="has-recent">Recent Activity</SelectItem>
+          </SelectContent>
+        </Select>
+        <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-list-include-otw">
+          <Switch
+            checked={listIncludeOtw}
+            onCheckedChange={setListIncludeOtw}
+            data-testid="switch-list-include-otw"
+          />
+          <span className="text-sm text-muted-foreground">Include OTW</span>
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-xl border p-4">
+            <div className="text-xs text-muted-foreground">Brokers</div>
+            <div className="text-2xl font-bold mt-1" data-testid="text-broker-count">
+              {brokerCount}
+            </div>
+        </div>
+        <div className="rounded-xl border p-4">
+            <div className="text-xs text-muted-foreground">Standalone Suppliers</div>
+            <div className="text-2xl font-bold mt-1" data-testid="text-total-suppliers">
+              {standaloneCount}
+            </div>
+        </div>
+        <div className="rounded-xl border p-4">
+            <div className="text-xs text-muted-foreground">Total Containers</div>
+            <div className="text-2xl font-bold mt-1" data-testid="text-total-containers">
+              {totalContainers}
+            </div>
+        </div>
+        <div className="rounded-xl border p-4">
+            <div className="flex items-center justify-between gap-1 flex-wrap">
+              <div className="text-xs text-muted-foreground">Total USD</div>
+              {listIncludeOtw && (
+                <div className="text-xs text-amber-500 font-medium">incl. OTW</div>
+              )}
+            </div>
+            <div className="mt-1 space-y-0.5">
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-xs text-muted-foreground w-14 shrink-0">We owe</span>
+                <span className="text-lg font-bold tabular-nums text-foreground" data-testid="text-total-usd-owed">
+                  ${totalUsdOwed.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="flex items-baseline gap-1.5 flex-wrap">
+                <span className="text-xs text-muted-foreground w-14 shrink-0">Overpaid</span>
+                <span className="text-lg font-bold tabular-nums text-green-600 dark:text-green-400" data-testid="text-total-usd-overpaid">
+                  ${totalUsdOverpaid.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+        </div>
+      </div>
+
+      <div className="rounded-xl border overflow-hidden">
+          {displayedTopLevel.length > 0 ? (
+            <div className="divide-y">
+              {displayedTopLevel.map((s) => {
+                const childAccounts = subAccountsByParent[s.id] || [];
+                const hasChildren = childAccounts.length > 0;
+                const isExpanded = expandedSupplierIds.has(s.id);
+
+                const SupplierRow = ({ sup, isChild }: { sup: SupplierWithBalance; isChild?: boolean }) => {
+                  const isParent = !isChild && hasChildren;
+                  const handleOpen = () => {

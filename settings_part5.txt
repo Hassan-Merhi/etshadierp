@@ -1,0 +1,500 @@
+                                  <span>Location ID: {v.locationId} (deleted)</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+
+                    <Card className="p-6">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                          <div className="flex items-center gap-4">
+                            <div className="p-3 bg-blue-500/10 rounded-lg">
+                              <Package className="h-6 w-6 text-blue-500" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold" data-testid="text-container-offload-analysis">Container Offload Analysis</h3>
+                              <p className="text-sm text-muted-foreground">
+                                Analyze PO line items for a container to detect duplicates, blank quantities, and other issues
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Select value={selectedContainerForDiag} onValueChange={setSelectedContainerForDiag}>
+                              <SelectTrigger className="w-[200px]" data-testid="select-container-for-diag">
+                                <SelectValue placeholder="Select container" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {containersForDiag.map((c: any) => (
+                                  <SelectItem key={c.id} value={c.id.toString()}>
+                                    {c.containerNumber} ({c.status})
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="outline"
+                              disabled={!selectedContainerForDiag || isLoadingContainerDiag}
+                              onClick={async () => {
+                                if (!selectedContainerForDiag) return;
+                                try {
+                                  setIsLoadingContainerDiag(true);
+                                  setContainerDiagResult(null);
+                                  const response = await fetch(`/api/containers/${selectedContainerForDiag}/offload-diagnostics`, { method: "GET", credentials: "include" });
+                                  const result = await response.json();
+                                  if (response.ok) {
+                                    setContainerDiagResult(result);
+                                    if (!result.hasIssues) toast({ title: "No Issues Found", description: `Container ${result.containerNumber} has ${result.lineItemCount} valid line items, total ${result.totalQuantity} bales.` });
+                                  } else {
+                                    toast({ title: "Error", description: result.message, variant: "destructive" });
+                                  }
+                                } catch (error: any) {
+                                  toast({ title: "Error", description: error.message, variant: "destructive" });
+                                } finally {
+                                  setIsLoadingContainerDiag(false);
+                                }
+                              }}
+                              data-testid="button-analyze-container"
+                            >
+                              {isLoadingContainerDiag ? "Analyzing..." : "Analyze"}
+                            </Button>
+                          </div>
+                        </div>
+                        {containerDiagResult && (
+                          <div className={`p-4 rounded-lg space-y-3 ${containerDiagResult.hasIssues ? 'bg-destructive/10' : 'bg-green-500/10'}`}>
+                            <div className="flex items-center justify-between">
+                              <p className={`font-medium ${containerDiagResult.hasIssues ? 'text-destructive' : 'text-green-600'}`}>
+                                {containerDiagResult.containerNumber} ({containerDiagResult.containerStatus})
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {containerDiagResult.poCount} POs, {containerDiagResult.lineItemCount} line items
+                              </p>
+                            </div>
+                            {containerDiagResult.hasIssues && (
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium text-destructive">Issues Found:</p>
+                                <div className="max-h-48 overflow-y-auto text-sm space-y-1">
+                                  {containerDiagResult.lineItems.filter((item: any) => !item.isValid).map((item: any, i: number) => (
+                                    <div key={i} className="flex justify-between gap-2 py-1 border-b last:border-0">
+                                      <span className="truncate">{item.poNumber} - {item.stockItemCode || 'No stock item'} (Qty: {item.quantity})</span>
+                                      <span className="text-destructive whitespace-nowrap">{item.issues.join(', ')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+
+                    <Card className="p-6">
+                      <div className="flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 bg-purple-500/10 rounded-lg">
+                            <Building2 className="h-6 w-6 text-purple-500" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold" data-testid="text-parent-company-title">Parent Company for Net Position</h3>
+                            <p className="text-sm text-muted-foreground">
+                              Set which company is the parent for supplier balance reporting. Suppliers are only counted in the parent company's Net Position.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={parentCompanyData?.parentCompanyId?.toString() || "none"}
+                            onValueChange={(value) => {
+                              const companyId = value === "none" ? null : parseInt(value, 10);
+                              setParentCompanyMutation.mutate(companyId);
+                            }}
+                            disabled={setParentCompanyMutation.isPending || (currentUser?.role !== "Admin" && currentUser?.role !== "Developer")}
+                          >
+                            <SelectTrigger className="w-[200px]" data-testid="select-parent-company">
+                              <SelectValue placeholder="Select parent company" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Not Set</SelectItem>
+                              {companies.map((company: any) => (
+                                <SelectItem key={company.id} value={company.id.toString()}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {currentUser?.role !== "Admin" && currentUser?.role !== "Developer" && (
+                            <span className="text-xs text-muted-foreground">(Admin only)</span>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+
+                    <NetPositionAdjustmentCard />
+                  </div>
+                </div>
+              )}
+            </div>
+            );
+          })()}
+
+        </div>
+
+        {/* Initialize Accounting Balances Dialog */}
+        <AlertDialog open={isInitBalancesDialogOpen} onOpenChange={setIsInitBalancesDialogOpen}>
+          <AlertDialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Initialize Accounting Balances</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                {!initBalancesResult ? (
+                  <p>This will create Owner's Capital accounts for each company to balance the Import Cycle. This action cannot be easily undone.</p>
+                ) : (
+                  <div className="space-y-4 mt-4">
+                    <div className="text-foreground font-medium">{initBalancesResult.message}</div>
+                    {initBalancesResult.results?.map((r: any) => (
+                      <div key={r.companyId} className="p-3 border rounded-md space-y-2">
+                        <div className="font-medium">{r.companyName}</div>
+                        <div className="text-sm">Imbalance: ${formatNumber(r.imbalance || 0)}</div>
+                        <div className="text-sm">{r.message}</div>
+                        
+                        {r.components && (
+                          <div className="text-sm mt-3 border-t pt-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="w-full justify-between"
+                              onClick={() => setExpandedBreakdownId(expandedBreakdownId === r.companyId ? null : r.companyId)}
+                              data-testid={`button-expand-breakdown-${r.companyId}`}
+                            >
+                              <span>View Calculation Breakdown</span>
+                              {expandedBreakdownId === r.companyId ? (
+                                <ChevronUp className="h-4 w-4 ml-2" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 ml-2" />
+                              )}
+                            </Button>
+                            {expandedBreakdownId === r.companyId && (
+                              <>
+                                <div className="mt-2 grid grid-cols-2 gap-4 p-2 bg-muted/50 rounded">
+                                  <div>
+                                    <div className="font-medium text-green-600 dark:text-green-400 mb-1">Assets (Debit)</div>
+                                    {r.components.assets?.map((c: any, i: number) => (
+                                      <div key={i} className="flex justify-between">
+                                        <span>{c.name}</span>
+                                        <span>${formatNumber(c.value)}</span>
+                                      </div>
+                                    ))}
+                                    <div className="border-t mt-1 pt-1 font-medium flex justify-between">
+                                      <span>Total Assets</span>
+                                      <span>${formatNumber(r.components.totalAssets || 0)}</span>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-red-600 dark:text-red-400 mb-1">Liabilities (Credit)</div>
+                                    {r.components.liabilities?.map((c: any, i: number) => (
+                                      <div key={i} className="flex justify-between">
+                                        <span>{c.name}</span>
+                                        <span>${formatNumber(c.value)}</span>
+                                      </div>
+                                    ))}
+                                    <div className="border-t mt-1 pt-1 font-medium flex justify-between">
+                                      <span>Total Liabilities</span>
+                                      <span>${formatNumber(r.components.totalLiabilities || 0)}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="mt-2 p-2 bg-muted rounded text-center font-medium">
+                                  Net Imbalance = ${formatNumber(r.components.totalAssets || 0)} - ${formatNumber(r.components.totalLiabilities || 0)} = ${formatNumber(r.imbalance || 0)}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {initBalancesResult.sqlForProduction && (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-medium">SQL for Production (Copy to Render):</div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              navigator.clipboard.writeText(initBalancesResult.sqlForProduction);
+                              toast({
+                                title: "Copied",
+                                description: "SQL copied to clipboard",
+                              });
+                            }}
+                            data-testid="button-copy-sql"
+                          >
+                            Copy SQL
+                          </Button>
+                        </div>
+                        <pre className="p-3 bg-muted rounded-md text-xs overflow-x-auto whitespace-pre-wrap">
+                          {initBalancesResult.sqlForProduction}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Close</AlertDialogCancel>
+              {!initBalancesResult && (
+                <AlertDialogAction
+                  onClick={() => initializeBalancesMutation.mutate()}
+                  disabled={initializeBalancesMutation.isPending}
+                >
+                  {initializeBalancesMutation.isPending ? "Processing..." : "Initialize All Companies"}
+                </AlertDialogAction>
+              )}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Fix Old PO Credits Dialog */}
+        <AlertDialog open={isFixPOCreditsDialogOpen} onOpenChange={(open) => {
+          setIsFixPOCreditsDialogOpen(open);
+          if (!open) {
+            setSelectedCompanyForFix("");
+            setSelectedParentCompanyForFix("");
+            setFixPOCreditsResult(null);
+            setReversePOCreditsResult(null);
+          }
+        }}>
+          <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Inter-Company Credit Management</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                {!fixPOCreditsResult && !reversePOCreditsResult ? (
+                  <div className="space-y-4">
+                    <p>
+                      <strong>Fix:</strong> Creates inter-company credit entries for old offloaded POs.
+                      <br />
+                      <strong>Reverse:</strong> Removes all inter-company (INTERCO) vouchers.
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Subsidiary Company (source)</label>
+                        <Select
+                          value={selectedCompanyForFix}
+                          onValueChange={setSelectedCompanyForFix}
+                        >
+                          <SelectTrigger className="mt-1" data-testid="select-company-for-fix">
+                            <SelectValue placeholder="Choose subsidiary..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies
+                              .filter((c: any) => c.id.toString() !== selectedParentCompanyForFix)
+                              .map((company: any) => (
+                                <SelectItem key={company.id} value={company.id.toString()}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">The company whose POs need fixing</p>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-foreground">Parent Company (receiver)</label>
+                        <Select
+                          value={selectedParentCompanyForFix}
+                          onValueChange={setSelectedParentCompanyForFix}
+                        >
+                          <SelectTrigger className="mt-1" data-testid="select-parent-for-fix">
+                            <SelectValue placeholder="Choose parent..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {companies
+                              .filter((c: any) => c.id.toString() !== selectedCompanyForFix)
+                              .map((company: any) => (
+                                <SelectItem key={company.id} value={company.id.toString()}>
+                                  {company.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground mt-1">The company that paid suppliers</p>
+                      </div>
+                    </div>
+                    {selectedCompanyForFix && selectedParentCompanyForFix && (
+                      <div className="status-info p-3 rounded-md">
+                        <p className="text-sm">
+                          This will create credit entries for <strong>{companies.find((c: any) => c.id.toString() === selectedCompanyForFix)?.name}</strong> towards <strong>{companies.find((c: any) => c.id.toString() === selectedParentCompanyForFix)?.name}</strong>.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : fixPOCreditsResult ? (
+                  <div className="space-y-4 mt-4">
+                    <div className="text-foreground font-medium">{fixPOCreditsResult.message}</div>
+                    <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded">
+                      <div>
+                        <div className="text-sm text-muted-foreground">POs Fixed</div>
+                        <div className="text-lg font-semibold">{fixPOCreditsResult.fixed}</div>
+                      </div>
+                      <div>
+                        <div className="text-sm text-muted-foreground">Total Amount</div>
+                        <div className="text-lg font-semibold">${formatNumber(parseFloat(fixPOCreditsResult.totalAmount || 0))}</div>
+                      </div>
+                    </div>
+                    {fixPOCreditsResult.details?.length > 0 && (
+                      <div className="mt-4">
+                        <div className="font-medium mb-2">Details:</div>
+                        <div className="max-h-60 overflow-y-auto border rounded">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Company</TableHead>
+                                <TableHead>PO Number</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {fixPOCreditsResult.details.map((d: any, i: number) => (
+                                <TableRow key={i}>
+                                  <TableCell>{d.company}</TableCell>
+                                  <TableCell>{d.poNumber}</TableCell>
+                                  <TableCell className="text-right">${formatNumber(d.amount)}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : reversePOCreditsResult ? (
+                  <div className="space-y-4 mt-4">
+                    <div className="text-foreground font-medium">{reversePOCreditsResult.message}</div>
+                    <div className="p-3 bg-muted/50 rounded">
+                      <div className="text-sm text-muted-foreground">Vouchers Reversed</div>
+                      <div className="text-lg font-semibold">{reversePOCreditsResult.reversed}</div>
+                    </div>
+                    {reversePOCreditsResult.details?.length > 0 && (
+                      <div className="mt-4">
+                        <div className="font-medium mb-2">Deleted Vouchers:</div>
+                        <div className="max-h-60 overflow-y-auto border rounded">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Company</TableHead>
+                                <TableHead>Voucher Number</TableHead>
+                                <TableHead className="text-right">Amount</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {reversePOCreditsResult.details.map((d: any, i: number) => (
+                                <TableRow key={i}>
+                                  <TableCell>{d.company}</TableCell>
+                                  <TableCell>{d.voucherNumber}</TableCell>
+                                  <TableCell className="text-right">${formatNumber(parseFloat(d.amount))}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="gap-2">
+              <AlertDialogCancel>Close</AlertDialogCancel>
+              {!fixPOCreditsResult && !reversePOCreditsResult && (
+                <>
+                  <Button
+                    variant="destructive"
+                    onClick={() => reversePOCreditsMutation.mutate({ 
+                      companyId: parseInt(selectedCompanyForFix), 
+                      parentCompanyId: parseInt(selectedParentCompanyForFix) 
+                    })}
+                    disabled={reversePOCreditsMutation.isPending || fixPOCreditsMutation.isPending || !selectedCompanyForFix || !selectedParentCompanyForFix}
+                    data-testid="button-reverse-po-credits"
+                  >
+                    {reversePOCreditsMutation.isPending ? "Reversing..." : "Reverse Credits"}
+                  </Button>
+                  <AlertDialogAction
+                    onClick={() => fixPOCreditsMutation.mutate({ 
+                      companyId: parseInt(selectedCompanyForFix), 
+                      parentCompanyId: parseInt(selectedParentCompanyForFix) 
+                    })}
+                    disabled={fixPOCreditsMutation.isPending || reversePOCreditsMutation.isPending || !selectedCompanyForFix || !selectedParentCompanyForFix}
+                  >
+                    {fixPOCreditsMutation.isPending ? "Processing..." : "Fix Credits"}
+                  </AlertDialogAction>
+                </>
+              )}
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Reset Company Data Dialog */}
+        <AlertDialog open={isResetDataDialogOpen} onOpenChange={(open) => {
+          setIsResetDataDialogOpen(open);
+          if (!open) {
+            setSelectedCompanyForReset("");
+            setResetDataResult(null);
+          }
+        }}>
+          <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Reset Company Data</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                {!resetDataResult ? (
+                  <div className="space-y-4">
+                    <div className="status-warning p-3 rounded-md">
+                      <p className="text-sm font-medium">
+                        Warning: This action permanently deletes data. This cannot be undone.
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium text-foreground">Select Company to Reset</label>
+                      <Select
+                        value={selectedCompanyForReset}
+                        onValueChange={setSelectedCompanyForReset}
+                      >
+                        <SelectTrigger className="mt-1" data-testid="select-company-for-reset">
+                          <SelectValue placeholder="Choose a company..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies.map((company: any) => (
+                            <SelectItem key={company.id} value={company.id.toString()}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-red-600 mb-2">Will be DELETED:</h4>
+                        <ul className="text-xs text-muted-foreground space-y-1">
+                          <li>• Payment vouchers</li>
+                          <li>• Receipt vouchers</li>
+                          <li>• Journal vouchers</li>
+                          <li>• Associated voucher entries</li>
+                        </ul>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-green-600 mb-2">Will be PRESERVED:</h4>
+                        <ul className="text-xs text-muted-foreground space-y-1">
+                          <li>• All containers & offloads</li>
+                          <li>• Inventory/stock balances</li>
+                          <li>• Locations & accounts</li>
+                          <li>• POS vouchers</li>
+                          <li>• Production/Consumption/Stock Transfer</li>
+                          <li>• Purchase Orders</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4 mt-4">

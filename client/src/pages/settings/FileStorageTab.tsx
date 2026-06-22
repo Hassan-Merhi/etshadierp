@@ -6,25 +6,13 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { readFromBuffer } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  FolderOpen, Folder, FolderPlus, Upload, Download, Trash2, Eye, Pencil,
-  ArrowRightLeft, FileText, FileSpreadsheet, FileImage, File, Search,
-  Loader2, Database, X, ChevronRight,
+  Upload, Download, Trash2, Eye, Pencil,
+  ArrowRightLeft, Search, Loader2, Database, ChevronRight,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -59,135 +47,9 @@ interface PreviewState {
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function visibleName(file: StoredFile) {
-  return file.displayName || file.fileName;
-}
-
-function getPreviewType(file: StoredFile): PreviewType {
-  const mt = file.fileType.toLowerCase();
-  const name = file.fileName.toLowerCase();
-  if (mt === "application/pdf") return "pdf";
-  if (mt.startsWith("image/")) return "image";
-  if (mt === "text/csv" || name.endsWith(".csv")) return "csv";
-  if (mt === "text/plain" || name.endsWith(".txt")) return "text";
-  if (
-    mt.includes("spreadsheet") || mt.includes("excel") ||
-    name.endsWith(".xlsx") || name.endsWith(".xls")
-  ) return "excel";
-  return "unsupported";
-}
-
-function FileIcon({ fileType, fileName, className }: { fileType: string; fileName: string; className?: string }) {
-  const mt = fileType.toLowerCase();
-  const name = fileName.toLowerCase();
-  if (mt === "application/pdf") return <FileText className={`text-red-500 ${className}`} />;
-  if (mt.startsWith("image/")) return <FileImage className={`text-blue-400 ${className}`} />;
-  if (mt.includes("spreadsheet") || mt.includes("excel") || name.endsWith(".xlsx") || name.endsWith(".xls") || name.endsWith(".csv"))
-    return <FileSpreadsheet className={`text-green-500 ${className}`} />;
-  if (mt.includes("word") || name.endsWith(".doc") || name.endsWith(".docx"))
-    return <FileText className={`text-blue-500 ${className}`} />;
-  return <File className={`text-muted-foreground ${className}`} />;
-}
-
-// ── Preview Modal ────────────────────────────────────────────────────────────
-function PreviewModal({
-  preview, onClose, onDownload,
-}: {
-  preview: PreviewState | null;
-  onClose: () => void;
-  onDownload: (file: StoredFile) => void;
-}) {
-  if (!preview) return null;
-  const { file, type, blobUrl, text, rows, loading, error } = preview;
-
-  return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-4xl w-full max-h-[90vh] flex flex-col gap-0 p-0">
-        <DialogHeader className="px-6 pt-5 pb-3 border-b flex-row items-center justify-between">
-          <DialogTitle className="truncate max-w-[80%] text-base">
-            {visibleName(file)}
-          </DialogTitle>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={() => onDownload(file)} data-testid="button-preview-download">
-              <Download className="h-4 w-4 mr-1" />
-              Download
-            </Button>
-            <Button size="icon" variant="ghost" onClick={onClose} data-testid="button-preview-close">
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-auto p-4 min-h-[300px]">
-          {loading && (
-            <div className="flex items-center justify-center h-40 gap-2 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Loading preview...</span>
-            </div>
-          )}
-          {error && (
-            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2">
-              <FileText className="h-10 w-10 opacity-30" />
-              <p>Could not load preview.</p>
-            </div>
-          )}
-          {!loading && !error && type === "pdf" && blobUrl && (
-            <iframe
-              src={blobUrl}
-              title="PDF Preview"
-              className="w-full h-[65vh] rounded border-0"
-              data-testid="preview-pdf"
-            />
-          )}
-          {!loading && !error && type === "image" && blobUrl && (
-            <div className="flex items-center justify-center">
-              <img src={blobUrl} alt={visibleName(file)} className="max-w-full max-h-[65vh] rounded object-contain" data-testid="preview-image" />
-            </div>
-          )}
-          {!loading && !error && (type === "csv" || type === "excel") && rows && rows.length > 0 && (
-            <div className="overflow-auto max-h-[65vh]">
-              <table className="text-xs w-full border-collapse" data-testid="preview-table">
-                <tbody>
-                  {rows.map((row, ri) => (
-                    <tr key={ri} className={ri === 0 ? "bg-muted font-semibold" : "border-b border-border/40 hover:bg-muted/30"}>
-                      {row.map((cell: any, ci: number) => (
-                        <td key={ci} className="px-2 py-1 border-r border-border/40 whitespace-nowrap max-w-[200px] truncate">
-                          {cell == null ? "" : String(cell)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {!loading && !error && (type === "csv" || type === "excel") && (!rows || rows.length === 0) && (
-            <p className="text-muted-foreground text-sm">No data to preview.</p>
-          )}
-          {!loading && !error && type === "text" && text !== undefined && (
-            <pre className="text-xs whitespace-pre-wrap font-mono bg-muted/30 p-4 rounded max-h-[65vh] overflow-auto" data-testid="preview-text">
-              {text}
-            </pre>
-          )}
-          {!loading && !error && type === "unsupported" && (
-            <div className="flex flex-col items-center justify-center h-40 gap-3 text-muted-foreground">
-              <FileIcon fileType={file.fileType} fileName={file.fileName} className="h-12 w-12" />
-              <p className="font-medium">{visibleName(file)}</p>
-              <p className="text-sm">{file.fileType} &bull; {formatSize(file.fileSize)}</p>
-              <p className="text-sm">Preview not available for this file type.</p>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
+import { PreviewModal, FileIcon, formatSize, visibleName, getPreviewType } from "./FileStorageSections";
+import { FolderList } from "./FolderList";
+import { FileStorageDialogs } from "./FileStorageDialogs";
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function FileStorageTab() {
@@ -222,7 +84,6 @@ export function FileStorageTab() {
   const [moveFileId, setMoveFileId] = useState<number | null>(null);
   const [moveFolderTarget, setMoveFolderTarget] = useState<string>("unfiled");
 
-  // ── Queries ────────────────────────────────────────────────────────────────
   const { data: folders = [], isLoading: foldersLoading } = useQuery<FileFolder[]>({
     queryKey: ["/api/file-folders"],
   });
@@ -231,7 +92,6 @@ export function FileStorageTab() {
     queryKey: ["/api/files"],
   });
 
-  // Files in current folder
   const folderFiles = allFiles.filter((f) => {
     const match =
       selectedFolderId === "unfiled"
@@ -245,7 +105,20 @@ export function FileStorageTab() {
   const fileCountForFolder = (id: number | null) =>
     allFiles.filter((f) => (id === null ? f.folderId == null : f.folderId === id)).length;
 
-  // ── Mutations ──────────────────────────────────────────────────────────────
+  const onRenameFolder = (id: number, name: string) => {
+    setRenameFolderId(id);
+    setRenameFolderName(name);
+    setRenameFolderOpen(true);
+  };
+
+  const onDeleteFolder = (id: number, name: string, hasFiles: boolean) => {
+    setDeleteFolderId(id);
+    setDeleteFolderName(name);
+    setDeleteFolderHasFiles(hasFiles);
+  };
+
+  const onNewFolder = () => setNewFolderOpen(true);
+
   const createFolderMutation = useMutation({
     mutationFn: async (name: string) => apiRequest("POST", "/api/file-folders", { name }),
     onSuccess: () => {
@@ -333,7 +206,6 @@ export function FileStorageTab() {
     onError: (e: any) => { if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" }); },
   });
 
-  // ── Download ───────────────────────────────────────────────────────────────
   const handleDownload = async (file: StoredFile) => {
     try {
       const res = await fetch(`/api/files/${file.id}/download`, { credentials: "include" });
@@ -352,7 +224,6 @@ export function FileStorageTab() {
     }
   };
 
-  // ── Preview ────────────────────────────────────────────────────────────────
   const revokePreviewUrl = useCallback(() => {
     if (previewBlobUrl.current) {
       URL.revokeObjectURL(previewBlobUrl.current);
@@ -418,7 +289,6 @@ export function FileStorageTab() {
     }
   };
 
-  // ── Folder panel ──────────────────────────────────────────────────────────
   const currentFolderName =
     selectedFolderId === "unfiled"
       ? "Unfiled"
@@ -432,75 +302,17 @@ export function FileStorageTab() {
       </div>
 
       <div className="flex gap-4 min-h-[600px]">
-        {/* ── Left: Folders ───────────────────────────────────────────────── */}
-        <div className="w-52 shrink-0 flex flex-col gap-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-1 mb-1">Folders</p>
-
-          {/* Unfiled */}
-          <button
-            className={`flex items-center gap-2 w-full px-2 py-1.5 rounded-md text-sm text-left hover-elevate ${selectedFolderId === "unfiled" ? "bg-accent text-accent-foreground" : ""}`}
-            onClick={() => setSelectedFolderId("unfiled")}
-            data-testid="button-folder-unfiled"
-          >
-            <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="flex-1 truncate">Unfiled</span>
-            <Badge variant="secondary" className="text-xs px-1.5 py-0 shrink-0">{fileCountForFolder(null)}</Badge>
-          </button>
-
-          {/* Created folders */}
-          {foldersLoading ? (
-            <div className="space-y-1 px-1">
-              {[1, 2].map((i) => <Skeleton key={i} className="h-7 w-full" />)}
-            </div>
-          ) : (
-            folders.map((folder) => (
-              <div key={folder.id} className="group flex items-center gap-1 w-full">
-                <button
-                  className={`flex items-center gap-2 flex-1 min-w-0 px-2 py-1.5 rounded-md text-sm text-left hover-elevate ${selectedFolderId === folder.id ? "bg-accent text-accent-foreground" : ""}`}
-                  onClick={() => setSelectedFolderId(folder.id)}
-                  data-testid={`button-folder-${folder.id}`}
-                >
-                  <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="flex-1 truncate">{folder.name}</span>
-                  <Badge variant="secondary" className="text-xs px-1.5 py-0 shrink-0">{fileCountForFolder(folder.id)}</Badge>
-                </button>
-                <div className="invisible group-hover:visible flex items-center gap-0.5 shrink-0">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6"
-                    onClick={() => { setRenameFolderId(folder.id); setRenameFolderName(folder.name); setRenameFolderOpen(true); }}
-                    data-testid={`button-rename-folder-${folder.id}`}
-                    title="Rename folder"
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-6 w-6"
-                    onClick={() => { setDeleteFolderId(folder.id); setDeleteFolderName(folder.name); setDeleteFolderHasFiles(fileCountForFolder(folder.id) > 0); }}
-                    data-testid={`button-delete-folder-${folder.id}`}
-                    title="Delete folder"
-                  >
-                    <Trash2 className="h-3 w-3 text-destructive" />
-                  </Button>
-                </div>
-              </div>
-            ))
-          )}
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-2 w-full"
-            onClick={() => { setNewFolderName(""); setNewFolderOpen(true); }}
-            data-testid="button-new-folder"
-          >
-            <FolderPlus className="h-4 w-4 mr-2" />
-            New Folder
-          </Button>
-        </div>
+        {/* ── Left: Folder List ────────────────────────────────────────────── */}
+        <FolderList
+          selectedFolderId={selectedFolderId}
+          setSelectedFolderId={setSelectedFolderId}
+          allFiles={allFiles}
+          folders={folders}
+          foldersLoading={foldersLoading}
+          onRename={onRenameFolder}
+          onDelete={onDeleteFolder}
+          onNewFolder={onNewFolder}
+        />
 
         {/* ── Right: File Area ─────────────────────────────────────────────── */}
         <div className="flex-1 min-w-0 flex flex-col gap-3">
@@ -647,160 +459,41 @@ export function FileStorageTab() {
       {/* ── Preview Modal ────────────────────────────────────────────────────── */}
       <PreviewModal preview={preview} onClose={closePreview} onDownload={handleDownload} />
 
-      {/* ── New Folder Dialog ────────────────────────────────────────────────── */}
-      <Dialog open={newFolderOpen} onOpenChange={setNewFolderOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>New Folder</DialogTitle></DialogHeader>
-          <Input
-            placeholder="Folder name"
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && newFolderName.trim()) createFolderMutation.mutate(newFolderName.trim()); }}
-            autoFocus
-            data-testid="input-new-folder-name"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewFolderOpen(false)}>Cancel</Button>
-            <Button
-              disabled={!newFolderName.trim() || createFolderMutation.isPending}
-              onClick={() => createFolderMutation.mutate(newFolderName.trim())}
-              data-testid="button-create-folder-confirm"
-            >
-              {createFolderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Rename Folder Dialog ─────────────────────────────────────────────── */}
-      <Dialog open={renameFolderOpen} onOpenChange={setRenameFolderOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Rename Folder</DialogTitle></DialogHeader>
-          <Input
-            placeholder="Folder name"
-            value={renameFolderName}
-            onChange={(e) => setRenameFolderName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && renameFolderName.trim() && renameFolderId) renameFolderMutation.mutate({ id: renameFolderId, name: renameFolderName.trim() }); }}
-            autoFocus
-            data-testid="input-rename-folder"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameFolderOpen(false)}>Cancel</Button>
-            <Button
-              disabled={!renameFolderName.trim() || renameFolderMutation.isPending}
-              onClick={() => { if (renameFolderId) renameFolderMutation.mutate({ id: renameFolderId, name: renameFolderName.trim() }); }}
-              data-testid="button-rename-folder-confirm"
-            >
-              {renameFolderMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Rename"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Delete Folder Dialog ─────────────────────────────────────────────── */}
-      <AlertDialog open={deleteFolderId !== null} onOpenChange={(open) => { if (!open) setDeleteFolderId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete folder "{deleteFolderName}"?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteFolderHasFiles
-                ? "This folder still has files. Move or delete them before removing the folder."
-                : "This folder will be permanently deleted. This cannot be undone."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            {!deleteFolderHasFiles && (
-              <AlertDialogAction
-                className="bg-destructive text-destructive-foreground"
-                onClick={() => { if (deleteFolderId) deleteFolderMutation.mutate(deleteFolderId); }}
-                data-testid="button-confirm-delete-folder"
-              >
-                Delete
-              </AlertDialogAction>
-            )}
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* ── Rename File Dialog ───────────────────────────────────────────────── */}
-      <Dialog open={renameFileOpen} onOpenChange={setRenameFileOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Rename File</DialogTitle></DialogHeader>
-          <Input
-            placeholder="Display name"
-            value={renameFileName}
-            onChange={(e) => setRenameFileName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && renameFileName.trim() && renameFileId) renameFileMutation.mutate({ id: renameFileId, displayName: renameFileName.trim() }); }}
-            autoFocus
-            data-testid="input-rename-file"
-          />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameFileOpen(false)}>Cancel</Button>
-            <Button
-              disabled={!renameFileName.trim() || renameFileMutation.isPending}
-              onClick={() => { if (renameFileId) renameFileMutation.mutate({ id: renameFileId, displayName: renameFileName.trim() }); }}
-              data-testid="button-rename-file-confirm"
-            >
-              {renameFileMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Rename"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Move File Dialog ─────────────────────────────────────────────────── */}
-      <Dialog open={moveFileOpen} onOpenChange={setMoveFileOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Move File</DialogTitle></DialogHeader>
-          <Select value={moveFolderTarget} onValueChange={setMoveFolderTarget}>
-            <SelectTrigger data-testid="select-move-destination">
-              <SelectValue placeholder="Select folder..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unfiled">Unfiled</SelectItem>
-              {folders.map((f) => (
-                <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setMoveFileOpen(false)}>Cancel</Button>
-            <Button
-              disabled={moveFileMutation.isPending}
-              onClick={() => {
-                if (!moveFileId) return;
-                const folderId = moveFolderTarget === "unfiled" ? null : parseInt(moveFolderTarget);
-                moveFileMutation.mutate({ id: moveFileId, folderId });
-              }}
-              data-testid="button-move-file-confirm"
-            >
-              {moveFileMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Move"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Delete File Dialog ───────────────────────────────────────────────── */}
-      <AlertDialog open={deleteFileId !== null} onOpenChange={(open) => { if (!open) setDeleteFileId(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete file?</AlertDialogTitle>
-            <AlertDialogDescription>
-              "{deleteFileName}" will be permanently deleted. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground"
-              onClick={() => { if (deleteFileId) deleteFileMutation.mutate(deleteFileId); }}
-              data-testid="button-confirm-delete-file"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <FileStorageDialogs
+        newFolderOpen={newFolderOpen}
+        setNewFolderOpen={setNewFolderOpen}
+        newFolderName={newFolderName}
+        setNewFolderName={setNewFolderName}
+        createFolderMutation={createFolderMutation}
+        renameFolderOpen={renameFolderOpen}
+        setRenameFolderOpen={setRenameFolderOpen}
+        renameFolderName={renameFolderName}
+        setRenameFolderName={setRenameFolderName}
+        renameFolderId={renameFolderId}
+        renameFolderMutation={renameFolderMutation}
+        deleteFolderId={deleteFolderId}
+        setDeleteFolderId={setDeleteFolderId}
+        deleteFolderName={deleteFolderName}
+        deleteFolderHasFiles={deleteFolderHasFiles}
+        deleteFolderMutation={deleteFolderMutation}
+        renameFileOpen={renameFileOpen}
+        setRenameFileOpen={setRenameFileOpen}
+        renameFileName={renameFileName}
+        setRenameFileName={setRenameFileName}
+        renameFileId={renameFileId}
+        renameFileMutation={renameFileMutation}
+        moveFileOpen={moveFileOpen}
+        setMoveFileOpen={setMoveFileOpen}
+        moveFileId={moveFileId}
+        moveFolderTarget={moveFolderTarget}
+        setMoveFolderTarget={setMoveFolderTarget}
+        folders={folders}
+        moveFileMutation={moveFileMutation}
+        deleteFileId={deleteFileId}
+        setDeleteFileId={setDeleteFileId}
+        deleteFileName={deleteFileName}
+        deleteFileMutation={deleteFileMutation}
+      />
     </div>
   );
 }

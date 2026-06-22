@@ -1,0 +1,377 @@
+import { SupplierFormDialog } from "./SupplierFormDialog";
+import { SupplierOtherDialogs } from "./SupplierOtherDialogs";
+import { SupplierPaymentFxDialogs } from "./SupplierPaymentFxDialogs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { SupplierWithBalance, BulkFxPreview } from "./factorySupplierTypes";
+import { FactorySupplier } from "@shared/schema";
+import { UseMutationResult } from "@tanstack/react-query";
+import { Layers } from "lucide-react";
+
+interface SupplierDialogsProps {
+  createOpen: boolean;
+  setCreateOpen: (val: boolean) => void;
+  editingSupplier: FactorySupplier | null;
+  setEditingSupplier: (val: FactorySupplier | null) => void;
+  formData: any;
+  setFormData: (val: any) => void;
+  formRole: "broker" | "standalone" | "linked";
+  setFormRole: (val: "broker" | "standalone" | "linked") => void;
+  allSuppliers: SupplierWithBalance[];
+  createSubAccountParentId: number | null;
+  setCreateSubAccountParentId: (val: number | null) => void;
+  createMutation: UseMutationResult<any, any, any>;
+  updateMutation: UseMutationResult<any, any, any>;
+  resetForm: () => void;
+  
+  paymentDialogSupplier: SupplierWithBalance | null;
+  setPaymentDialogSupplier: (val: SupplierWithBalance | null) => void;
+  paymentForm: any;
+  setPaymentForm: (val: any) => void;
+  ledgerAccounts: any[] | undefined;
+  paymentMutation: UseMutationResult<any, any, any>;
+  paymentAmtUsd: number;
+  paymentBalanceUsd: number;
+  isOverpayment: boolean;
+  overpaymentUsd: number;
+  
+  fxConversionOpen: boolean;
+  setFxConversionOpen: (val: boolean) => void;
+  fxConversionForm: any;
+  setFxConversionForm: (val: any) => void;
+  fxSourceType: "supplier" | "commission" | "both";
+  setFxSourceType: (val: "supplier" | "commission" | "both") => void;
+  fxConversionMutation: UseMutationResult<any, any, any>;
+  wrapAdminAction: (fn: () => void, title: string) => void;
+  
+  bulkFxOpen: boolean;
+  setBulkFxOpen: (val: boolean) => void;
+  bulkFxBrokerId: number | null;
+  bulkFxBrokerName: string;
+  bulkFxForm: any;
+  setBulkFxForm: (val: any) => void;
+  bulkFxPreview: BulkFxPreview | null;
+  setBulkFxPreview: (val: BulkFxPreview | null) => void;
+  bulkFxPreviewMutation: UseMutationResult<any, any, any>;
+  bulkFxMutation: UseMutationResult<any, any, any>;
+  
+  obEditSupplier: { id: number; name: string; currentBalance: string } | null;
+  setObEditSupplier: (val: any) => void;
+  obEditValue: string;
+  setObEditValue: (val: string) => void;
+  obEditMutation: UseMutationResult<any, any, any>;
+  
+  dueDialogSupplier: { name: string; containers: any[] } | null;
+  setDueDialogSupplier: (val: any) => void;
+  formatDate: (val: string) => string;
+  formatNum: (val: string) => string;
+
+  editObComm: null | { rawStockId: number; amount: string; currencyCode: string; personName: string; notes: string };
+  setEditObComm: (val: any) => void;
+  updateObCommissionMutation: UseMutationResult<any, any, any>;
+}
+
+export function SupplierDialogs({
+  createOpen, setCreateOpen, editingSupplier, setEditingSupplier,
+  formData, setFormData, formRole, setFormRole, allSuppliers,
+  createSubAccountParentId, setCreateSubAccountParentId,
+  createMutation, updateMutation, resetForm,
+  paymentDialogSupplier, setPaymentDialogSupplier, paymentForm, setPaymentForm,
+  ledgerAccounts, paymentMutation, paymentAmtUsd, paymentBalanceUsd, isOverpayment, overpaymentUsd,
+  fxConversionOpen, setFxConversionOpen, fxConversionForm, setFxConversionForm,
+  fxSourceType, setFxSourceType, fxConversionMutation, wrapAdminAction,
+  bulkFxOpen, setBulkFxOpen, bulkFxBrokerId, bulkFxBrokerName, bulkFxForm, setBulkFxForm,
+  bulkFxPreview, setBulkFxPreview, bulkFxPreviewMutation, bulkFxMutation,
+  obEditSupplier, setObEditSupplier, obEditValue, setObEditValue, obEditMutation,
+  dueDialogSupplier, setDueDialogSupplier,
+  formatDate, formatNum,
+  editObComm, setEditObComm, updateObCommissionMutation,
+}: SupplierDialogsProps) {
+
+  return (
+    <>
+      <SupplierFormDialog
+        createOpen={createOpen} setCreateOpen={setCreateOpen} editingSupplier={editingSupplier} setEditingSupplier={setEditingSupplier}
+        formData={formData} setFormData={setFormData} formRole={formRole} setFormRole={setFormRole} allSuppliers={allSuppliers}
+        createSubAccountParentId={createSubAccountParentId} setCreateSubAccountParentId={setCreateSubAccountParentId}
+        createMutation={createMutation} updateMutation={updateMutation} resetForm={resetForm} wrapAdminAction={wrapAdminAction}
+      />
+
+      <SupplierPaymentFxDialogs
+        paymentDialogSupplier={paymentDialogSupplier} setPaymentDialogSupplier={setPaymentDialogSupplier} paymentForm={paymentForm} setPaymentForm={setPaymentForm}
+        allSuppliers={allSuppliers} ledgerAccounts={ledgerAccounts} paymentMutation={paymentMutation} paymentAmtUsd={paymentAmtUsd} paymentBalanceUsd={paymentBalanceUsd}
+        isOverpayment={isOverpayment} overpaymentUsd={overpaymentUsd} formatNum={formatNum}
+        fxConversionOpen={fxConversionOpen} setFxConversionOpen={setFxConversionOpen} fxConversionForm={fxConversionForm} setFxConversionForm={setFxConversionForm}
+        fxSourceType={fxSourceType} setFxSourceType={setFxSourceType} fxConversionMutation={fxConversionMutation} wrapAdminAction={wrapAdminAction}
+      />
+
+      <Dialog open={bulkFxOpen} onOpenChange={(open) => { if (!open) { setBulkFxOpen(false); setBulkFxPreview(null); } }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-blue-500" />
+              Bulk FX Settlement — {bulkFxBrokerName}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkFxPreview
+                ? "Review the breakdown below. Each supplier's account will be debited by the amount shown."
+                : "Enter a total amount in a foreign currency. It will be split across all linked suppliers, capped at each supplier's outstanding balance."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {bulkFxPreview ? (
+            <div className="space-y-4">
+              <div className="rounded-md border p-3 space-y-2 bg-muted/40">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total to settle</span>
+                  <span className="font-semibold tabular-nums">{bulkFxForm.fromCurrencyCode} {parseFloat(bulkFxPreview.totalAllocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">≈ USD equivalent</span>
+                  <span className="font-semibold tabular-nums text-green-600 dark:text-green-400">${parseFloat(bulkFxPreview.totalUsd || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Account deductions</p>
+                <div className="rounded-md border divide-y text-sm max-h-64 overflow-y-auto">
+                  {bulkFxPreview.transfers.map((t) => {
+                    const overpaid = parseFloat(t.overpayment || "0") > 0.01;
+                    return (
+                    <div key={t.supplierId} className="flex justify-between items-center px-3 py-2">
+                      <div>
+                        <div className="font-medium">{t.supplierName}</div>
+                        {overpaid && (
+                          <div className="text-xs text-amber-600 dark:text-amber-400">
+                            incl. {bulkFxForm.fromCurrencyCode} {parseFloat(t.overpayment).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} overpayment (will show as CR)
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right space-y-0.5">
+                        <div className="tabular-nums font-medium">{bulkFxForm.fromCurrencyCode} {parseFloat(t.allocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="text-xs text-muted-foreground">≈ ${parseFloat(t.toAmountUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</div>
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <DialogFooter className="gap-2 flex-wrap">
+                <Button variant="outline" onClick={() => setBulkFxPreview(null)} disabled={bulkFxMutation.isPending}>
+                  Back to Edit
+                </Button>
+                <Button
+                  onClick={() => wrapAdminAction(() => bulkFxMutation.mutate(), "Record Bulk FX Settlement")}
+                  disabled={bulkFxMutation.isPending}
+                  data-testid="button-bulk-fx-confirm"
+                >
+                  {bulkFxMutation.isPending ? "Recording..." : "Confirm & Record Settlement"}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Currency</Label>
+                  <Input
+                    value={bulkFxForm.fromCurrencyCode}
+                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() }))}
+                    maxLength={10}
+                    placeholder="EUR"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Total Amount</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={bulkFxForm.totalAmount}
+                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, totalAmount: e.target.value }))}
+                    placeholder="e.g. 50000"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>1 {bulkFxForm.fromCurrencyCode || "CCY"} = X USD (rate)</Label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={bulkFxForm.fxRateToUsd}
+                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, fxRateToUsd: e.target.value }))}
+                    placeholder="e.g. 1.08"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Entry Date</Label>
+                  <Input
+                    type="date"
+                    value={bulkFxForm.date}
+                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setBulkFxOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => bulkFxPreviewMutation.mutate()}
+                  disabled={bulkFxPreviewMutation.isPending || !bulkFxForm.fromCurrencyCode || !bulkFxForm.totalAmount || !bulkFxForm.fxRateToUsd}
+                >
+                  {bulkFxPreviewMutation.isPending ? "Loading preview..." : "Preview Settlement"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <SupplierOtherDialogs
+        obEditSupplier={obEditSupplier} setObEditSupplier={setObEditSupplier} obEditValue={obEditValue} setObEditValue={setObEditValue} obEditMutation={obEditMutation}
+        dueDialogSupplier={dueDialogSupplier} setDueDialogSupplier={setDueDialogSupplier}
+        formatDate={formatDate}
+        editObComm={editObComm} setEditObComm={setEditObComm} updateObCommissionMutation={updateObCommissionMutation}
+        wrapAdminAction={wrapAdminAction}
+      />
+    </>
+  );
+}
+
+      <Dialog open={bulkFxOpen} onOpenChange={(open) => { if (!open) { setBulkFxOpen(false); setBulkFxPreview(null); } }}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-blue-500" />
+              Bulk FX Settlement — {bulkFxBrokerName}
+            </DialogTitle>
+            <DialogDescription>
+              {bulkFxPreview
+                ? "Review the breakdown below. Each supplier's account will be debited by the amount shown."
+                : "Enter a total amount in a foreign currency. It will be split across all linked suppliers, capped at each supplier's outstanding balance."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {bulkFxPreview ? (
+            <div className="space-y-4">
+              <div className="rounded-md border p-3 space-y-2 bg-muted/40">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Total to settle</span>
+                  <span className="font-semibold tabular-nums">{bulkFxForm.fromCurrencyCode} {parseFloat(bulkFxPreview.totalAllocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">≈ USD equivalent</span>
+                  <span className="font-semibold tabular-nums text-green-600 dark:text-green-400">${parseFloat(bulkFxPreview.totalUsd || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Account deductions</p>
+                <div className="rounded-md border divide-y text-sm max-h-64 overflow-y-auto">
+                  {bulkFxPreview.transfers.map((t) => {
+                    const overpaid = parseFloat(t.overpayment || "0") > 0.01;
+                    return (
+                    <div key={t.supplierId} className="flex justify-between items-center px-3 py-2">
+                      <div>
+                        <div className="font-medium">{t.supplierName}</div>
+                        {overpaid && (
+                          <div className="text-xs text-amber-600 dark:text-amber-400">
+                            incl. {bulkFxForm.fromCurrencyCode} {parseFloat(t.overpayment).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} overpayment (will show as CR)
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right space-y-0.5">
+                        <div className="tabular-nums font-medium">{bulkFxForm.fromCurrencyCode} {parseFloat(t.allocated).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                        <div className="text-xs text-muted-foreground">≈ ${parseFloat(t.toAmountUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD</div>
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <DialogFooter className="gap-2 flex-wrap">
+                <Button variant="outline" onClick={() => setBulkFxPreview(null)} disabled={bulkFxMutation.isPending}>
+                  Back to Edit
+                </Button>
+                <Button
+                  onClick={() => wrapAdminAction(() => bulkFxMutation.mutate(), "Record Bulk FX Settlement")}
+                  disabled={bulkFxMutation.isPending}
+                  data-testid="button-bulk-fx-confirm"
+                >
+                  {bulkFxMutation.isPending ? "Recording..." : "Confirm & Record Settlement"}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Currency</Label>
+                  <Input
+                    value={bulkFxForm.fromCurrencyCode}
+                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, fromCurrencyCode: e.target.value.toUpperCase() }))}
+                    maxLength={10}
+                    placeholder="EUR"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Total Amount</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={bulkFxForm.totalAmount}
+                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, totalAmount: e.target.value }))}
+                    placeholder="e.g. 50000"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>1 {bulkFxForm.fromCurrencyCode || "CCY"} = X USD (rate)</Label>
+                  <Input
+                    type="number"
+                    step="0.0001"
+                    value={bulkFxForm.fxRateToUsd}
+                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, fxRateToUsd: e.target.value }))}
+                    placeholder="e.g. 1.08"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Entry Date</Label>
+                  <Input
+                    type="date"
+                    value={bulkFxForm.date}
+                    onChange={(e) => setBulkFxForm((f: any) => ({ ...f, date: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setBulkFxOpen(false)}>Cancel</Button>
+                <Button
+                  onClick={() => bulkFxPreviewMutation.mutate()}
+                  disabled={bulkFxPreviewMutation.isPending || !bulkFxForm.fromCurrencyCode || !bulkFxForm.totalAmount || !bulkFxForm.fxRateToUsd}
+                >
+                  {bulkFxPreviewMutation.isPending ? "Loading preview..." : "Preview Settlement"}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <SupplierOtherDialogs
+        obEditSupplier={obEditSupplier} setObEditSupplier={setObEditSupplier} obEditValue={obEditValue} setObEditValue={setObEditValue} obEditMutation={obEditMutation}
+        dueDialogSupplier={dueDialogSupplier} setDueDialogSupplier={setDueDialogSupplier}
+        formatDate={formatDate}
+        editObComm={editObComm} setEditObComm={setEditObComm} updateObCommissionMutation={updateObCommissionMutation}
+        wrapAdminAction={wrapAdminAction}
+      />
+    </>
+  );
+}

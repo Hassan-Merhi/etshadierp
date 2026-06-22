@@ -1,0 +1,500 @@
+
+          {/* Admin Reset Password Dialog */}
+          <Dialog open={!!userToResetPassword} onOpenChange={(open) => {
+            if (!open) {
+              setUserToResetPassword(null);
+              setNewPasswordForReset("");
+            }
+          }}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Reset Password for {userToResetPassword?.username}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Enter a new password for this user. They will be able to log in with this password immediately.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="reset-new-password">New Password</Label>
+                  <Input
+                    id="reset-new-password"
+                    type="password"
+                    value={newPasswordForReset}
+                    onChange={(e) => setNewPasswordForReset(e.target.value)}
+                    placeholder="Enter new password (min 4 characters)"
+                    data-testid="input-reset-new-password"
+                  />
+                </div>
+                <div className="flex gap-2 justify-end border-t pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setUserToResetPassword(null);
+                      setNewPasswordForReset("");
+                    }}
+                    disabled={resetPasswordMutation.isPending}
+                    data-testid="button-cancel-reset-password"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      if (newPasswordForReset.length < 4) {
+                        toast({
+                          title: "Error",
+                          description: "Password must be at least 4 characters",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      resetPasswordMutation.mutate({
+                        userId: userToResetPassword.id,
+                        newPassword: newPasswordForReset,
+                      });
+                    }}
+                    disabled={resetPasswordMutation.isPending || newPasswordForReset.length < 4}
+                    data-testid="button-submit-reset-password"
+                  >
+                    {resetPasswordMutation.isPending ? "Resetting..." : "Reset Password"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+  
+          {/* Users & Permissions Hub */}
+          {activeSection === "users-permissions" && (
+            <UsersPermissionsHub
+              userRole={currentUser?.role}
+              appMode={appMode}
+            />
+          )}
+
+          {activeSection === "sessions-hub" && currentUser?.role === "Developer" && (
+            <SessionsHub
+              isAdmin={["Admin", "Owner", "Developer"].includes(currentUser?.role || "")}
+              isDev={currentUser?.role === "Developer"}
+            />
+          )}
+
+          {activeSection === "edit-log" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                <h2 className="text-2xl font-semibold">Edit Log</h2>
+              </div>
+              <p className="text-muted-foreground">
+                Track all changes made to records across the system with before/after values.
+              </p>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Recent Changes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <EditLogTable companyId={selectedCompany?.id} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {activeSection === "approvals" && (
+            <ApprovalsPage currentUser={currentUser} />
+          )}
+
+          {activeSection === "business-alerts" && (
+            <BusinessAlertsPage currentUser={currentUser} />
+          )}
+
+          {activeSection === "data-tools" && currentUser?.role === "Developer" && (
+            <DataToolsTab />
+          )}
+          {activeSection === "pos-setup" && currentUser?.role === "Developer" && (
+            <PosSetupHub userRole={currentUser?.role} />
+          )}
+          {activeSection === "fx-rates" && appMode === "factory" && (
+            <div className="space-y-5 max-w-2xl">
+              <div>
+                <h2 className="text-2xl font-semibold flex items-center gap-2">
+                  <TrendingUp className="h-6 w-6" />
+                  FX Rates
+                </h2>
+                <p className="text-muted-foreground text-sm mt-1">
+                  Manage exchange rates for converting foreign-currency balances to USD.
+                </p>
+              </div>
+              <FxRatesCard />
+            </div>
+          )}
+
+          {activeSection === "files-export" && (
+            <FileStorageAndExport />
+          )}
+
+          {activeSection === "export-center" && (
+            <ExportCenter />
+          )}
+
+          {activeSection === "preferences" && (
+            <div className="space-y-6 max-w-lg">
+              <div>
+                <h2 className="text-2xl font-semibold flex items-center gap-2"><Settings2 className="h-5 w-5" />Preferences</h2>
+                <p className="text-muted-foreground text-sm mt-1">Customize your display and regional settings.</p>
+              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Date Format</CardTitle>
+                  <CardDescription>Choose how dates are displayed across the application.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {(["MM/DD/YYYY", "DD/MM/YYYY"] as const).map((fmt) => (
+                    <label
+                      key={fmt}
+                      className={`flex items-center gap-3 p-3 rounded-md border cursor-pointer transition-colors ${dateFormat === fmt ? "border-primary bg-primary/5" : "border-border hover-elevate"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="dateFormat"
+                        value={fmt}
+                        checked={dateFormat === fmt}
+                        onChange={() => setDateFormat(fmt)}
+                        disabled={isDateFormatPending}
+                        className="accent-primary"
+                        data-testid={`radio-date-format-${fmt}`}
+                      />
+                      <div>
+                        <div className="font-medium text-sm">{fmt}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {fmt === "MM/DD/YYYY" ? "e.g. 12/31/2025 (US style)" : "e.g. 31/12/2025 (International style)"}
+                        </div>
+                      </div>
+                      {dateFormat === fmt && <Check className="h-4 w-4 text-primary ml-auto" />}
+                    </label>
+                  ))}
+                  {isDateFormatPending && <p className="text-xs text-muted-foreground">Saving…</p>}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">POS Receipt Settings</CardTitle>
+                  <CardDescription>Configure how POS receipts are displayed and printed.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <POSReceiptSettings />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+
+          {activeSection === "system" && (() => {
+            const pfx = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
+            const isDev = currentUser?.role === "Developer";
+            return (
+            <div className="space-y-8">
+              {/* Page header */}
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h2 className="text-2xl font-semibold">System Tools</h2>
+                  <Badge variant="secondary" className="text-xs">Admin Tools</Badge>
+                </div>
+                <p className="text-muted-foreground text-sm">Manage recovery, diagnostics, and financial position insights.</p>
+              </div>
+
+              {/* Admin notice */}
+              <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-md border text-sm text-muted-foreground">
+                <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                <p>System tools can affect company records, diagnostics, or user access. Use them carefully and review changes before confirming.</p>
+              </div>
+
+              {/* Main 4 tools */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <Link href={`${pfx}/deleted-items`}>
+                  <Card className="p-6 hover-elevate cursor-pointer h-full">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="p-2.5 bg-destructive/10 rounded-md">
+                          <Trash2 className="h-5 w-5 text-destructive" />
+                        </div>
+                        <Badge variant="secondary" className="text-xs">Recovery</Badge>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-1" data-testid="link-deleted-items">Deleted Items</h3>
+                        <p className="text-sm text-muted-foreground">Restore deleted records or permanently remove archived data.</p>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                        Open <ChevronRight className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href={`${pfx}/import-cycle-diagnostics`}>
+                  <Card className="p-6 hover-elevate cursor-pointer h-full">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="p-2.5 bg-yellow-500/10 rounded-md">
+                          <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                        </div>
+                        <Badge variant="secondary" className="text-xs">Diagnostics</Badge>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-1" data-testid="link-import-diagnostics">Import Cycle Diagnostics</h3>
+                        <p className="text-sm text-muted-foreground">Detect imbalance issues and troubleshoot import cycle problems.</p>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                        Run Check <ChevronRight className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
+
+                <Link href={`${pfx}/net-position-details`}>
+                  <Card className="p-6 hover-elevate cursor-pointer h-full">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="p-2.5 bg-purple-500/10 rounded-md">
+                          <PieChart className="h-5 w-5 text-purple-500" />
+                        </div>
+                        <Badge variant="secondary" className="text-xs">Financials</Badge>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold mb-1" data-testid="link-net-profit-details">Net Position Details</h3>
+                        <p className="text-sm text-muted-foreground">View income, expenses, and net position breakdowns by period.</p>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                        View Details <ChevronRight className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </Card>
+                </Link>
+              </div>
+
+              {/* Developer Tools section */}
+              {isDev && (
+                <div className="space-y-6">
+                  <div className="border-t pt-6">
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="text-lg font-semibold">Developer Tools</h3>
+                      <Badge variant="outline" className="text-xs border-orange-500/50 text-orange-500">Dev Mode</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">Advanced maintenance and repair utilities available only in Dev Mode.</p>
+                  </div>
+
+                  <div className="flex items-start gap-3 p-4 bg-orange-500/10 rounded-md border border-orange-500/20 text-sm text-orange-700 dark:text-orange-400">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <p>These tools can modify or reset important company data. Use only for maintenance, migration, or debugging.</p>
+                  </div>
+
+                  {/* Nav-style dev tools grid */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Link href={`${pfx}/chatbot-settings`}>
+                      <Card className="p-6 hover-elevate cursor-pointer h-full">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="p-2.5 bg-primary/10 rounded-md">
+                              <Bot className="h-5 w-5 text-primary" />
+                            </div>
+                            <Badge variant="secondary" className="text-xs">AI Access</Badge>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold mb-1" data-testid="link-chatbot-settings">AI Chatbot Settings</h3>
+                            <p className="text-sm text-muted-foreground">Manage AI assistant access permissions and review conversation history.</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                            Manage <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+
+                    <Link href={`${pfx}/notification-settings`}>
+                      <Card className="p-6 hover-elevate cursor-pointer h-full">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="p-2.5 bg-primary/10 rounded-md">
+                              <Bell className="h-5 w-5 text-primary" />
+                            </div>
+                            <Badge variant="secondary" className="text-xs">Alerts</Badge>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold mb-1" data-testid="link-notification-settings">Notification Settings</h3>
+                            <p className="text-sm text-muted-foreground">Configure which users receive alerts for loading, invoice, and intercompany events.</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                            Manage <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+
+                    {appMode !== "factory" && (
+                      <Link href={`${pfx}/account-groups`}>
+                        <Card className="p-6 hover-elevate cursor-pointer h-full">
+                          <div className="flex flex-col gap-4">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="p-2.5 bg-blue-500/10 rounded-md">
+                                <Layers className="h-5 w-5 text-blue-500" />
+                              </div>
+                              <Badge variant="secondary" className="text-xs">Accounts</Badge>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold mb-1" data-testid="link-account-groups">Account Groups</h3>
+                              <p className="text-sm text-muted-foreground">Create parent groups and organise accounts under them for better reporting.</p>
+                            </div>
+                            <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                              Open <ChevronRight className="h-4 w-4" />
+                            </div>
+                          </div>
+                        </Card>
+                      </Link>
+                    )}
+
+                    <Link href="/account-transfer">
+                      <Card className="p-6 hover-elevate cursor-pointer h-full">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="p-2.5 bg-indigo-500/10 rounded-md">
+                              <ArrowLeftRight className="h-5 w-5 text-indigo-500" />
+                            </div>
+                            <Badge variant="secondary" className="text-xs">Accounts</Badge>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold mb-1" data-testid="link-account-transfer">Account Transfer</h3>
+                            <p className="text-sm text-muted-foreground">Move voucher entries from one ledger account to another in bulk.</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                            Open <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+
+                    <Card
+                      className="p-6 hover-elevate cursor-pointer h-full"
+                      onClick={() => {
+                        setEmptyAccountsOpen(true);
+                        setEmptyAccountsSelected([]);
+                        setEmptyAccountsFilter("");
+                      }}
+                      data-testid="card-clean-empty-accounts"
+                    >
+                      <div className="flex flex-col gap-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="p-2.5 bg-rose-500/10 rounded-md">
+                            <Eraser className="h-5 w-5 text-rose-500" />
+                          </div>
+                          <Badge variant="secondary" className="text-xs">Cleanup</Badge>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold mb-1">Clean Empty Accounts</h3>
+                          <p className="text-sm text-muted-foreground">Find and delete ledger accounts with no entries or opening balance.</p>
+                        </div>
+                        <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                          Clean Up <ChevronRight className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Link href={`${pfx}/company-data-reset`}>
+                      <Card className="p-6 hover-elevate cursor-pointer h-full">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="p-2.5 bg-red-500/10 rounded-md">
+                              <Trash2 className="h-5 w-5 text-red-500" />
+                            </div>
+                            <Badge variant="outline" className="text-xs border-destructive/40 text-destructive">Destructive</Badge>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold mb-1" data-testid="link-company-data-reset">Company Data Reset</h3>
+                            <p className="text-sm text-muted-foreground">Clear vouchers and opening balances for selected accounts.</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium text-destructive">
+                            Open <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+
+                    <Link href="/factory/bale-relabeling">
+                      <Card className="p-6 hover-elevate cursor-pointer h-full">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="p-2.5 bg-yellow-500/10 rounded-md">
+                              <RefreshCw className="h-5 w-5 text-yellow-500" />
+                            </div>
+                            <Badge variant="secondary" className="text-xs">Factory</Badge>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold mb-1" data-testid="link-bale-relabeling">Bale Relabeling</h3>
+                            <p className="text-sm text-muted-foreground">Reassign or relabel bales and re-enter wipers stock by date.</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                            Open <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+
+                    <Link href="/factory/reprint-labels">
+                      <Card className="p-6 hover-elevate cursor-pointer h-full">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="p-2.5 bg-blue-500/10 rounded-md">
+                              <Printer className="h-5 w-5 text-blue-500" />
+                            </div>
+                            <Badge variant="secondary" className="text-xs">Factory</Badge>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold mb-1" data-testid="link-reprint-labels">Reprint Labels</h3>
+                            <p className="text-sm text-muted-foreground">Reprint bale barcode labels for any existing bales.</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                            Open <ChevronRight className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </Card>
+                    </Link>
+
+                    {appMode === "factory" && (
+                      <Link href="/factory/customer-logos">
+                        <Card className="p-6 hover-elevate cursor-pointer h-full">
+                          <div className="flex flex-col gap-4">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="p-2.5 bg-indigo-500/10 rounded-md">
+                                <Upload className="h-5 w-5 text-indigo-500" />
+                              </div>
+                              <Badge variant="secondary" className="text-xs">Factory</Badge>
+                            </div>
+                            <div>
+                              <h3 className="font-semibold mb-1" data-testid="link-customer-logos">Customer Logos</h3>
+                              <p className="text-sm text-muted-foreground">Upload and manage per-customer logos used on bale labels.</p>
+                            </div>
+                            <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                              Open <ChevronRight className="h-4 w-4" />
+                            </div>
+                          </div>
+                        </Card>
+                      </Link>
+                    )}
+
+                    <Link href={`${pfx}/orphaned-records`}>
+                      <Card className="p-6 hover-elevate cursor-pointer h-full">
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="p-2.5 bg-orange-500/10 rounded-md">
+                              <MapPin className="h-5 w-5 text-orange-500" />
+                            </div>
+                            <Badge variant="secondary" className="text-xs">Repair</Badge>
+                          </div>
+                          <div>
+                            <h3 className="font-semibold mb-1" data-testid="link-orphaned-records">Orphaned Records</h3>
+                            <p className="text-sm text-muted-foreground">Find and reassign records that reference deleted locations.</p>
+                          </div>
+                          <div className="flex items-center gap-1 text-sm font-medium text-primary">
+                            Open <ChevronRight className="h-4 w-4" />
+                          </div>

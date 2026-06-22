@@ -15,8 +15,8 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Check, X, MapPin, Zap } from "lucide-react";
-import { ConfirmPasswordDialog } from "@/components/ConfirmPasswordDialog";
-import { PermissionSummaryCard } from "./PermissionSummaryCard";
+import { ConfirmPasswordDialog, PermissionSummaryCard } from "./InlineRoleEditorSections";
+import { PosLocationManager } from "./PosLocationManager";
 
 const ROLE_OPTIONS = [
   "Admin", "Owner", "Manager", "POS", "Normal User", "View Only",
@@ -311,74 +311,16 @@ export function InlineRoleEditor({
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">POS Settings</p>
 
           {/* Locations with per-location cash accounts */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <Label className="text-xs flex items-center gap-1">
-                <MapPin className="h-3 w-3" />
-                Assigned Locations
-                {selectedLocationIds.length > 0 && (
-                  <Badge variant="secondary" className="text-xs ml-1">{selectedLocationIds.length} selected</Badge>
-                )}
-              </Label>
-              <div className="flex gap-1">
-                <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAllLocations}>All</Button>
-                <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={clearLocations}>Clear</Button>
-              </div>
-            </div>
-            {locations.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No locations for this company.</p>
-            ) : (
-              <div className="space-y-1 max-h-56 overflow-y-auto rounded-md border p-2" data-testid="select-locations">
-                {(locations as any[]).map((loc: any) => {
-                  const checked = selectedLocationIds.includes(loc.id);
-                  return (
-                    <div key={loc.id} className="space-y-1">
-                      <label
-                        className={`flex items-center gap-2 cursor-pointer text-xs rounded px-2 py-1 transition-colors ${checked ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted/50"}`}
-                        data-testid={`checkbox-location-${loc.id}`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleLocation(loc.id)}
-                          className="rounded shrink-0"
-                        />
-                        <span className="truncate">{loc.name}</span>
-                        <span className="text-muted-foreground shrink-0">({loc.code})</span>
-                      </label>
-                      {checked && (!posViewOnly || selectedLocationIds[0] === loc.id) && (
-                        <div className="pl-6 pr-1 pb-1">
-                          <Select
-                            value={locationCashAccounts[loc.id]?.toString() || ""}
-                            onValueChange={(v) =>
-                              setLocationCashAccounts((prev) => ({ ...prev, [loc.id]: parseInt(v) }))
-                            }
-                          >
-                            <SelectTrigger className="h-7 text-xs" data-testid={`select-cash-account-loc-${loc.id}`}>
-                              <SelectValue placeholder="Select cash account *" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {cashAccounts.map((a: any) => (
-                                <SelectItem key={a.id} value={a.id.toString()}>
-                                  {a.name} ({a.code})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {!locationCashAccounts[loc.id] && (
-                            <p className="text-xs text-destructive mt-0.5">Cash account required</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {isPOS && selectedLocationIds.length === 0 && (
-              <p className="text-xs text-destructive">At least one location required for POS roles.</p>
-            )}
-          </div>
+          <PosLocationManager
+            locations={locations}
+            selectedLocationIds={selectedLocationIds}
+            setSelectedLocationIds={setSelectedLocationIds}
+            setAssignedLocationId={setAssignedLocationId}
+            locationCashAccounts={locationCashAccounts}
+            setLocationCashAccounts={setLocationCashAccounts}
+            posViewOnly={posViewOnly}
+            cashAccounts={cashAccounts}
+          />
 
           {/* POS Station + Daybook Days */}
           <div className="grid grid-cols-2 gap-3">

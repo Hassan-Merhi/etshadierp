@@ -1,0 +1,83 @@
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ChevronDown } from "lucide-react";
+
+export interface MultiOption {
+  label: string;
+  value: string;
+  dividerBefore?: boolean;
+}
+
+export function MultiFilterSelect({
+  allLabel,
+  options,
+  selected,
+  onChange,
+  testId,
+}: {
+  allLabel: string;
+  options: MultiOption[];
+  selected: string[];
+  onChange: (vals: string[]) => void;
+  testId?: string;
+}) {
+  const toggle = (val: string) => {
+    onChange(selected.includes(val) ? selected.filter((v) => v !== val) : [...selected, val]);
+  };
+
+  const triggerLabel =
+    selected.length === 0
+      ? allLabel
+      : selected.length === 1
+        ? (options.find((o) => o.value === selected[0])?.label ?? selected[0])
+        : `${selected.length} selected`;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs w-full justify-between font-normal px-2"
+          data-testid={testId}
+        >
+          <span className="truncate">{triggerLabel}</span>
+          <ChevronDown className="h-3 w-3 shrink-0 ml-1 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-1" align="start">
+        <div className="max-h-56 overflow-y-auto">
+          {options.map((opt) => (
+            <div key={opt.value}>
+              {opt.dividerBefore && <div className="border-t my-1" />}
+              <div
+                className="flex items-center gap-2 px-2 py-1.5 rounded-sm cursor-pointer hover-elevate text-xs"
+                onClick={() => toggle(opt.value)}
+              >
+                <Checkbox
+                  checked={selected.includes(opt.value)}
+                  onCheckedChange={() => toggle(opt.value)}
+                  className="h-3 w-3 shrink-0"
+                />
+                <span>{opt.label}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+        {selected.length > 0 && (
+          <div className="border-t mt-1 pt-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-full text-xs text-muted-foreground"
+              onClick={() => onChange([])}
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
