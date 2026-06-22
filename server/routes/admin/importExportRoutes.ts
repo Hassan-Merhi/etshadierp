@@ -36,7 +36,7 @@ import {
   insertDashboardAccountSelectionSchema,
   creditNoteItems, 
   pendingBarcodes, insertPendingBarcodeSchema,
-  storedFiles, fileFolders, spreadsheets, liveSpreadsheets,
+  storedFiles, fileFolders, spreadsheets, liveSpreadsheets, insertLiveSpreadsheetSchema,
   agentAccounts, insertAgentAccountSchema,
   freightAccounts,
   snapshotPinnedAccounts,

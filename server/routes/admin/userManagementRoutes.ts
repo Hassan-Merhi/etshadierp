@@ -62,6 +62,147 @@ import path from "path";
 import fs from "fs";
 
 
+
+// Shared helper: compute the raw import cycle balance for a given company.
+// Uses the identical formula as /api/stats/import-cycle-balance (without the stored equity adjustment).
+// Shared by both the single-company and all-companies recalculate endpoints.
+export async function computeRawBalance(companyId: number): Promise<number> {
+
+  const getBalance = async (accountType: string, isLiability = false): Promise<number> => {
+    const accts = await db.select().from(ledgerAccounts)
+      .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.accountType, accountType), isNull(ledgerAccounts.deletedAt)));
+    let total = 0;
+    for (const acct of accts) {
+      const entries = await db.select({ cr: voucherEntries.creditAmount, dr: voucherEntries.debitAmount })
+        .from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+        .where(and(eq(voucherEntries.ledgerAccountId, acct.id), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
+      const raw = parseFloat(acct.openingBalance || "0");
+      const side = acct.openingBalanceSide || "Dr";
+      const signedOpening = isLiability ? (side === "Cr" ? raw : -raw) : (side === "Dr" ? raw : -raw);
+      total += entries.reduce((s, e) => {
+        const cr = parseFloat(e.cr || "0"); const dr = parseFloat(e.dr || "0");
+        return s + (isLiability ? cr - dr : dr - cr);
+      }, signedOpening);
+    }
+    return total;
+  };
+
+  const getTxBalance = async (accountType: string, isLiability = true): Promise<number> => {
+    const r = await db.select({
+      totalCredit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)`,
+      totalDebit:  sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount}  AS DECIMAL)), 0)`,
+    }).from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+      .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+      .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.accountType, accountType),
+        isNull(ledgerAccounts.deletedAt), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
+    const cr = parseFloat(r[0]?.totalCredit || "0"); const dr = parseFloat(r[0]?.totalDebit || "0");
+    return isLiability ? cr - dr : dr - cr;
+  };
+
+  const supplierEntries = await db.select({ supplierId: voucherEntries.supplierId, cr: voucherEntries.creditAmount, dr: voucherEntries.debitAmount })
+    .from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+    .where(and(isNotNull(voucherEntries.supplierId), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
+  const allSuppliersRaw = await storage.getAllSuppliers();
+  const activeSupplierIds = new Set(supplierEntries.map(e => e.supplierId).filter(Boolean));
+  const coContainers = await db.select({ supplierId: containers.supplierId }).from(containers).where(eq(containers.companyId, companyId));
+  for (const c of coContainers) { if (c.supplierId) activeSupplierIds.add(c.supplierId); }
+  const supplierOpeningTotal = allSuppliersRaw.filter(s => activeSupplierIds.has(s.id)).reduce((s, sup) => s + parseFloat(sup.openingBalance || "0"), 0);
+  const supplierBalance = supplierEntries.reduce((s, e) => s + parseFloat(e.cr || "0") - parseFloat(e.dr || "0"), supplierOpeningTotal);
+
+  const otwRows = await db.select({ grandTotal: containers.grandTotal }).from(containers)
+    .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")));
+  const stockOtwValue = otwRows.reduce((s, c) => s + parseFloat(c.grandTotal || "0"), 0);
+
+  const dutyAgentBalance        = await getBalance("Duty Agent", true);
+  const transporterAgentBalance = await getBalance("Transporter Agent", true);
+  const loansBalance            = await getBalance("Loans", true);
+  const cashBalance             = await getBalance("Cash", false);
+
+  const ledgerBankBalance = await getBalance("Bank", false);
+  const standaloneBankEntries = await db.select({ cr: voucherEntries.creditAmount, dr: voucherEntries.debitAmount })
+    .from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+    .innerJoin(bankAccounts, eq(voucherEntries.bankAccountId, bankAccounts.id))
+    .where(and(isNotNull(voucherEntries.bankAccountId), isNull(voucherEntries.ledgerAccountId),
+      isNull(bankAccounts.linkedLedgerId), eq(bankAccounts.companyId, companyId),
+      isNull(bankAccounts.deletedAt), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
+  const standaloneBankAccts = await db.select().from(bankAccounts)
+    .where(and(eq(bankAccounts.companyId, companyId), isNull(bankAccounts.deletedAt), isNull(bankAccounts.linkedLedgerId)));
+  const standaloneOpening = standaloneBankAccts.reduce((s, a) => {
+    const raw = parseFloat(a.openingBalance || "0"); return s + ((a.openingBalanceSide || "Dr") === "Dr" ? raw : -raw);
+  }, 0);
+  const standaloneVoucher = standaloneBankEntries.reduce((s, e) => s + parseFloat(e.dr || "0") - parseFloat(e.cr || "0"), 0);
+  const bankBalance = ledgerBankBalance + standaloneOpening + standaloneVoucher;
+
+  const indirectExpenseBalance = await getBalance("Indirect Expense", false);
+  const incomeBalance          = await getBalance("Income", true);
+
+  const invRows = await db.select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
+    .from(inventory).innerJoin(locations, eq(inventory.locationId, locations.id))
+    .where(and(eq(inventory.companyId, companyId), isNull(locations.deletedAt)));
+  const stockOnFloorValue = invRows.reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.averageRate || "0"), 0);
+
+  const cogsRows = await db.select({ totalCost: salesItems.totalCost }).from(salesItems)
+    .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
+    .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
+  const cogsBalance = cogsRows.reduce((s, i) => s + parseFloat(i.totalCost || "0"), 0);
+
+  const payrollAccts = await db.select({ id: ledgerAccounts.id, openingBalance: ledgerAccounts.openingBalance })
+    .from(ledgerAccounts)
+    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.accountType, "Expense"),
+      sql`(${ledgerAccounts.name} ILIKE '%salary%' OR ${ledgerAccounts.name} ILIKE '%payroll%' OR ${ledgerAccounts.name} ILIKE '%wage%')`,
+      isNull(ledgerAccounts.deletedAt)));
+  let payrollExpenseBalance = 0;
+  if (payrollAccts.length > 0) {
+    const payrollIds = payrollAccts.map(a => a.id);
+    const payrollEntries = await db.select({ cr: voucherEntries.creditAmount, dr: voucherEntries.debitAmount })
+      .from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+      .where(and(inArray(voucherEntries.ledgerAccountId, payrollIds), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
+    const openingTot = payrollAccts.reduce((s, a) => s + parseFloat(a.openingBalance || "0"), 0);
+    const txTot = payrollEntries.reduce((s, e) => s + parseFloat(e.dr || "0") - parseFloat(e.cr || "0"), 0);
+    payrollExpenseBalance = openingTot + txTot;
+  }
+
+  const advRows = await db.select({ remainingBalance: salaryAdvances.remainingBalance }).from(salaryAdvances)
+    .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
+  const salaryAdvancesBalance = advRows.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+
+  const empRows = await db.select({ currentBalance: employees.currentBalance }).from(employees)
+    .where(and(eq(employees.companyId, companyId), isNull(employees.deletedAt)));
+  const payrollLiabilitiesBalance = empRows.reduce((s, e) => { const b = parseFloat(e.currentBalance || "0"); return s + (b > 0 ? b : 0); }, 0);
+
+  const assetBalance             = await getBalance("Asset", false);
+  const governmentTaxesBalance   = await getBalance("Government Taxes", false);
+  const liabilityBalance         = await getBalance("Liability", true);
+  const profitBalance            = await getBalance("Profit", true);
+  const equityTransactionBalance = await getTxBalance("Equity", true);
+  const apTransactionBalance     = await getTxBalance("Accounts Payable", true);
+
+  const allLedgerAccts = await db.select({ openingBalance: ledgerAccounts.openingBalance, openingBalanceSide: ledgerAccounts.openingBalanceSide })
+    .from(ledgerAccounts).where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
+  let totalDrOpenings = 0; let totalCrOpenings = 0;
+  for (const a of allLedgerAccts) {
+    const raw = parseFloat(a.openingBalance || "0");
+    if (raw === 0) continue;
+    if ((a.openingBalanceSide || "Dr") === "Dr") totalDrOpenings += raw; else totalCrOpenings += raw;
+  }
+  const empOpenings = await db.select({ openingBalance: employees.openingBalance }).from(employees)
+    .where(and(eq(employees.companyId, companyId), isNull(employees.deletedAt)));
+  totalCrOpenings += empOpenings.reduce((s, e) => s + parseFloat(e.openingBalance || "0"), 0);
+  let openingBalanceEquity = totalCrOpenings - totalDrOpenings;
+
+  const stockItemOpenings = await db.select({ openingValue: stockItems.openingValue }).from(stockItems)
+    .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
+  openingBalanceEquity -= stockItemOpenings.reduce((s, i) => s + parseFloat(i.openingValue || "0"), 0);
+
+  return Math.round((
+    (stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
+     indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance + salaryAdvancesBalance) -
+    (supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance +
+     profitBalance + equityTransactionBalance + apTransactionBalance + incomeBalance + payrollLiabilitiesBalance -
+     openingBalanceEquity)
+  ) * 100) / 100;
+}
+
 export function registerUserManagementRoutes(app: Express) {
   app.get("/api/admin/legacy-employee-accounts", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
@@ -299,145 +440,6 @@ export function registerUserManagementRoutes(app: Express) {
     }
   });
 
-  // Shared helper: compute the raw import cycle balance for a given company.
-  // Uses the identical formula as /api/stats/import-cycle-balance (without the stored equity adjustment).
-  // Shared by both the single-company and all-companies recalculate endpoints.
-  const computeRawBalance = async (companyId: number): Promise<number> => {
-
-    const getBalance = async (accountType: string, isLiability = false): Promise<number> => {
-      const accts = await db.select().from(ledgerAccounts)
-        .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.accountType, accountType), isNull(ledgerAccounts.deletedAt)));
-      let total = 0;
-      for (const acct of accts) {
-        const entries = await db.select({ cr: voucherEntries.creditAmount, dr: voucherEntries.debitAmount })
-          .from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(and(eq(voucherEntries.ledgerAccountId, acct.id), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
-        const raw = parseFloat(acct.openingBalance || "0");
-        const side = acct.openingBalanceSide || "Dr";
-        const signedOpening = isLiability ? (side === "Cr" ? raw : -raw) : (side === "Dr" ? raw : -raw);
-        total += entries.reduce((s, e) => {
-          const cr = parseFloat(e.cr || "0"); const dr = parseFloat(e.dr || "0");
-          return s + (isLiability ? cr - dr : dr - cr);
-        }, signedOpening);
-      }
-      return total;
-    };
-
-    const getTxBalance = async (accountType: string, isLiability = true): Promise<number> => {
-      const r = await db.select({
-        totalCredit: sql<string>`COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)`,
-        totalDebit:  sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount}  AS DECIMAL)), 0)`,
-      }).from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
-        .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.accountType, accountType),
-          isNull(ledgerAccounts.deletedAt), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
-      const cr = parseFloat(r[0]?.totalCredit || "0"); const dr = parseFloat(r[0]?.totalDebit || "0");
-      return isLiability ? cr - dr : dr - cr;
-    };
-
-    const supplierEntries = await db.select({ supplierId: voucherEntries.supplierId, cr: voucherEntries.creditAmount, dr: voucherEntries.debitAmount })
-      .from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-      .where(and(isNotNull(voucherEntries.supplierId), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
-    const allSuppliersRaw = await storage.getAllSuppliers();
-    const activeSupplierIds = new Set(supplierEntries.map(e => e.supplierId).filter(Boolean));
-    const coContainers = await db.select({ supplierId: containers.supplierId }).from(containers).where(eq(containers.companyId, companyId));
-    for (const c of coContainers) { if (c.supplierId) activeSupplierIds.add(c.supplierId); }
-    const supplierOpeningTotal = allSuppliersRaw.filter(s => activeSupplierIds.has(s.id)).reduce((s, sup) => s + parseFloat(sup.openingBalance || "0"), 0);
-    const supplierBalance = supplierEntries.reduce((s, e) => s + parseFloat(e.cr || "0") - parseFloat(e.dr || "0"), supplierOpeningTotal);
-
-    const otwRows = await db.select({ grandTotal: containers.grandTotal }).from(containers)
-      .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")));
-    const stockOtwValue = otwRows.reduce((s, c) => s + parseFloat(c.grandTotal || "0"), 0);
-
-    const dutyAgentBalance        = await getBalance("Duty Agent", true);
-    const transporterAgentBalance = await getBalance("Transporter Agent", true);
-    const loansBalance            = await getBalance("Loans", true);
-    const cashBalance             = await getBalance("Cash", false);
-
-    const ledgerBankBalance = await getBalance("Bank", false);
-    const standaloneBankEntries = await db.select({ cr: voucherEntries.creditAmount, dr: voucherEntries.debitAmount })
-      .from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-      .innerJoin(bankAccounts, eq(voucherEntries.bankAccountId, bankAccounts.id))
-      .where(and(isNotNull(voucherEntries.bankAccountId), isNull(voucherEntries.ledgerAccountId),
-        isNull(bankAccounts.linkedLedgerId), eq(bankAccounts.companyId, companyId),
-        isNull(bankAccounts.deletedAt), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
-    const standaloneBankAccts = await db.select().from(bankAccounts)
-      .where(and(eq(bankAccounts.companyId, companyId), isNull(bankAccounts.deletedAt), isNull(bankAccounts.linkedLedgerId)));
-    const standaloneOpening = standaloneBankAccts.reduce((s, a) => {
-      const raw = parseFloat(a.openingBalance || "0"); return s + ((a.openingBalanceSide || "Dr") === "Dr" ? raw : -raw);
-    }, 0);
-    const standaloneVoucher = standaloneBankEntries.reduce((s, e) => s + parseFloat(e.dr || "0") - parseFloat(e.cr || "0"), 0);
-    const bankBalance = ledgerBankBalance + standaloneOpening + standaloneVoucher;
-
-    const indirectExpenseBalance = await getBalance("Indirect Expense", false);
-    const incomeBalance          = await getBalance("Income", true);
-
-    const invRows = await db.select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
-      .from(inventory).innerJoin(locations, eq(inventory.locationId, locations.id))
-      .where(and(eq(inventory.companyId, companyId), isNull(locations.deletedAt)));
-    const stockOnFloorValue = invRows.reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.averageRate || "0"), 0);
-
-    const cogsRows = await db.select({ totalCost: salesItems.totalCost }).from(salesItems)
-      .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-      .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
-    const cogsBalance = cogsRows.reduce((s, i) => s + parseFloat(i.totalCost || "0"), 0);
-
-    const payrollAccts = await db.select({ id: ledgerAccounts.id, openingBalance: ledgerAccounts.openingBalance })
-      .from(ledgerAccounts)
-      .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.accountType, "Expense"),
-        sql`(${ledgerAccounts.name} ILIKE '%salary%' OR ${ledgerAccounts.name} ILIKE '%payroll%' OR ${ledgerAccounts.name} ILIKE '%wage%')`,
-        isNull(ledgerAccounts.deletedAt)));
-    let payrollExpenseBalance = 0;
-    if (payrollAccts.length > 0) {
-      const payrollIds = payrollAccts.map(a => a.id);
-      const payrollEntries = await db.select({ cr: voucherEntries.creditAmount, dr: voucherEntries.debitAmount })
-        .from(voucherEntries).innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(and(inArray(voucherEntries.ledgerAccountId, payrollIds), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
-      const openingTot = payrollAccts.reduce((s, a) => s + parseFloat(a.openingBalance || "0"), 0);
-      const txTot = payrollEntries.reduce((s, e) => s + parseFloat(e.dr || "0") - parseFloat(e.cr || "0"), 0);
-      payrollExpenseBalance = openingTot + txTot;
-    }
-
-    const advRows = await db.select({ remainingBalance: salaryAdvances.remainingBalance }).from(salaryAdvances)
-      .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
-    const salaryAdvancesBalance = advRows.reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
-
-    const empRows = await db.select({ currentBalance: employees.currentBalance }).from(employees)
-      .where(and(eq(employees.companyId, companyId), isNull(employees.deletedAt)));
-    const payrollLiabilitiesBalance = empRows.reduce((s, e) => { const b = parseFloat(e.currentBalance || "0"); return s + (b > 0 ? b : 0); }, 0);
-
-    const assetBalance             = await getBalance("Asset", false);
-    const governmentTaxesBalance   = await getBalance("Government Taxes", false);
-    const liabilityBalance         = await getBalance("Liability", true);
-    const profitBalance            = await getBalance("Profit", true);
-    const equityTransactionBalance = await getTxBalance("Equity", true);
-    const apTransactionBalance     = await getTxBalance("Accounts Payable", true);
-
-    const allLedgerAccts = await db.select({ openingBalance: ledgerAccounts.openingBalance, openingBalanceSide: ledgerAccounts.openingBalanceSide })
-      .from(ledgerAccounts).where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
-    let totalDrOpenings = 0; let totalCrOpenings = 0;
-    for (const a of allLedgerAccts) {
-      const raw = parseFloat(a.openingBalance || "0");
-      if (raw === 0) continue;
-      if ((a.openingBalanceSide || "Dr") === "Dr") totalDrOpenings += raw; else totalCrOpenings += raw;
-    }
-    const empOpenings = await db.select({ openingBalance: employees.openingBalance }).from(employees)
-      .where(and(eq(employees.companyId, companyId), isNull(employees.deletedAt)));
-    totalCrOpenings += empOpenings.reduce((s, e) => s + parseFloat(e.openingBalance || "0"), 0);
-    let openingBalanceEquity = totalCrOpenings - totalDrOpenings;
-
-    const stockItemOpenings = await db.select({ openingValue: stockItems.openingValue }).from(stockItems)
-      .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
-    openingBalanceEquity -= stockItemOpenings.reduce((s, i) => s + parseFloat(i.openingValue || "0"), 0);
-
-    return Math.round((
-      (stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance +
-       indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance + salaryAdvancesBalance) -
-      (supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + liabilityBalance +
-       profitBalance + equityTransactionBalance + apTransactionBalance + incomeBalance + payrollLiabilitiesBalance -
-       openingBalanceEquity)
-    ) * 100) / 100;
-  };
 
   // Recalculate Opening Balance Equity adjustment
   // Self-sufficient: computes rawBalance server-side so no body params are needed.

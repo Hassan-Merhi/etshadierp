@@ -5,6 +5,7 @@ import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { sqlArray } from "../../lib/sqlArray";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "../_helpers";
+import { computeRawBalance } from "./userManagementRoutes";
 import {
   factoryCategories, factoryBaleProducts, factoryContainers, factoryRawStock,
   factoryRawMaterialAdjustments, factoryMixBatches, factoryBales,
