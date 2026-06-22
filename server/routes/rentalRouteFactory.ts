@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { registerRentalUnitsContractsRoutes } from "./rental/rentalUnitsContractsRoutes";
 import { registerRentalPaymentsAccrualRoutes } from "./rental/rentalPaymentsAccrualRoutes";
 import { registerRentalAccrualConfigRoutes } from "./rental/rentalAccrualConfigRoutes";
+export { ensureMonthlyForCompany, postRentAccrualForCompany } from "./rental/_rentalShared";
 
 type RentalModule = "PROPERTIES" | "ERP" | "FACTORY";
 

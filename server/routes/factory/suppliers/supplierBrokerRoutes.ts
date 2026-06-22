@@ -901,5 +901,3 @@ export function registerSupplierBrokerRoutes(app: Express) {
   // ───────────────────────────────────────────────
 
 }
-
-}
