@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   ScanLine, ArrowLeft, Play, CheckCircle, XCircle, Trash2,
-  FileDown, FileSpreadsheet, AlertTriangle, Package, Truck, RotateCcw, List,
+  FileDown, FileSpreadsheet, AlertTriangle, Package, Truck, RotateCcw, List, FilePlus,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
@@ -32,6 +32,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 
 interface InvoiceSummary {
   id: number;
+  customerId: number;
   invoiceNumber: string | null;
   orderDate: string;
   status: string;
@@ -281,6 +282,21 @@ export default function FactoryInvoiceLoadingScan() {
       setActiveSessionId(null);
       queryClient.invalidateQueries({ queryKey: [`/api/factory/invoices/${invoiceId}/loading-summary`] });
       toast({ title: "Cancelled", description: "Loading session cancelled." });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const createRemainingProformaMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/factory/invoices/${invoiceId}/create-remaining-proforma`);
+      if (!res.ok) throw new Error((await res.json()).message);
+      return res.json() as Promise<{ proformaId: number; proformaName: string }>;
+    },
+    onSuccess: (data) => {
+      toast({ title: "Proforma created", description: `"${data.proformaName}" is ready. Opening now…` });
+      navigate(`/factory/sales/proformas/${data.proformaId}`);
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -693,6 +709,33 @@ export default function FactoryInvoiceLoadingScan() {
                 </Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ── Create proforma for remaining bales ── */}
+      {!activeSessionId && !isFullyLoaded && summary.totals.remaining > 0 && summary.sessions.some((s) => s.status === "COMPLETED") && (
+        <Card className="border-amber-200 dark:border-amber-800">
+          <CardContent className="pt-4 pb-4 flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <FilePlus className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                  {summary.totals.remaining} bale{summary.totals.remaining !== 1 ? "s" : ""} not loaded
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Create a new proforma with the remaining items so you can start a new loading.
+                </p>
+              </div>
+            </div>
+            <Button
+              onClick={() => createRemainingProformaMutation.mutate()}
+              disabled={createRemainingProformaMutation.isPending}
+              data-testid="button-create-remaining-proforma"
+            >
+              <FilePlus className="h-4 w-4 mr-1" />
+              {createRemainingProformaMutation.isPending ? "Creating…" : "Create Proforma for Remaining"}
+            </Button>
           </CardContent>
         </Card>
       )}

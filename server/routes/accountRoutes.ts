@@ -65,7 +65,8 @@ export function registerAccountRoutes(app: Express) {
         storage.getAllCustomers(companyId),
       ]);
       const isFactoryCompany = currentCompany?.companyType === "factory";
-      const suppliers = isFactoryCompany ? [] : allSuppliers;
+      const isPropertiesCompany = currentCompany?.companyType === "properties";
+      const suppliers = (isFactoryCompany || isPropertiesCompany) ? [] : allSuppliers;
 
       // Build a map of ledgerAccountId → customer opening balance.
       // For customer-linked ledger accounts, the customer record is the
@@ -451,13 +452,26 @@ export function registerAccountRoutes(app: Express) {
         }),
       ];
 
+      // Determine whether the current company is the primary (parent) company.
+      // The opening balance is a one-time historical entry that only belongs to the
+      // parent company's books — child/sub companies start from zero.
+      // Primary = lowest database ID across all ERP companies (created first during setup).
+      const allErpCompanies = (await storage.getAllCompanies()).filter(
+        (c: any) => !c.companyType || c.companyType === "erp",
+      );
+      const primaryErpCompanyId =
+        allErpCompanies.length > 0
+          ? Math.min(...allErpCompanies.map((c: any) => c.id))
+          : null;
+      const isParentContext = companyId === primaryErpCompanyId;
+
       // Calculate supplier balances separately using global entries (matching /api/suppliers/stats)
       // Suppliers are global entities, so their balances should include entries from ALL companies
       const supplierAccountsList = await Promise.all(
         suppliers.map(async (supplier) => {
           // Get entries across ALL companies (same as supplier stats endpoint)
           const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
-          const openingBalance = parseFloat(supplier.openingBalance || "0");
+          const openingBalance = isParentContext ? parseFloat(supplier.openingBalance || "0") : 0;
 
           // Calculate balance: Opening Balance + Credits - Debits
           // This gives a signed value where positive = we owe them, negative = they owe us/prepaid
@@ -624,6 +638,7 @@ export function registerAccountRoutes(app: Express) {
       // Phase 1: determine company type (other fetches are conditional on this)
       const currentCompany = await storage.getCompanyById(companyId);
       const isFactoryCompany = currentCompany?.companyType === "factory";
+      const isPropertiesCompany = currentCompany?.companyType === "properties";
 
       // Phase 2: all independent fetches in parallel (allEntries runs concurrently with others)
       const [
@@ -642,7 +657,7 @@ export function registerAccountRoutes(app: Express) {
         storage.getAllBankAccounts(companyId),
         storage.getAllFixedAssets(companyId),
         storage.getAllEmployees(companyId),
-        isFactoryCompany ? Promise.resolve([] as any[]) : storage.getAllSuppliers(),
+        (isFactoryCompany || isPropertiesCompany) ? Promise.resolve([] as any[]) : storage.getAllSuppliers(),
         isFactoryCompany
           ? db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId)).orderBy(factorySuppliers.name)
           : Promise.resolve([] as any[]),
@@ -843,7 +858,7 @@ export function registerAccountRoutes(app: Express) {
             balance,
           };
         }),
-        // ERP Suppliers — only included for non-factory companies (factory companies use factorySuppliers)
+        // ERP Suppliers — only included for ERP companies (factory and properties use different account structures)
         ...suppliers.map((supplier) => {
           const transactionBalance = supplierBalances.get(supplier.id) || 0;
           const openingBalance = parseFloat(supplier.openingBalance || "0");

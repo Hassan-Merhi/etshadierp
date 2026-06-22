@@ -8,6 +8,7 @@ import {
   ClipboardList,
   ArrowLeftRight,
   KeyRound,
+  BarChart2,
 } from "lucide-react";
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { useMemo } from "react";
@@ -43,8 +44,9 @@ export const PROPERTIES_NAV_SECTIONS: NavSection[] = [
     label: "Accounting",
     color: NAV_COLOR.accounting,
     items: [
-      { title: "Accounts", url: "/properties/accounts", icon: Landmark },
-      { title: "Vouchers", url: "/properties/vouchers", icon: FileText },
+      { title: "Accounts",   url: "/properties/accounts",  icon: Landmark  },
+      { title: "Vouchers",   url: "/properties/vouchers",  icon: FileText  },
+      { title: "Analytics",  url: "/properties/analytics", icon: BarChart2 },
     ],
   },
 ];

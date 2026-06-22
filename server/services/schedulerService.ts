@@ -4,7 +4,7 @@ import { PassThrough } from "stream";
 import { fetchAllCompanies } from "./exportDataService";
 import { sendExportEmail } from "./emailService";
 import { pool } from "../db";
-import { ensureMonthlyForCompany, postRentAccrualForCompany } from "../routes/rentalRouteFactory";
+import { ensureMonthlyForCompany, postRentAccrualForCompany } from "../routes/rental/_rentalShared";
 import { getWaSettings, getActiveRecipients, sendWhatsAppFile, sendWhatsAppFileToChatId, sendWhatsAppText } from "./whatsappService";
 import { generateNetPositionExcel } from "../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../helpers/generateStockPdf";
