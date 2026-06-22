@@ -82,7 +82,7 @@ export function ContainerDrawerTracking({
     <div className="space-y-0.5" data-testid={testId}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">{label}</span>
-        <span className={\`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 \${badgeColor}\`}>{badge}</span>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 \${badgeColor}`}>{badge}</span>
       </div>
       {(detail || detailNode) && (
         <p className="text-[11px] text-muted-foreground/70 text-right leading-snug">

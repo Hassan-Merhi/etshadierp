@@ -84,7 +84,7 @@ export function ContainerDrawer({
       apiRequest("PATCH", `/api/containers/${container!.id}/tracking`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [queryKey] });
-      toast({ title: "Saved", description: \`\${container?.containerNumber} updated.\` });
+      toast({ title: "Saved", description: `\${container?.containerNumber} updated.` });
       onClose();
     },
     onError: (err: any) => {

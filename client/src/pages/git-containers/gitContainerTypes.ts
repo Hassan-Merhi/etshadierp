@@ -182,16 +182,16 @@ export function getContainerPriority(c: EnrichedContainerRow): UIPriority {
   if (statusLower === "in transit")
     return { tier: "high", label: "High", reason: "In Transit — active movement", intervalHours: 24 };
   if (daysUntilEta !== null && daysUntilEta >= 0 && daysUntilEta <= 3)
-    return { tier: "high", label: "High", reason: \`ETA in \${daysUntilEta} day\${daysUntilEta !== 1 ? "s" : ""}\`, intervalHours: 24 };
+    return { tier: "high", label: "High", reason: `ETA in \${daysUntilEta} day\${daysUntilEta !== 1 ? "s" : ""}`, intervalHours: 24 };
   if (daysUntilEta !== null && daysUntilEta >= 0 && daysUntilEta <= 7)
-    return { tier: "medium", label: "Medium", reason: \`ETA in \${daysUntilEta} days\`, intervalHours: 48 };
+    return { tier: "medium", label: "Medium", reason: `ETA in \${daysUntilEta} days`, intervalHours: 48 };
   if (statusLower === "arrived")
     return { tier: "medium", label: "Medium", reason: "Arrived — awaiting offload", intervalHours: 48 };
   if (daysUntilEta !== null && daysUntilEta >= 0 && daysUntilEta <= 14)
-    return { tier: "medium", label: "Medium", reason: \`ETA in \${daysUntilEta} days\`, intervalHours: 48 };
+    return { tier: "medium", label: "Medium", reason: `ETA in \${daysUntilEta} days`, intervalHours: 48 };
   if (daysUntilEta !== null && daysUntilEta > 14) {
     const intervalHours = daysUntilEta > 21 ? 120 : 96;
-    return { tier: "low", label: "Low", reason: \`ETA in \${daysUntilEta} days\`, intervalHours };
+    return { tier: "low", label: "Low", reason: `ETA in \${daysUntilEta} days`, intervalHours };
   }
   return { tier: "low", label: "Low", reason: "No ETA set", intervalHours: 120 };
 }

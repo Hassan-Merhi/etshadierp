@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle, FileSpreadsheet, Images, MessageCircle, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
-import { ImportBalesTab } from "./BaleStockEntry";
+import { ImportBalesTab } from "./bale-stock-entry/ImportBalesTab";
 import { PageHeader } from "@/components/PageHeader";
 
 interface Location {

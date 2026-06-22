@@ -39,7 +39,7 @@ export function EtaCell({ container }: { container: EnrichedContainerRow }) {
         type="date"
         value={value}
         autoFocus
-        data-testid={\`input-eta-inline-\${container.id}\`}
+        data-testid={`input-eta-inline-\${container.id}`}
         onChange={(e) => setValue(e.target.value)}
         onBlur={save}
         onKeyDown={(e) => {
@@ -56,7 +56,7 @@ export function EtaCell({ container }: { container: EnrichedContainerRow }) {
     <span
       onClick={(e) => { e.stopPropagation(); setValue(container.eta ?? ""); setEditing(true); }}
       title="Click to set or edit ETA"
-      data-testid={\`text-eta-\${container.id}\`}
+      data-testid={`text-eta-\${container.id}`}
       className="cursor-text underline decoration-dashed underline-offset-2 decoration-muted-foreground/40"
     >
       {container.eta ? fmtDate(container.eta) : <span className="text-muted-foreground/50 text-xs no-underline">set ETA</span>}
@@ -146,7 +146,7 @@ export function InlineNumberCell({ id, field, value, prefix = "$" }: {
       title="Click to edit"
       className="cursor-text underline decoration-dashed underline-offset-2 decoration-muted-foreground/40"
     >
-      {num > 0 ? \`\${prefix}\${fmt(num)}\` : <span className="text-muted-foreground/50 text-xs">—</span>}
+      {num > 0 ? `\${prefix}\${fmt(num)}` : <span className="text-muted-foreground/50 text-xs">—</span>}
     </span>
   );
 }

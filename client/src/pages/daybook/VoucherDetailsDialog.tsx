@@ -396,7 +396,7 @@ export function VoucherDetailsDialog({
                   </div>
                 )}
               </div>
-            </div>
+            )}
 
             {isStockTransferVoucher && (revisionsLoading || voucherRevisions.length > 0) && (
               <div className="space-y-4">

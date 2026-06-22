@@ -1,6 +1,6 @@
 import { History, Clock } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { EditLogTable } from "./AuditLog";
+import { AuditLog } from "./AuditLog";
 
 interface EditLogTabProps {
   selectedCompany: any;
@@ -25,7 +25,7 @@ export function EditLogTab({ selectedCompany }: EditLogTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <EditLogTable companyId={selectedCompany?.id} />
+          <AuditLog />
         </CardContent>
       </Card>
     </div>

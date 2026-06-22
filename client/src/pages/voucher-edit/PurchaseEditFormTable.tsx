@@ -154,7 +154,7 @@ export function PurchaseEditFormTable({
             </td>
             <td></td>
           </tr>
-        </tbody>
+        </tfoot>
       </table>
     </div>
   );
