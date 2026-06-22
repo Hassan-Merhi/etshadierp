@@ -298,6 +298,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
   const isFactoryCompany = selectedCompany?.companyType === "factory";
+  const isPropertiesCompany = selectedCompany?.companyType === "properties";
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideVoucherAmounts = (myErpPages?.hiddenErpCostFields ?? []).includes("voucher_amounts");
   const [isAutoCreating, setIsAutoCreating] = useState(false);
@@ -409,7 +410,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // triggers fire; staleTime prevents re-fetches on subsequent navigation.
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", selectedCompany?.id],
-    enabled: accountPickersNeeded && !!selectedCompany,
+    enabled: accountPickersNeeded && !!selectedCompany && !isPropertiesCompany,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -471,7 +472,7 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   // only uses queryKey[0] as the URL which would strip the search parameter.
   const { data: supplierSearchResults = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", "live-search", debouncedAccountSearch, selectedCompany?.id],
-    enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany,
+    enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany && !isPropertiesCompany,
     staleTime: 30 * 1000,
     queryFn: async () => {
       const res = await fetch(

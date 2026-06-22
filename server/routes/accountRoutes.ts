@@ -65,7 +65,8 @@ export function registerAccountRoutes(app: Express) {
         storage.getAllCustomers(companyId),
       ]);
       const isFactoryCompany = currentCompany?.companyType === "factory";
-      const suppliers = isFactoryCompany ? [] : allSuppliers;
+      const isPropertiesCompany = currentCompany?.companyType === "properties";
+      const suppliers = (isFactoryCompany || isPropertiesCompany) ? [] : allSuppliers;
 
       // Build a map of ledgerAccountId → customer opening balance.
       // For customer-linked ledger accounts, the customer record is the
@@ -637,6 +638,7 @@ export function registerAccountRoutes(app: Express) {
       // Phase 1: determine company type (other fetches are conditional on this)
       const currentCompany = await storage.getCompanyById(companyId);
       const isFactoryCompany = currentCompany?.companyType === "factory";
+      const isPropertiesCompany = currentCompany?.companyType === "properties";
 
       // Phase 2: all independent fetches in parallel (allEntries runs concurrently with others)
       const [
@@ -655,7 +657,7 @@ export function registerAccountRoutes(app: Express) {
         storage.getAllBankAccounts(companyId),
         storage.getAllFixedAssets(companyId),
         storage.getAllEmployees(companyId),
-        isFactoryCompany ? Promise.resolve([] as any[]) : storage.getAllSuppliers(),
+        (isFactoryCompany || isPropertiesCompany) ? Promise.resolve([] as any[]) : storage.getAllSuppliers(),
         isFactoryCompany
           ? db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId)).orderBy(factorySuppliers.name)
           : Promise.resolve([] as any[]),
@@ -856,7 +858,7 @@ export function registerAccountRoutes(app: Express) {
             balance,
           };
         }),
-        // ERP Suppliers — only included for non-factory companies (factory companies use factorySuppliers)
+        // ERP Suppliers — only included for ERP companies (factory and properties use different account structures)
         ...suppliers.map((supplier) => {
           const transactionBalance = supplierBalances.get(supplier.id) || 0;
           const openingBalance = parseFloat(supplier.openingBalance || "0");
