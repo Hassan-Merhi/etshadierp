@@ -142,10 +142,9 @@ export function registerGlobalTransactionRoutes(
       }
 
       // 3. Build WHERE conditions
-      // Privileged users (Admin/Owner/Manager/Developer) can see deleted vouchers when searching
       const conditions: any[] = [
         inArray(vouchers.companyId, targetCompanyIds),
-        ...(isPrivileged ? [] : [isNull(vouchers.deletedAt)]),
+        isNull(vouchers.deletedAt),
       ];
 
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
