@@ -1,22 +1,25 @@
 export {
   propertyUnits,
   insertPropertyUnitSchema,
-  InsertPropertyUnit,
-  PropertyUnit,
   propertyContracts,
   insertPropertyContractSchema,
-  InsertPropertyContract,
-  PropertyContract,
   propertyMonthlyLedger,
   insertPropertyMonthlyLedgerSchema,
-  InsertPropertyMonthlyLedger,
-  PropertyMonthlyLedger,
   propertyPayments,
   insertPropertyPaymentSchema,
-  InsertPropertyPayment,
-  PropertyPayment,
   rentalAutoTransferConfigs,
   insertRentalAutoTransferConfigSchema,
+} from './_definitions';
+
+export type {
+  InsertPropertyUnit,
+  PropertyUnit,
+  InsertPropertyContract,
+  PropertyContract,
+  InsertPropertyMonthlyLedger,
+  PropertyMonthlyLedger,
+  InsertPropertyPayment,
+  PropertyPayment,
   InsertRentalAutoTransferConfig,
   RentalAutoTransferConfig,
-} from './index';
+} from './_definitions';

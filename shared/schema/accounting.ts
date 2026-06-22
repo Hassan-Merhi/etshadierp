@@ -2,15 +2,18 @@ export {
   ledgerAccounts,
   insertLedgerAccountSchema,
   updateLedgerAccountSchema,
+  bankAccounts,
+  insertBankAccountSchema,
+  fixedAssets,
+  insertFixedAssetSchema,
+} from './_definitions';
+
+export type {
   InsertLedgerAccount,
   UpdateLedgerAccount,
   LedgerAccount,
-  bankAccounts,
-  insertBankAccountSchema,
   InsertBankAccount,
   BankAccount,
-  fixedAssets,
-  insertFixedAssetSchema,
   InsertFixedAsset,
   FixedAsset,
-} from './index';
+} from './_definitions';
