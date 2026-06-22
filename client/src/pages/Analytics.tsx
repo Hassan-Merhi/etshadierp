@@ -780,6 +780,28 @@ export default function Analytics() {
     return total;
   };
 
+  // Absolute total: sums displayed (absolute) balances with hierarchical deduplication.
+  // Used for Cash, Loans/Banks, Assets, Liabilities sections so the footer total
+  // always equals the sum of what is shown in each individual row.
+  const calculateAbsoluteTotal = (accountList: Account[]) => {
+    const accountIds = new Set(accountList.map(acc => acc.accountId));
+    const parentAccountIds = new Set(
+      accountList.filter(acc => acc.parentId).map(acc => acc.parentId!)
+    );
+    let total = 0;
+    accountList.forEach(acc => {
+      const hasChildrenInList = parentAccountIds.has(acc.accountId);
+      const isChildOfParentInList = acc.parentId && accountIds.has(acc.parentId);
+      if (hasChildrenInList) {
+        const children = accountList.filter(child => child.parentId === acc.accountId);
+        total += children.reduce((sum, child) => sum + parseBalance(child.balance), 0);
+      } else if (!isChildOfParentInList) {
+        total += parseBalance(acc.balance);
+      }
+    });
+    return total;
+  };
+
   const calculatePLTotal = (accountList: Account[]) => {
     return accountList.reduce((sum, acc) => {
       const balance = parseBalance(acc.balance);
@@ -808,6 +830,7 @@ export default function Analytics() {
   };
 
   // Filter accounts - Cash accounts are ledger accounts with accountType="Cash"
+  // Also include bank-entity accounts whose name/code contains "cash"
   const cashAccounts = accounts.filter(
     (acc) => 
       (acc.type === "ledger" && acc.accountType === "Cash") ||
@@ -815,6 +838,12 @@ export default function Analytics() {
         (acc.name || "").toLowerCase().includes("cash") || 
         (acc.code || "").toLowerCase().includes("cash")
       ))
+  );
+
+  // Ledger accounts typed as "Bank" (e.g. "Roukaya Cash") — shown in Loans/Banks section
+  // These are separate from bank-entity accounts (acc.type === "bank")
+  const bankTypeLedgerAccounts = accounts.filter(
+    (acc) => acc.type === "ledger" && acc.accountType === "Bank"
   );
 
   const assetAccounts = accounts.filter(
@@ -860,7 +889,7 @@ export default function Analytics() {
   const loansBanksAccounts = accounts.filter(
     (acc) =>
       acc.type === "bank" ||
-      (acc.type === "ledger" && acc.accountType === "Loans")
+      (acc.type === "ledger" && (acc.accountType === "Loans" || acc.accountType === "Bank"))
   );
 
   const directIncomeAccounts = accounts.filter(
@@ -1130,7 +1159,7 @@ export default function Analytics() {
                 <div className="text-right">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
                   <p className="text-2xl font-bold font-mono tabular-nums">
-                    {formatSmartCurrency(calculateTotal(assetAccounts))}
+                    {formatSmartCurrency(calculateAbsoluteTotal(assetAccounts))}
                   </p>
                 </div>
               </div>
@@ -1159,7 +1188,7 @@ export default function Analytics() {
                     <TableFooter>
                       <TableRow>
                         <TableCell className="font-semibold">Total</TableCell>
-                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(assetAccounts))}</TableCell>
+                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateAbsoluteTotal(assetAccounts))}</TableCell>
                       </TableRow>
                     </TableFooter>
                   </Table>
@@ -1182,7 +1211,7 @@ export default function Analytics() {
                 <div className="text-right">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
                   <p className="text-2xl font-bold font-mono tabular-nums">
-                    {formatSmartCurrency(calculateTotal(liabilityAccounts))}
+                    {formatSmartCurrency(calculateAbsoluteTotal(liabilityAccounts))}
                   </p>
                 </div>
               </div>
@@ -1211,7 +1240,7 @@ export default function Analytics() {
                     <TableFooter>
                       <TableRow>
                         <TableCell className="font-semibold">Total</TableCell>
-                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(liabilityAccounts))}</TableCell>
+                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateAbsoluteTotal(liabilityAccounts))}</TableCell>
                       </TableRow>
                     </TableFooter>
                   </Table>
@@ -1234,7 +1263,7 @@ export default function Analytics() {
                 <div className="text-right">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Cash</p>
                   <p className="text-2xl font-bold font-mono tabular-nums">
-                    {formatSmartCurrency(calculateTotal(cashAccounts))}
+                    {formatSmartCurrency(calculateAbsoluteTotal(cashAccounts))}
                   </p>
                 </div>
               </div>
@@ -1263,7 +1292,7 @@ export default function Analytics() {
                     <TableFooter>
                       <TableRow>
                         <TableCell className="font-semibold">Total Cash</TableCell>
-                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(cashAccounts))}</TableCell>
+                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateAbsoluteTotal(cashAccounts))}</TableCell>
                       </TableRow>
                     </TableFooter>
                   </Table>
@@ -1286,7 +1315,7 @@ export default function Analytics() {
                 <div className="text-right">
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total Balance</p>
                   <p className="text-2xl font-bold font-mono tabular-nums">
-                    {formatSmartCurrency(calculateTotal(loansBanksAccounts))}
+                    {formatSmartCurrency(calculateAbsoluteTotal(loansBanksAccounts))}
                   </p>
                 </div>
               </div>
@@ -1315,7 +1344,7 @@ export default function Analytics() {
                     <TableFooter>
                       <TableRow>
                         <TableCell className="font-semibold">Total Balance</TableCell>
-                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(loansBanksAccounts))}</TableCell>
+                        <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateAbsoluteTotal(loansBanksAccounts))}</TableCell>
                       </TableRow>
                     </TableFooter>
                   </Table>

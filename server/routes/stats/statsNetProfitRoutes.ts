@@ -38,8 +38,8 @@ import {
 import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
-import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
-import { classifyNetPositionAccounts, getAccountNetBalance, round2 } from "../netPositionHelper";
+import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHelper";
+import { classifyNetPositionAccounts, getAccountNetBalance, round2 } from "../../netPositionHelper";
 
 // ---------------------------------------------------------------------------
 // Lightweight in-process TTL cache for expensive computed stat endpoints.

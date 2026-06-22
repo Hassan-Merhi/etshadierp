@@ -31,6 +31,8 @@ import { adjustInventory } from "../../inventoryHelper";
 
 
 export function registerStockMergeRoutes(app: Express) {
+  // Update stock transfer item
+  app.patch("/api/stock-transfer-items/:id", requireAuth, async (req, res) => {
     try {
       const itemId = parseInt(req.params.id);
       if (isNaN(itemId)) {
@@ -1113,6 +1115,4 @@ export function registerStockMergeRoutes(app: Express) {
   });
 
   // Bank Accounts
-}
-
 }

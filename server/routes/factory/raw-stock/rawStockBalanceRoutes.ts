@@ -3,7 +3,7 @@ import { getClientDate } from "../../../lib/dateUtils";
 import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
-import { classifyNetPositionAccounts } from "../../netPositionHelper";
+import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
@@ -668,7 +668,5 @@ export function registerRawStockBalanceRoutes(app: Express) {
   // ───────────────────────────────────────────────
   // 6. Factory Mix Batches
   // ───────────────────────────────────────────────
-
-}
 
 }

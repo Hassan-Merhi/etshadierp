@@ -3,7 +3,7 @@ import type { Express } from "express";
 import { db } from "../../../db";
 import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
-import { buildBrokerStatement } from "./factorySuppliersRoutes";
+import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
   writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,

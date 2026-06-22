@@ -576,5 +576,3 @@ export function registerRentalAccrualConfigRoutes(
     }
   });
 }
-
-}

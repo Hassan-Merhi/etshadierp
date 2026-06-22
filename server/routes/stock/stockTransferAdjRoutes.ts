@@ -1164,6 +1164,4 @@ export function registerStockTransferAdjRoutes(app: Express) {
     },
   );
 
-  // Update stock transfer item
-  app.patch("/api/stock-transfer-items/:id", requireAuth, async (req, res) => {
 }
