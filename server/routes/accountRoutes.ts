@@ -451,13 +451,26 @@ export function registerAccountRoutes(app: Express) {
         }),
       ];
 
+      // Determine whether the current company is the primary (parent) company.
+      // The opening balance is a one-time historical entry that only belongs to the
+      // parent company's books — child/sub companies start from zero.
+      // Primary = lowest database ID across all ERP companies (created first during setup).
+      const allErpCompanies = (await storage.getAllCompanies()).filter(
+        (c: any) => !c.companyType || c.companyType === "erp",
+      );
+      const primaryErpCompanyId =
+        allErpCompanies.length > 0
+          ? Math.min(...allErpCompanies.map((c: any) => c.id))
+          : null;
+      const isParentContext = companyId === primaryErpCompanyId;
+
       // Calculate supplier balances separately using global entries (matching /api/suppliers/stats)
       // Suppliers are global entities, so their balances should include entries from ALL companies
       const supplierAccountsList = await Promise.all(
         suppliers.map(async (supplier) => {
           // Get entries across ALL companies (same as supplier stats endpoint)
           const entries = await storage.getVoucherEntriesBySupplier(supplier.id);
-          const openingBalance = parseFloat(supplier.openingBalance || "0");
+          const openingBalance = isParentContext ? parseFloat(supplier.openingBalance || "0") : 0;
 
           // Calculate balance: Opening Balance + Credits - Debits
           // This gives a signed value where positive = we owe them, negative = they owe us/prepaid
