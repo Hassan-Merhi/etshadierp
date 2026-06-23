@@ -122,12 +122,12 @@ export function AccountTransactionRows({
                   {v.voucherType}
                 </Badge>
               </TableCell>
-              <TableCell className="py-2 text-[11px] max-w-[250px] truncate">
+              <TableCell className="py-2 text-[11px] max-w-[420px] truncate">
                 <div className="font-semibold text-foreground">{v.voucherNumber}</div>
                 <div className="text-muted-foreground truncate">{v.voucherDescription || v.narration}</div>
               </TableCell>
               {appMode === "factory" && (
-                <TableCell className="py-2 text-[10px] text-muted-foreground max-w-[150px] truncate">
+                <TableCell className="py-2 text-[10px] text-muted-foreground max-w-[280px] truncate">
                    {v.narration}
                 </TableCell>
               )}
