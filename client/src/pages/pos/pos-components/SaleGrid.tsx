@@ -193,7 +193,6 @@ export function SaleGrid({
                             col.key === "quantity" && getStockWarning(row) ? "text-destructive font-bold" : ""
                           }`}
                           placeholder={col.key === "itemName" ? "Type to search..." : ""}
-                          style={col.key === "quantity" || col.key === "rate" ? { fontSize: "16px" } : undefined}
                           data-testid={`input-${col.key}-${rowIndex}`}
                         />
                       )}
