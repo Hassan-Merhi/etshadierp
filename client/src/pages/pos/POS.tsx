@@ -1264,22 +1264,35 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
             <div className="mt-2 flex flex-wrap items-center gap-3 px-1">
               <span className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{validItemCount}</span> Items&nbsp;&nbsp; Qty{" "}
+                <span className="font-semibold text-foreground">{validItemCount}</span> items&nbsp;&nbsp;Qty{" "}
                 <span className="font-semibold text-foreground font-mono">{totalQty.toFixed(2)}</span>
               </span>
-              <span className="text-sm ml-auto font-semibold">
-                Total&nbsp;
-                <span className="font-mono text-primary text-base">{formatDisplayAmount(total)}</span>
+              <span className="text-sm ml-auto flex items-baseline gap-1">
+                <span className="text-muted-foreground">Total</span>
+                <span className="font-mono font-bold text-2xl">{formatDisplayAmount(total)}</span>
               </span>
             </div>
 
-            <Textarea
-              placeholder="Sale notes (optional)..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="resize-none mt-2 h-14 min-h-[56px] text-sm"
-              data-testid="input-notes"
-            />
+            {/* Collapsible notes — hidden by default to match production layout */}
+            <div className="mt-1 px-1">
+              {notes ? (
+                <Textarea
+                  placeholder="Notes (optional)"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="resize-none h-12 min-h-[48px] text-sm"
+                  data-testid="input-notes"
+                />
+              ) : (
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  onClick={() => setNotes(" ")}
+                  data-testid="button-add-note"
+                >
+                  + Add note
+                </button>
+              )}
+            </div>
           </div>
 
           <InventoryPicker
