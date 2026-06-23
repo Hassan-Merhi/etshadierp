@@ -914,3 +914,52 @@ export async function getVoucherHistoryForItem(stockItemId: number, companyId: n
   allTransactions.sort((a, b) => new Date(b.voucherDate).getTime() - new Date(a.voucherDate).getTime());
   return allTransactions;
 }
+
+// ---------------------------------------------------------------------------
+// Bulk Stock Item Operations
+// ---------------------------------------------------------------------------
+
+export async function bulkGetStockItemsByIds(ids: number[], companyId: number): Promise<schema.StockItem[]> {
+  if (ids.length === 0) return [];
+  return await db
+    .select()
+    .from(schema.stockItems)
+    .where(and(
+      inArray(schema.stockItems.id, ids),
+      eq(schema.stockItems.companyId, companyId),
+      isNull(schema.stockItems.deletedAt)
+    ));
+}
+
+export async function bulkDeleteStockItems(ids: number[]): Promise<void> {
+  if (ids.length === 0) return;
+  await db
+    .update(schema.stockItems)
+    .set({ deletedAt: new Date() })
+    .where(inArray(schema.stockItems.id, ids));
+}
+
+// ---------------------------------------------------------------------------
+// Stock Item Code Aliases
+// ---------------------------------------------------------------------------
+
+export async function getAllCompanyCodeAliases(companyId: number): Promise<schema.StockItemCodeAlias[]> {
+  return await db
+    .select()
+    .from(schema.stockItemCodeAliases)
+    .where(eq(schema.stockItemCodeAliases.companyId, companyId));
+}
+
+export async function createStockItemCodeAlias(data: schema.InsertStockItemCodeAlias): Promise<schema.StockItemCodeAlias> {
+  const [alias] = await db
+    .insert(schema.stockItemCodeAliases)
+    .values(data)
+    .returning();
+  return alias;
+}
+
+export async function deleteStockItemCodeAlias(aliasId: number): Promise<void> {
+  await db
+    .delete(schema.stockItemCodeAliases)
+    .where(eq(schema.stockItemCodeAliases.id, aliasId));
+}

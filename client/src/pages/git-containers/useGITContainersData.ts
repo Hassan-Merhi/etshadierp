@@ -122,9 +122,10 @@ export function useGITContainersData({
     onError: (err: any) => toast({ title: "Track All failed", description: err.message, variant: "destructive" }),
   });
 
+  const isBulkPending = bulkTrackMutation.isPending;
+
   useEffect(() => {
     if (!isAllowed) return;
-    const isBulkPending = bulkTrackMutation.isPending;
     if (!isBulkPending && !showProgressBanner) return;
 
     let stopped = false;

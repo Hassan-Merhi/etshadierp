@@ -31,6 +31,12 @@ export async function deleteLocation(id: number): Promise<void> {
   await db.update(schema.locations).set({ deletedAt: new Date() }).where(eq(schema.locations.id, id));
 }
 
+export async function getLocationByCode(code: string, companyId: number): Promise<schema.Location | undefined> {
+  const [location] = await db.select().from(schema.locations)
+    .where(and(eq(schema.locations.code, code), eq(schema.locations.companyId, companyId), isNull(schema.locations.deletedAt)));
+  return location;
+}
+
 // ---------------------------------------------------------------------------
 // Stock Groups
 // ---------------------------------------------------------------------------
@@ -58,6 +64,12 @@ export async function updateStockGroup(id: number, updates: Partial<schema.Inser
 
 export async function deleteStockGroup(id: number): Promise<void> {
   await db.delete(schema.stockGroups).where(eq(schema.stockGroups.id, id));
+}
+
+export async function getStockGroupByCode(code: string, companyId: number): Promise<schema.StockGroup | undefined> {
+  const [group] = await db.select().from(schema.stockGroups)
+    .where(and(eq(schema.stockGroups.code, code), eq(schema.stockGroups.companyId, companyId)));
+  return group;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,48 +142,75 @@ export async function searchStockItems(companyId: number, query: string, limit: 
 // Code Aliases
 // ---------------------------------------------------------------------------
 
-export async function getCodeAliasesByStockItem(stockItemId: number): Promise<schema.CodeAlias[]> {
-  return await db.select().from(schema.codeAliases).where(eq(schema.codeAliases.stockItemId, stockItemId));
+export async function getCodeAliasesByStockItem(stockItemId: number): Promise<schema.StockItemCodeAlias[]> {
+  return await db.select().from(schema.stockItemCodeAliases).where(eq(schema.stockItemCodeAliases.stockItemId, stockItemId));
 }
 
-export async function createCodeAlias(alias: schema.InsertCodeAlias): Promise<schema.CodeAlias> {
-  const [created] = await db.insert(schema.codeAliases).values(alias).returning();
+export async function getStockItemCodeAliases(stockItemId: number): Promise<schema.StockItemCodeAlias[]> {
+  return getCodeAliasesByStockItem(stockItemId);
+}
+
+export async function getStockItemCodeAliasById(aliasId: number): Promise<schema.StockItemCodeAlias | undefined> {
+  const [alias] = await db.select().from(schema.stockItemCodeAliases).where(eq(schema.stockItemCodeAliases.id, aliasId));
+  return alias;
+}
+
+export async function createCodeAlias(alias: schema.InsertStockItemCodeAlias): Promise<schema.StockItemCodeAlias> {
+  const [created] = await db.insert(schema.stockItemCodeAliases).values(alias).returning();
   return created;
 }
 
 export async function deleteCodeAlias(id: number): Promise<void> {
-  await db.delete(schema.codeAliases).where(eq(schema.codeAliases.id, id));
+  await db.delete(schema.stockItemCodeAliases).where(eq(schema.stockItemCodeAliases.id, id));
 }
 
 // ---------------------------------------------------------------------------
 // Location Prices
 // ---------------------------------------------------------------------------
 
-export async function getLocationPrices(companyId: number, locationId: number): Promise<schema.LocationPrice[]> {
-  return await db.select().from(schema.locationPrices)
-    .where(and(eq(schema.locationPrices.companyId, companyId), eq(schema.locationPrices.locationId, locationId)));
+export async function getLocationPrices(companyId: number, locationId: number): Promise<schema.StockItemLocationPrice[]> {
+  return await db.select().from(schema.stockItemLocationPrices)
+    .where(eq(schema.stockItemLocationPrices.locationId, locationId));
 }
 
-export async function getLocationPricesByStockItem(stockItemId: number, companyId: number): Promise<schema.LocationPrice[]> {
-  return await db.select().from(schema.locationPrices)
-    .where(and(eq(schema.locationPrices.stockItemId, stockItemId), eq(schema.locationPrices.companyId, companyId)));
+export async function getAllLocationPrices(companyId: number): Promise<schema.StockItemLocationPrice[]> {
+  return await db.select({
+    id: schema.stockItemLocationPrices.id,
+    stockItemId: schema.stockItemLocationPrices.stockItemId,
+    locationId: schema.stockItemLocationPrices.locationId,
+    sellingPrice: schema.stockItemLocationPrices.sellingPrice,
+    createdAt: schema.stockItemLocationPrices.createdAt,
+    updatedAt: schema.stockItemLocationPrices.updatedAt,
+  })
+    .from(schema.stockItemLocationPrices)
+    .innerJoin(schema.locations, eq(schema.stockItemLocationPrices.locationId, schema.locations.id))
+    .where(eq(schema.locations.companyId, companyId));
 }
 
-export async function upsertLocationPrice(price: schema.InsertLocationPrice): Promise<schema.LocationPrice> {
+export async function getLocationPricesByStockItem(stockItemId: number, companyId: number): Promise<schema.StockItemLocationPrice[]> {
+  return await db.select().from(schema.stockItemLocationPrices)
+    .where(eq(schema.stockItemLocationPrices.stockItemId, stockItemId));
+}
+
+export async function getStockItemLocationPrices(stockItemId: number, companyId: number): Promise<schema.StockItemLocationPrice[]> {
+  return getLocationPricesByStockItem(stockItemId, companyId);
+}
+
+export async function upsertLocationPrice(stockItemId: number, locationId: number, sellingPrice: string): Promise<schema.StockItemLocationPrice> {
   const [result] = await db
-    .insert(schema.locationPrices)
-    .values(price)
+    .insert(schema.stockItemLocationPrices)
+    .values({ stockItemId, locationId, sellingPrice })
     .onConflictDoUpdate({
-      target: [schema.locationPrices.locationId, schema.locationPrices.stockItemId],
-      set: { sellingPrice: price.sellingPrice, updatedAt: sql`now()` },
+      target: [schema.stockItemLocationPrices.locationId, schema.stockItemLocationPrices.stockItemId],
+      set: { sellingPrice, updatedAt: sql`now()` },
     })
     .returning();
   return result;
 }
 
-export async function deleteLocationPrice(locationId: number, stockItemId: number): Promise<void> {
-  await db.delete(schema.locationPrices)
-    .where(and(eq(schema.locationPrices.locationId, locationId), eq(schema.locationPrices.stockItemId, stockItemId)));
+export async function deleteLocationPrice(priceId: number): Promise<void> {
+  await db.delete(schema.stockItemLocationPrices)
+    .where(eq(schema.stockItemLocationPrices.id, priceId));
 }
 
 // ---------------------------------------------------------------------------
@@ -260,6 +299,28 @@ export async function getInventoryByStockItem(stockItemId: number, companyId: nu
     .from(schema.inventory)
     .leftJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
     .where(and(eq(schema.inventory.stockItemId, stockItemId), eq(schema.inventory.companyId, companyId)));
+}
+
+export async function updateInventory(
+  locationId: number,
+  stockItemId: number,
+  quantity: string,
+  averageRate: string,
+  totalValue: string,
+  companyId?: number,
+): Promise<void> {
+  let resolvedCompanyId = companyId;
+  if (!resolvedCompanyId) {
+    const [loc] = await db.select({ companyId: schema.locations.companyId }).from(schema.locations).where(eq(schema.locations.id, locationId));
+    resolvedCompanyId = loc?.companyId ?? 0;
+  }
+  await db
+    .insert(schema.inventory)
+    .values({ locationId, stockItemId, quantity, averageRate, totalValue, companyId: resolvedCompanyId })
+    .onConflictDoUpdate({
+      target: [schema.inventory.locationId, schema.inventory.stockItemId],
+      set: { quantity, averageRate, totalValue, lastUpdated: sql`now()` },
+    });
 }
 
 export async function getTotalInventoryValue(companyId: number): Promise<number> {

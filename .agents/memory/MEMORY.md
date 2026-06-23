@@ -5,3 +5,4 @@
 - [Same-company parent freight posting](same-company-freight.md) — when freightPaidBy='parent' and the PO is on the parent company, freight must be embedded in the local voucher (DR freightAcct), not skipped.
 - [Schema domain split — factory.ts](schema-factory-split.md) — factory.ts is now actual defs; erp.ts owns baleLabelPrints/customerLogos/referenceSequences/locationPriceGroups; _definitions.ts is dead code.
 - [Vouchers.tsx monolith split](vouchers-split.md) — Vouchers.tsx split into JournalForm, StockTransferForm, StockAdjustmentForm under pages/vouchers/; each owns its own queries/state/mutations/JSX.
+- [Storage refactor missing functions](storage-refactor-gaps.md) — after domain split, several storage functions were missing or had wrong schema refs; see file for full list of patterns fixed.
