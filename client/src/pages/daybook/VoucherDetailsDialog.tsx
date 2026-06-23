@@ -679,7 +679,11 @@ export function VoucherDetailsDialog({
             <Button
               onClick={() => {
                 onOpenChange(false);
-                handleEdit(selectedVoucher);
+                if (selectedVoucher.voucherType === "Purchase" && purchaseOrderData?.id) {
+                  navigate(`/purchase-orders/${purchaseOrderData.id}/edit`);
+                } else {
+                  handleEdit(selectedVoucher);
+                }
               }}
               data-testid="button-edit-from-view-dialog"
             >
