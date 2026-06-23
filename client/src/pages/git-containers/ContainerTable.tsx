@@ -25,8 +25,8 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
       <div className="flex-1 overflow-auto custom-scrollbar relative">
         <div ref={printRef}>
           <Table className="text-xs border-collapse">
-            <TableHeader className="bg-muted/50 sticky top-0 z-10">
-              <TableRow className="hover:bg-transparent border-b">
+            <TableHeader className="sticky top-0 z-10 bg-primary/10 dark:bg-primary/15">
+              <TableRow className="hover:bg-transparent border-b border-primary/20">
                 <TableHead className="w-[110px] font-bold h-9">Container #</TableHead>
                 {colVis.supplier && <TableHead className="w-[100px] font-bold h-9">Supplier</TableHead>}
                 {colVis.company && <TableHead className="w-[120px] font-bold h-9">Company</TableHead>}
@@ -113,12 +113,12 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                       )}
                       {colVis.cost && (
                         <TableCell className="text-right font-mono text-muted-foreground h-10">
-                          {c.grandTotal ? Number(c.grandTotal).toLocaleString() : "—"}
+                          {c.grandTotal ? `$${Number(c.grandTotal).toLocaleString()}` : "—"}
                         </TableCell>
                       )}
                       {colVis.freight && (
                         <TableCell className="text-right font-mono text-muted-foreground h-10">
-                          {freight > 0 ? freight.toLocaleString() : "—"}
+                          {freight > 0 ? `$${freight.toLocaleString()}` : "—"}
                         </TableCell>
                       )}
                       {colVis.truckNo && (
@@ -217,7 +217,7 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                           {canEditRow ? (
                             <InlineNumberCell id={c.id} field="transportFee" value={c.transportFee} width="70px" />
                           ) : c.transportFee ? (
-                            Number(c.transportFee).toLocaleString()
+                            `$${Number(c.transportFee).toLocaleString()}`
                           ) : (
                             "—"
                           )}
@@ -237,7 +237,7 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                           {canEditRow ? (
                             <InlineNumberCell id={c.id} field="dutyFee" value={c.dutyFee} width="70px" />
                           ) : c.dutyFee ? (
-                            Number(c.dutyFee).toLocaleString()
+                            `$${Number(c.dutyFee).toLocaleString()}`
                           ) : (
                             "—"
                           )}
