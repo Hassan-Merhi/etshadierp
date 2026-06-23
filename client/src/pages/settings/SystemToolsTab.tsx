@@ -1,23 +1,11 @@
-import {
-  Trash2,
-  AlertTriangle,
-  RefreshCw,
-  Calculator,
-  Package,
-  Building2,
-  Loader2,
-  Eraser,
-  Search,
-  Check,
-  Info,
-  Database,
-} from "lucide-react";
+import { useState } from "react";
+import { RefreshCw, Calculator, Building2, Loader2, Database } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UseMutationResult } from "@tanstack/react-query";
-import { ParentCreditAccountSelect } from "./ParentCreditAccountSelect";
-import { formatNumber } from "@/lib/formatNumber";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ZeroBalancesDialog, InitializeBalancesDialog } from "./AccountingRepairDialogs";
 import { CleanEmptyAccountsDialog } from "./CleanEmptyAccountsDialog";
@@ -29,70 +17,6 @@ interface SystemToolsTabProps {
   currentUser: any;
   selectedCompany: any;
   companies: any[];
-  isRecalcAllLoading: boolean;
-  setIsRecalcAllLoading: (v: boolean) => void;
-  orphanedChargesDiagnostic: any;
-  setOrphanedChargesDiagnostic: (v: any) => void;
-  isFixingOrphanedCharges: boolean;
-  setIsFixingOrphanedCharges: (v: boolean) => void;
-  orphanedPosSalesDiagnostic: any;
-  setOrphanedPosSalesDiagnostic: (v: any) => void;
-  isFixingOrphanedPosSales: boolean;
-  setIsFixingOrphanedPosSales: (v: boolean) => void;
-  isLoadingOrphanedPosSales: boolean;
-  setIsLoadingOrphanedPosSales: (v: boolean) => void;
-  selectedContainerForDiag: string;
-  setSelectedContainerForDiag: (v: string) => void;
-  containersForDiag: any[];
-  containerDiagResult: any;
-  setContainerDiagResult: (v: any) => void;
-  isLoadingContainerDiag: boolean;
-  setIsLoadingContainerDiag: (v: boolean) => void;
-  isZeroBalanceDialogOpen: boolean;
-  setIsZeroBalanceDialogOpen: (v: boolean) => void;
-  selectedAccountsToZero: number[];
-  setSelectedAccountsToZero: (v: number[]) => void;
-  allLedgerAccounts: any[];
-  zeroBalancesMutation: UseMutationResult<any, any, any>;
-  isInitBalancesDialogOpen: boolean;
-  setIsInitBalancesDialogOpen: (v: boolean) => void;
-  initBalancesResult: any;
-  setInitBalancesResult: (v: any) => void;
-  initializeBalancesMutation: UseMutationResult<any, any, any>;
-  isFixPOCreditsDialogOpen: boolean;
-  setIsFixPOCreditsDialogOpen: (v: boolean) => void;
-  selectedCompanyForFix: string;
-  setSelectedCompanyForFix: (v: string) => void;
-  selectedParentCompanyForFix: string;
-  setSelectedParentCompanyForFix: (v: string) => void;
-  fixPOCreditsResult: any;
-  setFixPOCreditsResult: (v: any) => void;
-  fixPOCreditsMutation: UseMutationResult<any, any, any>;
-  reversePOCreditsResult: any;
-  setReversePOCreditsResult: (v: any) => void;
-  reversePOCreditsMutation: UseMutationResult<any, any, any>;
-  isResetDataDialogOpen: boolean;
-  setIsResetDataDialogOpen: (v: boolean) => void;
-  selectedCompanyForReset: string;
-  setSelectedCompanyForReset: (v: string) => void;
-  resetDataResult: any;
-  setResetDataResult: (v: any) => void;
-  resetCompanyDataMutation: UseMutationResult<any, any, any>;
-  emptyAccountsOpen: boolean;
-  setEmptyAccountsOpen: (v: boolean) => void;
-  emptyAccounts: any[];
-  isLoadingEmptyAccounts: boolean;
-  emptyAccountsSelected: number[];
-  setEmptyAccountsSelected: (v: number[]) => void;
-  emptyAccountsFilter: string;
-  setEmptyAccountsFilter: (v: string) => void;
-  bulkDeleteAccountsMutation: UseMutationResult<any, any, any>;
-  queryClient: any;
-  toast: any;
-  modeApiRequest: any;
-  setParentCompanyMutation: UseMutationResult<any, any, any>;
-  parentCompanyData: any;
-  fixParentPOSupplierMutation: UseMutationResult<any, any, any>;
 }
 
 export function SystemToolsTab({
@@ -100,73 +24,46 @@ export function SystemToolsTab({
   currentUser,
   selectedCompany,
   companies,
-  isRecalcAllLoading,
-  setIsRecalcAllLoading,
-  orphanedChargesDiagnostic,
-  setOrphanedChargesDiagnostic,
-  isFixingOrphanedCharges,
-  setIsFixingOrphanedCharges,
-  orphanedPosSalesDiagnostic,
-  setOrphanedPosSalesDiagnostic,
-  isFixingOrphanedPosSales,
-  setIsFixingOrphanedPosSales,
-  isLoadingOrphanedPosSales,
-  setIsLoadingOrphanedPosSales,
-  selectedContainerForDiag,
-  setSelectedContainerForDiag,
-  containersForDiag,
-  containerDiagResult,
-  setContainerDiagResult,
-  isLoadingContainerDiag,
-  setIsLoadingContainerDiag,
-  isZeroBalanceDialogOpen,
-  setIsZeroBalanceDialogOpen,
-  selectedAccountsToZero,
-  setSelectedAccountsToZero,
-  allLedgerAccounts,
-  zeroBalancesMutation,
-  isInitBalancesDialogOpen,
-  setIsInitBalancesDialogOpen,
-  initBalancesResult,
-  setInitBalancesResult,
-  initializeBalancesMutation,
-  isFixPOCreditsDialogOpen,
-  setIsFixPOCreditsDialogOpen,
-  selectedCompanyForFix,
-  setSelectedCompanyForFix,
-  selectedParentCompanyForFix,
-  setSelectedParentCompanyForFix,
-  fixPOCreditsResult,
-  setFixPOCreditsResult,
-  fixPOCreditsMutation,
-  reversePOCreditsResult,
-  setReversePOCreditsResult,
-  reversePOCreditsMutation,
-  isResetDataDialogOpen,
-  setIsResetDataDialogOpen,
-  selectedCompanyForReset,
-  setSelectedCompanyForReset,
-  resetDataResult,
-  setResetDataResult,
-  resetCompanyDataMutation,
-  emptyAccountsOpen,
-  setEmptyAccountsOpen,
-  emptyAccounts,
-  isLoadingEmptyAccounts,
-  emptyAccountsSelected,
-  setEmptyAccountsSelected,
-  emptyAccountsFilter,
-  setEmptyAccountsFilter,
-  bulkDeleteAccountsMutation,
-  queryClient,
-  toast,
-  modeApiRequest,
-  setParentCompanyMutation,
-  parentCompanyData,
-  fixParentPOSupplierMutation,
 }: SystemToolsTabProps) {
+  const { toast } = useToast();
   const isDev = currentUser?.role === "Developer";
-  const pfx = appMode === "factory" ? "/factory" : appMode === "properties" ? "/properties" : "";
+
+  const [isZeroBalanceDialogOpen, setIsZeroBalanceDialogOpen] = useState(false);
+  const [isInitBalancesDialogOpen, setIsInitBalancesDialogOpen] = useState(false);
+  const [isFixPOCreditsDialogOpen, setIsFixPOCreditsDialogOpen] = useState(false);
+  const [isResetDataDialogOpen, setIsResetDataDialogOpen] = useState(false);
+  const [emptyAccountsOpen, setEmptyAccountsOpen] = useState(false);
+  const [orphanedChargesDiagnostic, setOrphanedChargesDiagnostic] = useState<any>(null);
+
+  const { data: parentCompanyData } = useQuery<{ parentCompanyId: number | null }>({
+    queryKey: ["/api/system/parent-company"],
+    enabled: ["Admin", "Owner", "Developer"].includes(currentUser?.role || ""),
+  });
+
+  const setParentCompanyMutation = useMutation({
+    mutationFn: async (companyId: number | null) =>
+      apiRequest("POST", "/api/system/parent-company", { companyId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/system/parent-company"] });
+      toast({ title: "Saved", description: "Parent company updated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update parent company.", variant: "destructive" });
+    },
+  });
+
+  const fixParentPOSupplierMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/fix-parent-po-supplier-entries", {});
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Done", description: data?.message || "Supplier entries fixed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to fix supplier entries.", variant: "destructive" });
+    },
+  });
 
   return (
     <div className="space-y-8">
@@ -207,10 +104,7 @@ export function SystemToolsTab({
                 </div>
               </div>
               <Button
-                onClick={() => {
-                  setSelectedAccountsToZero([]);
-                  setIsZeroBalanceDialogOpen(true);
-                }}
+                onClick={() => setIsZeroBalanceDialogOpen(true)}
                 disabled={!selectedCompany}
                 data-testid="button-zero-balances"
               >
@@ -355,8 +249,7 @@ export function SystemToolsTab({
         </Card>
       )}
 
-      {/* ALL DIALOGS (Extracted from the main Settings page) */}
-
+      {/* Dialogs */}
       <ZeroBalancesDialog
         open={isZeroBalanceDialogOpen}
         onOpenChange={setIsZeroBalanceDialogOpen}
