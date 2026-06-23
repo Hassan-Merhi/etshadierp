@@ -629,7 +629,6 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
                   <TableHead>Item Name</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
                   <TableHead className="text-right">Total Cost</TableHead>
-                  <TableHead>Supplier</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -699,7 +698,6 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
                             <TableCell className="text-right font-mono text-sm">
                               {formatAmount(container.rate)}
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">{container.supplierName}</TableCell>
                           </TableRow>
                         ))}
                     </Fragment>
@@ -782,7 +780,6 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
                         >
                           <div>
                             <span className="font-mono font-medium">{container.containerNumber}</span>
-                            <span className="ml-2 text-muted-foreground">{container.supplierName}</span>
                           </div>
                           <div className="font-mono text-right">
                             <span>{Math.round(container.quantity).toLocaleString()}</span>
