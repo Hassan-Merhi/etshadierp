@@ -69,28 +69,46 @@ export function VoucherDetailsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            <DialogTitle>Voucher Details</DialogTitle>
-            <Badge {...getVoucherTypeBadge(selectedVoucher.voucherType)}>{selectedVoucher.voucherType}</Badge>
-          </div>
+          <DialogTitle>Voucher Details</DialogTitle>
           <DialogDescription>
-            {selectedVoucher.voucherNumber} — {formatDisplayDate(selectedVoucher.voucherDate)}
+            {selectedVoucher.voucherType === "Purchase"
+              ? "View voucher information"
+              : `${selectedVoucher.voucherNumber} — ${formatDisplayDate(selectedVoucher.voucherDate)}`}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Description</span>
-              <p className="text-sm leading-relaxed">{selectedVoucher.description || "No description provided."}</p>
+          {selectedVoucher.voucherType === "Purchase" ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Date</p>
+                  <p className="text-sm font-medium">{formatDisplayDate(selectedVoucher.voucherDate)}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Type</p>
+                  <Badge {...getVoucherTypeBadge(selectedVoucher.voucherType)}>{selectedVoucher.voucherType}</Badge>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Description</p>
+                <p className="text-sm leading-relaxed">{selectedVoucher.description || "No description provided."}</p>
+              </div>
             </div>
-            <div className="space-y-1 md:text-right">
-              <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Created At</span>
-              <p className="text-sm font-mono">
-                {formatDisplayDate(selectedVoucher.createdAt)} {formatDisplayTime(selectedVoucher.createdAt)}
-              </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-1">
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Description</span>
+                <p className="text-sm leading-relaxed">{selectedVoucher.description || "No description provided."}</p>
+              </div>
+              <div className="space-y-1 md:text-right">
+                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Created At</span>
+                <p className="text-sm font-mono">
+                  {formatDisplayDate(selectedVoucher.createdAt)} {formatDisplayTime(selectedVoucher.createdAt)}
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -123,7 +141,123 @@ export function VoucherDetailsDialog({
               </div>
             ) : (
               <div className="border rounded-lg overflow-hidden">
-                {selectedVoucher.voucherType === "Sales" || selectedVoucher.voucherType === "POS" ? (
+                {selectedVoucher.voucherType === "Purchase" ? (
+                  (() => {
+                    const purchaseItems = viewVoucherEntries.filter((e) => (e as any).isPurchaseItem);
+                    return (
+                      <div>
+                        {/* Supplier card */}
+                        {purchaseOrderData && (
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b bg-muted/20">
+                            <div>
+                              <p className="font-semibold text-sm">
+                                {purchaseOrderData.supplierName || "Unknown Supplier"}
+                              </p>
+                              {!isPOSUser && poSupplierBalance != null && (
+                                <p className="text-xs text-muted-foreground">
+                                  Balance:{" "}
+                                  <span className="font-mono">
+                                    $ {parseFloat(poSupplierBalance).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                  </span>
+                                </p>
+                              )}
+                              {purchaseOrderData.containerNumber && (
+                                <p className="text-xs text-muted-foreground">
+                                  Container: {purchaseOrderData.containerNumber}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <Button
+                                size="sm"
+                                onClick={() => { onOpenChange(false); navigate(`/containers/${purchaseOrderData.containerId}`); }}
+                                data-testid="button-open-po"
+                              >
+                                Open
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => { onOpenChange(false); navigate(`/containers/${purchaseOrderData.containerId}?tab=compare`); }}
+                                data-testid="button-compare-po"
+                              >
+                                Compare
+                              </Button>
+                              {!isPOSUser && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => { onOpenChange(false); navigate(`/purchase-orders/${purchaseOrderData.id}/edit`); }}
+                                  data-testid="button-edit-po"
+                                >
+                                  Edit PO
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        {/* Items table */}
+                        <Table>
+                          <TableHeader className="sticky top-0 z-30 bg-background">
+                            <TableRow>
+                              <TableHead>Item Name</TableHead>
+                              <TableHead className="text-right">Qty</TableHead>
+                              {!isPOSUser && <TableHead className="text-right">Rate</TableHead>}
+                              {!isPOSUser && <TableHead className="text-right">Total</TableHead>}
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {purchaseItems.map((entry) => (
+                              <TableRow key={entry.id}>
+                                <TableCell className="font-medium">
+                                  {entry.stockItemName || entry.accountName}
+                                </TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {parseFloat(entry.quantity || "0")}
+                                </TableCell>
+                                {!isPOSUser && (
+                                  <TableCell className="text-right font-mono">
+                                    {entry.rate != null ? formatAmount(entry.rate) : "-"}
+                                  </TableCell>
+                                )}
+                                {!isPOSUser && (
+                                  <TableCell className="text-right font-mono">
+                                    {entry.totalAmount != null ? formatAmount(entry.totalAmount) : "-"}
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                        {/* Charges summary */}
+                        {!isPOSUser && purchaseOrderData && (
+                          (() => {
+                            const charges = [
+                              { label: "Items Total", value: purchaseOrderData.itemsTotal },
+                              { label: "Freight", value: purchaseOrderData.freight },
+                              { label: "Fumigation", value: purchaseOrderData.fumigation },
+                              { label: "Surcharge", value: purchaseOrderData.surcharge },
+                              { label: "Document Charges", value: purchaseOrderData.documentCharges },
+                              { label: "Other Charges", value: purchaseOrderData.otherCharges },
+                              { label: "Discount", value: purchaseOrderData.discount },
+                            ].filter((c) => c.value != null && parseFloat(String(c.value)) !== 0);
+                            if (charges.length === 0) return null;
+                            return (
+                              <div className="border-t px-4 py-3 space-y-1">
+                                {charges.map((c) => (
+                                  <div key={c.label} className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">{c.label}</span>
+                                    <span className="font-mono">{formatAmount(c.value)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()
+                        )}
+                      </div>
+                    );
+                  })()
+                ) : selectedVoucher.voucherType === "Sales" || selectedVoucher.voucherType === "POS" ? (
                   (() => {
                     const salesItems = viewVoucherEntries.filter((e) => e.isStockItem || e.stockItemId);
                     const ledgerEntries = viewVoucherEntries.filter((e) => !e.isStockItem && !e.stockItemId);
