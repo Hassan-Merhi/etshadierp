@@ -1,7 +1,6 @@
 import { ChevronDown, ChevronRight, Eye } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { AccountTableProps } from "./accountTypes";
 
 export function AccountTable({
@@ -18,7 +17,6 @@ export function AccountTable({
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead className="w-[300px]">Account</TableHead>
-            <TableHead>Type</TableHead>
             {!hideBalances && <TableHead className="text-right">Balance</TableHead>}
             <TableHead className="w-[80px] text-right">Action</TableHead>
           </TableRow>
@@ -38,7 +36,7 @@ export function AccountTable({
           ))}
           {filteredAccounts.length === 0 && (
             <TableRow>
-              <TableCell colSpan={hideBalances ? 3 : 4} className="text-center py-8 text-muted-foreground text-sm">
+              <TableCell colSpan={hideBalances ? 2 : 3} className="text-center py-8 text-muted-foreground text-sm">
                 No accounts found matching your search.
               </TableCell>
             </TableRow>
@@ -85,13 +83,7 @@ function AccountRows({
               <div className="w-6" />
             )}
             <span className="truncate">{account.name}</span>
-            <span className="text-[10px] text-muted-foreground font-mono ml-2">{account.code}</span>
           </div>
-        </TableCell>
-        <TableCell>
-          <Badge variant="outline" className="text-[10px] uppercase font-bold tracking-wider py-0 px-1.5 h-4">
-            {account.type}
-          </Badge>
         </TableCell>
         {!hideBalances && (
           <TableCell className="text-right font-mono tabular-nums">
