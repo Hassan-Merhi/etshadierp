@@ -49,14 +49,14 @@ export function SaleGrid({
       <div className="table-responsive">
         <div className="min-w-[340px] sm:min-w-[500px]">
           {/* Header */}
-          <div className="flex bg-muted/30 border-b border-muted sticky top-0 z-30">
-            <div className="w-8 sm:w-12 flex items-center justify-center border-r border-muted h-9 sm:h-10 text-xs text-muted-foreground">
+          <div className="flex bg-foreground/[0.06] dark:bg-muted/40 border-b border-border sticky top-0 z-30">
+            <div className="w-8 sm:w-12 flex items-center justify-center border-r border-border/50 h-9 text-[11px] font-semibold text-muted-foreground">
               #
             </div>
             {columns.map((col) => (
               <div
                 key={col.key}
-                className={`${col.width} flex items-center px-1.5 sm:px-3 border-r border-muted h-9 sm:h-10 text-xs sm:text-sm text-muted-foreground`}
+                className={`${col.width} flex items-center px-1.5 sm:px-3 border-r border-border/50 h-9 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide`}
               >
                 {col.label}
               </div>
