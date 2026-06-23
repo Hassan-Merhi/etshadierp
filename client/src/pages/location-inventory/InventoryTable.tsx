@@ -49,10 +49,10 @@ export function InventoryTable({
   selectedGroup,
 }: InventoryTableProps) {
   return (
-    <Card className="overflow-hidden border-none shadow-none bg-transparent">
-      <div className="overflow-x-auto">
+    <Card className="border-none shadow-none bg-transparent">
+      <div>
         <table className="w-full text-sm border-collapse">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-background">
             <tr className="bg-muted/50 text-muted-foreground h-10">
               <th className="text-left px-3 font-medium">Item</th>
               {showMovement ? (
