@@ -1,6 +1,5 @@
 import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -79,7 +78,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [selectedLocationLocal, setSelectedLocationLocal] = useState<Location | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
-  const { registerCursorNav, clearCursorNav } = useCursorNav();
   const [viewAllItems, setViewAllItems] = useState<boolean>(false);
   const [printWithCost, setPrintWithCost] = useState<boolean>(false);
   const [locationSearchTerm, setLocationSearchTerm] = useState("");
