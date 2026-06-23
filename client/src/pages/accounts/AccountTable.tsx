@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronRight, Eye } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { AccountTableProps } from "./accountTypes";
 
 export function AccountTable({
@@ -16,7 +17,8 @@ export function AccountTable({
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40 hover:bg-muted/40">
-            <TableHead className="w-[300px]">Account</TableHead>
+            <TableHead className="w-[420px]">Account</TableHead>
+            <TableHead className="w-[120px]">Type</TableHead>
             {!hideBalances && <TableHead className="text-right">Balance</TableHead>}
             <TableHead className="w-[80px] text-right">Action</TableHead>
           </TableRow>
@@ -36,7 +38,7 @@ export function AccountTable({
           ))}
           {filteredAccounts.length === 0 && (
             <TableRow>
-              <TableCell colSpan={hideBalances ? 2 : 3} className="text-center py-8 text-muted-foreground text-sm">
+              <TableCell colSpan={hideBalances ? 3 : 4} className="text-center py-8 text-muted-foreground text-sm">
                 No accounts found matching your search.
               </TableCell>
             </TableRow>
@@ -75,15 +77,27 @@ function AccountRows({
             {hasChildren ? (
               <button
                 onClick={() => toggleParent(account.id)}
-                className="p-1 hover:bg-muted rounded transition-colors"
+                className="p-1 hover:bg-muted rounded transition-colors flex-shrink-0"
               >
                 {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
             ) : (
-              <div className="w-6" />
+              <div className="w-6 flex-shrink-0" />
             )}
-            <span className="truncate">{account.name}</span>
+            <div className="min-w-0">
+              <span className="block truncate max-w-[320px]">{account.name}</span>
+              {account.code && (
+                <span className="text-[10px] font-mono text-muted-foreground">{account.code}</span>
+              )}
+            </div>
           </div>
+        </TableCell>
+        <TableCell>
+          {account.type && (
+            <Badge variant="outline" className="text-xs whitespace-nowrap">
+              {account.type}
+            </Badge>
+          )}
         </TableCell>
         {!hideBalances && (
           <TableCell className="text-right font-mono tabular-nums">
