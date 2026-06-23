@@ -300,11 +300,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const inventory = showZeroStock ? activeInventoryData : activeInventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
 
   const stockGroups: StockGroupSummary[] = inventory
-    .filter(item => !!item.stockGroupId)
     .reduce((groups, item) => {
-      let group = groups.find(g => g.groupId === item.stockGroupId);
+      const groupId = item.stockGroupId ?? null;
+      let group = groups.find(g => g.groupId === groupId);
       if (!group) {
-        group = { groupId: item.stockGroupId, groupCode: item.stockGroupCode, groupName: item.stockGroupName || "Unknown", totalQuantity: 0, totalValue: 0, averageRate: 0, itemCount: 0, items: [] };
+        group = { groupId, groupCode: item.stockGroupCode, groupName: item.stockGroupName || "Ungrouped", totalQuantity: 0, totalValue: 0, averageRate: 0, itemCount: 0, items: [] };
         groups.push(group);
       }
       const qty = parseFloat(item.quantity || "0");
