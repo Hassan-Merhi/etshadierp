@@ -327,7 +327,7 @@ export async function getLocationInventory(companyId: number, locationId: number
         stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
         stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
         stockItemActive: sql<boolean | null>`CASE WHEN ${schema.stockItems.deletedAt} IS NOT NULL THEN false ELSE ${schema.stockItems.active} END`,
-        barcode: schema.stockItems.barcode,
+        barcode: sql<string | null>`NULL`,
         categoryId: schema.stockItems.categoryId,
         categoryName: schema.stockCategories.name,
         lastSellingPrice: sql<string>`COALESCE(${schema.stockItemLocationPrices.sellingPrice}, ${schema.stockItems.sellingPrice})`,
