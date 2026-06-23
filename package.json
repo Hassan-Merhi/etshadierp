@@ -5,8 +5,9 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
-    "build": "node ./node_modules/vite/bin/vite.js build && ./node_modules/.bin/esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
-    "start": "NODE_ENV=production node dist/index.js",
+    "prebuild": "node -e \"require.resolve('vite'); require.resolve('esbuild'); console.log('Build dependencies OK')\"",
+    "build": "npx vite build && npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "start": "node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "build:cap": "vite build --mode production",
