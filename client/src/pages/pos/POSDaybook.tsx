@@ -31,6 +31,8 @@ import {
   TrendingUp,
   TrendingDown,
   LayoutList,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
@@ -511,7 +513,41 @@ export default function POSDaybook() {
     <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <PageHeader title="POS Daybook" subtitle={getSubtitle()} />
-        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="pos-daybook-period-filter" />
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              const fmt = "yyyy-MM-dd";
+              setPeriodFilter((prev) => ({
+                fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), fmt),
+                toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), fmt),
+                preset: "custom",
+              }));
+            }}
+            title="Previous day (−)"
+            data-testid="button-prev-day"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="pos-daybook-period-filter" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              const fmt = "yyyy-MM-dd";
+              setPeriodFilter((prev) => ({
+                fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), fmt),
+                toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), fmt),
+                preset: "custom",
+              }));
+            }}
+            title="Next day (+)"
+            data-testid="button-next-day"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Stats pill bar */}

@@ -29,7 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Book, Eye, EyeOff, Plus, ChevronDown, FileDown, X, LayoutList, Layers } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
 import { utils, writeFile } from "@/lib/excelHelper";
@@ -66,6 +66,29 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const hideAmounts = hiddenErpCosts.includes("daybook_amounts");
   const [periodFilter, setPeriodFilter] = useState(getDefaultPeriodValue("today"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
+
+  const shiftDay = (delta: number) => {
+    const fmt = "yyyy-MM-dd";
+    setPeriodFilter((prev) => ({
+      fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), delta), fmt),
+      toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), delta), fmt),
+      preset: "custom",
+    }));
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (hasAnyOpenDialog()) return;
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      const isBack = e.key === "-" || e.code === "Minus";
+      const isForward = (e.key === "+" && e.shiftKey) || (e.code === "Equal" && e.shiftKey) || e.key === "=";
+      if (isBack) { e.preventDefault(); shiftDay(-1); }
+      else if (isForward) { e.preventDefault(); shiftDay(1); }
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
   const [filters, setFilters] = useState({
     voucherType: "all",
     searchQuery: "",
@@ -455,7 +478,7 @@ export default function Daybook({ user }: { user?: any } = {}) {
   const displayedRows = useMemo(() => visibleRows.slice(0, daybookRowLimit), [visibleRows, daybookRowLimit]);
 
   const canEdit = (v: Voucher) => !["Sales", "Purchase"].includes(v.voucherType) && user?.role !== "POS";
-  const canDelete = () => user?.role === "admin";
+  const canDelete = () => !!(user?.canDeleteRecords);
   const handleView = (v: Voucher) => {
     setSelectedVoucher(v);
     setViewProfitFilter("all");
@@ -551,6 +574,8 @@ export default function Daybook({ user }: { user?: any } = {}) {
         setPeriodFilter={setPeriodFilter}
         filters={filters}
         setFilters={setFilters}
+        onPrevDay={() => shiftDay(-1)}
+        onNextDay={() => shiftDay(1)}
       />
 
       <Card>

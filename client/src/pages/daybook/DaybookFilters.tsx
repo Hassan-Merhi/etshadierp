@@ -1,5 +1,6 @@
-import { Search, X } from "lucide-react";
+import { Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
@@ -15,9 +16,11 @@ interface DaybookFiltersProps {
     maxAmount: string;
   };
   setFilters: (v: any) => void;
+  onPrevDay?: () => void;
+  onNextDay?: () => void;
 }
 
-export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilters }: DaybookFiltersProps) {
+export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilters, onPrevDay, onNextDay }: DaybookFiltersProps) {
   const hasActiveFilters =
     periodFilter.preset !== "today" ||
     filters.voucherType !== "all" ||
@@ -29,7 +32,25 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
   return (
     <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onPrevDay}
+          title="Previous day (−)"
+          data-testid="button-prev-day"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
         <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onNextDay}
+          title="Next day (+)"
+          data-testid="button-next-day"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
 
         <div className="h-6 w-px bg-border hidden sm:block" />
 

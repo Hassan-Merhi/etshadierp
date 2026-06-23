@@ -15,6 +15,7 @@ import {
   Package,
   Trash2,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   X,
   FileDown,
@@ -2433,7 +2434,39 @@ export default function FactoryDaybook() {
               data-testid="input-search"
               className="w-44 h-8 text-sm"
             />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                const fmt = "yyyy-MM-dd";
+                setPeriodFilter((prev) => ({
+                  fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), -1), fmt),
+                  toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), -1), fmt),
+                  preset: "custom",
+                }));
+              }}
+              title="Previous day (−)"
+              data-testid="button-prev-day"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
             <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                const fmt = "yyyy-MM-dd";
+                setPeriodFilter((prev) => ({
+                  fromDate: format(addDays(new Date(prev.fromDate + "T00:00:00"), 1), fmt),
+                  toDate: format(addDays(new Date(prev.toDate + "T00:00:00"), 1), fmt),
+                  preset: "custom",
+                }));
+              }}
+              title="Next day (+)"
+              data-testid="button-next-day"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
             <Select value={txTypeFilter} onValueChange={setTxTypeFilter}>
               <SelectTrigger className="w-36 h-8 text-sm" data-testid="select-tx-type">
                 <SelectValue />
