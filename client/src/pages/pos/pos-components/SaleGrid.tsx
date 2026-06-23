@@ -144,6 +144,10 @@ export function SaleGrid({
                           onChange={(e) => {
                             if (col.key !== "amount") {
                               updateRow(rowIndex, col.key as keyof SaleRow, e.target.value);
+                              if (col.key === "itemName") {
+                                setSearchTerm(e.target.value);
+                                setHighlightedIndex(0);
+                              }
                             }
                           }}
                           onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
