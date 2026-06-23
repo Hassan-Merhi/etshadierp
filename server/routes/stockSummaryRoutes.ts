@@ -870,12 +870,12 @@ export function registerStockSummaryRoutes(app: Express) {
         }
       }
       
-      // 3. Sales at this location (Outwards) — use totalSales (selling price) not totalCost
+      // 3. Sales at this location (Outwards) — use totalCost (cost price) for inventory valuation
       const salesData = await db
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${vouchers.voucherDate})`,
           quantity: salesItems.quantity,
-          totalSales: salesItems.totalSales,
+          totalCost: salesItems.totalCost,
         })
         .from(salesItems)
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
@@ -891,7 +891,7 @@ export function registerStockSummaryRoutes(app: Express) {
       for (const row of salesData) {
         const month = Number(row.month);
         monthBuckets[month].outQty += parseFloat(row.quantity);
-        monthBuckets[month].outVal += parseFloat(row.totalSales || "0");
+        monthBuckets[month].outVal += parseFloat(row.totalCost || "0");
       }
 
       // 4. Credit / Debit Note Items at this location
@@ -1118,7 +1118,7 @@ export function registerStockSummaryRoutes(app: Express) {
   
   // Per-month drill-down: individual transactions for a stock item at a location
   // Returns inTransactions and outTransactions arrays for the given year+month.
-  // Out-value for sales uses selling price (totalSales); transfers use totalAmount.
+  // Out-value for sales uses cost price (totalCost); transfers use totalAmount.
   app.get("/api/locations/:locationId/stock-items/:stockItemId/monthly-detail", requireAuth, async (req, res) => {
     try {
       const locationId  = parseInt(req.params.locationId);
@@ -1138,7 +1138,7 @@ export function registerStockSummaryRoutes(app: Express) {
           date:       vouchers.voucherDate,
           ref:        vouchers.voucherNumber,
           qty:        salesItems.quantity,
-          totalSales: salesItems.totalSales,
+          totalCost:  salesItems.totalCost,
         })
         .from(salesItems)
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
@@ -1153,7 +1153,7 @@ export function registerStockSummaryRoutes(app: Express) {
         ));
       for (const r of saleRows) {
         const qty = parseFloat(r.qty);
-        const val = parseFloat(r.totalSales || "0");
+        const val = parseFloat(r.totalCost || "0");
         outTx.push({ type: "Sale", date: r.date, reference: r.ref, qty, rate: qty > 0 ? val / qty : 0, value: val });
       }
 
