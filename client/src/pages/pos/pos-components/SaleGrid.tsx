@@ -68,13 +68,13 @@ export function SaleGrid({
             {rows.map((row, rowIndex) => (
               <div key={row.id}>
                 <div className="group flex border-b border-muted/50 hover-elevate">
-                  <div className="w-8 sm:w-12 flex items-center justify-center border-r border-muted/50 h-10 sm:h-10 text-xs text-muted-foreground">
+                  <div className="w-8 sm:w-12 flex items-center justify-center border-r border-muted/50 h-9 text-xs text-muted-foreground">
                     {rowIndex + 1}
                   </div>
                   {columns.map((col, colIndex) => (
                     <div
                       key={col.key}
-                      className={`${col.width} border-r h-10 sm:h-10 ${col.key === "amount" ? "bg-muted/30" : ""}`}
+                      className={`${col.width} border-r h-9 ${col.key === "amount" ? "bg-muted/30" : ""}`}
                       onMouseDown={(e) => {
                         const invalidIdx = rows.findIndex((r) => r.itemName?.trim() && !r.stockItemId);
                         if (invalidIdx !== -1 && !(rowIndex === invalidIdx && col.key === "itemName")) {

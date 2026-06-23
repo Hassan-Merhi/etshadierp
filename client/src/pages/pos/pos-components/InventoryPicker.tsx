@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ScanBarcode, AlertTriangle } from "lucide-react";
+import { ScanBarcode } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { InventoryItem } from "./posTypes";
 
@@ -11,8 +11,26 @@ export interface InventoryPickerProps {
   syncTerm?: string;
 }
 
-function normalize(s: string) {
+// Keep spaces so "GS HAND" doesn't bleed into adjacent words.
+// Only strip dots and dashes (common in codes like BL.K.001).
+function normalizeName(s: string) {
+  return (s || "").toLowerCase().replace(/[.\-]/g, "");
+}
+
+// For codes, strip everything (spaces + dots + dashes) so "BL K 001" and "BL.K.001" both match "blk001".
+function normalizeCode(s: string) {
   return (s || "").toLowerCase().replace(/[.\-\s]/g, "");
+}
+
+function matches(item: InventoryItem, raw: string): boolean {
+  const term = raw.toLowerCase().replace(/[.\-]/g, "").trim();
+  if (!term) return true;
+  const termNoSpace = term.replace(/\s/g, "");
+  // Name: search with spaces kept (prevents cross-word false positives)
+  if (normalizeName(item.name).includes(term)) return true;
+  // Code: strip spaces for compact entry (e.g. "blk001" or "BL.K.001")
+  if (normalizeCode(item.code).includes(termNoSpace)) return true;
+  return false;
 }
 
 export function InventoryPicker({
@@ -29,16 +47,11 @@ export function InventoryPicker({
   }, [syncTerm]);
 
   const filteredInventory = localSearch
-    ? (() => {
-        const n = normalize(localSearch);
-        return inventory.filter(
-          (item) => normalize(item.name).includes(n) || normalize(item.code).includes(n)
-        );
-      })()
+    ? inventory.filter((item) => matches(item, localSearch))
     : inventory;
 
   return (
-    <Card className="w-full lg:w-72 flex flex-col overflow-hidden h-[300px] lg:h-auto">
+    <Card className="w-full lg:w-96 flex flex-col overflow-hidden h-[300px] lg:h-auto shrink-0">
       {/* Header */}
       <div className="px-3 pt-3 pb-2 shrink-0">
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Items</p>
@@ -62,7 +75,7 @@ export function InventoryPicker({
           return (
             <button
               key={item.code}
-              className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2 border-b border-muted/40 transition-colors duration-100 ${
+              className={`w-full text-left px-3 py-1.5 flex items-center justify-between gap-2 border-b border-muted/40 transition-colors duration-100 ${
                 index === highlightedIndex
                   ? "bg-primary/10"
                   : "hover:bg-muted/40"
@@ -75,7 +88,7 @@ export function InventoryPicker({
             >
               <div className="min-w-0">
                 <p className="text-sm font-semibold leading-tight truncate">{item.name}</p>
-                <p className="text-[11px] text-muted-foreground font-mono mt-0.5">{item.code}</p>
+                <p className="text-[11px] text-muted-foreground font-mono">{item.code}</p>
               </div>
               <span
                 className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${
