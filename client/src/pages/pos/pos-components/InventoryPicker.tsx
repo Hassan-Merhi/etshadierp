@@ -1,26 +1,37 @@
-import { Search, Badge, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import { Search, AlertTriangle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { InventoryItem } from "./posTypes";
 
 export interface InventoryPickerProps {
-  searchTerm: string;
-  setSearchTerm: (term: string) => void;
-  getFilteredInventory: () => InventoryItem[];
+  inventory: InventoryItem[];
   selectItem: (item: InventoryItem) => void;
   itemListRef: React.RefObject<HTMLDivElement>;
   highlightedIndex: number;
 }
 
+function normalize(s: string) {
+  return (s || "").toLowerCase().replace(/[.\-\s]/g, "");
+}
+
 export function InventoryPicker({
-  searchTerm,
-  setSearchTerm,
-  getFilteredInventory,
+  inventory,
   selectItem,
   itemListRef,
   highlightedIndex,
 }: InventoryPickerProps) {
-  const filteredInventory = getFilteredInventory();
+  const [localSearch, setLocalSearch] = useState("");
+
+  const filteredInventory = localSearch
+    ? (() => {
+        const n = normalize(localSearch);
+        return inventory.filter(
+          (item) => normalize(item.name).includes(n) || normalize(item.code).includes(n)
+        );
+      })()
+    : inventory;
 
   return (
     <Card className="w-full lg:w-80 flex flex-col overflow-hidden h-[300px] lg:h-auto">
@@ -30,8 +41,8 @@ export function InventoryPicker({
           <Input
             placeholder="Search products..."
             className="pl-8 h-9"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
             data-testid="input-product-search"
           />
         </div>
@@ -44,7 +55,10 @@ export function InventoryPicker({
               className={`w-full text-left px-3 py-2.5 transition-all duration-150 flex flex-col gap-1 active-elevate-2 ${
                 index === highlightedIndex ? "bg-accent/50" : "hover:bg-accent/20"
               }`}
-              onClick={() => selectItem(item)}
+              onClick={() => {
+                selectItem(item);
+                setLocalSearch("");
+              }}
               data-testid={`button-select-item-${item.code}`}
             >
               <div className="flex items-start justify-between gap-2">
@@ -52,9 +66,9 @@ export function InventoryPicker({
                 <span className="text-xs font-mono text-muted-foreground shrink-0">{item.code}</span>
               </div>
               <div className="flex items-center justify-between mt-0.5">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   <span className="text-xs font-mono font-bold">
-                    $ {item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    Qty: {Math.round(item.stock).toLocaleString()}
                   </span>
                   {item.stock < 10 && item.stock > 0 && <AlertTriangle className="h-3 w-3 text-amber-500" />}
                 </div>
@@ -68,7 +82,7 @@ export function InventoryPicker({
                         : "border-emerald-400/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
                   }`}
                 >
-                  {item.stock === 0 ? "Out" : Math.round(item.stock)}
+                  {item.stock === 0 ? "Out" : item.stock < 10 ? "Low" : "In stock"}
                 </Badge>
               </div>
             </button>

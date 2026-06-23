@@ -662,8 +662,13 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       setZeroStockAlert(true);
       return;
     }
-    const targetRow = targetRowOverride ?? activeRow ?? rows.findIndex((r) => !r.itemName);
+    let targetRow = targetRowOverride ?? activeRow ?? rows.findIndex((r) => !r.itemName);
     const newRows = [...rows];
+    // If no empty row found, append one
+    if (targetRow === -1 || targetRow == null) {
+      targetRow = newRows.length;
+      newRows.push({ id: Date.now().toString(), itemName: "", quantity: 0, rate: 0, rateUSD: 0, amount: 0 });
+    }
     const rateUSD = lastSoldPrices[item.stockItemId] ? parseFloat(lastSoldPrices[item.stockItemId]) : item.price;
     const displayRate = activeCurrency === "CFA" ? Math.round(rateUSD * exchangeRate) : rateUSD;
 
@@ -1197,9 +1202,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
 
           <InventoryPicker
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            getFilteredInventory={getFilteredInventory}
+            inventory={inventory}
             selectItem={selectItem}
             itemListRef={itemListRef}
             highlightedIndex={highlightedIndex}
