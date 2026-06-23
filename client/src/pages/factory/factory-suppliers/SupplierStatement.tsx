@@ -32,6 +32,7 @@ import {
 import { StatementResponse, SupplierWithBalance } from "./factorySupplierTypes";
 import { LinkedSupplierExposure } from "./LinkedSupplierExposure";
 import { CurrencyPools } from "./CurrencyPools";
+import { SupplierStatementRows } from "./SupplierStatementRows";
 
 interface SupplierStatementProps {
   statementSupplierId: number;
