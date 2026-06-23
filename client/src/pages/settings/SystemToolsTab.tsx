@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ZeroBalancesDialog, InitializeBalancesDialog } from "./AccountingRepairDialogs";
 import { CleanEmptyAccountsDialog } from "./CleanEmptyAccountsDialog";
 import { FixPOCreditsDialog, ResetCompanyDataDialog } from "./SystemMaintenanceDialogs";
+import { DiagnosticsSection } from "./DiagnosticsSection";
 
 interface SystemToolsTabProps {
   appMode: string;
@@ -225,7 +226,7 @@ export function SystemToolsTab({
           </Card>
         </div>
 
-import { DiagnosticsSection } from "./DiagnosticsSection";
+      <DiagnosticsSection setOrphanedChargesDiagnostic={setOrphanedChargesDiagnostic} toast={toast} />
       </div>
 
       {/* Advanced Admin Actions (Only for Developers) */}
