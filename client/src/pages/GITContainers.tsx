@@ -272,7 +272,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     <div className="flex flex-col h-full overflow-hidden">
       {!embedded && <PageHeader title="Containers OTW" subtitle="Active container logistics and tracking" />}
 
-      <div className="flex-1 overflow-hidden p-4 space-y-4">
+      <div className="flex-1 overflow-hidden p-4 flex flex-col gap-4">
         {/* ── Company Mode ── */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -508,13 +508,15 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
           undoImportMutation={undoImportMutation}
         />
 
-        <ContainerTable
-          containers={filteredContainers}
-          colVis={colVis}
-          sessionCompanyId={sessionCompanyId}
-          onOpenDrawer={openDrawer}
-          printRef={printRef}
-        />
+        <div className="flex-1 min-h-0">
+          <ContainerTable
+            containers={filteredContainers}
+            colVis={colVis}
+            sessionCompanyId={sessionCompanyId}
+            onOpenDrawer={openDrawer}
+            printRef={printRef}
+          />
+        </div>
       </div>
 
       <ContainerDrawer
