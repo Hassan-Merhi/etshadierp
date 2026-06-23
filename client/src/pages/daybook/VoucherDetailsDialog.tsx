@@ -52,7 +52,10 @@ export function VoucherDetailsDialog({
   formatAmount,
   formatDisplayDate,
   formatDisplayTime,
+  cashAccountBalance,
   entryBalances,
+  purchaseOrderData,
+  poSupplierBalance,
   selectedDialogRow,
   setSelectedDialogRow,
   viewProfitFilter,
@@ -60,6 +63,7 @@ export function VoucherDetailsDialog({
   user,
   handleEdit,
   canEdit,
+  navigate,
 }: VoucherDetailsDialogProps) {
   if (!selectedVoucher) return null;
 
@@ -78,7 +82,9 @@ export function VoucherDetailsDialog({
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {selectedVoucher.voucherType === "Purchase" ? (
+          {(selectedVoucher.voucherType === "Purchase" ||
+            selectedVoucher.voucherType === "Sales" ||
+            selectedVoucher.voucherType === "POS") ? (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
@@ -90,9 +96,18 @@ export function VoucherDetailsDialog({
                   <Badge {...getVoucherTypeBadge(selectedVoucher.voucherType)}>{selectedVoucher.voucherType}</Badge>
                 </div>
               </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Description</p>
-                <p className="text-sm leading-relaxed">{selectedVoucher.description || "No description provided."}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Description</p>
+                  <p className="text-sm leading-relaxed">{selectedVoucher.description || "—"}</p>
+                </div>
+                {(selectedVoucher.voucherType === "Sales" || selectedVoucher.voucherType === "POS") &&
+                  selectedVoucher.locationName && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Location</p>
+                      <p className="text-sm font-medium">{selectedVoucher.locationName}</p>
+                    </div>
+                  )}
               </div>
             </div>
           ) : (
@@ -117,18 +132,21 @@ export function VoucherDetailsDialog({
                 {viewEntriesLoading && <Skeleton className="h-4 w-4 rounded-full" />}
               </h3>
               {(selectedVoucher.voucherType === "Sales" || selectedVoucher.voucherType === "POS") && !isPOSUser && (
-                <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
-                  {(["all", "gain", "loss", "even"] as const).map((filter) => (
-                    <Button
-                      key={filter}
-                      variant={viewProfitFilter === filter ? "secondary" : "ghost"}
-                      size="sm"
-                      className="h-7 text-xs px-2.5 capitalize"
-                      onClick={() => setViewProfitFilter(filter)}
-                    >
-                      {filter}
-                    </Button>
-                  ))}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Filter:</span>
+                  <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+                    {(["all", "gain", "loss", "even"] as const).map((filter) => (
+                      <Button
+                        key={filter}
+                        variant={viewProfitFilter === filter ? "secondary" : "ghost"}
+                        size="sm"
+                        className="h-7 text-xs px-2.5 capitalize"
+                        onClick={() => setViewProfitFilter(filter)}
+                      >
+                        {filter}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -268,17 +286,53 @@ export function VoucherDetailsDialog({
                       if (viewProfitFilter === "loss") return profit < -0.01;
                       return Math.abs(profit) <= 0.01;
                     });
+                    const paymentEntry = ledgerEntries.find(
+                      (e) => parseFloat(e.debitAmount || "0") > 0
+                    ) || ledgerEntries[0];
+                    const hasHassans = !isPOSUser && salesItems.some(
+                      (e) => e.hassansPrice != null || e.hassansProfit != null
+                    );
+                    const totalQty = filteredItems.reduce((s, e) => s + parseFloat(e.quantity || "0"), 0);
+                    const totalAmt = filteredItems.reduce((s, e) => s + parseFloat(e.totalAmount || e.totalSales || "0"), 0);
+                    const totalCost = filteredItems.reduce((s, e) => s + parseFloat(e.costPrice || "0") * parseFloat(e.quantity || "0"), 0);
+                    const totalProfit = filteredItems.reduce((s, e) => s + parseFloat(e.profit || "0"), 0);
 
                     return (
-                      <div className="space-y-6">
+                      <div>
+                        {/* Payment account card */}
+                        {paymentEntry && (
+                          <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
+                            <p className="font-semibold text-sm">{paymentEntry.accountName}</p>
+                            {!isPOSUser && (
+                              <div className="text-sm text-right">
+                                <span className="text-xs text-muted-foreground mr-1">Balance</span>
+                                <span className="font-mono font-semibold">
+                                  $ {parseFloat(cashAccountBalance || entryBalances[paymentEntry.id] || "0")
+                                    .toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        {/* Keyboard hint */}
+                        {!isPOSUser && (
+                          <p className="text-xs text-muted-foreground text-right px-4 py-1.5 border-b">
+                            Hover or use ↑↓ to select · Alt+S to view item
+                          </p>
+                        )}
+                        {/* Items table */}
                         <Table>
                           <TableHeader className="sticky top-0 z-30 bg-background">
                             <TableRow>
-                              <TableHead>Item</TableHead>
+                              <TableHead>Item Name</TableHead>
                               <TableHead className="text-right">Qty</TableHead>
-                              {!isPOSUser && <TableHead className="text-right">Rate</TableHead>}
+                              {!isPOSUser && <TableHead className="text-right">Price</TableHead>}
+                              {!isPOSUser && <TableHead className="text-right">Cost</TableHead>}
                               {!isPOSUser && <TableHead className="text-right">Total</TableHead>}
                               {!isPOSUser && <TableHead className="text-right">Profit</TableHead>}
+                              {hasHassans && <TableHead className="text-right">Hassan's Price</TableHead>}
+                              {hasHassans && <TableHead className="text-right">Hassan's Profit</TableHead>}
+                              {hasHassans && <TableHead className="text-right">Hassan's %</TableHead>}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -286,11 +340,12 @@ export function VoucherDetailsDialog({
                               const isSelected = selectedDialogRow === idx;
                               const profit = parseFloat(entry.profit || "0");
                               const pColor =
-                                profit > 0.01
-                                  ? "text-emerald-600"
-                                  : profit < -0.01
-                                    ? "text-destructive"
-                                    : "text-muted-foreground";
+                                profit > 0.01 ? "text-emerald-600 dark:text-emerald-400"
+                                : profit < -0.01 ? "text-destructive"
+                                : "text-muted-foreground";
+                              const costPerUnit = entry.costPrice != null
+                                ? parseFloat(entry.costPrice)
+                                : null;
                               return (
                                 <TableRow
                                   key={entry.id}
@@ -305,16 +360,40 @@ export function VoucherDetailsDialog({
                                     {parseFloat(entry.quantity || "0")}
                                   </TableCell>
                                   {!isPOSUser && (
-                                    <TableCell className="text-right font-mono">{formatAmount(entry.rate)}</TableCell>
-                                  )}
-                                  {!isPOSUser && (
                                     <TableCell className="text-right font-mono">
-                                      {formatAmount(entry.totalAmount)}
+                                      {entry.rate != null ? formatAmount(entry.rate) : "-"}
                                     </TableCell>
                                   )}
                                   {!isPOSUser && (
-                                    <TableCell className={`text-right font-mono font-medium ${pColor}`}>
+                                    <TableCell className="text-right font-mono text-muted-foreground">
+                                      {costPerUnit != null ? formatAmount(costPerUnit) : "-"}
+                                    </TableCell>
+                                  )}
+                                  {!isPOSUser && (
+                                    <TableCell className="text-right font-mono">
+                                      {formatAmount(entry.totalAmount || entry.totalSales)}
+                                    </TableCell>
+                                  )}
+                                  {!isPOSUser && (
+                                    <TableCell className={`text-right font-mono font-semibold ${pColor}`}>
                                       {formatAmount(profit)}
+                                    </TableCell>
+                                  )}
+                                  {hasHassans && (
+                                    <TableCell className="text-right font-mono text-muted-foreground">
+                                      {entry.hassansPrice != null ? formatAmount(entry.hassansPrice) : "-"}
+                                    </TableCell>
+                                  )}
+                                  {hasHassans && (
+                                    <TableCell className="text-right font-mono text-muted-foreground">
+                                      {entry.hassansProfit != null ? formatAmount(entry.hassansProfit) : "-"}
+                                    </TableCell>
+                                  )}
+                                  {hasHassans && (
+                                    <TableCell className="text-right font-mono text-muted-foreground">
+                                      {entry.hassansPercentage != null
+                                        ? `${parseFloat(entry.hassansPercentage).toFixed(1)}%`
+                                        : "-"}
                                     </TableCell>
                                   )}
                                 </TableRow>
@@ -322,41 +401,19 @@ export function VoucherDetailsDialog({
                             })}
                           </TableBody>
                         </Table>
-
-                        {ledgerEntries.length > 0 && (
-                          <div className="border-t">
-                            <Table>
-                              <TableHeader className="sticky top-0 z-30 bg-background">
-                                <TableRow>
-                                  <TableHead>Account</TableHead>
-                                  {!isPOSUser && (
-                                    <>
-                                      <TableHead className="text-right">Debit</TableHead>
-                                      <TableHead className="text-right">Credit</TableHead>
-                                    </>
-                                  )}
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {ledgerEntries.map((entry) => (
-                                  <TableRow key={entry.id}>
-                                    <TableCell>
-                                      <div className="font-medium">{entry.accountName}</div>
-                                    </TableCell>
-                                    {!isPOSUser && (
-                                      <>
-                                        <TableCell className="text-right font-mono">
-                                          {parseFloat(entry.debitAmount) > 0 ? formatAmount(entry.debitAmount) : "-"}
-                                        </TableCell>
-                                        <TableCell className="text-right font-mono">
-                                          {parseFloat(entry.creditAmount) > 0 ? formatAmount(entry.creditAmount) : "-"}
-                                        </TableCell>
-                                      </>
-                                    )}
-                                  </TableRow>
-                                ))}
-                              </TableBody>
-                            </Table>
+                        {/* Totals row */}
+                        {!isPOSUser && filteredItems.length > 0 && (
+                          <div className="flex items-center justify-between border-t px-4 py-2.5 font-semibold text-sm bg-muted/20">
+                            <span>Total</span>
+                            <div className="flex items-center gap-6 font-mono">
+                              <span className="text-muted-foreground">{totalQty}</span>
+                              <span className="text-muted-foreground">{formatAmount(totalCost)}</span>
+                              <span>{formatAmount(totalAmt)}</span>
+                              <span className={totalProfit > 0.01 ? "text-emerald-600 dark:text-emerald-400" : totalProfit < -0.01 ? "text-destructive" : "text-muted-foreground"}>
+                                {formatAmount(totalProfit)}
+                              </span>
+                              {hasHassans && <span className="text-muted-foreground">$ 0</span>}
+                            </div>
                           </div>
                         )}
                       </div>
