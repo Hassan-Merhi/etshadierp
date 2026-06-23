@@ -553,87 +553,120 @@ export function registerAuthRoutes(app: Express) {
   // GET: Fetch audit logs (Admin/Owner only)
   app.get("/api/audit-log", requireAuth, async (req, res) => {
     try {
-      // Check if user has admin/owner role
       const userRole = req.session.currentRole;
       if (!userRole || !["Admin", "Owner", "Developer"].includes(userRole)) {
         return res.status(403).json({ message: "Access denied. Admin or Owner role required." });
       }
 
       const companyId = req.session.currentCompanyId;
-      const { limit = "200", offset = "0", tableName, userId, action, dateFrom, dateTo, search } = req.query;
+      // Accept both old param names (tableName/dateFrom/dateTo/offset) and new client names (module/from/to/page)
+      const {
+        limit: limitStr = "50",
+        offset: offsetStr,
+        page: pageStr,
+        tableName,
+        module: moduleParam,
+        userId,
+        action,
+        dateFrom,
+        from: fromParam,
+        dateTo,
+        to: toParam,
+        search,
+      } = req.query as Record<string, string>;
 
-      // Build query conditions — always exclude actions performed by Developer-role users.
-      // Roles live in userCompanyRoles, not on the users table itself.
-      let conditions: any[] = [
+      const pageSize = parseInt(limitStr) || 50;
+      const pageNum = pageStr ? parseInt(pageStr) : 1;
+      const offset = offsetStr ? parseInt(offsetStr) : (pageNum - 1) * pageSize;
+
+      const resolvedTable = (tableName as string) || (moduleParam as string) || "";
+      const resolvedFrom = (dateFrom as string) || (fromParam as string) || "";
+      const resolvedTo = (dateTo as string) || (toParam as string) || "";
+
+      const baseConditions: any[] = [
         sql`${auditLog.userId} NOT IN (
             SELECT user_id FROM user_company_roles WHERE role = 'Developer'
           )`,
         ...(companyId ? [eq(auditLog.companyId, companyId)] : []),
       ];
-      if (tableName && typeof tableName === "string") {
-        conditions.push(eq(auditLog.tableName, tableName));
-      }
-      if (userId && typeof userId === "string") {
-        conditions.push(eq(auditLog.userId, userId));
-      }
+
+      const filterConditions: any[] = [];
+      if (resolvedTable) filterConditions.push(eq(auditLog.tableName, resolvedTable));
+      if (userId) filterConditions.push(eq(auditLog.userId, userId as string));
       if (action && typeof action === "string") {
         const actionVals = action
           .split(",")
           .map((a) => a.trim())
           .filter((a) => ["create", "update", "delete"].includes(a));
-        if (actionVals.length === 1) {
-          conditions.push(eq(auditLog.action, actionVals[0] as any));
-        } else if (actionVals.length > 1) {
-          conditions.push(inArray(auditLog.action, actionVals as any[]));
-        }
+        if (actionVals.length === 1) filterConditions.push(eq(auditLog.action, actionVals[0] as any));
+        else if (actionVals.length > 1) filterConditions.push(inArray(auditLog.action, actionVals as any[]));
       }
-      if (dateFrom && typeof dateFrom === "string") {
-        conditions.push(gte(auditLog.createdAt, new Date(dateFrom)));
-      }
-      if (dateTo && typeof dateTo === "string") {
-        const to = new Date(dateTo);
+      if (resolvedFrom) filterConditions.push(gte(auditLog.createdAt, new Date(resolvedFrom)));
+      if (resolvedTo) {
+        const to = new Date(resolvedTo);
         to.setHours(23, 59, 59, 999);
-        conditions.push(lte(auditLog.createdAt, to));
+        filterConditions.push(lte(auditLog.createdAt, to));
       }
       if (search && typeof search === "string" && search.trim()) {
-        conditions.push(ilike(auditLog.recordIdentifier, `%${search.trim()}%`));
+        filterConditions.push(ilike(auditLog.recordIdentifier, `%${search.trim()}%`));
       }
 
-      const rawLogs = await db
-        .select({
-          id: auditLog.id,
-          userId: auditLog.userId,
-          storedUsername: auditLog.username,
-          companyId: auditLog.companyId,
-          action: auditLog.action,
-          tableName: auditLog.tableName,
-          recordId: auditLog.recordId,
-          recordIdentifier: auditLog.recordIdentifier,
-          changes: auditLog.changes,
-          createdAt: auditLog.createdAt,
-          resolvedUsername: users.username,
-          displayName: factoryUserProfiles.displayName,
-        })
-        .from(auditLog)
-        .leftJoin(users, eq(users.id, auditLog.userId))
-        .leftJoin(
-          factoryUserProfiles,
-          and(
-            eq(factoryUserProfiles.userId, auditLog.userId),
-            companyId ? eq(factoryUserProfiles.companyId, companyId) : sql`1 = 0`
+      const allConditions = [...baseConditions, ...filterConditions];
+      const whereClause = allConditions.length > 0 ? and(...allConditions) : undefined;
+
+      // Parallel: fetch page of logs + total count + known modules
+      const [rawLogs, countResult, modulesResult] = await Promise.all([
+        db
+          .select({
+            id: auditLog.id,
+            userId: auditLog.userId,
+            storedUsername: auditLog.username,
+            companyId: auditLog.companyId,
+            action: auditLog.action,
+            tableName: auditLog.tableName,
+            recordId: auditLog.recordId,
+            recordIdentifier: auditLog.recordIdentifier,
+            changes: auditLog.changes,
+            createdAt: auditLog.createdAt,
+            resolvedUsername: users.username,
+            displayName: factoryUserProfiles.displayName,
+          })
+          .from(auditLog)
+          .leftJoin(users, eq(users.id, auditLog.userId))
+          .leftJoin(
+            factoryUserProfiles,
+            and(
+              eq(factoryUserProfiles.userId, auditLog.userId),
+              companyId ? eq(factoryUserProfiles.companyId, companyId) : sql`1 = 0`
+            )
           )
-        )
-        .where(conditions.length > 0 ? and(...conditions) : undefined)
-        .orderBy(desc(auditLog.createdAt))
-        .limit(parseInt(limit as string))
-        .offset(parseInt(offset as string));
+          .where(whereClause)
+          .orderBy(desc(auditLog.createdAt))
+          .limit(pageSize)
+          .offset(offset),
+        db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(auditLog)
+          .where(whereClause),
+        db
+          .selectDistinct({ tableName: auditLog.tableName })
+          .from(auditLog)
+          .where(
+            and(...baseConditions)
+          )
+          .orderBy(auditLog.tableName),
+      ]);
 
       const logs = rawLogs.map(({ storedUsername, resolvedUsername, displayName, ...row }) => ({
         ...row,
         username: resolvedUsername || displayName || storedUsername || "Unknown",
       }));
 
-      res.json(logs);
+      const total = countResult[0]?.count ?? 0;
+      const totalPages = Math.max(1, Math.ceil(total / pageSize));
+      const knownModules = modulesResult.map((r) => r.tableName).filter(Boolean);
+
+      res.json({ logs, totalPages, total, knownModules });
     } catch (error: any) {
       console.error("Error fetching audit logs:", error);
       res.status(500).json({ message: error.message });
