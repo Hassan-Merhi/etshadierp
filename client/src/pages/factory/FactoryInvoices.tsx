@@ -57,6 +57,7 @@ interface CustomerOrder {
   containerNumber?: string | null;
   proformaName?: string | null;
   destination?: string | null;
+  containerNotes?: string | null;
   isHidden?: boolean;
 }
 
@@ -225,7 +226,7 @@ export default function FactoryInvoices() {
   };
 
   // Column count for colspan calculations
-  const colCount = 10 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
+  const colCount = 11 - (hideProformaCol ? 1 : 0) - (hideTotalsUsd ? 1 : 0);
 
   const fmtKg = (val: string | number | null | undefined) => {
     const n = parseFloat(String(val ?? "0"));
@@ -340,6 +341,7 @@ export default function FactoryInvoices() {
                 {!hideProformaCol && <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Proforma</TableHead>}
                 <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Container</TableHead>
                 <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Destination</TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Notes</TableHead>
                 <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Date</TableHead>
                 <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</TableHead>
                 <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Bales</TableHead>
@@ -396,6 +398,9 @@ export default function FactoryInvoices() {
                         </TableCell>
                         <TableCell className="text-sm" data-testid={`text-destination-${order.id}`}>
                           {order.destination || <span className="text-muted-foreground/50">—</span>}
+                        </TableCell>
+                        <TableCell className="text-sm max-w-[200px] truncate" data-testid={`text-notes-${order.id}`} title={order.containerNotes ?? undefined}>
+                          {order.containerNotes || <span className="text-muted-foreground/50">—</span>}
                         </TableCell>
                         <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
                           {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}

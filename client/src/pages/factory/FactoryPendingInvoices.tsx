@@ -42,6 +42,7 @@ interface CustomerOrder {
   customerName: string;
   containerNumber?: string | null;
   proformaName?: string | null;
+  containerNotes?: string | null;
 }
 
 export default function FactoryPendingInvoices() {
@@ -153,6 +154,7 @@ export default function FactoryPendingInvoices() {
                 <TableHead>Customer</TableHead>
                 <TableHead>Proforma</TableHead>
                 <TableHead>Container</TableHead>
+                <TableHead>Notes</TableHead>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Bales</TableHead>
                 <TableHead className="text-right">Total</TableHead>
@@ -163,7 +165,7 @@ export default function FactoryPendingInvoices() {
             <TableBody>
               {filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
                     <div className="flex flex-col items-center gap-2">
                       <Package className="h-10 w-10 opacity-40" />
                       <p>No invoices found</p>
@@ -189,6 +191,9 @@ export default function FactoryPendingInvoices() {
                     </TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-container-${order.id}`}>
                       {order.containerNumber || <span className="text-muted-foreground/50">—</span>}
+                    </TableCell>
+                    <TableCell className="text-sm max-w-[200px] truncate" data-testid={`text-notes-${order.id}`} title={order.containerNotes ?? undefined}>
+                      {order.containerNotes || <span className="text-muted-foreground/50">—</span>}
                     </TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
                       {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
