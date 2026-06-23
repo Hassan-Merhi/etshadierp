@@ -78,28 +78,16 @@ export default function AccountSidebar({
   const listRef = useRef<HTMLDivElement>(null);
   const { formatAmount } = useCurrencyContext();
 
+  const handleAutoCreate = async () => {
+    if (!onAutoCreateAccount) return;
+    const trimmedName = searchValue.trim();
+    if (!trimmedName) return;
+    const newAccount = await onAutoCreateAccount(trimmedName);
+    if (newAccount) onSelectAccount(newAccount);
+  };
+
   const handleKeyDown = async (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter" && isFactoryCompany && onAutoCreateAccount) {
-      e.preventDefault();
-      const trimmedName = searchValue.trim();
-      if (!trimmedName) return;
-
-      // Check for EXACT match (case-insensitive) - only select if name matches exactly
-      const exactMatch = filteredAccounts.find(
-        (acc) => acc.name.toLowerCase() === trimmedName.toLowerCase()
-      );
-
-      if (exactMatch) {
-        onSelectAccount(exactMatch);
-        return;
-      }
-
-      // No exact match - auto-create for factory (even if there are partial matches)
-      const newAccount = await onAutoCreateAccount(trimmedName);
-      if (newAccount) {
-        onSelectAccount(newAccount);
-      }
-    } else if (e.key === "ArrowDown") {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       if (filteredAccounts.length > 0) {
         onHighlightedIndexChange(Math.min(highlightedIndex + 1, filteredAccounts.length - 1));
@@ -109,11 +97,17 @@ export default function AccountSidebar({
       if (filteredAccounts.length > 0) {
         onHighlightedIndexChange(Math.max(highlightedIndex - 1, 0));
       }
-    } else if (e.key === "Enter" && !isFactoryCompany) {
-      // For non-factory: select highlighted account on Enter
-      if (filteredAccounts.length > 0 && highlightedIndex >= 0 && highlightedIndex < filteredAccounts.length) {
-        e.preventDefault();
-        onSelectAccount(filteredAccounts[highlightedIndex]);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (filteredAccounts.length > 0) {
+        // Accounts exist — select highlighted (or first) just like ERP
+        const idx = highlightedIndex >= 0 && highlightedIndex < filteredAccounts.length
+          ? highlightedIndex
+          : 0;
+        onSelectAccount(filteredAccounts[idx]);
+      } else if (isFactoryCompany && onAutoCreateAccount && searchValue.trim()) {
+        // No accounts found and factory mode — auto-create
+        await handleAutoCreate();
       }
     }
   };
@@ -237,9 +231,26 @@ export default function AccountSidebar({
       <div className="flex-1 overflow-y-auto p-3" ref={listRef}>
         <div className="space-y-1">
           {filteredAccounts.length === 0 ? (
-            <div className="text-center py-8 text-sm text-muted-foreground">
-              {isFactoryCompany && searchValue.trim() ? (
-                <span>Press <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded">Enter</kbd> to create "{searchValue.trim()}"</span>
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              {isFactoryCompany && searchValue.trim() && onAutoCreateAccount ? (
+                <div className="space-y-3">
+                  <p>No match for "{searchValue.trim()}"</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleAutoCreate}
+                    disabled={isAutoCreating}
+                    data-testid="button-create-account-inline"
+                    className="gap-1.5"
+                  >
+                    {isAutoCreating
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Plus className="h-3.5 w-3.5" />}
+                    Create "{searchValue.trim()}"
+                  </Button>
+                  <p className="text-xs">or press <kbd className="px-1.5 py-0.5 bg-muted rounded">Enter</kbd></p>
+                </div>
               ) : (
                 "No accounts found"
               )}
