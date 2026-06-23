@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -7,9 +7,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, ArrowDownCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Plus, Trash2, ArrowDownCircle, Loader2, ChevronDown, ChevronUp, Banknote, TrendingDown, Activity } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -21,6 +21,7 @@ import { queryClient } from "@/lib/queryClient";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useAppMode } from "@/contexts/AppModeContext";
 import type { Employee } from "@shared/schema";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   salaryAdvanceSchema,
   deductionSchema,
@@ -41,6 +42,8 @@ export function AdvancesTab() {
   const [deductionDialogOpen, setDeductionDialogOpen] = useState(false);
   const [selectedAdvance, setSelectedAdvance] = useState<SalaryAdvance | null>(null);
   const [showPaid, setShowPaid] = useState(false);
+  const [workerFilter, setWorkerFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const { data: workerStaff = [] } = useQuery<Employee[]>({
     queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
@@ -50,6 +53,11 @@ export function AdvancesTab() {
 
   const { data: salaryAdvances = [], isLoading: advancesLoading } = useQuery<SalaryAdvance[]>({
     queryKey: ["/api/salary-advances", selectedCompany?.id],
+    enabled: !!selectedCompany,
+  });
+
+  const { data: repayments = [], isLoading: repaymentsLoading } = useQuery<any[]>({
+    queryKey: ["/api/salary-advance-deductions", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
 
@@ -121,6 +129,7 @@ export function AdvancesTab() {
     onSuccess: () => {
       toast({ title: "Success", description: "Deduction recorded successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances", selectedCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/salary-advance-deductions", selectedCompany?.id] });
       setDeductionDialogOpen(false);
       deductionForm.reset();
       setSelectedAdvance(null);
@@ -130,6 +139,31 @@ export function AdvancesTab() {
     },
   });
 
+  // Stats
+  const stats = useMemo(() => {
+    const total = salaryAdvances.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+    const outstanding = salaryAdvances
+      .filter((a) => !a.fullyPaid)
+      .reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+    const active = salaryAdvances.filter((a) => !a.fullyPaid).length;
+    return { total, outstanding, active };
+  }, [salaryAdvances]);
+
+  // Filtered list
+  const filteredAdvances = useMemo(() => {
+    return salaryAdvances.filter((a) => {
+      const matchWorker = workerFilter === "all" || String(a.employeeId) === workerFilter;
+      const matchStatus =
+        statusFilter === "all" ||
+        (statusFilter === "outstanding" && !a.fullyPaid) ||
+        (statusFilter === "paid" && a.fullyPaid);
+      return matchWorker && matchStatus;
+    });
+  }, [salaryAdvances, workerFilter, statusFilter]);
+
+  const outstanding = filteredAdvances.filter((a) => !a.fullyPaid);
+  const paid = filteredAdvances.filter((a) => a.fullyPaid);
+
   if (advancesLoading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -138,141 +172,354 @@ export function AdvancesTab() {
     );
   }
 
+  const renderAdvanceRows = (rows: SalaryAdvance[]) =>
+    rows.map((advance) => (
+      <TableRow key={advance.id}>
+        <TableCell>
+          <div className="flex flex-col">
+            <span className="font-medium">{advance.employeeName}</span>
+            <span className="text-xs text-muted-foreground">{advance.employeeCode}</span>
+          </div>
+        </TableCell>
+        <TableCell>{formatDisplayDate(advance.advanceDate)}</TableCell>
+        <TableCell className="text-right font-mono">{formatAmount(parseFloat(advance.amount))}</TableCell>
+        <TableCell className="text-right font-mono font-bold text-amber-600 dark:text-amber-400">
+          {formatAmount(parseFloat(advance.remainingBalance))}
+        </TableCell>
+        <TableCell>
+          <Badge variant="outline" className="text-[10px]">
+            {(advance as any).isOpeningBalance ? "Opening Balance" : "Advance"}
+          </Badge>
+        </TableCell>
+        <TableCell>
+          {advance.fullyPaid ? (
+            <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
+          ) : (
+            <Badge variant="outline" className="border-amber-500 text-amber-500">Outstanding</Badge>
+          )}
+        </TableCell>
+        <TableCell className="text-sm text-muted-foreground max-w-[180px] truncate">
+          {advance.notes || "—"}
+        </TableCell>
+        <TableCell className="text-right">
+          <div className="flex justify-end gap-1">
+            {!advance.fullyPaid && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => {
+                  setSelectedAdvance(advance);
+                  deductionForm.setValue("deductionAmount", advance.remainingBalance);
+                  setDeductionDialogOpen(true);
+                }}
+                title="Record Repayment"
+                data-testid={`button-repay-advance-${advance.id}`}
+              >
+                <ArrowDownCircle className="h-4 w-4 text-green-600" />
+              </Button>
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="text-destructive"
+              onClick={() => {
+                if (confirm("Are you sure you want to delete this advance?")) {
+                  deleteAdvanceMutation.mutate(advance.id);
+                }
+              }}
+              data-testid={`button-delete-advance-${advance.id}`}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+    ));
+
+  const advanceTableHeaders = (
+    <TableRow>
+      <TableHead>Worker</TableHead>
+      <TableHead>Date</TableHead>
+      <TableHead className="text-right">Amount</TableHead>
+      <TableHead className="text-right">Remaining</TableHead>
+      <TableHead>Type</TableHead>
+      <TableHead>Status</TableHead>
+      <TableHead>Notes</TableHead>
+      <TableHead className="text-right">Actions</TableHead>
+    </TableRow>
+  );
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Salary Advances</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Advances + Deductions</h2>
           <p className="text-muted-foreground">Manage and track worker salary advances and repayments</p>
         </div>
-        <Button onClick={() => setAdvanceDialogOpen(true)} data-testid="button-create-advance">
-          <Plus className="mr-2 h-4 w-4" />
-          New Advance
-        </Button>
       </div>
 
-      {(() => {
-        const outstanding = salaryAdvances.filter((a) => !a.fullyPaid);
-        const paid = salaryAdvances.filter((a) => a.fullyPaid);
+      <Tabs defaultValue="advances">
+        <TabsList>
+          <TabsTrigger value="advances">Advances</TabsTrigger>
+          <TabsTrigger value="repayments">Repayments</TabsTrigger>
+          <TabsTrigger value="worker-deductions">Worker Deductions</TabsTrigger>
+        </TabsList>
 
-        const renderRows = (rows: SalaryAdvance[]) =>
-          rows.map((advance) => (
-            <TableRow key={advance.id}>
-              <TableCell>{formatDisplayDate(advance.advanceDate)}</TableCell>
-              <TableCell>
-                <div className="flex flex-col">
-                  <span className="font-medium">{advance.employeeName}</span>
-                  <span className="text-xs text-muted-foreground">{advance.employeeCode}</span>
-                </div>
-              </TableCell>
-              <TableCell className="text-right font-mono">{formatAmount(parseFloat(advance.amount))}</TableCell>
-              <TableCell className="text-right font-mono font-bold text-amber-600 dark:text-amber-400">
-                {formatAmount(parseFloat(advance.remainingBalance))}
-              </TableCell>
-              <TableCell>
-                {advance.fullyPaid ? (
-                  <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
+        {/* ── Advances sub-tab ── */}
+        <TabsContent value="advances" className="space-y-4 pt-4">
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="border rounded-md p-4 flex items-center gap-3">
+              <Banknote className="h-8 w-8 text-blue-500 shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Total Given</p>
+                <p className="text-lg font-bold">{formatAmount(stats.total)}</p>
+              </div>
+            </div>
+            <div className="border rounded-md p-4 flex items-center gap-3">
+              <TrendingDown className="h-8 w-8 text-amber-500 shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Outstanding</p>
+                <p className="text-lg font-bold">{formatAmount(stats.outstanding)}</p>
+              </div>
+            </div>
+            <div className="border rounded-md p-4 flex items-center gap-3">
+              <Activity className="h-8 w-8 text-green-500 shrink-0" />
+              <div>
+                <p className="text-xs text-muted-foreground">Active Advances</p>
+                <p className="text-lg font-bold">{stats.active}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Filters + actions */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Select value={workerFilter} onValueChange={setWorkerFilter}>
+              <SelectTrigger className="w-44" data-testid="select-worker-filter">
+                <SelectValue placeholder="All Workers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Workers</SelectItem>
+                {workerStaff.map((w) => (
+                  <SelectItem key={w.id} value={String(w.id)}>
+                    {w.firstName} {w.lastName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-40" data-testid="select-status-filter">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="outstanding">Outstanding</SelectItem>
+                <SelectItem value="paid">Fully Paid</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="ml-auto flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setAdvanceDialogOpen(true)}
+                data-testid="button-bulk-advance"
+              >
+                <Banknote className="mr-2 h-4 w-4" />
+                Bulk Advance
+              </Button>
+              <Button onClick={() => setAdvanceDialogOpen(true)} data-testid="button-create-advance">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Advance
+              </Button>
+            </div>
+          </div>
+
+          {/* Outstanding table */}
+          <div className="border rounded-md">
+            <Table>
+              <TableHeader>{advanceTableHeaders}</TableHeader>
+              <TableBody>
+                {outstanding.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      No outstanding advances
+                    </TableCell>
+                  </TableRow>
                 ) : (
-                  <Badge variant="outline" className="border-amber-500 text-amber-500">Outstanding</Badge>
+                  renderAdvanceRows(outstanding)
                 )}
-              </TableCell>
-              <TableCell className="text-right">
-                <div className="flex justify-end gap-1">
-                  {!advance.fullyPaid && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => {
-                        setSelectedAdvance(advance);
-                        deductionForm.setValue("deductionAmount", advance.remainingBalance);
-                        setDeductionDialogOpen(true);
-                      }}
-                      title="Record Repayment"
-                    >
-                      <ArrowDownCircle className="h-4 w-4 text-green-600" />
-                    </Button>
-                  )}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="text-destructive"
-                    onClick={() => {
-                      if (confirm("Are you sure you want to delete this advance?")) {
-                        deleteAdvanceMutation.mutate(advance.id);
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ));
+              </TableBody>
+            </Table>
+          </div>
 
-        return (
-          <>
-            {/* Outstanding advances */}
+          {/* Collapsible fully-paid section */}
+          {paid.length > 0 && (
+            <div className="border rounded-md overflow-hidden">
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/40 transition-colors"
+                onClick={() => setShowPaid((v) => !v)}
+                data-testid="button-toggle-paid-advances"
+              >
+                <span className="flex items-center gap-2">
+                  <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
+                  <span className="text-muted-foreground">
+                    {paid.length} advance{paid.length !== 1 ? "s" : ""}
+                  </span>
+                </span>
+                {showPaid ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
+              </button>
+              {showPaid && (
+                <Table>
+                  <TableHeader>{advanceTableHeaders}</TableHeader>
+                  <TableBody>{renderAdvanceRows(paid)}</TableBody>
+                </Table>
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ── Repayments sub-tab ── */}
+        <TabsContent value="repayments" className="pt-4">
+          {repaymentsLoading ? (
+            <div className="flex items-center justify-center p-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
             <div className="border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
                     <TableHead>Worker</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Remaining</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead>Payroll Month</TableHead>
+                    <TableHead className="text-right">Repayment Amount</TableHead>
+                    <TableHead className="text-right">Advance Remaining After</TableHead>
+                    <TableHead>Date Recorded</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {outstanding.length === 0 ? (
+                  {repayments.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                        No outstanding advances
+                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                        No repayments recorded yet
                       </TableCell>
                     </TableRow>
                   ) : (
-                    renderRows(outstanding)
+                    repayments.map((r) => (
+                      <TableRow key={r.id}>
+                        <TableCell>
+                          <span className="font-medium">{r.workerName || `Employee #${r.employeeId}`}</span>
+                        </TableCell>
+                        <TableCell>{r.payrollMonth}</TableCell>
+                        <TableCell className="text-right font-mono text-green-600 dark:text-green-400 font-bold">
+                          {formatAmount(parseFloat(r.deductionAmount || "0"))}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">
+                          {formatAmount(parseFloat(r.advanceRemaining || "0"))}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {r.createdAt ? formatDisplayDate(r.createdAt.split("T")[0]) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>
             </div>
+          )}
+        </TabsContent>
 
-            {/* Fully paid — collapsible */}
-            {paid.length > 0 && (
-              <div className="border rounded-md overflow-hidden">
-                <button
-                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/40 transition-colors"
-                  onClick={() => setShowPaid((v) => !v)}
-                  data-testid="button-toggle-paid-advances"
-                >
-                  <span className="flex items-center gap-2">
-                    <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
-                    <span className="text-muted-foreground">{paid.length} advance{paid.length !== 1 ? "s" : ""}</span>
-                  </span>
-                  {showPaid ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-                </button>
-                {showPaid && (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Worker</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-right">Remaining</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+        {/* ── Worker Deductions sub-tab ── */}
+        <TabsContent value="worker-deductions" className="pt-4">
+          <div className="border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Worker</TableHead>
+                  <TableHead className="text-right">Advance Amount</TableHead>
+                  <TableHead className="text-right">Total Repaid</TableHead>
+                  <TableHead className="text-right">Still Owed</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {workerStaff.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      No workers found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  (() => {
+                    const workerMap = new Map<
+                      number,
+                      { name: string; code: string; totalAdvanced: number; totalRepaid: number; owed: number }
+                    >();
+                    salaryAdvances.forEach((a) => {
+                      const existing = workerMap.get(a.employeeId) || {
+                        name: a.employeeName,
+                        code: a.employeeCode,
+                        totalAdvanced: 0,
+                        totalRepaid: 0,
+                        owed: 0,
+                      };
+                      existing.totalAdvanced += parseFloat(a.amount || "0");
+                      existing.totalRepaid +=
+                        parseFloat(a.amount || "0") - parseFloat(a.remainingBalance || "0");
+                      existing.owed += parseFloat(a.remainingBalance || "0");
+                      workerMap.set(a.employeeId, existing);
+                    });
+                    const rows = Array.from(workerMap.values()).filter((r) => r.totalAdvanced > 0);
+                    if (rows.length === 0) {
+                      return (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                            No advance deductions on record
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    return rows.map((r, i) => (
+                      <TableRow key={i}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{r.name}</span>
+                            <span className="text-xs text-muted-foreground">{r.code}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatAmount(r.totalAdvanced)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-green-600 dark:text-green-400">
+                          {formatAmount(r.totalRepaid)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold text-amber-600 dark:text-amber-400">
+                          {formatAmount(r.owed)}
+                        </TableCell>
+                        <TableCell>
+                          {r.owed <= 0 ? (
+                            <Badge variant="default" className="bg-green-500">Clear</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-amber-500 text-amber-500">
+                              Owes
+                            </Badge>
+                          )}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>{renderRows(paid)}</TableBody>
-                  </Table>
+                    ));
+                  })()
                 )}
-              </div>
-            )}
-          </>
-        );
-      })()}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
+      </Tabs>
 
+      {/* ── Add Advance Dialog ── */}
       <Dialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -289,7 +536,7 @@ export function AdvancesTab() {
                     <FormLabel>Worker</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger data-testid="select-advance-worker">
                           <SelectValue placeholder="Select worker" />
                         </SelectTrigger>
                       </FormControl>
@@ -313,7 +560,7 @@ export function AdvancesTab() {
                     <FormItem>
                       <FormLabel>Amount</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" placeholder="0.00" {...field} />
+                        <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-advance-amount" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -330,6 +577,7 @@ export function AdvancesTab() {
                           type="date"
                           value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
                           onChange={(e) => field.onChange(new Date(e.target.value))}
+                          data-testid="input-advance-date"
                         />
                       </FormControl>
                       <FormMessage />
@@ -363,7 +611,7 @@ export function AdvancesTab() {
                       <FormLabel>Cash Account</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                          <SelectTrigger>
+                          <SelectTrigger data-testid="select-advance-cash">
                             <SelectValue placeholder="Select account" />
                           </SelectTrigger>
                         </FormControl>
@@ -387,13 +635,13 @@ export function AdvancesTab() {
                   <FormItem>
                     <FormLabel>Notes (Optional)</FormLabel>
                     <FormControl>
-                      <Textarea {...field} />
+                      <Textarea {...field} data-testid="textarea-advance-notes" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={advanceMutation.isPending}>
+              <Button type="submit" className="w-full" disabled={advanceMutation.isPending} data-testid="button-save-advance">
                 {advanceMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Advance
               </Button>
@@ -402,11 +650,14 @@ export function AdvancesTab() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Record Repayment Dialog ── */}
       <Dialog open={deductionDialogOpen} onOpenChange={setDeductionDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Record Repayment</DialogTitle>
-            <DialogDescription>Manually record a repayment for {selectedAdvance?.employeeName}.</DialogDescription>
+            <DialogDescription>
+              Manually record a repayment for {selectedAdvance?.employeeName}.
+            </DialogDescription>
           </DialogHeader>
           <Form {...deductionForm}>
             <form onSubmit={deductionForm.handleSubmit((data) => deductionMutation.mutate(data))} className="space-y-4">
@@ -417,7 +668,7 @@ export function AdvancesTab() {
                   <FormItem>
                     <FormLabel>Repayment Amount</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} />
+                      <Input type="number" step="0.01" {...field} data-testid="input-repayment-amount" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -430,13 +681,13 @@ export function AdvancesTab() {
                   <FormItem>
                     <FormLabel>Reference Month (YYYY-MM)</FormLabel>
                     <FormControl>
-                      <Input type="month" {...field} />
+                      <Input type="month" {...field} data-testid="input-repayment-month" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={deductionMutation.isPending}>
+              <Button type="submit" className="w-full" disabled={deductionMutation.isPending} data-testid="button-save-repayment">
                 {deductionMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Submit Repayment
               </Button>
@@ -447,5 +698,3 @@ export function AdvancesTab() {
     </div>
   );
 }
-
-import { Checkbox } from "@/components/ui/checkbox";

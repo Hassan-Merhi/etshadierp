@@ -300,7 +300,7 @@ export default function Payroll() {
         <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="employees">Employees</TabsTrigger>
           <TabsTrigger value="workers">Workers</TabsTrigger>
-          <TabsTrigger value="advances">Advances</TabsTrigger>
+          <TabsTrigger value="advances">Advances + Deductions</TabsTrigger>
           <TabsTrigger value="groups">Groups</TabsTrigger>
           <TabsTrigger value="run-payroll">Run Payroll</TabsTrigger>
         </TabsList>
