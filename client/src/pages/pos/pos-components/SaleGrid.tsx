@@ -90,15 +90,17 @@ export function SaleGrid({
                     >
                       {col.key === "delete" ? (
                         <div className="flex items-center justify-center h-full opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDeleteRow(rowIndex)}
-                            className="h-8 w-8"
-                            data-testid={`button-delete-row-${rowIndex}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {rowIndex > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteRow(rowIndex)}
+                              className="h-8 w-8"
+                              data-testid={`button-delete-row-${rowIndex}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       ) : col.key === "plBale" || col.key === "totalPL" ? (
                         (() => {
