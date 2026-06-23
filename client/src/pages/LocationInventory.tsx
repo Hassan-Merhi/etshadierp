@@ -315,8 +315,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
         if (!allStockCategoryFilter.includes(rowCatId)) return false;
       }
       if (allStockLocationFilter) {
-        const locId = parseInt(allStockLocationFilter, 10);
-        if ((row.qtyByLocation[locId] || 0) === 0) return false;
+        const matchingIds = allInventoryLocations
+          .filter((l) => l.name === allStockLocationFilter)
+          .map((l) => l.id);
+        const hasQty = matchingIds.some((id) => (row.qtyByLocation[id] || 0) > 0);
+        if (!hasQty) return false;
       }
       if (allStockSearchTerm) {
         const s = allStockSearchTerm.toLowerCase();
@@ -324,7 +327,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       }
       return true;
     }).sort((a, b) => a.stockGroupName.localeCompare(b.stockGroupName) || a.stockItemName.localeCompare(b.stockItemName));
-  }, [combinedStockRows, allStockGroupFilter, allStockCategoryFilter, allStockLocationFilter, allStockSearchTerm]);
+  }, [combinedStockRows, allStockGroupFilter, allStockCategoryFilter, allStockLocationFilter, allStockSearchTerm, allInventoryLocations]);
 
   const openingInventoryMap = useMemo(() => {
     const map = new Map<number, number>();
@@ -543,7 +546,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               allStockCategoryFilter={allStockCategoryFilter}
               setAllStockCategoryFilter={setAllStockCategoryFilter}
               allStockSelectedRowIndex={allStockSelectedRowIndex}
-              openMovement={(l, n) => { setStockMovementItem({ stockItemId: 0, stockItemName: "", locationId: l, locationName: n }); setStockMovementOpen(true); }}
+              openMovement={(l, n, sId, sName) => { setStockMovementItem({ stockItemId: sId, stockItemName: sName, locationId: l, locationName: n }); setStockMovementOpen(true); }}
               formatAmount={formatAmount}
               posUser={posUser}
               allStockTableRef={allStockTableRef}

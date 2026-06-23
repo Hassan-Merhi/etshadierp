@@ -26,7 +26,7 @@ interface CombinedStockViewProps {
   allStockCategoryFilter: string[];
   setAllStockCategoryFilter: (cats: string[] | ((prev: string[]) => string[])) => void;
   allStockSelectedRowIndex: number;
-  openMovement: (locId: number | null, locName: string | null, e?: any) => void;
+  openMovement: (locId: number | null, locName: string | null, stockItemId: number, stockItemName: string, e?: any) => void;
   formatAmount: (amt: number) => string;
   posUser?: any;
   allStockTableRef: React.RefObject<HTMLDivElement>;
@@ -53,6 +53,16 @@ export function CombinedStockView({
   posUser,
   allStockTableRef,
 }: CombinedStockViewProps) {
+  // Deduplicate locations by name for the dropdown
+  const uniqueLocationNames = Array.from(
+    new Map(allInventoryLocations.map((l) => [l.name, l])).values()
+  );
+
+  // When a location filter is active, only show columns for locations matching that name
+  const visibleLocations = allStockLocationFilter
+    ? allInventoryLocations.filter((l) => l.name === allStockLocationFilter)
+    : allInventoryLocations;
+
   return (
     <div className="space-y-4">
       {/* Stats bar */}
@@ -65,7 +75,7 @@ export function CombinedStockView({
           </div>
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
             <Warehouse className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold">{allInventoryLocations.length.toLocaleString()}</span>
+            <span className="text-sm font-semibold">{uniqueLocationNames.length.toLocaleString()}</span>
             <span className="text-xs text-muted-foreground">Locations</span>
           </div>
           {!posUser && (
@@ -115,8 +125,8 @@ export function CombinedStockView({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__all__">All Locations</SelectItem>
-              {allInventoryLocations.map((loc) => (
-                <SelectItem key={String(loc.id)} value={String(loc.id)}>
+              {uniqueLocationNames.map((loc) => (
+                <SelectItem key={loc.name} value={loc.name}>
                   {loc.name}
                 </SelectItem>
               ))}
@@ -184,7 +194,7 @@ export function CombinedStockView({
                       Category
                     </th>
                   )}
-                  {allInventoryLocations.map((loc) => (
+                  {visibleLocations.map((loc) => (
                     <th key={loc.id} className="text-right px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap">
                       {loc.name}
                     </th>
@@ -216,7 +226,7 @@ export function CombinedStockView({
                       rows.push(
                         <tr key={`group-${row.stockGroupName}`} className="bg-muted/30">
                           <td
-                            colSpan={allInventoryLocations.length + 4 + (categoriesList.length > 0 ? 1 : 0)}
+                            colSpan={visibleLocations.length + 4 + (categoriesList.length > 0 ? 1 : 0)}
                             className="px-4 py-1.5 sticky left-0 bg-muted/30 z-10"
                           >
                             <div className="flex items-center justify-between gap-4">
@@ -249,7 +259,7 @@ export function CombinedStockView({
                         )}
                         data-testid={`row-allstock-${row.stockItemId}`}
                         data-allstock-row-index={currentIdx}
-                        onClick={() => openMovement(null, null)}
+                        onClick={() => openMovement(null, null, row.stockItemId, row.stockItemName)}
                       >
                         <td className={cn(
                           "px-4 py-2 font-medium whitespace-nowrap sticky left-0 z-10 transition-colors",
@@ -264,13 +274,13 @@ export function CombinedStockView({
                               : <span className="text-muted-foreground/40 text-xs">—</span>}
                           </td>
                         )}
-                        {allInventoryLocations.map((loc) => (
+                        {visibleLocations.map((loc) => (
                           <td
                             key={loc.id}
                             className="px-4 py-2 text-right font-mono whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline"
                             title={`View movement for ${loc.name}`}
                             onClick={(e) => {
-                              if (row.qtyByLocation[loc.id] != null) openMovement(loc.id, loc.name, e);
+                              if (row.qtyByLocation[loc.id] != null) openMovement(loc.id, loc.name, row.stockItemId, row.stockItemName, e);
                               else e.stopPropagation();
                             }}
                           >
@@ -305,7 +315,7 @@ export function CombinedStockView({
                     Total ({filteredCombinedRows.length} items)
                   </td>
                   {categoriesList.length > 0 && <td className="px-4 py-2.5" />}
-                  {allInventoryLocations.map((loc) => {
+                  {visibleLocations.map((loc) => {
                     const locTotal = filteredCombinedRows.reduce((s, r) => s + (r.qtyByLocation[loc.id] || 0), 0);
                     return (
                       <td key={loc.id} className="px-4 py-2.5 text-right font-mono whitespace-nowrap text-muted-foreground">

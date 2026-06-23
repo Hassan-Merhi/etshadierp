@@ -312,11 +312,18 @@ export function StockMovementDialog({
             {stockMovementItem && (
               <Button
                 onClick={() => {
-                  const locId = stockMovementItem.locationId ?? 0;
+                  const locId = stockMovementItem.locationId;
+                  const sid = stockMovementItem.stockItemId;
                   if (drillMonth) {
-                    navigate(`/locations/${locId}/stock-items/${stockMovementItem.stockItemId}/vouchers/${drillMonth.year}/${drillMonth.month}`);
+                    if (locId) {
+                      navigate(`/locations/${locId}/stock-items/${sid}/vouchers/${drillMonth.year}/${drillMonth.month}`);
+                    }
                   } else {
-                    navigate(`/locations/${locId}/stock-items/${stockMovementItem.stockItemId}/monthly-summary`);
+                    if (locId) {
+                      navigate(`/locations/${locId}/stock-items/${sid}/monthly-summary`);
+                    } else {
+                      navigate(`/stock-items/${sid}/monthly-summary`);
+                    }
                   }
                   setDrillMonth(null);
                   setStockMovementOpen(false);
