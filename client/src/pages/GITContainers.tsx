@@ -64,6 +64,7 @@ import { FilterBar } from "./git-containers/FilterBar";
 import { ImportResultBanner } from "./git-containers/ImportResultBanner";
 import { useContainerSummaryStats } from "./git-containers/containerHelpers";
 import { useGITContainersData } from "./git-containers/useGITContainersData";
+import { useContainerFilters } from "./git-containers/useContainerFilters";
 
 export default function GITContainers({ embedded = false }: { embedded?: boolean } = {}) {
   const { data: user, isLoading: userLoading } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
