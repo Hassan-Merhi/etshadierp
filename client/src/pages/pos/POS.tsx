@@ -1234,6 +1234,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             selectItem={selectItem}
             itemListRef={itemListRef}
             highlightedIndex={highlightedIndex}
+            syncTerm={searchTerm}
           />
         </div>
       </div>

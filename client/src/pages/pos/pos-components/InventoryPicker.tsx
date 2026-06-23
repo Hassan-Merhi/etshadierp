@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -10,6 +10,7 @@ export interface InventoryPickerProps {
   selectItem: (item: InventoryItem) => void;
   itemListRef: React.RefObject<HTMLDivElement>;
   highlightedIndex: number;
+  syncTerm?: string;
 }
 
 function normalize(s: string) {
@@ -21,8 +22,17 @@ export function InventoryPicker({
   selectItem,
   itemListRef,
   highlightedIndex,
+  syncTerm,
 }: InventoryPickerProps) {
   const [localSearch, setLocalSearch] = useState("");
+
+  // When the grid's inline search term changes (user typing in the item row),
+  // mirror it into the right-panel search so the list filters in real time.
+  useEffect(() => {
+    if (syncTerm !== undefined) {
+      setLocalSearch(syncTerm);
+    }
+  }, [syncTerm]);
 
   const filteredInventory = localSearch
     ? (() => {
