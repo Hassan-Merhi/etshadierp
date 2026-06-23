@@ -55,6 +55,21 @@ import { DaybookTable } from "./daybook/DaybookTable";
 import { VoucherDetailsDialog } from "./daybook/VoucherDetailsDialog";
 import { VoucherEditDialog } from "./daybook/VoucherEditDialog";
 
+const VOUCHER_TYPE_ORDER: Record<string, number> = {
+  Purchase: 0,
+  PurchaseOrder: 1,
+  Sales: 2,
+  POS: 3,
+  Payment: 4,
+  Receipt: 5,
+  Journal: 6,
+  Contra: 7,
+  StockTransfer: 8,
+  "Stock Transfer": 8,
+  "Credit Note": 9,
+  "Debit Note": 10,
+};
+
 export default function Daybook({ user }: { user?: any } = {}) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -462,6 +477,9 @@ export default function Daybook({ user }: { user?: any } = {}) {
       const da = a._type === "voucher" ? a.data.voucherDate : a.data.offloadedAt.slice(0, 10);
       const db = b._type === "voucher" ? b.data.voucherDate : b.data.offloadedAt.slice(0, 10);
       if (da !== db) return filters.sortOrder === "asc" ? da.localeCompare(db) : db.localeCompare(da);
+      const typeA = a._type === "voucher" ? (VOUCHER_TYPE_ORDER[a.data.voucherType] ?? 99) : 99;
+      const typeB = b._type === "voucher" ? (VOUCHER_TYPE_ORDER[b.data.voucherType] ?? 99) : 99;
+      if (typeA !== typeB) return typeA - typeB;
       const idA = a.data.id,
         idB = b.data.id;
       return filters.sortOrder === "asc" ? idA - idB : idB - idA;
