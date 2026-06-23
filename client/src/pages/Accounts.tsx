@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, Search, Edit } from "lucide-react";
+import { Plus, Search, Edit, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,6 +48,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { apiRequest } from "@/lib/queryClient";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export default function Accounts() {
   const { selectedCompany } = useCompany();
@@ -105,6 +106,8 @@ export default function Accounts() {
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [alterSearchTerm, setAlterSearchTerm] = useState("");
   const [alterSelectedAccount, setAlterSelectedAccount] = useState<Account | null>(null);
+  const [findQuery, setFindQuery] = useState("");
+  const debouncedFindQuery = useDebounce(findQuery, 350);
 
   const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(window.location.search);
@@ -149,6 +152,17 @@ export default function Accounts() {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
+  const { data: voucherSearchResults = [], isFetching: voucherSearchLoading } = useQuery<any[]>({
+    queryKey: ["/api/vouchers/search", debouncedFindQuery],
+    queryFn: async () => {
+      if (!debouncedFindQuery.trim()) return [];
+      const res = await fetch(`/api/vouchers/search?q=${encodeURIComponent(debouncedFindQuery)}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Search failed");
+      return res.json();
+    },
+    enabled: debouncedFindQuery.trim().length > 0,
+  });
+
   const updateLedgerMutation = useMutation({
     mutationFn: async (data: { id: number; name?: string; accountType?: string; openingBalance?: string; openingBalanceSide?: string; active?: boolean }) => {
       const { id, ...rest } = data;
@@ -592,6 +606,76 @@ export default function Accounts() {
                 </Card>
               )}
             </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="find">
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by voucher number, description, or amount (e.g. REC-001, duties, 3967)"
+                value={findQuery}
+                onChange={(e) => setFindQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-find-voucher"
+                autoFocus
+              />
+            </div>
+
+            {!debouncedFindQuery.trim() ? (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <FileText className="w-10 h-10 mb-3 opacity-30" />
+                <p className="font-medium text-sm">Find any voucher</p>
+                <p className="text-xs mt-1">Type a voucher number, description, or amount above</p>
+              </div>
+            ) : voucherSearchLoading ? (
+              <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+                Searching…
+              </div>
+            ) : voucherSearchResults.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <FileText className="w-10 h-10 mb-3 opacity-30" />
+                <p className="font-medium text-sm">No vouchers found</p>
+                <p className="text-xs mt-1">Try a different number, description, or amount</p>
+              </div>
+            ) : (
+              <div className="rounded-md border overflow-hidden divide-y">
+                {voucherSearchResults.map((v) => (
+                  <button
+                    key={v.id}
+                    data-testid={`button-voucher-result-${v.id}`}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors"
+                    onClick={() => navigate(`${modePrefix}/vouchers/${v.id}/edit`)}
+                  >
+                    <FileText className="w-4 h-4 shrink-0 text-muted-foreground" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm">{v.voucherNumber}</span>
+                        <Badge variant="outline" className="text-[10px]">{v.voucherType}</Badge>
+                        {v.locationName && (
+                          <span className="text-xs text-muted-foreground">{v.locationName}</span>
+                        )}
+                      </div>
+                      {v.description && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{v.description}</p>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-medium">
+                        {formatAmount(parseFloat(v.totalAmount || "0"))}
+                        {v.currency && v.currency !== "USD" && (
+                          <span className="text-xs text-muted-foreground ml-1">{v.currency}</span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatDisplayDate(v.effectiveDate || v.voucherDate)}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
