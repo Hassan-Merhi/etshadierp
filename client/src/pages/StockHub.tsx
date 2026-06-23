@@ -1,14 +1,16 @@
 import { useSearch, useLocation } from "wouter";
-import { Package, Search, Truck } from "lucide-react";
+import { Package, Search, Truck, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import StockItems from "@/pages/StockItems";
 import StockQuery from "@/pages/StockQuery";
 import OffloadItemSearch from "@/pages/OffloadItemSearch";
+import { GradesCategoriesManager } from "@/components/GradesCategoriesManager";
 
 const TABS = [
   { value: "items", label: "Items", icon: Package },
   { value: "query", label: "Query", icon: Search },
   { value: "offload", label: "Offload Search", icon: Truck },
+  { value: "grades", label: "Grades & Categories", icon: Tag },
 ];
 
 export default function StockHub() {
@@ -43,6 +45,7 @@ export default function StockHub() {
       {activeTab === "items" && <StockItems />}
       {activeTab === "query" && <StockQuery />}
       {activeTab === "offload" && <OffloadItemSearch />}
+      {activeTab === "grades" && <GradesCategoriesManager />}
     </div>
   );
 }
