@@ -313,15 +313,15 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
     staleTime: 30000,
   });
 
+  // Redirect legacy /pos URL to / for POS users
+  useEffect(() => {
+    if (isPOS && window.location.pathname === "/pos") {
+      navigate("/");
+    }
+  }, [isPOS, navigate]);
+
   // POS users only see POS and Location Inventory
   if (isPOS) {
-    // Redirect legacy /pos URL to /
-    useEffect(() => {
-      if (window.location.pathname === "/pos") {
-        navigate("/");
-      }
-    }, [navigate]);
-
     return (
       <Switch>
         <Route path="/">{() => <POS posUser={user} />}</Route>

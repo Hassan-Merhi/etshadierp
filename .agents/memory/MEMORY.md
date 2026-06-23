@@ -8,3 +8,4 @@
 - [Storage refactor missing functions](storage-refactor-gaps.md) — after domain split, several storage functions were missing or had wrong schema refs; see file for full list of patterns fixed.
 - [Route split orphan pattern](route-split-orphans.md) — after any route barrel split, verify sub-dir files are imported by a parent; routes.ts orphan check must scan server/routes.ts too (not just server/routes/).
 - [Radix Tabs requires TabsList](radix-tabs-tabslist.md) — using Tabs+TabsContent without TabsList/TabsTrigger causes null-dispatcher useContext crash; always include TabsList even when using custom visual buttons.
+- [Hooks inside conditional blocks](hooks-in-conditionals.md) — useEffect/useState inside if() in Router caused invalid hook call; wouter v3 component= prop uses createElement correctly (not plain function); cache clear fixes stale-module null-dispatcher crashes.
