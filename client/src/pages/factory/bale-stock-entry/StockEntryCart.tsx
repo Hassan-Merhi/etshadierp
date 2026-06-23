@@ -130,7 +130,7 @@ export function StockEntryCart({
                     <SelectContent>
                       <SelectItem value="none">Unassigned</SelectItem>
                       {filteredWorkers.map((w: any) => (
-                        <SelectItem key={w.id} value={String(w.id)}>{w.name}</SelectItem>
+                        <SelectItem key={w.id} value={String(w.id)}>{w.fullName || w.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

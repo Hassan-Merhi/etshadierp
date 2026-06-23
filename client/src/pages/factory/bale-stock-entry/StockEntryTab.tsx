@@ -291,14 +291,14 @@ export function StockEntryTab() {
   const stockEntryMutation = useMutation({
     mutationFn: async () => {
       const response = await modeApiRequest("POST", "/api/factory/stock-entry", {
-        locationId: parseInt(selectedLocationId),
+        erpLocationId: parseInt(selectedLocationId),
         items: cart.map((item) => ({
           productId: item.productId,
           qty: item.qty,
           weightPerBaleKg: item.weightPerBaleKg,
           finalizedBy: item.finalizedBy,
         })),
-        date: entryDate,
+        entryDate,
         customerId: selectedCustomerId !== "none" ? parseInt(selectedCustomerId) : null,
         logoId: selectedLogoId,
       });

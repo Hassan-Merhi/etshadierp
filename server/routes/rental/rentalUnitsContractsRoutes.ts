@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { getCompanyId, findOrCreateLedgerAccount, maybeRunAutoTransfer, ensureMonthlyLedgerRows, findEarliestOutstandingMonth, ensureMonthlyForCompany, postRentAccrualForCompany, type RentalModule } from "./_rentalShared";
+import { getCompanyId, findOrCreateLedgerAccount, maybeRunAutoTransfer, ensureMonthlyLedgerRows, findEarliestOutstandingMonth, ensureMonthlyForCompany, postRentAccrualForCompany, buildAllocations, type RentalModule } from "./_rentalShared";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { z } from "zod";
