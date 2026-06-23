@@ -260,7 +260,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           {allLocations.map(loc => (
             <Card key={loc.id} className="p-6 cursor-pointer hover-elevate" onClick={() => setSelectedLocation(loc)}>
               <h3 className="text-lg font-bold">{loc.name}</h3>
-              <p className="text-muted-foreground">{loc.code}</p>
             </Card>
           ))}
         </div>
