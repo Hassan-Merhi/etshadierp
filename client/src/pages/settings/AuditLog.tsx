@@ -31,7 +31,7 @@ export function AuditLog() {
   const [selectedLog, setSelectedLog] = useState<any>(null);
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ["/api/audit-logs", { action: filterAction, module: filterModule, search: filterSearch, from: filterDateFrom, to: filterDateTo, page }],
+    queryKey: ["/api/audit-log", { action: filterAction, module: filterModule, search: filterSearch, from: filterDateFrom, to: filterDateTo, page }],
     queryFn: async () => {
       const params = new URLSearchParams({
         action: filterAction,
@@ -42,7 +42,7 @@ export function AuditLog() {
         page: page.toString(),
         limit: "50",
       });
-      const res = await apiRequest("GET", `/api/audit-logs?${params.toString()}`);
+      const res = await apiRequest("GET", `/api/audit-log?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch logs");
       return res.json();
     },
