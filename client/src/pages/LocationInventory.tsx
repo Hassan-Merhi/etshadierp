@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
@@ -143,6 +143,20 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const { toast } = useToast();
   const { formatAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
+  const companyId = selectedCompany?.id;
+
+  // Reset location/group selection and invalidate caches whenever the active company changes.
+  useEffect(() => {
+    setSelectedLocationLocal(null);
+    setSelectedGroup(null);
+    setViewAllItems(false);
+    setLocationSearchTerm("");
+    setGroupSearchTerm("");
+    setItemSearchTerm("");
+    queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
+  }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -243,8 +257,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   });
 
   const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
-    queryKey: ["/api/locations"],
-    enabled: !posUser,
+    queryKey: companyId ? [`/api/locations?companyId=${companyId}`] : [],
+    enabled: !posUser && !!companyId,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -256,39 +270,67 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const locations = posUser ? posAssignedLocations : allLocations;
   const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
 
-  const inventoryQueryKey = selectedLocationLocal
-    ? [`/api/locations/${selectedLocationLocal.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`]
-    : [];
-
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: inventoryQueryKey,
-    enabled: !!selectedLocationLocal,
+    queryKey:
+      selectedLocationLocal && companyId
+        ? [`/api/locations/${selectedLocationLocal.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`, companyId]
+        : [],
+    queryFn: async () => {
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!selectedLocationLocal && !!companyId,
   });
 
   const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey:
-      selectedLocationLocal && fromDate
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`]
+      selectedLocationLocal && fromDate && companyId
+        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`, companyId]
         : [],
-    enabled: !!selectedLocationLocal && !!fromDate,
+    queryFn: async () => {
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${fromDate}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!selectedLocationLocal && !!fromDate && !!companyId,
   });
 
   const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
     queryKey:
-      selectedLocationLocal && asOfDate
-        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`]
+      selectedLocationLocal && asOfDate && companyId
+        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`, companyId]
         : [],
-    enabled: !!selectedLocationLocal && !!asOfDate,
+    queryFn: async () => {
+      const url = `/api/locations/${selectedLocationLocal!.id}/inventory?asOfDate=${asOfDate}`;
+      const res = await fetch(url, { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!selectedLocationLocal && !!asOfDate && !!companyId,
   });
 
   const { data: allInventoryData = [], isLoading: allInventoryLoading } = useQuery<any[]>({
-    queryKey: ["/api/inventory"],
-    enabled: showAllStock,
+    queryKey: companyId ? ["/api/inventory", companyId] : [],
+    queryFn: async () => {
+      const res = await fetch("/api/inventory", { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: showAllStock && !!companyId,
     staleTime: 30000,
   });
 
   const { data: categoriesList = [] } = useQuery<{ id: number; name: string; active: boolean }[]>({
-    queryKey: ["/api/stock-categories"],
+    queryKey: companyId ? ["/api/stock-categories", companyId] : [],
+    queryFn: async () => {
+      const res = await fetch("/api/stock-categories", { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!companyId,
     staleTime: 5 * 60 * 1000,
   });
 

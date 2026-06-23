@@ -308,51 +308,61 @@ export async function deleteLocationPrice(priceId: number): Promise<void> {
 
 export async function getLocationInventory(companyId: number, locationId: number, includeZero = false): Promise<any[]> {
   if (!includeZero) {
-    // Join via locations to verify company ownership — avoids hiding rows where inventory.company_id is NULL/stale
-    const rows = await db.execute(sql`
-      SELECT
-        inv.id                AS "inventoryId",
-        inv.location_id       AS "locationId",
-        inv.stock_item_id     AS "stockItemId",
-        inv.quantity,
-        inv.average_rate      AS "averageRate",
-        inv.total_value       AS "totalValue",
-        inv.last_updated      AS "lastUpdated",
-        si.name               AS "stockItemName",
-        si.code               AS "stockItemCode",
-        si.uom                AS "stockItemUom",
-        si.stock_group_id     AS "stockGroupId",
-        COALESCE(sg.name, '') AS "stockGroupName",
-        COALESCE(sg.code, '') AS "stockGroupCode",
-        si.active             AS "stockItemActive",
-        si.barcode,
-        si.category_id        AS "categoryId",
-        sc.name               AS "categoryName",
-        COALESCE(lp.selling_price, si.selling_price) AS "lastSellingPrice"
-      FROM inventory inv
-      JOIN locations loc
-        ON loc.id = inv.location_id
-      LEFT JOIN stock_items si
-        ON si.id = inv.stock_item_id
-      LEFT JOIN stock_groups sg
-        ON sg.id = si.stock_group_id
-      LEFT JOIN stock_categories sc
-        ON sc.id = si.category_id
-      LEFT JOIN stock_item_location_prices lp
-        ON lp.stock_item_id = inv.stock_item_id
-        AND lp.location_id  = ${locationId}
-      WHERE inv.location_id  = ${locationId}
-        AND loc.company_id   = ${companyId}
-        AND si.id IS NOT NULL
-        AND si.deleted_at IS NULL
-      ORDER BY si.code ASC
-    `);
+    // Use Drizzle query builder (more reliable than raw sql template for this path).
+    // innerJoin on locations verifies company ownership — avoids hiding rows where
+    // inventory.company_id is NULL/stale.
+    const rows = await db
+      .select({
+        inventoryId: schema.inventory.id,
+        locationId: schema.inventory.locationId,
+        stockItemId: schema.inventory.stockItemId,
+        quantity: schema.inventory.quantity,
+        averageRate: schema.inventory.averageRate,
+        totalValue: schema.inventory.totalValue,
+        lastUpdated: schema.inventory.lastUpdated,
+        stockItemName: schema.stockItems.name,
+        stockItemCode: schema.stockItems.code,
+        stockItemUom: schema.stockItems.uom,
+        stockGroupId: schema.stockItems.stockGroupId,
+        stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
+        stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
+        stockItemActive: sql<boolean | null>`CASE WHEN ${schema.stockItems.deletedAt} IS NOT NULL THEN false ELSE ${schema.stockItems.active} END`,
+        barcode: schema.stockItems.barcode,
+        categoryId: schema.stockItems.categoryId,
+        categoryName: schema.stockCategories.name,
+        lastSellingPrice: sql<string>`COALESCE(${schema.stockItemLocationPrices.sellingPrice}, ${schema.stockItems.sellingPrice})`,
+      })
+      .from(schema.inventory)
+      .innerJoin(schema.locations, eq(schema.locations.id, schema.inventory.locationId))
+      .leftJoin(schema.stockItems, eq(schema.stockItems.id, schema.inventory.stockItemId))
+      .leftJoin(schema.stockGroups, eq(schema.stockGroups.id, schema.stockItems.stockGroupId))
+      .leftJoin(schema.stockCategories, eq(schema.stockCategories.id, schema.stockItems.categoryId))
+      .leftJoin(
+        schema.stockItemLocationPrices,
+        and(
+          eq(schema.stockItemLocationPrices.stockItemId, schema.inventory.stockItemId),
+          eq(schema.stockItemLocationPrices.locationId, locationId)
+        )
+      )
+      .where(
+        and(
+          eq(schema.inventory.locationId, locationId),
+          eq(schema.locations.companyId, companyId),
+          isNotNull(schema.stockItems.id),
+          // Show non-deleted items always; also show soft-deleted items
+          // if they still carry non-zero inventory at this location.
+          or(
+            isNull(schema.stockItems.deletedAt),
+            sql`COALESCE(NULLIF(CAST(${schema.inventory.quantity} AS TEXT), '')::numeric, 0) <> 0`
+          )
+        )
+      )
+      .orderBy(asc(schema.stockItems.code));
 
-    const result = rows.rows as any[];
     console.log(
-      `[getLocationInventory] companyId=${companyId} locationId=${locationId} includeZero=false → ${result.length} rows`
+      `[getLocationInventory] companyId=${companyId} locationId=${locationId} includeZero=false → ${rows.length} rows`
     );
-    return result;
+    return rows;
   }
 
   // includeZero=true: start from stock_items so zero-stock items appear.
@@ -373,7 +383,7 @@ export async function getLocationInventory(companyId: number, locationId: number
       si.stock_group_id     AS "stockGroupId",
       COALESCE(sg.name, '') AS "stockGroupName",
       COALESCE(sg.code, '') AS "stockGroupCode",
-      si.active             AS "stockItemActive",
+      CASE WHEN si.deleted_at IS NOT NULL THEN false ELSE si.active END AS "stockItemActive",
       si.barcode,
       si.category_id        AS "categoryId",
       sc.name               AS "categoryName",
@@ -389,8 +399,13 @@ export async function getLocationInventory(companyId: number, locationId: number
     LEFT JOIN stock_item_location_prices lp
       ON lp.stock_item_id = si.id
       AND lp.location_id  = ${locationId}
-    WHERE si.deleted_at IS NULL
-      AND COALESCE(si.active, true) = true
+    WHERE (
+        -- Non-deleted active items always appear (even at zero quantity)
+        (si.deleted_at IS NULL AND COALESCE(si.active, true) = true)
+        OR
+        -- Soft-deleted items only appear if they have a real non-zero inventory row here
+        (si.deleted_at IS NOT NULL AND COALESCE(NULLIF(CAST(inv.quantity AS TEXT), '')::numeric, 0) <> 0)
+      )
       AND (
         si.company_id = ${companyId}
         OR EXISTS (
