@@ -378,13 +378,24 @@ export function registerLocationRoutes(app: Express) {
 
       const includeZero = req.query.includeZero === "true";
 
+      // Use the location's own companyId as source of truth (not session, which
+      // may lag or differ in multi-company contexts). Access check above already
+      // confirmed location.companyId === session.currentCompanyId.
+      const inventoryCompanyId = location.companyId;
+
+      console.log(
+        `[inventory] locationId=${locationId} sessionCompanyId=${req.session.currentCompanyId} ` +
+        `locationCompanyId=${inventoryCompanyId} includeZero=${includeZero} asOfDate=${asOfDate ?? "none"}`
+      );
+
       let inventory;
       if (asOfDate) {
-        const companyId = req.session.currentCompanyId!;
-        inventory = await calculateHistoricalLocationInventory(locationId, companyId, asOfDate);
+        inventory = await calculateHistoricalLocationInventory(locationId, inventoryCompanyId, asOfDate);
       } else {
-        inventory = await storage.getLocationInventory(req.session.currentCompanyId!, locationId, includeZero);
+        inventory = await storage.getLocationInventory(inventoryCompanyId, locationId, includeZero);
       }
+
+      console.log(`[inventory] result rows=${Array.isArray(inventory) ? inventory.length : "?"} for locationId=${locationId}`);
 
       // Filter sensitive data for POS users (they should only see quantity)
       const isPOS = req.user?.role === "POS";

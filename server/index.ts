@@ -4207,6 +4207,15 @@ END $$`,
     `ALTER TABLE customer_order_lines ADD COLUMN IF NOT EXISTS price_per_kg decimal(20,4)`,
     // Hide individual loadings from the list (June 2026)
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN NOT NULL DEFAULT FALSE`,
+    // Backfill inventory.company_id from the owning location's company (June 2026).
+    // Fixes rows where company_id was never set or became stale after data migrations.
+    // Safe: only touches rows where company_id is NULL or mismatched — never changes
+    // ownership of a row that already has the correct company_id.
+    `UPDATE inventory inv
+     SET company_id = loc.company_id
+     FROM locations loc
+     WHERE inv.location_id = loc.id
+       AND (inv.company_id IS NULL OR inv.company_id <> loc.company_id)`,
   ];
 
   // /api/health/db — reports migration status but does NOT block deployment.

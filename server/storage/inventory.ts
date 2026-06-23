@@ -356,7 +356,8 @@ export async function getLocationInventory(companyId: number, locationId: number
   }
 
   // includeZero=true: start from stock_items so zero-stock items appear.
-  // Use COALESCE(si.active, true) to include legacy rows where active IS NULL.
+  // Include items that belong to the company OR legacy items that already
+  // have an inventory row at this location (stale si.company_id safety net).
   const rows = await db.execute(sql`
     SELECT
       inv.id                AS "inventoryId",
@@ -388,9 +389,16 @@ export async function getLocationInventory(companyId: number, locationId: number
     LEFT JOIN stock_item_location_prices lp
       ON lp.stock_item_id = si.id
       AND lp.location_id  = ${locationId}
-    WHERE si.company_id   = ${companyId}
-      AND si.deleted_at   IS NULL
+    WHERE si.deleted_at IS NULL
       AND COALESCE(si.active, true) = true
+      AND (
+        si.company_id = ${companyId}
+        OR EXISTS (
+          SELECT 1 FROM inventory inv2
+          WHERE inv2.stock_item_id = si.id
+            AND inv2.location_id   = ${locationId}
+        )
+      )
     ORDER BY si.code ASC
   `);
 
