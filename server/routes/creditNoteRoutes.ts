@@ -221,7 +221,8 @@ export function registerCreditNoteRoutes(app: Express) {
         }
 
           if (noteType === "Credit Note") {
-            await adjustInventory(tx, locationId, stockItemId, qty, companyId, inventoryCostVal);
+            // Do NOT pass a rate — cost price must never change due to POS/credit-note returns.
+            await adjustInventory(tx, locationId, stockItemId, qty, companyId);
 
             let inventoryAccount = await tx
               .select()
@@ -557,7 +558,8 @@ export function registerCreditNoteRoutes(app: Express) {
           if (noteType === "Credit Note") {
             await adjustInventory(tx, item.locationId, item.stockItemId, -qty, companyId);
           } else {
-            await adjustInventory(tx, item.locationId, item.stockItemId, qty, companyId, rate);
+            // Do NOT pass a rate — cost price must never change due to POS/credit-note activity.
+            await adjustInventory(tx, item.locationId, item.stockItemId, qty, companyId);
           }
         }
 
@@ -623,7 +625,8 @@ export function registerCreditNoteRoutes(app: Express) {
           }
 
           if (noteType === "Credit Note") {
-            await adjustInventory(tx, locationId, stockItemId, qty, companyId, inventoryCostVal);
+            // Do NOT pass a rate — cost price must never change due to POS/credit-note returns.
+            await adjustInventory(tx, locationId, stockItemId, qty, companyId);
 
             let inventoryAccount = await tx
               .select()

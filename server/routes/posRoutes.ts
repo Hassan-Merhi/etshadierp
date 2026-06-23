@@ -1309,8 +1309,9 @@ export function registerPosRoutes(app: Express) {
           const oldQty = parseFloat(oldItem.quantity);
           const oldCost = parseFloat(oldItem.costPrice || "0");
           
-          // Add back the old quantity to inventory (reversal of sale)
-          await adjustInventory(tx, existingVoucher.locationId!, oldItem.stockItemId, oldQty, existingVoucher.companyId, oldCost);
+          // Add back the old quantity to inventory (reversal of sale).
+          // Do NOT pass a rate — cost price must never change due to POS activity.
+          await adjustInventory(tx, existingVoucher.locationId!, oldItem.stockItemId, oldQty, existingVoucher.companyId);
         }
 
         // Delete old sales items and voucher entries
