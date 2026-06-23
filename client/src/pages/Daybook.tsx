@@ -485,9 +485,11 @@ export default function Daybook({ user }: { user?: any } = {}) {
     setViewDialogOpen(true);
   };
   const handleEdit = (v: Voucher) => {
+    if (v.voucherType === "Sales" || v.voucherType === "POS") {
+      navigate(`/pos/edit/${v.id}`);
+      return;
+    }
     const map: Record<string, string> = {
-      Sales: "sales",
-      POS: "pos",
       Purchase: "purchase",
       PurchaseOrder: "purchase-order",
       Payment: "payment",
