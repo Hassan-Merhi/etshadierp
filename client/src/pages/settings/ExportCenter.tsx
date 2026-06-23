@@ -120,18 +120,23 @@ export function ExportCenter() {
     }
   };
 
-  const sendViaWhatsApp = async () => {
-    try {
+  const sendViaWaMutation = useMutation({
+    mutationFn: async () => {
       const body: any = {};
       if (fromDate) body.fromDate = fromDate;
       if (toDate) body.toDate = toDate;
-      const data = (await (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json()) as any;
+      return (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json();
+    },
+    onSuccess: (data: any) => {
       toast({ title: "WhatsApp export started", description: data.message });
       [5, 20, 45, 75, 120].forEach((s) => setTimeout(() => refetchBackup(), s * 1000));
-    } catch (e: any) {
+    },
+    onError: (e: any) => {
       toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message });
-    }
-  };
+    },
+  });
+
+  const sendViaWhatsApp = () => sendViaWaMutation.mutate();
 
   const downloadNpExcel = () => {
     const url = `/api/reports/net-position-monthly-excel?startDate=${npDefaultStart}&endDate=${npDefaultEnd}`;
@@ -231,7 +236,7 @@ export function ExportCenter() {
             recipients={emailRecipients}
             settings={exportSettings}
             waReady={waReady}
-            sendingWa={false}
+            sendingWa={sendViaWaMutation.isPending}
             sendViaWhatsApp={sendViaWhatsApp}
             showCompanies={showCompanies}
             setShowCompanies={setShowCompanies}
