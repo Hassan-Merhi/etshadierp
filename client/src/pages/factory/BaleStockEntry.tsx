@@ -14,8 +14,6 @@ import GroundScan from "./GroundScan";
 import DailyScan from "./DailyScan";
 
 import { StockEntryTab } from "./bale-stock-entry/StockEntryTab";
-import { RemoveFromStockTab } from "./bale-stock-entry/RemoveFromStockTab";
-import { ImportBalesTab } from "./bale-stock-entry/ImportBalesTab";
 import { DailyStockSummary } from "./bale-stock-entry/DailyStockSummary";
 import { WorkerCategoriesTab } from "./bale-stock-entry/WorkerCategoriesTab";
 
@@ -120,12 +118,6 @@ export default function BaleStockEntry() {
             <Tag className="h-4 w-4 mr-1" />
             Worker Categories
           </TabsTrigger>
-          <TabsTrigger value="remove" data-testid="tab-remove-stock">
-            Remove Stock
-          </TabsTrigger>
-          <TabsTrigger value="import" data-testid="tab-import-bales">
-            Import Bales
-          </TabsTrigger>
         </TabsList>
         {showEntry && (
           <TabsContent value="entry" className="mt-4">
@@ -156,16 +148,6 @@ export default function BaleStockEntry() {
         <TabsContent value="worker-categories" className="mt-4">
           {mountedTabs.has("worker-categories") && (
             <WorkerCategoriesTab />
-          )}
-        </TabsContent>
-        <TabsContent value="remove" className="mt-4">
-          {mountedTabs.has("remove") && (
-            <RemoveFromStockTab />
-          )}
-        </TabsContent>
-        <TabsContent value="import" className="mt-4">
-          {mountedTabs.has("import") && (
-            <ImportBalesTab />
           )}
         </TabsContent>
       </Tabs>
