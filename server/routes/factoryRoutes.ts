@@ -16,6 +16,8 @@ import { registerFactoryShippingContainerRoutes } from "./factory/factoryShippin
 import { registerFactoryDailyScanRoutes } from "./factory/factoryDailyScanRoutes";
 import { registerFactoryGroundScanRoutes } from "./factory/factoryGroundScanRoutes";
 import { registerFactoryContainerTrackingRoutes } from "./factory/factoryContainerTrackingRoutes";
+import { registerEndProductionRoutes } from "./factory/endProductionRoutes";
+import { registerProductionPlannerRoutes } from "./factory/factoryProductionPlannerRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
 
@@ -116,4 +118,6 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
   registerFactoryDailyScanRoutes(app);
   registerFactoryGroundScanRoutes(app);
   registerFactoryContainerTrackingRoutes(app);
+  registerEndProductionRoutes(app, requireAuth);
+  registerProductionPlannerRoutes(app);
 }

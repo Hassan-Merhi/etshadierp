@@ -6,3 +6,4 @@
 - [Schema domain split — factory.ts](schema-factory-split.md) — factory.ts is now actual defs; erp.ts owns baleLabelPrints/customerLogos/referenceSequences/locationPriceGroups; _definitions.ts is dead code.
 - [Vouchers.tsx monolith split](vouchers-split.md) — Vouchers.tsx split into JournalForm, StockTransferForm, StockAdjustmentForm under pages/vouchers/; each owns its own queries/state/mutations/JSX.
 - [Storage refactor missing functions](storage-refactor-gaps.md) — after domain split, several storage functions were missing or had wrong schema refs; see file for full list of patterns fixed.
+- [Route split orphan pattern](route-split-orphans.md) — after any route barrel split, verify sub-dir files are imported by a parent; routes.ts orphan check must scan server/routes.ts too (not just server/routes/).
