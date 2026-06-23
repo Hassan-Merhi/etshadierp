@@ -383,29 +383,12 @@ export function registerLocationRoutes(app: Express) {
       // confirmed location.companyId === session.currentCompanyId.
       const inventoryCompanyId = location.companyId;
 
-      // Diagnostic: count rows at various filter stages to expose hidden data.
-      const diagRows = await db.execute(sql`
-        SELECT
-          (SELECT COUNT(*) FROM inventory WHERE location_id = ${locationId}) AS raw_inv,
-          (SELECT COUNT(*) FROM inventory inv JOIN stock_items si ON si.id = inv.stock_item_id WHERE inv.location_id = ${locationId}) AS joined_count,
-          (SELECT COUNT(*) FROM inventory inv JOIN stock_items si ON si.id = inv.stock_item_id WHERE inv.location_id = ${locationId} AND si.deleted_at IS NOT NULL) AS deleted_count,
-          (SELECT COUNT(*) FROM inventory inv JOIN stock_items si ON si.id = inv.stock_item_id WHERE inv.location_id = ${locationId} AND si.deleted_at IS NULL) AS live_count
-      `);
-      const diag = (diagRows.rows as any[])[0] ?? {};
-      console.log(
-        `[inventory] locationId=${locationId} sessionCompanyId=${req.session.currentCompanyId} ` +
-        `locationCompanyId=${inventoryCompanyId} includeZero=${includeZero} asOfDate=${asOfDate ?? "none"} | ` +
-        `diag: raw_inv=${diag.raw_inv} joined=${diag.joined_count} deleted=${diag.deleted_count} live=${diag.live_count}`
-      );
-
       let inventory;
       if (asOfDate) {
         inventory = await calculateHistoricalLocationInventory(locationId, inventoryCompanyId, asOfDate);
       } else {
         inventory = await storage.getLocationInventory(inventoryCompanyId, locationId, includeZero);
       }
-
-      console.log(`[inventory] result rows=${Array.isArray(inventory) ? inventory.length : "?"} for locationId=${locationId}`);
 
       // Filter sensitive data for POS users (they should only see quantity)
       const isPOS = req.user?.role === "POS";

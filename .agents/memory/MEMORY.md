@@ -11,3 +11,4 @@
 - [Hooks inside conditional blocks](hooks-in-conditionals.md) — useEffect/useState inside if() in Router caused invalid hook call; wouter v3 component= prop uses createElement correctly (not plain function); cache clear fixes stale-module null-dispatcher crashes.
 - [PageHeader uses children not actions](page-header-api.md) — PageHeader renders actions as children prop (line 89), NOT an "actions" prop; also uses showBackButton (not showBack) and window.history.back() — no onBack prop.
 - [SW cache stale chunks crash React](sw-stale-chunks.md) — service worker staleWhileRevalidate caches Vite dep chunks; after Vite cache clear, old SW cache serves stale chunks with mismatched React instance → null dispatcher. Fix: bump CACHE_VERSION to force cache eviction.
+- [Drizzle db.execute crashes on complex queries](drizzle-execute-crash.md) — db.execute(sql`...`) throws "Cannot convert undefined or null to object" on multi-join queries; use pool.query(text, params) instead.

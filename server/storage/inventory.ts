@@ -1,5 +1,5 @@
 import { eq, and, or, isNull, isNotNull, asc, desc, sql, inArray, ilike, ne } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import * as schema from "@shared/schema";
 
 // ---------------------------------------------------------------------------
@@ -308,70 +308,62 @@ export async function deleteLocationPrice(priceId: number): Promise<void> {
 
 export async function getLocationInventory(companyId: number, locationId: number, includeZero = false): Promise<any[]> {
   if (!includeZero) {
-    // Use Drizzle query builder (more reliable than raw sql template for this path).
-    // innerJoin on locations verifies company ownership — avoids hiding rows where
-    // inventory.company_id is NULL/stale.
-    const rows = await db
-      .select({
-        inventoryId: schema.inventory.id,
-        locationId: schema.inventory.locationId,
-        stockItemId: schema.inventory.stockItemId,
-        quantity: schema.inventory.quantity,
-        averageRate: schema.inventory.averageRate,
-        totalValue: schema.inventory.totalValue,
-        lastUpdated: schema.inventory.lastUpdated,
-        stockItemName: schema.stockItems.name,
-        stockItemCode: schema.stockItems.code,
-        stockItemUom: schema.stockItems.uom,
-        stockGroupId: schema.stockItems.stockGroupId,
-        stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
-        stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
-        stockItemActive: sql<boolean | null>`CASE WHEN ${schema.stockItems.deletedAt} IS NOT NULL THEN false ELSE ${schema.stockItems.active} END`,
-        barcode: sql<string | null>`NULL`,
-        categoryId: schema.stockItems.categoryId,
-        categoryName: schema.stockCategories.name,
-        lastSellingPrice: sql<string>`COALESCE(${schema.stockItemLocationPrices.sellingPrice}, ${schema.stockItems.sellingPrice})`,
-      })
-      .from(schema.inventory)
-      .innerJoin(schema.locations, eq(schema.locations.id, schema.inventory.locationId))
-      .leftJoin(schema.stockItems, eq(schema.stockItems.id, schema.inventory.stockItemId))
-      .leftJoin(schema.stockGroups, eq(schema.stockGroups.id, schema.stockItems.stockGroupId))
-      .leftJoin(schema.stockCategories, eq(schema.stockCategories.id, schema.stockItems.categoryId))
-      .leftJoin(
-        schema.stockItemLocationPrices,
-        and(
-          eq(schema.stockItemLocationPrices.stockItemId, schema.inventory.stockItemId),
-          eq(schema.stockItemLocationPrices.locationId, locationId)
+    // Use pool.query() directly — bypasses Drizzle result-processing layer.
+    const qr = await pool.query(
+      `SELECT
+        inv.id                AS "inventoryId",
+        inv.location_id       AS "locationId",
+        inv.stock_item_id     AS "stockItemId",
+        inv.quantity,
+        inv.average_rate      AS "averageRate",
+        inv.total_value       AS "totalValue",
+        inv.last_updated      AS "lastUpdated",
+        si.name               AS "stockItemName",
+        si.code               AS "stockItemCode",
+        si.uom                AS "stockItemUom",
+        si.stock_group_id     AS "stockGroupId",
+        COALESCE(sg.name, '') AS "stockGroupName",
+        COALESCE(sg.code, '') AS "stockGroupCode",
+        CASE WHEN si.deleted_at IS NOT NULL THEN false ELSE si.active END AS "stockItemActive",
+        NULL::text            AS barcode,
+        si.category_id        AS "categoryId",
+        sc.name               AS "categoryName",
+        COALESCE(lp.selling_price, si.selling_price) AS "lastSellingPrice"
+      FROM inventory inv
+      INNER JOIN locations loc
+        ON loc.id = inv.location_id
+      LEFT JOIN stock_items si
+        ON si.id = inv.stock_item_id
+      LEFT JOIN stock_groups sg
+        ON sg.id = si.stock_group_id
+      LEFT JOIN stock_categories sc
+        ON sc.id = si.category_id
+      LEFT JOIN stock_item_location_prices lp
+        ON lp.stock_item_id = inv.stock_item_id
+        AND lp.location_id  = $1
+      WHERE inv.location_id  = $1
+        AND loc.company_id   = $2
+        AND si.id IS NOT NULL
+        AND (
+          si.deleted_at IS NULL
+          OR COALESCE(inv.quantity::numeric, 0) <> 0
         )
-      )
-      .where(
-        and(
-          eq(schema.inventory.locationId, locationId),
-          eq(schema.locations.companyId, companyId),
-          isNotNull(schema.stockItems.id),
-          // Show non-deleted items always; also show soft-deleted items
-          // if they still carry non-zero inventory at this location.
-          or(
-            isNull(schema.stockItems.deletedAt),
-            sql`COALESCE(NULLIF(CAST(${schema.inventory.quantity} AS TEXT), '')::numeric, 0) <> 0`
-          )
-        )
-      )
-      .orderBy(asc(schema.stockItems.code));
-
-    console.log(
-      `[getLocationInventory] companyId=${companyId} locationId=${locationId} includeZero=false → ${rows.length} rows`
+      ORDER BY si.code ASC`,
+      [locationId, companyId]
     );
-    return rows;
+
+    const result = qr.rows;
+    console.log(
+      `[getLocationInventory] companyId=${companyId} locationId=${locationId} includeZero=false → ${result.length} rows`
+    );
+    return result;
   }
 
   // includeZero=true: start from stock_items so zero-stock items appear.
-  // Include items that belong to the company OR legacy items that already
-  // have an inventory row at this location (stale si.company_id safety net).
-  const rows = await db.execute(sql`
-    SELECT
+  const qr2 = await pool.query(
+    `SELECT
       inv.id                AS "inventoryId",
-      ${locationId}         AS "locationId",
+      $1::int               AS "locationId",
       si.id                 AS "stockItemId",
       COALESCE(inv.quantity,     '0') AS quantity,
       COALESCE(inv.average_rate, '0') AS "averageRate",
@@ -391,33 +383,32 @@ export async function getLocationInventory(companyId: number, locationId: number
     FROM stock_items si
     LEFT JOIN inventory inv
       ON inv.stock_item_id = si.id
-      AND inv.location_id  = ${locationId}
+      AND inv.location_id  = $1
     LEFT JOIN stock_groups sg
       ON sg.id = si.stock_group_id
     LEFT JOIN stock_categories sc
       ON sc.id = si.category_id
     LEFT JOIN stock_item_location_prices lp
       ON lp.stock_item_id = si.id
-      AND lp.location_id  = ${locationId}
+      AND lp.location_id  = $1
     WHERE (
-        -- Non-deleted active items always appear (even at zero quantity)
         (si.deleted_at IS NULL AND COALESCE(si.active, true) = true)
         OR
-        -- Soft-deleted items only appear if they have a real non-zero inventory row here
         (si.deleted_at IS NOT NULL AND COALESCE(NULLIF(CAST(inv.quantity AS TEXT), '')::numeric, 0) <> 0)
       )
       AND (
-        si.company_id = ${companyId}
+        si.company_id = $2
         OR EXISTS (
           SELECT 1 FROM inventory inv2
           WHERE inv2.stock_item_id = si.id
-            AND inv2.location_id   = ${locationId}
+            AND inv2.location_id   = $1
         )
       )
-    ORDER BY si.code ASC
-  `);
+    ORDER BY si.code ASC`,
+    [locationId, companyId]
+  );
 
-  const result = rows.rows as any[];
+  const result = qr2.rows;
   console.log(
     `[getLocationInventory] companyId=${companyId} locationId=${locationId} includeZero=true → ${result.length} rows`
   );
