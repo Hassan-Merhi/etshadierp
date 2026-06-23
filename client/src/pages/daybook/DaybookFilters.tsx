@@ -30,8 +30,9 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
     filters.statusFilter !== "all";
 
   return (
-    <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-col gap-2.5">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="rounded-lg border bg-muted/30 px-3 sm:px-4 py-3 flex flex-col gap-2.5">
+      {/* Row 1: date navigation + period filter */}
+      <div className="flex items-center gap-2">
         <Button
           variant="ghost"
           size="icon"
@@ -41,7 +42,9 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+        <div className="flex-1">
+          <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
+        </div>
         <Button
           variant="ghost"
           size="icon"
@@ -51,11 +54,12 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
+      </div>
 
-        <div className="h-6 w-px bg-border hidden sm:block" />
-
+      {/* Row 2: type + status selects + search */}
+      <div className="flex flex-wrap gap-2">
         <Select value={filters.voucherType} onValueChange={(value) => setFilters({ ...filters, voucherType: value })}>
-          <SelectTrigger id="voucher-type" data-testid="select-voucher-type" className="w-[130px]">
+          <SelectTrigger id="voucher-type" data-testid="select-voucher-type" className="flex-1 min-w-[120px] sm:w-[130px] sm:flex-none">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -74,7 +78,7 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
           value={filters.statusFilter}
           onValueChange={(value) => setFilters({ ...filters, statusFilter: value as "all" | "active" | "optional" })}
         >
-          <SelectTrigger id="status-filter" data-testid="select-status-filter" className="w-[130px]">
+          <SelectTrigger id="status-filter" data-testid="select-status-filter" className="flex-1 min-w-[120px] sm:w-[130px] sm:flex-none">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -84,9 +88,7 @@ export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilt
           </SelectContent>
         </Select>
 
-        <div className="h-6 w-px bg-border hidden sm:block" />
-
-        <div className="relative flex-1 min-w-[180px]">
+        <div className="relative w-full sm:flex-1 sm:min-w-[180px]">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             id="search"
