@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, ArrowLeft, FileDown, MoreHorizontal, Printer, Trash2, Pencil, Search, Eye, Plus } from "lucide-react";
+import { FileDown, MoreHorizontal, Eye, Plus, Save } from "lucide-react";
 import { Link } from "wouter";
 import type { Location } from "./posTypes";
 
@@ -23,6 +23,9 @@ export interface POSHeaderProps {
   onImportClick: () => void;
   onShowStockReport: () => void;
   navigate: (path: string) => void;
+  saveMutation?: any;
+  hasValidItems?: boolean;
+  handleSaveSale?: () => void;
 }
 
 export function POSHeader({
@@ -41,20 +44,18 @@ export function POSHeader({
   onImportClick,
   onShowStockReport,
   navigate,
+  saveMutation,
+  hasValidItems,
+  handleSaveSale,
 }: POSHeaderProps) {
   return (
     <PageHeader
       title={editVoucherId ? "Edit Transaction" : "Point of Sale"}
-      description={activeLocation ? `Location: ${activeLocation.name} (${activeLocation.code})` : "Select a location to begin"}
-      showBack={false}
+      showBack={!!editVoucherId}
+      onBack={() => navigate("/pos-daybook")}
       actions={
         <div className="flex items-center gap-2">
-          {editVoucherId ? (
-            <Button variant="outline" size="sm" onClick={() => navigate("/pos-daybook")} className="gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Daybook
-            </Button>
-          ) : (
+          {editVoucherId ? null : (
             <>
               {posUser && posAssignedLocations.length > 1 && (
                 <Select
@@ -64,32 +65,11 @@ export function POSHeader({
                     if (loc) setPosSelectedLocation(loc);
                   }}
                 >
-                  <SelectTrigger className="w-[180px] h-9" data-testid="select-pos-location">
+                  <SelectTrigger className="w-[180px]" data-testid="select-pos-location">
                     <SelectValue placeholder="Switch Location" />
                   </SelectTrigger>
                   <SelectContent>
                     {posAssignedLocations.map((loc) => (
-                      <SelectItem key={loc.id} value={loc.id.toString()}>
-                        {loc.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {!posUser && (
-                <Select
-                  value={activeLocation?.id?.toString()}
-                  onValueChange={(val) => {
-                    const loc = allLocations.find(l => l.id.toString() === val);
-                    if (loc) setSelectedLocation(loc);
-                  }}
-                >
-                  <SelectTrigger className="w-[180px] h-9" data-testid="select-admin-location">
-                    <SelectValue placeholder="Switch Location" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allLocations.map((loc) => (
                       <SelectItem key={loc.id} value={loc.id.toString()}>
                         {loc.name}
                       </SelectItem>
@@ -112,7 +92,7 @@ export function POSHeader({
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-9 w-9" data-testid="button-pos-options">
+                  <Button variant="outline" size="icon" data-testid="button-pos-options">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -141,6 +121,24 @@ export function POSHeader({
                 </DropdownMenuContent>
               </DropdownMenu>
             </>
+          )}
+
+          {!posUser && handleSaveSale && (
+            <Button
+              onClick={handleSaveSale}
+              disabled={saveMutation?.isPending || !hasValidItems}
+              className="gap-2"
+              data-testid="button-save-sale"
+            >
+              {saveMutation?.isPending ? (
+                "Saving..."
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  {editVoucherId ? "Update" : "Save"}
+                </>
+              )}
+            </Button>
           )}
         </div>
       }
