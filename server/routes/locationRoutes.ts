@@ -367,7 +367,7 @@ if (asOfDate) {
   const companyId = req.session.currentCompanyId!;
   inventory = await calculateHistoricalLocationInventory(locationId, companyId, asOfDate);
 } else {
-  inventory = await storage.getLocationInventory(locationId);
+  inventory = await storage.getLocationInventory(req.session.currentCompanyId!, locationId);
 }
 
         // Filter sensitive data for POS users (they should only see quantity)
@@ -412,7 +412,7 @@ if (asOfDate) {
             });
         }
 
-        const inventory = await storage.getLocationInventory(locationId);
+        const inventory = await storage.getLocationInventory(req.session.currentCompanyId!, locationId);
 
         // Filter out zero-quantity items
         const filteredInventory = inventory.filter(
@@ -501,7 +501,7 @@ if (asOfDate) {
         const groupName: string | null = req.body.groupName ?? null;
 
         // Get live inventory for this location
-        const inventoryRows = await storage.getLocationInventory(locationId);
+        const inventoryRows = await storage.getLocationInventory(req.session.currentCompanyId!, locationId);
 
         // Filter to specific group if requested, and exclude zero qty
         const rows = inventoryRows.filter((item: any) => {

@@ -577,7 +577,7 @@ export function registerInventoryRoutes(app: Express) {
 
             // Check if inventory already exists for this item at this location
             const existingInventory =
-              await storage.getLocationInventory(locationId);
+              await storage.getLocationInventory(req.session.currentCompanyId!, locationId);
             const existing = existingInventory.find(
               (inv) => inv.stockItemId === stockItem.id,
             );

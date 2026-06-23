@@ -181,6 +181,8 @@ export async function deleteLocationPrice(locationId: number, stockItemId: numbe
 export async function getLocationInventory(companyId: number, locationId: number): Promise<any[]> {
   return await db
     .select({
+      inventoryId: schema.inventory.id,
+      locationId: schema.inventory.locationId,
       stockItemId: schema.inventory.stockItemId,
       quantity: schema.inventory.quantity,
       averageRate: schema.inventory.averageRate,
@@ -188,20 +190,26 @@ export async function getLocationInventory(companyId: number, locationId: number
       lastUpdated: schema.inventory.lastUpdated,
       stockItemName: schema.stockItems.name,
       stockItemCode: schema.stockItems.code,
-      stockItemUnit: schema.stockItems.unit,
+      stockItemUom: schema.stockItems.uom,
       stockGroupId: schema.stockItems.stockGroupId,
-      stockGroupName: schema.stockGroups.name,
+      stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
+      stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
+      stockItemActive: schema.stockItems.active,
       barcode: schema.stockItems.barcode,
+      categoryId: schema.stockItems.categoryId,
+      categoryName: schema.stockCategories.name,
     })
     .from(schema.inventory)
     .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
     .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
+    .leftJoin(schema.stockCategories, eq(schema.stockItems.categoryId, schema.stockCategories.id))
     .where(and(
       eq(schema.inventory.companyId, companyId),
       eq(schema.inventory.locationId, locationId),
       isNotNull(schema.stockItems.id),
       isNull(schema.stockItems.deletedAt)
-    ));
+    ))
+    .orderBy(asc(schema.stockItems.code));
 }
 
 export async function getCompanyInventory(companyId: number): Promise<any[]> {
