@@ -19,25 +19,25 @@ import {
 } from "lucide-react";
 
 interface AgentDutyWaSettings {
-  groups:         Record<string, string>;
+  groups: Record<string, string>;
   hasCredentials: boolean;
-  waEnabled:      boolean;
+  waEnabled: boolean;
 }
 
 interface GreenChat {
-  id:   string;
+  id: string;
   name: string;
   type: string;
 }
 
 export function AgentDutyWhatsAppSection() {
   const { toast } = useToast();
-  const [expanded,       setExpanded]       = useState(false);
-  const [groups,         setGroups]         = useState<Record<string, string>>({});
-  const [newAgentName,   setNewAgentName]   = useState("");
-  const [chats,          setChats]          = useState<GreenChat[]>([]);
-  const [chatsLoading,   setChatsLoading]   = useState(false);
-  const [pickerFor,      setPickerFor]      = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [groups, setGroups] = useState<Record<string, string>>({});
+  const [newAgentName, setNewAgentName] = useState("");
+  const [chats, setChats] = useState<GreenChat[]>([]);
+  const [chatsLoading, setChatsLoading] = useState(false);
+  const [pickerFor, setPickerFor] = useState<string | null>(null);
 
   const { data: settings, isLoading } = useQuery<AgentDutyWaSettings>({
     queryKey: ["/api/git/agent-duty-wa-settings"],
@@ -62,7 +62,7 @@ export function AgentDutyWhatsAppSection() {
     try {
       const res = await apiRequest("GET", "/api/whatsapp/chats");
       if (!res.ok) throw new Error("Failed to fetch chats");
-      const data = await res.json() as GreenChat[];
+      const data = (await res.json()) as GreenChat[];
       setChats(data.filter((c) => c.type === "group" || String(c.id).endsWith("@g.us")));
     } catch (e: any) {
       toast({ title: "Could not load chats", description: e.message, variant: "destructive" });
@@ -78,12 +78,12 @@ export function AgentDutyWhatsAppSection() {
       toast({ title: "Agent already exists", variant: "destructive" });
       return;
     }
-    setGroups(prev => ({ ...prev, [name]: "" }));
+    setGroups((prev) => ({ ...prev, [name]: "" }));
     setNewAgentName("");
   }
 
   function removeAgent(name: string) {
-    setGroups(prev => {
+    setGroups((prev) => {
       const next = { ...prev };
       delete next[name];
       return next;
@@ -92,7 +92,7 @@ export function AgentDutyWhatsAppSection() {
   }
 
   function assignGroup(agentName: string, chatId: string) {
-    setGroups(prev => ({ ...prev, [agentName]: chatId }));
+    setGroups((prev) => ({ ...prev, [agentName]: chatId }));
     setPickerFor(null);
   }
 
@@ -117,13 +117,19 @@ export function AgentDutyWhatsAppSection() {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {configuredCount > 0 ? (
-            <Badge variant="secondary" className="text-xs">{configuredCount} configured</Badge>
+            <Badge variant="secondary" className="text-xs">
+              {configuredCount} configured
+            </Badge>
           ) : (
-            <Badge variant="outline" className="text-xs">Not set</Badge>
+            <Badge variant="outline" className="text-xs">
+              Not set
+            </Badge>
           )}
-          {expanded
-            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          {expanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
         </div>
       </button>
 
@@ -138,11 +144,22 @@ export function AgentDutyWhatsAppSection() {
             <>
               <div className="flex items-center gap-2 text-sm">
                 {settings?.hasCredentials && settings?.waEnabled ? (
-                  <><CheckCircle className="h-4 w-4 text-green-500" /><span className="text-muted-foreground">WhatsApp connected and enabled.</span></>
+                  <>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-muted-foreground">WhatsApp connected and enabled.</span>
+                  </>
                 ) : settings?.hasCredentials ? (
-                  <><XCircle className="h-4 w-4 text-amber-500" /><span className="text-muted-foreground">Credentials set but WhatsApp sending is disabled.</span></>
+                  <>
+                    <XCircle className="h-4 w-4 text-amber-500" />
+                    <span className="text-muted-foreground">Credentials set but WhatsApp sending is disabled.</span>
+                  </>
                 ) : (
-                  <><XCircle className="h-4 w-4 text-red-500" /><span className="text-muted-foreground">WhatsApp not configured. Set credentials in WhatsApp &amp; Notifications → Main Instance.</span></>
+                  <>
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    <span className="text-muted-foreground">
+                      WhatsApp not configured. Set credentials in WhatsApp &amp; Notifications → Main Instance.
+                    </span>
+                  </>
                 )}
               </div>
 
@@ -161,7 +178,7 @@ export function AgentDutyWhatsAppSection() {
                 )}
 
                 {Object.entries(groups).map(([name, chatId]) => {
-                  const matchedChat = chats.find(c => c.id === chatId);
+                  const matchedChat = chats.find((c) => c.id === chatId);
                   return (
                     <div key={name} className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -178,14 +195,16 @@ export function AgentDutyWhatsAppSection() {
                           variant="outline"
                           onClick={() => {
                             if (chats.length === 0) loadChats();
-                            setPickerFor(prev => prev === name ? null : name);
+                            setPickerFor((prev) => (prev === name ? null : name));
                           }}
                           disabled={chatsLoading}
                           data-testid={`button-pick-group-${name}`}
                         >
-                          {chatsLoading && pickerFor === name
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                            : <Users className="h-3.5 w-3.5 mr-1.5" />}
+                          {chatsLoading && pickerFor === name ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                          ) : (
+                            <Users className="h-3.5 w-3.5 mr-1.5" />
+                          )}
                           {chatId ? "Change" : "Pick Group"}
                         </Button>
                         <Button
@@ -200,7 +219,7 @@ export function AgentDutyWhatsAppSection() {
 
                       {pickerFor === name && chats.length > 0 && (
                         <div className="ml-26 space-y-1 max-h-40 overflow-y-auto rounded-md border p-1 ml-28">
-                          {chats.map(c => (
+                          {chats.map((c) => (
                             <button
                               key={c.id}
                               type="button"
@@ -225,8 +244,8 @@ export function AgentDutyWhatsAppSection() {
                     className="border rounded-md px-2 py-1 text-sm h-9 w-36 bg-background"
                     placeholder="Agent name"
                     value={newAgentName}
-                    onChange={e => setNewAgentName(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && addAgent()}
+                    onChange={(e) => setNewAgentName(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addAgent()}
                     data-testid="input-new-agent-name"
                   />
                   <Button
@@ -261,9 +280,11 @@ export function AgentDutyWhatsAppSection() {
                   disabled={chatsLoading || !settings?.hasCredentials}
                   data-testid="button-refresh-agent-duty-wa-chats"
                 >
-                  {chatsLoading
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                    : <Users className="h-3.5 w-3.5 mr-1.5" />}
+                  {chatsLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                  ) : (
+                    <Users className="h-3.5 w-3.5 mr-1.5" />
+                  )}
                   Refresh Groups
                 </Button>
               </div>

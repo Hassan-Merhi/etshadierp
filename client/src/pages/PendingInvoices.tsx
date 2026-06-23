@@ -78,16 +78,28 @@ export default function PendingInvoices() {
   const allOrders = [...pendingOrders, ...verifiedOrders];
   const isLoading = pendingLoading || verifiedLoading;
 
-  const filteredOrders = statusFilter === "ALL"
-    ? allOrders
-    : allOrders.filter((o) => o.status === statusFilter);
+  const filteredOrders = statusFilter === "ALL" ? allOrders : allOrders.filter((o) => o.status === statusFilter);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "PENDING_VERIFICATION":
-        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800">Pending Verification</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
+          >
+            Pending Verification
+          </Badge>
+        );
       case "VERIFIED":
-        return <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">Verified</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+          >
+            Verified
+          </Badge>
+        );
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -97,7 +109,11 @@ export default function PendingInvoices() {
     <div className="flex flex-col h-full p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
         <div>
-          <PageHeader title="Pending Invoices" subtitle="Orders awaiting verification" icon={<ClipboardCheck className="h-5 w-5" />} />
+          <PageHeader
+            title="Pending Invoices"
+            subtitle="Orders awaiting verification"
+            icon={<ClipboardCheck className="h-5 w-5" />}
+          />
         </div>
         <div className="flex items-center gap-2" data-testid="filter-tabs">
           <Button
@@ -150,7 +166,11 @@ export default function PendingInvoices() {
             <TableBody>
               {filteredOrders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
+                  <TableCell
+                    colSpan={7}
+                    className="text-center text-muted-foreground py-8"
+                    data-testid="text-no-orders"
+                  >
                     <div className="flex flex-col items-center gap-2">
                       <Package className="h-10 w-10 opacity-40" />
                       <p>No pending invoices found</p>
@@ -168,21 +188,23 @@ export default function PendingInvoices() {
                     <TableCell className="font-mono" data-testid={`text-order-number-${order.id}`}>
                       {order.invoiceNumber || `#${order.id}`}
                     </TableCell>
-                    <TableCell data-testid={`text-customer-name-${order.id}`}>
-                      {order.customerName}
-                    </TableCell>
+                    <TableCell data-testid={`text-customer-name-${order.id}`}>{order.customerName}</TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
                       {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-total-bales-${order.id}`}>
                       {order.totalQtyBales ?? "-"}
                     </TableCell>
-                    <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
-                      {parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    <TableCell
+                      className="text-right font-mono font-semibold"
+                      data-testid={`text-grand-total-${order.id}`}
+                    >
+                      {parseFloat(order.grandTotal || "0").toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })}
                     </TableCell>
-                    <TableCell data-testid={`text-status-${order.id}`}>
-                      {getStatusBadge(order.status)}
-                    </TableCell>
+                    <TableCell data-testid={`text-status-${order.id}`}>{getStatusBadge(order.status)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         <Button
@@ -195,11 +217,7 @@ export default function PendingInvoices() {
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              data-testid={`button-delete-order-${order.id}`}
-                            >
+                            <Button variant="ghost" size="icon" data-testid={`button-delete-order-${order.id}`}>
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </AlertDialogTrigger>
@@ -207,12 +225,15 @@ export default function PendingInvoices() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for {order.customerName}. 
-                                Any bales assigned to this order will be returned to stock. This cannot be undone.
+                                This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for{" "}
+                                {order.customerName}. Any bales assigned to this order will be returned to stock. This
+                                cannot be undone.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                              <AlertDialogCancel data-testid={`button-cancel-delete-${order.id}`}>Cancel</AlertDialogCancel>
+                              <AlertDialogCancel data-testid={`button-cancel-delete-${order.id}`}>
+                                Cancel
+                              </AlertDialogCancel>
                               <AlertDialogAction
                                 onClick={() => deleteMutation.mutate(order.id)}
                                 data-testid={`button-confirm-delete-${order.id}`}

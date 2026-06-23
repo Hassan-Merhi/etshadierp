@@ -2,18 +2,35 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import { addDays, format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAdminOverride } from "@/hooks/use-admin-override";
-import { Printer, Trash2, Search, Package, CheckSquare, RefreshCw, Pencil, Check, X, Download, ChevronLeft, ChevronRight, ChevronDown, Undo2, AlertTriangle, Lock, XCircle, ShieldAlert, FileSpreadsheet, Upload, CheckCircle, Minus } from "lucide-react";
+import {
+  Printer,
+  Trash2,
+  Search,
+  Package,
+  CheckSquare,
+  RefreshCw,
+  Pencil,
+  Check,
+  X,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Undo2,
+  AlertTriangle,
+  Lock,
+  XCircle,
+  ShieldAlert,
+  FileSpreadsheet,
+  Upload,
+  CheckCircle,
+  Minus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,14 +39,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -46,10 +56,16 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 import { LabelPrintSettings, getPaperFormat } from "@/components/LabelPrintSettings";
-import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, formatLabelNum, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+import {
+  generateCombinedLabelsHtml,
+  generateA5LabelsHtml,
+  generateStickerLabelsHtml,
+  formatLabelNum,
+  type LabelData,
+  type A4DesignColor,
+} from "@/lib/labelHtml";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
 import type { FactoryMixBatch, FactoryBaleProduct } from "@shared/schema";
-
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING_PRESSING: "outline",
@@ -73,7 +89,7 @@ export default function BalesHistory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [batchFilter, setBatchFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [dateFilter, setDateFilter] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [dateFilter, setDateFilter] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkStatus, setBulkStatus] = useState("");
@@ -106,10 +122,10 @@ export default function BalesHistory() {
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       if (e.key === "-") {
         e.preventDefault();
-        setDateFilter((prev) => prev ? format(addDays(new Date(prev + "T00:00:00"), -1), fmt) : prev);
+        setDateFilter((prev) => (prev ? format(addDays(new Date(prev + "T00:00:00"), -1), fmt) : prev));
       } else if (e.key === "+" || (e.key === "=" && e.shiftKey)) {
         e.preventDefault();
-        setDateFilter((prev) => prev ? format(addDays(new Date(prev + "T00:00:00"), 1), fmt) : prev);
+        setDateFilter((prev) => (prev ? format(addDays(new Date(prev + "T00:00:00"), 1), fmt) : prev));
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -121,7 +137,7 @@ export default function BalesHistory() {
     try {
       const params = new URLSearchParams();
       if (exportFrom) params.set("from", exportFrom);
-      if (exportTo)   params.set("to", exportTo);
+      if (exportTo) params.set("to", exportTo);
       const url = `/api/factory/bales/stock-register.xlsx${params.toString() ? `?${params}` : ""}`;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) {
@@ -245,7 +261,9 @@ export default function BalesHistory() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-balances"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       setReturnToStockBale(null);
-      const invoiceMsg = data.invoiceNumber ? ` Invoice ${data.invoiceNumber} updated to $${parseFloat(data.newGrandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.` : "";
+      const invoiceMsg = data.invoiceNumber
+        ? ` Invoice ${data.invoiceNumber} updated to $${parseFloat(data.newGrandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`
+        : "";
       toast({ title: "Bale returned to stock", description: `Bale removed from order.${invoiceMsg}` });
     },
     onError: (err: any) => {
@@ -281,7 +299,17 @@ export default function BalesHistory() {
   });
 
   const removeMutation = useMutation({
-    mutationFn: async ({ ids, supervisorUsername, supervisorPassword, reason }: { ids: number[]; supervisorUsername: string; supervisorPassword: string; reason: string }) => {
+    mutationFn: async ({
+      ids,
+      supervisorUsername,
+      supervisorPassword,
+      reason,
+    }: {
+      ids: number[];
+      supervisorUsername: string;
+      supervisorPassword: string;
+      reason: string;
+    }) => {
       const response = await modeApiRequest("POST", "/api/factory/stock-entry/remove", {
         baleIds: ids,
         supervisorUsername,
@@ -312,12 +340,22 @@ export default function BalesHistory() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/factory/bales/bulk-update-names", { method: "POST", body: formData, credentials: "include" });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Upload failed"); }
+      const res = await fetch("/api/factory/bales/bulk-update-names", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: "Names updated", description: `Updated ${data.updated} bale${data.updated !== 1 ? "s" : ""}, skipped ${data.skipped}.` });
+      toast({
+        title: "Names updated",
+        description: `Updated ${data.updated} bale${data.updated !== 1 ? "s" : ""}, skipped ${data.skipped}.`,
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
     },
     onError: (err: Error) => {
@@ -331,12 +369,22 @@ export default function BalesHistory() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/factory/bales/reimport", { method: "POST", body: formData, credentials: "include" });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Reimport failed"); }
+      const res = await fetch("/api/factory/bales/reimport", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Reimport failed");
+      }
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: "Bales reimported", description: `Successfully reimported ${data.imported} bale(s) (${parseFloat(data.totalWeight).toFixed(1)} kg).` });
+      toast({
+        title: "Bales reimported",
+        description: `Successfully reimported ${data.imported} bale(s) (${parseFloat(data.totalWeight).toFixed(1)} kg).`,
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
     },
@@ -355,7 +403,10 @@ export default function BalesHistory() {
 
   const saveEditName = (baleId: number) => {
     if (editingNameValue.trim()) {
-      wrapAdminAction(() => updateProductName.mutate({ id: baleId, name: editingNameValue.trim() }), "Update Bale Name");
+      wrapAdminAction(
+        () => updateProductName.mutate({ id: baleId, name: editingNameValue.trim() }),
+        "Update Bale Name"
+      );
     } else {
       setEditingNameId(null);
     }
@@ -400,7 +451,11 @@ export default function BalesHistory() {
         await printRawZpl(zpl);
         toast({ title: "Label sent to Zebra printer" });
       } catch (err: any) {
-        toast({ title: "Zebra print failed — falling back to browser", description: err.message, variant: "destructive" });
+        toast({
+          title: "Zebra print failed — falling back to browser",
+          description: err.message,
+          variant: "destructive",
+        });
         openBrowserReprint([label]);
       }
     } else {
@@ -415,9 +470,7 @@ export default function BalesHistory() {
       setDesignPickerOpen(true);
       return;
     }
-    const paperHtml = fmt === "A5"
-      ? generateA5LabelsHtml(labels)
-      : generateCombinedLabelsHtml(labels, designColor);
+    const paperHtml = fmt === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels, designColor);
     const stickerHtml = generateStickerLabelsHtml(labels);
 
     const w1 = window.open("", "_blank", "width=800,height=900");
@@ -436,9 +489,18 @@ export default function BalesHistory() {
       const imgs = w2.document.images;
       let loaded = 0;
       const total = imgs.length;
-      const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => w2.print(), 300); };
-      if (total === 0) { setTimeout(() => w2.print(), 300); }
-      else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+      const tryPrint = () => {
+        loaded++;
+        if (loaded >= total) setTimeout(() => w2.print(), 300);
+      };
+      if (total === 0) {
+        setTimeout(() => w2.print(), 300);
+      } else {
+        for (let i = 0; i < total; i++) {
+          if (imgs[i].complete) tryPrint();
+          else imgs[i].onload = imgs[i].onerror = tryPrint;
+        }
+      }
     }
 
     if (!w1 && !w2) {
@@ -460,7 +522,7 @@ export default function BalesHistory() {
     // When the user is actively searching by text, skip the date filter so
     // bales from any date are included (e.g. searching an old reference number).
     if (dateFilter && !searchTerm) {
-      const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString('en-CA') : null;
+      const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString("en-CA") : null;
       if (baleDate !== dateFilter) return false;
     }
 
@@ -474,7 +536,9 @@ export default function BalesHistory() {
         product?.name,
         product?.articleCode,
         batch?.name,
-      ].filter(Boolean).map((s: string) => s.toLowerCase());
+      ]
+        .filter(Boolean)
+        .map((s: string) => s.toLowerCase());
       if (!searchFields.some((f) => f.includes(term))) return false;
     }
 
@@ -485,7 +549,18 @@ export default function BalesHistory() {
   const totalBales = filtered.reduce((sum: number, row: any) => sum + (row.bale.quantity || 1), 0);
 
   const groupedFiltered = useMemo(() => {
-    const map = new Map<string, { key: string; productName: string; articleCode: string; sellingPrice: string | null; totalQty: number; totalWeightKg: number; rows: any[] }>();
+    const map = new Map<
+      string,
+      {
+        key: string;
+        productName: string;
+        articleCode: string;
+        sellingPrice: string | null;
+        totalQty: number;
+        totalWeightKg: number;
+        rows: any[];
+      }
+    >();
     for (const row of filtered) {
       const { bale, product } = row;
       const name = product?.name || bale.productName || bale.category || "-";
@@ -519,23 +594,19 @@ export default function BalesHistory() {
     });
   }
 
-  const todayStr = new Date().toLocaleDateString('en-CA');
+  const todayStr = new Date().toLocaleDateString("en-CA");
   const summaryDate = dateFilter || todayStr;
   const todayInStock = (balesData || []).filter((row: any) => {
     const bale = row.bale;
     if (bale.status !== "IN_STOCK") return false;
-    const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString('en-CA') : null;
+    const baleDate = bale.createdAt ? new Date(bale.createdAt).toLocaleDateString("en-CA") : null;
     return baleDate === summaryDate;
   });
 
   // Robust classification: check category → productName → product.name with includes() matching
   // so "Garbage Bales", "GARBAGE", " garbage " and "wiper"/"WIPERS" all classify correctly
   const getBaleClassification = (row: any): "garbage" | "wipers" | "regular" => {
-    const candidates = [
-      row.bale?.category,
-      row.bale?.productName,
-      row.product?.name,
-    ]
+    const candidates = [row.bale?.category, row.bale?.productName, row.product?.name]
       .filter((v: any) => v && typeof v === "string")
       .map((v: string) => v.toLowerCase().trim());
 
@@ -583,8 +654,12 @@ export default function BalesHistory() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="secondary" data-testid="badge-total-bales" className="font-mono">{totalBales} bales</Badge>
-          <Badge variant="outline" data-testid="badge-total-weight" className="font-mono">{formatLabelNum(totalWeight)} kg</Badge>
+          <Badge variant="secondary" data-testid="badge-total-bales" className="font-mono">
+            {totalBales} bales
+          </Badge>
+          <Badge variant="outline" data-testid="badge-total-weight" className="font-mono">
+            {formatLabelNum(totalWeight)} kg
+          </Badge>
           <Button
             size="sm"
             variant="outline"
@@ -609,20 +684,32 @@ export default function BalesHistory() {
           />
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">In Stock</span>
-            <span className="text-sm font-bold font-mono tabular-nums" data-testid="text-today-qty">{regularQty}</span>
-            <span className="text-xs text-muted-foreground font-mono" data-testid="text-today-kg">{formatLabelNum(regularKg)} kg</span>
+            <span className="text-sm font-bold font-mono tabular-nums" data-testid="text-today-qty">
+              {regularQty}
+            </span>
+            <span className="text-xs text-muted-foreground font-mono" data-testid="text-today-kg">
+              {formatLabelNum(regularKg)} kg
+            </span>
           </div>
           <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Garbage</span>
-            <span className="text-sm font-bold font-mono tabular-nums" data-testid="text-today-garbage-qty">{garbageQty}</span>
-            <span className="text-xs text-muted-foreground font-mono" data-testid="text-today-garbage-kg">{formatLabelNum(garbageKg)} kg</span>
+            <span className="text-sm font-bold font-mono tabular-nums" data-testid="text-today-garbage-qty">
+              {garbageQty}
+            </span>
+            <span className="text-xs text-muted-foreground font-mono" data-testid="text-today-garbage-kg">
+              {formatLabelNum(garbageKg)} kg
+            </span>
           </div>
           <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Wipers</span>
-            <span className="text-sm font-bold font-mono tabular-nums" data-testid="text-today-wipers-qty">{wipersQty}</span>
-            <span className="text-xs text-muted-foreground font-mono" data-testid="text-today-wipers-kg">{formatLabelNum(wipersKg)} kg</span>
+            <span className="text-sm font-bold font-mono tabular-nums" data-testid="text-today-wipers-qty">
+              {wipersQty}
+            </span>
+            <span className="text-xs text-muted-foreground font-mono" data-testid="text-today-wipers-kg">
+              {formatLabelNum(wipersKg)} kg
+            </span>
           </div>
         </div>
       </div>
@@ -645,7 +732,9 @@ export default function BalesHistory() {
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => setDateFilter((prev) => prev ? format(addDays(new Date(prev + "T00:00:00"), -1), "yyyy-MM-dd") : prev)}
+              onClick={() =>
+                setDateFilter((prev) => (prev ? format(addDays(new Date(prev + "T00:00:00"), -1), "yyyy-MM-dd") : prev))
+              }
               disabled={!dateFilter}
               data-testid="button-prev-date"
             >
@@ -661,7 +750,9 @@ export default function BalesHistory() {
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => setDateFilter((prev) => prev ? format(addDays(new Date(prev + "T00:00:00"), 1), "yyyy-MM-dd") : prev)}
+              onClick={() =>
+                setDateFilter((prev) => (prev ? format(addDays(new Date(prev + "T00:00:00"), 1), "yyyy-MM-dd") : prev))
+              }
               disabled={!dateFilter}
               data-testid="button-next-date"
             >
@@ -701,7 +792,7 @@ export default function BalesHistory() {
               <DropdownMenuLabel>Export / Import</DropdownMenuLabel>
               <DropdownMenuItem
                 onClick={() => {
-                  const exportDate = dateFilter || new Date().toLocaleDateString('en-CA');
+                  const exportDate = dateFilter || new Date().toLocaleDateString("en-CA");
                   window.open(`/api/factory/bales/export-full.xlsx?date=${exportDate}`, "_blank");
                 }}
                 data-testid="button-export-bales-full"
@@ -742,7 +833,11 @@ export default function BalesHistory() {
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) { setReimporting(true); reimportMutation.mutate(file); e.target.value = ""; }
+              if (file) {
+                setReimporting(true);
+                reimportMutation.mutate(file);
+                e.target.value = "";
+              }
             }}
             data-testid="input-reimport-bales"
           />
@@ -753,7 +848,11 @@ export default function BalesHistory() {
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) { setImportingNames(true); bulkUpdateNamesMutation.mutate(file); e.target.value = ""; }
+              if (file) {
+                setImportingNames(true);
+                bulkUpdateNamesMutation.mutate(file);
+                e.target.value = "";
+              }
             }}
             data-testid="input-import-bale-names"
           />
@@ -782,7 +881,12 @@ export default function BalesHistory() {
             <Button
               size="sm"
               disabled={!bulkStatus || bulkUpdateStatus.isPending}
-              onClick={() => wrapAdminAction(() => bulkUpdateStatus.mutate({ ids: Array.from(selectedIds), status: bulkStatus }), "Bulk Update Status")}
+              onClick={() =>
+                wrapAdminAction(
+                  () => bulkUpdateStatus.mutate({ ids: Array.from(selectedIds), status: bulkStatus }),
+                  "Bulk Update Status"
+                )
+              }
               data-testid="button-bulk-update"
             >
               {bulkUpdateStatus.isPending ? "Updating..." : "Apply"}
@@ -807,7 +911,10 @@ export default function BalesHistory() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => { setSelectedIds(new Set()); setBulkStatus(""); }}
+              onClick={() => {
+                setSelectedIds(new Set());
+                setBulkStatus("");
+              }}
               data-testid="button-clear-selection"
             >
               Clear
@@ -833,185 +940,258 @@ export default function BalesHistory() {
                       data-testid="checkbox-select-all"
                     />
                   </TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ref #</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Product</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Article</TableHead>
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Qty</TableHead>
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Weight (kg)</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Last Printed</TableHead>
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {groupedFiltered.map((group) => {
-                    const isExpanded = expandedGroups.has(group.key);
-                    const allGroupSelected = group.rows.every((r: any) => selectedIds.has(r.bale.id));
-                    const someGroupSelected = group.rows.some((r: any) => selectedIds.has(r.bale.id));
-                    const uniqueStatuses = [...new Set(group.rows.map((r: any) => r.bale.status as string))];
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Ref #
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Product
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Article
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Qty
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Weight (kg)
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Status
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Last Printed
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {groupedFiltered.map((group) => {
+                  const isExpanded = expandedGroups.has(group.key);
+                  const allGroupSelected = group.rows.every((r: any) => selectedIds.has(r.bale.id));
+                  const someGroupSelected = group.rows.some((r: any) => selectedIds.has(r.bale.id));
+                  const uniqueStatuses = [...new Set(group.rows.map((r: any) => r.bale.status as string))];
 
-                    return [
-                      // ── Group summary row ──
-                      <TableRow
-                        key={`group-${group.key}`}
-                        className="bg-muted/20 hover-elevate cursor-pointer"
-                        data-testid={`row-group-${group.key}`}
-                      >
-                        <TableCell>
-                          <Checkbox
-                            checked={allGroupSelected}
-                            data-state={someGroupSelected && !allGroupSelected ? "indeterminate" : undefined}
-                            onCheckedChange={() => {
-                              setSelectedIds((prev) => {
-                                const next = new Set(prev);
-                                if (allGroupSelected) group.rows.forEach((r: any) => next.delete(r.bale.id));
-                                else group.rows.forEach((r: any) => next.add(r.bale.id));
-                                return next;
-                              });
-                            }}
-                            data-testid={`checkbox-group-${group.key}`}
-                          />
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground font-mono">
-                          <Badge variant="outline" className="text-xs font-mono">
-                            {group.rows.length} bale{group.rows.length !== 1 ? "s" : ""}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <button
-                            className="flex items-center gap-1.5 text-left font-medium hover:underline"
-                            onClick={() => toggleGroup(group.key)}
-                            data-testid={`button-toggle-group-${group.key}`}
-                          >
-                            {isExpanded
-                              ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                              : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
-                            {group.productName}
-                          </button>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{group.articleCode}</TableCell>
-                        <TableCell className="text-right font-semibold">{group.totalQty}</TableCell>
-                        <TableCell className="text-right font-mono font-semibold">{formatLabelNum(group.totalWeightKg)}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {uniqueStatuses.map((s) => (
-                              <Badge key={s} variant={(STATUS_COLORS[s] || "secondary") as any} className="text-xs">
-                                {s.replace(/_/g, " ")}
-                              </Badge>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell />
-                        <TableCell />
-                      </TableRow>,
+                  return [
+                    // ── Group summary row ──
+                    <TableRow
+                      key={`group-${group.key}`}
+                      className="bg-muted/20 hover-elevate cursor-pointer"
+                      data-testid={`row-group-${group.key}`}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={allGroupSelected}
+                          data-state={someGroupSelected && !allGroupSelected ? "indeterminate" : undefined}
+                          onCheckedChange={() => {
+                            setSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (allGroupSelected) group.rows.forEach((r: any) => next.delete(r.bale.id));
+                              else group.rows.forEach((r: any) => next.add(r.bale.id));
+                              return next;
+                            });
+                          }}
+                          data-testid={`checkbox-group-${group.key}`}
+                        />
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground font-mono">
+                        <Badge variant="outline" className="text-xs font-mono">
+                          {group.rows.length} bale{group.rows.length !== 1 ? "s" : ""}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          className="flex items-center gap-1.5 text-left font-medium hover:underline"
+                          onClick={() => toggleGroup(group.key)}
+                          data-testid={`button-toggle-group-${group.key}`}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                          )}
+                          {group.productName}
+                        </button>
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{group.articleCode}</TableCell>
+                      <TableCell className="text-right font-semibold">{group.totalQty}</TableCell>
+                      <TableCell className="text-right font-mono font-semibold">
+                        {formatLabelNum(group.totalWeightKg)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {uniqueStatuses.map((s) => (
+                            <Badge key={s} variant={(STATUS_COLORS[s] || "secondary") as any} className="text-xs">
+                              {s.replace(/_/g, " ")}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell />
+                      <TableCell />
+                    </TableRow>,
 
-                      // ── Expanded individual bale rows ──
-                      ...(isExpanded ? group.rows.map((row: any) => {
-                        const bale = row.bale;
-                        const product = row.product;
-                        return (
-                          <TableRow key={bale.id} className="bg-background" data-testid={`row-bale-${bale.id}`}>
-                            <TableCell className="pl-6">
-                              <Checkbox
-                                checked={selectedIds.has(bale.id)}
-                                onCheckedChange={() => toggleSelect(bale.id)}
-                                data-testid={`checkbox-bale-${bale.id}`}
-                              />
-                            </TableCell>
-                            <TableCell className="font-mono text-xs pl-6">{bale.referenceNumber || bale.baleCode || "-"}</TableCell>
-                            <TableCell className="pl-8">
-                              {editingNameId === bale.id ? (
-                                <div className="flex items-center gap-1">
-                                  <Input
-                                    ref={nameInputRef}
-                                    value={editingNameValue}
-                                    onChange={(e) => setEditingNameValue(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") saveEditName(bale.id);
-                                      if (e.key === "Escape") setEditingNameId(null);
-                                    }}
-                                    className="h-7 text-xs w-[160px]"
-                                    data-testid={`input-edit-name-${bale.id}`}
-                                  />
-                                  <Button size="icon" variant="ghost" onClick={() => saveEditName(bale.id)} data-testid={`button-save-name-${bale.id}`}>
-                                    <Check className="h-3 w-3" />
-                                  </Button>
-                                  <Button size="icon" variant="ghost" onClick={() => setEditingNameId(null)} data-testid={`button-cancel-name-${bale.id}`}>
-                                    <X className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1 group cursor-pointer text-sm text-muted-foreground" onClick={() => startEditName(bale.id, product?.name || bale.productName || "")} data-testid={`text-product-name-${bale.id}`}>
-                                  <span>{product?.name || bale.productName || "-"}</span>
-                                  <Pencil className="h-3 w-3 text-muted-foreground visible md:invisible md:group-hover:visible" />
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{product?.articleCode || bale.category || "-"}</TableCell>
-                            <TableCell className="text-right">{bale.quantity}</TableCell>
-                            <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
-                            <TableCell>
-                              <Select
-                                value={bale.status}
-                                onValueChange={(val) => wrapAdminAction(() => updateStatus.mutate({ id: bale.id, status: val }), "Update Bale Status")}
+                    // ── Expanded individual bale rows ──
+                    ...(isExpanded
+                      ? group.rows.map((row: any) => {
+                          const bale = row.bale;
+                          const product = row.product;
+                          return (
+                            <TableRow key={bale.id} className="bg-background" data-testid={`row-bale-${bale.id}`}>
+                              <TableCell className="pl-6">
+                                <Checkbox
+                                  checked={selectedIds.has(bale.id)}
+                                  onCheckedChange={() => toggleSelect(bale.id)}
+                                  data-testid={`checkbox-bale-${bale.id}`}
+                                />
+                              </TableCell>
+                              <TableCell className="font-mono text-xs pl-6">
+                                {bale.referenceNumber || bale.baleCode || "-"}
+                              </TableCell>
+                              <TableCell className="pl-8">
+                                {editingNameId === bale.id ? (
+                                  <div className="flex items-center gap-1">
+                                    <Input
+                                      ref={nameInputRef}
+                                      value={editingNameValue}
+                                      onChange={(e) => setEditingNameValue(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") saveEditName(bale.id);
+                                        if (e.key === "Escape") setEditingNameId(null);
+                                      }}
+                                      className="h-7 text-xs w-[160px]"
+                                      data-testid={`input-edit-name-${bale.id}`}
+                                    />
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => saveEditName(bale.id)}
+                                      data-testid={`button-save-name-${bale.id}`}
+                                    >
+                                      <Check className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setEditingNameId(null)}
+                                      data-testid={`button-cancel-name-${bale.id}`}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="flex items-center gap-1 group cursor-pointer text-sm text-muted-foreground"
+                                    onClick={() => startEditName(bale.id, product?.name || bale.productName || "")}
+                                    data-testid={`text-product-name-${bale.id}`}
+                                  >
+                                    <span>{product?.name || bale.productName || "-"}</span>
+                                    <Pencil className="h-3 w-3 text-muted-foreground visible md:invisible md:group-hover:visible" />
+                                  </div>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-xs text-muted-foreground">
+                                {product?.articleCode || bale.category || "-"}
+                              </TableCell>
+                              <TableCell className="text-right">{bale.quantity}</TableCell>
+                              <TableCell className="text-right font-mono">{formatLabelNum(bale.weightKg)}</TableCell>
+                              <TableCell>
+                                <Select
+                                  value={bale.status}
+                                  onValueChange={(val) =>
+                                    wrapAdminAction(
+                                      () => updateStatus.mutate({ id: bale.id, status: val }),
+                                      "Update Bale Status"
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger
+                                    className="w-[140px] h-8 text-xs"
+                                    data-testid={`select-status-${bale.id}`}
+                                  >
+                                    <Badge
+                                      variant={(STATUS_COLORS[bale.status] || "secondary") as any}
+                                      className="text-xs"
+                                    >
+                                      {bale.status.replace(/_/g, " ")}
+                                    </Badge>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
+                                    <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
+                                    <SelectItem value="PRESSED">Pressed</SelectItem>
+                                    <SelectItem value="FINALIZED">Finalized</SelectItem>
+                                    <SelectItem value="IN_STOCK">In Stock</SelectItem>
+                                    <SelectItem value="RESERVED">Reserved</SelectItem>
+                                    <SelectItem value="SOLD">Sold</SelectItem>
+                                    <SelectItem value="REPACKED">Repacked</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell
+                                className="text-xs text-muted-foreground"
+                                data-testid={`text-last-printed-${bale.id}`}
                               >
-                                <SelectTrigger className="w-[140px] h-8 text-xs" data-testid={`select-status-${bale.id}`}>
-                                  <Badge variant={(STATUS_COLORS[bale.status] || "secondary") as any} className="text-xs">
-                                    {bale.status.replace(/_/g, " ")}
-                                  </Badge>
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="PENDING_PRESSING">Pending Pressing</SelectItem>
-                                  <SelectItem value="LABEL_PRINTED">Label Printed</SelectItem>
-                                  <SelectItem value="PRESSED">Pressed</SelectItem>
-                                  <SelectItem value="FINALIZED">Finalized</SelectItem>
-                                  <SelectItem value="IN_STOCK">In Stock</SelectItem>
-                                  <SelectItem value="RESERVED">Reserved</SelectItem>
-                                  <SelectItem value="SOLD">Sold</SelectItem>
-                                  <SelectItem value="REPACKED">Repacked</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell className="text-xs text-muted-foreground" data-testid={`text-last-printed-${bale.id}`}>
-                              {row.lastPrintedAt ? new Date(row.lastPrintedAt).toLocaleString() : "Never"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {(bale.status === "RESERVED_FOR_ORDER" || bale.status === "RESERVED" || bale.status === "SOLD") && (
+                                {row.lastPrintedAt ? new Date(row.lastPrintedAt).toLocaleString() : "Never"}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  {(bale.status === "RESERVED_FOR_ORDER" ||
+                                    bale.status === "RESERVED" ||
+                                    bale.status === "SOLD") && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setReturnToStockBale(row)}
+                                      title="Return bale to stock"
+                                      data-testid={`button-return-to-stock-${bale.id}`}
+                                    >
+                                      <Undo2 className="h-4 w-4 text-blue-500" />
+                                    </Button>
+                                  )}
+                                  {myAccess?.fullAccess && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setRepackConfirm(row)}
+                                      disabled={bale.status === "REPACKED" || bale.status === "SOLD"}
+                                      title="Repack bale"
+                                      data-testid={`button-repack-${bale.id}`}
+                                    >
+                                      <RefreshCw className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                   <Button
                                     size="icon"
                                     variant="ghost"
-                                    onClick={() => setReturnToStockBale(row)}
-                                    title="Return bale to stock"
-                                    data-testid={`button-return-to-stock-${bale.id}`}
+                                    onClick={() => handleReprint(row)}
+                                    data-testid={`button-reprint-${bale.id}`}
                                   >
-                                    <Undo2 className="h-4 w-4 text-blue-500" />
+                                    <Printer className="h-4 w-4" />
                                   </Button>
-                                )}
-                                {myAccess?.fullAccess && (
-                                  <Button size="icon" variant="ghost" onClick={() => setRepackConfirm(row)} disabled={bale.status === "REPACKED" || bale.status === "SOLD"} title="Repack bale" data-testid={`button-repack-${bale.id}`}>
-                                    <RefreshCw className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                <Button size="icon" variant="ghost" onClick={() => handleReprint(row)} data-testid={`button-reprint-${bale.id}`}>
-                                  <Printer className="h-4 w-4" />
-                                </Button>
-                                {myAccess?.fullAccess && (
-                                  <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(bale.id)} data-testid={`button-delete-${bale.id}`}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      }) : []),
-                    ];
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                                  {myAccess?.fullAccess && (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setDeleteConfirm(bale.id)}
+                                      data-testid={`button-delete-${bale.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      : []),
+                  ];
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       {/* ── Remove from Stock Dialog ── */}
@@ -1023,7 +1203,8 @@ export default function BalesHistory() {
               Supervisor Authorization Required
             </DialogTitle>
             <DialogDescription>
-              Removing {inStockSelectedCount} IN STOCK bale(s) requires supervisor credentials. This action will be logged.
+              Removing {inStockSelectedCount} IN STOCK bale(s) requires supervisor credentials. This action will be
+              logged.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -1031,7 +1212,10 @@ export default function BalesHistory() {
               <p className="text-sm text-muted-foreground mb-1">Supervisor Username</p>
               <Input
                 value={supervisorUsername}
-                onChange={(e) => { setSupervisorUsername(e.target.value); setAuthError(""); }}
+                onChange={(e) => {
+                  setSupervisorUsername(e.target.value);
+                  setAuthError("");
+                }}
                 placeholder="Enter supervisor username..."
                 data-testid="input-supervisor-username"
               />
@@ -1041,7 +1225,10 @@ export default function BalesHistory() {
               <Input
                 type="password"
                 value={supervisorPassword}
-                onChange={(e) => { setSupervisorPassword(e.target.value); setAuthError(""); }}
+                onChange={(e) => {
+                  setSupervisorPassword(e.target.value);
+                  setAuthError("");
+                }}
                 placeholder="Enter supervisor password..."
                 data-testid="input-supervisor-password"
               />
@@ -1063,7 +1250,9 @@ export default function BalesHistory() {
             )}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setRemoveDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setRemoveDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               disabled={!supervisorUsername || !supervisorPassword || removeMutation.isPending}
@@ -1071,7 +1260,12 @@ export default function BalesHistory() {
                 const idsToRemove = Array.from(selectedIds).filter((id) =>
                   (balesData || []).some((r: any) => r.bale.id === id && r.bale.status === "IN_STOCK")
                 );
-                removeMutation.mutate({ ids: idsToRemove, supervisorUsername, supervisorPassword, reason: removalReason });
+                removeMutation.mutate({
+                  ids: idsToRemove,
+                  supervisorUsername,
+                  supervisorPassword,
+                  reason: removalReason,
+                });
               }}
               data-testid="button-confirm-remove"
             >
@@ -1090,7 +1284,9 @@ export default function BalesHistory() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirm(null)} data-testid="button-cancel-delete">Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteConfirm(null)} data-testid="button-cancel-delete">
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               onClick={() => deleteConfirm && deleteBale.mutate(deleteConfirm)}
@@ -1110,16 +1306,22 @@ export default function BalesHistory() {
             <DialogDescription>
               {repackConfirm && (
                 <>
-                  Repack bale <span className="font-mono font-semibold">{repackConfirm.bale.referenceNumber}</span> ({repackConfirm.product?.name || repackConfirm.bale.productName || "Unknown"})?
-                  This will mark the original bale as REPACKED and create a new bale with a new reference code. Labels will be printed for the new bale.
+                  Repack bale <span className="font-mono font-semibold">{repackConfirm.bale.referenceNumber}</span> (
+                  {repackConfirm.product?.name || repackConfirm.bale.productName || "Unknown"})? This will mark the
+                  original bale as REPACKED and create a new bale with a new reference code. Labels will be printed for
+                  the new bale.
                 </>
               )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRepackConfirm(null)} data-testid="button-cancel-repack">Cancel</Button>
+            <Button variant="outline" onClick={() => setRepackConfirm(null)} data-testid="button-cancel-repack">
+              Cancel
+            </Button>
             <Button
-              onClick={() => wrapAdminAction(() => repackConfirm && repackBale.mutate(repackConfirm.bale.id), "Repack Bale")}
+              onClick={() =>
+                wrapAdminAction(() => repackConfirm && repackBale.mutate(repackConfirm.bale.id), "Repack Bale")
+              }
               disabled={repackBale.isPending}
               data-testid="button-confirm-repack"
             >
@@ -1129,7 +1331,15 @@ export default function BalesHistory() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={designPickerOpen} onOpenChange={(open) => { if (!open) { setDesignPickerOpen(false); setPendingReprintLabels(null); } }}>
+      <Dialog
+        open={designPickerOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDesignPickerOpen(false);
+            setPendingReprintLabels(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Choose Label Design</DialogTitle>
@@ -1150,17 +1360,21 @@ export default function BalesHistory() {
                   }
                 }}
               >
-                <img
-                  src={opt.previewUrl}
-                  className="w-full h-16 rounded-md object-cover"
-                  alt={opt.label}
-                />
+                <img src={opt.previewUrl} className="w-full h-16 rounded-md object-cover" alt={opt.label} />
                 <span className="text-sm font-medium">{opt.label}</span>
               </button>
             ))}
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setDesignPickerOpen(false); setPendingReprintLabels(null); }}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDesignPickerOpen(false);
+                setPendingReprintLabels(null);
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               variant="secondary"
               data-testid="button-design-none"
@@ -1172,18 +1386,38 @@ export default function BalesHistory() {
                   const paperHtml = generateCombinedLabelsHtml(labels);
                   const stickerHtml = generateStickerLabelsHtml(labels);
                   const w1 = window.open("", "_blank", "width=800,height=900");
-                  if (w1) { w1.document.write(paperHtml); w1.document.close(); w1.focus(); setTimeout(() => w1.print(), 500); }
+                  if (w1) {
+                    w1.document.write(paperHtml);
+                    w1.document.close();
+                    w1.focus();
+                    setTimeout(() => w1.print(), 500);
+                  }
                   const w2 = window.open("", "_blank", "width=400,height=600");
                   if (w2) {
-                    w2.document.write(stickerHtml); w2.document.close(); w2.focus();
-                    const imgs = w2.document.images; let loaded = 0; const total = imgs.length;
-                    const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => w2.print(), 300); };
-                    if (total === 0) { setTimeout(() => w2.print(), 300); }
-                    else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+                    w2.document.write(stickerHtml);
+                    w2.document.close();
+                    w2.focus();
+                    const imgs = w2.document.images;
+                    let loaded = 0;
+                    const total = imgs.length;
+                    const tryPrint = () => {
+                      loaded++;
+                      if (loaded >= total) setTimeout(() => w2.print(), 300);
+                    };
+                    if (total === 0) {
+                      setTimeout(() => w2.print(), 300);
+                    } else {
+                      for (let i = 0; i < total; i++) {
+                        if (imgs[i].complete) tryPrint();
+                        else imgs[i].onload = imgs[i].onerror = tryPrint;
+                      }
+                    }
                   }
                 }
               }}
-            >No Banner (Blank)</Button>
+            >
+              No Banner (Blank)
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1194,7 +1428,8 @@ export default function BalesHistory() {
           <DialogHeader>
             <DialogTitle>Export Stock Register</DialogTitle>
             <DialogDescription>
-              Exports all bales (all statuses) to Excel with reference numbers, article codes, product names, weights, dates and more. Leave dates blank to export everything.
+              Exports all bales (all statuses) to Excel with reference numbers, article codes, product names, weights,
+              dates and more. Leave dates blank to export everything.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -1231,7 +1466,12 @@ export default function BalesHistory() {
         </DialogContent>
       </Dialog>
       {/* Return to Stock Dialog */}
-      <Dialog open={!!returnToStockBale} onOpenChange={(open) => { if (!open) setReturnToStockBale(null); }}>
+      <Dialog
+        open={!!returnToStockBale}
+        onOpenChange={(open) => {
+          if (!open) setReturnToStockBale(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1240,8 +1480,10 @@ export default function BalesHistory() {
             </DialogTitle>
             <DialogDescription>
               Bale <span className="font-mono font-semibold">{returnToStockBale?.bale?.referenceNumber}</span>
-              {returnToStockBale?.product?.name || returnToStockBale?.bale?.productName ? ` — ${returnToStockBale?.product?.name || returnToStockBale?.bale?.productName}` : ""}
-              {" "}({returnToStockBale?.bale?.weightKg} kg)
+              {returnToStockBale?.product?.name || returnToStockBale?.bale?.productName
+                ? ` — ${returnToStockBale?.product?.name || returnToStockBale?.bale?.productName}`
+                : ""}{" "}
+              ({returnToStockBale?.bale?.weightKg} kg)
             </DialogDescription>
           </DialogHeader>
 
@@ -1253,7 +1495,9 @@ export default function BalesHistory() {
                 <div className="rounded-md border p-3 space-y-1.5 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Order status</span>
-                    <Badge variant="secondary" className="text-xs">{returnToStockOrderInfo.status}</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {returnToStockOrderInfo.status}
+                    </Badge>
                   </div>
                   {returnToStockOrderInfo.invoiceNumber && (
                     <div className="flex justify-between">
@@ -1269,7 +1513,13 @@ export default function BalesHistory() {
                   )}
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Current total</span>
-                    <span className="font-mono">${parseFloat(returnToStockOrderInfo.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="font-mono">
+                      $
+                      {parseFloat(returnToStockOrderInfo.grandTotal || "0").toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Bales in order</span>
@@ -1288,31 +1538,38 @@ export default function BalesHistory() {
                   <div className="flex items-start gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 text-sm">
                     <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                     <p>
-                      This order is <strong>finalized</strong>. Removing this bale will reduce invoice <strong>{returnToStockOrderInfo.invoiceNumber}</strong> and update the customer's balance. The invoice number will not change. Admin authorisation required.
+                      This order is <strong>finalized</strong>. Removing this bale will reduce invoice{" "}
+                      <strong>{returnToStockOrderInfo.invoiceNumber}</strong> and update the customer's balance. The
+                      invoice number will not change. Admin authorisation required.
                     </p>
                   </div>
                 )}
 
-                {!["FINALIZED"].includes(returnToStockOrderInfo.status) && returnToStockOrderInfo.totalBalesInOrder > 1 && (
-                  <p className="text-sm text-muted-foreground">
-                    The bale will be removed from this order and returned to stock. Order totals will be recalculated.
-                  </p>
-                )}
+                {!["FINALIZED"].includes(returnToStockOrderInfo.status) &&
+                  returnToStockOrderInfo.totalBalesInOrder > 1 && (
+                    <p className="text-sm text-muted-foreground">
+                      The bale will be removed from this order and returned to stock. Order totals will be recalculated.
+                    </p>
+                  )}
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">No order linked to this bale — it will simply be returned to stock.</p>
+              <p className="text-sm text-muted-foreground">
+                No order linked to this bale — it will simply be returned to stock.
+              </p>
             )}
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setReturnToStockBale(null)} data-testid="button-cancel-return-to-stock">
+            <Button
+              variant="outline"
+              onClick={() => setReturnToStockBale(null)}
+              data-testid="button-cancel-return-to-stock"
+            >
               Cancel
             </Button>
             <Button
               disabled={
-                returnToStockMutation.isPending ||
-                orderInfoLoading ||
-                (returnToStockOrderInfo?.totalBalesInOrder <= 1)
+                returnToStockMutation.isPending || orderInfoLoading || returnToStockOrderInfo?.totalBalesInOrder <= 1
               }
               onClick={() => {
                 if (!returnToStockBale) return;

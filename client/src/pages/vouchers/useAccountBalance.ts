@@ -87,7 +87,10 @@ export function useAccountBalance({
         const currMap = new Map<string, number>();
         transactions.forEach((t) => {
           const curr = t.currency || "USD";
-          currMap.set(curr, (currMap.get(curr) ?? 0) + parseFloat(t.creditAmount || "0") - parseFloat(t.debitAmount || "0"));
+          currMap.set(
+            curr,
+            (currMap.get(curr) ?? 0) + parseFloat(t.creditAmount || "0") - parseFloat(t.debitAmount || "0")
+          );
         });
         currMap.set("USD", (currMap.get("USD") ?? 0) + openingBalance);
         const result = Array.from(currMap.entries())
@@ -96,7 +99,9 @@ export function useAccountBalance({
         const hasNonUsd = result.some((r) => r.currency !== "USD");
         return hasNonUsd ? result : null;
       } else if (paymentAccountType === "factorySupplier") {
-        const res = await fetch(`/api/factory/suppliers/${paymentAccountId}/broker-statement`, { credentials: "include" });
+        const res = await fetch(`/api/factory/suppliers/${paymentAccountId}/broker-statement`, {
+          credentials: "include",
+        });
         if (!res.ok) return null;
         const data = await res.json();
         const ledgers: any[] = data.currencyLedgers || [];

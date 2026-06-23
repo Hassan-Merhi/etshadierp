@@ -8,34 +8,25 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import {
-  MessageSquare,
-  Plus,
-  Trash2,
-  Users,
-  CheckCircle,
-  XCircle,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
+import { MessageSquare, Plus, Trash2, Users, CheckCircle, XCircle, ChevronDown, ChevronRight } from "lucide-react";
 
 interface WaSettings {
-  instanceId:     string;
-  apiToken:       string;
-  enabled:        boolean;
+  instanceId: string;
+  apiToken: string;
+  enabled: boolean;
   hasCredentials: boolean;
 }
 
 interface Recipient {
-  id:      number;
-  chatId:  string;
-  name:    string;
+  id: number;
+  chatId: string;
+  name: string;
   isGroup: boolean;
-  active:  boolean;
+  active: boolean;
 }
 
 interface GreenChat {
-  id:   string;
+  id: string;
   name: string;
   type: string;
 }
@@ -44,10 +35,10 @@ export function WhatsAppExportSection() {
   const { toast } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [instanceId, setInstanceId] = useState("");
-  const [apiToken,   setApiToken]   = useState("");
+  const [apiToken, setApiToken] = useState("");
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [newChatId, setNewChatId] = useState("");
-  const [newName,   setNewName]   = useState("");
+  const [newName, setNewName] = useState("");
 
   const { data: settings } = useQuery<WaSettings>({
     queryKey: ["/api/whatsapp/settings"],
@@ -59,7 +50,11 @@ export function WhatsAppExportSection() {
     enabled: expanded,
   });
 
-  const { data: chats = [], isLoading: loadingChats, refetch: fetchChats } = useQuery<GreenChat[]>({
+  const {
+    data: chats = [],
+    isLoading: loadingChats,
+    refetch: fetchChats,
+  } = useQuery<GreenChat[]>({
     queryKey: ["/api/whatsapp/chats"],
     enabled: false,
   });
@@ -82,16 +77,15 @@ export function WhatsAppExportSection() {
     mutationFn: (value: boolean) =>
       apiRequest("PUT", "/api/whatsapp/settings", {
         instanceId: settings?.instanceId ?? "",
-        apiToken:   "••••••",
-        enabled:    value,
+        apiToken: "••••••",
+        enabled: value,
       }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings"] }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const addRecipient = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", "/api/whatsapp/recipients", { chatId: newChatId, name: newName }),
+    mutationFn: () => apiRequest("POST", "/api/whatsapp/recipients", { chatId: newChatId, name: newName }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/recipients"] });
       setNewChatId("");
@@ -145,9 +139,7 @@ export function WhatsAppExportSection() {
           <MessageSquare className="h-5 w-5 text-green-600" />
           <div>
             <p className="font-semibold">WhatsApp Export</p>
-            <p className="text-sm text-muted-foreground">
-              Green API credentials, recipients, and master on/off switch
-            </p>
+            <p className="text-sm text-muted-foreground">Green API credentials, recipients, and master on/off switch</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -162,7 +154,6 @@ export function WhatsAppExportSection() {
 
       {expanded && (
         <div className="border-t p-4 space-y-6">
-
           {/* ── Credentials ─────────────────────────────────────────── */}
           <div className="space-y-3">
             <p className="text-sm font-medium">Green API Credentials</p>
@@ -287,9 +278,8 @@ export function WhatsAppExportSection() {
             {/* Manual entry */}
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">
-                Or enter a chatId manually. For DRC use{" "}
-                <code className="bg-muted px-1 rounded">243XXXXXXXXX@c.us</code> (individual) or paste a group chatId ending in{" "}
-                <code className="bg-muted px-1 rounded">@g.us</code>.
+                Or enter a chatId manually. For DRC use <code className="bg-muted px-1 rounded">243XXXXXXXXX@c.us</code>{" "}
+                (individual) or paste a group chatId ending in <code className="bg-muted px-1 rounded">@g.us</code>.
               </p>
               <div className="flex gap-2 flex-wrap">
                 <Input
@@ -332,21 +322,27 @@ export function WhatsAppExportSection() {
                     data-testid={`row-wa-recipient-${r.id}`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      {r.isGroup
-                        ? <Users className="h-4 w-4 shrink-0 text-blue-500" />
-                        : <MessageSquare className="h-4 w-4 shrink-0 text-green-500" />}
+                      {r.isGroup ? (
+                        <Users className="h-4 w-4 shrink-0 text-blue-500" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4 shrink-0 text-green-500" />
+                      )}
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{r.name}</p>
                         <p className="text-xs text-muted-foreground truncate">{r.chatId}</p>
                       </div>
                       {r.isGroup && (
-                        <Badge variant="secondary" className="shrink-0">Group</Badge>
+                        <Badge variant="secondary" className="shrink-0">
+                          Group
+                        </Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {r.active
-                        ? <CheckCircle className="h-4 w-4 text-green-500" />
-                        : <XCircle className="h-4 w-4 text-muted-foreground" />}
+                      {r.active ? (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <XCircle className="h-4 w-4 text-muted-foreground" />
+                      )}
                       <Switch
                         checked={r.active}
                         onCheckedChange={(v) => toggleActive.mutate({ id: r.id, active: v })}

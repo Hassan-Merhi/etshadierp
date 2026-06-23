@@ -86,48 +86,48 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     label: "Production",
     color: NAV_COLOR.operations,
     items: [
-      { title: "Stock Entry",     url: "/factory/stock-entry",     icon: ScanLine },
-      { title: "Raw Materials",   url: "/factory/raw-materials",   icon: Package  },
-      { title: "Waste Dispatch",  url: "/factory/waste-dispatch",  icon: Trash2   },
-      { title: "Bale Explorer",   url: "/factory/bales-hub",       icon: History  },
+      { title: "Stock Entry", url: "/factory/stock-entry", icon: ScanLine },
+      { title: "Raw Materials", url: "/factory/raw-materials", icon: Package },
+      { title: "Waste Dispatch", url: "/factory/waste-dispatch", icon: Trash2 },
+      { title: "Bale Explorer", url: "/factory/bales-hub", icon: History },
     ],
   },
   {
     label: "Sales",
     color: NAV_COLOR.sales,
     items: [
-      { title: "Factory POS",           url: "/factory/pos",                    icon: ShoppingCart },
-      { title: "Invoicing",             url: "/factory/invoicing",              icon: FileText     },
-      { title: "Stock Allocation",      url: "/factory/stock-allocation-v5",    icon: LayoutGrid   },
-      { title: "Loadings",              url: "/factory/sales/loadings",         icon: Container    },
+      { title: "Factory POS", url: "/factory/pos", icon: ShoppingCart },
+      { title: "Invoicing", url: "/factory/invoicing", icon: FileText },
+      { title: "Stock Allocation", url: "/factory/stock-allocation-v5", icon: LayoutGrid },
+      { title: "Loadings", url: "/factory/sales/loadings", icon: Container },
     ],
   },
   {
     label: "Inventory",
     color: NAV_COLOR.inventory,
     items: [
-      { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin    },
-      { title: "Containers",         url: "/factory/containers-hub",     icon: Container },
+      { title: "Location Inventory", url: "/factory/location-inventory", icon: MapPin },
+      { title: "Containers", url: "/factory/containers-hub", icon: Container },
     ],
   },
   {
     label: "Finance",
     color: NAV_COLOR.finance,
     items: [
-      { title: "Parties",          url: "/factory/parties",                 icon: Users          },
-      { title: "Payroll",          url: "/factory/payroll-hub",             icon: HardHat        },
-      { title: "Vouchers",         url: "/factory/vouchers",                icon: FileText       },
-      { title: "Accounts",         url: "/factory/accounts",               icon: Landmark       },
-      { title: "Analytics",        url: "/factory/analytics",               icon: TrendingUp,    adminOnly: true },
+      { title: "Parties", url: "/factory/parties", icon: Users },
+      { title: "Payroll", url: "/factory/payroll-hub", icon: HardHat },
+      { title: "Vouchers", url: "/factory/vouchers", icon: FileText },
+      { title: "Accounts", url: "/factory/accounts", icon: Landmark },
+      { title: "Analytics", url: "/factory/analytics", icon: TrendingUp, adminOnly: true },
     ],
   },
   {
     label: "Rentals",
     color: NAV_COLOR.rentals,
     items: [
-      { title: "Shops",      url: "/factory/rental/shops",      icon: Store     },
-      { title: "Warehouses", url: "/factory/rental/warehouses", icon: Building2,  developerOnly: true },
-      { title: "Payments",   url: "/factory/rental/payments",   icon: CreditCard, developerOnly: true },
+      { title: "Shops", url: "/factory/rental/shops", icon: Store },
+      { title: "Warehouses", url: "/factory/rental/warehouses", icon: Building2, developerOnly: true },
+      { title: "Payments", url: "/factory/rental/payments", icon: CreditCard, developerOnly: true },
     ],
   },
   {
@@ -135,30 +135,50 @@ export const FACTORY_NAV_SECTIONS: FactoryNavSection[] = [
     color: NAV_COLOR.intelligence,
     developerOnly: true,
     items: [
-      { title: "Factory Dashboard", url: "/factory/intelligence/dashboard",       icon: Activity,       featureFlag: "dashboardEnabled"           },
-      { title: "KPIs",              url: "/factory/intelligence/kpis",            icon: Gauge,          featureFlag: "kpisEnabled"                },
-      { title: "Supplier Intel",     url: "/factory/intelligence/supplier-hub",    icon: ClipboardCheck, featureFlag: "supplierReportEnabled"      },
-      { title: "Financial Intel",   url: "/factory/intelligence/financial-hub",   icon: BarChart3,      featureFlag: "netProfitEnabled"           },
-      { title: "Production Intel",  url: "/factory/intelligence/production-hub",  icon: Beaker,         featureFlag: "productionSummaryEnabled"   },
-      { title: "Alerts",            url: "/factory/intelligence/alerts",          icon: Bell,           featureFlag: "alertsEnabled"              },
-      { title: "Intel Settings",    url: "/factory/intelligence/settings",        icon: Settings,       adminOnly: true                           },
+      {
+        title: "Factory Dashboard",
+        url: "/factory/intelligence/dashboard",
+        icon: Activity,
+        featureFlag: "dashboardEnabled",
+      },
+      { title: "KPIs", url: "/factory/intelligence/kpis", icon: Gauge, featureFlag: "kpisEnabled" },
+      {
+        title: "Supplier Intel",
+        url: "/factory/intelligence/supplier-hub",
+        icon: ClipboardCheck,
+        featureFlag: "supplierReportEnabled",
+      },
+      {
+        title: "Financial Intel",
+        url: "/factory/intelligence/financial-hub",
+        icon: BarChart3,
+        featureFlag: "netProfitEnabled",
+      },
+      {
+        title: "Production Intel",
+        url: "/factory/intelligence/production-hub",
+        icon: Beaker,
+        featureFlag: "productionSummaryEnabled",
+      },
+      { title: "Alerts", url: "/factory/intelligence/alerts", icon: Bell, featureFlag: "alertsEnabled" },
+      { title: "Intel Settings", url: "/factory/intelligence/settings", icon: Settings, adminOnly: true },
     ],
   },
 ];
 
 export const FACTORY_NAV_PAGES: { key: string; label: string; group: string }[] = [
-  ...FACTORY_NAV_SECTIONS.flatMap(s =>
-    s.items.map(item => ({ key: item.url.replace(/^\//, ""), label: item.title, group: s.label }))
+  ...FACTORY_NAV_SECTIONS.flatMap((s) =>
+    s.items.map((item) => ({ key: item.url.replace(/^\//, ""), label: item.title, group: s.label }))
   ),
-  { key: "factory/daybook",   label: "Daybook",   group: "Other"    },
-  { key: "factory/chat",      label: "Chat",      group: "Other"    },
-  { key: "factory/settings",  label: "Settings",  group: "Other"    },
+  { key: "factory/daybook", label: "Daybook", group: "Other" },
+  { key: "factory/chat", label: "Chat", group: "Other" },
+  { key: "factory/settings", label: "Settings", group: "Other" },
 ];
 
 const FACTORY_PINNED_DEFAULTS: NavItem[] = [
   { title: "Overview", url: "/factory/production-report", icon: BarChart3 },
-  { title: "Daybook",              url: "/factory/daybook",           icon: BookOpen  },
-  { title: "Agent Ledger",          url: "/factory/agents",            icon: UserRound },
+  { title: "Daybook", url: "/factory/daybook", icon: BookOpen },
+  { title: "Agent Ledger", url: "/factory/agents", icon: UserRound },
 ];
 
 export function useFactoryVisibleSections(user?: any): {
@@ -172,7 +192,10 @@ export function useFactoryVisibleSections(user?: any): {
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
-    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    queryFn: async () => {
+      const r = await fetch("/api/factory/settings");
+      return r.ok ? r.json() : {};
+    },
     staleTime: 60000,
     enabled: !!user,
   });
@@ -196,9 +219,8 @@ export function useFactoryVisibleSections(user?: any): {
     return true;
   };
 
-  const sections = FACTORY_NAV_SECTIONS
-    .filter(s => !s.developerOnly || isDeveloper)
-    .map(s => ({
+  const sections = FACTORY_NAV_SECTIONS.filter((s) => !s.developerOnly || isDeveloper)
+    .map((s) => ({
       ...s,
       items: s.items.filter((item) => {
         if (item.developerOnly && !isDeveloper) return false;
@@ -219,9 +241,10 @@ export function useFactoryVisibleSections(user?: any): {
         }
         return true;
       }),
-    })).filter(s => s.items.length > 0);
+    }))
+    .filter((s) => s.items.length > 0);
 
-  const isPrivileged = isAdmin || (myAccess?.fullAccess === true);
+  const isPrivileged = isAdmin || myAccess?.fullAccess === true;
   return { sections, isPinnedVisible, isAdmin, isDeveloper, isPrivileged };
 }
 
@@ -232,7 +255,7 @@ export function FactorySidebar({ user }: { user?: any }) {
 
   const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder(
     "factory-pinned-order",
-    FACTORY_PINNED_DEFAULTS,
+    FACTORY_PINNED_DEFAULTS
   );
 
   const { data: chatUnread } = useQuery<{ count: number }>({
@@ -243,23 +266,26 @@ export function FactorySidebar({ user }: { user?: any }) {
 
   useEffect(() => {
     const count = chatUnread?.count || 0;
-    if (prevUnreadRef.current === -1) { prevUnreadRef.current = count; return; }
+    if (prevUnreadRef.current === -1) {
+      prevUnreadRef.current = count;
+      return;
+    }
     if (count > prevUnreadRef.current)
       toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
     prevUnreadRef.current = count;
   }, [chatUnread?.count]);
 
-  const { sections: visibleSections, isPinnedVisible, isAdmin, isDeveloper, isPrivileged } = useFactoryVisibleSections(user);
+  const {
+    sections: visibleSections,
+    isPinnedVisible,
+    isAdmin,
+    isDeveloper,
+    isPrivileged,
+  } = useFactoryVisibleSections(user);
 
   const { openSections, toggleSection } = useOpenSections(visibleSections);
 
-  const allNavItems = useMemo(
-    () => [
-      ...FACTORY_PINNED_DEFAULTS,
-      ...FACTORY_NAV_SECTIONS.flatMap((s) => s.items),
-    ],
-    [],
-  );
+  const allNavItems = useMemo(() => [...FACTORY_PINNED_DEFAULTS, ...FACTORY_NAV_SECTIONS.flatMap((s) => s.items)], []);
   const { selectedCompany } = useCompany();
   const recentItems = useRecentNav(allNavItems, selectedCompany?.id);
 
@@ -267,12 +293,7 @@ export function FactorySidebar({ user }: { user?: any }) {
 
   return (
     <Sidebar>
-      <ModuleHeader
-        icon={Factory}
-        label="Business OS"
-        tagline="Factory / Production"
-        accent={MODULE_ACCENT.factory}
-      />
+      <ModuleHeader icon={Factory} label="Business OS" tagline="Factory / Production" accent={MODULE_ACCENT.factory} />
 
       <SidebarContent className="px-3 py-2 overflow-y-auto">
         <PinnedNavList
@@ -316,8 +337,22 @@ export function FactorySidebar({ user }: { user?: any }) {
         )}
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
-          {isPrivileged && <SidebarFlatLink href="/factory/spreadsheet" icon={TableProperties} label="Spreadsheet" testId="link-factory-spreadsheet" />}
-          <SidebarFlatLink href="/factory/chat" icon={MessageCircle} label="Chat" color={NAV_COLOR.pinned} badge={chatUnread?.count} testId="link-factory-chat" />
+          {isPrivileged && (
+            <SidebarFlatLink
+              href="/factory/spreadsheet"
+              icon={TableProperties}
+              label="Spreadsheet"
+              testId="link-factory-spreadsheet"
+            />
+          )}
+          <SidebarFlatLink
+            href="/factory/chat"
+            icon={MessageCircle}
+            label="Chat"
+            color={NAV_COLOR.pinned}
+            badge={chatUnread?.count}
+            testId="link-factory-chat"
+          />
           {conflictCount > 0 && (
             <a
               href="/factory/conflicts"
@@ -327,19 +362,34 @@ export function FactorySidebar({ user }: { user?: any }) {
             >
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
               <span className="flex-1 leading-tight">Conflicts</span>
-              <Badge variant="outline" className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400" data-testid="badge-factory-conflict-count">
+              <Badge
+                variant="outline"
+                className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400"
+                data-testid="badge-factory-conflict-count"
+              >
                 {conflictCount}
               </Badge>
             </a>
           )}
           {!["Admin", "Owner", "Developer"].includes(user?.role) && (
-            <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-factory-my-settings" />
+            <SidebarFlatLink
+              href="/my-settings"
+              icon={KeyRound}
+              label="My Settings"
+              testId="link-factory-my-settings"
+            />
           )}
           {(isAdmin || isDeveloper) && (
             <SidebarFlatLink href="/factory/settings" icon={Settings} label="Settings" testId="link-factory-settings" />
           )}
           {isDeveloper && (
-            <SidebarFlatLink href="/factory/intelligence/settings" icon={Settings} label="Intel Settings" color={NAV_COLOR.intelligence} testId="link-factory-intel-settings" />
+            <SidebarFlatLink
+              href="/factory/intelligence/settings"
+              icon={Settings}
+              label="Intel Settings"
+              color={NAV_COLOR.intelligence}
+              testId="link-factory-intel-settings"
+            />
           )}
         </div>
       </SidebarContent>

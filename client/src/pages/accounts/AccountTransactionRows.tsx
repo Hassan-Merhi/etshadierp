@@ -37,37 +37,18 @@ export function AccountTransactionRows({
           <TableRow className="bg-muted/40 hover:bg-muted/40">
             <TableHead className="w-[40px] py-2 print:hidden">
               <Checkbox
-                checked={
-                  vouchersWithBalance.length > 0 &&
-                  selectedVoucherIds.size === vouchersWithBalance.length
-                }
+                checked={vouchersWithBalance.length > 0 && selectedVoucherIds.size === vouchersWithBalance.length}
                 onCheckedChange={toggleSelectAll}
                 data-testid="checkbox-select-all"
               />
             </TableHead>
-            <TableHead className="col-date w-[100px] py-2 sticky left-0 bg-muted z-10">
-              Date
-            </TableHead>
-            <TableHead className="col-type w-[100px] py-2">
-              Type
-            </TableHead>
-            <TableHead className="col-particulars py-2">
-              Particulars
-            </TableHead>
-            {appMode === "factory" && (
-              <TableHead className="py-2">
-                Notes
-              </TableHead>
-            )}
-            {!hideBalances && <TableHead className="col-amount text-right w-[120px] py-2">
-              Debit
-            </TableHead>}
-            {!hideBalances && <TableHead className="col-amount text-right w-[120px] py-2">
-              Credit
-            </TableHead>}
-            {!hideBalances && <TableHead className="col-balance text-right w-[130px] py-2">
-              Balance
-            </TableHead>}
+            <TableHead className="col-date w-[100px] py-2 sticky left-0 bg-muted z-10">Date</TableHead>
+            <TableHead className="col-type w-[100px] py-2">Type</TableHead>
+            <TableHead className="col-particulars py-2">Particulars</TableHead>
+            {appMode === "factory" && <TableHead className="py-2">Notes</TableHead>}
+            {!hideBalances && <TableHead className="col-amount text-right w-[120px] py-2">Debit</TableHead>}
+            {!hideBalances && <TableHead className="col-amount text-right w-[120px] py-2">Credit</TableHead>}
+            {!hideBalances && <TableHead className="col-balance text-right w-[130px] py-2">Balance</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -78,14 +59,24 @@ export function AccountTransactionRows({
               <span className="font-semibold">Opening Balance</span>
             </TableCell>
             <TableCell className="text-right font-mono py-2">
-              {!hideBalances && (selectedAccount?.type === "supplier"
-                ? openingBalance < 0 ? formatAmountProp(Math.abs(openingBalance)) : "-"
-                : openingBalance > 0 ? formatAmountProp(openingBalance) : "-")}
+              {!hideBalances &&
+                (selectedAccount?.type === "supplier"
+                  ? openingBalance < 0
+                    ? formatAmountProp(Math.abs(openingBalance))
+                    : "-"
+                  : openingBalance > 0
+                    ? formatAmountProp(openingBalance)
+                    : "-")}
             </TableCell>
             <TableCell className="text-right font-mono py-2">
-              {!hideBalances && (selectedAccount?.type === "supplier"
-                ? openingBalance > 0 ? formatAmountProp(openingBalance) : "-"
-                : openingBalance < 0 ? formatAmountProp(Math.abs(openingBalance)) : "-")}
+              {!hideBalances &&
+                (selectedAccount?.type === "supplier"
+                  ? openingBalance > 0
+                    ? formatAmountProp(openingBalance)
+                    : "-"
+                  : openingBalance < 0
+                    ? formatAmountProp(Math.abs(openingBalance))
+                    : "-")}
             </TableCell>
             <TableCell className="text-right font-mono font-semibold py-2">
               {!hideBalances && (
@@ -93,8 +84,12 @@ export function AccountTransactionRows({
                   {formatAmountProp(Math.abs(openingBalance))}
                   <span className="ml-1 text-[10px] opacity-70">
                     {selectedAccount?.type === "supplier"
-                      ? openingBalance > 0 ? "Cr" : "Dr"
-                      : openingBalance >= 0 ? "Dr" : "Cr"}
+                      ? openingBalance > 0
+                        ? "Cr"
+                        : "Dr"
+                      : openingBalance >= 0
+                        ? "Dr"
+                        : "Cr"}
                   </span>
                 </>
               )}
@@ -128,25 +123,31 @@ export function AccountTransactionRows({
               </TableCell>
               {appMode === "factory" && (
                 <TableCell className="py-2 text-[10px] text-muted-foreground max-w-[280px] truncate">
-                   {v.narration}
+                  {v.narration}
                 </TableCell>
               )}
-              {!hideBalances && <TableCell className="py-2 text-right font-mono text-[11px] tabular-nums">
-                {v.totalDebit > 0 ? formatAmountProp(v.totalDebit) : "—"}
-              </TableCell>}
-              {!hideBalances && <TableCell className="py-2 text-right font-mono text-[11px] tabular-nums">
-                {v.totalCredit > 0 ? formatAmountProp(v.totalCredit) : "—"}
-              </TableCell>}
-              {!hideBalances && <TableCell className="py-2 text-right font-mono text-[11px] tabular-nums font-semibold">
-                {v.runningBalance != null ? (
-                  <>
-                    {formatAmountProp(Math.abs(v.runningBalance))}
-                    <span className="ml-1 text-[10px] opacity-70">
-                      {v.runningBalance >= 0 ? "Dr" : "Cr"}
-                    </span>
-                  </>
-                ) : "—"}
-              </TableCell>}
+              {!hideBalances && (
+                <TableCell className="py-2 text-right font-mono text-[11px] tabular-nums">
+                  {v.totalDebit > 0 ? formatAmountProp(v.totalDebit) : "—"}
+                </TableCell>
+              )}
+              {!hideBalances && (
+                <TableCell className="py-2 text-right font-mono text-[11px] tabular-nums">
+                  {v.totalCredit > 0 ? formatAmountProp(v.totalCredit) : "—"}
+                </TableCell>
+              )}
+              {!hideBalances && (
+                <TableCell className="py-2 text-right font-mono text-[11px] tabular-nums font-semibold">
+                  {v.runningBalance != null ? (
+                    <>
+                      {formatAmountProp(Math.abs(v.runningBalance))}
+                      <span className="ml-1 text-[10px] opacity-70">{v.runningBalance >= 0 ? "Dr" : "Cr"}</span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+              )}
             </TableRow>
           ))}
         </TableBody>

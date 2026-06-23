@@ -7,24 +7,12 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { format, parseISO, startOfMonth, endOfMonth } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  ArrowLeft,
-  ChevronRight,
-  Loader2,
-  FileText,
-} from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2, FileText } from "lucide-react";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -87,16 +75,14 @@ export default function LedgerVouchers() {
   const { formatShortDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-  
+
   const accountId = params?.accountId ? parseInt(params.accountId) : null;
   const year = params?.year ? parseInt(params.year) : null;
   const month = params?.month ? parseInt(params.month) : null;
 
   useEscapeToParent();
 
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
-    getInitialPeriodValue(year, month)
-  );
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getInitialPeriodValue(year, month));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
   useEffect(() => {
@@ -117,10 +103,9 @@ export default function LedgerVouchers() {
         startDate: periodFilter.fromDate,
         endDate: periodFilter.toDate,
       });
-      const response = await fetch(
-        `/api/reports/ledger-vouchers/${accountId}/${year}/${month}?${searchParams}`,
-        { credentials: "include" }
-      );
+      const response = await fetch(`/api/reports/ledger-vouchers/${accountId}/${year}/${month}?${searchParams}`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch ledger vouchers");
       return response.json();
     },
@@ -160,11 +145,7 @@ export default function LedgerVouchers() {
             </div>
           </div>
           <div className="text-right">
-            <PeriodFilter
-              value={periodFilter}
-              onChange={setPeriodFilter}
-              data-testid="ledger-vouchers-period-filter"
-            />
+            <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="ledger-vouchers-period-filter" />
           </div>
         </div>
       </div>
@@ -186,8 +167,8 @@ export default function LedgerVouchers() {
                       Ledger: {data.account.name}
                     </CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      1/{data.monthName.substring(0, 3)}/{data.year} to{" "}
-                      {new Date(data.year, data.month, 0).getDate()}/{data.monthName.substring(0, 3)}/{data.year}
+                      1/{data.monthName.substring(0, 3)}/{data.year} to {new Date(data.year, data.month, 0).getDate()}/
+                      {data.monthName.substring(0, 3)}/{data.year}
                     </p>
                   </div>
                   <div className="text-right">
@@ -205,9 +186,7 @@ export default function LedgerVouchers() {
                     return { ...v, runningBalance: runningBal };
                   });
                   const formatBal = (bal: number) =>
-                    bal === 0
-                      ? "—"
-                      : `${formatAmount(Math.abs(bal))} ${bal >= 0 ? "Cr" : "Dr"}`;
+                    bal === 0 ? "—" : `${formatAmount(Math.abs(bal))} ${bal >= 0 ? "Cr" : "Dr"}`;
                   return (
                     <div className="border rounded-lg overflow-x-auto">
                       <Table>
@@ -224,7 +203,9 @@ export default function LedgerVouchers() {
                         <TableBody>
                           {/* Opening Balance Row */}
                           <TableRow className="bg-muted/20 font-semibold">
-                            <TableCell className="text-sm text-muted-foreground" colSpan={3}>Opening Balance</TableCell>
+                            <TableCell className="text-sm text-muted-foreground" colSpan={3}>
+                              Opening Balance
+                            </TableCell>
                             <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
                             <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
                             <TableCell className="text-right font-mono text-sm">
@@ -256,14 +237,20 @@ export default function LedgerVouchers() {
                                     {voucher.voucherType}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="text-sm hidden sm:table-cell">
-                                  {voucher.particulars}
+                                <TableCell className="text-sm hidden sm:table-cell">{voucher.particulars}</TableCell>
+                                <TableCell className="text-right font-mono text-sm">
+                                  {voucher.debit > 0 ? (
+                                    formatAmount(voucher.debit)
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
-                                  {voucher.debit > 0 ? formatAmount(voucher.debit) : <span className="text-muted-foreground">—</span>}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-sm">
-                                  {voucher.credit > 0 ? formatAmount(voucher.credit) : <span className="text-muted-foreground">—</span>}
+                                  {voucher.credit > 0 ? (
+                                    formatAmount(voucher.credit)
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right font-mono text-sm">
                                   {formatBal(voucher.runningBalance)}
@@ -274,22 +261,34 @@ export default function LedgerVouchers() {
                         </TableBody>
                         <tfoot className="sticky bottom-0 z-20 bg-background">
                           <TableRow className="border-t bg-muted/20 text-sm">
-                            <TableCell colSpan={3} className="text-right text-muted-foreground font-medium">Opening Balance:</TableCell>
+                            <TableCell colSpan={3} className="text-right text-muted-foreground font-medium">
+                              Opening Balance:
+                            </TableCell>
                             <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
                             <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
                             <TableCell className="text-right font-mono">{formatBal(data.openingBalance)}</TableCell>
                           </TableRow>
                           <TableRow className="bg-muted/10 text-sm">
-                            <TableCell colSpan={3} className="text-right text-muted-foreground font-medium">Current Total:</TableCell>
-                            <TableCell className="text-right font-mono font-semibold">{data.totals.debit > 0 ? formatAmount(data.totals.debit) : "—"}</TableCell>
-                            <TableCell className="text-right font-mono font-semibold">{data.totals.credit > 0 ? formatAmount(data.totals.credit) : "—"}</TableCell>
+                            <TableCell colSpan={3} className="text-right text-muted-foreground font-medium">
+                              Current Total:
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold">
+                              {data.totals.debit > 0 ? formatAmount(data.totals.debit) : "—"}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold">
+                              {data.totals.credit > 0 ? formatAmount(data.totals.credit) : "—"}
+                            </TableCell>
                             <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
                           </TableRow>
                           <TableRow className="bg-muted/30 font-bold text-sm">
-                            <TableCell colSpan={3} className="text-right text-muted-foreground font-semibold">Current Balance:</TableCell>
+                            <TableCell colSpan={3} className="text-right text-muted-foreground font-semibold">
+                              Current Balance:
+                            </TableCell>
                             <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
                             <TableCell className="text-right font-mono text-muted-foreground">—</TableCell>
-                            <TableCell className={`text-right font-mono ${data.closingBalance >= 0 ? "" : "text-destructive"}`}>
+                            <TableCell
+                              className={`text-right font-mono ${data.closingBalance >= 0 ? "" : "text-destructive"}`}
+                            >
                               {formatBal(data.closingBalance)}
                             </TableCell>
                           </TableRow>

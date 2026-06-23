@@ -3,52 +3,137 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { cache } from "../lib/simpleCache";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
 import {
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, insertVoucherSchema, insertVoucherEntrySchema,
+  upload,
+  logAudit,
+  getCurrentExchangeRate,
+  calculateHistoricalLocationInventory,
+  syncEmployeeBalancesFromEntries,
+} from "./_helpers";
+import {
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  insertVoucherSchema,
+  insertVoucherEntrySchema,
   insertSalesItemSchema,
-  suppliers, customers, customerBalances, locations, employees, userLocations,
-  auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
-  ledgerAccounts, insertLedgerAccountSchema, 
-  companies, users, userCompanyRoles, companySettings, insertCompanySettingsSchema,
-  FEATURE_KEYS, fiscalPeriodClosures,
-  wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
-  bales, baleProducts, baleProductCategories, baleTransfers,
-  factoryBales, factoryBaleProducts, baleLabelPrints,
+  suppliers,
+  customers,
+  customerBalances,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  companies,
+  users,
+  userCompanyRoles,
+  companySettings,
+  insertCompanySettingsSchema,
+  FEATURE_KEYS,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  insertWasteDispatchSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  baleTransfers,
+  factoryBales,
+  factoryBaleProducts,
+  baleLabelPrints,
   factoryWorkers,
-  factoryPressingBatches, factoryMixBatches, factoryMixBatchSources, factoryContainers, factorySuppliers,
-  productionRawStock, mixBatches, productionBales,
-  pressingBatches, baleTransferItems, systemSettings,
-  factoryRawStock, erpPayrollRuns, referenceSequences, baleSequences,
-  customerOrders, customerOrderBales,
-  insertBaleSchema, insertBaleTransferSchema,
-  
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  factoryPressingBatches,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryContainers,
+  factorySuppliers,
+  productionRawStock,
+  mixBatches,
+  productionBales,
+  pressingBatches,
+  baleTransferItems,
+  systemSettings,
+  factoryRawStock,
+  erpPayrollRuns,
+  referenceSequences,
+  baleSequences,
+  customerOrders,
+  customerOrderBales,
+  insertBaleSchema,
+  insertBaleTransferSchema,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, 
-  pendingBarcodes, insertPendingBarcodeSchema,
-  storedFiles, spreadsheets, liveSpreadsheets,
-  agentAccounts, insertAgentAccountSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  storedFiles,
+  spreadsheets,
+  liveSpreadsheets,
+  agentAccounts,
+  insertAgentAccountSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
   chatMessages,
-  
   factorySettings as fSettings,
   factoryDaybookEntries as fde,
   factoryBaleSequences,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -97,7 +182,7 @@ export function registerBaleRoutes(app: Express) {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
       const bale = await storage.getBaleById(id);
-      
+
       if (!bale) {
         return res.status(404).json({ message: "Bale not found" });
       }
@@ -123,7 +208,7 @@ export function registerBaleRoutes(app: Express) {
 
       const barcode = req.params.barcode;
       const bale = await storage.getBaleByBarcode(barcode, companyId);
-      
+
       if (!bale) {
         return res.status(404).json({ message: "Bale not found" });
       }
@@ -167,7 +252,7 @@ export function registerBaleRoutes(app: Express) {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
       const existing = await storage.getBaleById(id);
-      
+
       if (!existing) {
         return res.status(404).json({ message: "Bale not found" });
       }
@@ -197,7 +282,7 @@ export function registerBaleRoutes(app: Express) {
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid bale ID" });
       const existing = await storage.getBaleById(id);
-      
+
       if (!existing) {
         return res.status(404).json({ message: "Bale not found" });
       }
@@ -227,9 +312,7 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid data format" });
       }
 
-      const validatedBales = balesData.map((b: any) => 
-        insertBaleSchema.parse({ ...b, companyId })
-      );
+      const validatedBales = balesData.map((b: any) => insertBaleSchema.parse({ ...b, companyId }));
 
       const created = await storage.bulkCreateBales(validatedBales);
       res.json({ success: true, count: created.length, bales: created });
@@ -250,25 +333,28 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "No rows provided" });
       }
 
-      const preview = await Promise.all(rows.map(async (row) => {
-        const barcode = String(row.barcode || "").trim();
-        const newPrice = parseFloat(String(row.price || ""));
-        if (!barcode) return { barcode, status: "invalid", currentPrice: null, newPrice: null };
-        if (isNaN(newPrice) || newPrice < 0) return { barcode, status: "invalid_price", currentPrice: null, newPrice: null };
-        const bale = await storage.getBaleByBarcode(barcode, companyId);
-        if (!bale) return { barcode, status: "not_found", currentPrice: null, newPrice };
-        const currentPrice = bale.price ? parseFloat(bale.price) : null;
-        const noChange = currentPrice !== null && Math.abs(currentPrice - newPrice) < 0.001;
-        return {
-          id: bale.id,
-          barcode,
-          category: bale.category,
-          grade: bale.grade,
-          status: noChange ? "no_change" : "will_update",
-          currentPrice,
-          newPrice,
-        };
-      }));
+      const preview = await Promise.all(
+        rows.map(async (row) => {
+          const barcode = String(row.barcode || "").trim();
+          const newPrice = parseFloat(String(row.price || ""));
+          if (!barcode) return { barcode, status: "invalid", currentPrice: null, newPrice: null };
+          if (isNaN(newPrice) || newPrice < 0)
+            return { barcode, status: "invalid_price", currentPrice: null, newPrice: null };
+          const bale = await storage.getBaleByBarcode(barcode, companyId);
+          if (!bale) return { barcode, status: "not_found", currentPrice: null, newPrice };
+          const currentPrice = bale.price ? parseFloat(bale.price) : null;
+          const noChange = currentPrice !== null && Math.abs(currentPrice - newPrice) < 0.001;
+          return {
+            id: bale.id,
+            barcode,
+            category: bale.category,
+            grade: bale.grade,
+            status: noChange ? "no_change" : "will_update",
+            currentPrice,
+            newPrice,
+          };
+        })
+      );
 
       res.json({ preview });
     } catch (error: any) {
@@ -514,11 +600,16 @@ export function registerBaleRoutes(app: Express) {
       if (!articleCode && req.body.itemNumber) {
         const num = parseInt(String(req.body.itemNumber));
         if (!isNaN(num) && num >= 1 && num <= 99) {
-          articleCode = `HMD${String(num).padStart(2, '0')}000`;
+          articleCode = `HMD${String(num).padStart(2, "0")}000`;
         }
       }
       const code = req.body.code || articleCode || `AUTO-${Date.now()}`;
-      const data = insertBaleProductSchema.parse({ ...req.body, companyId, articleCode: articleCode || undefined, code });
+      const data = insertBaleProductSchema.parse({
+        ...req.body,
+        companyId,
+        articleCode: articleCode || undefined,
+        code,
+      });
 
       if (articleCode) {
         const existingByArticle = await storage.getBaleProductByArticleCode(articleCode, companyId);
@@ -616,7 +707,10 @@ export function registerBaleRoutes(app: Express) {
 
       await db.transaction(async (tx) => {
         const categoryCache: Record<string, number> = {};
-        const existingCategories = await tx.select().from(baleProductCategories).where(eq(baleProductCategories.companyId, companyId));
+        const existingCategories = await tx
+          .select()
+          .from(baleProductCategories)
+          .where(eq(baleProductCategories.companyId, companyId));
         for (const cat of existingCategories) {
           categoryCache[cat.name.toLowerCase()] = cat.id;
         }
@@ -627,7 +721,7 @@ export function registerBaleRoutes(app: Express) {
           if (!articleCode && itemNumber) {
             const num = parseInt(String(itemNumber));
             if (!isNaN(num) && num >= 1 && num <= 99) {
-              articleCode = `HMD${String(num).padStart(2, '0')}000`;
+              articleCode = `HMD${String(num).padStart(2, "0")}000`;
             }
           }
 
@@ -644,11 +738,14 @@ export function registerBaleRoutes(app: Express) {
             if (categoryCache[lowerCat]) {
               categoryId = categoryCache[lowerCat];
             } else {
-              const [newCat] = await tx.insert(baleProductCategories).values({
-                companyId,
-                name: categoryName,
-                isActive: true,
-              }).returning();
+              const [newCat] = await tx
+                .insert(baleProductCategories)
+                .values({
+                  companyId,
+                  name: categoryName,
+                  isActive: true,
+                })
+                .returning();
               categoryCache[lowerCat] = newCat.id;
               categoryId = newCat.id;
               categoriesCreated++;
@@ -660,19 +757,23 @@ export function registerBaleRoutes(app: Express) {
           const weightPerBaleKg = row.weightPerBaleKg || row.weight_per_bale_kg || row.weight || undefined;
           const active = row.active === undefined ? true : Boolean(row.active);
 
-          const [existing] = await tx.select().from(baleProducts).where(
-            and(eq(baleProducts.articleCode, articleCode), eq(baleProducts.companyId, companyId))
-          );
+          const [existing] = await tx
+            .select()
+            .from(baleProducts)
+            .where(and(eq(baleProducts.articleCode, articleCode), eq(baleProducts.companyId, companyId)));
 
           if (existing) {
-            await tx.update(baleProducts).set({
-              name,
-              description: description || existing.description,
-              weightPerBaleKg: weightPerBaleKg ? String(weightPerBaleKg) : existing.weightPerBaleKg,
-              categoryId: categoryId ?? existing.categoryId,
-              active,
-              updatedAt: sql`now()`,
-            }).where(eq(baleProducts.id, existing.id));
+            await tx
+              .update(baleProducts)
+              .set({
+                name,
+                description: description || existing.description,
+                weightPerBaleKg: weightPerBaleKg ? String(weightPerBaleKg) : existing.weightPerBaleKg,
+                categoryId: categoryId ?? existing.categoryId,
+                active,
+                updatedAt: sql`now()`,
+              })
+              .where(eq(baleProducts.id, existing.id));
             updated++;
           } else {
             await tx.insert(baleProducts).values({
@@ -701,7 +802,6 @@ export function registerBaleRoutes(app: Express) {
   // existing factory_bales ref for this company, by taking the max across both
   // sequence tables and the actual data.
   async function generateSafeRef(tx: any, companyId: number): Promise<string> {
-
     // Find the true max numeric ref already in use for this company
     const [maxRow] = await tx
       .select({
@@ -716,15 +816,12 @@ export function registerBaleRoutes(app: Express) {
       .select()
       .from(referenceSequences)
       .where(eq(referenceSequences.companyId, companyId))
-      .for('update');
-    const [baleSeq] = await tx
-      .select()
-      .from(factoryBaleSequences)
-      .where(eq(factoryBaleSequences.companyId, companyId));
+      .for("update");
+    const [baleSeq] = await tx.select().from(factoryBaleSequences).where(eq(factoryBaleSequences.companyId, companyId));
 
     const seqMax = Math.max(refSeq?.nextNumber ?? 0, baleSeq?.nextNumber ?? 0);
     const safeNext = Math.max(dbMax + 1, seqMax);
-    const referenceNumber = `REF${String(safeNext).padStart(6, '0')}`;
+    const referenceNumber = `REF${String(safeNext).padStart(6, "0")}`;
 
     // Update (or insert) referenceSequences so next call gets safeNext+1
     if (refSeq) {
@@ -791,10 +888,7 @@ export function registerBaleRoutes(app: Express) {
             } else {
               // Bale has no ref yet (e.g. pressing batch bale) — generate one safely
               referenceNumber = await generateSafeRef(tx, companyId);
-              await tx
-                .update(factoryBales)
-                .set({ referenceNumber })
-                .where(eq(factoryBales.id, bale.productionBaleId));
+              await tx.update(factoryBales).set({ referenceNumber }).where(eq(factoryBales.id, bale.productionBaleId));
             }
           } else if (bale.referenceNumber) {
             // Pre-allocated offline ref — use it directly (sequence was already advanced)
@@ -891,10 +985,7 @@ export function registerBaleRoutes(app: Express) {
         const baleRows = await db
           .select({ referenceNumber: factoryBales.referenceNumber, status: factoryBales.status })
           .from(factoryBales)
-          .where(and(
-            eq(factoryBales.companyId, companyId),
-            inArray(factoryBales.referenceNumber, refNumbers),
-          ));
+          .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.referenceNumber, refNumbers)));
         for (const b of baleRows) {
           if (b.referenceNumber) baleStatusMap[b.referenceNumber] = b.status;
         }
@@ -957,7 +1048,11 @@ export function registerBaleRoutes(app: Express) {
         // Use stored workerName first (denormalized); fall back to join if not yet populated
         let directWorkerName: string | null = directBale.workerName ?? null;
         if (!directWorkerName && directBale.finalizedBy) {
-          const [wk] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, directBale.finalizedBy)).limit(1);
+          const [wk] = await db
+            .select({ fullName: factoryWorkers.fullName })
+            .from(factoryWorkers)
+            .where(eq(factoryWorkers.id, directBale.finalizedBy))
+            .limit(1);
           if (wk) directWorkerName = wk.fullName;
         }
 
@@ -1062,7 +1157,11 @@ export function registerBaleRoutes(app: Express) {
         // Use stored workerName first (denormalized); fall back to join if not yet populated
         let workerName: string | null = factoryBale.workerName ?? null;
         if (!workerName && factoryBale.finalizedBy) {
-          const [wk] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, factoryBale.finalizedBy)).limit(1);
+          const [wk] = await db
+            .select({ fullName: factoryWorkers.fullName })
+            .from(factoryWorkers)
+            .where(eq(factoryWorkers.id, factoryBale.finalizedBy))
+            .limit(1);
           if (wk) workerName = wk.fullName;
         }
 
@@ -1144,9 +1243,10 @@ export function registerBaleRoutes(app: Express) {
                     .where(inArray(factoryContainers.id, containerIds));
 
                   const supplierIds = [...new Set(containerRows.filter((c) => c.supplierId).map((c) => c.supplierId!))];
-                  const supplierRows = supplierIds.length > 0
-                    ? await db.select().from(factorySuppliers).where(inArray(factorySuppliers.id, supplierIds))
-                    : [];
+                  const supplierRows =
+                    supplierIds.length > 0
+                      ? await db.select().from(factorySuppliers).where(inArray(factorySuppliers.id, supplierIds))
+                      : [];
                   const supplierMap = new Map(supplierRows.map((s) => [s.id, s.name]));
 
                   containers_used = containerRows.map((c) => {
@@ -1157,7 +1257,7 @@ export function registerBaleRoutes(app: Express) {
                       origin: c.origin,
                       arrivalDate: c.arrivalDate,
                       status: c.status,
-                      supplierName: c.supplierId ? (supplierMap.get(c.supplierId) || null) : null,
+                      supplierName: c.supplierId ? supplierMap.get(c.supplierId) || null : null,
                       weightKgUsed: src?.weightKg || null,
                       currencyCode: c.currencyCode,
                       ratePerKg: c.ratePerKg,
@@ -1262,12 +1362,7 @@ export function registerBaleRoutes(app: Express) {
           scannedByUserId: req.session.userId || null,
           scannedAt: new Date(),
         })
-        .where(
-          and(
-            eq(baleLabelPrints.referenceNumber, referenceNumber),
-            eq(baleLabelPrints.companyId, companyId)
-          )
-        )
+        .where(and(eq(baleLabelPrints.referenceNumber, referenceNumber), eq(baleLabelPrints.companyId, companyId)))
         .returning();
 
       if (!updated) {
@@ -1283,147 +1378,165 @@ export function registerBaleRoutes(app: Express) {
   });
 
   // Admin: Delete bale/reference everywhere (soft-delete the factory bale)
-  app.delete("/api/lookup/reference/:referenceNumber/delete-everywhere", requireAuth, requireRole("Admin", "Owner", "Developer"), async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.delete(
+    "/api/lookup/reference/:referenceNumber/delete-everywhere",
+    requireAuth,
+    requireRole("Admin", "Owner", "Developer"),
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
+        const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
 
-      const [bale] = await db
-        .select()
-        .from(factoryBales)
-        .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
-        .limit(1);
-
-      if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
-
-      // Guard: refuse if bale is on a finalized/locked customer order
-      const [orderBaleRow] = await db
-        .select()
-        .from(customerOrderBales)
-        .where(eq(customerOrderBales.baleReference, referenceNumber))
-        .limit(1);
-
-      if (orderBaleRow) {
-        const [order] = await db
-          .select({ status: customerOrders.status })
-          .from(customerOrders)
-          .where(eq(customerOrders.id, orderBaleRow.orderId))
+        const [bale] = await db
+          .select()
+          .from(factoryBales)
+          .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
           .limit(1);
-        if (order && ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status)) {
-          return res.status(409).json({ message: "This bale is linked to a finalized/locked order and cannot be deleted from here." });
-        }
-      }
 
-      const deletedAt = new Date();
-      await db
-        .update(factoryBales)
-        .set({ status: "DELETED", deletedAt, updatedAt: deletedAt })
-        .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)));
+        if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
 
-      // Write audit entry so "Deleted by" info is available on the barcode lookup
-      await logAudit({
-        userId: req.session.userId!,
-        username: (req.session as any).username || "unknown",
-        companyId,
-        action: "delete",
-        tableName: "factory_bales",
-        recordId: bale.id,
-        recordIdentifier: referenceNumber,
-        changes: { status: { old: bale.status, new: "DELETED" } },
-      });
-
-      res.json({ message: "Bale deleted from linked records" });
-    } catch (error: any) {
-      console.error("Error deleting bale everywhere:", error);
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Admin: Change the linked bale product (article code / product name) for a reference
-  app.patch("/api/lookup/reference/:referenceNumber/change-product", requireAuth, requireRole("Admin", "Owner", "Developer"), async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
-      const { newProductId } = req.body;
-
-      if (!newProductId || typeof newProductId !== "number") {
-        return res.status(400).json({ message: "newProductId (number) is required" });
-      }
-
-      const [bale] = await db
-        .select()
-        .from(factoryBales)
-        .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
-        .limit(1);
-
-      if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
-
-      // Guard: locked order
-      const [orderBaleRow] = await db
-        .select()
-        .from(customerOrderBales)
-        .where(eq(customerOrderBales.baleReference, referenceNumber))
-        .limit(1);
-
-      if (orderBaleRow) {
-        const [order] = await db
-          .select({ status: customerOrders.status })
-          .from(customerOrders)
-          .where(eq(customerOrders.id, orderBaleRow.orderId))
+        // Guard: refuse if bale is on a finalized/locked customer order
+        const [orderBaleRow] = await db
+          .select()
+          .from(customerOrderBales)
+          .where(eq(customerOrderBales.baleReference, referenceNumber))
           .limit(1);
-        if (order && ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status)) {
-          return res.status(409).json({ message: "This bale is linked to a finalized/locked order and cannot be changed." });
+
+        if (orderBaleRow) {
+          const [order] = await db
+            .select({ status: customerOrders.status })
+            .from(customerOrders)
+            .where(eq(customerOrders.id, orderBaleRow.orderId))
+            .limit(1);
+          if (order && ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status)) {
+            return res
+              .status(409)
+              .json({ message: "This bale is linked to a finalized/locked order and cannot be deleted from here." });
+          }
         }
-      }
 
-      const [newProduct] = await db
-        .select()
-        .from(factoryBaleProducts)
-        .where(and(eq(factoryBaleProducts.id, newProductId), eq(factoryBaleProducts.companyId, companyId)))
-        .limit(1);
-
-      if (!newProduct) return res.status(404).json({ message: "Target product not found" });
-
-      const newArticleCode = newProduct.articleCode || newProduct.code;
-      const newBaleCode = newProduct.code;
-      const newProductName = newProduct.name;
-
-      await db.transaction(async (tx) => {
-        await tx
+        const deletedAt = new Date();
+        await db
           .update(factoryBales)
-          .set({ productId: newProduct.id, articleCode: newArticleCode, baleCode: newBaleCode, productName: newProductName, updatedAt: new Date() })
+          .set({ status: "DELETED", deletedAt, updatedAt: deletedAt })
           .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)));
 
-        await tx
-          .update(baleLabelPrints)
-          .set({ articleCode: newArticleCode })
-          .where(and(eq(baleLabelPrints.referenceNumber, referenceNumber), eq(baleLabelPrints.companyId, companyId)));
-      });
+        // Write audit entry so "Deleted by" info is available on the barcode lookup
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "delete",
+          tableName: "factory_bales",
+          recordId: bale.id,
+          recordIdentifier: referenceNumber,
+          changes: { status: { old: bale.status, new: "DELETED" } },
+        });
 
-      res.json({ message: "Bale product changed", newArticleCode, newProductName });
-    } catch (error: any) {
-      console.error("Error changing bale product:", error);
-      res.status(500).json({ message: error.message });
+        res.json({ message: "Bale deleted from linked records" });
+      } catch (error: any) {
+        console.error("Error deleting bale everywhere:", error);
+        res.status(500).json({ message: error.message });
+      }
     }
-  });
+  );
+
+  // Admin: Change the linked bale product (article code / product name) for a reference
+  app.patch(
+    "/api/lookup/reference/:referenceNumber/change-product",
+    requireAuth,
+    requireRole("Admin", "Owner", "Developer"),
+    async (req, res) => {
+      try {
+        const companyId = req.session.currentCompanyId || (req.session as any).factoryCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+        const referenceNumber = decodeURIComponent(req.params.referenceNumber).toUpperCase();
+        const { newProductId } = req.body;
+
+        if (!newProductId || typeof newProductId !== "number") {
+          return res.status(400).json({ message: "newProductId (number) is required" });
+        }
+
+        const [bale] = await db
+          .select()
+          .from(factoryBales)
+          .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)))
+          .limit(1);
+
+        if (!bale) return res.status(404).json({ message: "Bale not found for this reference" });
+
+        // Guard: locked order
+        const [orderBaleRow] = await db
+          .select()
+          .from(customerOrderBales)
+          .where(eq(customerOrderBales.baleReference, referenceNumber))
+          .limit(1);
+
+        if (orderBaleRow) {
+          const [order] = await db
+            .select({ status: customerOrders.status })
+            .from(customerOrders)
+            .where(eq(customerOrders.id, orderBaleRow.orderId))
+            .limit(1);
+          if (order && ["FINALIZED", "VERIFIED", "DISPATCHED", "SOLD"].includes(order.status)) {
+            return res
+              .status(409)
+              .json({ message: "This bale is linked to a finalized/locked order and cannot be changed." });
+          }
+        }
+
+        const [newProduct] = await db
+          .select()
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.id, newProductId), eq(factoryBaleProducts.companyId, companyId)))
+          .limit(1);
+
+        if (!newProduct) return res.status(404).json({ message: "Target product not found" });
+
+        const newArticleCode = newProduct.articleCode || newProduct.code;
+        const newBaleCode = newProduct.code;
+        const newProductName = newProduct.name;
+
+        await db.transaction(async (tx) => {
+          await tx
+            .update(factoryBales)
+            .set({
+              productId: newProduct.id,
+              articleCode: newArticleCode,
+              baleCode: newBaleCode,
+              productName: newProductName,
+              updatedAt: new Date(),
+            })
+            .where(and(eq(factoryBales.referenceNumber, referenceNumber), eq(factoryBales.companyId, companyId)));
+
+          await tx
+            .update(baleLabelPrints)
+            .set({ articleCode: newArticleCode })
+            .where(and(eq(baleLabelPrints.referenceNumber, referenceNumber), eq(baleLabelPrints.companyId, companyId)));
+        });
+
+        res.json({ message: "Bale product changed", newArticleCode, newProductName });
+      } catch (error: any) {
+        console.error("Error changing bale product:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
 
   // Company Settings API Routes
   app.get("/api/company-settings", requireAuth, async (req, res) => {
     try {
       const { companyId: queryCompanyId } = req.query;
-      const companyId = queryCompanyId
-        ? parseInt(queryCompanyId as string)
-        : req.session.currentCompanyId;
+      const companyId = queryCompanyId ? parseInt(queryCompanyId as string) : req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
 
       const settings = await cache(`company_settings:${companyId}`, 30_000, () =>
-        storage.getCompanySettings(companyId).then((s) => s || { companyId }),
+        storage.getCompanySettings(companyId).then((s) => s || { companyId })
       );
       res.json(settings);
     } catch (error: any) {
@@ -1435,9 +1548,7 @@ export function registerBaleRoutes(app: Express) {
   app.post("/api/company-settings", requireAuth, async (req, res) => {
     try {
       const { companyId: bodyCompanyId } = req.body;
-      const companyId = bodyCompanyId
-        ? parseInt(bodyCompanyId as string)
-        : req.session.currentCompanyId;
+      const companyId = bodyCompanyId ? parseInt(bodyCompanyId as string) : req.session.currentCompanyId;
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -1515,16 +1626,22 @@ export function registerBaleRoutes(app: Express) {
       const finalCostPerKg = req.body.costPerKg || container.ratePerKg || null;
 
       if (!finalReceivedKg || parseFloat(finalReceivedKg) <= 0) {
-        return res.status(400).json({ message: "Received weight is required. Container has no saved Total KG - please provide a value." });
+        return res
+          .status(400)
+          .json({ message: "Received weight is required. Container has no saved Total KG - please provide a value." });
       }
       if (!finalCostPerKg || parseFloat(finalCostPerKg) <= 0) {
-        return res.status(400).json({ message: "Cost per kg is required. Container has no saved Rate per KG - please provide a value." });
+        return res
+          .status(400)
+          .json({ message: "Cost per kg is required. Container has no saved Rate per KG - please provide a value." });
       }
 
       const existing = await db
         .select()
         .from(productionRawStock)
-        .where(and(eq(productionRawStock.companyId, companyId), eq(productionRawStock.containerId, parseInt(containerId))));
+        .where(
+          and(eq(productionRawStock.companyId, companyId), eq(productionRawStock.containerId, parseInt(containerId)))
+        );
 
       if (existing.length > 0) {
         return res.status(409).json({ message: "Container already offloaded to production raw stock" });
@@ -1558,19 +1675,14 @@ export function registerBaleRoutes(app: Express) {
         .from(productionRawStock)
         .where(eq(productionRawStock.companyId, companyId));
 
-      const offloadedIdList = offloadedIds.map(r => r.containerId);
+      const offloadedIdList = offloadedIds.map((r) => r.containerId);
 
       const allContainers = await db
         .select()
         .from(containers)
-        .where(
-          and(
-            eq(containers.companyId, companyId),
-            eq(containers.status, "AVAILABLE")
-          )
-        );
+        .where(and(eq(containers.companyId, companyId), eq(containers.status, "AVAILABLE")));
 
-      const available = allContainers.filter(c => !offloadedIdList.includes(c.id));
+      const available = allContainers.filter((c) => !offloadedIdList.includes(c.id));
       res.json(available);
     } catch (error: any) {
       console.error("Error fetching available containers:", error);
@@ -1600,14 +1712,14 @@ export function registerBaleRoutes(app: Express) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      
+
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid mix batch ID" });
       }
-      
+
       const batch = await storage.getMixBatchById(id, companyId);
-      
+
       if (!batch) {
         return res.status(404).json({ message: "Mix batch not found" });
       }
@@ -1627,8 +1739,8 @@ export function registerBaleRoutes(app: Express) {
 
       const { sources, batchSources, name, ...batchData } = req.body;
 
-      const hasSources = (sources && Array.isArray(sources) && sources.length > 0);
-      const hasBatchSources = (batchSources && Array.isArray(batchSources) && batchSources.length > 0);
+      const hasSources = sources && Array.isArray(sources) && sources.length > 0;
+      const hasBatchSources = batchSources && Array.isArray(batchSources) && batchSources.length > 0;
 
       if (!hasSources && !hasBatchSources) {
         return res.status(400).json({ message: "At least one container or batch source is required" });
@@ -1641,11 +1753,17 @@ export function registerBaleRoutes(app: Express) {
           .from(mixBatches)
           .where(eq(mixBatches.companyId, companyId));
         const batchNum = existingBatches.length + 1;
-        const batchCode = batchData.batchCode || `MB-${year}-${String(batchNum).padStart(3, '0')}`;
+        const batchCode = batchData.batchCode || `MB-${year}-${String(batchNum).padStart(3, "0")}`;
 
         let totalWeightKg = 0;
         let totalCost = 0;
-        const validatedSources: Array<{ containerId?: number; sourceBatchId?: number; weightKg: number; costPerKg: number; totalCost: number }> = [];
+        const validatedSources: Array<{
+          containerId?: number;
+          sourceBatchId?: number;
+          weightKg: number;
+          costPerKg: number;
+          totalCost: number;
+        }> = [];
 
         // Process container sources
         if (hasSources) {
@@ -1661,10 +1779,7 @@ export function registerBaleRoutes(app: Express) {
             const [rawStock] = await tx
               .select()
               .from(productionRawStock)
-              .where(and(
-                eq(productionRawStock.companyId, companyId),
-                eq(productionRawStock.containerId, cId)
-              ))
+              .where(and(eq(productionRawStock.companyId, companyId), eq(productionRawStock.containerId, cId)))
               .for("update");
 
             if (!rawStock) {
@@ -1673,7 +1788,9 @@ export function registerBaleRoutes(app: Express) {
 
             const remaining = parseFloat(rawStock.receivedKg) - parseFloat(rawStock.usedKg);
             if (wKg > remaining + 0.001) {
-              throw new Error(`Container ${rawStock.containerId} only has ${remaining.toFixed(3)} kg remaining, requested ${wKg}`);
+              throw new Error(
+                `Container ${rawStock.containerId} only has ${remaining.toFixed(3)} kg remaining, requested ${wKg}`
+              );
             }
 
             const newUsed = parseFloat(rawStock.usedKg) + wKg;
@@ -1702,10 +1819,7 @@ export function registerBaleRoutes(app: Express) {
             const [srcBatch] = await tx
               .select()
               .from(mixBatches)
-              .where(and(
-                eq(mixBatches.id, srcBatchId),
-                eq(mixBatches.companyId, companyId)
-              ))
+              .where(and(eq(mixBatches.id, srcBatchId), eq(mixBatches.companyId, companyId)))
               .for("update");
 
             if (!srcBatch) {
@@ -1717,7 +1831,9 @@ export function registerBaleRoutes(app: Express) {
             const srcRemaining = srcTotal - srcUsed;
 
             if (wKg > srcRemaining + 0.001) {
-              throw new Error(`Batch ${srcBatch.batchCode} only has ${srcRemaining.toFixed(3)} kg remaining, requested ${wKg}`);
+              throw new Error(
+                `Batch ${srcBatch.batchCode} only has ${srcRemaining.toFixed(3)} kg remaining, requested ${wKg}`
+              );
             }
 
             // Deduct from source batch's usedKg
@@ -1726,7 +1842,7 @@ export function registerBaleRoutes(app: Express) {
               .update(mixBatches)
               .set({
                 usedKg: newUsed.toFixed(3),
-                status: (newUsed >= srcTotal - 0.001) ? "COMPLETED" : srcBatch.status,
+                status: newUsed >= srcTotal - 0.001 ? "COMPLETED" : srcBatch.status,
               })
               .where(eq(mixBatches.id, srcBatchId));
 
@@ -1734,7 +1850,12 @@ export function registerBaleRoutes(app: Express) {
             const sCost = wKg * srcCostPerKg;
             totalWeightKg += wKg;
             totalCost += sCost;
-            validatedSources.push({ sourceBatchId: srcBatchId, weightKg: wKg, costPerKg: srcCostPerKg, totalCost: sCost });
+            validatedSources.push({
+              sourceBatchId: srcBatchId,
+              weightKg: wKg,
+              costPerKg: srcCostPerKg,
+              totalCost: sCost,
+            });
           }
         }
 
@@ -1782,12 +1903,12 @@ export function registerBaleRoutes(app: Express) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      
+
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid mix batch ID" });
       }
-      
+
       const sources = await storage.getMixBatchSources(id, companyId);
       res.json(sources);
     } catch (error: any) {
@@ -1802,20 +1923,20 @@ export function registerBaleRoutes(app: Express) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      
+
       const mixBatchId = parseInt(req.params.id);
       if (isNaN(mixBatchId)) {
         return res.status(400).json({ message: "Invalid mix batch ID" });
       }
-      
+
       // Verify the mix batch belongs to this company
       const batch = await storage.getMixBatchById(mixBatchId, companyId);
       if (!batch) {
         return res.status(404).json({ message: "Mix batch not found" });
       }
-      const data = insertMixBatchSourceSchema.parse({ 
-        ...req.body, 
-        mixBatchId 
+      const data = insertMixBatchSourceSchema.parse({
+        ...req.body,
+        mixBatchId,
       });
 
       const source = await storage.addMixBatchSource(data);
@@ -1856,7 +1977,7 @@ export function registerBaleRoutes(app: Express) {
       }
 
       const bale = await storage.getProductionBaleByBarcode(req.params.barcode, companyId);
-      
+
       if (!bale) {
         return res.status(404).json({ message: "Bale not found" });
       }
@@ -1921,8 +2042,8 @@ export function registerBaleRoutes(app: Express) {
         const totalWeight = weight * numBales;
         const remainingKg = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg || "0");
         if (totalWeight > remainingKg + 0.001) {
-          return res.status(400).json({ 
-            message: `Not enough remaining in mix batch. Available: ${remainingKg.toFixed(3)} kg, Requested: ${totalWeight.toFixed(3)} kg` 
+          return res.status(400).json({
+            message: `Not enough remaining in mix batch. Available: ${remainingKg.toFixed(3)} kg, Requested: ${totalWeight.toFixed(3)} kg`,
           });
         }
         costPerKg = parseFloat(batch.costPerKg);
@@ -1950,7 +2071,7 @@ export function registerBaleRoutes(app: Express) {
             .returning();
           pressingBatchId = pb.id;
         }
-        
+
         // Create bales with unique barcodes (all within transaction)
         for (let i = 0; i < numBales; i++) {
           // Generate unique barcode within transaction
@@ -1958,19 +2079,16 @@ export function registerBaleRoutes(app: Express) {
             .select()
             .from(baleSequences)
             .where(eq(baleSequences.companyId, companyId))
-            .for('update'); // Lock the row
+            .for("update"); // Lock the row
 
           let barcode: string;
           if (!sequence) {
             // Create new sequence
-            const [newSeq] = await tx
-              .insert(baleSequences)
-              .values({ companyId, nextNumber: 2 })
-              .returning();
-            barcode = `HD${String(newSeq.nextNumber - 1).padStart(5, '0')}`;
+            const [newSeq] = await tx.insert(baleSequences).values({ companyId, nextNumber: 2 }).returning();
+            barcode = `HD${String(newSeq.nextNumber - 1).padStart(5, "0")}`;
           } else {
             // Increment and use
-            barcode = `HD${String(sequence.nextNumber).padStart(5, '0')}`;
+            barcode = `HD${String(sequence.nextNumber).padStart(5, "0")}`;
             await tx
               .update(baleSequences)
               .set({ nextNumber: sequence.nextNumber + 1 })
@@ -1993,11 +2111,8 @@ export function registerBaleRoutes(app: Express) {
             status: isPressing ? "PENDING" : "IN_STOCK",
             pressedAt: new Date(),
           };
-          
-          const [bale] = await tx
-            .insert(productionBales)
-            .values(baleData)
-            .returning();
+
+          const [bale] = await tx.insert(productionBales).values(baleData).returning();
           createdBales.push(bale);
         }
 
@@ -2015,7 +2130,12 @@ export function registerBaleRoutes(app: Express) {
         return { bales: createdBales, pressingBatchId };
       });
 
-      res.json({ bales: result.bales, success: true, count: result.bales.length, pressingBatchId: result.pressingBatchId });
+      res.json({
+        bales: result.bales,
+        success: true,
+        count: result.bales.length,
+        pressingBatchId: result.pressingBatchId,
+      });
     } catch (error: any) {
       console.error("Error creating production bales:", error);
       res.status(500).json({ message: error.message });
@@ -2036,10 +2156,7 @@ export function registerBaleRoutes(app: Express) {
         .from(productionBales)
         .leftJoin(baleProducts, eq(productionBales.productId, baleProducts.id))
         .leftJoin(mixBatches, eq(productionBales.mixBatchId, mixBatches.id))
-        .where(and(
-          eq(productionBales.companyId, companyId),
-          eq(productionBales.status, "PENDING")
-        ))
+        .where(and(eq(productionBales.companyId, companyId), eq(productionBales.status, "PENDING")))
         .orderBy(desc(productionBales.createdAt));
 
       res.json(pending);
@@ -2065,13 +2182,12 @@ export function registerBaleRoutes(app: Express) {
         .from(productionBales)
         .leftJoin(baleProducts, eq(productionBales.productId, baleProducts.id))
         .leftJoin(mixBatches, eq(productionBales.mixBatchId, mixBatches.id))
-        .where(and(
-          eq(productionBales.companyId, companyId),
-          or(
-            eq(productionBales.barcodeValue, barcode),
-            eq(productionBales.baleCode, barcode)
+        .where(
+          and(
+            eq(productionBales.companyId, companyId),
+            or(eq(productionBales.barcodeValue, barcode), eq(productionBales.baleCode, barcode))
           )
-        ));
+        );
 
       if (results.length === 0) {
         return res.status(404).json({ message: "Bale not found" });
@@ -2106,15 +2222,12 @@ export function registerBaleRoutes(app: Express) {
           const bales = await db
             .select()
             .from(productionBales)
-            .where(and(
-              eq(productionBales.pressingBatchId, b.batch.id),
-              eq(productionBales.companyId, companyId)
-            ));
+            .where(and(eq(productionBales.pressingBatchId, b.batch.id), eq(productionBales.companyId, companyId)));
           return {
             ...b,
             bales,
-            pendingCount: bales.filter(bl => bl.status === "PENDING").length,
-            finalizedCount: bales.filter(bl => bl.status !== "PENDING").length,
+            pendingCount: bales.filter((bl) => bl.status === "PENDING").length,
+            finalizedCount: bales.filter((bl) => bl.status !== "PENDING").length,
           };
         })
       );
@@ -2143,26 +2256,20 @@ export function registerBaleRoutes(app: Express) {
         .from(pressingBatches)
         .leftJoin(baleProducts, eq(pressingBatches.productId, baleProducts.id))
         .leftJoin(mixBatches, eq(pressingBatches.mixBatchId, mixBatches.id))
-        .where(and(
-          eq(pressingBatches.id, batchId),
-          eq(pressingBatches.companyId, companyId)
-        ));
+        .where(and(eq(pressingBatches.id, batchId), eq(pressingBatches.companyId, companyId)));
 
       if (!batchRow) return res.status(404).json({ message: "Pressing batch not found" });
 
       const bales = await db
         .select()
         .from(productionBales)
-        .where(and(
-          eq(productionBales.pressingBatchId, batchId),
-          eq(productionBales.companyId, companyId)
-        ));
+        .where(and(eq(productionBales.pressingBatchId, batchId), eq(productionBales.companyId, companyId)));
 
       res.json({
         ...batchRow,
         bales,
-        pendingCount: bales.filter(b => b.status === "PENDING").length,
-        finalizedCount: bales.filter(b => b.status !== "PENDING").length,
+        pendingCount: bales.filter((b) => b.status === "PENDING").length,
+        finalizedCount: bales.filter((b) => b.status !== "PENDING").length,
       });
     } catch (error: any) {
       console.error("Error fetching pressing batch:", error);
@@ -2186,13 +2293,11 @@ export function registerBaleRoutes(app: Express) {
       const [batch] = await db
         .select()
         .from(pressingBatches)
-        .where(and(
-          eq(pressingBatches.id, parseInt(pressingBatchId)),
-          eq(pressingBatches.companyId, companyId)
-        ));
+        .where(and(eq(pressingBatches.id, parseInt(pressingBatchId)), eq(pressingBatches.companyId, companyId)));
 
       if (!batch) return res.status(404).json({ message: "Pressing batch not found" });
-      if (batch.status === "FINALIZED") return res.status(400).json({ message: "This pressing batch has already been finalized" });
+      if (batch.status === "FINALIZED")
+        return res.status(400).json({ message: "This pressing batch has already been finalized" });
 
       const mixBatch = await storage.getMixBatchById(parseInt(mixBatchId), companyId);
       if (!mixBatch) return res.status(404).json({ message: "Mix batch not found" });
@@ -2200,11 +2305,13 @@ export function registerBaleRoutes(app: Express) {
       const pendingBales = await db
         .select()
         .from(productionBales)
-        .where(and(
-          eq(productionBales.pressingBatchId, batch.id),
-          eq(productionBales.companyId, companyId),
-          eq(productionBales.status, "PENDING")
-        ));
+        .where(
+          and(
+            eq(productionBales.pressingBatchId, batch.id),
+            eq(productionBales.companyId, companyId),
+            eq(productionBales.status, "PENDING")
+          )
+        );
 
       const expectedCount = pendingBales.length;
       const scannedIds = scannedBaleIds.map((id: any) => parseInt(id));
@@ -2217,7 +2324,7 @@ export function registerBaleRoutes(app: Express) {
         });
       }
 
-      const pendingBaleIds = new Set(pendingBales.map(b => b.id));
+      const pendingBaleIds = new Set(pendingBales.map((b) => b.id));
       const invalidIds = scannedIds.filter((id: number) => !pendingBaleIds.has(id));
       if (invalidIds.length > 0) {
         return res.status(400).json({
@@ -2226,7 +2333,7 @@ export function registerBaleRoutes(app: Express) {
         });
       }
 
-      const scannedBaleRecords = pendingBales.filter(b => scannedIds.includes(b.id));
+      const scannedBaleRecords = pendingBales.filter((b) => scannedIds.includes(b.id));
       const totalWeight = scannedBaleRecords.reduce((sum, b) => sum + parseFloat(b.weightKg || "0"), 0);
       const mixRemainingKg = parseFloat(mixBatch.totalWeightKg) - parseFloat(mixBatch.usedKg || "0");
       if (totalWeight > mixRemainingKg + 0.001) {
@@ -2240,7 +2347,7 @@ export function registerBaleRoutes(app: Express) {
       const updated = await db.transaction(async (tx) => {
         const finalizedBales: any[] = [];
         for (const baleId of scannedIds) {
-          const baleRecord = scannedBaleRecords.find(b => b.id === baleId);
+          const baleRecord = scannedBaleRecords.find((b) => b.id === baleId);
           const baleWeight = parseFloat(baleRecord?.weightKg || "0");
           const baleTotalCost = (baleWeight * costPerKg).toFixed(2);
 
@@ -2254,11 +2361,13 @@ export function registerBaleRoutes(app: Express) {
               status: "IN_STOCK",
               updatedAt: new Date(),
             })
-            .where(and(
-              eq(productionBales.id, baleId),
-              eq(productionBales.companyId, companyId),
-              eq(productionBales.status, "PENDING")
-            ))
+            .where(
+              and(
+                eq(productionBales.id, baleId),
+                eq(productionBales.companyId, companyId),
+                eq(productionBales.status, "PENDING")
+              )
+            )
             .returning();
 
           if (updatedBale) finalizedBales.push(updatedBale);
@@ -2321,9 +2430,7 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid data format" });
       }
 
-      const validatedBales = balesData.map((b: any) => 
-        insertProductionBaleSchema.parse({ ...b, companyId })
-      );
+      const validatedBales = balesData.map((b: any) => insertProductionBaleSchema.parse({ ...b, companyId }));
 
       const created = await storage.bulkCreateProductionBales(validatedBales);
       res.json({ success: true, count: created.length, bales: created });
@@ -2361,11 +2468,12 @@ export function registerBaleRoutes(app: Express) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      const bale = await storage.updateProductionBaleFromScan(
-        barcodeValue,
-        companyId,
-        { weightKg, category, grade, warehouseLocation }
-      );
+      const bale = await storage.updateProductionBaleFromScan(barcodeValue, companyId, {
+        weightKg,
+        category,
+        grade,
+        warehouseLocation,
+      });
 
       res.json(bale);
     } catch (error: any) {
@@ -2377,13 +2485,13 @@ export function registerBaleRoutes(app: Express) {
   app.post("/api/generate-barcode", requireAuth, async (req, res) => {
     try {
       const { text } = req.body;
-      
+
       if (!text) {
         return res.status(400).json({ message: "Barcode text is required" });
       }
 
       const bwipjs = await getBwipjs();
-      
+
       // Render to PNG buffer
       const png = await bwipjs.toBuffer({
         bcid: "code128",
@@ -2407,13 +2515,13 @@ export function registerBaleRoutes(app: Express) {
   app.get("/api/barcode/:code", requireAuth, async (req, res) => {
     try {
       const code = decodeURIComponent(req.params.code);
-      
+
       if (!code) {
         return res.status(400).json({ message: "Barcode code is required" });
       }
 
       const bwipjs = await getBwipjs();
-      
+
       const png = await bwipjs.toBuffer({
         bcid: "code128",
         text: code,
@@ -2503,10 +2611,15 @@ export function registerBaleRoutes(app: Express) {
       const updated = await db
         .update(productionBales)
         .set({ status, updatedAt: new Date() })
-        .where(and(
-          inArray(productionBales.id, ids.map((id: any) => parseInt(id))),
-          eq(productionBales.companyId, companyId)
-        ))
+        .where(
+          and(
+            inArray(
+              productionBales.id,
+              ids.map((id: any) => parseInt(id))
+            ),
+            eq(productionBales.companyId, companyId)
+          )
+        )
         .returning();
 
       res.json({ updated: updated.length });
@@ -2566,7 +2679,7 @@ export function registerBaleRoutes(app: Express) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      
+
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) {
         return res.status(400).json({ message: "Invalid customer ID" });
@@ -2586,7 +2699,7 @@ export function registerBaleRoutes(app: Express) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      
+
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) {
         return res.status(400).json({ message: "Invalid customer ID" });
@@ -2607,13 +2720,13 @@ export function registerBaleRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      
+
       // Check if user is POS role
       const isPOS = req.session.currentRole === "POS";
-      
+
       const locationId = parseInt(req.params.locationId);
       if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
-      
+
       const items = await db
         .select({
           id: inventory.id,
@@ -2625,18 +2738,11 @@ export function registerBaleRoutes(app: Express) {
         })
         .from(inventory)
         .innerJoin(stockItems, eq(inventory.stockItemId, stockItems.id))
-        .where(
-          and(
-            eq(inventory.locationId, locationId),
-            sql`CAST(${inventory.quantity} AS NUMERIC) > 0`
-          )
-        );
-      
+        .where(and(eq(inventory.locationId, locationId), sql`CAST(${inventory.quantity} AS NUMERIC) > 0`));
+
       // Strip cost fields for POS users
-      const sanitizedItems = isPOS
-        ? items.map(({ averageRate, ...rest }) => rest)
-        : items;
-      
+      const sanitizedItems = isPOS ? items.map(({ averageRate, ...rest }) => rest) : items;
+
       res.json(sanitizedItems);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2684,8 +2790,17 @@ export function registerBaleRoutes(app: Express) {
 
       const { sourceLocationId, destinationLocationId, transferDate, notes, items } = req.body;
 
-      if (!sourceLocationId || !destinationLocationId || !transferDate || !items || !Array.isArray(items) || items.length === 0) {
-        return res.status(400).json({ message: "Missing required fields: sourceLocationId, destinationLocationId, transferDate, and items array" });
+      if (
+        !sourceLocationId ||
+        !destinationLocationId ||
+        !transferDate ||
+        !items ||
+        !Array.isArray(items) ||
+        items.length === 0
+      ) {
+        return res.status(400).json({
+          message: "Missing required fields: sourceLocationId, destinationLocationId, transferDate, and items array",
+        });
       }
       const createdBy = (req.session as any).username || "system";
 
@@ -2817,10 +2932,7 @@ export function registerBaleRoutes(app: Express) {
       const transferId = parseInt(req.params.id);
       if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
 
-      const [transfer] = await db
-        .select()
-        .from(baleTransfers)
-        .where(eq(baleTransfers.id, transferId));
+      const [transfer] = await db.select().from(baleTransfers).where(eq(baleTransfers.id, transferId));
 
       if (!transfer) return res.status(404).json({ message: "Transfer not found" });
 
@@ -2846,10 +2958,7 @@ export function registerBaleRoutes(app: Express) {
       const transferId = parseInt(req.params.id);
       if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
 
-      const [transfer] = await db
-        .select()
-        .from(baleTransfers)
-        .where(eq(baleTransfers.id, transferId));
+      const [transfer] = await db.select().from(baleTransfers).where(eq(baleTransfers.id, transferId));
 
       if (!transfer) return res.status(404).json({ message: "Transfer not found" });
 
@@ -2858,10 +2967,7 @@ export function registerBaleRoutes(app: Express) {
       }
 
       await db.transaction(async (tx) => {
-        const items = await tx
-          .select()
-          .from(baleTransferItems)
-          .where(eq(baleTransferItems.transferId, transferId));
+        const items = await tx.select().from(baleTransferItems).where(eq(baleTransferItems.transferId, transferId));
 
         for (const item of items) {
           await tx
@@ -2889,11 +2995,11 @@ export function registerBaleRoutes(app: Express) {
       const { items, status, notes } = req.body;
       const transferId = parseInt(req.params.id, 10);
       if (isNaN(transferId)) return res.status(400).json({ message: "Invalid transfer ID" });
-      
+
       await storage.updateBaleTransfer(transferId, {
         status,
         notes,
-        updatedBy: (req.session as any).username || "system"
+        updatedBy: (req.session as any).username || "system",
       });
 
       if (items) {
@@ -2902,7 +3008,7 @@ export function registerBaleRoutes(app: Express) {
             await storage.updateBaleTransferItem(item.id, {
               weightKg: item.weightKg.toString(),
               costPerKg: item.costPerKg.toString(),
-              totalCost: item.totalCost.toString()
+              totalCost: item.totalCost.toString(),
             });
           } else {
             await storage.createBaleTransferItem({
@@ -2911,7 +3017,7 @@ export function registerBaleRoutes(app: Express) {
               quantity: item.quantity,
               weightKg: item.weightKg.toString(),
               costPerKg: item.costPerKg.toString(),
-              totalCost: item.totalCost.toString()
+              totalCost: item.totalCost.toString(),
             });
           }
         }
@@ -2927,19 +3033,21 @@ export function registerBaleRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      
+
       const _locId = parseInt(req.params.locationId, 10);
       if (isNaN(_locId)) return res.status(400).json({ message: "Invalid location ID" });
       const bales = await storage.getProductionBalesByLocation(companyId, _locId);
-      res.json(bales.map(b => ({
-        id: b.id,
-        baleCode: b.baleCode,
-        category: b.category,
-        grade: b.grade,
-        weightKg: b.weightKg,
-        costPerKg: b.costPerKg,
-        totalCost: b.totalCost
-      })));
+      res.json(
+        bales.map((b) => ({
+          id: b.id,
+          baleCode: b.baleCode,
+          category: b.category,
+          grade: b.grade,
+          weightKg: b.weightKg,
+          costPerKg: b.costPerKg,
+          totalCost: b.totalCost,
+        }))
+      );
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

@@ -36,8 +36,8 @@ function getDefaultDateRange() {
   const from = new Date();
   from.setDate(from.getDate() - 30);
   return {
-    from: from.toLocaleDateString('en-CA'),
-    to: to.toLocaleDateString('en-CA'),
+    from: from.toLocaleDateString("en-CA"),
+    to: to.toLocaleDateString("en-CA"),
   };
 }
 
@@ -55,15 +55,20 @@ export default function FactoryKpis() {
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
-    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    queryFn: async () => {
+      const r = await fetch("/api/factory/settings");
+      return r.ok ? r.json() : {};
+    },
     staleTime: 60000,
   });
 
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
-  const showWorkers = settings?.kpisTabWorkerPerformanceEnabled !== false && !hiddenTabs.includes("hide_tab_kpis_worker_performance");
-  const showMixes   = settings?.kpisTabMixEfficiencyEnabled    !== false && !hiddenTabs.includes("hide_tab_kpis_mix_efficiency");
+  const showWorkers =
+    settings?.kpisTabWorkerPerformanceEnabled !== false && !hiddenTabs.includes("hide_tab_kpis_worker_performance");
+  const showMixes =
+    settings?.kpisTabMixEfficiencyEnabled !== false && !hiddenTabs.includes("hide_tab_kpis_mix_efficiency");
 
   const dailyQuery = useQuery<DailyProduction[]>({
     queryKey: ["/api/factory/kpis/daily", from, to],
@@ -124,9 +129,19 @@ export default function FactoryKpis() {
 
       <Tabs defaultValue="daily" data-testid="tabs-kpi">
         <TabsList>
-          <TabsTrigger value="daily" data-testid="tab-daily">Daily Production</TabsTrigger>
-          {showWorkers && <TabsTrigger value="workers" data-testid="tab-workers">Worker Performance</TabsTrigger>}
-          {showMixes && <TabsTrigger value="mixes" data-testid="tab-mixes">Mix Efficiency</TabsTrigger>}
+          <TabsTrigger value="daily" data-testid="tab-daily">
+            Daily Production
+          </TabsTrigger>
+          {showWorkers && (
+            <TabsTrigger value="workers" data-testid="tab-workers">
+              Worker Performance
+            </TabsTrigger>
+          )}
+          {showMixes && (
+            <TabsTrigger value="mixes" data-testid="tab-mixes">
+              Mix Efficiency
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="daily">
@@ -142,7 +157,9 @@ export default function FactoryKpis() {
                 </div>
               ) : !Array.isArray(dailyQuery.data) || dailyQuery.data.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground" data-testid="text-no-data">No daily production data for selected range</p>
+                  <p className="text-muted-foreground" data-testid="text-no-data">
+                    No daily production data for selected range
+                  </p>
                 </div>
               ) : (
                 <div className="table-responsive">
@@ -158,7 +175,9 @@ export default function FactoryKpis() {
                     <TableBody>
                       {dailyQuery.data.map((row, idx) => (
                         <TableRow key={row.date ?? idx} data-testid={`row-daily-${idx}`}>
-                          <TableCell className="font-mono text-sm">{row.date ? formatDisplayDate(row.date) : "—"}</TableCell>
+                          <TableCell className="font-mono text-sm">
+                            {row.date ? formatDisplayDate(row.date) : "—"}
+                          </TableCell>
                           <TableCell className="font-mono">{row.balesProduced}</TableCell>
                           <TableCell className="font-mono">{row.kgPressed}</TableCell>
                           <TableCell className="font-mono">{row.wasteKg}</TableCell>
@@ -186,7 +205,9 @@ export default function FactoryKpis() {
                   </div>
                 ) : !Array.isArray(workersQuery.data) || workersQuery.data.length === 0 ? (
                   <div className="text-center py-8">
-                    <p className="text-muted-foreground" data-testid="text-no-data">No worker performance data for selected range</p>
+                    <p className="text-muted-foreground" data-testid="text-no-data">
+                      No worker performance data for selected range
+                    </p>
                   </div>
                 ) : (
                   <div className="table-responsive">
@@ -233,7 +254,9 @@ export default function FactoryKpis() {
                   </div>
                 ) : !Array.isArray(mixesQuery.data) || mixesQuery.data.length === 0 ? (
                   <div className="text-center py-8">
-                    <p className="text-muted-foreground" data-testid="text-no-data">No mix efficiency data for selected range</p>
+                    <p className="text-muted-foreground" data-testid="text-no-data">
+                      No mix efficiency data for selected range
+                    </p>
                   </div>
                 ) : (
                   <div className="table-responsive">
@@ -254,7 +277,10 @@ export default function FactoryKpis() {
                             <TableCell className="font-mono">{mix.totalInputKg}</TableCell>
                             <TableCell className="font-mono">{mix.totalOutputKg}</TableCell>
                             <TableCell className="font-mono">{mix.wasteKg}</TableCell>
-                            <TableCell className={`font-mono font-medium ${getWasteColor(mix.wastePercent ?? 0)}`} data-testid={`text-waste-percent-${idx}`}>
+                            <TableCell
+                              className={`font-mono font-medium ${getWasteColor(mix.wastePercent ?? 0)}`}
+                              data-testid={`text-waste-percent-${idx}`}
+                            >
                               {(mix.wastePercent ?? 0).toFixed(1)}%
                             </TableCell>
                           </TableRow>

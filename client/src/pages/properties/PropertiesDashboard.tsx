@@ -5,26 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/PageHeader";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
   TrendingUp,
   Plus,
@@ -180,7 +163,8 @@ function CustomNetPositionView({ data }: { data: ProfitData }) {
   const toggle = useCallback((key: string) => {
     setHiddenKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       savePropsCustomViewHidden(next);
       return next;
     });
@@ -194,15 +178,15 @@ function CustomNetPositionView({ data }: { data: ProfitData }) {
 
   const visibleHaveTotal = useMemo(
     () => allAccounts.filter((a) => a.side === "have" && !hiddenKeys.has(a.key)).reduce((s, a) => s + a.value, 0),
-    [allAccounts, hiddenKeys],
+    [allAccounts, hiddenKeys]
   );
   const visibleOweTotal = useMemo(
     () => allAccounts.filter((a) => a.side === "owe" && !hiddenKeys.has(a.key)).reduce((s, a) => s + a.value, 0),
-    [allAccounts, hiddenKeys],
+    [allAccounts, hiddenKeys]
   );
   const visibleSpentTotal = useMemo(
     () => allAccounts.filter((a) => a.side === "spent" && !hiddenKeys.has(a.key)).reduce((s, a) => s + a.value, 0),
-    [allAccounts, hiddenKeys],
+    [allAccounts, hiddenKeys]
   );
   const customNet = visibleHaveTotal - visibleOweTotal - visibleSpentTotal;
   const netPositive = customNet >= 0;
@@ -234,7 +218,9 @@ function CustomNetPositionView({ data }: { data: ProfitData }) {
           <div className="flex items-center gap-2">
             <Equal className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-base">Custom Net Position View</CardTitle>
-            <Badge variant="outline" className="text-xs">View only</Badge>
+            <Badge variant="outline" className="text-xs">
+              View only
+            </Badge>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {hiddenCount > 0 && (
@@ -244,13 +230,15 @@ function CustomNetPositionView({ data }: { data: ProfitData }) {
             )}
             {hiddenCount > 0 && (
               <Button variant="ghost" size="sm" onClick={resetAll} data-testid="button-props-custom-view-reset">
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />Show all
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                Show all
               </Button>
             )}
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Same accounts as the Net Position breakdown above. Hide any account to adjust the subtotal shown here — the actual figures above are never affected.
+          Same accounts as the Net Position breakdown above. Hide any account to adjust the subtotal shown here — the
+          actual figures above are never affected.
         </p>
       </CardHeader>
       <CardContent className="p-0">
@@ -261,12 +249,15 @@ function CustomNetPositionView({ data }: { data: ProfitData }) {
               className={`text-2xl font-bold font-mono ${netPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
               data-testid="text-props-custom-net-position"
             >
-              {customNet < 0 ? "-" : ""}{formatAmount(Math.abs(customNet))}
+              {customNet < 0 ? "-" : ""}
+              {formatAmount(Math.abs(customNet))}
             </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-0.5">Have</p>
-            <p className="font-mono font-semibold text-green-600 dark:text-green-400">{formatAmount(visibleHaveTotal)}</p>
+            <p className="font-mono font-semibold text-green-600 dark:text-green-400">
+              {formatAmount(visibleHaveTotal)}
+            </p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-0.5">Owe</p>
@@ -274,7 +265,9 @@ function CustomNetPositionView({ data }: { data: ProfitData }) {
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-0.5">Spent</p>
-            <p className="font-mono font-semibold text-orange-600 dark:text-orange-400">{formatAmount(visibleSpentTotal)}</p>
+            <p className="font-mono font-semibold text-orange-600 dark:text-orange-400">
+              {formatAmount(visibleSpentTotal)}
+            </p>
           </div>
           {hiddenCount > 0 && (
             <Badge variant="secondary" className="text-xs ml-auto">
@@ -297,10 +290,7 @@ function CustomNetPositionView({ data }: { data: ProfitData }) {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Badge
-                        variant="outline"
-                        className={`text-[9px] px-1 h-4 shrink-0 ${sideBadgeClass(acc.side)}`}
-                      >
+                      <Badge variant="outline" className={`text-[9px] px-1 h-4 shrink-0 ${sideBadgeClass(acc.side)}`}>
                         {sideLabel(acc.side)}
                       </Badge>
                       <p className="text-sm font-medium truncate">{acc.name}</p>
@@ -337,7 +327,8 @@ function CustomNetPositionView({ data }: { data: ProfitData }) {
             className={`font-mono text-base font-bold ${netPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
             data-testid="text-props-custom-net-footer"
           >
-            {customNet < 0 ? "-" : ""}{formatAmount(Math.abs(customNet))}
+            {customNet < 0 ? "-" : ""}
+            {formatAmount(Math.abs(customNet))}
           </span>
         </div>
       </CardContent>
@@ -357,7 +348,11 @@ export default function PropertiesDashboard() {
   const [cashComboboxOpen, setCashComboboxOpen] = useState(false);
 
   // Fetch net profit data
-  const { data: profitData, isLoading, isError } = useQuery<ProfitData>({
+  const {
+    data: profitData,
+    isLoading,
+    isError,
+  } = useQuery<ProfitData>({
     queryKey: ["/api/stats/net-profit", selectedCompany?.id],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/stats/net-profit");
@@ -471,7 +466,11 @@ export default function PropertiesDashboard() {
     },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
-      toast({ title: "Error", description: error.message || "Failed to remove payable account", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove payable account",
+        variant: "destructive",
+      });
     },
   });
 
@@ -549,7 +548,7 @@ export default function PropertiesDashboard() {
   const availableCashAccounts = allAccounts
     .filter((acc) => {
       const alreadyAdded = dashboardCashAccounts.some(
-        (dca) => dca.accountType === (acc.type || "").toLowerCase() && dca.accountId === acc.accountId,
+        (dca) => dca.accountType === (acc.type || "").toLowerCase() && dca.accountId === acc.accountId
       );
       return !alreadyAdded;
     })
@@ -574,11 +573,7 @@ export default function PropertiesDashboard() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <PageHeader
-          title="Dashboard"
-          subtitle="Overview of your properties performance"
-          showHomeButton={false}
-        />
+        <PageHeader title="Dashboard" subtitle="Overview of your properties performance" showHomeButton={false} />
       </div>
 
       {/* KPI Cards */}
@@ -700,7 +695,9 @@ export default function PropertiesDashboard() {
                 </div>
                 <div className="border-t pt-2 mt-2 flex justify-between font-medium text-lg">
                   <span>=</span>
-                  <span className={cn("font-mono", (profitData?.netPosition ?? 0) >= 0 ? "text-green-600" : "text-red-600")}>
+                  <span
+                    className={cn("font-mono", (profitData?.netPosition ?? 0) >= 0 ? "text-green-600" : "text-red-600")}
+                  >
                     {formatAmount(profitData?.netPosition ?? 0)}
                   </span>
                 </div>
@@ -710,7 +707,7 @@ export default function PropertiesDashboard() {
                       "text-xs font-medium px-2 py-1 rounded-full",
                       (profitData?.netPosition ?? 0) >= 0
                         ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+                        : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                     )}
                   >
                     {profitData?.netPositionLabel ?? ""}
@@ -732,7 +729,12 @@ export default function PropertiesDashboard() {
           <div className="p-4 text-center">
             <p className="text-xs text-muted-foreground mb-1">Available</p>
             <p className="text-xl font-bold font-mono text-green-600" data-testid="text-total-available">
-              {formatAmount(displayedCashAccounts.reduce((s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)), 0))}
+              {formatAmount(
+                displayedCashAccounts.reduce(
+                  (s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)),
+                  0
+                )
+              )}
             </p>
           </div>
           <div className="p-4 text-center">
@@ -744,11 +746,17 @@ export default function PropertiesDashboard() {
           <div className="p-4 text-center">
             <p className="text-xs text-muted-foreground mb-1">Net</p>
             {(() => {
-              const avail = displayedCashAccounts.reduce((s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)), 0);
+              const avail = displayedCashAccounts.reduce(
+                (s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)),
+                0
+              );
               const pay = dashboardPayableAccounts.reduce((s, a) => s + Math.abs(a.balance), 0);
               const net = avail - pay;
               return (
-                <p className={`text-xl font-bold font-mono ${net >= 0 ? "text-green-600" : "text-red-600"}`} data-testid="text-net-position">
+                <p
+                  className={`text-xl font-bold font-mono ${net >= 0 ? "text-green-600" : "text-red-600"}`}
+                  data-testid="text-net-position"
+                >
                   {formatAmount(net)}
                 </p>
               );
@@ -780,8 +788,17 @@ export default function PropertiesDashboard() {
                       <label className="text-sm font-medium mb-2 block">Account</label>
                       <Popover open={cashComboboxOpen} onOpenChange={setCashComboboxOpen}>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" aria-expanded={cashComboboxOpen} className="w-full justify-between" data-testid="select-account">
-                            {selectedAccountId > 0 ? availableCashAccounts.find((acc) => acc.accountId === selectedAccountId)?.name || "Select account..." : "Search accounts..."}
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={cashComboboxOpen}
+                            className="w-full justify-between"
+                            data-testid="select-account"
+                          >
+                            {selectedAccountId > 0
+                              ? availableCashAccounts.find((acc) => acc.accountId === selectedAccountId)?.name ||
+                                "Select account..."
+                              : "Search accounts..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
@@ -792,8 +809,20 @@ export default function PropertiesDashboard() {
                               <CommandEmpty>No account found.</CommandEmpty>
                               <CommandGroup>
                                 {availableCashAccounts.map((account) => (
-                                  <CommandItem key={account.id} value={account.name} onSelect={() => { setSelectedAccountId(account.accountId); setCashComboboxOpen(false); }}>
-                                    <Check className={cn("mr-2 h-4 w-4", selectedAccountId === account.accountId ? "opacity-100" : "opacity-0")} />
+                                  <CommandItem
+                                    key={account.id}
+                                    value={account.name}
+                                    onSelect={() => {
+                                      setSelectedAccountId(account.accountId);
+                                      setCashComboboxOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selectedAccountId === account.accountId ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
                                     {account.name}
                                   </CommandItem>
                                 ))}
@@ -807,7 +836,10 @@ export default function PropertiesDashboard() {
                       onClick={() => {
                         if (selectedAccountId > 0) {
                           const account = allAccounts.find((a) => a.accountId === selectedAccountId);
-                          addAccountMutation.mutate({ accountType: account?.type.toLowerCase() || "ledger", accountId: selectedAccountId });
+                          addAccountMutation.mutate({
+                            accountType: account?.type.toLowerCase() || "ledger",
+                            accountId: selectedAccountId,
+                          });
                         }
                       }}
                       disabled={selectedAccountId === 0 || addAccountMutation.isPending}
@@ -822,7 +854,9 @@ export default function PropertiesDashboard() {
             </div>
 
             {cashAccountsError ? (
-              <p className="text-sm text-destructive text-center py-4">Error loading accounts: {(cashAccountsError as any)?.message || "Unknown error"}</p>
+              <p className="text-sm text-destructive text-center py-4">
+                Error loading accounts: {(cashAccountsError as any)?.message || "Unknown error"}
+              </p>
             ) : displayedCashAccounts.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No accounts added yet</p>
             ) : (
@@ -833,7 +867,9 @@ export default function PropertiesDashboard() {
                     <div
                       key={dca.id}
                       draggable
-                      onDragStart={() => { dragCashRef.current = dca.id; }}
+                      onDragStart={() => {
+                        dragCashRef.current = dca.id;
+                      }}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => handleCashDrop(dca.id)}
                       className="flex items-center gap-2 py-2 px-2 rounded hover-elevate group cursor-grab active:cursor-grabbing"
@@ -841,8 +877,19 @@ export default function PropertiesDashboard() {
                     >
                       <GripVertical className="h-4 w-4 text-muted-foreground/40 shrink-0" />
                       <span className="flex-1 text-sm font-medium truncate">{dca.account.name}</span>
-                      <span className="text-sm font-bold font-mono text-green-600" data-testid={`text-balance-${dca.id}`}>{formatAmount(balance)}</span>
-                      <Button size="icon" variant="ghost" className="ml-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={() => removeAccountMutation.mutate(dca.id)} data-testid={`button-remove-cash-account-${dca.id}`}>
+                      <span
+                        className="text-sm font-bold font-mono text-green-600"
+                        data-testid={`text-balance-${dca.id}`}
+                      >
+                        {formatAmount(balance)}
+                      </span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="ml-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                        onClick={() => removeAccountMutation.mutate(dca.id)}
+                        data-testid={`button-remove-cash-account-${dca.id}`}
+                      >
                         <X className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -850,7 +897,14 @@ export default function PropertiesDashboard() {
                 })}
                 <div className="flex items-center justify-between py-2 px-2 bg-green-50 dark:bg-green-950/30 rounded font-bold mt-1">
                   <span className="text-sm">Total Available</span>
-                  <span className="text-sm font-mono text-green-600">{formatAmount(displayedCashAccounts.reduce((s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)), 0))}</span>
+                  <span className="text-sm font-mono text-green-600">
+                    {formatAmount(
+                      displayedCashAccounts.reduce(
+                        (s, d) => s + parseFloat(String(d.account.balance || d.account.currentBalance || 0)),
+                        0
+                      )
+                    )}
+                  </span>
                 </div>
               </div>
             )}
@@ -881,8 +935,17 @@ export default function PropertiesDashboard() {
                       <label className="text-sm font-medium mb-2 block">Account</label>
                       <Popover open={payableComboboxOpen} onOpenChange={setPayableComboboxOpen}>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" aria-expanded={payableComboboxOpen} className="w-full justify-between" data-testid="select-payable-account">
-                            {selectedPayableAccountId > 0 ? availablePayableAccounts.find((acc) => acc.accountId === selectedPayableAccountId)?.name || "Select account..." : "Search accounts..."}
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={payableComboboxOpen}
+                            className="w-full justify-between"
+                            data-testid="select-payable-account"
+                          >
+                            {selectedPayableAccountId > 0
+                              ? availablePayableAccounts.find((acc) => acc.accountId === selectedPayableAccountId)
+                                  ?.name || "Select account..."
+                              : "Search accounts..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
@@ -893,8 +956,20 @@ export default function PropertiesDashboard() {
                               <CommandEmpty>No account found.</CommandEmpty>
                               <CommandGroup>
                                 {availablePayableAccounts.map((account) => (
-                                  <CommandItem key={account.accountId} value={account.name} onSelect={() => { setSelectedPayableAccountId(account.accountId); setPayableComboboxOpen(false); }}>
-                                    <Check className={cn("mr-2 h-4 w-4", selectedPayableAccountId === account.accountId ? "opacity-100" : "opacity-0")} />
+                                  <CommandItem
+                                    key={account.accountId}
+                                    value={account.name}
+                                    onSelect={() => {
+                                      setSelectedPayableAccountId(account.accountId);
+                                      setPayableComboboxOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selectedPayableAccountId === account.accountId ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
                                     {account.name}
                                   </CommandItem>
                                 ))}
@@ -922,7 +997,9 @@ export default function PropertiesDashboard() {
             </div>
 
             {payableAccountsError ? (
-              <p className="text-sm text-destructive text-center py-4">Error loading accounts: {(payableAccountsError as any)?.message || "Unknown error"}</p>
+              <p className="text-sm text-destructive text-center py-4">
+                Error loading accounts: {(payableAccountsError as any)?.message || "Unknown error"}
+              </p>
             ) : dashboardPayableAccounts.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No accounts added yet</p>
             ) : (
@@ -931,7 +1008,9 @@ export default function PropertiesDashboard() {
                   <div
                     key={account.id}
                     draggable
-                    onDragStart={() => { dragPayableRef.current = account.id; }}
+                    onDragStart={() => {
+                      dragPayableRef.current = account.id;
+                    }}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => handlePayableDrop(account.id)}
                     className="flex items-center gap-2 py-2 px-2 rounded hover-elevate group cursor-grab active:cursor-grabbing"
@@ -939,15 +1018,28 @@ export default function PropertiesDashboard() {
                   >
                     <GripVertical className="h-4 w-4 text-muted-foreground/40 shrink-0" />
                     <span className="flex-1 text-sm font-medium truncate">{account.name}</span>
-                    <span className="text-sm font-bold font-mono text-red-600" data-testid={`text-payable-${account.id}`}>{formatAmount(Math.abs(account.balance))}</span>
-                    <Button size="icon" variant="ghost" className="ml-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={() => removePayableAccountMutation.mutate(account.id)} data-testid={`button-remove-payable-account-${account.id}`}>
+                    <span
+                      className="text-sm font-bold font-mono text-red-600"
+                      data-testid={`text-payable-${account.id}`}
+                    >
+                      {formatAmount(Math.abs(account.balance))}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="ml-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                      onClick={() => removePayableAccountMutation.mutate(account.id)}
+                      data-testid={`button-remove-payable-account-${account.id}`}
+                    >
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ))}
                 <div className="flex items-center justify-between py-2 px-2 bg-red-50 dark:bg-red-950/30 rounded font-bold mt-1">
                   <span className="text-sm">Total To Pay</span>
-                  <span className="text-sm font-mono text-red-600">{formatAmount(dashboardPayableAccounts.reduce((s, a) => s + Math.abs(a.balance), 0))}</span>
+                  <span className="text-sm font-mono text-red-600">
+                    {formatAmount(dashboardPayableAccounts.reduce((s, a) => s + Math.abs(a.balance), 0))}
+                  </span>
                 </div>
               </div>
             )}

@@ -1,14 +1,32 @@
 import type { Express } from "express";
-import { getCompanyId, findOrCreateLedgerAccount, maybeRunAutoTransfer, ensureMonthlyLedgerRows, findEarliestOutstandingMonth, buildAllocations, ensureMonthlyForCompany, postRentAccrualForCompany, type RentalModule } from "./_rentalShared";
+import {
+  getCompanyId,
+  findOrCreateLedgerAccount,
+  maybeRunAutoTransfer,
+  ensureMonthlyLedgerRows,
+  findEarliestOutstandingMonth,
+  buildAllocations,
+  ensureMonthlyForCompany,
+  postRentAccrualForCompany,
+  type RentalModule,
+} from "./_rentalShared";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { z } from "zod";
 import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import {
-  propertyUnits, propertyContracts, propertyMonthlyLedger, propertyPayments,
-  insertPropertyUnitSchema, insertPropertyContractSchema,
-  ledgerAccounts, vouchers, voucherEntries, rentalAutoTransferConfigs,
-  interCompanyTransfers, companies,
+  propertyUnits,
+  propertyContracts,
+  propertyMonthlyLedger,
+  propertyPayments,
+  insertPropertyUnitSchema,
+  insertPropertyContractSchema,
+  ledgerAccounts,
+  vouchers,
+  voucherEntries,
+  rentalAutoTransferConfigs,
+  interCompanyTransfers,
+  companies,
 } from "@shared/schema";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { logAudit } from "../_helpers";
@@ -19,7 +37,7 @@ export function registerRentalPaymentsAccrualRoutes(
   module: RentalModule,
   urlPrefix: string,
   incomeAccountName: string,
-  shopExpenseAccountName: string = "Rent Expense - Shops",
+  shopExpenseAccountName: string = "Rent Expense - Shops"
 ) {
   const tag = `[${module}/rental]`;
 
@@ -27,30 +45,49 @@ export function registerRentalPaymentsAccrualRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const data = z.object({
-        contractId: z.number(),
-        cashAccountId: z.number().nullable().optional(),
-        amount: z.union([z.string(), z.number()]).transform(v => String(v)),
-        paymentDate: z.string().min(1),
-        notes: z.string().optional(),
-        currency: z.string().optional().default("USD"),
-        exchangeRate: z.union([z.string(), z.number()]).transform(v => String(v)).optional().default("1"),
-      }).parse(req.body);
+      const data = z
+        .object({
+          contractId: z.number(),
+          cashAccountId: z.number().nullable().optional(),
+          amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+          paymentDate: z.string().min(1),
+          notes: z.string().optional(),
+          currency: z.string().optional().default("USD"),
+          exchangeRate: z
+            .union([z.string(), z.number()])
+            .transform((v) => String(v))
+            .optional()
+            .default("1"),
+        })
+        .parse(req.body);
 
       let isSharedPayment = false;
-      let [contract] = await db.select().from(propertyContracts).where(and(
-        eq(propertyContracts.id, data.contractId),
-        eq(propertyContracts.companyId, companyId),
-        eq(propertyContracts.module, module),
-      ));
+      let [contract] = await db
+        .select()
+        .from(propertyContracts)
+        .where(
+          and(
+            eq(propertyContracts.id, data.contractId),
+            eq(propertyContracts.companyId, companyId),
+            eq(propertyContracts.module, module)
+          )
+        );
       // If not found as owner, check if it's a shared contract linked to this company
       if (!contract) {
-        const [sharedContract] = await db.select().from(propertyContracts).where(and(
-          eq(propertyContracts.id, data.contractId),
-          eq(propertyContracts.linkedCompanyId, companyId),
-          eq(propertyContracts.status, "ACTIVE"),
-        ));
-        if (sharedContract) { contract = sharedContract; isSharedPayment = true; }
+        const [sharedContract] = await db
+          .select()
+          .from(propertyContracts)
+          .where(
+            and(
+              eq(propertyContracts.id, data.contractId),
+              eq(propertyContracts.linkedCompanyId, companyId),
+              eq(propertyContracts.status, "ACTIVE")
+            )
+          );
+        if (sharedContract) {
+          contract = sharedContract;
+          isSharedPayment = true;
+        }
       }
       if (!contract) return res.status(404).json({ message: "Contract not found" });
       // For shared contracts, ledger/payment rows use the source company's ID;
@@ -60,7 +97,8 @@ export function registerRentalPaymentsAccrualRoutes(
       await ensureMonthlyLedgerRows(contract.id);
 
       const pd = new Date(data.paymentDate);
-      const payYear = pd.getUTCFullYear(), payMonth = pd.getUTCMonth() + 1;
+      const payYear = pd.getUTCFullYear(),
+        payMonth = pd.getUTCMonth() + 1;
 
       const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
 
@@ -75,13 +113,21 @@ export function registerRentalPaymentsAccrualRoutes(
       const payments = await db.transaction(async (tx) => {
         // Ensure a ledger row exists for every allocated month
         for (const alloc of allocations) {
-          await tx.insert(propertyMonthlyLedger).values({
-            companyId: contractCompanyId, module, contractId: contract.id, unitId: contract.unitId,
-            year: alloc.year, month: alloc.month,
-            expectedAmount: contract.rentalAmount, paidAmount: "0",
-          }).onConflictDoNothing({
-            target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
-          });
+          await tx
+            .insert(propertyMonthlyLedger)
+            .values({
+              companyId: contractCompanyId,
+              module,
+              contractId: contract.id,
+              unitId: contract.unitId,
+              year: alloc.year,
+              month: alloc.month,
+              expectedAmount: contract.rentalAmount,
+              paidAmount: "0",
+            })
+            .onConflictDoNothing({
+              target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
+            });
         }
 
         // Create ONE voucher for the full payment total
@@ -92,49 +138,111 @@ export function registerRentalPaymentsAccrualRoutes(
           // Shared units are rented FROM Hassan Properties, so HADI is paying OUT, not collecting.
           const isShop = isSharedPayment || unit?.unitType === "SHOP";
           const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-          const monthSpan = allocations.length > 1
-            ? `${String(allocations[0].month).padStart(2,"0")}/${allocations[0].year} – ${String(allocations[allocations.length-1].month).padStart(2,"0")}/${allocations[allocations.length-1].year}`
-            : `${String(m).padStart(2,"0")}/${y}`;
+          const monthSpan =
+            allocations.length > 1
+              ? `${String(allocations[0].month).padStart(2, "0")}/${allocations[0].year} – ${String(allocations[allocations.length - 1].month).padStart(2, "0")}/${allocations[allocations.length - 1].year}`
+              : `${String(m).padStart(2, "0")}/${y}`;
 
           const voucherCurrency = data.currency || "USD";
           if (isShop) {
             // Simple direct posting: Dr Rent Expense / Cr Cash for the full amount.
             // No accrual/prepaid/advance splitting — the expense is recognised at payment time.
             const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
-            const [v] = await tx.insert(vouchers).values({
-              companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
-              voucherType: "Payment", voucherDate: data.paymentDate as any,
-              description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
-            }).returning();
+            const [v] = await tx
+              .insert(vouchers)
+              .values({
+                companyId,
+                voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
+                voucherType: "Payment",
+                voucherDate: data.paymentDate as any,
+                description: narration,
+                totalAmount: data.amount,
+                currency: voucherCurrency,
+                sourceModule: "ERP",
+              })
+              .returning();
             voucherId = v.id;
 
-            const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+            const expenseId = await findOrCreateLedgerAccount(
+              tx,
+              companyId,
+              shopExpenseAccountName,
+              "Indirect Expense",
+              "SHOP-RENT-EXP"
+            );
             await tx.insert(voucherEntries).values([
-              { voucherId: v.id, ledgerAccountId: expenseId,          debitAmount: data.amount, creditAmount: "0", narration },
-              { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
+              { voucherId: v.id, ledgerAccountId: expenseId, debitAmount: data.amount, creditAmount: "0", narration },
+              {
+                voucherId: v.id,
+                ledgerAccountId: data.cashAccountId,
+                debitAmount: "0",
+                creditAmount: data.amount,
+                narration,
+              },
             ]);
           } else {
-            const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
+            const incomeAccountId = await findOrCreateLedgerAccount(
+              tx,
+              companyId,
+              incomeAccountName,
+              "Income",
+              "RENT-INC",
+              "Indirect Income"
+            );
             const narration = `Rent received - ${unitLabel} - ${monthSpan}`;
-            const [v] = await tx.insert(vouchers).values({
-              companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
-              voucherType: "Receipt", voucherDate: data.paymentDate as any,
-              description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
-            }).returning();
+            const [v] = await tx
+              .insert(vouchers)
+              .values({
+                companyId,
+                voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
+                voucherType: "Receipt",
+                voucherDate: data.paymentDate as any,
+                description: narration,
+                totalAmount: data.amount,
+                currency: voucherCurrency,
+                sourceModule: "ERP",
+              })
+              .returning();
             voucherId = v.id;
             // Split: future months → Deferred Rent Revenue; due months → Rent Income
-            const futureAllocsL = allocations.filter(a => a.year > payYear || (a.year === payYear && a.month > payMonth));
+            const futureAllocsL = allocations.filter(
+              (a) => a.year > payYear || (a.year === payYear && a.month > payMonth)
+            );
             const deferredChunkL = futureAllocsL.reduce((s, a) => s + Number(a.chunk), 0);
             const earnedChunkL = parseFloat(data.amount) - deferredChunkL;
             const lEntries: any[] = [
-              { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: data.amount, creditAmount: "0", narration },
+              {
+                voucherId: v.id,
+                ledgerAccountId: data.cashAccountId,
+                debitAmount: data.amount,
+                creditAmount: "0",
+                narration,
+              },
             ];
             if (earnedChunkL > 0.005) {
-              lEntries.push({ voucherId: v.id, ledgerAccountId: incomeAccountId, debitAmount: "0", creditAmount: earnedChunkL.toFixed(2), narration });
+              lEntries.push({
+                voucherId: v.id,
+                ledgerAccountId: incomeAccountId,
+                debitAmount: "0",
+                creditAmount: earnedChunkL.toFixed(2),
+                narration,
+              });
             }
             if (deferredChunkL > 0.005) {
-              const deferredId = await findOrCreateLedgerAccount(tx, companyId, "Deferred Rent Revenue", "Liability", "DEF-RENT-REV");
-              lEntries.push({ voucherId: v.id, ledgerAccountId: deferredId, debitAmount: "0", creditAmount: deferredChunkL.toFixed(2), narration });
+              const deferredId = await findOrCreateLedgerAccount(
+                tx,
+                companyId,
+                "Deferred Rent Revenue",
+                "Liability",
+                "DEF-RENT-REV"
+              );
+              lEntries.push({
+                voucherId: v.id,
+                ledgerAccountId: deferredId,
+                debitAmount: "0",
+                creditAmount: deferredChunkL.toFixed(2),
+                narration,
+              });
             }
             await tx.insert(voucherEntries).values(lEntries);
 
@@ -156,54 +264,95 @@ export function registerRentalPaymentsAccrualRoutes(
 
               // ── HADI L'SHI intercompany account (Asset — Properties owes HADI) ──
               const hadiIntercoId = await findOrCreateLedgerAccount(
-                tx, companyId,
+                tx,
+                companyId,
                 "Hassan Properties — Intercompany",
                 "Intercompany",
                 "PROP-IC",
-                "hadi_prop_intercompany",
+                "hadi_prop_intercompany"
               );
               // ── Hassan Properties intercompany account (Liability — owes HADI) ──
               const propIntercoId = await findOrCreateLedgerAccount(
-                tx, sourceCompanyId,
+                tx,
+                sourceCompanyId,
                 "HADI L'SHI — Intercompany",
                 "Intercompany",
                 "HADI-IC",
-                "prop_hadi_intercompany",
+                "prop_hadi_intercompany"
               );
               // ── Hassan Properties rental income account ──
               const propIncomeId = await findOrCreateLedgerAccount(
-                tx, sourceCompanyId,
+                tx,
+                sourceCompanyId,
                 "Rental Income - Properties",
                 "Income",
                 "RENT-INC",
-                "Indirect Income",
+                "Indirect Income"
               );
 
               const icNarration = `Rent collected by HADI L'SHI - ${unitLabel} - ${monthSpan}`;
 
               // HADI reclass journal: Dr Rental Income (reverse HADI's own income) / Cr Interco (HADI is owed by Properties)
               // This leaves HADI with: Dr Cash / Cr Interco Receivable — a clean collection on behalf of Properties.
-              const [hadiIcV] = await tx.insert(vouchers).values({
-                companyId,
-                voucherNumber: `RENT-IC-H-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
-                voucherType: "Journal", voucherDate: data.paymentDate as any,
-                description: icNarration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
-              }).returning();
+              const [hadiIcV] = await tx
+                .insert(vouchers)
+                .values({
+                  companyId,
+                  voucherNumber: `RENT-IC-H-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
+                  voucherType: "Journal",
+                  voucherDate: data.paymentDate as any,
+                  description: icNarration,
+                  totalAmount: data.amount,
+                  currency: voucherCurrency,
+                  sourceModule: "ERP",
+                })
+                .returning();
               await tx.insert(voucherEntries).values([
-                { voucherId: hadiIcV.id, ledgerAccountId: incomeAccountId, debitAmount: data.amount, creditAmount: "0", narration: icNarration },
-                { voucherId: hadiIcV.id, ledgerAccountId: hadiIntercoId,   debitAmount: "0", creditAmount: data.amount, narration: icNarration },
+                {
+                  voucherId: hadiIcV.id,
+                  ledgerAccountId: incomeAccountId,
+                  debitAmount: data.amount,
+                  creditAmount: "0",
+                  narration: icNarration,
+                },
+                {
+                  voucherId: hadiIcV.id,
+                  ledgerAccountId: hadiIntercoId,
+                  debitAmount: "0",
+                  creditAmount: data.amount,
+                  narration: icNarration,
+                },
               ]);
 
               // Hassan Properties income journal: Dr Interco (liability) / Cr Rental Income
-              const [propV] = await tx.insert(vouchers).values({
-                companyId: sourceCompanyId,
-                voucherNumber: `RENT-IC-P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
-                voucherType: "Journal", voucherDate: data.paymentDate as any,
-                description: icNarration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "PROPERTIES",
-              }).returning();
+              const [propV] = await tx
+                .insert(vouchers)
+                .values({
+                  companyId: sourceCompanyId,
+                  voucherNumber: `RENT-IC-P-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
+                  voucherType: "Journal",
+                  voucherDate: data.paymentDate as any,
+                  description: icNarration,
+                  totalAmount: data.amount,
+                  currency: voucherCurrency,
+                  sourceModule: "PROPERTIES",
+                })
+                .returning();
               await tx.insert(voucherEntries).values([
-                { voucherId: propV.id, ledgerAccountId: propIntercoId, debitAmount: data.amount, creditAmount: "0", narration: icNarration },
-                { voucherId: propV.id, ledgerAccountId: propIncomeId,  debitAmount: "0", creditAmount: data.amount, narration: icNarration },
+                {
+                  voucherId: propV.id,
+                  ledgerAccountId: propIntercoId,
+                  debitAmount: data.amount,
+                  creditAmount: "0",
+                  narration: icNarration,
+                },
+                {
+                  voucherId: propV.id,
+                  ledgerAccountId: propIncomeId,
+                  debitAmount: "0",
+                  creditAmount: data.amount,
+                  narration: icNarration,
+                },
               ]);
             }
           }
@@ -212,29 +361,42 @@ export function registerRentalPaymentsAccrualRoutes(
         // Create one payment row per allocated month and update that month's ledger
         const created: (typeof propertyPayments.$inferSelect)[] = [];
         for (const alloc of allocations) {
-          const [row] = await tx.select().from(propertyMonthlyLedger).where(and(
-            eq(propertyMonthlyLedger.contractId, contract.id),
-            eq(propertyMonthlyLedger.year, alloc.year),
-            eq(propertyMonthlyLedger.month, alloc.month),
-          ));
+          const [row] = await tx
+            .select()
+            .from(propertyMonthlyLedger)
+            .where(
+              and(
+                eq(propertyMonthlyLedger.contractId, contract.id),
+                eq(propertyMonthlyLedger.year, alloc.year),
+                eq(propertyMonthlyLedger.month, alloc.month)
+              )
+            );
 
           const isFutureAlloc = alloc.year > payYear || (alloc.year === payYear && alloc.month > payMonth);
 
-          const [p] = await tx.insert(propertyPayments).values({
-            companyId: contractCompanyId, module, contractId: contract.id, unitId: contract.unitId,
-            ledgerRowId: row.id,
-            cashAccountId: data.cashAccountId ?? null,
-            // All split rows share the same voucherId (one financial transaction)
-            voucherId: voucherId ?? null,
-            amount: alloc.chunk,
-            paymentDate: data.paymentDate as any,
-            forYear: alloc.year, forMonth: alloc.month,
-            currency: data.currency || "USD",
-            exchangeRate: data.exchangeRate || "1",
-            notes: allocations.length > 1
-              ? `${data.notes ? data.notes + " | " : ""}Split from ${data.amount} payment`
-              : (data.notes ?? null),
-          }).returning();
+          const [p] = await tx
+            .insert(propertyPayments)
+            .values({
+              companyId: contractCompanyId,
+              module,
+              contractId: contract.id,
+              unitId: contract.unitId,
+              ledgerRowId: row.id,
+              cashAccountId: data.cashAccountId ?? null,
+              // All split rows share the same voucherId (one financial transaction)
+              voucherId: voucherId ?? null,
+              amount: alloc.chunk,
+              paymentDate: data.paymentDate as any,
+              forYear: alloc.year,
+              forMonth: alloc.month,
+              currency: data.currency || "USD",
+              exchangeRate: data.exchangeRate || "1",
+              notes:
+                allocations.length > 1
+                  ? `${data.notes ? data.notes + " | " : ""}Split from ${data.amount} payment`
+                  : (data.notes ?? null),
+            })
+            .returning();
           created.push(p);
 
           await tx.execute(sql`
@@ -247,12 +409,22 @@ export function registerRentalPaymentsAccrualRoutes(
       // Fire auto-transfer if configured (outside transaction — best-effort, use total amount)
       if (data.cashAccountId) {
         const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-        await maybeRunAutoTransfer(companyId, module, data.cashAccountId, data.amount, data.paymentDate, unitLabel, payments[0].id, data.notes);
+        await maybeRunAutoTransfer(
+          companyId,
+          module,
+          data.cashAccountId,
+          data.amount,
+          data.paymentDate,
+          unitLabel,
+          payments[0].id,
+          data.notes
+        );
       }
 
       res.json(payments[0]);
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      if (e instanceof z.ZodError)
+        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
       console.error(`${tag} payments:`, e);
       res.status(500).json({ message: e.message });
     }
@@ -264,29 +436,47 @@ export function registerRentalPaymentsAccrualRoutes(
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const items = z.array(z.object({
-        contractId: z.number(),
-        cashAccountId: z.number().nullable().optional(),
-        amount: z.union([z.string(), z.number()]).transform(v => String(v)),
-        paymentDate: z.string().min(1),
-        notes: z.string().optional(),
-        currency: z.string().optional().default("USD"),
-        exchangeRate: z.union([z.string(), z.number()]).transform(v => String(v)).optional().default("1"),
-      })).min(1).parse(req.body);
+      const items = z
+        .array(
+          z.object({
+            contractId: z.number(),
+            cashAccountId: z.number().nullable().optional(),
+            amount: z.union([z.string(), z.number()]).transform((v) => String(v)),
+            paymentDate: z.string().min(1),
+            notes: z.string().optional(),
+            currency: z.string().optional().default("USD"),
+            exchangeRate: z
+              .union([z.string(), z.number()])
+              .transform((v) => String(v))
+              .optional()
+              .default("1"),
+          })
+        )
+        .min(1)
+        .parse(req.body);
 
       const results: any[] = [];
       for (const data of items) {
-        const [contract] = await db.select().from(propertyContracts).where(and(
-          eq(propertyContracts.id, data.contractId),
-          eq(propertyContracts.companyId, companyId),
-          eq(propertyContracts.module, module),
-        ));
-        if (!contract) { results.push({ contractId: data.contractId, error: "Contract not found" }); continue; }
+        const [contract] = await db
+          .select()
+          .from(propertyContracts)
+          .where(
+            and(
+              eq(propertyContracts.id, data.contractId),
+              eq(propertyContracts.companyId, companyId),
+              eq(propertyContracts.module, module)
+            )
+          );
+        if (!contract) {
+          results.push({ contractId: data.contractId, error: "Contract not found" });
+          continue;
+        }
 
         await ensureMonthlyLedgerRows(contract.id);
 
         const pd = new Date(data.paymentDate);
-        const payYear = pd.getUTCFullYear(), payMonth = pd.getUTCMonth() + 1;
+        const payYear = pd.getUTCFullYear(),
+          payMonth = pd.getUTCMonth() + 1;
         const [unit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, contract.unitId));
 
         const totalAmountNum = parseFloat(data.amount);
@@ -297,59 +487,129 @@ export function registerRentalPaymentsAccrualRoutes(
 
         const payments = await db.transaction(async (tx) => {
           for (const alloc of allocations) {
-            await tx.insert(propertyMonthlyLedger).values({
-              companyId, module, contractId: contract.id, unitId: contract.unitId,
-              year: alloc.year, month: alloc.month,
-              expectedAmount: contract.rentalAmount, paidAmount: "0",
-            }).onConflictDoNothing({
-              target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
-            });
+            await tx
+              .insert(propertyMonthlyLedger)
+              .values({
+                companyId,
+                module,
+                contractId: contract.id,
+                unitId: contract.unitId,
+                year: alloc.year,
+                month: alloc.month,
+                expectedAmount: contract.rentalAmount,
+                paidAmount: "0",
+              })
+              .onConflictDoNothing({
+                target: [propertyMonthlyLedger.contractId, propertyMonthlyLedger.year, propertyMonthlyLedger.month],
+              });
           }
 
           let voucherId: number | null = null;
           if (data.cashAccountId) {
             const isShop = unit?.unitType === "SHOP";
             const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-            const monthSpan = allocations.length > 1
-              ? `${String(allocations[0].month).padStart(2,"0")}/${allocations[0].year} – ${String(allocations[allocations.length-1].month).padStart(2,"0")}/${allocations[allocations.length-1].year}`
-              : `${String(m).padStart(2,"0")}/${y}`;
+            const monthSpan =
+              allocations.length > 1
+                ? `${String(allocations[0].month).padStart(2, "0")}/${allocations[0].year} – ${String(allocations[allocations.length - 1].month).padStart(2, "0")}/${allocations[allocations.length - 1].year}`
+                : `${String(m).padStart(2, "0")}/${y}`;
 
             const voucherCurrency = data.currency || "USD";
             if (isShop) {
               // Simple direct posting: Dr Rent Expense / Cr Cash for the full amount.
               const narration = `Rent paid - ${unitLabel} - ${monthSpan}`;
-              const [v] = await tx.insert(vouchers).values({
-                companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2,7)}-${contract.id}`,
-                voucherType: "Payment", voucherDate: data.paymentDate as any,
-                description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
-              }).returning();
+              const [v] = await tx
+                .insert(vouchers)
+                .values({
+                  companyId,
+                  voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
+                  voucherType: "Payment",
+                  voucherDate: data.paymentDate as any,
+                  description: narration,
+                  totalAmount: data.amount,
+                  currency: voucherCurrency,
+                  sourceModule: "ERP",
+                })
+                .returning();
               voucherId = v.id;
-              const expenseId = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+              const expenseId = await findOrCreateLedgerAccount(
+                tx,
+                companyId,
+                shopExpenseAccountName,
+                "Indirect Expense",
+                "SHOP-RENT-EXP"
+              );
               await tx.insert(voucherEntries).values([
-                { voucherId: v.id, ledgerAccountId: expenseId,          debitAmount: data.amount, creditAmount: "0", narration },
-                { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: "0", creditAmount: data.amount, narration },
+                { voucherId: v.id, ledgerAccountId: expenseId, debitAmount: data.amount, creditAmount: "0", narration },
+                {
+                  voucherId: v.id,
+                  ledgerAccountId: data.cashAccountId,
+                  debitAmount: "0",
+                  creditAmount: data.amount,
+                  narration,
+                },
               ]);
             } else {
-              const incomeAccountId = await findOrCreateLedgerAccount(tx, companyId, incomeAccountName, "Income", "RENT-INC", "Indirect Income");
+              const incomeAccountId = await findOrCreateLedgerAccount(
+                tx,
+                companyId,
+                incomeAccountName,
+                "Income",
+                "RENT-INC",
+                "Indirect Income"
+              );
               const narration = `Rent received - ${unitLabel} - ${monthSpan}`;
-              const [v] = await tx.insert(vouchers).values({
-                companyId, voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2,7)}-${contract.id}`,
-                voucherType: "Receipt", voucherDate: data.paymentDate as any,
-                description: narration, totalAmount: data.amount, currency: voucherCurrency, sourceModule: "ERP",
-              }).returning();
+              const [v] = await tx
+                .insert(vouchers)
+                .values({
+                  companyId,
+                  voucherNumber: `RENT-${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${contract.id}`,
+                  voucherType: "Receipt",
+                  voucherDate: data.paymentDate as any,
+                  description: narration,
+                  totalAmount: data.amount,
+                  currency: voucherCurrency,
+                  sourceModule: "ERP",
+                })
+                .returning();
               voucherId = v.id;
-              const futureAllocsLB = allocations.filter(a => a.year > payYear || (a.year === payYear && a.month > payMonth));
+              const futureAllocsLB = allocations.filter(
+                (a) => a.year > payYear || (a.year === payYear && a.month > payMonth)
+              );
               const deferredChunkLB = futureAllocsLB.reduce((s, a) => s + Number(a.chunk), 0);
               const earnedChunkLB = parseFloat(data.amount) - deferredChunkLB;
               const lbEntries: any[] = [
-                { voucherId: v.id, ledgerAccountId: data.cashAccountId, debitAmount: data.amount, creditAmount: "0", narration },
+                {
+                  voucherId: v.id,
+                  ledgerAccountId: data.cashAccountId,
+                  debitAmount: data.amount,
+                  creditAmount: "0",
+                  narration,
+                },
               ];
               if (earnedChunkLB > 0.005) {
-                lbEntries.push({ voucherId: v.id, ledgerAccountId: incomeAccountId, debitAmount: "0", creditAmount: earnedChunkLB.toFixed(2), narration });
+                lbEntries.push({
+                  voucherId: v.id,
+                  ledgerAccountId: incomeAccountId,
+                  debitAmount: "0",
+                  creditAmount: earnedChunkLB.toFixed(2),
+                  narration,
+                });
               }
               if (deferredChunkLB > 0.005) {
-                const deferredId = await findOrCreateLedgerAccount(tx, companyId, "Deferred Rent Revenue", "Liability", "DEF-RENT-REV");
-                lbEntries.push({ voucherId: v.id, ledgerAccountId: deferredId, debitAmount: "0", creditAmount: deferredChunkLB.toFixed(2), narration });
+                const deferredId = await findOrCreateLedgerAccount(
+                  tx,
+                  companyId,
+                  "Deferred Rent Revenue",
+                  "Liability",
+                  "DEF-RENT-REV"
+                );
+                lbEntries.push({
+                  voucherId: v.id,
+                  ledgerAccountId: deferredId,
+                  debitAmount: "0",
+                  creditAmount: deferredChunkLB.toFixed(2),
+                  narration,
+                });
               }
               await tx.insert(voucherEntries).values(lbEntries);
             }
@@ -357,23 +617,38 @@ export function registerRentalPaymentsAccrualRoutes(
 
           const created: (typeof propertyPayments.$inferSelect)[] = [];
           for (const alloc of allocations) {
-            const [row] = await tx.select().from(propertyMonthlyLedger).where(and(
-              eq(propertyMonthlyLedger.contractId, contract.id),
-              eq(propertyMonthlyLedger.year, alloc.year),
-              eq(propertyMonthlyLedger.month, alloc.month),
-            ));
-            const [p] = await tx.insert(propertyPayments).values({
-              companyId, module, contractId: contract.id, unitId: contract.unitId,
-              ledgerRowId: row.id, cashAccountId: data.cashAccountId ?? null,
-              voucherId: voucherId ?? null, amount: alloc.chunk,
-              paymentDate: data.paymentDate as any,
-              forYear: alloc.year, forMonth: alloc.month,
-              currency: data.currency || "USD",
-              exchangeRate: data.exchangeRate || "1",
-              notes: allocations.length > 1
-                ? `${data.notes ? data.notes + " | " : ""}Split from ${data.amount} payment`
-                : (data.notes ?? null),
-            }).returning();
+            const [row] = await tx
+              .select()
+              .from(propertyMonthlyLedger)
+              .where(
+                and(
+                  eq(propertyMonthlyLedger.contractId, contract.id),
+                  eq(propertyMonthlyLedger.year, alloc.year),
+                  eq(propertyMonthlyLedger.month, alloc.month)
+                )
+              );
+            const [p] = await tx
+              .insert(propertyPayments)
+              .values({
+                companyId,
+                module,
+                contractId: contract.id,
+                unitId: contract.unitId,
+                ledgerRowId: row.id,
+                cashAccountId: data.cashAccountId ?? null,
+                voucherId: voucherId ?? null,
+                amount: alloc.chunk,
+                paymentDate: data.paymentDate as any,
+                forYear: alloc.year,
+                forMonth: alloc.month,
+                currency: data.currency || "USD",
+                exchangeRate: data.exchangeRate || "1",
+                notes:
+                  allocations.length > 1
+                    ? `${data.notes ? data.notes + " | " : ""}Split from ${data.amount} payment`
+                    : (data.notes ?? null),
+              })
+              .returning();
             created.push(p);
             await tx.execute(sql`
               UPDATE property_monthly_ledger SET paid_amount = paid_amount + ${alloc.chunk}::numeric WHERE id = ${row.id}
@@ -384,14 +659,24 @@ export function registerRentalPaymentsAccrualRoutes(
 
         if (data.cashAccountId && payments.length > 0) {
           const unitLabel = unit ? `${unit.locationGroup}/${unit.unitNumber}` : `Unit#${contract.unitId}`;
-          await maybeRunAutoTransfer(companyId, module, data.cashAccountId, data.amount, data.paymentDate, unitLabel, payments[0].id, data.notes);
+          await maybeRunAutoTransfer(
+            companyId,
+            module,
+            data.cashAccountId,
+            data.amount,
+            data.paymentDate,
+            unitLabel,
+            payments[0].id,
+            data.notes
+          );
         }
         results.push({ contractId: data.contractId, paymentsCreated: payments.length });
       }
 
       res.json({ processed: results.length, results });
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      if (e instanceof z.ZodError)
+        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
       console.error(`${tag} bulk-payments:`, e);
       res.status(500).json({ message: e.message });
     }
@@ -406,14 +691,19 @@ export function registerRentalPaymentsAccrualRoutes(
       if (paymentId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(paymentId)) return res.status(400).json({ message: "Invalid payment id" });
 
-      const [payment] = await db.select().from(propertyPayments).where(and(
-        eq(propertyPayments.id, paymentId),
-        eq(propertyPayments.companyId, companyId),
-        eq(propertyPayments.module, module),
-      ));
+      const [payment] = await db
+        .select()
+        .from(propertyPayments)
+        .where(
+          and(
+            eq(propertyPayments.id, paymentId),
+            eq(propertyPayments.companyId, companyId),
+            eq(propertyPayments.module, module)
+          )
+        );
       if (!payment) return res.status(404).json({ message: "Payment not found" });
 
-      await db.transaction(async tx => {
+      await db.transaction(async (tx) => {
         // 1. Reverse the monthly ledger paid_amount
         if (payment.ledgerRowId) {
           await tx.execute(sql`
@@ -426,12 +716,10 @@ export function registerRentalPaymentsAccrualRoutes(
         // 2. Soft-delete the linked payment voucher ONLY if no other payment row
         //    references the same voucherId (split payments share one voucher)
         if (payment.voucherId) {
-          const siblings = await tx.select({ id: propertyPayments.id })
+          const siblings = await tx
+            .select({ id: propertyPayments.id })
             .from(propertyPayments)
-            .where(and(
-              eq(propertyPayments.voucherId, payment.voucherId),
-              sql`${propertyPayments.id} != ${paymentId}`,
-            ));
+            .where(and(eq(propertyPayments.voucherId, payment.voucherId), sql`${propertyPayments.id} != ${paymentId}`));
           if (siblings.length === 0) {
             await tx.execute(sql`
               UPDATE vouchers SET deleted_at = NOW() WHERE id = ${payment.voucherId}
@@ -439,7 +727,7 @@ export function registerRentalPaymentsAccrualRoutes(
             // Also soft-delete the AP-CLEAR auto-clearing journal created alongside this payment
             await tx.execute(sql`
               UPDATE vouchers SET deleted_at = NOW()
-              WHERE voucher_number = ${'AP-CLEAR-' + payment.voucherId}
+              WHERE voucher_number = ${"AP-CLEAR-" + payment.voucherId}
                 AND company_id = ${companyId}
                 AND deleted_at IS NULL
             `);
@@ -475,7 +763,8 @@ export function registerRentalPaymentsAccrualRoutes(
 
         // 5. If this was a guarantee-release payment, reset guaranteePostedToStatement on the contract
         if (payment.notes && payment.notes.includes("[Guarantee release]") && payment.contractId) {
-          await tx.update(propertyContracts)
+          await tx
+            .update(propertyContracts)
             .set({ guaranteePostedToStatement: false })
             .where(eq(propertyContracts.id, payment.contractId));
         }
@@ -497,22 +786,33 @@ export function registerRentalPaymentsAccrualRoutes(
       if (unitId === null) return res.status(400).json({ message: "Invalid id" });
 
       let isShared = false;
-      let [unit] = await db.select().from(propertyUnits).where(and(
-        eq(propertyUnits.id, unitId), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module),
-      ));
+      let [unit] = await db
+        .select()
+        .from(propertyUnits)
+        .where(
+          and(eq(propertyUnits.id, unitId), eq(propertyUnits.companyId, companyId), eq(propertyUnits.module, module))
+        );
 
       // If unit doesn't belong to this company, check if it's shared with this company
       // Wrapped in try/catch — gracefully skips if column not migrated yet in production
       if (!unit) {
         try {
-          const [sharedContract] = await db.select().from(propertyContracts).where(and(
-            eq(propertyContracts.unitId, unitId),
-            eq(propertyContracts.linkedCompanyId, companyId),
-            eq(propertyContracts.status, "ACTIVE"),
-          ));
+          const [sharedContract] = await db
+            .select()
+            .from(propertyContracts)
+            .where(
+              and(
+                eq(propertyContracts.unitId, unitId),
+                eq(propertyContracts.linkedCompanyId, companyId),
+                eq(propertyContracts.status, "ACTIVE")
+              )
+            );
           if (sharedContract) {
             const [ownerUnit] = await db.select().from(propertyUnits).where(eq(propertyUnits.id, unitId));
-            if (ownerUnit) { unit = ownerUnit; isShared = true; }
+            if (ownerUnit) {
+              unit = ownerUnit;
+              isShared = true;
+            }
           }
         } catch (sharedErr: any) {
           console.warn(`${tag} shared-detail skipped:`, sharedErr.message?.split("\n")[0]);
@@ -520,46 +820,67 @@ export function registerRentalPaymentsAccrualRoutes(
       }
       if (!unit) return res.status(404).json({ message: "Unit not found" });
 
-      const [contract] = await db.select().from(propertyContracts).where(and(
-        isShared
-          ? eq(propertyContracts.linkedCompanyId, companyId)
-          : eq(propertyContracts.companyId, companyId),
-        // Shared contracts may live in any module on the owner's side; skip module filter
-        ...(isShared ? [] : [eq(propertyContracts.module, module)]),
-        eq(propertyContracts.unitId, unitId),
-        eq(propertyContracts.status, "ACTIVE"),
-      ));
+      const [contract] = await db
+        .select()
+        .from(propertyContracts)
+        .where(
+          and(
+            isShared ? eq(propertyContracts.linkedCompanyId, companyId) : eq(propertyContracts.companyId, companyId),
+            // Shared contracts may live in any module on the owner's side; skip module filter
+            ...(isShared ? [] : [eq(propertyContracts.module, module)]),
+            eq(propertyContracts.unitId, unitId),
+            eq(propertyContracts.status, "ACTIVE")
+          )
+        );
 
-      let ledger: any[] = [], rentPayments: any[] = [], guaranteePayments: any[] = [];
+      let ledger: any[] = [],
+        rentPayments: any[] = [],
+        guaranteePayments: any[] = [];
       if (contract) {
         await ensureMonthlyLedgerRows(contract.id);
-        ledger = await db.select().from(propertyMonthlyLedger)
+        ledger = await db
+          .select()
+          .from(propertyMonthlyLedger)
           .where(eq(propertyMonthlyLedger.contractId, contract.id))
           .orderBy(propertyMonthlyLedger.year, propertyMonthlyLedger.month);
-        const allPayments = await db.select().from(propertyPayments)
+        const allPayments = await db
+          .select()
+          .from(propertyPayments)
           .where(eq(propertyPayments.contractId, contract.id))
           .orderBy(desc(propertyPayments.paymentDate));
         // Separate guarantee/deposit activity from normal rent payments.
         // A payment is a guarantee activity if its notes contain "[Guarantee release]"
         // OR if ledgerRowId is null (guarantee-to-cash inserts with ledgerRowId: null).
         guaranteePayments = allPayments.filter(
-          p => p.ledgerRowId === null || (p.notes ?? "").includes("[Guarantee release]"),
+          (p) => p.ledgerRowId === null || (p.notes ?? "").includes("[Guarantee release]")
         );
         rentPayments = allPayments.filter(
-          p => p.ledgerRowId !== null && !(p.notes ?? "").includes("[Guarantee release]"),
+          (p) => p.ledgerRowId !== null && !(p.notes ?? "").includes("[Guarantee release]")
         );
       }
 
-      const pastContracts = await db.select().from(propertyContracts)
-        .where(and(
-          eq(propertyContracts.companyId, companyId),
-          eq(propertyContracts.module, module),
-          eq(propertyContracts.unitId, unitId),
-          eq(propertyContracts.status, "ENDED"),
-        ))
+      const pastContracts = await db
+        .select()
+        .from(propertyContracts)
+        .where(
+          and(
+            eq(propertyContracts.companyId, companyId),
+            eq(propertyContracts.module, module),
+            eq(propertyContracts.unitId, unitId),
+            eq(propertyContracts.status, "ENDED")
+          )
+        )
         .orderBy(desc(propertyContracts.endDate));
 
-      res.json({ unit, contract: contract ?? null, ledger, payments: rentPayments, guaranteePayments, pastContracts, isShared });
+      res.json({
+        unit,
+        contract: contract ?? null,
+        ledger,
+        payments: rentPayments,
+        guaranteePayments,
+        pastContracts,
+        isShared,
+      });
     } catch (e: any) {
       console.error(`${tag} detail:`, e);
       res.status(500).json({ message: e.message });
@@ -571,11 +892,16 @@ export function registerRentalPaymentsAccrualRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const accts = await db.select().from(ledgerAccounts).where(and(
-        eq(ledgerAccounts.companyId, companyId),
-        eq(ledgerAccounts.active, true),
-        isNull(ledgerAccounts.deletedAt),
-      ));
+      const accts = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            eq(ledgerAccounts.active, true),
+            isNull(ledgerAccounts.deletedAt)
+          )
+        );
       res.json(accts.sort((a, b) => a.name.localeCompare(b.name)));
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -609,10 +935,7 @@ export function registerRentalPaymentsAccrualRoutes(
         .from(propertyPayments)
         .leftJoin(propertyContracts, eq(propertyContracts.id, propertyPayments.contractId))
         .leftJoin(propertyUnits, eq(propertyUnits.id, propertyPayments.unitId))
-        .where(and(
-          eq(propertyPayments.companyId, companyId),
-          eq(propertyPayments.module, module),
-        ))
+        .where(and(eq(propertyPayments.companyId, companyId), eq(propertyPayments.module, module)))
         .orderBy(desc(propertyPayments.paymentDate));
 
       res.json(payments);
@@ -645,7 +968,12 @@ export function registerRentalPaymentsAccrualRoutes(
       await ensureMonthlyForCompany(companyId, module);
 
       // Post all due, unaccrued rows as ONE combined journal voucher
-      const { accrued, skipped } = await postRentAccrualForCompany(companyId, shopExpenseAccountName, module, incomeAccountName);
+      const { accrued, skipped } = await postRentAccrualForCompany(
+        companyId,
+        shopExpenseAccountName,
+        module,
+        incomeAccountName
+      );
 
       res.json({ accrued, skipped });
     } catch (e: any) {

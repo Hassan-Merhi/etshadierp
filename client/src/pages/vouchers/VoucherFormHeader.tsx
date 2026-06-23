@@ -26,9 +26,7 @@ export function VoucherFormHeader({
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>
-          {voucherNumber && (
-            <p className="text-sm font-mono text-muted-foreground">#{voucherNumber}</p>
-          )}
+          {voucherNumber && <p className="text-sm font-mono text-muted-foreground">#{voucherNumber}</p>}
           {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
         </div>
         <div className="flex items-center gap-6">
@@ -38,11 +36,7 @@ export function VoucherFormHeader({
             render={({ field }) => (
               <FormItem className="flex flex-row items-center space-x-2 space-y-0">
                 <FormControl>
-                  <Switch
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                    data-testid="input-optional"
-                  />
+                  <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="input-optional" />
                 </FormControl>
                 <Label className="text-sm font-normal cursor-pointer">Optional</Label>
               </FormItem>
@@ -61,13 +55,11 @@ export function VoucherFormHeader({
                       field.value instanceof Date
                         ? format(field.value, "yyyy-MM-dd")
                         : typeof field.value === "string"
-                        ? field.value
-                        : ""
+                          ? field.value
+                          : ""
                     }
                     onChange={(e) =>
-                      field.onChange(
-                        e.target.value ? new Date(e.target.value + "T00:00:00") : new Date()
-                      )
+                      field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())
                     }
                     className="w-[180px]"
                     data-testid="input-voucher-date"

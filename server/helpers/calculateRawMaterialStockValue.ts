@@ -11,12 +11,7 @@
  */
 
 import { db } from "../db";
-import {
-  factoryRawStock,
-  factoryContainers,
-  factorySuppliers,
-  factoryRawMaterialAdjustments,
-} from "@shared/schema";
+import { factoryRawStock, factoryContainers, factorySuppliers, factoryRawMaterialAdjustments } from "@shared/schema";
 import { and, eq, sql } from "drizzle-orm";
 
 function parse(v: unknown): number {
@@ -26,55 +21,54 @@ function parse(v: unknown): number {
 export async function calculateRawMaterialStockValue(companyId: number): Promise<number> {
   const results = await db
     .select({
-      supplierId:      factoryContainers.supplierId,
-      supplierName:    factorySuppliers.name,
-      receivedKg:      factoryRawStock.receivedKg,
-      usedKg:          factoryRawStock.usedKg,
-      costPerKg:       factoryRawStock.costPerKg,
-      costPerKgUsd:    factoryRawStock.costPerKgUsd,
+      supplierId: factoryContainers.supplierId,
+      supplierName: factorySuppliers.name,
+      receivedKg: factoryRawStock.receivedKg,
+      usedKg: factoryRawStock.usedKg,
+      costPerKg: factoryRawStock.costPerKg,
+      costPerKgUsd: factoryRawStock.costPerKgUsd,
       containerStatus: factoryContainers.status,
-      containerId:     factoryRawStock.containerId,
+      containerId: factoryRawStock.containerId,
     })
     .from(factoryRawStock)
     .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
     .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-    .where(and(
-      eq(factoryRawStock.companyId, companyId),
-      sql`${factoryContainers.status} != 'DELETED'`,
-    ));
+    .where(and(eq(factoryRawStock.companyId, companyId), sql`${factoryContainers.status} != 'DELETED'`));
 
   // Mirror route's key exactly: `supplier-${id}` when supplierId present,
   // otherwise supplierName or `unknown-${containerId}`.
-  const supplierMap = new Map<string, {
-    _totalReceived:    number;
-    _totalUsed:        number;
-    _avgCostPerKg:     number;
-    _avgCostPerKgUsd:  number;
-  }>();
+  const supplierMap = new Map<
+    string,
+    {
+      _totalReceived: number;
+      _totalUsed: number;
+      _avgCostPerKg: number;
+      _avgCostPerKgUsd: number;
+    }
+  >();
 
   for (const r of results) {
-    const key      = r.supplierId ? `supplier-${r.supplierId}` : (r.supplierName || `unknown-${r.containerId}`);
+    const key = r.supplierId ? `supplier-${r.supplierId}` : r.supplierName || `unknown-${r.containerId}`;
     const received = parse(r.receivedKg);
-    const used     = parse(r.usedKg);
-    const cpk      = parse(r.costPerKg);
+    const used = parse(r.usedKg);
+    const cpk = parse(r.costPerKg);
     // Parse first, THEN fall back (same as route):  parseFloat(val) || fallback
-    const cpkUsd   = parseFloat(String(r.costPerKgUsd ?? "0")) || cpk;
+    const cpkUsd = parseFloat(String(r.costPerKgUsd ?? "0")) || cpk;
 
     const existing = supplierMap.get(key);
     if (existing) {
-      const prevCost    = existing._totalReceived * existing._avgCostPerKg;
+      const prevCost = existing._totalReceived * existing._avgCostPerKg;
       const prevCostUsd = existing._totalReceived * existing._avgCostPerKgUsd;
       existing._totalReceived += received;
-      existing._totalUsed     += used;
-      existing._avgCostPerKg    = existing._totalReceived > 0
-        ? (prevCost + received * cpk) / existing._totalReceived : 0;
-      existing._avgCostPerKgUsd = existing._totalReceived > 0
-        ? (prevCostUsd + received * cpkUsd) / existing._totalReceived : 0;
+      existing._totalUsed += used;
+      existing._avgCostPerKg = existing._totalReceived > 0 ? (prevCost + received * cpk) / existing._totalReceived : 0;
+      existing._avgCostPerKgUsd =
+        existing._totalReceived > 0 ? (prevCostUsd + received * cpkUsd) / existing._totalReceived : 0;
     } else {
       supplierMap.set(key, {
-        _totalReceived:   received,
-        _totalUsed:       used,
-        _avgCostPerKg:    cpk,
+        _totalReceived: received,
+        _totalUsed: used,
+        _avgCostPerKg: cpk,
         _avgCostPerKgUsd: cpkUsd,
       });
     }
@@ -87,7 +81,7 @@ export async function calculateRawMaterialStockValue(companyId: number): Promise
     .where(eq(factoryRawMaterialAdjustments.companyId, companyId));
 
   for (const adj of adjustments) {
-    const kg  = parse(adj.kg);
+    const kg = parse(adj.kg);
     const cpk = parse(adj.costPerKg);
     const isAdd = adj.type === "ADD";
 
@@ -103,9 +97,8 @@ export async function calculateRawMaterialStockValue(companyId: number): Promise
     if (existing) {
       if (isAdd) {
         const prevCost = existing._totalReceived * existing._avgCostPerKg;
-        existing._totalReceived  += kg;
-        existing._avgCostPerKg    = existing._totalReceived > 0
-          ? (prevCost + kg * cpk) / existing._totalReceived : 0;
+        existing._totalReceived += kg;
+        existing._avgCostPerKg = existing._totalReceived > 0 ? (prevCost + kg * cpk) / existing._totalReceived : 0;
         // Route sets USD = non-USD after adjustments
         existing._avgCostPerKgUsd = existing._avgCostPerKg;
       } else {
@@ -113,9 +106,9 @@ export async function calculateRawMaterialStockValue(companyId: number): Promise
       }
     } else {
       supplierMap.set(key, {
-        _totalReceived:   isAdd ? kg : 0,
-        _totalUsed:       isAdd ? 0  : kg,
-        _avgCostPerKg:    cpk,
+        _totalReceived: isAdd ? kg : 0,
+        _totalUsed: isAdd ? 0 : kg,
+        _avgCostPerKg: cpk,
         _avgCostPerKgUsd: cpk,
       });
     }

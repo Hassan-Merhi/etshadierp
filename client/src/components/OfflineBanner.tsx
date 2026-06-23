@@ -123,7 +123,9 @@ function OfflineBannerInner() {
         } else {
           const errText = await res.text().catch(() => `HTTP ${res.status}`);
           let errMsg = errText;
-          try { errMsg = JSON.parse(errText)?.message || errText; } catch {}
+          try {
+            errMsg = JSON.parse(errText)?.message || errText;
+          } catch {}
           updateItemStatus(item.id, "failed", errMsg);
           failed++;
         }
@@ -214,8 +216,8 @@ function OfflineBannerInner() {
           isOffline
             ? "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-b border-amber-500/30"
             : failedCount > 0
-            ? "bg-red-500/10 text-red-700 dark:text-red-400 border-b border-red-500/20"
-            : "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-b border-blue-500/20"
+              ? "bg-red-500/10 text-red-700 dark:text-red-400 border-b border-red-500/20"
+              : "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-b border-blue-500/20"
         }`}
         onClick={() => setDrawerOpen(true)}
         data-testid="offline-banner"
@@ -229,12 +231,12 @@ function OfflineBannerInner() {
           {isSyncing
             ? `Syncing ${pendingCount} action(s)...`
             : isOffline
-            ? pendingCount > 0
-              ? `Offline — ${pendingCount} action(s) pending sync`
-              : "You are offline"
-            : failedCount > 0
-            ? `${failedCount} action(s) failed to sync — tap to review`
-            : `${pendingCount} action(s) pending sync`}
+              ? pendingCount > 0
+                ? `Offline — ${pendingCount} action(s) pending sync`
+                : "You are offline"
+              : failedCount > 0
+                ? `${failedCount} action(s) failed to sync — tap to review`
+                : `${pendingCount} action(s) pending sync`}
         </span>
         {totalCount > 0 && (
           <Badge variant="outline" className="text-xs shrink-0" data-testid="badge-offline-count">
@@ -256,12 +258,7 @@ function OfflineBannerInner() {
 
           {!isOffline && pendingCount > 0 && (
             <div className="shrink-0 pt-2">
-              <Button
-                size="sm"
-                onClick={handleManualSync}
-                disabled={isSyncing}
-                data-testid="button-sync-now"
-              >
+              <Button size="sm" onClick={handleManualSync} disabled={isSyncing} data-testid="button-sync-now">
                 {isSyncing ? (
                   <RefreshCw className="h-3.5 w-3.5 animate-spin mr-1.5" />
                 ) : (
@@ -274,9 +271,7 @@ function OfflineBannerInner() {
 
           <div className="flex-1 overflow-y-auto py-2 space-y-2">
             {queue.length === 0 ? (
-              <div className="text-center text-muted-foreground py-10 text-sm">
-                No pending actions
-              </div>
+              <div className="text-center text-muted-foreground py-10 text-sm">No pending actions</div>
             ) : (
               queue.map((item) => (
                 <div

@@ -74,9 +74,7 @@ export function AdjustmentEditFormRows({
                     data-testid={`input-rate-${index}`}
                   />
                 </td>
-                <td className="p-2 text-right font-mono font-medium">
-                  {formatAmount(lineTotal)}
-                </td>
+                <td className="p-2 text-right font-mono font-medium">{formatAmount(lineTotal)}</td>
                 <td className="p-2 text-right">
                   {fields.length > 1 && (
                     <Button
@@ -101,9 +99,7 @@ export function AdjustmentEditFormRows({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  append({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })
-                }
+                onClick={() => append({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })}
                 data-testid="button-add-row"
               >
                 <Plus className="h-4 w-4 mr-2" />

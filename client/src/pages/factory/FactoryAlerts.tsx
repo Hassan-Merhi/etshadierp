@@ -21,13 +21,37 @@ interface Alert {
 function getSeverityBadge(severity: string) {
   switch (severity) {
     case "critical":
-      return <Badge variant="destructive" data-testid={`badge-severity-${severity}`}>{severity}</Badge>;
+      return (
+        <Badge variant="destructive" data-testid={`badge-severity-${severity}`}>
+          {severity}
+        </Badge>
+      );
     case "warning":
-      return <Badge variant="outline" className="border-yellow-500 text-yellow-600 dark:text-yellow-400" data-testid={`badge-severity-${severity}`}>{severity}</Badge>;
+      return (
+        <Badge
+          variant="outline"
+          className="border-yellow-500 text-yellow-600 dark:text-yellow-400"
+          data-testid={`badge-severity-${severity}`}
+        >
+          {severity}
+        </Badge>
+      );
     case "info":
-      return <Badge variant="secondary" className="text-blue-600 dark:text-blue-400" data-testid={`badge-severity-${severity}`}>{severity}</Badge>;
+      return (
+        <Badge
+          variant="secondary"
+          className="text-blue-600 dark:text-blue-400"
+          data-testid={`badge-severity-${severity}`}
+        >
+          {severity}
+        </Badge>
+      );
     default:
-      return <Badge variant="outline" data-testid={`badge-severity-${severity}`}>{severity}</Badge>;
+      return (
+        <Badge variant="outline" data-testid={`badge-severity-${severity}`}>
+          {severity}
+        </Badge>
+      );
   }
 }
 
@@ -95,7 +119,9 @@ export default function FactoryAlerts() {
             </div>
           ) : alerts.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground" data-testid="text-no-data">No alerts found</p>
+              <p className="text-muted-foreground" data-testid="text-no-data">
+                No alerts found
+              </p>
             </div>
           ) : (
             <div className="table-responsive">
@@ -118,8 +144,15 @@ export default function FactoryAlerts() {
                       data-testid={`row-alert-${alert.id}`}
                     >
                       <TableCell>{getSeverityBadge(alert.severity)}</TableCell>
-                      <TableCell className="font-medium" data-testid={`text-alert-title-${alert.id}`}>{alert.title}</TableCell>
-                      <TableCell className="text-muted-foreground max-w-xs truncate" data-testid={`text-alert-message-${alert.id}`}>{alert.message}</TableCell>
+                      <TableCell className="font-medium" data-testid={`text-alert-title-${alert.id}`}>
+                        {alert.title}
+                      </TableCell>
+                      <TableCell
+                        className="text-muted-foreground max-w-xs truncate"
+                        data-testid={`text-alert-message-${alert.id}`}
+                      >
+                        {alert.message}
+                      </TableCell>
                       <TableCell data-testid={`text-alert-entity-${alert.id}`}>{alert.entity}</TableCell>
                       <TableCell className="font-mono text-sm" data-testid={`text-alert-created-${alert.id}`}>
                         {new Date(alert.createdAt).toLocaleString()}
@@ -136,7 +169,9 @@ export default function FactoryAlerts() {
                             Mark Read
                           </Button>
                         ) : (
-                          <span className="text-xs text-muted-foreground" data-testid={`text-read-${alert.id}`}>Read</span>
+                          <span className="text-xs text-muted-foreground" data-testid={`text-read-${alert.id}`}>
+                            Read
+                          </span>
                         )}
                       </TableCell>
                     </TableRow>

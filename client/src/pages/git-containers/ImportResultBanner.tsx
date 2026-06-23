@@ -17,21 +17,21 @@ interface ImportResultBannerProps {
   };
 }
 
-export function ImportResultBanner({
-  importResult,
-  setImportResult,
-  undoImportMutation,
-}: ImportResultBannerProps) {
+export function ImportResultBanner({ importResult, setImportResult, undoImportMutation }: ImportResultBannerProps) {
   if (!importResult) return null;
 
   return (
-    <Card className="border-green-200 bg-green-50/50 dark:bg-green-900/10 dark:border-green-800/50 animate-in fade-in slide-in-from-top-1 duration-300" data-testid="banner-import-result">
+    <Card
+      className="border-green-200 bg-green-50/50 dark:bg-green-900/10 dark:border-green-800/50 animate-in fade-in slide-in-from-top-1 duration-300"
+      data-testid="banner-import-result"
+    >
       <CardContent className="p-3 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-green-800 dark:text-green-300">
-              Import Result: {importResult.updated} updated, {importResult.skipped} skipped, {importResult.notFound} not found.
+              Import Result: {importResult.updated} updated, {importResult.skipped} skipped, {importResult.notFound} not
+              found.
             </p>
             {importResult.errors.length > 0 && (
               <p className="text-xs text-green-700 dark:text-green-400 mt-0.5 truncate">

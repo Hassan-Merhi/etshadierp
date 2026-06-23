@@ -100,7 +100,7 @@ function SupplierRow({ acc, accentClass, index }: { acc: AccountItem; accentClas
             {hasBreakdown && (
               <button
                 type="button"
-                onClick={() => setOpen(o => !o)}
+                onClick={() => setOpen((o) => !o)}
                 className="shrink-0 text-muted-foreground hover:text-foreground"
                 data-testid={`button-breakdown-${index}`}
               >
@@ -124,13 +124,13 @@ function SupplierRow({ acc, accentClass, index }: { acc: AccountItem; accentClas
             <p className="text-xs text-muted-foreground font-mono">{acc.code}</p>
           )}
         </div>
-        <span className={`font-mono text-sm ml-4 shrink-0 ${accentClass}`}>
-          {fmt(acc.value)}
-        </span>
+        <span className={`font-mono text-sm ml-4 shrink-0 ${accentClass}`}>{fmt(acc.value)}</span>
       </div>
       {hasBreakdown && open && (
         <div className="bg-muted/20 px-4 py-2 space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Calculation Breakdown</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+            Calculation Breakdown
+          </p>
           {acc.breakdown!.map((line, j) => {
             const isNegative = line.usd < 0;
             const isFx = line.label.includes("FX") || line.label.includes("Net Balance");
@@ -138,11 +138,11 @@ function SupplierRow({ acc, accentClass, index }: { acc: AccountItem; accentClas
               <div key={j} className="flex items-center justify-between text-xs gap-4">
                 <div className="min-w-0">
                   <span className="text-foreground/80">{line.label}</span>
-                  {line.native && (
-                    <span className="ml-2 font-mono text-muted-foreground">({line.native})</span>
-                  )}
+                  {line.native && <span className="ml-2 font-mono text-muted-foreground">({line.native})</span>}
                 </div>
-                <span className={`font-mono shrink-0 ${isNegative ? "text-destructive" : isFx ? "text-muted-foreground" : accentClass}`}>
+                <span
+                  className={`font-mono shrink-0 ${isNegative ? "text-destructive" : isFx ? "text-muted-foreground" : accentClass}`}
+                >
                   {line.usd !== 0 ? fmt(line.usd) : "—"}
                 </span>
               </div>
@@ -190,9 +190,7 @@ function CategoryGroup({
             {accounts.length}
           </Badge>
         </div>
-        <span className={`font-mono text-sm font-semibold ${accentClass}`}>
-          {fmt(total)}
-        </span>
+        <span className={`font-mono text-sm font-semibold ${accentClass}`}>{fmt(total)}</span>
       </button>
       {open && (
         <div className="divide-y divide-border">
@@ -240,7 +238,10 @@ function Side({
         <p className="text-xs text-muted-foreground">{sublabel}</p>
       </CardHeader>
       <CardContent className="space-y-3">
-        <p className={`text-3xl font-bold font-mono ${colorClass}`} data-testid={`text-${label.toLowerCase().replace(/\s+/g, "-")}`}>
+        <p
+          className={`text-3xl font-bold font-mono ${colorClass}`}
+          data-testid={`text-${label.toLowerCase().replace(/\s+/g, "-")}`}
+        >
           {fmt(total)}
         </p>
 
@@ -271,12 +272,7 @@ function Side({
               {showAll && (
                 <div className="space-y-2">
                   {Object.entries(grouped).map(([cat, accs]) => (
-                    <CategoryGroup
-                      key={cat}
-                      title={cat}
-                      accounts={accs}
-                      accentClass={colorClass}
-                    />
+                    <CategoryGroup key={cat} title={cat} accounts={accs} accentClass={colorClass} />
                   ))}
                 </div>
               )}
@@ -315,7 +311,11 @@ function OrderGroup({
         data-testid={`toggle-order-group-${label.toLowerCase()}`}
       >
         <div className="flex items-center gap-2">
-          {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          {open ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
           {icon}
           <span className="text-sm font-semibold">{label}</span>
           <Badge className={`text-xs ${badgeClass}`}>{orders.length}</Badge>
@@ -337,7 +337,9 @@ function OrderGroup({
                 </div>
                 <div className="flex items-center gap-3 mt-0.5">
                   <span className="text-xs text-muted-foreground">{fmtDate(o.orderDate)}</span>
-                  <span className="text-xs text-muted-foreground">{o.totalQtyBales} bale{o.totalQtyBales !== 1 ? "s" : ""}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {o.totalQtyBales} bale{o.totalQtyBales !== 1 ? "s" : ""}
+                  </span>
                 </div>
               </div>
               <span className={`font-mono text-sm font-semibold ml-4 shrink-0 ${accentClass}`}>
@@ -401,9 +403,10 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
   }, [data.forUs.accounts, data.onUs.accounts]);
 
   const toggle = useCallback((key: string) => {
-    setHiddenKeys(prev => {
+    setHiddenKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       saveCustomViewHidden(next);
       return next;
     });
@@ -416,17 +419,17 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
   }, []);
 
   const visibleForUsTotal = useMemo(
-    () => allAccounts.filter(a => a.side === "forUs" && !hiddenKeys.has(a.key)).reduce((s, a) => s + a.value, 0),
-    [allAccounts, hiddenKeys],
+    () => allAccounts.filter((a) => a.side === "forUs" && !hiddenKeys.has(a.key)).reduce((s, a) => s + a.value, 0),
+    [allAccounts, hiddenKeys]
   );
   const visibleOnUsTotal = useMemo(
-    () => allAccounts.filter(a => a.side === "onUs" && !hiddenKeys.has(a.key)).reduce((s, a) => s + a.value, 0),
-    [allAccounts, hiddenKeys],
+    () => allAccounts.filter((a) => a.side === "onUs" && !hiddenKeys.has(a.key)).reduce((s, a) => s + a.value, 0),
+    [allAccounts, hiddenKeys]
   );
   const customNet = visibleForUsTotal - visibleOnUsTotal;
   const netPositive = customNet >= 0;
   const hiddenCount = hiddenKeys.size;
-  const visibleCount = allAccounts.filter(a => !hiddenKeys.has(a.key)).length;
+  const visibleCount = allAccounts.filter((a) => !hiddenKeys.has(a.key)).length;
 
   return (
     <Card data-testid="card-custom-net-position-view">
@@ -435,7 +438,9 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
           <div className="flex items-center gap-2">
             <Equal className="h-4 w-4 text-muted-foreground" />
             <CardTitle className="text-base">Custom Net Position View</CardTitle>
-            <Badge variant="outline" className="text-xs">View only</Badge>
+            <Badge variant="outline" className="text-xs">
+              View only
+            </Badge>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {hiddenCount > 0 && (
@@ -445,13 +450,15 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
             )}
             {hiddenCount > 0 && (
               <Button variant="ghost" size="sm" onClick={resetAll} data-testid="button-custom-view-reset">
-                <RotateCcw className="h-3.5 w-3.5 mr-1" />Show all
+                <RotateCcw className="h-3.5 w-3.5 mr-1" />
+                Show all
               </Button>
             )}
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Same accounts as the Net Position table above. Hide any account to adjust the subtotal shown here — the actual Net Position calculation above is never affected.
+          Same accounts as the Net Position table above. Hide any account to adjust the subtotal shown here — the actual
+          Net Position calculation above is never affected.
         </p>
       </CardHeader>
       <CardContent className="p-0">
@@ -463,7 +470,8 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
               className={`text-2xl font-bold font-mono ${netPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
               data-testid="text-custom-net-position"
             >
-              {customNet < 0 ? "-" : ""}{fmt(Math.abs(customNet))}
+              {customNet < 0 ? "-" : ""}
+              {fmt(Math.abs(customNet))}
             </p>
           </div>
           <div>
@@ -486,7 +494,7 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
           <p className="px-4 py-6 text-sm text-muted-foreground text-center">No accounts to display.</p>
         ) : (
           <div className="divide-y divide-border">
-            {allAccounts.map(acc => {
+            {allAccounts.map((acc) => {
               const hidden = hiddenKeys.has(acc.key);
               return (
                 <div
@@ -512,9 +520,7 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
                   </div>
                   <span
                     className={`font-mono text-sm font-semibold shrink-0 ${
-                      acc.side === "forUs"
-                        ? "text-green-600 dark:text-green-400"
-                        : "text-red-600 dark:text-red-400"
+                      acc.side === "forUs" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
                     }`}
                   >
                     {fmt(acc.value)}
@@ -548,7 +554,8 @@ function CustomNetPositionView({ data }: { data: NetPositionData }) {
             className={`font-mono text-base font-bold ${netPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
             data-testid="text-custom-net-footer"
           >
-            {customNet < 0 ? "-" : ""}{fmt(Math.abs(customNet))}
+            {customNet < 0 ? "-" : ""}
+            {fmt(Math.abs(customNet))}
           </span>
         </div>
       </CardContent>
@@ -575,7 +582,13 @@ export default function FactoryNetPosition() {
   const [asOf, setAsOf] = useState<string>(todayStr);
   const isToday = asOf === todayStr();
 
-  const { data: rawData, isLoading, error, refetch, isFetching } = useQuery<NetPositionData>({
+  const {
+    data: rawData,
+    isLoading,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery<NetPositionData>({
     queryKey: ["/api/factory/net-position", asOf],
     queryFn: async () => {
       const res = await fetch(`/api/factory/net-position?asOf=${asOf}`, { credentials: "include" });
@@ -613,51 +626,61 @@ export default function FactoryNetPosition() {
     const correctedItems = supplierWithBalances
       .filter((s: any) => !s.parentId)
       .map((s: any) => ({ id: s.id as number, name: s.name as string, balanceUsd: parseFloat(s.totalValue || "0") }))
-      .filter(s => Math.abs(s.balanceUsd) > 0.01);
+      .filter((s) => Math.abs(s.balanceUsd) > 0.01);
 
-    const correctedLiabilities = r2(correctedItems.filter(s => s.balanceUsd > 0).reduce((sum, s) => sum + s.balanceUsd, 0));
-    const correctedOverpayments = r2(correctedItems.filter(s => s.balanceUsd < 0).reduce((sum, s) => sum + Math.abs(s.balanceUsd), 0));
+    const correctedLiabilities = r2(
+      correctedItems.filter((s) => s.balanceUsd > 0).reduce((sum, s) => sum + s.balanceUsd, 0)
+    );
+    const correctedOverpayments = r2(
+      correctedItems.filter((s) => s.balanceUsd < 0).reduce((sum, s) => sum + Math.abs(s.balanceUsd), 0)
+    );
 
-    const liabilityDelta  = correctedLiabilities  - rawData.supplierLiabilities;
+    const liabilityDelta = correctedLiabilities - rawData.supplierLiabilities;
     const overpaymentDelta = correctedOverpayments - (rawData.supplierOverpayments ?? 0);
 
-    const correctedOnUsTotal  = r2(rawData.onUs.total  + liabilityDelta);
+    const correctedOnUsTotal = r2(rawData.onUs.total + liabilityDelta);
     const correctedForUsTotal = r2(rawData.forUs.total + overpaymentDelta);
     const correctedNetPosition = r2(correctedForUsTotal - correctedOnUsTotal);
 
     // Replace SUPPLIER accounts in onUs with corrected items
-    const nonSupplierOnUs = rawData.onUs.accounts.filter(a => a.code !== "SUPPLIER");
+    const nonSupplierOnUs = rawData.onUs.accounts.filter((a) => a.code !== "SUPPLIER");
     const correctedOnUsAccounts = [
       ...correctedItems
-        .filter(s => s.balanceUsd > 0)
+        .filter((s) => s.balanceUsd > 0)
         .sort((a, b) => b.balanceUsd - a.balanceUsd)
-        .map(s => ({ id: s.id, name: s.name, code: "SUPPLIER", value: r2(s.balanceUsd), category: "Supplier" })),
+        .map((s) => ({ id: s.id, name: s.name, code: "SUPPLIER", value: r2(s.balanceUsd), category: "Supplier" })),
       ...nonSupplierOnUs,
     ];
 
     // Replace SUPPLIER_OVERPAID accounts in forUs with corrected items
-    const nonSupplierForUs = rawData.forUs.accounts.filter(a => a.code !== "SUPPLIER_OVERPAID");
+    const nonSupplierForUs = rawData.forUs.accounts.filter((a) => a.code !== "SUPPLIER_OVERPAID");
     const correctedForUsAccounts = [
       ...nonSupplierForUs,
       ...correctedItems
-        .filter(s => s.balanceUsd < 0)
+        .filter((s) => s.balanceUsd < 0)
         .sort((a, b) => a.balanceUsd - b.balanceUsd)
-        .map(s => ({ id: s.id, name: s.name, code: "SUPPLIER_OVERPAID", value: r2(Math.abs(s.balanceUsd)), category: "Supplier Overpayments" })),
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          code: "SUPPLIER_OVERPAID",
+          value: r2(Math.abs(s.balanceUsd)),
+          category: "Supplier Overpayments",
+        })),
     ];
 
     // Update onUs breakdown — replace or add "Suppliers" line
-    let correctedOnUsBreakdown = rawData.onUs.breakdown.map(b =>
+    let correctedOnUsBreakdown = rawData.onUs.breakdown.map((b) =>
       b.name === "Suppliers" ? { ...b, value: correctedLiabilities } : b
     );
-    if (correctedLiabilities > 0 && !correctedOnUsBreakdown.some(b => b.name === "Suppliers")) {
+    if (correctedLiabilities > 0 && !correctedOnUsBreakdown.some((b) => b.name === "Suppliers")) {
       correctedOnUsBreakdown = [{ name: "Suppliers", value: correctedLiabilities }, ...correctedOnUsBreakdown];
     }
     // Remove "Suppliers" line if no liabilities
     if (correctedLiabilities === 0) {
-      correctedOnUsBreakdown = correctedOnUsBreakdown.filter(b => b.name !== "Suppliers");
+      correctedOnUsBreakdown = correctedOnUsBreakdown.filter((b) => b.name !== "Suppliers");
     }
 
-    const correctedForUsBreakdown = rawData.forUs.breakdown.map(b =>
+    const correctedForUsBreakdown = rawData.forUs.breakdown.map((b) =>
       b.name === "Supplier Overpayments" ? { ...b, value: correctedOverpayments } : b
     );
 
@@ -669,16 +692,24 @@ export default function FactoryNetPosition() {
       onUsTotal: correctedOnUsTotal,
       supplierLiabilities: correctedLiabilities,
       supplierOverpayments: correctedOverpayments,
-      forUs: { ...rawData.forUs, total: correctedForUsTotal, accounts: correctedForUsAccounts, breakdown: correctedForUsBreakdown },
-      onUs:  { ...rawData.onUs,  total: correctedOnUsTotal,  accounts: correctedOnUsAccounts,  breakdown: correctedOnUsBreakdown  },
+      forUs: {
+        ...rawData.forUs,
+        total: correctedForUsTotal,
+        accounts: correctedForUsAccounts,
+        breakdown: correctedForUsBreakdown,
+      },
+      onUs: {
+        ...rawData.onUs,
+        total: correctedOnUsTotal,
+        accounts: correctedOnUsAccounts,
+        breakdown: correctedOnUsBreakdown,
+      },
     };
   }, [rawData, supplierWithBalances]);
 
   const isPositive = (data?.netPosition ?? 0) >= 0;
   const hasPendingVerified =
-    (data?.pendingOrders?.length ?? 0) +
-    (data?.verifiedOrders?.length ?? 0) +
-    (data?.loadingOrders?.length ?? 0) > 0;
+    (data?.pendingOrders?.length ?? 0) + (data?.verifiedOrders?.length ?? 0) + (data?.loadingOrders?.length ?? 0) > 0;
 
   if (error) {
     return (
@@ -698,7 +729,11 @@ export default function FactoryNetPosition() {
         <div>
           <PageHeader
             title="Net Position"
-            subtitle={isToday ? "What we have vs what we owe — current standing" : `Historical snapshot — as of ${formatDateLabel(asOf)}`}
+            subtitle={
+              isToday
+                ? "What we have vs what we owe — current standing"
+                : `Historical snapshot — as of ${formatDateLabel(asOf)}`
+            }
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -736,12 +771,7 @@ export default function FactoryNetPosition() {
             </Button>
           </div>
           {!isToday && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAsOf(todayStr())}
-              data-testid="button-date-today"
-            >
+            <Button variant="outline" size="sm" onClick={() => setAsOf(todayStr())} data-testid="button-date-today">
               Today
             </Button>
           )}
@@ -765,7 +795,8 @@ export default function FactoryNetPosition() {
         <div className="flex items-center gap-2 px-4 py-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-sm">
           <CalendarDays className="h-4 w-4 shrink-0" />
           <span>
-            Showing net position as of <strong>{formatDateLabel(asOf)}</strong>. Supplier payments, vouchers, and customer balances are filtered to that date. Inventory reflects current stock.
+            Showing net position as of <strong>{formatDateLabel(asOf)}</strong>. Supplier payments, vouchers, and
+            customer balances are filtered to that date. Inventory reflects current stock.
           </span>
         </div>
       )}
@@ -774,7 +805,10 @@ export default function FactoryNetPosition() {
       {isLoading ? (
         <Skeleton className="h-28 w-full rounded-md" />
       ) : (
-        <Card className={`border-2 ${isPositive ? "border-green-500/30" : "border-red-500/30"}`} data-testid="card-net-position">
+        <Card
+          className={`border-2 ${isPositive ? "border-green-500/30" : "border-red-500/30"}`}
+          data-testid="card-net-position"
+        >
           <CardContent className="p-6">
             <div className="flex flex-wrap items-center justify-between gap-6">
               <div>
@@ -805,7 +839,9 @@ export default function FactoryNetPosition() {
                 <div className="text-muted-foreground text-xl font-light">=</div>
                 <div className="text-center">
                   <p className="text-xs text-muted-foreground mb-1">Net</p>
-                  <p className={`text-lg font-semibold font-mono ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  <p
+                    className={`text-lg font-semibold font-mono ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                  >
                     {data?.netPosition !== undefined && data.netPosition < 0 ? "-" : ""}
                     {fmt(Math.abs(data?.netPosition ?? 0))}
                   </p>
@@ -846,12 +882,10 @@ export default function FactoryNetPosition() {
       )}
 
       {/* Custom Net Position View — view-only, user-configurable account visibility */}
-      {!isLoading && data && (
-        <CustomNetPositionView data={data} />
-      )}
+      {!isLoading && data && <CustomNetPositionView data={data} />}
 
       {/* Broker Balance Breakdown */}
-      {!isLoading && (data?.onUs.accounts ?? []).some(a => a.code === "SUPPLIER" && a.breakdown?.length) && (
+      {!isLoading && (data?.onUs.accounts ?? []).some((a) => a.code === "SUPPLIER" && a.breakdown?.length) && (
         <Card data-testid="card-broker-breakdown">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Broker Balance Breakdown</CardTitle>
@@ -859,12 +893,14 @@ export default function FactoryNetPosition() {
           </CardHeader>
           <CardContent className="space-y-4">
             {(data?.onUs.accounts ?? [])
-              .filter(a => a.code === "SUPPLIER" && a.breakdown?.length)
+              .filter((a) => a.code === "SUPPLIER" && a.breakdown?.length)
               .map((broker, bi) => (
                 <div key={bi} className="border border-border rounded-md overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-2.5 bg-muted/30">
                     <span className="font-semibold text-sm">{broker.name}</span>
-                    <span className="font-mono text-sm font-bold text-red-600 dark:text-red-400">{fmt(broker.value)}</span>
+                    <span className="font-mono text-sm font-bold text-red-600 dark:text-red-400">
+                      {fmt(broker.value)}
+                    </span>
                   </div>
                   <div className="px-4 py-3 space-y-1.5">
                     {broker.breakdown!.map((line, j) => {
@@ -872,12 +908,17 @@ export default function FactoryNetPosition() {
                       const isFxOnly = line.usd === 0;
                       const isTotal = line.label.includes("Net Balance") || line.label.includes("× ");
                       return (
-                        <div key={j} className={`flex items-center justify-between text-xs gap-4 ${isTotal ? "border-t border-border pt-1.5 mt-1" : ""}`}>
+                        <div
+                          key={j}
+                          className={`flex items-center justify-between text-xs gap-4 ${isTotal ? "border-t border-border pt-1.5 mt-1" : ""}`}
+                        >
                           <div className="min-w-0">
                             <span className={isTotal ? "font-medium" : "text-foreground/80"}>{line.label}</span>
                             <span className="ml-2 font-mono text-muted-foreground">({line.native})</span>
                           </div>
-                          <span className={`font-mono shrink-0 font-medium ${isNeg ? "text-destructive" : isFxOnly ? "text-muted-foreground" : "text-foreground"}`}>
+                          <span
+                            className={`font-mono shrink-0 font-medium ${isNeg ? "text-destructive" : isFxOnly ? "text-muted-foreground" : "text-foreground"}`}
+                          >
                             {line.usd !== 0 ? fmt(line.usd) : "—"}
                           </span>
                         </div>
@@ -908,28 +949,39 @@ export default function FactoryNetPosition() {
               <div className="flex items-center gap-3 flex-wrap">
                 {(data?.pendingTotal ?? 0) > 0 && (
                   <span className="text-xs text-muted-foreground">
-                    Pending: <span className="font-mono font-semibold text-amber-500 dark:text-amber-400">{fmt(data?.pendingTotal ?? 0)}</span>
+                    Pending:{" "}
+                    <span className="font-mono font-semibold text-amber-500 dark:text-amber-400">
+                      {fmt(data?.pendingTotal ?? 0)}
+                    </span>
                   </span>
                 )}
                 {(data?.verifiedTotal ?? 0) > 0 && (
                   <span className="text-xs text-muted-foreground">
-                    Verified: <span className="font-mono font-semibold text-blue-500 dark:text-blue-400">{fmt(data?.verifiedTotal ?? 0)}</span>
+                    Verified:{" "}
+                    <span className="font-mono font-semibold text-blue-500 dark:text-blue-400">
+                      {fmt(data?.verifiedTotal ?? 0)}
+                    </span>
                   </span>
                 )}
                 {(data?.loadingTotal ?? 0) > 0 && (
                   <span className="text-xs text-muted-foreground">
-                    Loading: <span className="font-mono font-semibold text-purple-500 dark:text-purple-400">{fmt(data?.loadingTotal ?? 0)}</span>
+                    Loading:{" "}
+                    <span className="font-mono font-semibold text-purple-500 dark:text-purple-400">
+                      {fmt(data?.loadingTotal ?? 0)}
+                    </span>
                   </span>
                 )}
                 <span className="text-xs text-muted-foreground border-l border-border pl-3">
-                  Total: <span className="font-mono font-semibold text-foreground">
+                  Total:{" "}
+                  <span className="font-mono font-semibold text-foreground">
                     {fmt((data?.pendingTotal ?? 0) + (data?.verifiedTotal ?? 0) + (data?.loadingTotal ?? 0))}
                   </span>
                 </span>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Pending and Verified orders are included in "What We Have." Loading orders update live as bales are scanned.
+              Pending and Verified orders are included in "What We Have." Loading orders update live as bales are
+              scanned.
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -970,56 +1022,77 @@ export default function FactoryNetPosition() {
       )}
 
       {/* Sub-totals info */}
-      {!isLoading && data && (data.supplierLiabilities > 0 || data.ledgerAssets > 0 || data.inventoryValue > 0 || data.rawMaterialValue > 0) && (
-        <Card data-testid="card-composition">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Equal className="h-4 w-4 text-muted-foreground" />
-              <CardTitle className="text-base">Composition</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
-              {data.inventoryValue > 0 && (
-                <div className="space-y-1">
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Stock In Hand</p>
-                  <p className="font-mono font-semibold text-green-600 dark:text-green-400" data-testid="text-inventory-value">{fmt(data.inventoryValue)}</p>
-                  <p className="text-xs text-muted-foreground">Location inventory sell value</p>
-                </div>
-              )}
-              {data.rawMaterialValue > 0 && (
-                <div className="space-y-1">
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Raw Material Stock</p>
-                  <p className="font-mono font-semibold text-green-600 dark:text-green-400" data-testid="text-raw-material-value">{fmt(data.rawMaterialValue)}</p>
-                  <p className="text-xs text-muted-foreground">Raw materials stock value</p>
-                </div>
-              )}
-              <div className="space-y-1">
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">Ledger Assets</p>
-                <p className="font-mono font-semibold text-green-600 dark:text-green-400">{fmt(data.ledgerAssets)}</p>
-                <p className="text-xs text-muted-foreground">From accounting records</p>
+      {!isLoading &&
+        data &&
+        (data.supplierLiabilities > 0 ||
+          data.ledgerAssets > 0 ||
+          data.inventoryValue > 0 ||
+          data.rawMaterialValue > 0) && (
+          <Card data-testid="card-composition">
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Equal className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-base">Composition</CardTitle>
               </div>
-              <div className="space-y-1">
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">Supplier Balances</p>
-                <p className="font-mono font-semibold text-red-600 dark:text-red-400">{fmt(data.supplierLiabilities)}</p>
-                <p className="text-xs text-muted-foreground">Raw material suppliers owed</p>
-              </div>
-              {(data.supplierOverpayments ?? 0) > 0 && (
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
+                {data.inventoryValue > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Stock In Hand</p>
+                    <p
+                      className="font-mono font-semibold text-green-600 dark:text-green-400"
+                      data-testid="text-inventory-value"
+                    >
+                      {fmt(data.inventoryValue)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Location inventory sell value</p>
+                  </div>
+                )}
+                {data.rawMaterialValue > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Raw Material Stock</p>
+                    <p
+                      className="font-mono font-semibold text-green-600 dark:text-green-400"
+                      data-testid="text-raw-material-value"
+                    >
+                      {fmt(data.rawMaterialValue)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Raw materials stock value</p>
+                  </div>
+                )}
                 <div className="space-y-1">
-                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Supplier Overpayments</p>
-                  <p className="font-mono font-semibold text-green-600 dark:text-green-400">{fmt(data.supplierOverpayments ?? 0)}</p>
-                  <p className="text-xs text-muted-foreground">Overpaid — recoverable from suppliers</p>
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Ledger Assets</p>
+                  <p className="font-mono font-semibold text-green-600 dark:text-green-400">{fmt(data.ledgerAssets)}</p>
+                  <p className="text-xs text-muted-foreground">From accounting records</p>
                 </div>
-              )}
-              <div className="space-y-1">
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">Other Liabilities</p>
-                <p className="font-mono font-semibold text-red-600 dark:text-red-400">{fmt(data.ledgerLiabilities)}</p>
-                <p className="text-xs text-muted-foreground">From accounting records</p>
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Supplier Balances</p>
+                  <p className="font-mono font-semibold text-red-600 dark:text-red-400">
+                    {fmt(data.supplierLiabilities)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Raw material suppliers owed</p>
+                </div>
+                {(data.supplierOverpayments ?? 0) > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-muted-foreground text-xs uppercase tracking-wide">Supplier Overpayments</p>
+                    <p className="font-mono font-semibold text-green-600 dark:text-green-400">
+                      {fmt(data.supplierOverpayments ?? 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Overpaid — recoverable from suppliers</p>
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <p className="text-muted-foreground text-xs uppercase tracking-wide">Other Liabilities</p>
+                  <p className="font-mono font-semibold text-red-600 dark:text-red-400">
+                    {fmt(data.ledgerLiabilities)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">From accounting records</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
     </div>
   );
 }

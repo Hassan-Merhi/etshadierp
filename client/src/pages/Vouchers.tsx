@@ -16,8 +16,13 @@ import { CreditNoteTab } from "@/components/vouchers/CreditNoteTab";
 import { CreateAccountModal } from "@/components/vouchers/CreateAccountModal";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -27,8 +32,13 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useFormDraft } from "@/hooks/useFormDraft";
 import { DraftRestorePrompt } from "@/components/DraftRestorePrompt";
 import {
-  ArrowDownCircle, ArrowUpCircle, BookOpen, ArrowLeftRight,
-  SlidersHorizontal, FileText, ClipboardList,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  BookOpen,
+  ArrowLeftRight,
+  SlidersHorizontal,
+  FileText,
+  ClipboardList,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import StockTransferOrder from "@/pages/StockTransferOrder";
@@ -95,17 +105,15 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const tabParam = searchParams.get("tab");
   const voucherIdToEdit = editParam ? parseInt(editParam) : null;
 
-  const [activeTab, setActiveTab] = useState<"payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote">(
-    (tabParam as any) || "payment"
-  );
+  const [activeTab, setActiveTab] = useState<
+    "payment" | "receipt" | "journal" | "transfer" | "transferorder" | "adjustment" | "creditnote"
+  >((tabParam as any) || "payment");
   const [editVoucherId, setEditVoucherId] = useState<number | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [accountPickersNeeded, setAccountPickersNeeded] = useState(() => !!voucherIdToEdit);
 
   const isFactoryMode = appMode === "factory";
-  const visibleSidebarGroups = isFactoryMode
-    ? sidebarGroups.filter((g) => g.label !== "Adjustments")
-    : sidebarGroups;
+  const visibleSidebarGroups = isFactoryMode ? sidebarGroups.filter((g) => g.label !== "Adjustments") : sidebarGroups;
   const modePrefix = useModePrefix();
 
   const [sidebarSearchValue, setSidebarSearchValue] = useState("");
@@ -115,21 +123,50 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   const [waPendingPrompt, setWaPendingPrompt] = useState<{ accountId: number; month: string } | null>(null);
   const [showCreateAccountModal, setShowCreateAccountModal] = useState(false);
-  const [createAccountContext, setCreateAccountContext] = useState<{ tab: "payment" | "receipt" | "journal"; rowIndex?: number } | null>(null);
+  const [createAccountContext, setCreateAccountContext] = useState<{
+    tab: "payment" | "receipt" | "journal";
+    rowIndex?: number;
+  } | null>(null);
 
   const {
-    bankAccounts, ledgerAccounts, suppliers, customers, employees, fixedAssets,
-    factorySuppliersList, stockItems, locations, posLocationName, myLocations,
-    sidebarAccounts, voucherToEdit, supplierSearchResults, customerSearchResults,
-    allAccounts, liveAccountSearch, setLiveAccountSearch,
+    bankAccounts,
+    ledgerAccounts,
+    suppliers,
+    customers,
+    employees,
+    fixedAssets,
+    factorySuppliersList,
+    stockItems,
+    locations,
+    posLocationName,
+    myLocations,
+    sidebarAccounts,
+    voucherToEdit,
+    supplierSearchResults,
+    customerSearchResults,
+    allAccounts,
+    liveAccountSearch,
+    setLiveAccountSearch,
   } = useVoucherQueries({
-    selectedCompany, isFactoryCompany, isPropertiesCompany, voucherIdToEdit,
-    accountPickersNeeded, activeTab, isPOS, posLocationId,
+    selectedCompany,
+    isFactoryCompany,
+    isPropertiesCompany,
+    voucherIdToEdit,
+    accountPickersNeeded,
+    activeTab,
+    isPOS,
+    posLocationId,
   });
 
-  useEffect(() => { if (voucherIdToEdit) setAccountPickersNeeded(true); }, [voucherIdToEdit]);
-  useEffect(() => { if (activeRowIndex !== null) setAccountPickersNeeded(true); }, [activeRowIndex]);
-  useEffect(() => { if (sidebarSearchValue !== "") setAccountPickersNeeded(true); }, [sidebarSearchValue]);
+  useEffect(() => {
+    if (voucherIdToEdit) setAccountPickersNeeded(true);
+  }, [voucherIdToEdit]);
+  useEffect(() => {
+    if (activeRowIndex !== null) setAccountPickersNeeded(true);
+  }, [activeRowIndex]);
+  useEffect(() => {
+    if (sidebarSearchValue !== "") setAccountPickersNeeded(true);
+  }, [sidebarSearchValue]);
 
   const form = useForm<VoucherFormData>({
     resolver: zodResolver(voucherFormSchema),
@@ -158,7 +195,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
   const paymentDraftMode = isFactoryMode ? "factory" : "erp";
   const paymentDraftType = activeTab === "payment" ? "voucher-payment" : "voucher-receipt";
-  const { hasDraft: hasPaymentDraft, draftAge: paymentDraftAge, draft: paymentDraft, scheduleSave: schedulePaymentSave, discardDraft: discardPaymentDraft } = useFormDraft({
+  const {
+    hasDraft: hasPaymentDraft,
+    draftAge: paymentDraftAge,
+    draft: paymentDraft,
+    scheduleSave: schedulePaymentSave,
+    discardDraft: discardPaymentDraft,
+  } = useFormDraft({
     entityType: paymentDraftType,
     mode: paymentDraftMode,
     companyId: selectedCompany?.id ?? null,
@@ -172,9 +215,18 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   }, [JSON.stringify(allFormValues), voucherIdToEdit]);
 
   const { hydratedVoucherIdRef } = useVoucherHydration({
-    voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers,
-    employees, fixedAssets, customers, factorySuppliersList, form,
-    setTransactionRate, setVoucherEffectiveDate,
+    voucherToEdit,
+    allAccounts,
+    bankAccounts,
+    ledgerAccounts,
+    suppliers,
+    employees,
+    fixedAssets,
+    customers,
+    factorySuppliersList,
+    form,
+    setTransactionRate,
+    setVoucherEffectiveDate,
   });
 
   useEffect(() => {
@@ -194,19 +246,38 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
   const paymentAccountName = form.watch("paymentAccountName");
 
   const { filteredSidebarAccounts, selectedAccount } = useSidebarSync({
-    sidebarAccounts, sidebarSearchValue, paymentAccountId, paymentAccountType,
-    sidebarHighlightedIndex, setSidebarHighlightedIndex, entries, activeRowIndex, allAccounts,
+    sidebarAccounts,
+    sidebarSearchValue,
+    paymentAccountId,
+    paymentAccountType,
+    sidebarHighlightedIndex,
+    setSidebarHighlightedIndex,
+    entries,
+    activeRowIndex,
+    allAccounts,
   });
 
   const { accountBalance, accountCurrencyBalances } = useAccountBalance({
-    paymentAccountType, paymentAccountId, bankAccounts,
+    paymentAccountType,
+    paymentAccountId,
+    bankAccounts,
     selectedAccountOpeningBalance: selectedAccount?.openingBalance,
   });
 
   const { handleSidebarAccountSelect, handleAmountCommit, handleAutoCreateAccount } = useVoucherHandlers({
-    form, append, activeRowIndex, setActiveRowIndex, sidebarAccounts, selectedCompany,
-    setIsAutoCreating, queryClient, toast, setSelectedAccountId, setSelectedAccountType,
-    setSidebarSearchValue, setSidebarHighlightedIndex,
+    form,
+    append,
+    activeRowIndex,
+    setActiveRowIndex,
+    sidebarAccounts,
+    selectedCompany,
+    setIsAutoCreating,
+    queryClient,
+    toast,
+    setSelectedAccountId,
+    setSelectedAccountType,
+    setSidebarSearchValue,
+    setSidebarHighlightedIndex,
   });
 
   const saveMutation = useMutation({
@@ -239,7 +310,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     },
     onSuccess: async (data: any) => {
       const isEditMode = !!voucherIdToEdit;
-      toast({ title: "Success", description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully` });
+      toast({
+        title: "Success",
+        description: `${activeTab === "payment" ? "Payment" : "Receipt"} voucher ${isEditMode ? "updated" : "created"} successfully`,
+      });
       if (data?.whatsapp?.prompt && data.whatsapp.accountId && data.whatsapp.month) {
         setWaPendingPrompt({ accountId: data.whatsapp.accountId, month: data.whatsapp.month });
       }
@@ -258,10 +332,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
         setLocation(`${modePrefix}/daybook`);
       } else {
         form.reset({
-          paymentAccountType: "ledger", paymentAccountId: 0, paymentAccountName: "",
+          paymentAccountType: "ledger",
+          paymentAccountId: 0,
+          paymentAccountName: "",
           voucherDate: new Date(),
           entries: [{ accountType: "ledger", accountId: 0, accountName: "", amount: "" }],
-          notes: "", optional: false,
+          notes: "",
+          optional: false,
         });
       }
     },
@@ -274,22 +351,34 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
           voucherType,
           voucherDate: format(formData.voucherDate, "yyyy-MM-dd"),
           description: formData.notes || `${voucherType} (pending sync)`,
-          totalAmount: formData.entries.filter((e: any) => parseFloat(e.amount || "0") > 0).reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0).toFixed(2),
+          totalAmount: formData.entries
+            .filter((e: any) => parseFloat(e.amount || "0") > 0)
+            .reduce((sum: number, e: any) => sum + parseFloat(e.amount || "0"), 0)
+            .toFixed(2),
           optional: formData.optional || false,
           createdAt: new Date().toISOString(),
         };
-        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old: any) => Array.isArray(old) ? [syntheticVoucher, ...old] : old);
+        queryClient.setQueriesData({ queryKey: ["/api/vouchers"] }, (old: any) =>
+          Array.isArray(old) ? [syntheticVoucher, ...old] : old
+        );
         discardPaymentDraft();
         form.reset({
-          paymentAccountType: "ledger", paymentAccountId: 0, paymentAccountName: "",
+          paymentAccountType: "ledger",
+          paymentAccountId: 0,
+          paymentAccountName: "",
           voucherDate: new Date(),
           entries: [{ accountType: "ledger", accountId: 0, accountName: "", amount: "" }],
-          notes: "", optional: false,
+          notes: "",
+          optional: false,
         });
         return;
       }
       if ((error as any)._handledGlobally) return;
-      toast({ title: "Error", description: error.message || `Failed to ${voucherIdToEdit ? "update" : "create"} voucher`, variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || `Failed to ${voucherIdToEdit ? "update" : "create"} voucher`,
+        variant: "destructive",
+      });
     },
   });
 
@@ -300,7 +389,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       if (!res.ok) throw new Error(json.message || "Failed to send WhatsApp");
       return json;
     },
-    onSuccess: () => { toast({ title: "Statement sent to WhatsApp" }); setWaPendingPrompt(null); },
+    onSuccess: () => {
+      toast({ title: "Statement sent to WhatsApp" });
+      setWaPendingPrompt(null);
+    },
     onError: (error: any) => {
       if (error?._handledGlobally) return;
       toast({ title: "WhatsApp send failed", description: error.message, variant: "destructive" });
@@ -345,11 +437,13 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
     exportVoucherHelper({ formData: form.getValues(), activeTab, toast, detailed });
 
   const onSubmit = async (data: VoucherFormData) => {
-    const validEntries = data.entries.filter(
-      (entry) => entry.accountId > 0 && parseFloat(entry.amount || "0") > 0
-    );
+    const validEntries = data.entries.filter((entry) => entry.accountId > 0 && parseFloat(entry.amount || "0") > 0);
     if (validEntries.length === 0) {
-      toast({ title: "Validation Error", description: "Please add at least one entry with an account and a positive amount.", variant: "destructive" });
+      toast({
+        title: "Validation Error",
+        description: "Please add at least one entry with an account and a positive amount.",
+        variant: "destructive",
+      });
       return;
     }
     const totalDebits = validEntries.reduce((sum, entry) => {
@@ -357,7 +451,11 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
     if (isNaN(totalDebits) || totalDebits <= 0) {
-      toast({ title: "Validation Error", description: "Invalid amounts detected. Please check your entries.", variant: "destructive" });
+      toast({
+        title: "Validation Error",
+        description: "Invalid amounts detected. Please check your entries.",
+        variant: "destructive",
+      });
       return;
     }
     saveMutation.mutate({ ...data, entries: validEntries });
@@ -432,30 +530,52 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               {selectedCurrency === "CFA" && (
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
                   <span className="text-sm text-muted-foreground">Transaction Rate:</span>
-                  <ExchangeRateInput value={transactionRate} onChange={setTransactionRate} selectedCurrency={selectedCurrency} />
+                  <ExchangeRateInput
+                    value={transactionRate}
+                    onChange={setTransactionRate}
+                    selectedCurrency={selectedCurrency}
+                  />
                 </div>
               )}
               <PaymentVoucherTab
-                form={form} fieldArray={fieldArray} entries={entries} total={total}
-                paymentAccountId={paymentAccountId} paymentAccountType={paymentAccountType}
-                paymentAccountName={paymentAccountName} accountBalance={accountBalance}
-                accountCurrencyBalances={accountCurrencyBalances} allAccounts={allAccounts}
-                sidebarAccounts={sidebarAccounts} isEditMode={!!voucherIdToEdit}
+                form={form}
+                fieldArray={fieldArray}
+                entries={entries}
+                total={total}
+                paymentAccountId={paymentAccountId}
+                paymentAccountType={paymentAccountType}
+                paymentAccountName={paymentAccountName}
+                accountBalance={accountBalance}
+                accountCurrencyBalances={accountCurrencyBalances}
+                allAccounts={allAccounts}
+                sidebarAccounts={sidebarAccounts}
+                isEditMode={!!voucherIdToEdit}
                 filteredSidebarAccounts={filteredSidebarAccounts}
-                sidebarSearchValue={sidebarSearchValue} setSidebarSearchValue={setSidebarSearchValue}
-                sidebarHighlightedIndex={sidebarHighlightedIndex} setSidebarHighlightedIndex={setSidebarHighlightedIndex}
-                selectedAccountId={selectedAccountId} selectedAccountType={selectedAccountType}
+                sidebarSearchValue={sidebarSearchValue}
+                setSidebarSearchValue={setSidebarSearchValue}
+                sidebarHighlightedIndex={sidebarHighlightedIndex}
+                setSidebarHighlightedIndex={setSidebarHighlightedIndex}
+                selectedAccountId={selectedAccountId}
+                selectedAccountType={selectedAccountType}
                 handleSidebarAccountSelect={handleSidebarAccountSelect}
-                handleAmountCommit={handleAmountCommit} handlePrint={handlePrint}
-                handleExportVoucher={handleExportVoucher} onSubmit={onSubmit}
-                activeTab="payment" activeRowIndex={activeRowIndex} setActiveRowIndex={setActiveRowIndex}
+                handleAmountCommit={handleAmountCommit}
+                handlePrint={handlePrint}
+                handleExportVoucher={handleExportVoucher}
+                onSubmit={onSubmit}
+                activeTab="payment"
+                activeRowIndex={activeRowIndex}
+                setActiveRowIndex={setActiveRowIndex}
                 onCreateAccount={() => handleOpenCreateAccountModal("payment", activeRowIndex ?? undefined)}
-                isFactoryCompany={isFactoryCompany} onAutoCreateAccount={handleAutoCreateAccount}
-                isAutoCreating={isAutoCreating} originalTotal={originalTotal}
-                isPending={saveMutation.isPending} voucherNumber={voucherToEdit?.voucherNumber}
+                isFactoryCompany={isFactoryCompany}
+                onAutoCreateAccount={handleAutoCreateAccount}
+                isAutoCreating={isAutoCreating}
+                originalTotal={originalTotal}
+                isPending={saveMutation.isPending}
+                voucherNumber={voucherToEdit?.voucherNumber}
                 onAccountPickerOpen={() => setAccountPickersNeeded(true)}
                 onAccountSearchChange={setLiveAccountSearch}
-                effectiveDate={voucherEffectiveDate} onEffectiveDateChange={setVoucherEffectiveDate}
+                effectiveDate={voucherEffectiveDate}
+                onEffectiveDateChange={setVoucherEffectiveDate}
               />
             </div>
           )}
@@ -479,37 +599,57 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
               {selectedCurrency === "CFA" && (
                 <div className="flex flex-wrap items-center gap-2 sm:gap-4 p-3 bg-muted/30 rounded-md">
                   <span className="text-sm text-muted-foreground">Transaction Rate:</span>
-                  <ExchangeRateInput value={transactionRate} onChange={setTransactionRate} selectedCurrency={selectedCurrency} />
+                  <ExchangeRateInput
+                    value={transactionRate}
+                    onChange={setTransactionRate}
+                    selectedCurrency={selectedCurrency}
+                  />
                 </div>
               )}
               <ReceiptVoucherTab
-                form={form} fieldArray={fieldArray} entries={entries} total={total}
-                paymentAccountId={paymentAccountId} paymentAccountType={paymentAccountType}
-                paymentAccountName={paymentAccountName} accountBalance={accountBalance}
-                accountCurrencyBalances={accountCurrencyBalances} allAccounts={allAccounts}
-                sidebarAccounts={sidebarAccounts} isEditMode={!!voucherIdToEdit}
+                form={form}
+                fieldArray={fieldArray}
+                entries={entries}
+                total={total}
+                paymentAccountId={paymentAccountId}
+                paymentAccountType={paymentAccountType}
+                paymentAccountName={paymentAccountName}
+                accountBalance={accountBalance}
+                accountCurrencyBalances={accountCurrencyBalances}
+                allAccounts={allAccounts}
+                sidebarAccounts={sidebarAccounts}
+                isEditMode={!!voucherIdToEdit}
                 filteredSidebarAccounts={filteredSidebarAccounts}
-                sidebarSearchValue={sidebarSearchValue} setSidebarSearchValue={setSidebarSearchValue}
-                sidebarHighlightedIndex={sidebarHighlightedIndex} setSidebarHighlightedIndex={setSidebarHighlightedIndex}
-                selectedAccountId={selectedAccountId} selectedAccountType={selectedAccountType}
+                sidebarSearchValue={sidebarSearchValue}
+                setSidebarSearchValue={setSidebarSearchValue}
+                sidebarHighlightedIndex={sidebarHighlightedIndex}
+                setSidebarHighlightedIndex={setSidebarHighlightedIndex}
+                selectedAccountId={selectedAccountId}
+                selectedAccountType={selectedAccountType}
                 handleSidebarAccountSelect={handleSidebarAccountSelect}
-                handleAmountCommit={handleAmountCommit} handlePrint={handlePrint}
-                handleExportVoucher={handleExportVoucher} onSubmit={onSubmit}
-                activeTab="receipt" activeRowIndex={activeRowIndex} setActiveRowIndex={setActiveRowIndex}
+                handleAmountCommit={handleAmountCommit}
+                handlePrint={handlePrint}
+                handleExportVoucher={handleExportVoucher}
+                onSubmit={onSubmit}
+                activeTab="receipt"
+                activeRowIndex={activeRowIndex}
+                setActiveRowIndex={setActiveRowIndex}
                 onCreateAccount={() => handleOpenCreateAccountModal("receipt", activeRowIndex ?? undefined)}
-                isFactoryCompany={isFactoryCompany} onAutoCreateAccount={handleAutoCreateAccount}
-                isAutoCreating={isAutoCreating} originalTotal={originalTotal}
-                isPending={saveMutation.isPending} voucherNumber={voucherToEdit?.voucherNumber}
+                isFactoryCompany={isFactoryCompany}
+                onAutoCreateAccount={handleAutoCreateAccount}
+                isAutoCreating={isAutoCreating}
+                originalTotal={originalTotal}
+                isPending={saveMutation.isPending}
+                voucherNumber={voucherToEdit?.voucherNumber}
                 onAccountPickerOpen={() => setAccountPickersNeeded(true)}
                 onAccountSearchChange={setLiveAccountSearch}
-                effectiveDate={voucherEffectiveDate} onEffectiveDateChange={setVoucherEffectiveDate}
+                effectiveDate={voucherEffectiveDate}
+                onEffectiveDateChange={setVoucherEffectiveDate}
               />
             </div>
           )}
 
-          {!isPOS && activeTab === "journal" && (
-            <JournalForm voucherIdToEdit={voucherIdToEdit} isPOS={isPOS} />
-          )}
+          {!isPOS && activeTab === "journal" && <JournalForm voucherIdToEdit={voucherIdToEdit} isPOS={isPOS} />}
 
           {(isPOS || activeTab === "transfer") && (
             <StockTransferForm voucherIdToEdit={voucherIdToEdit} isPOS={isPOS} posUser={posUser} />
@@ -521,7 +661,10 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
           {!isPOS && activeTab === "creditnote" && (
             <div className="space-y-4">
-              <CreditNoteTab allAccounts={allAccounts} editVoucherId={activeTab === "creditnote" ? editVoucherId : null} />
+              <CreditNoteTab
+                allAccounts={allAccounts}
+                editVoucherId={activeTab === "creditnote" ? editVoucherId : null}
+              />
             </div>
           )}
 
@@ -540,13 +683,21 @@ export default function Vouchers({ posUser }: VouchersProps = {}) {
 
       <CreateAccountModal
         open={showCreateAccountModal}
-        onClose={() => { setShowCreateAccountModal(false); setCreateAccountContext(null); }}
+        onClose={() => {
+          setShowCreateAccountModal(false);
+          setCreateAccountContext(null);
+        }}
         companyId={selectedCompany?.id || 0}
         onAccountCreated={handleAccountCreated}
         apiRequestFn={modeApiRequest}
       />
 
-      <AlertDialog open={!!waPendingPrompt} onOpenChange={(open) => { if (!open) setWaPendingPrompt(null); }}>
+      <AlertDialog
+        open={!!waPendingPrompt}
+        onOpenChange={(open) => {
+          if (!open) setWaPendingPrompt(null);
+        }}
+      >
         <AlertDialogContent data-testid="dialog-whatsapp-prompt">
           <AlertDialogHeader>
             <AlertDialogTitle>Send Statement via WhatsApp?</AlertDialogTitle>

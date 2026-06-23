@@ -88,7 +88,9 @@ export default function FactoryCashflow() {
         </div>
       ) : !data ? (
         <div className="text-center py-8">
-          <p className="text-muted-foreground" data-testid="text-no-data">No cashflow data available</p>
+          <p className="text-muted-foreground" data-testid="text-no-data">
+            No cashflow data available
+          </p>
         </div>
       ) : (
         <>
@@ -111,7 +113,10 @@ export default function FactoryCashflow() {
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid="text-expected-income">
+                <div
+                  className="text-2xl font-bold text-green-600 dark:text-green-400"
+                  data-testid="text-expected-income"
+                >
                   {formatCurrency(data.expectedIncome)}
                 </div>
               </CardContent>
@@ -152,7 +157,9 @@ export default function FactoryCashflow() {
             <CardContent>
               {!data.freightPayments || data.freightPayments.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground" data-testid="text-no-freight">No upcoming freight payments</p>
+                  <p className="text-muted-foreground" data-testid="text-no-freight">
+                    No upcoming freight payments
+                  </p>
                 </div>
               ) : (
                 <div className="table-responsive">
@@ -190,7 +197,9 @@ export default function FactoryCashflow() {
             <CardContent>
               {!data.payrollForecast || data.payrollForecast.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground" data-testid="text-no-payroll">No payroll forecast data</p>
+                  <p className="text-muted-foreground" data-testid="text-no-payroll">
+                    No payroll forecast data
+                  </p>
                 </div>
               ) : (
                 <div className="table-responsive">

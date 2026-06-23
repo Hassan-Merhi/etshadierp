@@ -58,13 +58,17 @@ export function FolderList({
       >
         <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
         <span className="flex-1 truncate">Unfiled</span>
-        <Badge variant="secondary" className="text-xs px-1.5 py-0 shrink-0">{fileCountForFolder(null)}</Badge>
+        <Badge variant="secondary" className="text-xs px-1.5 py-0 shrink-0">
+          {fileCountForFolder(null)}
+        </Badge>
       </button>
 
       {/* Created folders */}
       {foldersLoading ? (
         <div className="space-y-1 px-1">
-          {[1, 2].map((i) => <Skeleton key={i} className="h-7 w-full" />)}
+          {[1, 2].map((i) => (
+            <Skeleton key={i} className="h-7 w-full" />
+          ))}
         </div>
       ) : (
         folders.map((folder) => (
@@ -76,7 +80,9 @@ export function FolderList({
             >
               <FolderOpen className="h-4 w-4 shrink-0 text-muted-foreground" />
               <span className="flex-1 truncate">{folder.name}</span>
-              <Badge variant="secondary" className="text-xs px-1.5 py-0 shrink-0">{fileCountForFolder(folder.id)}</Badge>
+              <Badge variant="secondary" className="text-xs px-1.5 py-0 shrink-0">
+                {fileCountForFolder(folder.id)}
+              </Badge>
             </button>
             <div className="invisible group-hover:visible flex items-center gap-0.5 shrink-0">
               <Button
@@ -104,13 +110,7 @@ export function FolderList({
         ))
       )}
 
-      <Button
-        variant="outline"
-        size="sm"
-        className="mt-2 w-full"
-        onClick={onNewFolder}
-        data-testid="button-new-folder"
-      >
+      <Button variant="outline" size="sm" className="mt-2 w-full" onClick={onNewFolder} data-testid="button-new-folder">
         <FolderPlus className="h-4 w-4 mr-2" />
         New Folder
       </Button>

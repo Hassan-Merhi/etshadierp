@@ -41,7 +41,10 @@ function normalizeLedgerType(selection: string): { accountType: string; subType?
 }
 
 const createAccountSchema = z.object({
-  name: z.string().min(1, "Name is required").refine(val => val.trim().length > 0, "Name cannot be empty"),
+  name: z
+    .string()
+    .min(1, "Name is required")
+    .refine((val) => val.trim().length > 0, "Name cannot be empty"),
   accountType: z.string().min(1, "Account type is required"),
   subType: z.string().optional(),
 });
@@ -96,7 +99,7 @@ export function CreateAccountModal({
     onSuccess: async (newAccount) => {
       await queryClient.invalidateQueries({ queryKey: ["/api/accounts/voucher-sidebar", companyId] });
       await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", companyId] });
-      
+
       toast({
         title: "Account created",
         description: `"${newAccount.name}" has been created and selected.`,
@@ -146,12 +149,7 @@ export function CreateAccountModal({
                 <FormItem>
                   <FormLabel>Account Name</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="e.g., Office Supplies"
-                      autoFocus
-                      data-testid="input-account-name"
-                    />
+                    <Input {...field} placeholder="e.g., Office Supplies" autoFocus data-testid="input-account-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -220,11 +218,7 @@ export function CreateAccountModal({
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending}
-                data-testid="button-create-account"
-              >
+              <Button type="submit" disabled={createMutation.isPending} data-testid="button-create-account">
                 {createMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />

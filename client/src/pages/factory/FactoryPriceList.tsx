@@ -42,7 +42,11 @@ export default function FactoryPriceList() {
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [showZeroOnly, setShowZeroOnly] = useState(false);
-  const [editingCell, setEditingCell] = useState<{ productId: number; field: "sellingPrice" | "productionPrice"; value: string } | null>(null);
+  const [editingCell, setEditingCell] = useState<{
+    productId: number;
+    field: "sellingPrice" | "productionPrice";
+    value: string;
+  } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -76,9 +80,7 @@ export default function FactoryPriceList() {
   });
 
   const handleStartEdit = (product: FactoryBaleProduct, field: "sellingPrice" | "productionPrice") => {
-    const currentValue = field === "sellingPrice"
-      ? (product.sellingPrice || "0")
-      : (product.productionPrice || "0");
+    const currentValue = field === "sellingPrice" ? product.sellingPrice || "0" : product.productionPrice || "0";
     setEditingCell({ productId: product.id, field, value: currentValue });
     setTimeout(() => inputRef.current?.select(), 30);
   };
@@ -120,7 +122,7 @@ export default function FactoryPriceList() {
     headerRow.alignment = { vertical: "middle" };
     headerRow.height = 18;
 
-    const activeProducts = products.filter(p => p.active);
+    const activeProducts = products.filter((p) => p.active);
     for (const p of activeProducts) {
       const sp = parseFloat(p.sellingPrice || "0");
       const pp = parseFloat(p.productionPrice || "0");
@@ -145,7 +147,9 @@ export default function FactoryPriceList() {
     ws.views = [{ state: "frozen", ySplit: 1 }];
 
     const buffer = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buffer as ArrayBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const blob = new Blob([buffer as ArrayBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -207,7 +211,8 @@ export default function FactoryPriceList() {
 
   const filteredProducts = products.filter((p) => {
     if (!p.active) return false;
-    const matchSearch = !search ||
+    const matchSearch =
+      !search ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       (p.articleCode || "").toLowerCase().includes(search.toLowerCase()) ||
       (p.code || "").toLowerCase().includes(search.toLowerCase());
@@ -283,13 +288,15 @@ export default function FactoryPriceList() {
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {categories.map((c) => (
-              <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              <SelectItem key={c.id} value={String(c.id)}>
+                {c.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Button
           variant={showZeroOnly ? "default" : "outline"}
-          onClick={() => setShowZeroOnly(v => !v)}
+          onClick={() => setShowZeroOnly((v) => !v)}
           className="gap-2 whitespace-nowrap"
           data-testid="button-show-zero-price-only"
         >
@@ -309,7 +316,9 @@ export default function FactoryPriceList() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-4 space-y-2">
-              {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
           ) : filteredProducts.length > 0 ? (
             <Table>
@@ -325,14 +334,19 @@ export default function FactoryPriceList() {
               </TableHeader>
               <TableBody>
                 {filteredProducts.map((product) => {
-                  const sellingIsEditing = editingCell?.productId === product.id && editingCell.field === "sellingPrice";
-                  const productionIsEditing = editingCell?.productId === product.id && editingCell.field === "productionPrice";
+                  const sellingIsEditing =
+                    editingCell?.productId === product.id && editingCell.field === "sellingPrice";
+                  const productionIsEditing =
+                    editingCell?.productId === product.id && editingCell.field === "productionPrice";
                   const sellingPrice = parseFloat(product.sellingPrice || "0");
                   const productionPrice = parseFloat(product.productionPrice || "0");
 
                   return (
                     <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
-                      <TableCell className="font-mono text-sm hidden sm:table-cell" data-testid={`text-article-code-${product.id}`}>
+                      <TableCell
+                        className="font-mono text-sm hidden sm:table-cell"
+                        data-testid={`text-article-code-${product.id}`}
+                      >
                         {product.articleCode || product.code || "—"}
                       </TableCell>
                       <TableCell className="font-medium" data-testid={`text-product-name-${product.id}`}>
@@ -340,21 +354,28 @@ export default function FactoryPriceList() {
                         {/* Mobile-only: show article code + category inline */}
                         <div className="sm:hidden flex flex-wrap items-center gap-1.5 mt-0.5">
                           {(product.articleCode || product.code) && (
-                            <span className="font-mono text-xs text-muted-foreground">{product.articleCode || product.code}</span>
+                            <span className="font-mono text-xs text-muted-foreground">
+                              {product.articleCode || product.code}
+                            </span>
                           )}
                           {product.categoryId && (
-                            <Badge variant="outline" className="text-xs">{categoryMap.get(product.categoryId) || "—"}</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {categoryMap.get(product.categoryId) || "—"}
+                            </Badge>
                           )}
                           {product.weightPerBaleKg && (
-                            <span className="text-xs text-muted-foreground">{parseFloat(product.weightPerBaleKg).toFixed(1)} kg/bale</span>
+                            <span className="text-xs text-muted-foreground">
+                              {parseFloat(product.weightPerBaleKg).toFixed(1)} kg/bale
+                            </span>
                           )}
                         </div>
                       </TableCell>
                       <TableCell className="hidden sm:table-cell">
-                        {product.categoryId
-                          ? <Badge variant="outline">{categoryMap.get(product.categoryId) || "—"}</Badge>
-                          : <span className="text-muted-foreground text-sm">—</span>
-                        }
+                        {product.categoryId ? (
+                          <Badge variant="outline">{categoryMap.get(product.categoryId) || "—"}</Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm text-muted-foreground hidden sm:table-cell">
                         {product.weightPerBaleKg ? `${parseFloat(product.weightPerBaleKg).toFixed(1)} kg` : "—"}
@@ -382,7 +403,11 @@ export default function FactoryPriceList() {
                               disabled={updatePriceMutation.isPending}
                               data-testid={`button-save-selling-${product.id}`}
                             >
-                              {updatePriceMutation.isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5 text-green-600" />}
+                              {updatePriceMutation.isPending ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5 text-green-600" />
+                              )}
                             </Button>
                             <Button
                               size="icon"
@@ -399,7 +424,9 @@ export default function FactoryPriceList() {
                             onClick={() => handleStartEdit(product, "sellingPrice")}
                             data-testid={`cell-selling-price-${product.id}`}
                           >
-                            <span className={`font-mono font-medium ${sellingPrice > 0 ? "" : "text-muted-foreground"}`}>
+                            <span
+                              className={`font-mono font-medium ${sellingPrice > 0 ? "" : "text-muted-foreground"}`}
+                            >
                               {sellingPrice > 0 ? `$${sellingPrice.toFixed(2)}` : "—"}
                             </span>
                             <Pencil className="h-3 w-3 text-muted-foreground opacity-60 md:opacity-0 md:group-hover:opacity-100" />
@@ -429,7 +456,11 @@ export default function FactoryPriceList() {
                               disabled={updatePriceMutation.isPending}
                               data-testid={`button-save-production-${product.id}`}
                             >
-                              {updatePriceMutation.isPending ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5 text-green-600" />}
+                              {updatePriceMutation.isPending ? (
+                                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <Check className="h-3.5 w-3.5 text-green-600" />
+                              )}
                             </Button>
                             <Button
                               size="icon"
@@ -463,7 +494,11 @@ export default function FactoryPriceList() {
               <Tag className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 text-lg font-semibold">No products found</h3>
               <p className="text-muted-foreground mt-2 text-sm">
-                {showZeroOnly ? "All products have a selling price set." : search || categoryFilter !== "all" ? "Try adjusting your filters." : "Add bale products to see them here."}
+                {showZeroOnly
+                  ? "All products have a selling price set."
+                  : search || categoryFilter !== "all"
+                    ? "Try adjusting your filters."
+                    : "Add bale products to see them here."}
               </p>
             </div>
           )}
@@ -472,7 +507,9 @@ export default function FactoryPriceList() {
 
       <div className="rounded-md bg-muted/50 border p-4 text-sm text-muted-foreground space-y-1">
         <p className="font-medium text-foreground">How prices work:</p>
-        <p>Selling prices set here are the catalog prices used across proformas when you click "Apply Catalog Prices."</p>
+        <p>
+          Selling prices set here are the catalog prices used across proformas when you click "Apply Catalog Prices."
+        </p>
         <p>On each proforma line you can lock the price — locked lines are skipped when applying catalog prices.</p>
         <p>Production cost is used for profitability reports and is not shown to customers.</p>
       </div>

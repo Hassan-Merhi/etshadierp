@@ -1,6 +1,16 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { BankAccount, LedgerAccount, Supplier, Customer, Employee, FixedAsset, FactorySupplierBasic, StockItem, Location } from "./voucherTypes";
+import type {
+  BankAccount,
+  LedgerAccount,
+  Supplier,
+  Customer,
+  Employee,
+  FixedAsset,
+  FactorySupplierBasic,
+  StockItem,
+  Location,
+} from "./voucherTypes";
 import type { CombinedAccount } from "@/components/AccountAutocomplete";
 import type { Account } from "@/components/AccountSidebar";
 
@@ -33,7 +43,8 @@ export function useVoucherQueries({
     return () => clearTimeout(timer);
   }, [liveAccountSearch]);
 
-  const needsStockData = isPOS || activeTab === "transfer" || activeTab === "transferorder" || activeTab === "adjustment";
+  const needsStockData =
+    isPOS || activeTab === "transfer" || activeTab === "transferorder" || activeTab === "adjustment";
 
   const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts", selectedCompany?.id],
@@ -91,10 +102,9 @@ export function useVoucherQueries({
     enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany && !isPropertiesCompany,
     staleTime: 30 * 1000,
     queryFn: async () => {
-      const res = await fetch(
-        `/api/suppliers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/suppliers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to search suppliers");
       return res.json();
     },
@@ -105,10 +115,9 @@ export function useVoucherQueries({
     enabled: debouncedAccountSearch.length >= 2 && !!selectedCompany,
     staleTime: 30 * 1000,
     queryFn: async () => {
-      const res = await fetch(
-        `/api/customers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/customers?search=${encodeURIComponent(debouncedAccountSearch)}&limit=50`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to search customers");
       return res.json();
     },
@@ -174,13 +183,39 @@ export function useVoucherQueries({
       })),
     ];
     return accounts.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  }, [ledgerAccounts, bankAccounts, suppliers, supplierSearchResults, employees, fixedAssets, customers, customerSearchResults, factorySuppliersList]);
+  }, [
+    ledgerAccounts,
+    bankAccounts,
+    suppliers,
+    supplierSearchResults,
+    employees,
+    fixedAssets,
+    customers,
+    customerSearchResults,
+    factorySuppliersList,
+  ]);
 
   return {
-    bankAccounts, ledgerAccounts, suppliers, customers, employees, fixedAssets,
-    factorySuppliersList, stockItems, locations, posLocation, posLocationName,
-    myLocations, sidebarAccounts, voucherToEdit, loadingVoucher,
-    supplierSearchResults, customerSearchResults, allAccounts, needsStockData,
-    liveAccountSearch, setLiveAccountSearch,
+    bankAccounts,
+    ledgerAccounts,
+    suppliers,
+    customers,
+    employees,
+    fixedAssets,
+    factorySuppliersList,
+    stockItems,
+    locations,
+    posLocation,
+    posLocationName,
+    myLocations,
+    sidebarAccounts,
+    voucherToEdit,
+    loadingVoucher,
+    supplierSearchResults,
+    customerSearchResults,
+    allAccounts,
+    needsStockData,
+    liveAccountSearch,
+    setLiveAccountSearch,
   };
 }

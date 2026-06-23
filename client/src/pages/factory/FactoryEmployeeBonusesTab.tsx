@@ -9,14 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
@@ -43,7 +44,7 @@ function fmt(val: string | number | null | undefined) {
   return isNaN(n) ? "0.00" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const today = () => new Date().toLocaleDateString('en-CA');
+const today = () => new Date().toLocaleDateString("en-CA");
 
 export default function FactoryEmployeeBonusesTab() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -75,9 +76,7 @@ export default function FactoryEmployeeBonusesTab() {
     },
   });
 
-  const totalBonuses = useMemo(() =>
-    bonuses.reduce((s, b) => s + parseFloat(b.amount || "0"), 0)
-  , [bonuses]);
+  const totalBonuses = useMemo(() => bonuses.reduce((s, b) => s + parseFloat(b.amount || "0"), 0), [bonuses]);
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -92,7 +91,10 @@ export default function FactoryEmployeeBonusesTab() {
           notes: addForm.notes || null,
         }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -108,7 +110,10 @@ export default function FactoryEmployeeBonusesTab() {
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/factory/employee-bonuses/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
     },
     onSuccess: () => {
       toast({ title: "Bonus reversed and deleted" });
@@ -131,7 +136,9 @@ export default function FactoryEmployeeBonusesTab() {
             <SelectContent>
               <SelectItem value="all">All Employees</SelectItem>
               {employees.map((e) => (
-                <SelectItem key={e.id} value={String(e.id)}>{e.firstName} {e.lastName}</SelectItem>
+                <SelectItem key={e.id} value={String(e.id)}>
+                  {e.firstName} {e.lastName}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -151,7 +158,11 @@ export default function FactoryEmployeeBonusesTab() {
       )}
 
       {isLoading ? (
-        <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
       ) : bonuses.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -175,12 +186,21 @@ export default function FactoryEmployeeBonusesTab() {
               <TableBody>
                 {bonuses.map((b) => (
                   <TableRow key={b.id} data-testid={`row-bonus-${b.id}`}>
-                    <TableCell className="font-medium">{b.firstName} {b.lastName}</TableCell>
+                    <TableCell className="font-medium">
+                      {b.firstName} {b.lastName}
+                    </TableCell>
                     <TableCell className="text-sm">{b.bonusDate}</TableCell>
-                    <TableCell className="text-right font-mono text-emerald-600 dark:text-emerald-400">{fmt(b.amount)}</TableCell>
+                    <TableCell className="text-right font-mono text-emerald-600 dark:text-emerald-400">
+                      {fmt(b.amount)}
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-48 truncate">{b.notes || "—"}</TableCell>
                     <TableCell>
-                      <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(b)} data-testid={`button-delete-bonus-${b.id}`}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setDeleteConfirm(b)}
+                        data-testid={`button-delete-bonus-${b.id}`}
+                      >
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </TableCell>
@@ -196,12 +216,16 @@ export default function FactoryEmployeeBonusesTab() {
                 <CardContent className="p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-medium text-sm">{b.firstName} {b.lastName}</p>
+                      <p className="font-medium text-sm">
+                        {b.firstName} {b.lastName}
+                      </p>
                       <p className="text-xs text-muted-foreground">{b.bonusDate}</p>
                       {b.notes && <p className="text-xs text-muted-foreground mt-0.5">{b.notes}</p>}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="font-mono text-emerald-600 dark:text-emerald-400 text-sm font-medium">{fmt(b.amount)}</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 text-sm font-medium">
+                        {fmt(b.amount)}
+                      </span>
                       <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(b)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
@@ -218,7 +242,9 @@ export default function FactoryEmployeeBonusesTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Employee Bonus</DialogTitle>
-            <DialogDescription>The bonus amount will be immediately credited to the employee's account balance.</DialogDescription>
+            <DialogDescription>
+              The bonus amount will be immediately credited to the employee's account balance.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -229,7 +255,9 @@ export default function FactoryEmployeeBonusesTab() {
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((e) => (
-                    <SelectItem key={e.id} value={String(e.id)}>{e.firstName} {e.lastName}</SelectItem>
+                    <SelectItem key={e.id} value={String(e.id)}>
+                      {e.firstName} {e.lastName}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -237,21 +265,44 @@ export default function FactoryEmployeeBonusesTab() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Date</Label>
-                <Input type="date" value={addForm.bonusDate} onChange={(e) => setAddForm((f) => ({ ...f, bonusDate: e.target.value }))} data-testid="input-bonus-date" />
+                <Input
+                  type="date"
+                  value={addForm.bonusDate}
+                  onChange={(e) => setAddForm((f) => ({ ...f, bonusDate: e.target.value }))}
+                  data-testid="input-bonus-date"
+                />
               </div>
               <div>
                 <Label>Amount</Label>
-                <Input type="number" placeholder="0.00" value={addForm.amount} onChange={(e) => setAddForm((f) => ({ ...f, amount: e.target.value }))} data-testid="input-bonus-amount" />
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={addForm.amount}
+                  onChange={(e) => setAddForm((f) => ({ ...f, amount: e.target.value }))}
+                  data-testid="input-bonus-amount"
+                />
               </div>
             </div>
             <div>
               <Label>Notes (optional)</Label>
-              <Textarea placeholder="e.g. Performance bonus Q1..." value={addForm.notes} onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))} rows={2} data-testid="input-bonus-notes" />
+              <Textarea
+                placeholder="e.g. Performance bonus Q1..."
+                value={addForm.notes}
+                onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                data-testid="input-bonus-notes"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={() => wrapAdminAction(() => addMutation.mutate(), "Credit Bonus")} disabled={addMutation.isPending || !addForm.employeeId || !addForm.amount} data-testid="button-confirm-add-bonus">
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(() => addMutation.mutate(), "Credit Bonus")}
+              disabled={addMutation.isPending || !addForm.employeeId || !addForm.amount}
+              data-testid="button-confirm-add-bonus"
+            >
               {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Credit Bonus
             </Button>
@@ -264,12 +315,23 @@ export default function FactoryEmployeeBonusesTab() {
           <DialogHeader>
             <DialogTitle>Reverse Bonus</DialogTitle>
             <DialogDescription>
-              This will reverse and delete the bonus of <strong>{deleteConfirm && fmt(deleteConfirm.amount)}</strong> for {deleteConfirm?.firstName} {deleteConfirm?.lastName}. The amount will be deducted from their account balance. This cannot be undone.
+              This will reverse and delete the bonus of <strong>{deleteConfirm && fmt(deleteConfirm.amount)}</strong>{" "}
+              for {deleteConfirm?.firstName} {deleteConfirm?.lastName}. The amount will be deducted from their account
+              balance. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => wrapAdminAction(() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id), "Reverse Bonus")} disabled={deleteMutation.isPending} data-testid="button-confirm-delete-bonus">
+            <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                wrapAdminAction(() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id), "Reverse Bonus")
+              }
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-bonus"
+            >
               {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Reverse Bonus
             </Button>

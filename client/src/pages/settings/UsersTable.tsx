@@ -32,9 +32,7 @@ export function UsersTable({ users, onEdit, onDelete, onResetPassword }: UsersTa
                 </Badge>
               </TableCell>
               <TableCell>
-                <Badge variant={user.active ? "default" : "secondary"}>
-                  {user.active ? "Active" : "Inactive"}
-                </Badge>
+                <Badge variant={user.active ? "default" : "secondary"}>{user.active ? "Active" : "Inactive"}</Badge>
               </TableCell>
               <TableCell className="text-right space-x-2">
                 <Button size="icon" variant="ghost" onClick={() => onResetPassword(user)} title="Reset Password">

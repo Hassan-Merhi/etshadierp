@@ -7,28 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Plus, Pencil, Trash2, Users, ArrowRight } from "lucide-react";
@@ -148,7 +129,9 @@ export default function IntercompanyLinks() {
     queryKey: ["/api/intercompany-links", recipientsDialogLink?.id, "recipients"],
     queryFn: async () => {
       if (!recipientsDialogLink) return [];
-      const r = await fetch(`/api/intercompany-links/${recipientsDialogLink.id}/recipients`, { credentials: "include" });
+      const r = await fetch(`/api/intercompany-links/${recipientsDialogLink.id}/recipients`, {
+        credentials: "include",
+      });
       if (!r.ok) return [];
       return r.json();
     },
@@ -160,7 +143,9 @@ export default function IntercompanyLinks() {
     queryKey: ["/api/companies", recipientsDialogLink?.destCompanyId, "member-ids"],
     queryFn: async () => {
       if (!recipientsDialogLink?.destCompanyId) return [];
-      const r = await fetch(`/api/companies/${recipientsDialogLink.destCompanyId}/member-ids`, { credentials: "include" });
+      const r = await fetch(`/api/companies/${recipientsDialogLink.destCompanyId}/member-ids`, {
+        credentials: "include",
+      });
       if (!r.ok) return [];
       return r.json();
     },
@@ -314,9 +299,11 @@ export default function IntercompanyLinks() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {links.map(link => (
+                {links.map((link) => (
                   <TableRow key={link.id} data-testid={`row-link-${link.id}`}>
-                    <TableCell className="font-medium">{link.label || <span className="text-muted-foreground text-xs">—</span>}</TableCell>
+                    <TableCell className="font-medium">
+                      {link.label || <span className="text-muted-foreground text-xs">—</span>}
+                    </TableCell>
                     <TableCell>
                       <div className="text-xs">
                         <p className="font-medium">{link.sourceCompanyName}</p>
@@ -332,7 +319,7 @@ export default function IntercompanyLinks() {
                     <TableCell>
                       <Switch
                         checked={link.active}
-                        onCheckedChange={checked => toggleActiveMutation.mutate({ id: link.id, active: checked })}
+                        onCheckedChange={(checked) => toggleActiveMutation.mutate({ id: link.id, active: checked })}
                         data-testid={`switch-active-${link.id}`}
                       />
                     </TableCell>
@@ -358,7 +345,9 @@ export default function IntercompanyLinks() {
                         <Button
                           size="icon"
                           variant="ghost"
-                          onClick={() => { if (confirm("Delete this link?")) deleteMutation.mutate(link.id); }}
+                          onClick={() => {
+                            if (confirm("Delete this link?")) deleteMutation.mutate(link.id);
+                          }}
                           data-testid={`button-delete-${link.id}`}
                         >
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -374,7 +363,12 @@ export default function IntercompanyLinks() {
       </Card>
 
       {/* Create / Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={open => { if (!open) closeDialog(); }}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          if (!open) closeDialog();
+        }}
+      >
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingLink ? "Edit Link" : "New Intercompany Link"}</DialogTitle>
@@ -384,7 +378,7 @@ export default function IntercompanyLinks() {
               <Label>Label (optional)</Label>
               <Input
                 value={form.label}
-                onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
                 placeholder="e.g. Lubumbashi → Factory payments"
                 data-testid="input-link-label"
               />
@@ -393,12 +387,19 @@ export default function IntercompanyLinks() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Source company</Label>
-                <Select value={form.sourceCompanyId} onValueChange={v => setForm(f => ({ ...f, sourceCompanyId: v, sourceLedgerAccountId: "" }))}>
+                <Select
+                  value={form.sourceCompanyId}
+                  onValueChange={(v) => setForm((f) => ({ ...f, sourceCompanyId: v, sourceLedgerAccountId: "" }))}
+                >
                   <SelectTrigger data-testid="select-source-company">
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {companies.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -406,14 +407,18 @@ export default function IntercompanyLinks() {
                 <Label>Source ledger account</Label>
                 <Select
                   value={form.sourceLedgerAccountId}
-                  onValueChange={v => setForm(f => ({ ...f, sourceLedgerAccountId: v }))}
+                  onValueChange={(v) => setForm((f) => ({ ...f, sourceLedgerAccountId: v }))}
                   disabled={!form.sourceCompanyId}
                 >
                   <SelectTrigger data-testid="select-source-account">
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {srcAccounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
+                    {srcAccounts.map((a) => (
+                      <SelectItem key={a.id} value={String(a.id)}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -432,12 +437,19 @@ export default function IntercompanyLinks() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Destination company</Label>
-                <Select value={form.destCompanyId} onValueChange={v => setForm(f => ({ ...f, destCompanyId: v, destLedgerAccountId: "" }))}>
+                <Select
+                  value={form.destCompanyId}
+                  onValueChange={(v) => setForm((f) => ({ ...f, destCompanyId: v, destLedgerAccountId: "" }))}
+                >
                   <SelectTrigger data-testid="select-dest-company">
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {companies.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -445,14 +457,18 @@ export default function IntercompanyLinks() {
                 <Label>IC account (credit side)</Label>
                 <Select
                   value={form.destLedgerAccountId}
-                  onValueChange={v => setForm(f => ({ ...f, destLedgerAccountId: v }))}
+                  onValueChange={(v) => setForm((f) => ({ ...f, destLedgerAccountId: v }))}
                   disabled={!form.destCompanyId}
                 >
                   <SelectTrigger data-testid="select-dest-account">
                     <SelectValue placeholder="Select…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {dstAccounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
+                    {dstAccounts.map((a) => (
+                      <SelectItem key={a.id} value={String(a.id)}>
+                        {a.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -466,29 +482,31 @@ export default function IntercompanyLinks() {
                 )}
                 <div className="flex flex-wrap gap-1.5">
                   {allUsers
-                    .filter(u => !form.destCompanyId || createDialogMemberIds.includes(u.id))
-                    .map(u => {
-                    const selected = recipientUserIds.includes(u.id);
-                    return (
-                      <Badge
-                        key={u.id}
-                        variant={selected ? "default" : "outline"}
-                        className="cursor-pointer select-none"
-                        onClick={() => setRecipientUserIds(ids =>
-                          selected ? ids.filter(id => id !== u.id) : [...ids, u.id]
-                        )}
-                        data-testid={`badge-user-${u.id}`}
-                      >
-                        {u.username}
-                      </Badge>
-                    );
-                  })}
+                    .filter((u) => !form.destCompanyId || createDialogMemberIds.includes(u.id))
+                    .map((u) => {
+                      const selected = recipientUserIds.includes(u.id);
+                      return (
+                        <Badge
+                          key={u.id}
+                          variant={selected ? "default" : "outline"}
+                          className="cursor-pointer select-none"
+                          onClick={() =>
+                            setRecipientUserIds((ids) => (selected ? ids.filter((id) => id !== u.id) : [...ids, u.id]))
+                          }
+                          data-testid={`badge-user-${u.id}`}
+                        >
+                          {u.username}
+                        </Badge>
+                      );
+                    })}
                 </div>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={closeDialog}>Cancel</Button>
+            <Button variant="outline" onClick={closeDialog}>
+              Cancel
+            </Button>
             <Button onClick={handleSave} disabled={!canSave || isSaving} data-testid="button-save-link">
               {isSaving ? "Saving…" : editingLink ? "Save Changes" : "Create Link"}
             </Button>
@@ -497,19 +515,25 @@ export default function IntercompanyLinks() {
       </Dialog>
 
       {/* Recipients Dialog */}
-      <Dialog open={!!recipientsDialogLink} onOpenChange={open => { if (!open) setRecipientsDialogLink(null); }}>
+      <Dialog
+        open={!!recipientsDialogLink}
+        onOpenChange={(open) => {
+          if (!open) setRecipientsDialogLink(null);
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Manage Recipients</DialogTitle>
           </DialogHeader>
           <div className="py-2 space-y-3">
             <p className="text-xs text-muted-foreground">
-              Select users in <strong>{recipientsDialogLink?.destCompanyName}</strong> who should receive notifications for this link.
+              Select users in <strong>{recipientsDialogLink?.destCompanyName}</strong> who should receive notifications
+              for this link.
             </p>
             <div className="flex flex-wrap gap-1.5">
               {allUsers
-                .filter(u => destCompanyMemberIds.includes(u.id))
-                .map(u => {
+                .filter((u) => destCompanyMemberIds.includes(u.id))
+                .map((u) => {
                   const selected = recipientForm.includes(u.id);
                   return (
                     <Badge
@@ -518,7 +542,7 @@ export default function IntercompanyLinks() {
                       className="cursor-pointer select-none"
                       onClick={() => {
                         setRecipientForm(
-                          selected ? recipientForm.filter(id => id !== u.id) : [...recipientForm, u.id]
+                          selected ? recipientForm.filter((id) => id !== u.id) : [...recipientForm, u.id]
                         );
                       }}
                       data-testid={`badge-recipient-${u.id}`}
@@ -532,11 +556,13 @@ export default function IntercompanyLinks() {
               )}
             </div>
             <div className="text-xs text-muted-foreground">
-              Current: {recipientsData.map(r => r.username || r.userId).join(", ") || "none"}
+              Current: {recipientsData.map((r) => r.username || r.userId).join(", ") || "none"}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRecipientsDialogLink(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setRecipientsDialogLink(null)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => {
                 if (!recipientsDialogLink) return;

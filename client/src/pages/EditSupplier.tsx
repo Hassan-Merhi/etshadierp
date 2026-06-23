@@ -7,14 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -124,12 +117,7 @@ export default function EditSupplier() {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleBack}
-            data-testid="button-back"
-          >
+          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <PageHeader title="Supplier Not Found" />
@@ -141,30 +129,21 @@ export default function EditSupplier() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleBack}
-          data-testid="button-back"
-        >
+        <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-page-title">
             Edit Supplier
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Update supplier information and opening balance
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">Update supplier information and opening balance</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Supplier Details</CardTitle>
-          <CardDescription>
-            Update the supplier information below
-          </CardDescription>
+          <CardDescription>Update the supplier information below</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -177,11 +156,7 @@ export default function EditSupplier() {
                     <FormItem>
                       <FormLabel>Code *</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="SUP-001" 
-                          {...field} 
-                          data-testid="input-code"
-                        />
+                        <Input placeholder="SUP-001" {...field} data-testid="input-code" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -195,11 +170,7 @@ export default function EditSupplier() {
                     <FormItem>
                       <FormLabel>Legal Name *</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="Acme Corporation" 
-                          {...field} 
-                          data-testid="input-legalName"
-                        />
+                        <Input placeholder="Acme Corporation" {...field} data-testid="input-legalName" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -213,12 +184,7 @@ export default function EditSupplier() {
                     <FormItem>
                       <FormLabel>Email *</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="email" 
-                          placeholder="contact@supplier.com" 
-                          {...field} 
-                          data-testid="input-email"
-                        />
+                        <Input type="email" placeholder="contact@supplier.com" {...field} data-testid="input-email" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -232,11 +198,7 @@ export default function EditSupplier() {
                     <FormItem>
                       <FormLabel>Phone</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="+1 234 567 8900" 
-                          {...field} 
-                          data-testid="input-phone"
-                        />
+                        <Input placeholder="+1 234 567 8900" {...field} data-testid="input-phone" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -250,11 +212,7 @@ export default function EditSupplier() {
                     <FormItem className="col-span-1 sm:col-span-2">
                       <FormLabel>Address</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="123 Business St, City, State" 
-                          {...field} 
-                          data-testid="input-address"
-                        />
+                        <Input placeholder="123 Business St, City, State" {...field} data-testid="input-address" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -268,11 +226,7 @@ export default function EditSupplier() {
                     <FormItem>
                       <FormLabel>Tax ID (GST/VAT)</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="GST123456" 
-                          {...field} 
-                          data-testid="input-taxId"
-                        />
+                        <Input placeholder="GST123456" {...field} data-testid="input-taxId" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -286,11 +240,7 @@ export default function EditSupplier() {
                     <FormItem>
                       <FormLabel>Payment Terms</FormLabel>
                       <FormControl>
-                        <Input 
-                          placeholder="Net 30" 
-                          {...field} 
-                          data-testid="input-paymentTerms"
-                        />
+                        <Input placeholder="Net 30" {...field} data-testid="input-paymentTerms" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -304,11 +254,11 @@ export default function EditSupplier() {
                     <FormItem>
                       <FormLabel>Opening Balance</FormLabel>
                       <FormControl>
-                        <Input 
+                        <Input
                           type="number"
                           step="0.01"
-                          placeholder="0.00" 
-                          {...field} 
+                          placeholder="0.00"
+                          {...field}
                           data-testid="input-openingBalance"
                         />
                       </FormControl>
@@ -335,7 +285,9 @@ export default function EditSupplier() {
                         <SelectContent>
                           <SelectItem value="__none__">No stock group linked</SelectItem>
                           {stockGroups.map((g: any) => (
-                            <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                            <SelectItem key={g.id} value={String(g.id)}>
+                              {g.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -365,19 +317,15 @@ export default function EditSupplier() {
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-4">
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => navigate("/suppliers")}
                   data-testid="button-cancel"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit" 
-                  disabled={updateMutation.isPending}
-                  data-testid="button-save"
-                >
+                <Button type="submit" disabled={updateMutation.isPending} data-testid="button-save">
                   {updateMutation.isPending ? "Saving..." : "Save"}
                 </Button>
               </div>

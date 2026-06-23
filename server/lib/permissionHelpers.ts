@@ -24,10 +24,7 @@ export type PermissionRow = {
  * Build a fast lookup map from raw permission rows for a given role.
  * Returns: featureKey → enabled
  */
-export function buildPermissionMap(
-  permissions: PermissionRow[],
-  role: string
-): Map<string, boolean> {
+export function buildPermissionMap(permissions: PermissionRow[], role: string): Map<string, boolean> {
   const map = new Map<string, boolean>();
   for (const p of permissions) {
     if (p.role === role) {
@@ -40,11 +37,7 @@ export function buildPermissionMap(
 /**
  * Core access check. Interprets permission semantics per role tier.
  */
-function isAllowed(
-  role: string,
-  featureKey: string,
-  permMap: Map<string, boolean>
-): boolean {
+function isAllowed(role: string, featureKey: string, permMap: Map<string, boolean>): boolean {
   // Developer and Admin are always allowed — cannot be restricted
   if (role === "Developer" || role === "Admin") return true;
 
@@ -62,56 +55,32 @@ function isAllowed(
 }
 
 /** Check access to a top-level module (e.g. "mod_erp", "mod_factory") */
-export function canAccessModule(
-  role: string,
-  moduleKey: string,
-  permMap: Map<string, boolean>
-): boolean {
+export function canAccessModule(role: string, moduleKey: string, permMap: Map<string, boolean>): boolean {
   return isAllowed(role, moduleKey, permMap);
 }
 
 /** Check access to a full page/route (e.g. "page_dashboard") */
-export function canAccessPage(
-  role: string,
-  pageKey: string,
-  permMap: Map<string, boolean>
-): boolean {
+export function canAccessPage(role: string, pageKey: string, permMap: Map<string, boolean>): boolean {
   return isAllowed(role, pageKey, permMap);
 }
 
 /** Check visibility of a sub-section / tab (e.g. "tab_workers_payroll") */
-export function canAccessTab(
-  role: string,
-  tabKey: string,
-  permMap: Map<string, boolean>
-): boolean {
+export function canAccessTab(role: string, tabKey: string, permMap: Map<string, boolean>): boolean {
   return isAllowed(role, tabKey, permMap);
 }
 
 /** Check permission to perform a write/action (e.g. "act_create_voucher") */
-export function canPerformAction(
-  role: string,
-  actionKey: string,
-  permMap: Map<string, boolean>
-): boolean {
+export function canPerformAction(role: string, actionKey: string, permMap: Map<string, boolean>): boolean {
   return isAllowed(role, actionKey, permMap);
 }
 
 /** Check visibility of a sensitive data field (e.g. "fld_cost_price") */
-export function canSeeSensitiveField(
-  role: string,
-  fieldKey: string,
-  permMap: Map<string, boolean>
-): boolean {
+export function canSeeSensitiveField(role: string, fieldKey: string, permMap: Map<string, boolean>): boolean {
   return isAllowed(role, fieldKey, permMap);
 }
 
 /** Check export/print capabilities (e.g. "exp_pdf") */
-export function canUseExportPrint(
-  role: string,
-  exportKey: string,
-  permMap: Map<string, boolean>
-): boolean {
+export function canUseExportPrint(role: string, exportKey: string, permMap: Map<string, boolean>): boolean {
   return isAllowed(role, exportKey, permMap);
 }
 
@@ -119,10 +88,6 @@ export function canUseExportPrint(
  * Convenience: check any permission key regardless of its type prefix.
  * Delegates to isAllowed with the same logic.
  */
-export function canAccess(
-  role: string,
-  permissionKey: string,
-  permMap: Map<string, boolean>
-): boolean {
+export function canAccess(role: string, permissionKey: string, permMap: Map<string, boolean>): boolean {
   return isAllowed(role, permissionKey, permMap);
 }

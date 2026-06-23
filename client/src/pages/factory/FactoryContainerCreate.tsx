@@ -7,13 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useLocation } from "wouter";
@@ -48,14 +42,14 @@ export default function FactoryContainerCreate() {
   const [otherChargeLines, setOtherChargeLines] = useState<OtherChargeLine[]>([]);
 
   const updateOtherChargeLine = (idx: number, field: keyof OtherChargeLine, value: string) => {
-    setOtherChargeLines(prev => prev.map((l, i) => i === idx ? { ...l, [field]: value } : l));
+    setOtherChargeLines((prev) => prev.map((l, i) => (i === idx ? { ...l, [field]: value } : l)));
   };
   const removeOtherChargeLine = (idx: number) => {
-    setOtherChargeLines(prev => prev.filter((_, i) => i !== idx));
+    setOtherChargeLines((prev) => prev.filter((_, i) => i !== idx));
   };
 
   useEffect(() => {
-    setFormData(f => ({ ...f, commissionCurrencyCode: currency, freightCurrencyCode: currency }));
+    setFormData((f) => ({ ...f, commissionCurrencyCode: currency, freightCurrencyCode: currency }));
   }, [currency]);
 
   const { data: suppliers } = useQuery<FactorySupplier[]>({
@@ -66,21 +60,21 @@ export default function FactoryContainerCreate() {
     queryKey: ["/api/ledger-accounts"],
   });
 
-  const activeSuppliers = suppliers?.filter(s => s.isActive) ?? [];
+  const activeSuppliers = suppliers?.filter((s) => s.isActive) ?? [];
 
   const selectedSupplier = formData.supplierId
-    ? activeSuppliers.find(s => s.id === parseInt(formData.supplierId)) ?? null
+    ? (activeSuppliers.find((s) => s.id === parseInt(formData.supplierId)) ?? null)
     : null;
 
   // Auto-derive broker from supplier's parentId (true broker balance model)
   const linkedBroker = selectedSupplier?.parentId
-    ? activeSuppliers.find(s => s.id === selectedSupplier.parentId) ?? null
+    ? (activeSuppliers.find((s) => s.id === selectedSupplier.parentId) ?? null)
     : null;
 
   // When supplier changes: if it has a linked broker, auto-set commissionSupplierId
   useEffect(() => {
     if (selectedSupplier?.parentId) {
-      setFormData(f => ({ ...f, commissionSupplierId: String(selectedSupplier.parentId) }));
+      setFormData((f) => ({ ...f, commissionSupplierId: String(selectedSupplier.parentId) }));
     }
     // If supplier has no parent, clear any previously auto-set broker only if it was auto-derived
     // (we leave manually-chosen broker intact when supplier has no parent)
@@ -117,10 +111,10 @@ export default function FactoryContainerCreate() {
         throw new Error(err.message || "Failed to create container");
       }
       const container = await res.json();
-      const validLines = otherChargeLines.filter(l => parseFloat(l.amount || "0") > 0);
+      const validLines = otherChargeLines.filter((l) => parseFloat(l.amount || "0") > 0);
       if (validLines.length > 0) {
         await factoryApiRequest("POST", `/api/factory/containers/${container.id}/other-charges/sync`, {
-          charges: validLines.map(l => ({
+          charges: validLines.map((l) => ({
             description: "Other Charge",
             amount: l.amount,
             currencyCode: l.currencyCode || currency,
@@ -153,12 +147,7 @@ export default function FactoryContainerCreate() {
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate("/factory/containers")}
-          data-testid="button-back"
-        >
+        <Button variant="ghost" size="icon" onClick={() => navigate("/factory/containers")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
@@ -172,19 +161,23 @@ export default function FactoryContainerCreate() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <Label>Container Number <span className="text-destructive">*</span></Label>
+            <Label>
+              Container Number <span className="text-destructive">*</span>
+            </Label>
             <Input
               value={formData.containerNumber}
-              onChange={e => setFormData({ ...formData, containerNumber: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, containerNumber: e.target.value })}
               placeholder="e.g., CNTR-2024-001"
               data-testid="input-container-number"
             />
           </div>
           <div>
-            <Label>Notes <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+            <Label>
+              Notes <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+            </Label>
             <Input
               value={formData.notes}
-              onChange={e => setFormData({ ...formData, notes: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               placeholder="Additional notes"
               data-testid="input-container-notes"
             />
@@ -202,16 +195,17 @@ export default function FactoryContainerCreate() {
             <Label>Purchase Supplier</Label>
             <Select
               value={formData.supplierId || "__none__"}
-              onValueChange={val => setFormData({ ...formData, supplierId: val === "__none__" ? "" : val })}
+              onValueChange={(val) => setFormData({ ...formData, supplierId: val === "__none__" ? "" : val })}
             >
               <SelectTrigger data-testid="select-container-supplier">
                 <SelectValue placeholder="Select supplier..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">None</SelectItem>
-                {filteredSupplierList.map(s => (
+                {filteredSupplierList.map((s) => (
                   <SelectItem key={s.id} value={s.id.toString()}>
-                    {s.name}{s.parentId ? " (linked)" : ""}
+                    {s.name}
+                    {s.parentId ? " (linked)" : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -223,8 +217,7 @@ export default function FactoryContainerCreate() {
             <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
               <span className="text-muted-foreground">
-                Linked Broker:{" "}
-                <span className="font-medium text-foreground">{linkedBroker.name}</span>
+                Linked Broker: <span className="font-medium text-foreground">{linkedBroker.name}</span>
               </span>
             </div>
           )}
@@ -242,7 +235,7 @@ export default function FactoryContainerCreate() {
               <Input
                 type="number"
                 value={totalKg}
-                onChange={e => setTotalKg(e.target.value)}
+                onChange={(e) => setTotalKg(e.target.value)}
                 placeholder="0.000"
                 data-testid="input-container-total-kg"
               />
@@ -252,7 +245,7 @@ export default function FactoryContainerCreate() {
               <Input
                 type="number"
                 value={ratePerKg}
-                onChange={e => setRatePerKg(e.target.value)}
+                onChange={(e) => setRatePerKg(e.target.value)}
                 placeholder="0.0000000"
                 step="0.0000001"
                 data-testid="input-container-rate"
@@ -263,7 +256,7 @@ export default function FactoryContainerCreate() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>Currency</Label>
-              <Select value={currency} onValueChange={val => setCurrency(val)}>
+              <Select value={currency} onValueChange={(val) => setCurrency(val)}>
                 <SelectTrigger data-testid="select-container-currency">
                   <SelectValue />
                 </SelectTrigger>
@@ -286,7 +279,7 @@ export default function FactoryContainerCreate() {
               <Input
                 type="number"
                 value={formData.commissionAmount}
-                onChange={e => setFormData({ ...formData, commissionAmount: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, commissionAmount: e.target.value })}
                 placeholder="0.00"
                 data-testid="input-container-commission"
               />
@@ -295,7 +288,7 @@ export default function FactoryContainerCreate() {
               <Label>Commission Currency</Label>
               <Select
                 value={formData.commissionCurrencyCode}
-                onValueChange={val => setFormData({ ...formData, commissionCurrencyCode: val })}
+                onValueChange={(val) => setFormData({ ...formData, commissionCurrencyCode: val })}
               >
                 <SelectTrigger data-testid="select-commission-currency">
                   <SelectValue />
@@ -312,10 +305,12 @@ export default function FactoryContainerCreate() {
           </div>
 
           <div>
-            <Label>Commission Notes <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+            <Label>
+              Commission Notes <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+            </Label>
             <Input
               value={formData.commissionNotes}
-              onChange={e => setFormData({ ...formData, commissionNotes: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, commissionNotes: e.target.value })}
               placeholder="e.g. Commission for container facilitation"
               data-testid="input-commission-notes"
             />
@@ -325,7 +320,8 @@ export default function FactoryContainerCreate() {
             <div className="rounded-md bg-muted/50 px-3 py-2 text-sm flex items-start gap-2 text-muted-foreground">
               <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
               <span>
-                A commission account for <strong className="text-foreground">{linkedBroker.name}</strong> will be automatically created or reused in your accounts.
+                A commission account for <strong className="text-foreground">{linkedBroker.name}</strong> will be
+                automatically created or reused in your accounts.
               </span>
             </div>
           )}
@@ -339,11 +335,13 @@ export default function FactoryContainerCreate() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <Label>Freight Amount <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Label>
+                Freight Amount <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+              </Label>
               <Input
                 type="number"
                 value={formData.freight}
-                onChange={e => setFormData({ ...formData, freight: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, freight: e.target.value })}
                 placeholder="0.00"
                 data-testid="input-container-freight"
               />
@@ -352,7 +350,7 @@ export default function FactoryContainerCreate() {
               <Label>Freight Currency</Label>
               <Select
                 value={formData.freightCurrencyCode}
-                onValueChange={val => setFormData({ ...formData, freightCurrencyCode: val })}
+                onValueChange={(val) => setFormData({ ...formData, freightCurrencyCode: val })}
               >
                 <SelectTrigger data-testid="select-freight-currency">
                   <SelectValue />
@@ -369,10 +367,12 @@ export default function FactoryContainerCreate() {
           </div>
 
           <div>
-            <Label>Freight Account <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+            <Label>
+              Freight Account <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+            </Label>
             <Select
               value={formData.freightAccountId || "__none__"}
-              onValueChange={val => setFormData({ ...formData, freightAccountId: val === "__none__" ? "" : val })}
+              onValueChange={(val) => setFormData({ ...formData, freightAccountId: val === "__none__" ? "" : val })}
             >
               <SelectTrigger data-testid="select-freight-account">
                 <SelectValue placeholder="Auto (Freight)" />
@@ -381,7 +381,8 @@ export default function FactoryContainerCreate() {
                 <SelectItem value="__none__">Auto (Freight)</SelectItem>
                 {ledgerAccounts.map((acc: any) => (
                   <SelectItem key={acc.id} value={String(acc.id)}>
-                    {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                    {acc.name}
+                    {acc.code ? ` (${acc.code})` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -390,13 +391,17 @@ export default function FactoryContainerCreate() {
 
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label>Other Charges <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Label>
+                Other Charges <span className="text-muted-foreground text-xs font-normal">(optional)</span>
+              </Label>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 className="h-7 px-2 text-xs"
-                onClick={() => setOtherChargeLines(prev => [...prev, { amount: "", currencyCode: currency, ledgerAccountId: "" }])}
+                onClick={() =>
+                  setOtherChargeLines((prev) => [...prev, { amount: "", currencyCode: currency, ledgerAccountId: "" }])
+                }
                 data-testid="button-add-other-charge"
               >
                 <Plus className="h-3 w-3 mr-1" />
@@ -418,14 +423,14 @@ export default function FactoryContainerCreate() {
                       key={`amt-${idx}`}
                       type="number"
                       value={line.amount}
-                      onChange={e => updateOtherChargeLine(idx, "amount", e.target.value)}
+                      onChange={(e) => updateOtherChargeLine(idx, "amount", e.target.value)}
                       placeholder="0.00"
                       data-testid={`input-other-charge-amount-${idx}`}
                     />
                     <Select
                       key={`ccy-${idx}`}
                       value={line.currencyCode || currency}
-                      onValueChange={val => updateOtherChargeLine(idx, "currencyCode", val)}
+                      onValueChange={(val) => updateOtherChargeLine(idx, "currencyCode", val)}
                     >
                       <SelectTrigger className="w-20" data-testid={`select-other-charge-currency-${idx}`}>
                         <SelectValue />
@@ -441,7 +446,9 @@ export default function FactoryContainerCreate() {
                     <Select
                       key={`acc-${idx}`}
                       value={line.ledgerAccountId || "__none__"}
-                      onValueChange={val => updateOtherChargeLine(idx, "ledgerAccountId", val === "__none__" ? "" : val)}
+                      onValueChange={(val) =>
+                        updateOtherChargeLine(idx, "ledgerAccountId", val === "__none__" ? "" : val)
+                      }
                     >
                       <SelectTrigger data-testid={`select-other-charge-account-${idx}`}>
                         <SelectValue placeholder="No account" />
@@ -450,7 +457,8 @@ export default function FactoryContainerCreate() {
                         <SelectItem value="__none__">No account</SelectItem>
                         {ledgerAccounts.map((acc: any) => (
                           <SelectItem key={acc.id} value={String(acc.id)}>
-                            {acc.name}{acc.code ? ` (${acc.code})` : ""}
+                            {acc.name}
+                            {acc.code ? ` (${acc.code})` : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -509,18 +517,10 @@ export default function FactoryContainerCreate() {
       })()}
 
       <div className="flex justify-end gap-3 pb-6">
-        <Button
-          variant="outline"
-          onClick={() => navigate("/factory/containers")}
-          data-testid="button-cancel"
-        >
+        <Button variant="outline" onClick={() => navigate("/factory/containers")} data-testid="button-cancel">
           Cancel
         </Button>
-        <Button
-          onClick={() => createMutation.mutate()}
-          disabled={!canSubmit}
-          data-testid="button-create-container"
-        >
+        <Button onClick={() => createMutation.mutate()} disabled={!canSubmit} data-testid="button-create-container">
           {createMutation.isPending ? "Creating..." : "Create Container"}
         </Button>
       </div>

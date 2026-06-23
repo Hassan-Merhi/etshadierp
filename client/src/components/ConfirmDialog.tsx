@@ -125,8 +125,8 @@ export function ConfirmDialog({
     tone === "destructive" || showSecond
       ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
       : tone === "warning"
-      ? "bg-warning text-warning-foreground hover:bg-warning/90"
-      : "";
+        ? "bg-warning text-warning-foreground hover:bg-warning/90"
+        : "";
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
@@ -140,7 +140,7 @@ export function ConfirmDialog({
                   "flex h-9 w-9 items-center justify-center rounded-md shrink-0",
                   tone === "destructive" && "bg-destructive-soft text-destructive",
                   tone === "warning" && "bg-warning-soft text-warning-soft-foreground",
-                  tone === "default" && "bg-primary/10 text-primary",
+                  tone === "default" && "bg-primary/10 text-primary"
                 )}
               >
                 <ResolvedIcon className="h-5 w-5" />

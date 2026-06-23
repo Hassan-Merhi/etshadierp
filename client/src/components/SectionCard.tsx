@@ -48,21 +48,11 @@ export function SectionCard({
               {description && <CardDescription className="mt-1 text-xs sm:text-sm">{description}</CardDescription>}
             </div>
           </div>
-          {actions && (
-            <div className="flex items-center gap-2 flex-wrap shrink-0">
-              {actions}
-            </div>
-          )}
+          {actions && <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>}
         </CardHeader>
       )}
-      <CardContent className={cn(noPadding ? "p-0" : "pt-0", contentClassName)}>
-        {children}
-      </CardContent>
-      {footer && (
-        <div className="border-t px-6 py-3 flex items-center justify-end gap-2 flex-wrap">
-          {footer}
-        </div>
-      )}
+      <CardContent className={cn(noPadding ? "p-0" : "pt-0", contentClassName)}>{children}</CardContent>
+      {footer && <div className="border-t px-6 py-3 flex items-center justify-end gap-2 flex-wrap">{footer}</div>}
     </Card>
   );
 }

@@ -38,35 +38,20 @@ export const newEntryRowSchema = z.object({
   accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
-  debitAmount: z
-    .string()
-    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
-      message: "Must be a valid number",
-    }),
-  creditAmount: z
-    .string()
-    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
-      message: "Must be a valid number",
-    }),
+  debitAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
+    message: "Must be a valid number",
+  }),
+  creditAmount: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, {
+    message: "Must be a valid number",
+  }),
   narration: z.string().optional(),
 });
 
 export const createVoucherSchema = z
   .object({
-    voucherType: z.enum(
-      [
-        "Journal",
-        "Payment",
-        "Receipt",
-        "Stock Transfer",
-        "Sales",
-        "Purchase",
-        "Contra",
-      ],
-      {
-        required_error: "Voucher type is required",
-      },
-    ),
+    voucherType: z.enum(["Journal", "Payment", "Receipt", "Stock Transfer", "Sales", "Purchase", "Contra"], {
+      required_error: "Voucher type is required",
+    }),
     voucherDate: z.string().min(1, "Voucher date is required"),
     description: z.string().optional(),
     optional: z.boolean().default(false),
@@ -74,20 +59,14 @@ export const createVoucherSchema = z
   })
   .refine(
     (data) => {
-      const totalDebits = data.entries.reduce(
-        (sum, entry) => sum + parseFloat(entry.debitAmount || "0"),
-        0,
-      );
-      const totalCredits = data.entries.reduce(
-        (sum, entry) => sum + parseFloat(entry.creditAmount || "0"),
-        0,
-      );
+      const totalDebits = data.entries.reduce((sum, entry) => sum + parseFloat(entry.debitAmount || "0"), 0);
+      const totalCredits = data.entries.reduce((sum, entry) => sum + parseFloat(entry.creditAmount || "0"), 0);
       return Math.abs(totalDebits - totalCredits) < 0.01;
     },
     {
       message: "Total debits must equal total credits",
       path: ["entries"],
-    },
+    }
   );
 
 export type CreateVoucherForm = z.infer<typeof createVoucherSchema>;
@@ -134,9 +113,7 @@ export interface OffloadDetail extends OffloadListItem {
   }>;
 }
 
-export type DaybookRow =
-  | { _type: "voucher"; data: Voucher }
-  | { _type: "offload"; data: OffloadListItem };
+export type DaybookRow = { _type: "voucher"; data: Voucher } | { _type: "offload"; data: OffloadListItem };
 
 export interface VoucherEntry {
   id: number;

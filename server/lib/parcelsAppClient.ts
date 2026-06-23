@@ -9,9 +9,7 @@
  * Never log or expose the key to the frontend.
  */
 
-const BASE_URL =
-  process.env.PARCELSAPP_API_BASE_URL ||
-  "https://parcelsapp.com/api/v3";
+const BASE_URL = process.env.PARCELSAPP_API_BASE_URL || "https://parcelsapp.com/api/v3";
 
 const POLL_INTERVAL_MS = 5_000;
 const POLL_MAX_ATTEMPTS = 18; // 90 seconds max
@@ -29,22 +27,24 @@ export interface ParcelsAppShipment {
   fromCache?: boolean;
   // ParcelsApp returns attributes as an array of {l, val} objects in the real API
   // response, but we also accept a plain dict for tests / legacy callers.
-  attributes?: Array<{ l: string; val?: string; [k: string]: unknown }> | {
-    status?: string;
-    location?: string;
-    description?: string;
-    weight?: string;
-    origin?: string;
-    destination?: string;
-    estimatedDeliveryDate?: string;
-    estimatedDelivery?: string;
-    deliveryDate?: string;
-    expectedDelivery?: string;
-    estimatedArrival?: string;
-    arrivalDate?: string;
-    eta?: string;
-    [key: string]: string | undefined;
-  };
+  attributes?:
+    | Array<{ l: string; val?: string; [k: string]: unknown }>
+    | {
+        status?: string;
+        location?: string;
+        description?: string;
+        weight?: string;
+        origin?: string;
+        destination?: string;
+        estimatedDeliveryDate?: string;
+        estimatedDelivery?: string;
+        deliveryDate?: string;
+        expectedDelivery?: string;
+        estimatedArrival?: string;
+        arrivalDate?: string;
+        eta?: string;
+        [key: string]: string | undefined;
+      };
   // Top-level ETA / delivery fields ParcelsApp may return directly on the shipment
   estimatedArrival?: string;
   estimatedDeliveryDate?: string;
@@ -87,7 +87,7 @@ function getApiKey(): string | null {
 async function initiateTracking(
   trackingId: string,
   destinationCountry: string | null | undefined = "United States",
-  carrier?: string,
+  carrier?: string
 ): Promise<{ uuid: string; done: boolean; shipments: ParcelsAppShipment[]; fromCache: boolean }> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("PARCELSAPP_API_KEY is not configured");
@@ -156,9 +156,7 @@ async function initiateTracking(
 /**
  * Polls for a tracking result by UUID. Returns when done or times out.
  */
-async function pollTracking(
-  uuid: string,
-): Promise<{ done: boolean; shipments: ParcelsAppShipment[] }> {
+async function pollTracking(uuid: string): Promise<{ done: boolean; shipments: ParcelsAppShipment[] }> {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error("PARCELSAPP_API_KEY is not configured");
 
@@ -200,7 +198,7 @@ function sleep(ms: number): Promise<void> {
 export async function trackContainer(
   containerNumber: string,
   destinationCountry = "United States",
-  carrier?: string,
+  carrier?: string
 ): Promise<ParcelsAppTrackResult> {
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -224,7 +222,9 @@ export async function trackContainer(
         return await initiateTracking(containerNumber, destinationCountry, carrier);
       } catch (err: any) {
         if (err?.isBusy && attempt < MAX_BUSY_RETRIES) {
-          console.warn(`[ParcelsApp] ${containerNumber}: BUSY — retry ${attempt + 1}/${MAX_BUSY_RETRIES} in ${BUSY_RETRY_DELAY_MS / 1000}s`);
+          console.warn(
+            `[ParcelsApp] ${containerNumber}: BUSY — retry ${attempt + 1}/${MAX_BUSY_RETRIES} in ${BUSY_RETRY_DELAY_MS / 1000}s`
+          );
           await sleep(BUSY_RETRY_DELAY_MS);
           continue;
         }
@@ -240,9 +240,8 @@ export async function trackContainer(
     rawResponse = initiated;
 
     if (initiated.done) {
-      const shipment = initiated.shipments.find(
-        (s) => s.trackingId === containerNumber,
-      ) ?? initiated.shipments[0] ?? null;
+      const shipment =
+        initiated.shipments.find((s) => s.trackingId === containerNumber) ?? initiated.shipments[0] ?? null;
       return {
         success: true,
         shipment,
@@ -261,10 +260,7 @@ export async function trackContainer(
         rawResponse = polled;
 
         // Keep the richest shipment seen across all polls
-        const candidate =
-          polled.shipments.find((s) => s.trackingId === containerNumber) ??
-          polled.shipments[0] ??
-          null;
+        const candidate = polled.shipments.find((s) => s.trackingId === containerNumber) ?? polled.shipments[0] ?? null;
         if (candidate && (candidate.states?.length ?? 0) >= (bestShipment?.states?.length ?? 0)) {
           bestShipment = candidate;
         }
@@ -284,7 +280,9 @@ export async function trackContainer(
 
     // Timed out — but if we received any shipment data during polling, use it
     if (bestShipment) {
-      console.warn(`[ParcelsApp] ${containerNumber}: timed out but returning partial data (${bestShipment.states?.length ?? 0} events)`);
+      console.warn(
+        `[ParcelsApp] ${containerNumber}: timed out but returning partial data (${bestShipment.states?.length ?? 0} events)`
+      );
       return {
         success: true,
         shipment: bestShipment,
@@ -327,22 +325,14 @@ export function normaliseEvents(shipment: ParcelsAppShipment): ParcelsAppEvent[]
  * Derives a simple last-known status string from the shipment attributes or latest state.
  */
 export function deriveLastStatus(shipment: ParcelsAppShipment): string | null {
-  return (
-    shipment.attributes?.status ??
-    shipment.states?.[0]?.status ??
-    null
-  );
+  return shipment.attributes?.status ?? shipment.states?.[0]?.status ?? null;
 }
 
 /**
  * Derives a simple last-known location string from the shipment attributes or latest state.
  */
 export function deriveLastLocation(shipment: ParcelsAppShipment): string | null {
-  return (
-    shipment.attributes?.location ??
-    shipment.states?.[0]?.location ??
-    null
-  );
+  return shipment.attributes?.location ?? shipment.states?.[0]?.location ?? null;
 }
 
 /**
@@ -426,7 +416,8 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
   // Catch-all: scan attribute keys for unambiguous ETA/estimated-arrival terms.
   // Explicitly excluded patterns: actual, ata, discharge, berth, gate, loaded,
   // departed, movement — those all describe past events, not future ETAs.
-  const etaKeyPattern = /^(eta|estimatedArrival|estimatedDelivery|expectedDelivery|scheduledArrival|plannedArrival|predictedETA)/i;
+  const etaKeyPattern =
+    /^(eta|estimatedArrival|estimatedDelivery|expectedDelivery|scheduledArrival|plannedArrival|predictedETA)/i;
   for (const [key, val] of Object.entries(attrsDict)) {
     if (!val || !etaKeyPattern.test(key)) continue;
     const d = tryDate(val);
@@ -456,7 +447,7 @@ export function deriveEstimatedDeliveryDate(shipment: ParcelsAppShipment): strin
     const isEtaEvent =
       sLower.includes("estimated time of arrival") ||
       sLower.includes("estimated arrival") ||
-      (sLower === "eta") ||
+      sLower === "eta" ||
       sLower.startsWith("eta ");
     if (isEtaEvent) {
       const d = tryDate(latestState.date);
@@ -506,10 +497,10 @@ export async function testConnection(): Promise<{
   if (!apiKey) return { ok: false, error: "PARCELSAPP_API_KEY is not configured" };
 
   try {
-    const res = await fetch(
-      `${BASE_URL}/account?apiKey=${encodeURIComponent(apiKey)}`,
-      { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10_000) },
-    );
+    const res = await fetch(`${BASE_URL}/account?apiKey=${encodeURIComponent(apiKey)}`, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!res.ok) {
       return { ok: false, error: `HTTP ${res.status}` };
     }

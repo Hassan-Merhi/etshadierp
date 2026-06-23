@@ -69,20 +69,37 @@ export const expenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
 const assetAccountTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
 
 const fixedAssetNamePatterns = [
-  "rover", "toyota", "mercedes", "vehicle", "car", "truck",
-  "land", "property", "building", "house",
-  "rolex", "watch", "luxury", "jewelry",
-  "guarantee", "deposit", "caution",
+  "rover",
+  "toyota",
+  "mercedes",
+  "vehicle",
+  "car",
+  "truck",
+  "land",
+  "property",
+  "building",
+  "house",
+  "rolex",
+  "watch",
+  "luxury",
+  "jewelry",
+  "guarantee",
+  "deposit",
+  "caution",
 ];
 
 const stockInventoryPatterns = [
-  "closing stock", "opening stock", "stock in hand", "stock on hand",
-  "inventory", "stock account", "goods in stock", "merchandise",
+  "closing stock",
+  "opening stock",
+  "stock in hand",
+  "stock on hand",
+  "inventory",
+  "stock account",
+  "goods in stock",
+  "merchandise",
 ];
 
-const stockInventoryCodes = [
-  "CLOSING_STOCK", "OPENING_STOCK", "STOCK", "INVENTORY", "STOCK_IN_HAND",
-];
+const stockInventoryCodes = ["CLOSING_STOCK", "OPENING_STOCK", "STOCK", "INVENTORY", "STOCK_IN_HAND"];
 
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -93,16 +110,10 @@ export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 10
  * Positive  →  we hold an asset / they owe us.
  * Negative  →  we owe them / it is a liability.
  */
-export function getAccountNetBalance(
-  acc: AccountLike,
-  balanceMap: Map<number, AccountBalance>,
-): number {
+export function getAccountNetBalance(acc: AccountLike, balanceMap: Map<number, AccountBalance>): number {
   const opening = parseFloat(acc.openingBalance || "0");
   const defaultSide = assetDefaultDrTypes.includes(acc.accountType || "") ? 1 : -1;
-  const openingSide =
-    acc.openingBalanceSide === "Dr" ? 1
-    : acc.openingBalanceSide === "Cr" ? -1
-    : defaultSide;
+  const openingSide = acc.openingBalanceSide === "Dr" ? 1 : acc.openingBalanceSide === "Cr" ? -1 : defaultSide;
   const signedOpening = opening * openingSide;
   const balance = balanceMap.get(acc.id) || { debit: 0, credit: 0 };
   return signedOpening + balance.debit - balance.credit;
@@ -126,17 +137,14 @@ export function getAccountNetBalance(
 export function classifyNetPositionAccounts(
   accounts: AccountLike[],
   balanceMap: Map<number, AccountBalance>,
-  options: ClassifyOptions = {},
+  options: ClassifyOptions = {}
 ): ClassifyResult {
-  const {
-    additionalExcludedCodes = new Set<string>(),
-    includeSupplierTypeAccounts = true,
-  } = options;
+  const { additionalExcludedCodes = new Set<string>(), includeSupplierTypeAccounts = true } = options;
 
   // Build the set of accounts excluded from expense tracking (IMPORT_CHARGES
   // children, PURCHASES, etc.) — the same set the ERP uses.
   const excludedFromExpenses = new Set<number>();
-  const importChargesParent = accounts.find(a => a.code === "IMPORT_CHARGES");
+  const importChargesParent = accounts.find((a) => a.code === "IMPORT_CHARGES");
   if (importChargesParent) {
     excludedFromExpenses.add(importChargesParent.id);
     for (const acc of accounts) {
@@ -145,8 +153,10 @@ export function classifyNetPositionAccounts(
   }
   for (const acc of accounts) {
     if (
-      acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES_") ||
-      acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE"
+      acc.code === "PURCHASES" ||
+      acc.code?.startsWith("PURCHASES_") ||
+      acc.code === "PRODUCTION_ADJUSTMENT" ||
+      acc.code === "CONSUMPTION_EXPENSE"
     ) {
       excludedFromExpenses.add(acc.id);
     }
@@ -162,15 +172,14 @@ export function classifyNetPositionAccounts(
     const codeLower = (acc.code || "").toLowerCase();
 
     if (assetAccountTypes.includes(acc.accountType || "")) {
-      if (stockInventoryPatterns.some(p => nameLower.includes(p))) return true;
-      if (stockInventoryCodes.some(c =>
-        codeLower === c.toLowerCase() || codeLower.startsWith(c.toLowerCase() + "_")
-      )) return true;
+      if (stockInventoryPatterns.some((p) => nameLower.includes(p))) return true;
+      if (stockInventoryCodes.some((c) => codeLower === c.toLowerCase() || codeLower.startsWith(c.toLowerCase() + "_")))
+        return true;
       // Fixed-asset name patterns (vehicles, land, luxury goods, etc.) are only applied
       // to accounts explicitly typed as "Fixed Asset". Regular Asset / Current Asset
       // accounts (e.g. "Security Deposits Paid") are current assets and must appear in
       // the net position.
-      if (acc.accountType === "Fixed Asset" && fixedAssetNamePatterns.some(p => nameLower.includes(p))) return true;
+      if (acc.accountType === "Fixed Asset" && fixedAssetNamePatterns.some((p) => nameLower.includes(p))) return true;
     }
 
     return false;
@@ -201,27 +210,41 @@ export function classifyNetPositionAccounts(
       // Negative balance on a liability account = we owe them = liability
       if (netBalance > 0) {
         forUsTotal += netBalance;
-        categoryTotals[`asset_${category} Deposits`] =
-          (categoryTotals[`asset_${category} Deposits`] || 0) + netBalance;
-        forUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(netBalance), category: `${category} Deposits` });
+        categoryTotals[`asset_${category} Deposits`] = (categoryTotals[`asset_${category} Deposits`] || 0) + netBalance;
+        forUsAccounts.push({
+          id: acc.id,
+          name: acc.name,
+          code: acc.code || "",
+          value: round2(netBalance),
+          category: `${category} Deposits`,
+        });
       } else {
         onUsTotal += Math.abs(netBalance);
-        categoryTotals[`liability_${category}`] =
-          (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
-        onUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(Math.abs(netBalance)), category });
+        categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
+        onUsAccounts.push({
+          id: acc.id,
+          name: acc.name,
+          code: acc.code || "",
+          value: round2(Math.abs(netBalance)),
+          category,
+        });
       }
     } else {
       // Asset-type (and other) accounts: positive = asset, negative = liability (overdraft)
       if (netBalance > 0) {
         forUsTotal += netBalance;
-        categoryTotals[`asset_${category}`] =
-          (categoryTotals[`asset_${category}`] || 0) + netBalance;
+        categoryTotals[`asset_${category}`] = (categoryTotals[`asset_${category}`] || 0) + netBalance;
         forUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(netBalance), category });
       } else {
         onUsTotal += Math.abs(netBalance);
-        categoryTotals[`liability_${category}`] =
-          (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
-        onUsAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: round2(Math.abs(netBalance)), category });
+        categoryTotals[`liability_${category}`] = (categoryTotals[`liability_${category}`] || 0) + Math.abs(netBalance);
+        onUsAccounts.push({
+          id: acc.id,
+          name: acc.name,
+          code: acc.code || "",
+          value: round2(Math.abs(netBalance)),
+          category,
+        });
       }
     }
   }

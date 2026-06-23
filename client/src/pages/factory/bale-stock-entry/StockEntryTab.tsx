@@ -20,7 +20,12 @@ import { generateCombinedLabelsHtml, generateA5LabelsHtml, type LabelData, type 
 import type { FactoryBaleProduct, Location, FactoryCategory } from "@shared/schema";
 
 import { StockEntryCart } from "./StockEntryCart";
-import { ConfirmStockEntryDialog, QuickCreateProductDialog, DesignPickerDialog, AdminAuthDialog } from "./StockEntryDialogs";
+import {
+  ConfirmStockEntryDialog,
+  QuickCreateProductDialog,
+  DesignPickerDialog,
+  AdminAuthDialog,
+} from "./StockEntryDialogs";
 import { StockEntryScanner } from "./StockEntryScanner";
 import { StockEntrySidebar } from "./StockEntrySidebar";
 import { openBrowserPrint, printLabels } from "./StockEntryPrinting";
@@ -41,7 +46,7 @@ export function StockEntryTab() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [entryDate, setEntryDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [entryDate, setEntryDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("none");
   const [selectedLogoId, setSelectedLogoId] = useState<number | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
@@ -51,7 +56,13 @@ export function StockEntryTab() {
   const { selectedCompany } = useCompany();
   const { colors: designColors } = useLabelDesignColors();
 
-  const { hasDraft: hasCartDraft, draftAge: cartDraftAge, draft: cartDraft, scheduleSave: scheduleCartSave, discardDraft: discardCartDraft } = useFormDraft({
+  const {
+    hasDraft: hasCartDraft,
+    draftAge: cartDraftAge,
+    draft: cartDraft,
+    scheduleSave: scheduleCartSave,
+    discardDraft: discardCartDraft,
+  } = useFormDraft({
     entityType: "factory-stock-entry-cart",
     mode: "factory",
     companyId: selectedCompany?.id ?? null,
@@ -59,7 +70,15 @@ export function StockEntryTab() {
 
   useEffect(() => {
     if (cart.length > 0 || selectedLocationId) {
-      scheduleCartSave({ cart: cart.map(i => ({ productId: i.productId, productName: i.product.name, qty: i.qty, weightPerBaleKg: i.weightPerBaleKg })), selectedLocationId });
+      scheduleCartSave({
+        cart: cart.map((i) => ({
+          productId: i.productId,
+          productName: i.product.name,
+          qty: i.qty,
+          weightPerBaleKg: i.weightPerBaleKg,
+        })),
+        selectedLocationId,
+      });
     }
   }, [cart, selectedLocationId]);
 
@@ -69,19 +88,19 @@ export function StockEntryTab() {
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: categories } = useQuery<FactoryCategory[]>({ queryKey: ["/api/factory/categories"] });
-  
+
   const { data: workers = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/workers"],
     enabled: cart.length > 0,
   });
   const { data: workerCategoryGroups = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/worker-categories"],
-    queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then((r) => r.json()),
     enabled: cart.length > 0,
   });
   const { data: allCustomers = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/customers"],
-    queryFn: () => fetch("/api/factory/customers", { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch("/api/factory/customers", { credentials: "include" }).then((r) => r.json()),
   });
 
   const [workerCategoryFilter, setWorkerCategoryFilter] = useState("all");
@@ -89,23 +108,22 @@ export function StockEntryTab() {
 
   useEffect(() => {
     if (workerCategoryGroups.length > 0 && !workerCategoryFilterManual) {
-      const pressing = workerCategoryGroups.find((c: any) =>
-        (c.name as string)?.toLowerCase().includes("pressing")
-      );
+      const pressing = workerCategoryGroups.find((c: any) => (c.name as string)?.toLowerCase().includes("pressing"));
       if (pressing) {
         setWorkerCategoryFilter(String(pressing.id));
       }
     }
   }, [workerCategoryGroups, workerCategoryFilterManual]);
 
-  const filteredWorkers = workerCategoryFilter === "all"
-    ? (workers as any[]).filter((w: any) => w.active !== false)
-    : (() => {
-        const cat = workerCategoryGroups.find((c: any) => String(c.id) === workerCategoryFilter);
-        if (!cat) return (workers as any[]).filter((w: any) => w.active !== false);
-        const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
-        return (workers as any[]).filter((w: any) => w.active !== false && ids.includes(w.id));
-      })();
+  const filteredWorkers =
+    workerCategoryFilter === "all"
+      ? (workers as any[]).filter((w: any) => w.active !== false)
+      : (() => {
+          const cat = workerCategoryGroups.find((c: any) => String(c.id) === workerCategoryFilter);
+          if (!cat) return (workers as any[]).filter((w: any) => w.active !== false);
+          const ids = Array.isArray(cat.workerIds) ? (cat.workerIds as number[]) : [];
+          return (workers as any[]).filter((w: any) => w.active !== false && ids.includes(w.id));
+        })();
 
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [quickCreateName, setQuickCreateName] = useState("");
@@ -134,7 +152,10 @@ export function StockEntryTab() {
     },
     onSuccess: (newProduct: FactoryBaleProduct) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
-      toast({ title: "Product Created", description: `"${newProduct.name}" created with article code ${newProduct.articleCode}` });
+      toast({
+        title: "Product Created",
+        description: `"${newProduct.name}" created with article code ${newProduct.articleCode}`,
+      });
       setQuickCreateOpen(false);
       setQuickCreateName("");
       setQuickCreateCategoryId("");
@@ -145,7 +166,17 @@ export function StockEntryTab() {
       setScanInput("");
       setShowDropdown(false);
       const defaultWeight = newProduct.weightPerBaleKg ? parseFloat(newProduct.weightPerBaleKg) : 25;
-      setCart((prev) => [...prev, { productId: newProduct.id, product: newProduct, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null, overrideLogoId: null }]);
+      setCart((prev) => [
+        ...prev,
+        {
+          productId: newProduct.id,
+          product: newProduct,
+          qty: 1,
+          weightPerBaleKg: defaultWeight,
+          finalizedBy: null,
+          overrideLogoId: null,
+        },
+      ]);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -163,7 +194,10 @@ export function StockEntryTab() {
 
   useEffect(() => {
     const active = document.activeElement;
-    const isOtherInputFocused = active && active !== scanRef.current && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT");
+    const isOtherInputFocused =
+      active &&
+      active !== scanRef.current &&
+      (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT");
     if (scanRef.current && !isOtherInputFocused) scanRef.current.focus();
   }, [cart]);
 
@@ -173,9 +207,7 @@ export function StockEntryTab() {
 
     const trimmed = value.trim().toLowerCase();
     const product = activeProducts?.find(
-      (p) =>
-        p.articleCode?.toLowerCase() === trimmed ||
-        p.code.toLowerCase() === trimmed
+      (p) => p.articleCode?.toLowerCase() === trimmed || p.code.toLowerCase() === trimmed
     );
 
     if (!product) {
@@ -189,11 +221,19 @@ export function StockEntryTab() {
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
-        return prev.map((item) =>
-          item.productId === product.id ? { ...item, qty: item.qty + 1 } : item
-        );
+        return prev.map((item) => (item.productId === product.id ? { ...item, qty: item.qty + 1 } : item));
       }
-      return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null, overrideLogoId: null }];
+      return [
+        ...prev,
+        {
+          productId: product.id,
+          product,
+          qty: 1,
+          weightPerBaleKg: defaultWeight,
+          finalizedBy: null,
+          overrideLogoId: null,
+        },
+      ];
     });
 
     setScanInput("");
@@ -206,27 +246,38 @@ export function StockEntryTab() {
     }
   };
 
-  const filteredProducts = scanInput.trim().length > 0
-    ? (activeProducts || []).filter((p) => {
-        const term = scanInput.trim().toLowerCase();
-        return (
-          p.name.toLowerCase().includes(term) ||
-          (p.articleCode?.toLowerCase().includes(term)) ||
-          p.code.toLowerCase().includes(term)
-        );
-      }).slice(0, 1000)
-    : [];
+  const filteredProducts =
+    scanInput.trim().length > 0
+      ? (activeProducts || [])
+          .filter((p) => {
+            const term = scanInput.trim().toLowerCase();
+            return (
+              p.name.toLowerCase().includes(term) ||
+              p.articleCode?.toLowerCase().includes(term) ||
+              p.code.toLowerCase().includes(term)
+            );
+          })
+          .slice(0, 1000)
+      : [];
 
   const selectProduct = (product: FactoryBaleProduct) => {
     const defaultWeight = product.weightPerBaleKg ? parseFloat(product.weightPerBaleKg) : 25;
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
-        return prev.map((item) =>
-          item.productId === product.id ? { ...item, qty: item.qty + 1 } : item
-        );
+        return prev.map((item) => (item.productId === product.id ? { ...item, qty: item.qty + 1 } : item));
       }
-      return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight, finalizedBy: null, overrideLogoId: null }];
+      return [
+        ...prev,
+        {
+          productId: product.id,
+          product,
+          qty: 1,
+          weightPerBaleKg: defaultWeight,
+          finalizedBy: null,
+          overrideLogoId: null,
+        },
+      ];
     });
     setScanInput("");
     setScanError("");
@@ -236,9 +287,7 @@ export function StockEntryTab() {
   const updateQty = (productId: number, delta: number) => {
     setCart((prev) =>
       prev
-        .map((item) =>
-          item.productId === productId ? { ...item, qty: Math.max(0, item.qty + delta) } : item
-        )
+        .map((item) => (item.productId === productId ? { ...item, qty: Math.max(0, item.qty + delta) } : item))
         .filter((item) => item.qty > 0)
     );
   };
@@ -260,11 +309,11 @@ export function StockEntryTab() {
   };
 
   const assignWorker = (productId: number, workerId: number | null) => {
-    setCart((prev) => prev.map((item) => item.productId === productId ? { ...item, finalizedBy: workerId } : item));
+    setCart((prev) => prev.map((item) => (item.productId === productId ? { ...item, finalizedBy: workerId } : item)));
   };
 
   const setLogoOverride = (productId: number, logoId: number | null) => {
-    setCart((prev) => prev.map((item) => item.productId === productId ? { ...item, overrideLogoId: logoId } : item));
+    setCart((prev) => prev.map((item) => (item.productId === productId ? { ...item, overrideLogoId: logoId } : item)));
   };
 
   const [logoPickerOpen, setLogoPickerOpen] = useState<number | null>(null);
@@ -335,7 +384,16 @@ export function StockEntryTab() {
                 <CardTitle className="text-base font-bold">New Production Entry</CardTitle>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" className="h-8 text-xs font-semibold gap-1.5" onClick={() => { setAdminAuthOpen(true); setPendingCreateName(""); }} data-testid="button-quick-create">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs font-semibold gap-1.5"
+                  onClick={() => {
+                    setAdminAuthOpen(true);
+                    setPendingCreateName("");
+                  }}
+                  data-testid="button-quick-create"
+                >
                   <Plus className="h-3.5 w-3.5" />
                   Quick Create Product
                 </Button>
@@ -344,10 +402,12 @@ export function StockEntryTab() {
                     age={cartDraftAge}
                     onRestore={() => {
                       if (cartDraft?.cart) {
-                        const restored = cartDraft.cart.map((i: any) => {
-                          const p = baleProducts?.find(bp => bp.id === i.productId);
-                          return { ...i, product: p };
-                        }).filter((i: any) => i.product);
+                        const restored = cartDraft.cart
+                          .map((i: any) => {
+                            const p = baleProducts?.find((bp) => bp.id === i.productId);
+                            return { ...i, product: p };
+                          })
+                          .filter((i: any) => i.product);
                         setCart(restored);
                       }
                       if (cartDraft?.selectedLocationId) setSelectedLocationId(cartDraft.selectedLocationId);
@@ -401,7 +461,10 @@ export function StockEntryTab() {
           entryDate={entryDate}
           onEntryDateChange={setEntryDate}
           workerCategoryFilter={workerCategoryFilter}
-          onWorkerCategoryFilterChange={(val) => { setWorkerCategoryFilter(val); setWorkerCategoryFilterManual(true); }}
+          onWorkerCategoryFilterChange={(val) => {
+            setWorkerCategoryFilter(val);
+            setWorkerCategoryFilterManual(true);
+          }}
           workerCategoryGroups={workerCategoryGroups}
           selectedCustomerId={selectedCustomerId}
           onCustomerIdChange={setSelectedCustomerId}
@@ -464,7 +527,12 @@ export function StockEntryTab() {
 
       <DesignPickerDialog
         open={designPickerOpen}
-        onOpenChange={(open) => { if (!open) { setDesignPickerOpen(false); setPendingPrintLabels(null); } }}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDesignPickerOpen(false);
+            setPendingPrintLabels(null);
+          }
+        }}
         designColors={designColors}
         onSelect={(color) => {
           setDesignPickerOpen(false);
@@ -482,7 +550,12 @@ export function StockEntryTab() {
             const paperFormat = getPaperFormat();
             const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels);
             const win = window.open("", "_blank");
-            if (win) { win.document.write(labelHtml); win.document.close(); win.focus(); setTimeout(() => win.print(), 500); }
+            if (win) {
+              win.document.write(labelHtml);
+              win.document.close();
+              win.focus();
+              setTimeout(() => win.print(), 500);
+            }
           }
         }}
       />

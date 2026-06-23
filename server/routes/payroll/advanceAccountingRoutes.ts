@@ -34,22 +34,41 @@ function getFactoryCompanyId(req: any): number | undefined {
 }
 
 /** Write a single daybook entry (factory audit log). */
-async function writeDaybookEntry(dbOrTx: any, opts: {
-  companyId: number; txDate: string; txType: string;
-  referenceId?: number; referenceTable?: string; description: string;
-  metaJson?: string; currencyCode?: string; amountCurrency?: number;
-  fxRateToUsd?: number; amountUsd?: number; createdBy?: number;
-}) {
+async function writeDaybookEntry(
+  dbOrTx: any,
+  opts: {
+    companyId: number;
+    txDate: string;
+    txType: string;
+    referenceId?: number;
+    referenceTable?: string;
+    description: string;
+    metaJson?: string;
+    currencyCode?: string;
+    amountCurrency?: number;
+    fxRateToUsd?: number;
+    amountUsd?: number;
+    createdBy?: number;
+  }
+) {
   const currency = opts.currencyCode || "USD";
   const fxRate = opts.fxRateToUsd || 1;
   const amtCurrency = opts.amountCurrency || 0;
-  const amtUsd = opts.amountUsd !== undefined ? opts.amountUsd : (currency === "USD" ? amtCurrency : amtCurrency * fxRate);
+  const amtUsd =
+    opts.amountUsd !== undefined ? opts.amountUsd : currency === "USD" ? amtCurrency : amtCurrency * fxRate;
   await dbOrTx.insert(factoryDaybookEntries).values({
-    companyId: opts.companyId, txDate: opts.txDate, txType: opts.txType,
-    referenceId: opts.referenceId || null, referenceTable: opts.referenceTable || null,
-    description: opts.description, metaJson: opts.metaJson || null,
-    currencyCode: currency, amountCurrency: String(amtCurrency),
-    fxRateToUsd: String(fxRate), amountUsd: String(amtUsd), createdBy: opts.createdBy || null,
+    companyId: opts.companyId,
+    txDate: opts.txDate,
+    txType: opts.txType,
+    referenceId: opts.referenceId || null,
+    referenceTable: opts.referenceTable || null,
+    description: opts.description,
+    metaJson: opts.metaJson || null,
+    currencyCode: currency,
+    amountCurrency: String(amtCurrency),
+    fxRateToUsd: String(fxRate),
+    amountUsd: String(amtUsd),
+    createdBy: opts.createdBy || null,
   });
 }
 
@@ -90,16 +109,16 @@ const workerUpload = multer({
 
 function computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
   const start = new Date(startStr + "T00:00:00");
-  const end   = new Date(endStr   + "T00:00:00");
+  const end = new Date(endStr + "T00:00:00");
   let total = 0;
   let cur = new Date(start.getFullYear(), start.getMonth(), 1);
   while (cur <= end) {
-    const year  = cur.getFullYear();
+    const year = cur.getFullYear();
     const month = cur.getMonth();
-    const monthLastDay    = new Date(year, month + 1, 0);
+    const monthLastDay = new Date(year, month + 1, 0);
     const daysInThisMonth = monthLastDay.getDate();
     const segStart = new Date(Math.max(cur.getTime(), start.getTime()));
-    const segEnd   = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
+    const segEnd = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
     const daysInSeg = Math.floor((segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     total += salary * (daysInSeg / daysInThisMonth);
     cur = new Date(year, month + 1, 1);
@@ -130,7 +149,6 @@ function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string
   return attendedDays * dailyRate;
 }
 
-
 export function registerAdvanceAccountingRoutes(app: Express) {
   app.post("/api/factory/advances/repay-by-month", requireAuth, async (req: any, res: any) => {
     try {
@@ -146,18 +164,23 @@ export function registerAdvanceAccountingRoutes(app: Express) {
 
       const repayDate = repaymentDate || getClientDate(req);
 
-      const [acct] = await db.select({ id: ledgerAccounts.id })
+      const [acct] = await db
+        .select({ id: ledgerAccounts.id })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(400).json({ message: "Cash account not found" });
 
       // Find all outstanding advances (both Loan and Salary Deduction) for this month
-      const outstanding = await db.select().from(factoryWorkerAdvances)
-        .where(and(
-          eq(factoryWorkerAdvances.companyId, companyId),
-          eq(factoryWorkerAdvances.fullyPaid, false),
-          sql`to_char(${factoryWorkerAdvances.advanceDate}, 'YYYY-MM') = ${month}`,
-        ));
+      const outstanding = await db
+        .select()
+        .from(factoryWorkerAdvances)
+        .where(
+          and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            eq(factoryWorkerAdvances.fullyPaid, false),
+            sql`to_char(${factoryWorkerAdvances.advanceDate}, 'YYYY-MM') = ${month}`
+          )
+        );
 
       if (outstanding.length === 0) {
         return res.status(400).json({ message: "No outstanding advances found for that month" });
@@ -165,24 +188,35 @@ export function registerAdvanceAccountingRoutes(app: Express) {
 
       // Load worker names
       const workerIds = [...new Set(outstanding.map((a: any) => a.workerId))];
-      const workerRows = await db.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
-        .from(factoryWorkers).where(inArray(factoryWorkers.id, workerIds));
+      const workerRows = await db
+        .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+        .from(factoryWorkers)
+        .where(inArray(factoryWorkers.id, workerIds));
       const workerMap: Record<number, string> = Object.fromEntries(workerRows.map((w: any) => [w.id, w.fullName]));
 
       const result = await db.transaction(async (tx: any) => {
         // Resolve/create the Factory Worker Advances ledger account once
-        let [advancesAccount] = await tx.select({ id: ledgerAccounts.id })
+        let [advancesAccount] = await tx
+          .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
           .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
         if (!advancesAccount) {
-          const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+          const maxCodeResult = await tx
+            .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
           const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
-          [advancesAccount] = await tx.insert(ledgerAccounts).values({
-            companyId, code: nextCode, name: "Factory Worker Advances",
-            accountType: "Asset", active: true, isHidden: false,
-          }).returning();
+          [advancesAccount] = await tx
+            .insert(ledgerAccounts)
+            .values({
+              companyId,
+              code: nextCode,
+              name: "Factory Worker Advances",
+              accountType: "Asset",
+              active: true,
+              isHidden: false,
+            })
+            .returning();
         }
 
         let repaidCount = 0;
@@ -195,29 +229,42 @@ export function registerAdvanceAccountingRoutes(app: Express) {
           const workerName = workerMap[advance.workerId] || `Worker #${advance.workerId}`;
           const narration = `Advance repayment from ${workerName}: $${bal.toFixed(2)} (advance #${advance.id})`;
 
-          const [repayment] = await tx.insert(factoryAdvanceRepayments).values({
-            companyId,
-            advanceId: advance.id,
-            workerId: advance.workerId,
-            repaymentDate: repayDate,
-            amount: bal.toFixed(2),
-            cashAccountId,
-            notes: req.body.notes || null,
-          }).returning();
+          const [repayment] = await tx
+            .insert(factoryAdvanceRepayments)
+            .values({
+              companyId,
+              advanceId: advance.id,
+              workerId: advance.workerId,
+              repaymentDate: repayDate,
+              amount: bal.toFixed(2),
+              cashAccountId,
+              notes: req.body.notes || null,
+            })
+            .returning();
 
-          await tx.update(factoryWorkerAdvances).set({
-            remainingBalance: "0.00",
-            fullyPaid: true,
-          }).where(eq(factoryWorkerAdvances.id, advance.id));
+          await tx
+            .update(factoryWorkerAdvances)
+            .set({
+              remainingBalance: "0.00",
+              fullyPaid: true,
+            })
+            .where(eq(factoryWorkerAdvances.id, advance.id));
 
           // Voucher: DR Cash, CR Factory Worker Advances
           const voucherNumber = `RECEIPT-REPAY-${repayment.id}-${Date.now()}`;
-          const [createdVoucher] = await tx.insert(vouchers).values({
-            companyId, voucherNumber, voucherType: "Receipt",
-            voucherDate: repayDate, description: narration,
-            totalAmount: bal.toFixed(2), currency: "USD",
-            sourceModule: "FACTORY",
-          }).returning();
+          const [createdVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherNumber,
+              voucherType: "Receipt",
+              voucherDate: repayDate,
+              description: narration,
+              totalAmount: bal.toFixed(2),
+              currency: "USD",
+              sourceModule: "FACTORY",
+            })
+            .returning();
 
           await tx.insert(voucherEntries).values([
             {
@@ -237,7 +284,8 @@ export function registerAdvanceAccountingRoutes(app: Express) {
           ]);
 
           await writeDaybookEntry(tx, {
-            companyId, txDate: repayDate,
+            companyId,
+            txDate: repayDate,
             txType: "ADVANCE_REPAYMENT",
             referenceId: repayment.id,
             referenceTable: "factory_advance_repayments",
@@ -270,26 +318,34 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       const accountId = parseId(req.params.id);
       if (accountId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [acct] = await db.select({
-        id: ledgerAccounts.id, name: ledgerAccounts.name,
-        openingBalance: ledgerAccounts.openingBalance,
-        openingBalanceSide: ledgerAccounts.openingBalanceSide,
-      })
+      const [acct] = await db
+        .select({
+          id: ledgerAccounts.id,
+          name: ledgerAccounts.name,
+          openingBalance: ledgerAccounts.openingBalance,
+          openingBalanceSide: ledgerAccounts.openingBalanceSide,
+        })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(404).json({ message: "Account not found" });
 
       // Some cash entries are stored with bankAccountId (bank-linked), not ledgerAccountId.
       // Find any bankAccounts record whose linkedLedgerId = this ledger account.
-      const linkedBanks = await db.select({ id: bankAccounts.id, openingBalance: bankAccounts.openingBalance, openingBalanceSide: bankAccounts.openingBalanceSide })
+      const linkedBanks = await db
+        .select({
+          id: bankAccounts.id,
+          openingBalance: bankAccounts.openingBalance,
+          openingBalanceSide: bankAccounts.openingBalanceSide,
+        })
         .from(bankAccounts)
         .where(and(eq(bankAccounts.linkedLedgerId, accountId), eq(bankAccounts.companyId, companyId)));
 
       // Sum entries via ledgerAccountId
-      const [ledgerTotals] = await db.select({
-        totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
-        totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
-      })
+      const [ledgerTotals] = await db
+        .select({
+          totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+          totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+        })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(and(eq(voucherEntries.ledgerAccountId, accountId), eq(vouchers.companyId, companyId)));
@@ -302,10 +358,11 @@ export function registerAdvanceAccountingRoutes(app: Express) {
 
       // Also sum entries via bankAccountId for each linked bank account
       for (const bank of linkedBanks) {
-        const [bankTotals] = await db.select({
-          totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
-          totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
-        })
+        const [bankTotals] = await db
+          .select({
+            totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+            totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+          })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(and(eq(voucherEntries.bankAccountId, bank.id), eq(vouchers.companyId, companyId)));
@@ -339,40 +396,53 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       if (!date) return res.status(400).json({ message: "date is required" });
       const isCredit = direction !== "debit"; // default credit (reduces cash)
 
-      const [cashAcct] = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+      const [cashAcct] = await db
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!cashAcct) return res.status(400).json({ message: "Cash account not found" });
 
       await db.transaction(async (tx: any) => {
         // Resolve or auto-create the contra "Factory Advance Adjustments" account
-        let [adjAccount] = await tx.select({ id: ledgerAccounts.id })
+        let [adjAccount] = await tx
+          .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
           .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Advance Adjustments")));
         if (!adjAccount) {
-          const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+          const maxCodeResult = await tx
+            .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
           const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
-          [adjAccount] = await tx.insert(ledgerAccounts).values({
-            companyId, code: nextCode, name: "Factory Advance Adjustments",
-            accountType: "Equity", active: true, isHidden: false,
-          }).returning();
+          [adjAccount] = await tx
+            .insert(ledgerAccounts)
+            .values({
+              companyId,
+              code: nextCode,
+              name: "Factory Advance Adjustments",
+              accountType: "Equity",
+              active: true,
+              isHidden: false,
+            })
+            .returning();
         }
 
         const voucherNumber = `ADJ-CASH-${cashAccountId}-${Date.now()}`;
         const desc = narration || "Cash balance adjustment";
 
-        const [voucher] = await tx.insert(vouchers).values({
-          companyId,
-          voucherNumber,
-          voucherType: "Journal",
-          voucherDate: date,
-          description: desc,
-          totalAmount: amount.toFixed(2),
-          currency: "USD",
-          sourceModule: "FACTORY",
-        }).returning();
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherNumber,
+            voucherType: "Journal",
+            voucherDate: date,
+            description: desc,
+            totalAmount: amount.toFixed(2),
+            currency: "USD",
+            sourceModule: "FACTORY",
+          })
+          .returning();
 
         // isCredit = true  → CR Cash / DR Adjustments  (reduces cash balance)
         // isCredit = false → DR Cash / CR Adjustments  (increases cash balance)
@@ -394,7 +464,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
         ]);
       });
 
-      res.json({ message: `Cash adjustment posted — ${isCredit ? "CR" : "DR"} ${cashAcct.name} $${amount.toFixed(2)}` });
+      res.json({
+        message: `Cash adjustment posted — ${isCredit ? "CR" : "DR"} ${cashAcct.name} $${amount.toFixed(2)}`,
+      });
     } catch (error: any) {
       console.error("Error posting cash adjustment:", error);
       res.status(500).json({ message: error.message });
@@ -408,32 +480,44 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       // 1. All salary_deduction advances
-      const allAdvances = await db.select().from(factoryWorkerAdvances)
+      const allAdvances = await db
+        .select()
+        .from(factoryWorkerAdvances)
         .innerJoin(factoryWorkers, eq(factoryWorkerAdvances.workerId, factoryWorkers.id))
-        .where(and(
-          eq(factoryWorkerAdvances.companyId, companyId),
-          eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
-        ))
+        .where(
+          and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
+          )
+        )
         .orderBy(desc(factoryWorkerAdvances.advanceDate));
 
       const advanceIds = allAdvances.map((r: any) => r.factory_worker_advances.id);
 
       // 2. All repayment records for those advances
-      const repayments = advanceIds.length > 0
-        ? await db.select().from(factoryAdvanceRepayments)
-            .where(and(
-              eq(factoryAdvanceRepayments.companyId, companyId),
-              inArray(factoryAdvanceRepayments.advanceId, advanceIds),
-            ))
-        : [];
+      const repayments =
+        advanceIds.length > 0
+          ? await db
+              .select()
+              .from(factoryAdvanceRepayments)
+              .where(
+                and(
+                  eq(factoryAdvanceRepayments.companyId, companyId),
+                  inArray(factoryAdvanceRepayments.advanceId, advanceIds)
+                )
+              )
+          : [];
 
       // 3. All repayment vouchers for this company (both old RECEIPT-REPAY and new REPAY-SAL patterns)
-      const repayVouchers = await db.select({ voucherNumber: vouchers.voucherNumber })
+      const repayVouchers = await db
+        .select({ voucherNumber: vouchers.voucherNumber })
         .from(vouchers)
-        .where(and(
-          eq(vouchers.companyId, companyId),
-          sql`(${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%' OR ${vouchers.voucherNumber} LIKE 'REPAY-SAL-%')`,
-        ));
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            sql`(${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%' OR ${vouchers.voucherNumber} LIKE 'REPAY-SAL-%')`
+          )
+        );
 
       const voucheredRepayIds = new Set<number>();
       for (const v of repayVouchers) {
@@ -460,9 +544,13 @@ export function registerAdvanceAccountingRoutes(app: Express) {
         if (advRepays.length === 0) {
           if (isPaid) {
             auditAdvances.push({
-              id: adv.id, workerId: adv.workerId, workerName: worker.fullName,
-              advanceDate: adv.advanceDate, amount: adv.amount,
-              remainingBalance: adv.remainingBalance, fullyPaid: adv.fullyPaid,
+              id: adv.id,
+              workerId: adv.workerId,
+              workerName: worker.fullName,
+              advanceDate: adv.advanceDate,
+              amount: adv.amount,
+              remainingBalance: adv.remainingBalance,
+              fullyPaid: adv.fullyPaid,
               caseType: "no_repayment",
               repayments: [],
               missingVoucherRepayments: [],
@@ -472,9 +560,13 @@ export function registerAdvanceAccountingRoutes(app: Express) {
           const missingVoucherRepays = advRepays.filter((r: any) => !voucheredRepayIds.has(r.id));
           if (missingVoucherRepays.length > 0) {
             auditAdvances.push({
-              id: adv.id, workerId: adv.workerId, workerName: worker.fullName,
-              advanceDate: adv.advanceDate, amount: adv.amount,
-              remainingBalance: adv.remainingBalance, fullyPaid: adv.fullyPaid,
+              id: adv.id,
+              workerId: adv.workerId,
+              workerName: worker.fullName,
+              advanceDate: adv.advanceDate,
+              amount: adv.amount,
+              remainingBalance: adv.remainingBalance,
+              fullyPaid: adv.fullyPaid,
               caseType: "missing_voucher",
               repayments: advRepays,
               missingVoucherRepayments: missingVoucherRepays,
@@ -509,49 +601,72 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       if (!cashAccountId || isNaN(cashAccountId)) return res.status(400).json({ message: "cashAccountId is required" });
       if (!repaymentDate) return res.status(400).json({ message: "repaymentDate is required" });
 
-      const [cashAcct] = await db.select({ id: ledgerAccounts.id })
+      const [cashAcct] = await db
+        .select({ id: ledgerAccounts.id })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!cashAcct) return res.status(400).json({ message: "Cash account not found" });
 
       // Resolve or auto-create "Factory Workers Salary Payable" as the contra for salary-deduction repayments
       // (DR Salary Payable / CR Factory Worker Advances — salary deductions don't touch cash)
-      let [payableAcct] = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+      let [payableAcct] = await db
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Workers Salary Payable")));
       if (!payableAcct) {
-        const [maxCodeRow] = await db.select({ maxCode: sql<string>`MAX(${ledgerAccounts.code})` })
-          .from(ledgerAccounts).where(eq(ledgerAccounts.companyId, companyId));
+        const [maxCodeRow] = await db
+          .select({ maxCode: sql<string>`MAX(${ledgerAccounts.code})` })
+          .from(ledgerAccounts)
+          .where(eq(ledgerAccounts.companyId, companyId));
         const nextCode = String((parseInt(maxCodeRow?.maxCode || "1000") || 1000) + 1);
-        [payableAcct] = await db.insert(ledgerAccounts).values({
-          companyId, code: nextCode, name: "Factory Workers Salary Payable",
-          accountType: "Accounts Payable", openingBalance: "0", openingBalanceSide: "Cr",
-        }).returning({ id: ledgerAccounts.id, name: ledgerAccounts.name });
+        [payableAcct] = await db
+          .insert(ledgerAccounts)
+          .values({
+            companyId,
+            code: nextCode,
+            name: "Factory Workers Salary Payable",
+            accountType: "Accounts Payable",
+            openingBalance: "0",
+            openingBalanceSide: "Cr",
+          })
+          .returning({ id: ledgerAccounts.id, name: ledgerAccounts.name });
       }
 
       // Re-run audit to get fresh list
-      const allAdvances = await db.select().from(factoryWorkerAdvances)
+      const allAdvances = await db
+        .select()
+        .from(factoryWorkerAdvances)
         .innerJoin(factoryWorkers, eq(factoryWorkerAdvances.workerId, factoryWorkers.id))
-        .where(and(
-          eq(factoryWorkerAdvances.companyId, companyId),
-          eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
-        ));
+        .where(
+          and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
+          )
+        );
 
       const advanceIds = allAdvances.map((r: any) => r.factory_worker_advances.id);
-      const repayments = advanceIds.length > 0
-        ? await db.select().from(factoryAdvanceRepayments)
-            .where(and(
-              eq(factoryAdvanceRepayments.companyId, companyId),
-              inArray(factoryAdvanceRepayments.advanceId, advanceIds),
-            ))
-        : [];
+      const repayments =
+        advanceIds.length > 0
+          ? await db
+              .select()
+              .from(factoryAdvanceRepayments)
+              .where(
+                and(
+                  eq(factoryAdvanceRepayments.companyId, companyId),
+                  inArray(factoryAdvanceRepayments.advanceId, advanceIds)
+                )
+              )
+          : [];
 
-      const repayVouchers = await db.select({ voucherNumber: vouchers.voucherNumber })
+      const repayVouchers = await db
+        .select({ voucherNumber: vouchers.voucherNumber })
         .from(vouchers)
-        .where(and(
-          eq(vouchers.companyId, companyId),
-          sql`(${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%' OR ${vouchers.voucherNumber} LIKE 'REPAY-SAL-%')`,
-        ));
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            sql`(${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%' OR ${vouchers.voucherNumber} LIKE 'REPAY-SAL-%')`
+          )
+        );
 
       const voucheredRepayIds = new Set<number>();
       for (const v of repayVouchers) {
@@ -568,18 +683,27 @@ export function registerAdvanceAccountingRoutes(app: Express) {
 
       const result = await db.transaction(async (tx: any) => {
         // Resolve/create Factory Worker Advances ledger account once
-        let [advancesAccount] = await tx.select({ id: ledgerAccounts.id })
+        let [advancesAccount] = await tx
+          .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
           .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
         if (!advancesAccount) {
-          const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+          const maxCodeResult = await tx
+            .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
           const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
-          [advancesAccount] = await tx.insert(ledgerAccounts).values({
-            companyId, code: nextCode, name: "Factory Worker Advances",
-            accountType: "Asset", active: true, isHidden: false,
-          }).returning();
+          [advancesAccount] = await tx
+            .insert(ledgerAccounts)
+            .values({
+              companyId,
+              code: nextCode,
+              name: "Factory Worker Advances",
+              accountType: "Asset",
+              active: true,
+              isHidden: false,
+            })
+            .returning();
         }
 
         let posted = 0;
@@ -596,28 +720,54 @@ export function registerAdvanceAccountingRoutes(app: Express) {
             const amount = parseFloat(adv.amount || "0");
             if (amount <= 0) continue;
 
-            const [repayment] = await tx.insert(factoryAdvanceRepayments).values({
-              companyId, advanceId: adv.id, workerId: adv.workerId,
-              repaymentDate, amount: amount.toFixed(2),
-              cashAccountId, notes: "Auto-created by Repayment Audit",
-            }).returning();
+            const [repayment] = await tx
+              .insert(factoryAdvanceRepayments)
+              .values({
+                companyId,
+                advanceId: adv.id,
+                workerId: adv.workerId,
+                repaymentDate,
+                amount: amount.toFixed(2),
+                cashAccountId,
+                notes: "Auto-created by Repayment Audit",
+              })
+              .returning();
 
             const narration = `Salary deduction repayment — ${workerName}: $${amount.toFixed(2)} (advance #${adv.id})`;
             const voucherNumber = `REPAY-SAL-${repayment.id}-${Date.now()}`;
-            const [voucher] = await tx.insert(vouchers).values({
-              companyId, voucherNumber, voucherType: "Journal",
-              voucherDate: repaymentDate, description: narration,
-              totalAmount: amount.toFixed(2), currency: "USD", sourceModule: "FACTORY",
-            }).returning();
+            const [voucher] = await tx
+              .insert(vouchers)
+              .values({
+                companyId,
+                voucherNumber,
+                voucherType: "Journal",
+                voucherDate: repaymentDate,
+                description: narration,
+                totalAmount: amount.toFixed(2),
+                currency: "USD",
+                sourceModule: "FACTORY",
+              })
+              .returning();
 
             // DR Factory Workers Salary Payable / CR Factory Worker Advances
             // Salary deductions reduce the company's wage obligation — no cash movement
             await tx.insert(voucherEntries).values([
-              { voucherId: voucher.id, ledgerAccountId: payableAcct.id, debitAmount: amount.toFixed(2), creditAmount: "0", narration },
-              { voucherId: voucher.id, ledgerAccountId: advancesAccount.id, debitAmount: "0", creditAmount: amount.toFixed(2), narration },
+              {
+                voucherId: voucher.id,
+                ledgerAccountId: payableAcct.id,
+                debitAmount: amount.toFixed(2),
+                creditAmount: "0",
+                narration,
+              },
+              {
+                voucherId: voucher.id,
+                ledgerAccountId: advancesAccount.id,
+                debitAmount: "0",
+                creditAmount: amount.toFixed(2),
+                narration,
+              },
             ]);
             posted++;
-
           } else {
             // Case A: repayment records exist, re-create missing vouchers
             const missingRepays = advRepays.filter((r: any) => !voucheredRepayIds.has(r.id));
@@ -627,15 +777,35 @@ export function registerAdvanceAccountingRoutes(app: Express) {
               const rDate = repay.repaymentDate || repaymentDate;
               const narration = `Salary deduction repayment — ${workerName}: $${amount.toFixed(2)} (advance #${adv.id})`;
               const voucherNumber = `REPAY-SAL-${repay.id}-${Date.now()}`;
-              const [voucher] = await tx.insert(vouchers).values({
-                companyId, voucherNumber, voucherType: "Journal",
-                voucherDate: rDate, description: narration,
-                totalAmount: amount.toFixed(2), currency: "USD", sourceModule: "FACTORY",
-              }).returning();
+              const [voucher] = await tx
+                .insert(vouchers)
+                .values({
+                  companyId,
+                  voucherNumber,
+                  voucherType: "Journal",
+                  voucherDate: rDate,
+                  description: narration,
+                  totalAmount: amount.toFixed(2),
+                  currency: "USD",
+                  sourceModule: "FACTORY",
+                })
+                .returning();
 
               await tx.insert(voucherEntries).values([
-                { voucherId: voucher.id, ledgerAccountId: payableAcct.id, debitAmount: amount.toFixed(2), creditAmount: "0", narration },
-                { voucherId: voucher.id, ledgerAccountId: advancesAccount.id, debitAmount: "0", creditAmount: amount.toFixed(2), narration },
+                {
+                  voucherId: voucher.id,
+                  ledgerAccountId: payableAcct.id,
+                  debitAmount: amount.toFixed(2),
+                  creditAmount: "0",
+                  narration,
+                },
+                {
+                  voucherId: voucher.id,
+                  ledgerAccountId: advancesAccount.id,
+                  debitAmount: "0",
+                  creditAmount: amount.toFixed(2),
+                  narration,
+                },
               ]);
               posted++;
             }
@@ -661,12 +831,18 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       const advanceId = parseId(req.params.id);
       if (advanceId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [advance] = await db.select().from(factoryWorkerAdvances)
+      const [advance] = await db
+        .select()
+        .from(factoryWorkerAdvances)
         .where(and(eq(factoryWorkerAdvances.id, advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
       if (!advance) return res.status(404).json({ message: "Advance not found" });
 
-      const repayments = await db.select().from(factoryAdvanceRepayments)
-        .where(and(eq(factoryAdvanceRepayments.advanceId, advanceId), eq(factoryAdvanceRepayments.companyId, companyId)))
+      const repayments = await db
+        .select()
+        .from(factoryAdvanceRepayments)
+        .where(
+          and(eq(factoryAdvanceRepayments.advanceId, advanceId), eq(factoryAdvanceRepayments.companyId, companyId))
+        )
         .orderBy(desc(factoryAdvanceRepayments.repaymentDate));
 
       res.json(repayments);
@@ -683,7 +859,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       const advanceId = parseId(req.params.id);
       if (advanceId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [advance] = await db.select().from(factoryWorkerAdvances)
+      const [advance] = await db
+        .select()
+        .from(factoryWorkerAdvances)
         .where(and(eq(factoryWorkerAdvances.id, advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
       if (!advance) return res.status(404).json({ message: "Advance not found" });
       if (advance.repaymentType !== "manual_repayment") {
@@ -698,7 +876,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
 
       const bal = parseFloat(advance.remainingBalance || "0");
       if (amount > bal + 0.01) {
-        return res.status(400).json({ message: `Repayment ($${amount.toFixed(2)}) exceeds remaining balance ($${bal.toFixed(2)})` });
+        return res
+          .status(400)
+          .json({ message: `Repayment ($${amount.toFixed(2)}) exceeds remaining balance ($${bal.toFixed(2)})` });
       }
       const effectiveAmount = Math.min(amount, bal);
 
@@ -706,62 +886,84 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
 
       if (cashAccountId) {
-        const [acct] = await db.select({ id: ledgerAccounts.id })
+        const [acct] = await db
+          .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
           .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
         if (!acct) return res.status(400).json({ message: "Cash account not found" });
       }
 
-      const [worker] = await db.select({ fullName: factoryWorkers.fullName })
-        .from(factoryWorkers).where(eq(factoryWorkers.id, advance.workerId));
+      const [worker] = await db
+        .select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers)
+        .where(eq(factoryWorkers.id, advance.workerId));
 
       const result = await db.transaction(async (tx: any) => {
-        const [repayment] = await tx.insert(factoryAdvanceRepayments).values({
-          companyId,
-          advanceId,
-          workerId: advance.workerId,
-          repaymentDate,
-          amount: effectiveAmount.toFixed(2),
-          cashAccountId,
-          notes: req.body.notes || null,
-        }).returning();
+        const [repayment] = await tx
+          .insert(factoryAdvanceRepayments)
+          .values({
+            companyId,
+            advanceId,
+            workerId: advance.workerId,
+            repaymentDate,
+            amount: effectiveAmount.toFixed(2),
+            cashAccountId,
+            notes: req.body.notes || null,
+          })
+          .returning();
 
         const newBalance = bal - effectiveAmount;
         const isFullyPaid = newBalance <= 0.005;
 
-        await tx.update(factoryWorkerAdvances).set({
-          remainingBalance: Math.max(0, newBalance).toFixed(2),
-          fullyPaid: isFullyPaid,
-        }).where(eq(factoryWorkerAdvances.id, advanceId));
+        await tx
+          .update(factoryWorkerAdvances)
+          .set({
+            remainingBalance: Math.max(0, newBalance).toFixed(2),
+            fullyPaid: isFullyPaid,
+          })
+          .where(eq(factoryWorkerAdvances.id, advanceId));
 
         if (cashAccountId) {
-          let [advancesAccount] = await tx.select({ id: ledgerAccounts.id })
+          let [advancesAccount] = await tx
+            .select({ id: ledgerAccounts.id })
             .from(ledgerAccounts)
-            .where(and(
-              eq(ledgerAccounts.companyId, companyId),
-              eq(ledgerAccounts.name, "Factory Worker Advances"),
-            ));
+            .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
 
           if (!advancesAccount) {
-            const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            const maxCodeResult = await tx
+              .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
               .from(ledgerAccounts)
               .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
             const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
-            [advancesAccount] = await tx.insert(ledgerAccounts).values({
-              companyId, code: nextCode, name: "Factory Worker Advances",
-              accountType: "Asset", active: true, isHidden: false,
-            }).returning();
+            [advancesAccount] = await tx
+              .insert(ledgerAccounts)
+              .values({
+                companyId,
+                code: nextCode,
+                name: "Factory Worker Advances",
+                accountType: "Asset",
+                active: true,
+                isHidden: false,
+              })
+              .returning();
           }
 
           const voucherNumber = `RECEIPT-REPAY-${repayment.id}-${Date.now()}`;
           const narration = `Advance repayment from ${worker?.fullName || "Worker"}: $${effectiveAmount.toFixed(2)}`;
 
-          const [createdVoucher] = await tx.insert(vouchers).values({
-            companyId, voucherNumber, voucherType: "Receipt",
-            voucherDate: repaymentDate, description: narration,
-            totalAmount: effectiveAmount.toFixed(2), currency: "USD",
-            sourceModule: "FACTORY",
-          }).returning();
+          const [createdVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherNumber,
+              voucherType: "Receipt",
+              voucherDate: repaymentDate,
+              description: narration,
+              totalAmount: effectiveAmount.toFixed(2),
+              currency: "USD",
+              sourceModule: "FACTORY",
+            })
+            .returning();
 
           const repayNarration = `Advance repayment from ${worker?.fullName || "Worker"}: $${effectiveAmount.toFixed(2)}`;
           await tx.insert(voucherEntries).values([
@@ -783,7 +985,8 @@ export function registerAdvanceAccountingRoutes(app: Express) {
         }
 
         await writeDaybookEntry(tx, {
-          companyId, txDate: repaymentDate,
+          companyId,
+          txDate: repaymentDate,
           txType: "ADVANCE_REPAYMENT",
           referenceId: repayment.id,
           referenceTable: "factory_advance_repayments",
@@ -794,7 +997,9 @@ export function registerAdvanceAccountingRoutes(app: Express) {
           createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
         });
 
-        const [updatedAdvance] = await tx.select().from(factoryWorkerAdvances)
+        const [updatedAdvance] = await tx
+          .select()
+          .from(factoryWorkerAdvances)
           .where(eq(factoryWorkerAdvances.id, advanceId));
 
         return { repayment, advance: updatedAdvance };
@@ -826,23 +1031,30 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       }
 
       if (cashAccountId) {
-        const [acct] = await db.select({ id: ledgerAccounts.id })
+        const [acct] = await db
+          .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
           .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
         if (!acct) return res.status(400).json({ message: "Cash account not found" });
       }
 
-      const [worker] = await db.select({ fullName: factoryWorkers.fullName })
-        .from(factoryWorkers).where(eq(factoryWorkers.id, workerId));
+      const [worker] = await db
+        .select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers)
+        .where(eq(factoryWorkers.id, workerId));
       if (!worker) return res.status(404).json({ message: "Worker not found" });
 
-      const outstandingAdvances = await db.select().from(factoryWorkerAdvances)
-        .where(and(
-          eq(factoryWorkerAdvances.companyId, companyId),
-          eq(factoryWorkerAdvances.workerId, workerId),
-          eq(factoryWorkerAdvances.repaymentType, "manual_repayment"),
-          eq(factoryWorkerAdvances.fullyPaid, false),
-        ));
+      const outstandingAdvances = await db
+        .select()
+        .from(factoryWorkerAdvances)
+        .where(
+          and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            eq(factoryWorkerAdvances.workerId, workerId),
+            eq(factoryWorkerAdvances.repaymentType, "manual_repayment"),
+            eq(factoryWorkerAdvances.fullyPaid, false)
+          )
+        );
 
       const toRepay = outstandingAdvances.filter((a) => parseFloat(a.remainingBalance || "0") > 0.001);
       if (toRepay.length === 0) {
@@ -852,18 +1064,27 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       const result = await db.transaction(async (tx: any) => {
         let advancesAccountId: number | null = null;
         if (cashAccountId) {
-          let [found] = await tx.select({ id: ledgerAccounts.id })
+          let [found] = await tx
+            .select({ id: ledgerAccounts.id })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, "Factory Worker Advances")));
           if (!found) {
-            const maxCodeResult = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            const maxCodeResult = await tx
+              .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
               .from(ledgerAccounts)
               .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\\d+$'`));
             const nextCode = String((parseInt(maxCodeResult[0]?.maxCode || "0") || 0) + 1);
-            [found] = await tx.insert(ledgerAccounts).values({
-              companyId, code: nextCode, name: "Factory Worker Advances",
-              accountType: "Asset", active: true, isHidden: false,
-            }).returning();
+            [found] = await tx
+              .insert(ledgerAccounts)
+              .values({
+                companyId,
+                code: nextCode,
+                name: "Factory Worker Advances",
+                accountType: "Asset",
+                active: true,
+                isHidden: false,
+              })
+              .returning();
           }
           advancesAccountId = found.id;
         }
@@ -878,30 +1099,43 @@ export function registerAdvanceAccountingRoutes(app: Express) {
           // Use per-advance date if provided (each loan on its own month), else fall back to global date
           const effectiveRepaymentDate = perAdvanceDates[advance.id] || repaymentDate;
 
-          const [repayment] = await tx.insert(factoryAdvanceRepayments).values({
-            companyId,
-            advanceId: advance.id,
-            workerId,
-            repaymentDate: effectiveRepaymentDate,
-            amount: effectiveAmount.toFixed(2),
-            cashAccountId,
-            notes,
-          }).returning();
+          const [repayment] = await tx
+            .insert(factoryAdvanceRepayments)
+            .values({
+              companyId,
+              advanceId: advance.id,
+              workerId,
+              repaymentDate: effectiveRepaymentDate,
+              amount: effectiveAmount.toFixed(2),
+              cashAccountId,
+              notes,
+            })
+            .returning();
 
-          await tx.update(factoryWorkerAdvances).set({
-            remainingBalance: "0.00",
-            fullyPaid: true,
-          }).where(eq(factoryWorkerAdvances.id, advance.id));
+          await tx
+            .update(factoryWorkerAdvances)
+            .set({
+              remainingBalance: "0.00",
+              fullyPaid: true,
+            })
+            .where(eq(factoryWorkerAdvances.id, advance.id));
 
           if (cashAccountId && advancesAccountId) {
             const voucherNumber = `RECEIPT-REPAY-${repayment.id}-${Date.now()}`;
             const narration = `Bulk advance repayment from ${worker.fullName}: $${effectiveAmount.toFixed(2)} (advance #${advance.id})`;
-            const [createdVoucher] = await tx.insert(vouchers).values({
-              companyId, voucherNumber, voucherType: "Receipt",
-              voucherDate: effectiveRepaymentDate, description: narration,
-              totalAmount: effectiveAmount.toFixed(2), currency: "USD",
-              sourceModule: "FACTORY",
-            }).returning();
+            const [createdVoucher] = await tx
+              .insert(vouchers)
+              .values({
+                companyId,
+                voucherNumber,
+                voucherType: "Receipt",
+                voucherDate: effectiveRepaymentDate,
+                description: narration,
+                totalAmount: effectiveAmount.toFixed(2),
+                currency: "USD",
+                sourceModule: "FACTORY",
+              })
+              .returning();
 
             await tx.insert(voucherEntries).values([
               {
@@ -922,7 +1156,8 @@ export function registerAdvanceAccountingRoutes(app: Express) {
           }
 
           await writeDaybookEntry(tx, {
-            companyId, txDate: effectiveRepaymentDate,
+            companyId,
+            txDate: effectiveRepaymentDate,
             txType: "ADVANCE_REPAYMENT",
             referenceId: repayment.id,
             referenceTable: "factory_advance_repayments",
@@ -946,5 +1181,4 @@ export function registerAdvanceAccountingRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 }

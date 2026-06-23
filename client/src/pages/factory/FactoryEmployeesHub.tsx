@@ -12,11 +12,11 @@ import FactoryEmployeeWithdrawalsTab from "@/pages/factory/FactoryEmployeeWithdr
 type TabValue = "employees" | "payroll" | "attendance" | "advances" | "bonuses" | "withdrawals";
 
 const TAB_OPTIONS: { value: TabValue; label: string; icon: React.ElementType }[] = [
-  { value: "employees",   label: "Employees",   icon: Users },
-  { value: "payroll",     label: "Payroll",     icon: DollarSign },
-  { value: "attendance",  label: "Attendance",  icon: CalendarDays },
-  { value: "advances",    label: "Advances",    icon: Banknote },
-  { value: "bonuses",     label: "Bonuses",     icon: Gift },
+  { value: "employees", label: "Employees", icon: Users },
+  { value: "payroll", label: "Payroll", icon: DollarSign },
+  { value: "attendance", label: "Attendance", icon: CalendarDays },
+  { value: "advances", label: "Advances", icon: Banknote },
+  { value: "bonuses", label: "Bonuses", icon: Gift },
   { value: "withdrawals", label: "Withdrawals", icon: ArrowDownCircle },
 ];
 

@@ -65,7 +65,8 @@ export const voucherEntrySchema = z.object({
   accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer", "factorySupplier"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
-  amount: z.string()
+  amount: z
+    .string()
     .min(1, "Amount required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Amount must be a positive number",
@@ -89,7 +90,8 @@ export const journalEntrySchema = z.object({
   accountType: z.enum(["ledger", "bank", "supplier", "employee", "fixedAsset", "customer", "factorySupplier"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
-  amount: z.string()
+  amount: z
+    .string()
     .min(1, "Amount required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Amount must be a positive number",

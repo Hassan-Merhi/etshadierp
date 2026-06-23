@@ -10,21 +10,8 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { Badge } from "@/components/ui/badge";
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import * as XLSX from "@/lib/excelHelper";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useSearch } from "wouter";
 import {
   ScanLine,
@@ -46,13 +33,7 @@ import {
   ChevronUp,
   Pencil,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -135,7 +116,7 @@ export default function FactoryContainerLoadingScan() {
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  const [orderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [orderDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [orderId, setOrderId] = useState<number | null>(null);
   const [isResuming, setIsResuming] = useState(false);
   const [loadingNote, setLoadingNote] = useState<string>("");
@@ -149,14 +130,20 @@ export default function FactoryContainerLoadingScan() {
   const [finalizeDate, setFinalizeDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
-  const [lastScannedRef, setLastScannedRef] = useState<{ baleReference: string; baleName: string; articleCode: string } | null>(null);
+  const [lastScannedRef, setLastScannedRef] = useState<{
+    baleReference: string;
+    baleName: string;
+    articleCode: string;
+  } | null>(null);
   const [showLastScannedPopup, setShowLastScannedPopup] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importMode, setImportMode] = useState<"articleCode" | "refNumber">("articleCode");
   const [importPreview, setImportPreview] = useState<Array<{ articleCode: string; qty: number }>>([]);
   const [importRefNumbers, setImportRefNumbers] = useState<string[]>([]);
   const [showPendingWarning, setShowPendingWarning] = useState(false);
-  const [pendingOrders, setPendingOrders] = useState<Array<{ id: number; invoiceNumber: string | null; status: string; totalQtyBales: number }>>([]);
+  const [pendingOrders, setPendingOrders] = useState<
+    Array<{ id: number; invoiceNumber: string | null; status: string; totalQtyBales: number }>
+  >([]);
   const [baleToDelete, setBaleToDelete] = useState<{ id: number; baleReference: string } | null>(null);
   const [showRemovalLog, setShowRemovalLog] = useState(false);
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
@@ -195,15 +182,9 @@ export default function FactoryContainerLoadingScan() {
   }, [locations, orderId]);
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
-    queryKey: [
-      `/api/factory/customer-proformas?customerId=${customerId}`,
-      customerId,
-    ],
+    queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/factory/customer-proformas?customerId=${customerId}`,
-        { credentials: "include" },
-      );
+      const res = await fetch(`/api/factory/customer-proformas?customerId=${customerId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch proformas");
       return res.json();
     },
@@ -254,7 +235,11 @@ export default function FactoryContainerLoadingScan() {
       setLoadingNote(orderDetail.containerNotes || "");
       const stored = localStorage.getItem(`lastScannedBale_${orderDetail.id}`);
       if (stored) {
-        try { setLastScannedRef(JSON.parse(stored)); } catch { setLastScannedRef({ baleReference: stored, baleName: "", articleCode: "" }); }
+        try {
+          setLastScannedRef(JSON.parse(stored));
+        } catch {
+          setLastScannedRef({ baleReference: stored, baleName: "", articleCode: "" });
+        }
         setShowLastScannedPopup(true);
       }
       setTimeout(() => scannerRef.current?.focus(), 200);
@@ -269,11 +254,7 @@ export default function FactoryContainerLoadingScan() {
       orderDate: string;
       containerNotes?: string;
     }) => {
-      const res = await modeApiRequest(
-        "POST",
-        "/api/factory/customer-orders-loading",
-        data,
-      );
+      const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
     onSuccess: (data: any) => {
@@ -295,15 +276,19 @@ export default function FactoryContainerLoadingScan() {
   });
 
   const addBaleMutation = useMutation({
-    mutationFn: async (data: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }) => {
-      const res = await modeApiRequest(
-        "POST",
-        `/api/factory/customer-orders/${orderId}/bales`,
-        data,
-      );
+    mutationFn: async (data: {
+      scanCode: string;
+      locationId: number;
+      allowBypassProforma?: boolean;
+      allowBypassOverload?: boolean;
+    }) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
-    onSuccess: (data: any, variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }) => {
+    onSuccess: (
+      data: any,
+      variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }
+    ) => {
       setPendingBypassBaleRef(null);
       setPendingBypassOverloadRef(null);
       setScanFlash("success");
@@ -316,14 +301,26 @@ export default function FactoryContainerLoadingScan() {
         osc.frequency.value = 1000;
         ctx.resume().then(() => {
           osc.start();
-          setTimeout(() => { osc.stop(); ctx.close(); }, 120);
+          setTimeout(() => {
+            osc.stop();
+            ctx.close();
+          }, 120);
         });
-      } catch { /* no audio support */ }
-      setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 500);
+      } catch {
+        /* no audio support */
+      }
+      setTimeout(() => {
+        setScanFlash(null);
+        setShowScanSuccessPopup(false);
+      }, 500);
       if (orderId) {
         const scanned = variables.scanCode;
         const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
-        const lastScanned = { baleReference: newestForRef?.baleReference || scanned, baleName: newestForRef?.baleName || "", articleCode: newestForRef?.articleCode || "" };
+        const lastScanned = {
+          baleReference: newestForRef?.baleReference || scanned,
+          baleName: newestForRef?.baleName || "",
+          articleCode: newestForRef?.articleCode || "",
+        };
         localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
         setLastScannedRef(lastScanned);
       }
@@ -353,9 +350,14 @@ export default function FactoryContainerLoadingScan() {
           osc.frequency.value = 550;
           ctx.resume().then(() => {
             osc.start();
-            setTimeout(() => { osc.stop(); ctx.close(); }, 180);
+            setTimeout(() => {
+              osc.stop();
+              ctx.close();
+            }, 180);
           });
-        } catch { /* no audio support */ }
+        } catch {
+          /* no audio support */
+        }
         setTimeout(() => setScanFlash(null), 600);
         setScanCode("");
         return;
@@ -371,9 +373,14 @@ export default function FactoryContainerLoadingScan() {
           osc.frequency.value = 600;
           ctx.resume().then(() => {
             osc.start();
-            setTimeout(() => { osc.stop(); ctx.close(); }, 180);
+            setTimeout(() => {
+              osc.stop();
+              ctx.close();
+            }, 180);
           });
-        } catch { /* no audio support */ }
+        } catch {
+          /* no audio support */
+        }
         setTimeout(() => setScanFlash(null), 600);
         setScanCode("");
         return;
@@ -389,10 +396,18 @@ export default function FactoryContainerLoadingScan() {
           osc.frequency.setValueAtTime(700, ctx.currentTime);
           osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.18);
           osc.start();
-          setTimeout(() => { osc.stop(); ctx.close(); }, 220);
+          setTimeout(() => {
+            osc.stop();
+            ctx.close();
+          }, 220);
         });
-      } catch { /* no audio support */ }
-      setTimeout(() => { setScanFlash(null); setShowScanErrorPopup(false); }, 1500);
+      } catch {
+        /* no audio support */
+      }
+      setTimeout(() => {
+        setScanFlash(null);
+        setShowScanErrorPopup(false);
+      }, 1500);
       toast({
         title: "Scan Error",
         description: error.message,
@@ -417,10 +432,7 @@ export default function FactoryContainerLoadingScan() {
 
   const removeBaleMutation = useMutation({
     mutationFn: async (baleId: number) => {
-      await modeApiRequest(
-        "DELETE",
-        `/api/factory/customer-orders/${orderId}/bales/${baleId}`,
-      );
+      await modeApiRequest("DELETE", `/api/factory/customer-orders/${orderId}/bales/${baleId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -443,15 +455,16 @@ export default function FactoryContainerLoadingScan() {
   });
 
   const bulkImportMutation = useMutation({
-    mutationFn: async (payload: { mode: "articleCode"; items: Array<{ articleCode: string; qty: number }> } | { mode: "refNumber"; refNumbers: string[] }) => {
-      const body = payload.mode === "refNumber"
-        ? { locationId: parseInt(selectedLocationId), refNumbers: payload.refNumbers }
-        : { locationId: parseInt(selectedLocationId), items: payload.items };
-      const res = await modeApiRequest(
-        "POST",
-        `/api/factory/customer-orders/${orderId}/bales/bulk-import`,
-        body,
-      );
+    mutationFn: async (
+      payload:
+        | { mode: "articleCode"; items: Array<{ articleCode: string; qty: number }> }
+        | { mode: "refNumber"; refNumbers: string[] }
+    ) => {
+      const body =
+        payload.mode === "refNumber"
+          ? { locationId: parseInt(selectedLocationId), refNumbers: payload.refNumbers }
+          : { locationId: parseInt(selectedLocationId), items: payload.items };
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales/bulk-import`, body);
       return await res.json();
     },
     onSuccess: (data: any) => {
@@ -459,12 +472,11 @@ export default function FactoryContainerLoadingScan() {
       setShowImportDialog(false);
       setImportPreview([]);
       setImportRefNumbers([]);
-      const notFoundMsgs = (data.notFound || []).map((n: any) =>
-        `${n.articleCode}: requested ${n.requestedQty}, found ${n.foundQty}`
+      const notFoundMsgs = (data.notFound || []).map(
+        (n: any) => `${n.articleCode}: requested ${n.requestedQty}, found ${n.foundQty}`
       );
-      const notFoundRefMsgs = (data.notFoundRefs || []).length > 0
-        ? `Not found: ${(data.notFoundRefs as string[]).join(", ")}`
-        : undefined;
+      const notFoundRefMsgs =
+        (data.notFoundRefs || []).length > 0 ? `Not found: ${(data.notFoundRefs as string[]).join(", ")}` : undefined;
       toast({
         title: `Import complete — ${data.added} bale${data.added === 1 ? "" : "s"} added`,
         description: notFoundMsgs.length > 0 ? `Short: ${notFoundMsgs.join(", ")}` : notFoundRefMsgs,
@@ -479,11 +491,7 @@ export default function FactoryContainerLoadingScan() {
 
   const finalizeMutation = useMutation({
     mutationFn: async (txDate?: string) => {
-      await modeApiRequest(
-        "POST",
-        `/api/factory/customer-orders/${orderId}/finalize-loading`,
-        { txDate },
-      );
+      await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/finalize-loading`, { txDate });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
@@ -536,9 +544,7 @@ export default function FactoryContainerLoadingScan() {
         );
         if (res.ok) {
           const allOrders: any[] = await res.json();
-          const pending = allOrders.filter((o) =>
-            ["LOADING", "DRAFT", "PENDING_VERIFICATION"].includes(o.status)
-          );
+          const pending = allOrders.filter((o) => ["LOADING", "DRAFT", "PENDING_VERIFICATION"].includes(o.status));
           if (pending.length > 0) {
             setPendingOrders(pending);
             setShowPendingWarning(true);
@@ -557,26 +563,13 @@ export default function FactoryContainerLoadingScan() {
       orderDate,
       containerNotes: loadingNote.trim() || undefined,
     });
-  }, [
-    customerId,
-    selectedLocationId,
-    selectedProformaId,
-    proformas,
-    orderDate,
-    loadingNote,
-    createOrderMutation,
-  ]);
+  }, [customerId, selectedLocationId, selectedProformaId, proformas, orderDate, loadingNote, createOrderMutation]);
 
   const downloadTemplate = useCallback(async (mode: "ref" | "articleCode") => {
     const wb = XLSX.utils.book_new();
     let ws;
     if (mode === "ref") {
-      ws = XLSX.utils.aoa_to_sheet([
-        ["Ref Number"],
-        ["REF00001"],
-        ["REF00002"],
-        ["REF00003"],
-      ]);
+      ws = XLSX.utils.aoa_to_sheet([["Ref Number"], ["REF00001"], ["REF00002"], ["REF00003"]]);
       ws["!cols"] = [{ wch: 20 }];
     } else {
       ws = XLSX.utils.aoa_to_sheet([
@@ -589,21 +582,13 @@ export default function FactoryContainerLoadingScan() {
     XLSX.utils.book_append_sheet(wb, ws, "Import");
     await XLSX.writeFile(
       wb,
-      mode === "ref"
-        ? "bale-import-ref-number-template.xlsx"
-        : "bale-import-article-code-template.xlsx"
+      mode === "ref" ? "bale-import-ref-number-template.xlsx" : "bale-import-article-code-template.xlsx"
     );
   }, []);
 
   const handleScan = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (
-        e.key !== "Enter" ||
-        !scanCode.trim() ||
-        !orderId ||
-        !selectedLocationId
-      )
-        return;
+      if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
       e.preventDefault();
       const trimmed = scanCode.trim();
       const isBypassProforma = pendingBypassBaleRef !== null && pendingBypassBaleRef === trimmed;
@@ -617,65 +602,75 @@ export default function FactoryContainerLoadingScan() {
         allowBypassOverload: isBypassOverload || undefined,
       });
     },
-    [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, addBaleMutation],
+    [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, addBaleMutation]
   );
 
-  const handleImportFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const data = new Uint8Array(evt.target?.result as ArrayBuffer);
-        const wb = await XLSX.read(data, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows: any[] = XLSX.utils.sheet_to_json(ws);
+  const handleImportFile = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+          const wb = await XLSX.read(data, { type: "array" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const rows: any[] = XLSX.utils.sheet_to_json(ws);
 
-        // Detect mode: if any row has a "Ref" / "Reference" / "Ref Number" / "Ref Code" column, use ref mode
-        const firstRow = rows[0] || {};
-        const refKey = Object.keys(firstRow).find((k) =>
-          /^ref(erence)?([\s_-]?(number|code|no|num))?$/i.test(k.trim())
-        );
+          // Detect mode: if any row has a "Ref" / "Reference" / "Ref Number" / "Ref Code" column, use ref mode
+          const firstRow = rows[0] || {};
+          const refKey = Object.keys(firstRow).find((k) =>
+            /^ref(erence)?([\s_-]?(number|code|no|num))?$/i.test(k.trim())
+          );
 
-        if (refKey) {
-          // REF NUMBER / REF CODE MODE
-          const refs = rows
-            .map((r) => String(r[refKey] ?? "").trim())
-            .filter(Boolean);
-          if (refs.length === 0) {
-            toast({ title: "No valid rows found", description: "Ensure the Ref / Ref Code column has values", variant: "destructive" });
-            return;
+          if (refKey) {
+            // REF NUMBER / REF CODE MODE
+            const refs = rows.map((r) => String(r[refKey] ?? "").trim()).filter(Boolean);
+            if (refs.length === 0) {
+              toast({
+                title: "No valid rows found",
+                description: "Ensure the Ref / Ref Code column has values",
+                variant: "destructive",
+              });
+              return;
+            }
+            setImportMode("refNumber");
+            setImportRefNumbers(refs);
+            setImportPreview([]);
+            setShowImportDialog(true);
+          } else {
+            // ARTICLE CODE MODE (existing)
+            const parsed = rows
+              .map((r) => ({
+                articleCode: String(
+                  r["Article Code"] ?? r.articleCode ?? r.article_code ?? r.ArticleCode ?? r.ARTICLECODE ?? ""
+                ).trim(),
+                qty: parseInt(r.Qty ?? r.qty ?? r.QTY ?? r.Quantity ?? r.quantity ?? 0) || 0,
+              }))
+              .filter((r) => r.articleCode && r.qty > 0);
+            if (parsed.length === 0) {
+              toast({
+                title: "No valid rows found",
+                description:
+                  "Ensure columns are Article Code and Qty, or use a Ref Number column for individual bale import",
+                variant: "destructive",
+              });
+              return;
+            }
+            setImportMode("articleCode");
+            setImportPreview(parsed);
+            setImportRefNumbers([]);
+            setShowImportDialog(true);
           }
-          setImportMode("refNumber");
-          setImportRefNumbers(refs);
-          setImportPreview([]);
-          setShowImportDialog(true);
-        } else {
-          // ARTICLE CODE MODE (existing)
-          const parsed = rows
-            .map((r) => ({
-              articleCode: String(
-                r["Article Code"] ?? r.articleCode ?? r.article_code ?? r.ArticleCode ?? r.ARTICLECODE ?? ""
-              ).trim(),
-              qty: parseInt(r.Qty ?? r.qty ?? r.QTY ?? r.Quantity ?? r.quantity ?? 0) || 0,
-            }))
-            .filter((r) => r.articleCode && r.qty > 0);
-          if (parsed.length === 0) {
-            toast({ title: "No valid rows found", description: "Ensure columns are Article Code and Qty, or use a Ref Number column for individual bale import", variant: "destructive" });
-            return;
-          }
-          setImportMode("articleCode");
-          setImportPreview(parsed);
-          setImportRefNumbers([]);
-          setShowImportDialog(true);
+        } catch (err: any) {
+          toast({ title: "Parse error", description: err.message, variant: "destructive" });
         }
-      } catch (err: any) {
-        toast({ title: "Parse error", description: err.message, variant: "destructive" });
-      }
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = "";
-  }, [toast]);
+      };
+      reader.readAsArrayBuffer(file);
+      e.target.value = "";
+    },
+    [toast]
+  );
 
   const toggleGroup = useCallback((articleCode: string) => {
     setExpandedGroups((prev) => {
@@ -719,20 +714,14 @@ export default function FactoryContainerLoadingScan() {
     return maxB - maxA;
   });
 
-  const totalWeight = bales.reduce(
-    (sum, b) => sum + parseFloat(b.weight || "0"),
-    0,
-  );
+  const totalWeight = bales.reduce((sum, b) => sum + parseFloat(b.weight || "0"), 0);
 
   // Stock count query — fetches IN_STOCK bale counts per article code for proforma lines
-  const proformaArticleCodesForStock = useMemo(
-    () => {
-      if (!orderDetail?.proformaIdUsed) return [];
-      const pf = proformas.find((p) => p.id === orderDetail.proformaIdUsed) || proformas.find((p) => p.isActive);
-      return pf?.lines.map((l: any) => l.articleCode).filter(Boolean) || [];
-    },
-    [orderDetail?.proformaIdUsed, proformas],
-  );
+  const proformaArticleCodesForStock = useMemo(() => {
+    if (!orderDetail?.proformaIdUsed) return [];
+    const pf = proformas.find((p) => p.id === orderDetail.proformaIdUsed) || proformas.find((p) => p.isActive);
+    return pf?.lines.map((l: any) => l.articleCode).filter(Boolean) || [];
+  }, [orderDetail?.proformaIdUsed, proformas]);
   const stockLocationId = orderDetail?.locationId || (selectedLocationId ? parseInt(selectedLocationId) : null);
   const { data: stockCounts = {} } = useQuery<Record<string, number>>({
     queryKey: ["/api/factory/bale-stock-count", proformaArticleCodesForStock.join(","), stockLocationId],
@@ -780,18 +769,12 @@ export default function FactoryContainerLoadingScan() {
       };
     }) || [];
 
-  const fulfilledCount = proformaProgress.filter(
-    (l) => l.status === "fulfilled" || l.status === "overloaded",
-  ).length;
+  const fulfilledCount = proformaProgress.filter((l) => l.status === "fulfilled" || l.status === "overloaded").length;
   const totalLines = proformaProgress.length;
 
   // Extra bales not in proforma
-  const proformaArticleCodes = new Set(
-    linkedProforma?.lines.map((l) => l.articleCode) || [],
-  );
-  const extraArticles = Object.keys(loadedByArticle).filter(
-    (code) => !proformaArticleCodes.has(code),
-  );
+  const proformaArticleCodes = new Set(linkedProforma?.lines.map((l) => l.articleCode) || []);
+  const extraArticles = Object.keys(loadedByArticle).filter((code) => !proformaArticleCodes.has(code));
 
   const scanInputClass =
     scanFlash === "success"
@@ -824,7 +807,10 @@ export default function FactoryContainerLoadingScan() {
         </div>
       )}
       {pendingBypassOverloadRef !== null && (
-        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none" style={{ top: "4rem" }}>
+        <div
+          className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{ top: "4rem" }}
+        >
           <div className="bg-orange-500 text-white rounded-xl px-12 py-6 shadow-2xl border-4 border-orange-700 text-center">
             <div className="text-3xl font-black tracking-wide">QUANTITY EXCEEDED</div>
             <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
@@ -832,7 +818,10 @@ export default function FactoryContainerLoadingScan() {
         </div>
       )}
       {pendingBypassBaleRef !== null && (
-        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none" style={{ top: "4rem" }}>
+        <div
+          className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{ top: "4rem" }}
+        >
           <div className="bg-amber-400 text-amber-950 rounded-xl px-12 py-6 shadow-2xl border-4 border-amber-600 text-center">
             <div className="text-3xl font-black tracking-wide">ITEM NOT REQUESTED</div>
             <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
@@ -871,13 +860,14 @@ export default function FactoryContainerLoadingScan() {
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* Left: scanned bales */}
         <div className="lg:w-[60%] flex flex-col min-h-0">
-          <div className={`flex-1 flex flex-col min-h-0 rounded-xl border overflow-hidden transition-colors duration-300 ${scanFlash === "success" ? "ring-4 ring-green-500" : scanFlash === "error" ? "ring-2 ring-red-500" : ""}`}>
+          <div
+            className={`flex-1 flex flex-col min-h-0 rounded-xl border overflow-hidden transition-colors duration-300 ${scanFlash === "success" ? "ring-4 ring-green-500" : scanFlash === "error" ? "ring-2 ring-red-500" : ""}`}
+          >
             {/* Scanned bales header strip */}
-            <div className={`flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap transition-colors duration-300 ${scanFlash === "success" ? "bg-green-50 dark:bg-green-950" : scanFlash === "error" ? "bg-red-50 dark:bg-red-950/30" : "bg-muted/20"}`}>
-              <h2
-                className="font-semibold text-sm"
-                data-testid="text-bales-header"
-              >
+            <div
+              className={`flex items-center justify-between gap-2 px-4 py-3 border-b flex-wrap transition-colors duration-300 ${scanFlash === "success" ? "bg-green-50 dark:bg-green-950" : scanFlash === "error" ? "bg-red-50 dark:bg-red-950/30" : "bg-muted/20"}`}
+            >
+              <h2 className="font-semibold text-sm" data-testid="text-bales-header">
                 Scanned Bales
               </h2>
               <div className="flex items-center gap-2">
@@ -885,7 +875,9 @@ export default function FactoryContainerLoadingScan() {
                   {bales.length} bales
                 </Badge>
                 {bales.length > 0 && (
-                  <Badge variant="outline" data-testid="badge-total-weight">{totalWeight.toFixed(2)} kg</Badge>
+                  <Badge variant="outline" data-testid="badge-total-weight">
+                    {totalWeight.toFixed(2)} kg
+                  </Badge>
                 )}
                 <Button
                   size="icon"
@@ -899,203 +891,210 @@ export default function FactoryContainerLoadingScan() {
               </div>
             </div>
             <div className="flex flex-col flex-1 min-h-0 p-4">
-
-            {orderId && (
-              <div className="mb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-sm font-medium">
-                    <ScanLine className="inline h-4 w-4 mr-1" />
-                    Scan Bale
-                  </label>
-                  <div className="flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => importFileRef.current?.click()}
-                      data-testid="button-import-excel"
-                    >
-                      <Upload className="h-3 w-3 mr-1" />
-                      Import from Excel
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => downloadTemplate("ref")}
-                      data-testid="button-template-ref"
-                      title="Download Ref Number template"
-                    >
-                      <Download className="h-3 w-3" />
-                    </Button>
+              {orderId && (
+                <div className="mb-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-sm font-medium">
+                      <ScanLine className="inline h-4 w-4 mr-1" />
+                      Scan Bale
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => importFileRef.current?.click()}
+                        data-testid="button-import-excel"
+                      >
+                        <Upload className="h-3 w-3 mr-1" />
+                        Import from Excel
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => downloadTemplate("ref")}
+                        data-testid="button-template-ref"
+                        title="Download Ref Number template"
+                      >
+                        <Download className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <input
+                      ref={importFileRef}
+                      type="file"
+                      accept=".xlsx"
+                      className="hidden"
+                      onChange={handleImportFile}
+                      data-testid="input-import-file"
+                    />
                   </div>
-                  <input
-                    ref={importFileRef}
-                    type="file"
-                    accept=".xlsx"
-                    className="hidden"
-                    onChange={handleImportFile}
-                    data-testid="input-import-file"
+                  <Input
+                    ref={scannerRef}
+                    value={scanCode}
+                    onChange={(e) => setScanCode(e.target.value)}
+                    onKeyDown={handleScan}
+                    placeholder="Scan barcode, ref no., article code, item name (partial ok)…"
+                    disabled={!orderId || !selectedLocationId || addBaleMutation.isPending}
+                    className={`text-lg h-12 font-mono ${scanInputClass}`}
+                    autoFocus
+                    data-testid="input-scan-code"
                   />
                 </div>
-                <Input
-                  ref={scannerRef}
-                  value={scanCode}
-                  onChange={(e) => setScanCode(e.target.value)}
-                  onKeyDown={handleScan}
-                  placeholder="Scan barcode, ref no., article code, item name (partial ok)…"
-                  disabled={
-                    !orderId || !selectedLocationId || addBaleMutation.isPending
-                  }
-                  className={`text-lg h-12 font-mono ${scanInputClass}`}
-                  autoFocus
-                  data-testid="input-scan-code"
-                />
-              </div>
-            )}
+              )}
 
-            {viewMode === "detailed" && lastScannedRef && (
-              <div className="mb-3 flex items-center gap-3 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-3 py-2" data-testid="banner-last-scanned">
-                <div className="text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wide shrink-0">Last Scanned</div>
-                <div className="min-w-0">
-                  <div className="font-mono font-bold text-sm text-green-900 dark:text-green-100 truncate">{lastScannedRef.baleReference}</div>
-                  {lastScannedRef.baleName && <div className="text-xs text-green-700 dark:text-green-400 truncate">{lastScannedRef.baleName}</div>}
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto">
-              {orderedGroups.length === 0 ? (
+              {viewMode === "detailed" && lastScannedRef && (
                 <div
-                  className="flex flex-col items-center justify-center py-12 text-muted-foreground"
-                  data-testid="text-no-bales"
+                  className="mb-3 flex items-center gap-3 rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 px-3 py-2"
+                  data-testid="banner-last-scanned"
                 >
-                  <Package className="h-12 w-12 mb-3 opacity-40" />
-                  <p>No bales scanned yet</p>
-                  <p className="text-sm mt-1">
-                    {!orderId
-                      ? "Set up the loading order first, then scan bales"
-                      : "Scan bales using the scanner above"}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {orderedGroups.map((group) => (
-                    <div
-                      key={group.articleCode}
-                      data-testid={`group-article-${group.articleCode}`}
-                    >
-                      <button
-                        type="button"
-                        className="w-full flex flex-wrap items-center justify-between gap-2 mb-1 px-1 cursor-pointer rounded-md p-2 hover-elevate"
-                        onClick={() => toggleGroup(group.articleCode)}
-                        data-testid={`button-toggle-group-${group.articleCode}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            data-testid={`badge-article-${group.articleCode}`}
-                          >
-                            {group.articleCode}
-                          </Badge>
-                          <span className="text-sm font-medium">
-                            {group.baleName}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                          <span>Qty: {group.bales.length}</span>
-                          <span>Wt: {group.totalWeight.toFixed(2)} kg</span>
-                        </div>
-                      </button>
-                      {viewMode === "detailed" && (
-                        <Table>
-                          <TableBody>
-                            {[...group.bales].sort((a, b) => b.id - a.id).map((bale) => (
-                              <TableRow
-                                key={bale.id}
-                                data-testid={`row-bale-${bale.id}`}
-                              >
-                                <TableCell
-                                  data-testid={`text-bale-ref-${bale.id}`}
-                                >
-                                  <div className="font-mono text-sm">{bale.baleReference}</div>
-                                  {bale.baleName && (
-                                    <div className="text-xs text-muted-foreground mt-0.5">{bale.baleName}</div>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right text-sm text-muted-foreground">
-                                  {parseFloat(bale.weight || "0").toFixed(2)} kg
-                                </TableCell>
-                                <TableCell className="w-[40px]">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() =>
-                                      setBaleToDelete({ id: bale.id, baleReference: bale.baleReference })
-                                    }
-                                    disabled={removeBaleMutation.isPending}
-                                    data-testid={`button-remove-bale-${bale.id}`}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
+                  <div className="text-xs font-medium text-green-700 dark:text-green-300 uppercase tracking-wide shrink-0">
+                    Last Scanned
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-mono font-bold text-sm text-green-900 dark:text-green-100 truncate">
+                      {lastScannedRef.baleReference}
                     </div>
-                  ))}
+                    {lastScannedRef.baleName && (
+                      <div className="text-xs text-green-700 dark:text-green-400 truncate">
+                        {lastScannedRef.baleName}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
-            </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {orderedGroups.length === 0 ? (
+                  <div
+                    className="flex flex-col items-center justify-center py-12 text-muted-foreground"
+                    data-testid="text-no-bales"
+                  >
+                    <Package className="h-12 w-12 mb-3 opacity-40" />
+                    <p>No bales scanned yet</p>
+                    <p className="text-sm mt-1">
+                      {!orderId
+                        ? "Set up the loading order first, then scan bales"
+                        : "Scan bales using the scanner above"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {orderedGroups.map((group) => (
+                      <div key={group.articleCode} data-testid={`group-article-${group.articleCode}`}>
+                        <button
+                          type="button"
+                          className="w-full flex flex-wrap items-center justify-between gap-2 mb-1 px-1 cursor-pointer rounded-md p-2 hover-elevate"
+                          onClick={() => toggleGroup(group.articleCode)}
+                          data-testid={`button-toggle-group-${group.articleCode}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" data-testid={`badge-article-${group.articleCode}`}>
+                              {group.articleCode}
+                            </Badge>
+                            <span className="text-sm font-medium">{group.baleName}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <span>Qty: {group.bales.length}</span>
+                            <span>Wt: {group.totalWeight.toFixed(2)} kg</span>
+                          </div>
+                        </button>
+                        {viewMode === "detailed" && (
+                          <Table>
+                            <TableBody>
+                              {[...group.bales]
+                                .sort((a, b) => b.id - a.id)
+                                .map((bale) => (
+                                  <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
+                                    <TableCell data-testid={`text-bale-ref-${bale.id}`}>
+                                      <div className="font-mono text-sm">{bale.baleReference}</div>
+                                      {bale.baleName && (
+                                        <div className="text-xs text-muted-foreground mt-0.5">{bale.baleName}</div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right text-sm text-muted-foreground">
+                                      {parseFloat(bale.weight || "0").toFixed(2)} kg
+                                    </TableCell>
+                                    <TableCell className="w-[40px]">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() =>
+                                          setBaleToDelete({ id: bale.id, baleReference: bale.baleReference })
+                                        }
+                                        disabled={removeBaleMutation.isPending}
+                                        data-testid={`button-remove-bale-${bale.id}`}
+                                      >
+                                        <Trash2 className="h-3 w-3" />
+                                      </Button>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Removal log — only shown when there are removals */}
           {orderId && baleRemovals.length > 0 && (
             <div className="rounded-xl border overflow-hidden mt-4">
-            <div className="p-4">
-              <button
-                className="w-full flex items-center justify-between gap-2 text-sm font-medium"
-                onClick={() => setShowRemovalLog((v) => !v)}
-                data-testid="button-toggle-removal-log"
-                type="button"
-              >
-                <span className="flex items-center gap-2">
-                  <History className="h-4 w-4 text-muted-foreground" />
-                  Removed Bales
-                  <Badge variant="secondary" data-testid="badge-removal-count">{baleRemovals.length}</Badge>
-                </span>
-                {showRemovalLog ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
-              </button>
-              {showRemovalLog && (
-                <Table className="mt-3">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Reference</TableHead>
-                      <TableHead>Article</TableHead>
-                      <TableHead className="text-right">Weight</TableHead>
-                      <TableHead>Removed By</TableHead>
-                      <TableHead>Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {baleRemovals.map((r) => (
-                      <TableRow key={r.id} data-testid={`row-removal-${r.id}`} className="text-sm text-muted-foreground">
-                        <TableCell className="font-mono" data-testid={`text-removal-ref-${r.id}`}>{r.referenceNumber}</TableCell>
-                        <TableCell>{r.articleCode || "—"}</TableCell>
-                        <TableCell className="text-right">
-                          {r.weightKg ? `${parseFloat(r.weightKg).toFixed(2)} kg` : "—"}
-                        </TableCell>
-                        <TableCell>{r.removedByUsername || "—"}</TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          {new Date(r.removedAt).toLocaleString()}
-                        </TableCell>
+              <div className="p-4">
+                <button
+                  className="w-full flex items-center justify-between gap-2 text-sm font-medium"
+                  onClick={() => setShowRemovalLog((v) => !v)}
+                  data-testid="button-toggle-removal-log"
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    <History className="h-4 w-4 text-muted-foreground" />
+                    Removed Bales
+                    <Badge variant="secondary" data-testid="badge-removal-count">
+                      {baleRemovals.length}
+                    </Badge>
+                  </span>
+                  {showRemovalLog ? (
+                    <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  )}
+                </button>
+                {showRemovalLog && (
+                  <Table className="mt-3">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Reference</TableHead>
+                        <TableHead>Article</TableHead>
+                        <TableHead className="text-right">Weight</TableHead>
+                        <TableHead>Removed By</TableHead>
+                        <TableHead>Time</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
+                    </TableHeader>
+                    <TableBody>
+                      {baleRemovals.map((r) => (
+                        <TableRow
+                          key={r.id}
+                          data-testid={`row-removal-${r.id}`}
+                          className="text-sm text-muted-foreground"
+                        >
+                          <TableCell className="font-mono" data-testid={`text-removal-ref-${r.id}`}>
+                            {r.referenceNumber}
+                          </TableCell>
+                          <TableCell>{r.articleCode || "—"}</TableCell>
+                          <TableCell className="text-right">
+                            {r.weightKg ? `${parseFloat(r.weightKg).toFixed(2)} kg` : "—"}
+                          </TableCell>
+                          <TableCell>{r.removedByUsername || "—"}</TableCell>
+                          <TableCell className="whitespace-nowrap">{new Date(r.removedAt).toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1104,187 +1103,148 @@ export default function FactoryContainerLoadingScan() {
         <div className="lg:w-[40%] flex flex-col gap-4">
           {/* Setup card — hidden once order started and proforma is showing */}
           <div className="rounded-xl border overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
-            <span className="text-sm font-semibold">Setup</span>
-          </div>
-          <div className="p-4 space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-1 block">Customer</label>
-              <Select
-                value={selectedCustomerId}
-                onValueChange={setSelectedCustomerId}
-                disabled={!!orderId}
-              >
-                <SelectTrigger data-testid="select-customer">
-                  <SelectValue placeholder="Select customer..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => (
-                    <SelectItem
-                      key={c.id}
-                      value={c.id.toString()}
-                      data-testid={`select-customer-option-${c.id}`}
-                    >
-                      {c.legalName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/20">
+              <span className="text-sm font-semibold">Setup</span>
             </div>
-
-            <div>
-              <label className="text-sm font-medium mb-1 block">
-                <MapPin className="inline h-3 w-3 mr-1" />
-                Loading Location
-              </label>
-              <Select
-                value={selectedLocationId}
-                onValueChange={setSelectedLocationId}
-                disabled={!!orderId}
-              >
-                <SelectTrigger data-testid="select-location">
-                  <SelectValue placeholder="Select location..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((loc) => (
-                    <SelectItem
-                      key={loc.id}
-                      value={loc.id.toString()}
-                      data-testid={`select-location-option-${loc.id}`}
-                    >
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {customerId && !orderId && activeProformas.length > 0 && (
-              <div className="space-y-1">
-                <label className="text-sm font-medium">Proforma</label>
-                <Select
-                  value={selectedProformaId}
-                  onValueChange={setSelectedProformaId}
-                  disabled={!!orderId}
-                >
-                  <SelectTrigger data-testid="select-proforma">
-                    <SelectValue placeholder="Select a proforma..." />
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Customer</label>
+                <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId} disabled={!!orderId}>
+                  <SelectTrigger data-testid="select-customer">
+                    <SelectValue placeholder="Select customer..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none" data-testid="select-proforma-none">
-                      No proforma
-                    </SelectItem>
-                    {activeProformas.map((p) => (
-                      <SelectItem
-                        key={p.id}
-                        value={String(p.id)}
-                        data-testid={`select-proforma-option-${p.id}`}
-                      >
-                        {p.name}
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id.toString()} data-testid={`select-customer-option-${c.id}`}>
+                        {c.legalName}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-            )}
 
-            {customerId && !orderId && activeProformas.length === 0 && (
-              <p
-                className="text-sm text-muted-foreground"
-                data-testid="text-no-proforma"
-              >
-                No active proforma found. Loading will proceed without price
-                references.
-              </p>
-            )}
+              <div>
+                <label className="text-sm font-medium mb-1 block">
+                  <MapPin className="inline h-3 w-3 mr-1" />
+                  Loading Location
+                </label>
+                <Select value={selectedLocationId} onValueChange={setSelectedLocationId} disabled={!!orderId}>
+                  <SelectTrigger data-testid="select-location">
+                    <SelectValue placeholder="Select location..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((loc) => (
+                      <SelectItem
+                        key={loc.id}
+                        value={loc.id.toString()}
+                        data-testid={`select-location-option-${loc.id}`}
+                      >
+                        {loc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            {/* Note field — editable before and after loading starts */}
-            <div>
-              <label className="text-sm font-medium mb-1 block">Note</label>
-              {orderId ? (
-                <div className="flex gap-2 items-start">
+              {customerId && !orderId && activeProformas.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Proforma</label>
+                  <Select value={selectedProformaId} onValueChange={setSelectedProformaId} disabled={!!orderId}>
+                    <SelectTrigger data-testid="select-proforma">
+                      <SelectValue placeholder="Select a proforma..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none" data-testid="select-proforma-none">
+                        No proforma
+                      </SelectItem>
+                      {activeProformas.map((p) => (
+                        <SelectItem key={p.id} value={String(p.id)} data-testid={`select-proforma-option-${p.id}`}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {customerId && !orderId && activeProformas.length === 0 && (
+                <p className="text-sm text-muted-foreground" data-testid="text-no-proforma">
+                  No active proforma found. Loading will proceed without price references.
+                </p>
+              )}
+
+              {/* Note field — editable before and after loading starts */}
+              <div>
+                <label className="text-sm font-medium mb-1 block">Note</label>
+                {orderId ? (
+                  <div className="flex gap-2 items-start">
+                    <Textarea
+                      value={loadingNote}
+                      onChange={(e) => setLoadingNote(e.target.value)}
+                      placeholder="Add a note for this loading..."
+                      className="resize-none text-sm"
+                      rows={2}
+                      data-testid="input-loading-note"
+                    />
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={() => saveNoteMutation.mutate(loadingNote)}
+                      disabled={saveNoteMutation.isPending}
+                      data-testid="button-save-note"
+                      title="Save note"
+                    >
+                      <Save className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
                   <Textarea
                     value={loadingNote}
                     onChange={(e) => setLoadingNote(e.target.value)}
-                    placeholder="Add a note for this loading..."
+                    placeholder="Optional note (e.g. Rush order, Handle with care)"
                     className="resize-none text-sm"
                     rows={2}
                     data-testid="input-loading-note"
                   />
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => saveNoteMutation.mutate(loadingNote)}
-                    disabled={saveNoteMutation.isPending}
-                    data-testid="button-save-note"
-                    title="Save note"
-                  >
-                    <Save className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <Textarea
-                  value={loadingNote}
-                  onChange={(e) => setLoadingNote(e.target.value)}
-                  placeholder="Optional note (e.g. Rush order, Handle with care)"
-                  className="resize-none text-sm"
-                  rows={2}
-                  data-testid="input-loading-note"
-                />
+                )}
+              </div>
+
+              {!orderId && (
+                <Button
+                  className="w-full"
+                  onClick={handleStartLoading}
+                  disabled={!customerId || !selectedLocationId || createOrderMutation.isPending}
+                  data-testid="button-start-loading"
+                >
+                  <Play className="mr-2 h-4 w-4" />
+                  {createOrderMutation.isPending ? "Creating..." : "Start Loading"}
+                </Button>
               )}
             </div>
-
-            {!orderId && (
-              <Button
-                className="w-full"
-                onClick={handleStartLoading}
-                disabled={
-                  !customerId ||
-                  !selectedLocationId ||
-                  createOrderMutation.isPending
-                }
-                data-testid="button-start-loading"
-              >
-                <Play className="mr-2 h-4 w-4" />
-                {createOrderMutation.isPending
-                  ? "Creating..."
-                  : "Start Loading"}
-              </Button>
-            )}
-          </div>
           </div>
 
           {/* Proforma progress panel — shown when order is active and a proforma is linked */}
           {orderId && linkedProforma ? (
-            <div
-              className="rounded-xl border overflow-hidden flex flex-col"
-              data-testid="card-proforma-progress"
-            >
-            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 flex-wrap">
-              <div>
-                <h3 className="font-semibold text-sm">
-                  {linkedProforma.name}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {fulfilledCount} / {totalLines} lines fulfilled
-                </p>
+            <div className="rounded-xl border overflow-hidden flex flex-col" data-testid="card-proforma-progress">
+              <div className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 flex-wrap">
+                <div>
+                  <h3 className="font-semibold text-sm">{linkedProforma.name}</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {fulfilledCount} / {totalLines} lines fulfilled
+                  </p>
+                </div>
+                <Badge
+                  variant={fulfilledCount === totalLines && totalLines > 0 ? "default" : "secondary"}
+                  className={
+                    fulfilledCount === totalLines && totalLines > 0
+                      ? "bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
+                      : ""
+                  }
+                  data-testid="badge-proforma-progress"
+                >
+                  {fulfilledCount}/{totalLines}
+                </Badge>
               </div>
-              <Badge
-                variant={
-                  fulfilledCount === totalLines && totalLines > 0
-                    ? "default"
-                    : "secondary"
-                }
-                className={
-                  fulfilledCount === totalLines && totalLines > 0
-                    ? "bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
-                    : ""
-                }
-                data-testid="badge-proforma-progress"
-              >
-                {fulfilledCount}/{totalLines}
-              </Badge>
-            </div>
 
               <div className="overflow-y-auto max-h-[340px]">
                 <Table>
@@ -1292,36 +1252,24 @@ export default function FactoryContainerLoadingScan() {
                     <TableRow>
                       <TableHead className="text-xs">Article</TableHead>
                       <TableHead className="text-xs text-right">Exp</TableHead>
-                      <TableHead className="text-xs text-right">
-                        Loaded
-                      </TableHead>
+                      <TableHead className="text-xs text-right">Loaded</TableHead>
                       <TableHead className="text-xs text-right">Rem</TableHead>
                       <TableHead className="text-xs text-right">Stock</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {extraArticles.map((code) => (
-                      <TableRow
-                        key={code}
-                        className="bg-red-50 dark:bg-red-950/30"
-                        data-testid={`row-extra-${code}`}
-                      >
+                      <TableRow key={code} className="bg-red-50 dark:bg-red-950/30" data-testid={`row-extra-${code}`}>
                         <TableCell className="text-xs font-mono py-1.5">
-                          <div className="text-red-700 dark:text-red-400">
-                            {code}
-                          </div>
+                          <div className="text-red-700 dark:text-red-400">{code}</div>
                           {groupedBalesMap[code]?.baleName && (
                             <div className="text-red-700 dark:text-red-400 text-[10px] font-sans">
                               {groupedBalesMap[code].baleName}
                             </div>
                           )}
-                          <div className="text-red-500 dark:text-red-500 text-[10px]">
-                            Not on proforma
-                          </div>
+                          <div className="text-red-500 dark:text-red-500 text-[10px]">Not on proforma</div>
                         </TableCell>
-                        <TableCell className="text-xs text-right py-1.5 text-muted-foreground">
-                          —
-                        </TableCell>
+                        <TableCell className="text-xs text-right py-1.5 text-muted-foreground">—</TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5 text-red-600 dark:text-red-400 font-semibold">
                           {loadedByArticle[code]}
                         </TableCell>
@@ -1336,108 +1284,99 @@ export default function FactoryContainerLoadingScan() {
                         <TableCell />
                       </TableRow>
                     ))}
-                    {[...proformaProgress].sort((a, b) => {
-                      const order = { overloaded: 0, short: 1, fulfilled: 2, none: 3 };
-                      return (order[a.status] ?? 3) - (order[b.status] ?? 3);
-                    }).map((line) => (
-                      <TableRow
-                        key={line.id}
-                        className={
-                          line.status === "fulfilled"
-                            ? "bg-green-50 dark:bg-green-950/40"
-                            : line.status === "overloaded"
-                              ? "bg-orange-50 dark:bg-orange-950/30"
-                              : ""
-                        }
-                        data-testid={`row-progress-${line.articleCode}`}
-                      >
-                        <TableCell className="text-xs font-mono py-1.5">
-                          <div className="flex items-center gap-1">
-                            {line.status === "fulfilled" && (
-                              <CheckCircle className="h-3 w-3 text-green-600 shrink-0" />
-                            )}
-                            {line.status === "overloaded" && (
-                              <AlertTriangle className="h-3 w-3 text-orange-500 shrink-0" />
-                            )}
+                    {[...proformaProgress]
+                      .sort((a, b) => {
+                        const order = { overloaded: 0, short: 1, fulfilled: 2, none: 3 };
+                        return (order[a.status] ?? 3) - (order[b.status] ?? 3);
+                      })
+                      .map((line) => (
+                        <TableRow
+                          key={line.id}
+                          className={
+                            line.status === "fulfilled"
+                              ? "bg-green-50 dark:bg-green-950/40"
+                              : line.status === "overloaded"
+                                ? "bg-orange-50 dark:bg-orange-950/30"
+                                : ""
+                          }
+                          data-testid={`row-progress-${line.articleCode}`}
+                        >
+                          <TableCell className="text-xs font-mono py-1.5">
+                            <div className="flex items-center gap-1">
+                              {line.status === "fulfilled" && (
+                                <CheckCircle className="h-3 w-3 text-green-600 shrink-0" />
+                              )}
+                              {line.status === "overloaded" && (
+                                <AlertTriangle className="h-3 w-3 text-orange-500 shrink-0" />
+                              )}
+                              <span
+                                className={
+                                  line.status === "fulfilled"
+                                    ? "text-green-700 dark:text-green-400"
+                                    : line.status === "overloaded"
+                                      ? "text-orange-600 dark:text-orange-400"
+                                      : ""
+                                }
+                              >
+                                {line.articleCode}
+                              </span>
+                            </div>
+                            <div className="text-muted-foreground break-words">{line.productName}</div>
+                          </TableCell>
+                          <TableCell className="text-xs text-right font-mono py-1.5">{line.quantity}</TableCell>
+                          <TableCell className="text-xs text-right font-mono py-1.5">
                             <span
                               className={
                                 line.status === "fulfilled"
-                                  ? "text-green-700 dark:text-green-400"
+                                  ? "text-green-600 dark:text-green-400 font-semibold"
                                   : line.status === "overloaded"
-                                    ? "text-orange-600 dark:text-orange-400"
+                                    ? "text-orange-600 dark:text-orange-400 font-semibold"
                                     : ""
                               }
                             >
-                              {line.articleCode}
+                              {line.loaded}
                             </span>
-                          </div>
-                          <div className="text-muted-foreground break-words">
-                            {line.productName}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5">
-                          {line.quantity}
-                        </TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5">
-                          <span
-                            className={
-                              line.status === "fulfilled"
-                                ? "text-green-600 dark:text-green-400 font-semibold"
-                                : line.status === "overloaded"
-                                  ? "text-orange-600 dark:text-orange-400 font-semibold"
-                                  : ""
-                            }
+                          </TableCell>
+                          <TableCell className="text-xs text-right font-mono py-1.5">
+                            {line.status === "fulfilled" && (
+                              <span className="text-green-600 dark:text-green-400">✓</span>
+                            )}
+                            {line.status === "overloaded" && (
+                              <span className="text-orange-600 dark:text-orange-400">+{line.excess}</span>
+                            )}
+                            {line.status === "short" && (
+                              <span className="text-amber-600 dark:text-amber-400">{line.remaining}</span>
+                            )}
+                            {line.status === "none" && <span className="text-muted-foreground">{line.quantity}</span>}
+                          </TableCell>
+                          <TableCell
+                            className="text-xs text-right font-mono py-1.5"
+                            data-testid={`text-stock-${line.articleCode}`}
                           >
-                            {line.loaded}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5">
-                          {line.status === "fulfilled" && (
-                            <span className="text-green-600 dark:text-green-400">
-                              ✓
-                            </span>
-                          )}
-                          {line.status === "overloaded" && (
-                            <span className="text-orange-600 dark:text-orange-400">
-                              +{line.excess}
-                            </span>
-                          )}
-                          {line.status === "short" && (
-                            <span className="text-amber-600 dark:text-amber-400">
-                              {line.remaining}
-                            </span>
-                          )}
-                          {line.status === "none" && (
-                            <span className="text-muted-foreground">
-                              {line.quantity}
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5" data-testid={`text-stock-${line.articleCode}`}>
-                          {(() => {
-                            const inStock = stockCounts[line.articleCode] ?? null;
-                            if (inStock === null) return <span className="text-muted-foreground">—</span>;
-                            const needsMore = line.status === "short" || line.status === "none";
-                            const shortage = needsMore && inStock < line.remaining;
-                            const listParams = new URLSearchParams({
-                              articleCode: line.articleCode,
-                              productName: line.productName,
-                              back: window.location.pathname + window.location.search,
-                            });
-                            if (stockLocationId) listParams.set("locationId", String(stockLocationId));
-                            return (
-                              <button
-                                className={`underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 ${shortage ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}
-                                onClick={() => navigate(`/factory/stock-bale-list?${listParams}`)}
-                                data-testid={`button-stock-detail-${line.articleCode}`}
-                              >
-                                {inStock}
-                              </button>
-                            );
-                          })()}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                            {(() => {
+                              const inStock = stockCounts[line.articleCode] ?? null;
+                              if (inStock === null) return <span className="text-muted-foreground">—</span>;
+                              const needsMore = line.status === "short" || line.status === "none";
+                              const shortage = needsMore && inStock < line.remaining;
+                              const listParams = new URLSearchParams({
+                                articleCode: line.articleCode,
+                                productName: line.productName,
+                                back: window.location.pathname + window.location.search,
+                              });
+                              if (stockLocationId) listParams.set("locationId", String(stockLocationId));
+                              return (
+                                <button
+                                  className={`underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 ${shortage ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-muted-foreground"}`}
+                                  onClick={() => navigate(`/factory/stock-bale-list?${listParams}`)}
+                                  data-testid={`button-stock-detail-${line.articleCode}`}
+                                >
+                                  {inStock}
+                                </button>
+                              );
+                            })()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               </div>
@@ -1454,24 +1393,24 @@ export default function FactoryContainerLoadingScan() {
                 <span className="text-sm font-semibold">Order Summary</span>
               </div>
               <div className="p-4 space-y-2">
-              <div className="flex items-center justify-between gap-2 text-sm">
-                <span>Total Bales</span>
-                <span className="font-mono" data-testid="text-total-bales">
-                  {bales.length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-2 text-sm">
-                <span>Total Weight</span>
-                <span className="font-mono" data-testid="text-total-weight">
-                  {totalWeight.toFixed(2)} kg
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-2 text-sm">
-                <span>Article Groups</span>
-                <span className="font-mono" data-testid="text-article-groups">
-                  {Object.keys(groupedBalesMap).length}
-                </span>
-              </div>
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span>Total Bales</span>
+                  <span className="font-mono" data-testid="text-total-bales">
+                    {bales.length}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span>Total Weight</span>
+                  <span className="font-mono" data-testid="text-total-weight">
+                    {totalWeight.toFixed(2)} kg
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span>Article Groups</span>
+                  <span className="font-mono" data-testid="text-article-groups">
+                    {Object.keys(groupedBalesMap).length}
+                  </span>
+                </div>
               </div>
             </div>
           ) : null}
@@ -1504,7 +1443,16 @@ export default function FactoryContainerLoadingScan() {
       </div>
 
       {/* Import from Excel Dialog */}
-      <Dialog open={showImportDialog} onOpenChange={(open) => { setShowImportDialog(open); if (!open) { setImportPreview([]); setImportRefNumbers([]); } }}>
+      <Dialog
+        open={showImportDialog}
+        onOpenChange={(open) => {
+          setShowImportDialog(open);
+          if (!open) {
+            setImportPreview([]);
+            setImportRefNumbers([]);
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Import Bales from Excel</DialogTitle>
@@ -1584,13 +1532,22 @@ export default function FactoryContainerLoadingScan() {
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  {importPreview.reduce((s, r) => s + r.qty, 0)} total bales across {importPreview.length} article code{importPreview.length !== 1 ? "s" : ""}
+                  {importPreview.reduce((s, r) => s + r.qty, 0)} total bales across {importPreview.length} article code
+                  {importPreview.length !== 1 ? "s" : ""}
                 </p>
               </>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setShowImportDialog(false); setImportPreview([]); setImportRefNumbers([]); }} data-testid="button-cancel-import">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowImportDialog(false);
+                setImportPreview([]);
+                setImportRefNumbers([]);
+              }}
+              data-testid="button-cancel-import"
+            >
               Cancel
             </Button>
             <Button
@@ -1601,15 +1558,17 @@ export default function FactoryContainerLoadingScan() {
                   bulkImportMutation.mutate({ mode: "articleCode", items: importPreview });
                 }
               }}
-              disabled={bulkImportMutation.isPending || (importMode === "refNumber" ? importRefNumbers.length === 0 : importPreview.length === 0)}
+              disabled={
+                bulkImportMutation.isPending ||
+                (importMode === "refNumber" ? importRefNumbers.length === 0 : importPreview.length === 0)
+              }
               data-testid="button-confirm-import"
             >
               {bulkImportMutation.isPending
                 ? "Importing…"
                 : importMode === "refNumber"
                   ? `Add ${importRefNumbers.length} Bale${importRefNumbers.length !== 1 ? "s" : ""}`
-                  : `Add ${importPreview.reduce((s, r) => s + r.qty, 0)} Bales`
-              }
+                  : `Add ${importPreview.reduce((s, r) => s + r.qty, 0)} Bales`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1626,18 +1585,15 @@ export default function FactoryContainerLoadingScan() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              This proforma already has {pendingOrders.length === 1 ? "an active loading order" : `${pendingOrders.length} active loading orders`}. You can continue one of them or start a new loading.
+              This proforma already has{" "}
+              {pendingOrders.length === 1 ? "an active loading order" : `${pendingOrders.length} active loading orders`}
+              . You can continue one of them or start a new loading.
             </p>
             <div className="space-y-2">
               {pendingOrders.map((order) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between gap-2 rounded-md border p-3"
-                >
+                <div key={order.id} className="flex items-center justify-between gap-2 rounded-md border p-3">
                   <div className="text-sm">
-                    <span className="font-medium">
-                      {order.invoiceNumber || `Order #${order.id}`}
-                    </span>
+                    <span className="font-medium">{order.invoiceNumber || `Order #${order.id}`}</span>
                     <span className="text-muted-foreground ml-2">
                       · {order.totalQtyBales} bales · {order.status}
                     </span>
@@ -1723,24 +1679,14 @@ export default function FactoryContainerLoadingScan() {
                           }
                         >
                           <TableCell className="text-sm">
-                            <div className="font-mono text-xs">
-                              {line.articleCode}
-                            </div>
-                            <div className="text-muted-foreground text-xs">
-                              {line.productName}
-                            </div>
+                            <div className="font-mono text-xs">{line.articleCode}</div>
+                            <div className="text-muted-foreground text-xs">{line.productName}</div>
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {line.quantity}
-                          </TableCell>
-                          <TableCell className="text-right font-mono text-sm">
-                            {line.loaded}
-                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm">{line.quantity}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{line.loaded}</TableCell>
                           <TableCell className="text-right text-sm">
                             {line.status === "fulfilled" && (
-                              <span className="text-green-600 dark:text-green-400 font-semibold">
-                                ✓ Done
-                              </span>
+                              <span className="text-green-600 dark:text-green-400 font-semibold">✓ Done</span>
                             )}
                             {line.status === "overloaded" && (
                               <span className="text-orange-600 dark:text-orange-400 font-semibold flex items-center justify-end gap-1">
@@ -1748,8 +1694,7 @@ export default function FactoryContainerLoadingScan() {
                                 Over +{line.excess}
                               </span>
                             )}
-                            {(line.status === "short" ||
-                              line.status === "none") && (
+                            {(line.status === "short" || line.status === "none") && (
                               <span className="text-amber-600 dark:text-amber-400 flex items-center justify-end gap-1">
                                 <AlertTriangle className="h-3 w-3" />
                                 Short {line.remaining}
@@ -1759,26 +1704,17 @@ export default function FactoryContainerLoadingScan() {
                         </TableRow>
                       ))}
                       {extraArticles.map((code) => (
-                        <TableRow
-                          key={code}
-                          className="bg-red-50 dark:bg-red-950/30"
-                        >
+                        <TableRow key={code} className="bg-red-50 dark:bg-red-950/30">
                           <TableCell className="text-sm">
-                            <div className="font-mono text-xs text-red-700 dark:text-red-400">
-                              {code}
-                            </div>
+                            <div className="font-mono text-xs text-red-700 dark:text-red-400">{code}</div>
                             {groupedBalesMap[code]?.baleName && (
                               <div className="text-red-700 dark:text-red-400 text-xs font-sans font-normal">
                                 {groupedBalesMap[code].baleName}
                               </div>
                             )}
-                            <div className="text-red-500 text-xs">
-                              Not on proforma
-                            </div>
+                            <div className="text-red-500 text-xs">Not on proforma</div>
                           </TableCell>
-                          <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                            —
-                          </TableCell>
+                          <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
                           <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-400 font-semibold">
                             {loadedByArticle[code]}
                           </TableCell>
@@ -1798,33 +1734,16 @@ export default function FactoryContainerLoadingScan() {
                 <div className="flex items-center justify-between gap-2 text-sm border-t pt-2 flex-wrap gap-y-1">
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-green-600 dark:text-green-400 font-medium">
-                      {
-                        proformaProgress.filter((l) => l.status === "fulfilled")
-                          .length
-                      }{" "}
-                      fulfilled
+                      {proformaProgress.filter((l) => l.status === "fulfilled").length} fulfilled
                     </span>
-                    {proformaProgress.filter((l) => l.status === "overloaded")
-                      .length > 0 && (
+                    {proformaProgress.filter((l) => l.status === "overloaded").length > 0 && (
                       <span className="text-orange-600 dark:text-orange-400 font-medium">
-                        {
-                          proformaProgress.filter(
-                            (l) => l.status === "overloaded",
-                          ).length
-                        }{" "}
-                        overloaded
+                        {proformaProgress.filter((l) => l.status === "overloaded").length} overloaded
                       </span>
                     )}
-                    {proformaProgress.filter(
-                      (l) => l.status === "short" || l.status === "none",
-                    ).length > 0 && (
+                    {proformaProgress.filter((l) => l.status === "short" || l.status === "none").length > 0 && (
                       <span className="text-amber-600 dark:text-amber-400 font-medium">
-                        {
-                          proformaProgress.filter(
-                            (l) => l.status === "short" || l.status === "none",
-                          ).length
-                        }{" "}
-                        short
+                        {proformaProgress.filter((l) => l.status === "short" || l.status === "none").length} short
                       </span>
                     )}
                     {extraArticles.length > 0 && (
@@ -1841,25 +1760,18 @@ export default function FactoryContainerLoadingScan() {
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">
-                  This will mark the loading as complete and send it for office
-                  verification.
+                  This will mark the loading as complete and send it for office verification.
                 </p>
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span>Total Bales:</span>
-                    <span
-                      className="font-mono font-semibold"
-                      data-testid="text-dialog-total-bales"
-                    >
+                    <span className="font-mono font-semibold" data-testid="text-dialog-total-bales">
                       {bales.length}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span>Total Weight:</span>
-                    <span
-                      className="font-mono font-semibold"
-                      data-testid="text-dialog-total-weight"
-                    >
+                    <span className="font-mono font-semibold" data-testid="text-dialog-total-weight">
                       {totalWeight.toFixed(2)} kg
                     </span>
                   </div>
@@ -1890,9 +1802,7 @@ export default function FactoryContainerLoadingScan() {
                 data-testid="button-confirm-finalize"
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
-                {finalizeMutation.isPending
-                  ? "Finalizing..."
-                  : "Confirm Finalize"}
+                {finalizeMutation.isPending ? "Finalizing..." : "Confirm Finalize"}
               </Button>
             </div>
           </div>
@@ -1906,11 +1816,20 @@ export default function FactoryContainerLoadingScan() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Last bale scanned in this session:</p>
-            <div className="bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold text-center" data-testid="text-last-scanned-ref">
+            <div
+              className="bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold text-center"
+              data-testid="text-last-scanned-ref"
+            >
               {lastScannedRef?.baleReference}
-              {lastScannedRef?.baleName && <div className="text-sm font-normal text-muted-foreground mt-1">{lastScannedRef.baleName}</div>}
+              {lastScannedRef?.baleName && (
+                <div className="text-sm font-normal text-muted-foreground mt-1">{lastScannedRef.baleName}</div>
+              )}
             </div>
-            <Button className="w-full" onClick={() => setShowLastScannedPopup(false)} data-testid="button-dismiss-last-scanned">
+            <Button
+              className="w-full"
+              onClick={() => setShowLastScannedPopup(false)}
+              data-testid="button-dismiss-last-scanned"
+            >
               Continue Scanning
             </Button>
           </div>
@@ -1918,12 +1837,18 @@ export default function FactoryContainerLoadingScan() {
       </Dialog>
 
       {/* Bale removal confirmation */}
-      <AlertDialog open={!!baleToDelete} onOpenChange={(open) => { if (!open) setBaleToDelete(null); }}>
+      <AlertDialog
+        open={!!baleToDelete}
+        onOpenChange={(open) => {
+          if (!open) setBaleToDelete(null);
+        }}
+      >
         <AlertDialogContent data-testid="dialog-confirm-remove-bale">
           <AlertDialogHeader>
             <AlertDialogTitle>Remove bale from loading?</AlertDialogTitle>
             <AlertDialogDescription>
-              Bale <span className="font-mono font-semibold">{baleToDelete?.baleReference}</span> will be removed from this loading and returned to stock. This cannot be undone.
+              Bale <span className="font-mono font-semibold">{baleToDelete?.baleReference}</span> will be removed from
+              this loading and returned to stock. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

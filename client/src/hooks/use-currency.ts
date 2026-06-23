@@ -13,22 +13,22 @@ interface CurrencyInfo {
 }
 
 export function useCurrency(): CurrencyInfo {
-  const { 
-    selectedCurrency, 
-    setCurrency, 
+  const {
+    selectedCurrency,
+    setCurrency,
     toggleCurrency,
     exchangeRate,
     isMultiCurrency,
     formatAmount,
     convertToDisplay,
-    convertToUSD
+    convertToUSD,
   } = useCurrencyContext();
 
   const formatWithCurrency = (amount: number | string | null | undefined, currency: Currency): string => {
     if (amount == null) return "";
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return "";
-    
+
     if (currency === "USD") {
       const isWhole = Math.abs(numAmount) % 1 === 0;
       return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;

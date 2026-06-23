@@ -81,19 +81,12 @@ export function PageHeader({
             <span className="truncate">{title}</span>
           </h1>
           {subtitle && (
-            <p
-              className="mt-1 text-muted-foreground text-sm truncate"
-              data-testid="text-page-subtitle"
-            >
+            <p className="mt-1 text-muted-foreground text-sm truncate" data-testid="text-page-subtitle">
               {subtitle}
             </p>
           )}
         </div>
-        {children && (
-          <div className="flex items-center gap-2 flex-wrap shrink-0">
-            {children}
-          </div>
-        )}
+        {children && <div className="flex items-center gap-2 flex-wrap shrink-0">{children}</div>}
       </div>
     </div>
   );

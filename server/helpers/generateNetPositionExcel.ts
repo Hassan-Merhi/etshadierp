@@ -21,13 +21,13 @@ function addOneDay(dateStr: string): string {
 }
 
 export function fmtMonthLabel(dateStr: string): string {
-  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const [yr, mo] = dateStr.split("-");
   return `${names[parseInt(mo) - 1]} ${yr}`;
 }
 
 function fmtSheetName(dateStr: string): string {
-  const names = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const [yr, mo] = dateStr.split("-");
   return `${names[parseInt(mo) - 1]} ${yr}`;
 }
@@ -35,8 +35,8 @@ function fmtSheetName(dateStr: string): string {
 export function generateMonthEnds(startDate: string, endDate: string): string[] {
   const ends: string[] = [];
   const start = new Date(startDate + "T00:00:00Z");
-  const end   = new Date(endDate   + "T00:00:00Z");
-  let year  = start.getUTCFullYear();
+  const end = new Date(endDate + "T00:00:00Z");
+  let year = start.getUTCFullYear();
   let month = start.getUTCMonth();
   while (true) {
     const candidate = lastDayOfMonth(year, month);
@@ -50,7 +50,10 @@ export function generateMonthEnds(startDate: string, endDate: string): string[] 
       break;
     }
     month++;
-    if (month > 11) { month = 0; year++; }
+    if (month > 11) {
+      month = 0;
+      year++;
+    }
     if (year > 2100) break;
   }
   return ends;
@@ -59,35 +62,35 @@ export function generateMonthEnds(startDate: string, endDate: string): string[] 
 // ─── palette ──────────────────────────────────────────────────────────────────
 
 const C = {
-  DARK_BLUE:  "FF1E3A5F",
-  MID_BLUE:   "FF2D5F8A",
-  GREEN:      "FF16A34A",
-  RED:        "FFDC2626",
-  GREEN_BG:   "FFD1FAE5",
-  RED_BG:     "FFFEE2E2",
-  YELLOW_BG:  "FFFEF9C3",
-  AMBER_BG:   "FFFEF3C7",
-  GRAY_BG:    "FFF3F4F6",
-  GRAY_HD:    "FFE5E7EB",
-  WHITE:      "FFFFFFFF",
+  DARK_BLUE: "FF1E3A5F",
+  MID_BLUE: "FF2D5F8A",
+  GREEN: "FF16A34A",
+  RED: "FFDC2626",
+  GREEN_BG: "FFD1FAE5",
+  RED_BG: "FFFEE2E2",
+  YELLOW_BG: "FFFEF9C3",
+  AMBER_BG: "FFFEF3C7",
+  GRAY_BG: "FFF3F4F6",
+  GRAY_HD: "FFE5E7EB",
+  WHITE: "FFFFFFFF",
   LIGHT_BLUE: "FFE0EAF5",
-  MUTED:      "FF6B7280",
+  MUTED: "FF6B7280",
 };
 
-const currencyFmt = '#,##0.00';
-const signedFmt   = '+#,##0.00;-#,##0.00;"-"';
+const currencyFmt = "#,##0.00";
+const signedFmt = '+#,##0.00;-#,##0.00;"-"';
 
 function styleHeader(cell: any, bgArgb = C.DARK_BLUE) {
-  cell.font      = { bold: true, color: { argb: C.WHITE }, size: 11 };
-  cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: bgArgb } };
+  cell.font = { bold: true, color: { argb: C.WHITE }, size: 11 };
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: bgArgb } };
   cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
-  cell.border    = { bottom: { style: "thin", color: { argb: "FFAAAAAA" } } };
+  cell.border = { bottom: { style: "thin", color: { argb: "FFAAAAAA" } } };
 }
 
 function styleTitle(cell: any, text: string, fontSize = 16) {
-  cell.value     = text;
-  cell.font      = { bold: true, size: fontSize, color: { argb: C.WHITE } };
-  cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.DARK_BLUE } };
+  cell.value = text;
+  cell.font = { bold: true, size: fontSize, color: { argb: C.WHITE } };
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.DARK_BLUE } };
   cell.alignment = { horizontal: "center", vertical: "middle" };
 }
 
@@ -112,21 +115,21 @@ export async function generateNetPositionExcel(
   companyName: string,
   startDate: string,
   endDate: string,
-  dest?: NodeJS.WritableStream,
+  dest?: NodeJS.WritableStream
 ): Promise<Buffer> {
   const monthEnds = generateMonthEnds(startDate, endDate);
   if (monthEnds.length === 0) throw new Error("No months in range");
 
   type Snapshot = Awaited<ReturnType<typeof calculateNetPositionAsOf>> & {
-    dateStr:    string;
-    label:      string;
-    change:     number | null;
+    dateStr: string;
+    label: string;
+    change: number | null;
     periodFrom: string;
-    income:     IncomeStatement;
+    income: IncomeStatement;
   };
 
   const snapshots: Snapshot[] = [];
-  let prevNet:  number | null = null;
+  let prevNet: number | null = null;
   let prevDate: string | null = null;
 
   for (const dateStr of monthEnds) {
@@ -137,7 +140,7 @@ export async function generateNetPositionExcel(
     ]);
     const change = prevNet !== null ? round2(snap.netPosition - prevNet) : null;
     snapshots.push({ ...snap, dateStr, label: fmtMonthLabel(dateStr), change, periodFrom, income });
-    prevNet  = snap.netPosition;
+    prevNet = snap.netPosition;
     prevDate = dateStr;
   }
 
@@ -158,22 +161,22 @@ export async function generateNetPositionExcel(
 
   wsOv.mergeCells("A2:E2");
   const ovSub = wsOv.getCell("A2");
-  ovSub.value     = `Period: ${startDate}  →  ${endDate}   |   All figures in USD`;
-  ovSub.font      = { italic: true, size: 10, color: { argb: C.MUTED } };
+  ovSub.value = `Period: ${startDate}  →  ${endDate}   |   All figures in USD`;
+  ovSub.font = { italic: true, size: 10, color: { argb: C.MUTED } };
   ovSub.alignment = { horizontal: "center" };
   wsOv.getRow(2).height = 18;
 
   wsOv.addRow([]);
 
   // ── Most-recent position KPI box ─────────────────────────────────
-  const lastSnap   = snapshots[snapshots.length - 1];
+  const lastSnap = snapshots[snapshots.length - 1];
   const isFinalPos = lastSnap.netPosition >= 0;
 
   wsOv.mergeCells("A4:E4");
   const kpiTitle = wsOv.getCell("A4");
-  kpiTitle.value     = `Current Position  (as of ${lastSnap.dateStr})`;
-  kpiTitle.font      = { bold: true, size: 12, color: { argb: C.WHITE } };
-  kpiTitle.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.MID_BLUE } };
+  kpiTitle.value = `Current Position  (as of ${lastSnap.dateStr})`;
+  kpiTitle.font = { bold: true, size: 12, color: { argb: C.WHITE } };
+  kpiTitle.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.MID_BLUE } };
   kpiTitle.alignment = { horizontal: "center", vertical: "middle" };
   wsOv.getRow(4).height = 26;
 
@@ -182,10 +185,10 @@ export async function generateNetPositionExcel(
   const hdrRowNum = kpiHdrRow.number;
   wsOv.mergeCells(hdrRowNum, 1, hdrRowNum, 2);
   wsOv.mergeCells(hdrRowNum, 3, hdrRowNum, 4);
-  [1, 3, 5].forEach(col => {
+  [1, 3, 5].forEach((col) => {
     const cell = kpiHdrRow.getCell(col);
-    cell.font      = { bold: true, color: { argb: C.WHITE }, size: 10 };
-    cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.DARK_BLUE } };
+    cell.font = { bold: true, color: { argb: C.WHITE }, size: 10 };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.DARK_BLUE } };
     cell.alignment = { horizontal: "center", vertical: "middle" };
   });
 
@@ -194,13 +197,17 @@ export async function generateNetPositionExcel(
   const valRowNum = kpiValRow.number;
   wsOv.mergeCells(valRowNum, 1, valRowNum, 2);
   wsOv.mergeCells(valRowNum, 3, valRowNum, 4);
-  [[1, C.GREEN], [3, C.RED], [5, isFinalPos ? C.GREEN : C.RED]].forEach(([col, color]) => {
+  [
+    [1, C.GREEN],
+    [3, C.RED],
+    [5, isFinalPos ? C.GREEN : C.RED],
+  ].forEach(([col, color]) => {
     const cell = kpiValRow.getCell(col as number);
-    cell.numFmt    = currencyFmt;
-    cell.font      = { bold: true, size: 16, color: { argb: color as string } };
-    cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.LIGHT_BLUE } };
+    cell.numFmt = currencyFmt;
+    cell.font = { bold: true, size: 16, color: { argb: color as string } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.LIGHT_BLUE } };
     cell.alignment = { horizontal: "center", vertical: "middle" };
-    cell.border    = { bottom: { style: "medium", color: { argb: C.DARK_BLUE } } };
+    cell.border = { bottom: { style: "medium", color: { argb: C.DARK_BLUE } } };
   });
 
   const statusRow = wsOv.addRow(["", "", "", "", lastSnap.netPositionLabel]);
@@ -209,50 +216,46 @@ export async function generateNetPositionExcel(
   wsOv.mergeCells(stRowNum, 1, stRowNum, 2);
   wsOv.mergeCells(stRowNum, 3, stRowNum, 4);
   const stCell = statusRow.getCell(5);
-  stCell.font      = { bold: true, size: 12, color: { argb: isFinalPos ? C.GREEN : C.RED } };
+  stCell.font = { bold: true, size: 12, color: { argb: isFinalPos ? C.GREEN : C.RED } };
   stCell.alignment = { horizontal: "center" };
-  stCell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.LIGHT_BLUE } };
+  stCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.LIGHT_BLUE } };
 
   wsOv.addRow([]);
 
   // ── Monthly trend table ───────────────────────────────────────────
   wsOv.mergeCells("A9:E9");
   const trendTitle = wsOv.getCell("A9");
-  trendTitle.value     = "Monthly Trend";
-  trendTitle.font      = { bold: true, size: 11, color: { argb: C.WHITE } };
-  trendTitle.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.MID_BLUE } };
+  trendTitle.value = "Monthly Trend";
+  trendTitle.font = { bold: true, size: 11, color: { argb: C.WHITE } };
+  trendTitle.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.MID_BLUE } };
   trendTitle.alignment = { horizontal: "center", vertical: "middle" };
   wsOv.getRow(9).height = 24;
 
   const trendHdr = wsOv.addRow(["Month", "Money Owed TO US", "Money WE OWE", "Net Position", "Status"]);
   trendHdr.height = 22;
-  trendHdr.eachCell(cell => styleHeader(cell));
+  trendHdr.eachCell((cell) => styleHeader(cell));
 
   for (const s of snapshots) {
     const isPos = s.netPosition >= 0;
-    const dr = wsOv.addRow([
-      s.label,
-      s.forUsTotal,
-      s.onUsTotal,
-      Math.abs(s.netPosition),
-      s.netPositionLabel,
-    ]);
+    const dr = wsOv.addRow([s.label, s.forUsTotal, s.onUsTotal, Math.abs(s.netPosition), s.netPositionLabel]);
     dr.getCell(1).font = { bold: true };
     dr.getCell(2).numFmt = currencyFmt;
-    dr.getCell(2).font   = { color: { argb: C.GREEN } };
+    dr.getCell(2).font = { color: { argb: C.GREEN } };
     dr.getCell(3).numFmt = currencyFmt;
-    dr.getCell(3).font   = { color: { argb: C.RED } };
+    dr.getCell(3).font = { color: { argb: C.RED } };
     dr.getCell(4).numFmt = currencyFmt;
-    dr.getCell(4).font   = { bold: true, color: { argb: isPos ? C.GREEN : C.RED } };
-    dr.getCell(5).font   = { bold: true, color: { argb: isPos ? C.GREEN : C.RED } };
-    dr.eachCell(cell => {
+    dr.getCell(4).font = { bold: true, color: { argb: isPos ? C.GREEN : C.RED } };
+    dr.getCell(5).font = { bold: true, color: { argb: isPos ? C.GREEN : C.RED } };
+    dr.eachCell((cell) => {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: isPos ? C.GREEN_BG : C.RED_BG } };
       setThin(cell);
     });
   }
 
   // Column widths
-  [22, 24, 24, 22, 18].forEach((w, i) => { wsOv.getColumn(i + 1).width = w; });
+  [22, 24, 24, 22, 18].forEach((w, i) => {
+    wsOv.getColumn(i + 1).width = w;
+  });
 
   // ═══════════════════════════════════════════════════════════════════
   //  SHEET 2: Income
@@ -265,8 +268,8 @@ export async function generateNetPositionExcel(
 
   wsInc.mergeCells("A2:D2");
   const incSub = wsInc.getCell("A2");
-  incSub.value     = `Period: ${startDate}  →  ${endDate}   |   All figures in USD`;
-  incSub.font      = { italic: true, size: 10, color: { argb: C.MUTED } };
+  incSub.value = `Period: ${startDate}  →  ${endDate}   |   All figures in USD`;
+  incSub.font = { italic: true, size: 10, color: { argb: C.MUTED } };
   incSub.alignment = { horizontal: "center" };
   wsInc.getRow(2).height = 18;
 
@@ -275,42 +278,47 @@ export async function generateNetPositionExcel(
   // Summary table header
   const incHdr = wsInc.addRow(["Month", "Revenue", "Total Expenses", "Net Income"]);
   incHdr.height = 22;
-  incHdr.eachCell(cell => styleHeader(cell));
+  incHdr.eachCell((cell) => styleHeader(cell));
 
   for (const s of snapshots) {
     const netIncome = round2(s.income.totalRevenue - s.income.totalExpenses);
-    const isProfit  = netIncome >= 0;
+    const isProfit = netIncome >= 0;
     const dr = wsInc.addRow([s.label, s.income.totalRevenue, s.income.totalExpenses, Math.abs(netIncome)]);
     dr.getCell(1).font = { bold: true };
     dr.getCell(2).numFmt = currencyFmt;
-    dr.getCell(2).font   = { color: { argb: C.GREEN } };
+    dr.getCell(2).font = { color: { argb: C.GREEN } };
     dr.getCell(3).numFmt = currencyFmt;
-    dr.getCell(3).font   = { color: { argb: C.RED } };
+    dr.getCell(3).font = { color: { argb: C.RED } };
     dr.getCell(4).numFmt = currencyFmt;
-    dr.getCell(4).font   = { bold: true, color: { argb: isProfit ? C.GREEN : C.RED } };
-    dr.eachCell(cell => {
+    dr.getCell(4).font = { bold: true, color: { argb: isProfit ? C.GREEN : C.RED } };
+    dr.eachCell((cell) => {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: isProfit ? C.GREEN_BG : C.RED_BG } };
       setThin(cell);
     });
   }
 
   // Totals row
-  const totalRevenue  = round2(snapshots.reduce((s, x) => s + x.income.totalRevenue,  0));
+  const totalRevenue = round2(snapshots.reduce((s, x) => s + x.income.totalRevenue, 0));
   const totalExpenses = round2(snapshots.reduce((s, x) => s + x.income.totalExpenses, 0));
-  const totalNetInc   = round2(totalRevenue - totalExpenses);
-  const isTotProfit   = totalNetInc >= 0;
+  const totalNetInc = round2(totalRevenue - totalExpenses);
+  const isTotProfit = totalNetInc >= 0;
 
   wsInc.addRow([]);
   const incTotRow = wsInc.addRow(["Total (Period)", totalRevenue, totalExpenses, Math.abs(totalNetInc)]);
   incTotRow.height = 24;
   incTotRow.getCell(1).font = { bold: true, size: 11 };
-  [2,3,4].forEach(i => { incTotRow.getCell(i).numFmt = currencyFmt; });
+  [2, 3, 4].forEach((i) => {
+    incTotRow.getCell(i).numFmt = currencyFmt;
+  });
   incTotRow.getCell(2).font = { bold: true, color: { argb: C.GREEN } };
-  incTotRow.getCell(3).font = { bold: true, color: { argb: C.RED   } };
+  incTotRow.getCell(3).font = { bold: true, color: { argb: C.RED } };
   incTotRow.getCell(4).font = { bold: true, size: 12, color: { argb: isTotProfit ? C.GREEN : C.RED } };
-  incTotRow.eachCell(cell => {
-    cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: isTotProfit ? "FFB3F5D3" : "FFFDCFCF" } };
-    cell.border = { top: { style: "medium", color: { argb: C.DARK_BLUE } }, bottom: { style: "medium", color: { argb: C.DARK_BLUE } } };
+  incTotRow.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: isTotProfit ? "FFB3F5D3" : "FFFDCFCF" } };
+    cell.border = {
+      top: { style: "medium", color: { argb: C.DARK_BLUE } },
+      bottom: { style: "medium", color: { argb: C.DARK_BLUE } },
+    };
   });
 
   wsInc.addRow([]);
@@ -324,7 +332,7 @@ export async function generateNetPositionExcel(
     // Month heading
     const mHdr = wsInc.addRow([`${s.label}   (${s.periodFrom} → ${s.dateStr})`, "", "", ""]);
     mHdr.height = 22;
-    mHdr.eachCell(cell => {
+    mHdr.eachCell((cell) => {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.DARK_BLUE } };
       cell.font = { bold: true, color: { argb: C.WHITE }, size: 11 };
     });
@@ -333,42 +341,52 @@ export async function generateNetPositionExcel(
     // Revenue lines
     if (inc.revenueLines.length > 0) {
       const rHdr = wsInc.addRow(["  Revenue", "", "", ""]);
-      rHdr.eachCell(cell => {
+      rHdr.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF16A34A" } };
         cell.font = { bold: true, color: { argb: C.WHITE }, size: 10 };
       });
       for (const l of inc.revenueLines) {
         const lr = wsInc.addRow([`    ${l.label}`, "", l.value, ""]);
         lr.getCell(3).numFmt = currencyFmt;
-        lr.getCell(3).font   = { color: { argb: C.GREEN } };
-        lr.eachCell(cell => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.GREEN_BG } }; setThin(cell); });
+        lr.getCell(3).font = { color: { argb: C.GREEN } };
+        lr.eachCell((cell) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.GREEN_BG } };
+          setThin(cell);
+        });
       }
       const rTot = wsInc.addRow(["  Total Revenue", "", inc.totalRevenue, ""]);
       rTot.getCell(1).font = { bold: true };
       rTot.getCell(3).numFmt = currencyFmt;
-      rTot.getCell(3).font   = { bold: true, color: { argb: C.GREEN } };
-      rTot.eachCell(cell => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB3F5D3" } }; });
+      rTot.getCell(3).font = { bold: true, color: { argb: C.GREEN } };
+      rTot.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB3F5D3" } };
+      });
     }
 
     // Expense lines
     const allExpLines = [...inc.directExpLines, ...inc.indirectExpLines, ...inc.generalExpLines];
     if (allExpLines.length > 0) {
       const eHdr = wsInc.addRow(["  Expenses", "", "", ""]);
-      eHdr.eachCell(cell => {
+      eHdr.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.RED } };
         cell.font = { bold: true, color: { argb: C.WHITE }, size: 10 };
       });
       for (const l of allExpLines) {
         const lr = wsInc.addRow([`    ${l.label}`, "", l.value, ""]);
         lr.getCell(3).numFmt = currencyFmt;
-        lr.getCell(3).font   = { color: { argb: C.RED } };
-        lr.eachCell(cell => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.RED_BG } }; setThin(cell); });
+        lr.getCell(3).font = { color: { argb: C.RED } };
+        lr.eachCell((cell) => {
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.RED_BG } };
+          setThin(cell);
+        });
       }
       const eTot = wsInc.addRow(["  Total Expenses", "", inc.totalExpenses, ""]);
       eTot.getCell(1).font = { bold: true };
       eTot.getCell(3).numFmt = currencyFmt;
-      eTot.getCell(3).font   = { bold: true, color: { argb: C.RED } };
-      eTot.eachCell(cell => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDCFCF" } }; });
+      eTot.getCell(3).font = { bold: true, color: { argb: C.RED } };
+      eTot.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDCFCF" } };
+      });
     }
 
     // Net income line
@@ -376,27 +394,30 @@ export async function generateNetPositionExcel(
     niRow.height = 22;
     niRow.getCell(1).font = { bold: true, size: 11 };
     niRow.getCell(3).numFmt = currencyFmt;
-    niRow.getCell(3).font   = { bold: true, size: 11, color: { argb: netInc >= 0 ? C.GREEN : C.RED } };
-    niRow.getCell(4).font   = { bold: true, color: { argb: netInc >= 0 ? C.GREEN : C.RED } };
-    niRow.eachCell(cell => {
-      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: C.YELLOW_BG } };
-      cell.border = { top: { style: "thin", color: { argb: "FFAAAAAA" } }, bottom: { style: "thin", color: { argb: "FFAAAAAA" } } };
+    niRow.getCell(3).font = { bold: true, size: 11, color: { argb: netInc >= 0 ? C.GREEN : C.RED } };
+    niRow.getCell(4).font = { bold: true, color: { argb: netInc >= 0 ? C.GREEN : C.RED } };
+    niRow.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.YELLOW_BG } };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FFAAAAAA" } },
+        bottom: { style: "thin", color: { argb: "FFAAAAAA" } },
+      };
     });
 
     wsInc.addRow([]);
   }
 
-  [30, 10, 20, 12].forEach((w, i) => { wsInc.getColumn(i + 1).width = w; });
+  [30, 10, 20, 12].forEach((w, i) => {
+    wsInc.getColumn(i + 1).width = w;
+  });
 
   // ═══════════════════════════════════════════════════════════════════
   //  SHEETS 3…N: one per month — simplified detail only
   // ═══════════════════════════════════════════════════════════════════
   for (let idx = 0; idx < snapshots.length; idx++) {
-    const snap     = snapshots[idx];
+    const snap = snapshots[idx];
     const prevSnap = idx > 0 ? snapshots[idx - 1] : null;
-    const prevMap  = prevSnap
-      ? valueMap([...prevSnap.forUsLines, ...prevSnap.onUsLines])
-      : new Map<string, number>();
+    const prevMap = prevSnap ? valueMap([...prevSnap.forUsLines, ...prevSnap.onUsLines]) : new Map<string, number>();
 
     const ws = wb.addWorksheet(fmtSheetName(snap.dateStr));
 
@@ -406,8 +427,8 @@ export async function generateNetPositionExcel(
 
     ws.mergeCells("A2:D2");
     const meta = ws.getCell("A2");
-    meta.value     = `${companyName}   |   Snapshot: ${snap.dateStr}   |   Net Position: ${snap.netPosition >= 0 ? "+" : ""}${snap.netPosition.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
-    meta.font      = { italic: true, size: 10, color: { argb: C.MUTED } };
+    meta.value = `${companyName}   |   Snapshot: ${snap.dateStr}   |   Net Position: ${snap.netPosition >= 0 ? "+" : ""}${snap.netPosition.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+    meta.font = { italic: true, size: 10, color: { argb: C.MUTED } };
     meta.alignment = { horizontal: "center" };
     ws.getRow(2).height = 18;
 
@@ -416,26 +437,26 @@ export async function generateNetPositionExcel(
     // KPI row
     const kHdr = ws.addRow(["Money Owed TO US", "Money WE OWE", "Net Position", "Status"]);
     kHdr.height = 22;
-    kHdr.eachCell(cell => {
-      cell.font      = { bold: true, color: { argb: C.WHITE }, size: 10 };
-      cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.MID_BLUE } };
+    kHdr.eachCell((cell) => {
+      cell.font = { bold: true, color: { argb: C.WHITE }, size: 10 };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.MID_BLUE } };
       cell.alignment = { horizontal: "center", vertical: "middle" };
     });
 
-    const isPos  = snap.netPosition >= 0;
+    const isPos = snap.netPosition >= 0;
     const kVal = ws.addRow([snap.forUsTotal, snap.onUsTotal, Math.abs(snap.netPosition), snap.netPositionLabel]);
     kVal.height = 28;
     kVal.getCell(1).numFmt = currencyFmt;
-    kVal.getCell(1).font   = { bold: true, size: 13, color: { argb: C.GREEN } };
+    kVal.getCell(1).font = { bold: true, size: 13, color: { argb: C.GREEN } };
     kVal.getCell(2).numFmt = currencyFmt;
-    kVal.getCell(2).font   = { bold: true, size: 13, color: { argb: C.RED } };
+    kVal.getCell(2).font = { bold: true, size: 13, color: { argb: C.RED } };
     kVal.getCell(3).numFmt = currencyFmt;
-    kVal.getCell(3).font   = { bold: true, size: 13, color: { argb: isPos ? C.GREEN : C.RED } };
-    kVal.getCell(4).font   = { bold: true, size: 12, color: { argb: isPos ? C.GREEN : C.RED } };
-    kVal.eachCell(cell => {
-      cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C.LIGHT_BLUE } };
+    kVal.getCell(3).font = { bold: true, size: 13, color: { argb: isPos ? C.GREEN : C.RED } };
+    kVal.getCell(4).font = { bold: true, size: 12, color: { argb: isPos ? C.GREEN : C.RED } };
+    kVal.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.LIGHT_BLUE } };
       cell.alignment = { horizontal: "center", vertical: "middle" };
-      cell.border    = { bottom: { style: "medium", color: { argb: C.DARK_BLUE } } };
+      cell.border = { bottom: { style: "medium", color: { argb: C.DARK_BLUE } } };
     });
 
     ws.addRow([]);
@@ -444,42 +465,42 @@ export async function generateNetPositionExcel(
     const prevLabel = prevSnap ? prevSnap.label : "Prior Month";
     const detHdr = ws.addRow(["Line Item", snap.label, prevLabel, "Change"]);
     detHdr.height = 22;
-    detHdr.eachCell(cell => styleHeader(cell));
+    detHdr.eachCell((cell) => styleHeader(cell));
 
     // WHAT WE HAVE
     const forUsSec = ws.addRow(["  MONEY OWED TO US", "", "", ""]);
     forUsSec.height = 22;
-    forUsSec.eachCell(cell => {
+    forUsSec.eachCell((cell) => {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF16A34A" } };
       cell.font = { bold: true, color: { argb: C.WHITE } };
     });
 
     let forUsSubtotal = 0;
     for (const line of snap.forUsLines) {
-      const key     = lineKey(line);
+      const key = lineKey(line);
       const prevVal = prevMap.get(key) ?? 0;
-      const change  = prevSnap ? round2(line.value - prevVal) : null;
+      const change = prevSnap ? round2(line.value - prevVal) : null;
       forUsSubtotal += line.value;
 
       const dr = ws.addRow([line.label, line.value, prevSnap ? prevVal : null, change]);
-      dr.getCell(1).font   = { size: 10 };
+      dr.getCell(1).font = { size: 10 };
       dr.getCell(2).numFmt = currencyFmt;
-      dr.getCell(2).font   = { color: { argb: C.GREEN } };
+      dr.getCell(2).font = { color: { argb: C.GREEN } };
       if (prevSnap) {
         dr.getCell(3).numFmt = currencyFmt;
-        dr.getCell(3).font   = { color: { argb: C.MUTED } };
+        dr.getCell(3).font = { color: { argb: C.MUTED } };
       } else {
         dr.getCell(3).value = "—";
-        dr.getCell(3).font  = { color: { argb: C.MUTED } };
+        dr.getCell(3).font = { color: { argb: C.MUTED } };
       }
       if (change !== null) {
         dr.getCell(4).numFmt = signedFmt;
-        dr.getCell(4).font   = { italic: true, color: { argb: change >= 0 ? C.GREEN : C.RED } };
+        dr.getCell(4).font = { italic: true, color: { argb: change >= 0 ? C.GREEN : C.RED } };
       } else {
         dr.getCell(4).value = "—";
-        dr.getCell(4).font  = { color: { argb: C.MUTED } };
+        dr.getCell(4).font = { color: { argb: C.MUTED } };
       }
-      dr.eachCell(cell => {
+      dr.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.GREEN_BG } };
         setThin(cell);
       });
@@ -494,16 +515,22 @@ export async function generateNetPositionExcel(
     forUsTotRow.height = 20;
     forUsTotRow.getCell(1).font = { bold: true };
     forUsTotRow.getCell(2).numFmt = currencyFmt;
-    forUsTotRow.getCell(2).font   = { bold: true, color: { argb: C.GREEN } };
+    forUsTotRow.getCell(2).font = { bold: true, color: { argb: C.GREEN } };
     if (prevSnap) {
       forUsTotRow.getCell(3).numFmt = currencyFmt;
-      forUsTotRow.getCell(3).font   = { bold: true, color: { argb: C.MUTED } };
+      forUsTotRow.getCell(3).font = { bold: true, color: { argb: C.MUTED } };
       forUsTotRow.getCell(4).numFmt = signedFmt;
-      forUsTotRow.getCell(4).font   = { bold: true, color: { argb: (forUsSubtotal - prevSnap.forUsTotal) >= 0 ? C.GREEN : C.RED } };
+      forUsTotRow.getCell(4).font = {
+        bold: true,
+        color: { argb: forUsSubtotal - prevSnap.forUsTotal >= 0 ? C.GREEN : C.RED },
+      };
     }
-    forUsTotRow.eachCell(cell => {
-      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB3F5D3" } };
-      cell.border = { top: { style: "thin", color: { argb: "FF16A34A" } }, bottom: { style: "thin", color: { argb: "FF16A34A" } } };
+    forUsTotRow.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB3F5D3" } };
+      cell.border = {
+        top: { style: "thin", color: { argb: "FF16A34A" } },
+        bottom: { style: "thin", color: { argb: "FF16A34A" } },
+      };
     });
 
     ws.addRow([]);
@@ -511,37 +538,37 @@ export async function generateNetPositionExcel(
     // WHAT WE OWE
     const onUsSec = ws.addRow(["  MONEY WE OWE", "", "", ""]);
     onUsSec.height = 22;
-    onUsSec.eachCell(cell => {
+    onUsSec.eachCell((cell) => {
       cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDC2626" } };
       cell.font = { bold: true, color: { argb: C.WHITE } };
     });
 
     let onUsSubtotal = 0;
     for (const line of snap.onUsLines) {
-      const key     = lineKey(line);
+      const key = lineKey(line);
       const prevVal = prevMap.get(key) ?? 0;
-      const change  = prevSnap ? round2(line.value - prevVal) : null;
+      const change = prevSnap ? round2(line.value - prevVal) : null;
       onUsSubtotal += line.value;
 
       const dr = ws.addRow([line.label, line.value, prevSnap ? prevVal : null, change]);
-      dr.getCell(1).font   = { size: 10 };
+      dr.getCell(1).font = { size: 10 };
       dr.getCell(2).numFmt = currencyFmt;
-      dr.getCell(2).font   = { color: { argb: C.RED } };
+      dr.getCell(2).font = { color: { argb: C.RED } };
       if (prevSnap) {
         dr.getCell(3).numFmt = currencyFmt;
-        dr.getCell(3).font   = { color: { argb: C.MUTED } };
+        dr.getCell(3).font = { color: { argb: C.MUTED } };
       } else {
         dr.getCell(3).value = "—";
-        dr.getCell(3).font  = { color: { argb: C.MUTED } };
+        dr.getCell(3).font = { color: { argb: C.MUTED } };
       }
       if (change !== null) {
         dr.getCell(4).numFmt = signedFmt;
-        dr.getCell(4).font   = { italic: true, color: { argb: change <= 0 ? C.GREEN : C.RED } };
+        dr.getCell(4).font = { italic: true, color: { argb: change <= 0 ? C.GREEN : C.RED } };
       } else {
         dr.getCell(4).value = "—";
-        dr.getCell(4).font  = { color: { argb: C.MUTED } };
+        dr.getCell(4).font = { color: { argb: C.MUTED } };
       }
-      dr.eachCell(cell => {
+      dr.eachCell((cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C.RED_BG } };
         setThin(cell);
       });
@@ -556,17 +583,20 @@ export async function generateNetPositionExcel(
     onUsTotRow.height = 20;
     onUsTotRow.getCell(1).font = { bold: true };
     onUsTotRow.getCell(2).numFmt = currencyFmt;
-    onUsTotRow.getCell(2).font   = { bold: true, color: { argb: C.RED } };
+    onUsTotRow.getCell(2).font = { bold: true, color: { argb: C.RED } };
     if (prevSnap) {
       onUsTotRow.getCell(3).numFmt = currencyFmt;
-      onUsTotRow.getCell(3).font   = { bold: true, color: { argb: C.MUTED } };
+      onUsTotRow.getCell(3).font = { bold: true, color: { argb: C.MUTED } };
       const oweDiff = onUsSubtotal - prevSnap.onUsTotal;
       onUsTotRow.getCell(4).numFmt = signedFmt;
-      onUsTotRow.getCell(4).font   = { bold: true, color: { argb: oweDiff <= 0 ? C.GREEN : C.RED } };
+      onUsTotRow.getCell(4).font = { bold: true, color: { argb: oweDiff <= 0 ? C.GREEN : C.RED } };
     }
-    onUsTotRow.eachCell(cell => {
-      cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDCFCF" } };
-      cell.border = { top: { style: "thin", color: { argb: C.RED } }, bottom: { style: "thin", color: { argb: C.RED } } };
+    onUsTotRow.eachCell((cell) => {
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDCFCF" } };
+      cell.border = {
+        top: { style: "thin", color: { argb: C.RED } },
+        bottom: { style: "thin", color: { argb: C.RED } },
+      };
     });
 
     ws.getColumn(1).width = 40;

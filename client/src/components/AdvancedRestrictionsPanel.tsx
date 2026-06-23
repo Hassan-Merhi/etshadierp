@@ -19,11 +19,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Loader2, ChevronDown, ChevronRight, Search, Shield, Info } from "lucide-react";
 import {
   PERMISSION_CATALOG,
@@ -83,21 +79,9 @@ function countActive(role: string, permMap: Map<string, boolean>): number {
   return count;
 }
 
-const TYPE_ORDER: PermissionType[] = [
-  "module",
-  "page",
-  "tab",
-  "action",
-  "sensitive",
-  "export",
-  "pos",
-];
+const TYPE_ORDER: PermissionType[] = ["module", "page", "tab", "action", "sensitive", "export", "pos"];
 
-export function AdvancedRestrictionsPanel({
-  role,
-  companyId,
-  companyName,
-}: AdvancedRestrictionsPanelProps) {
+export function AdvancedRestrictionsPanel({ role, companyId, companyName }: AdvancedRestrictionsPanelProps) {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
@@ -109,10 +93,7 @@ export function AdvancedRestrictionsPanel({
   const { data: allPermissions = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/settings/role-permissions", companyId],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/settings/role-permissions?companyId=${companyId}`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/settings/role-permissions?companyId=${companyId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load permissions");
       return res.json();
     },
@@ -196,10 +177,8 @@ export function AdvancedRestrictionsPanel({
   // ── Helpers ───────────────────────────────────────────────────────────────
   const getChecked = (key: string) => dbToChecked(role, permMap.get(key));
 
-  const groupAllChecked = (entries: PermissionEntry[]) =>
-    entries.every((e) => getChecked(e.key));
-  const groupSomeChecked = (entries: PermissionEntry[]) =>
-    entries.some((e) => getChecked(e.key));
+  const groupAllChecked = (entries: PermissionEntry[]) => entries.every((e) => getChecked(e.key));
+  const groupSomeChecked = (entries: PermissionEntry[]) => entries.some((e) => getChecked(e.key));
 
   if (isPrivileged) {
     return (
@@ -227,8 +206,8 @@ export function AdvancedRestrictionsPanel({
       <div className="space-y-1">
         {isNormal ? (
           <p className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
-            <strong>Normal User</strong> has no access by default. Select what this user is
-            allowed to access. Checked items are visible/accessible.
+            <strong>Normal User</strong> has no access by default. Select what this user is allowed to access. Checked
+            items are visible/accessible.
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
@@ -280,10 +259,14 @@ export function AdvancedRestrictionsPanel({
                   )}
                   <span className="text-xs font-semibold">{typeLabel}</span>
                   {someChecked && !isNormal && (
-                    <Badge variant="secondary" className="text-xs">restricted</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      restricted
+                    </Badge>
                   )}
                   {someChecked && isNormal && (
-                    <Badge variant="secondary" className="text-xs">granted</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      granted
+                    </Badge>
                   )}
                 </div>
                 <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -333,7 +316,9 @@ export function AdvancedRestrictionsPanel({
                             {groupName}
                           </span>
                           {someGroupChecked && !allChecked && (
-                            <Badge variant="secondary" className="text-xs">partial</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              partial
+                            </Badge>
                           )}
                         </div>
                       </div>
@@ -375,9 +360,7 @@ export function AdvancedRestrictionsPanel({
         <div className="rounded-md border border-dashed px-3 py-2.5 space-y-1">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Info className="h-3.5 w-3.5" />
-            <span className="font-semibold uppercase tracking-wide">
-              Auto-detected / Unconfigured
-            </span>
+            <span className="font-semibold uppercase tracking-wide">Auto-detected / Unconfigured</span>
           </div>
           <p className="text-xs text-muted-foreground ml-5">
             These pages/routes exist in the app but haven't been formally catalogued yet.
@@ -394,7 +377,9 @@ export function AdvancedRestrictionsPanel({
                     data-testid={`checkbox-perm-${entry.key}`}
                   />
                   <span className="text-sm text-muted-foreground">{entry.label}</span>
-                  <Badge variant="outline" className="text-xs">unconfigured</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    unconfigured
+                  </Badge>
                 </div>
               );
             })}
@@ -403,9 +388,7 @@ export function AdvancedRestrictionsPanel({
       )}
 
       {filteredCatalog.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-3">
-          No permissions match your search.
-        </p>
+        <p className="text-sm text-muted-foreground text-center py-3">No permissions match your search.</p>
       )}
 
       {updateMutation.isPending && (

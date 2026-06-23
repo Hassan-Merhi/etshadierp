@@ -1,6 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, Plus, Trash2, CheckCircle2, XCircle, Copy, Save, Loader2, Check, ChevronsUpDown } from "lucide-react";
+import {
+  ClipboardList,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+  Copy,
+  Save,
+  Loader2,
+  Check,
+  ChevronsUpDown,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,8 +22,17 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 
-interface Worker { id: number; fullName: string; position: string; active: boolean; }
-interface WorkerCategory { id: number; name: string; workerIds: number[]; }
+interface Worker {
+  id: number;
+  fullName: string;
+  position: string;
+  active: boolean;
+}
+interface WorkerCategory {
+  id: number;
+  name: string;
+  workerIds: number[];
+}
 interface PlanEntry {
   id?: number;
   workerId: number;
@@ -38,7 +58,7 @@ function WorkerCombobox({
   entryKey: string;
 }) {
   const [open, setOpen] = useState(false);
-  const selected = workers.find(w => w.id === value);
+  const selected = workers.find((w) => w.id === value);
   const displayName = selected?.fullName ?? (value ? `Worker #${value}` : "Select worker…");
 
   return (
@@ -60,7 +80,7 @@ function WorkerCombobox({
           <CommandList>
             <CommandEmpty>No workers found.</CommandEmpty>
             <CommandGroup>
-              {workers.map(w => (
+              {workers.map((w) => (
                 <CommandItem
                   key={w.id}
                   value={w.fullName}
@@ -104,33 +124,38 @@ export default function ProductionPlannerDialog() {
 
   // Only show workers who are assigned to at least one pressing category.
   // If no categories exist yet, fall back to showing all workers so the planner isn't empty.
-  const categoryWorkerIdSet = new Set(workerCategories.flatMap(c => c.workerIds ?? []));
-  const workers = categoryWorkerIdSet.size > 0
-    ? allWorkers.filter(w => categoryWorkerIdSet.has(w.id))
-    : allWorkers;
+  const categoryWorkerIdSet = new Set(workerCategories.flatMap((c) => c.workerIds ?? []));
+  const workers = categoryWorkerIdSet.size > 0 ? allWorkers.filter((w) => categoryWorkerIdSet.has(w.id)) : allWorkers;
 
-  const { data: planData, isLoading: planLoading, refetch: refetchPlan } = useQuery<PlanData>({
+  const {
+    data: planData,
+    isLoading: planLoading,
+    refetch: refetchPlan,
+  } = useQuery<PlanData>({
     queryKey: ["/api/factory/production-planner", date],
-    queryFn: () => fetch(`/api/factory/production-planner/${date}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch(`/api/factory/production-planner/${date}`, { credentials: "include" }).then((r) => r.json()),
     enabled: open,
   });
 
   useEffect(() => {
     if (!planData) return;
     setNotes(planData.plan?.notes ?? "");
-    setEntries((planData.entries ?? []).map((e, i) => ({ ...e, workerCount: e.workerCount ?? 0, _key: `loaded-${i}` })));
+    setEntries(
+      (planData.entries ?? []).map((e, i) => ({ ...e, workerCount: e.workerCount ?? 0, _key: `loaded-${i}` }))
+    );
   }, [planData]);
 
   const saveMutation = useMutation({
-    mutationFn: () => apiRequest("POST", `/api/factory/production-planner/${date}`, {
-      notes,
-      categoryIds: [],
-      entries: entries.map(e => ({
-        workerId: e.workerId,
-        targetBales: e.targetBales,
-        workerCount: e.workerCount,
-      })),
-    }),
+    mutationFn: () =>
+      apiRequest("POST", `/api/factory/production-planner/${date}`, {
+        notes,
+        categoryIds: [],
+        entries: entries.map((e) => ({
+          workerId: e.workerId,
+          targetBales: e.targetBales,
+          workerCount: e.workerCount,
+        })),
+      }),
     onSuccess: () => {
       toast({ title: "Plan saved" });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/production-planner", date] });
@@ -142,10 +167,19 @@ export default function ProductionPlannerDialog() {
 
   const copyPreviousMutation = useMutation({
     mutationFn: (): Promise<{ entries: PlanEntry[]; categoryIds: number[]; notes: string; fromDate: string | null }> =>
-      fetch(`/api/factory/production-planner/${date}/copy-previous`, { credentials: "include" }).then(r => r.json()),
+      fetch(`/api/factory/production-planner/${date}/copy-previous`, { credentials: "include" }).then((r) => r.json()),
     onSuccess: (data) => {
-      if (!data.fromDate) { toast({ title: "No previous plan found" }); return; }
-      setEntries(data.entries.map((e, i) => ({ ...e, workerCount: (e as any).workerCount ?? 0, _key: `copied-${Date.now()}-${i}` })));
+      if (!data.fromDate) {
+        toast({ title: "No previous plan found" });
+        return;
+      }
+      setEntries(
+        data.entries.map((e, i) => ({
+          ...e,
+          workerCount: (e as any).workerCount ?? 0,
+          _key: `copied-${Date.now()}-${i}`,
+        }))
+      );
       setNotes(data.notes ?? "");
       toast({ title: `Copied plan from ${data.fromDate}` });
     },
@@ -154,25 +188,28 @@ export default function ProductionPlannerDialog() {
 
   const addRow = useCallback(() => {
     if (workers.length === 0) return;
-    const usedIds = new Set(entries.map(e => e.workerId));
-    const available = workers.filter(w => !usedIds.has(w.id));
+    const usedIds = new Set(entries.map((e) => e.workerId));
+    const available = workers.filter((w) => !usedIds.has(w.id));
     const worker = available[0] ?? workers[0];
-    setEntries(prev => [...prev, {
-      workerId: worker.id,
-      workerName: worker.fullName,
-      targetBales: 0,
-      workerCount: 0,
-      _key: `new-${Date.now()}`,
-    }]);
+    setEntries((prev) => [
+      ...prev,
+      {
+        workerId: worker.id,
+        workerName: worker.fullName,
+        targetBales: 0,
+        workerCount: 0,
+        _key: `new-${Date.now()}`,
+      },
+    ]);
   }, [workers, entries]);
 
-  const removeRow = (key: string) => setEntries(prev => prev.filter(e => e._key !== key));
+  const removeRow = (key: string) => setEntries((prev) => prev.filter((e) => e._key !== key));
 
   const updateWorker = (key: string, workerId: number, workerName: string) =>
-    setEntries(prev => prev.map(e => e._key !== key ? e : { ...e, workerId, workerName }));
+    setEntries((prev) => prev.map((e) => (e._key !== key ? e : { ...e, workerId, workerName })));
 
   const updateEntry = (key: string, field: "targetBales" | "workerCount", value: string) =>
-    setEntries(prev => prev.map(e => e._key !== key ? e : { ...e, [field]: parseInt(value) || 0 }));
+    setEntries((prev) => prev.map((e) => (e._key !== key ? e : { ...e, [field]: parseInt(value) || 0 })));
 
   const actuals = planData?.actuals ?? {};
 
@@ -203,7 +240,7 @@ export default function ProductionPlannerDialog() {
               <Input
                 type="date"
                 value={date}
-                onChange={e => setDate(e.target.value)}
+                onChange={(e) => setDate(e.target.value)}
                 className="w-40 text-sm"
                 data-testid="input-plan-date"
               />
@@ -215,12 +252,25 @@ export default function ProductionPlannerDialog() {
               disabled={copyPreviousMutation.isPending}
               data-testid="button-copy-yesterday"
             >
-              {copyPreviousMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Copy className="h-4 w-4 mr-1" />}
+              {copyPreviousMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Copy className="h-4 w-4 mr-1" />
+              )}
               Copy Previous Plan
             </Button>
             <div className="ml-auto">
-              <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-plan">
-                {saveMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+              <Button
+                size="sm"
+                onClick={() => saveMutation.mutate()}
+                disabled={saveMutation.isPending}
+                data-testid="button-save-plan"
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1" />
+                )}
                 Save Plan
               </Button>
             </div>
@@ -235,13 +285,23 @@ export default function ProductionPlannerDialog() {
               </div>
               <div>
                 <span className="text-muted-foreground">Total Actual: </span>
-                <span className={`font-semibold ${totalActual >= totalTarget && totalTarget > 0 ? "text-green-600 dark:text-green-400" : ""}`}>{totalActual} bales</span>
+                <span
+                  className={`font-semibold ${totalActual >= totalTarget && totalTarget > 0 ? "text-green-600 dark:text-green-400" : ""}`}
+                >
+                  {totalActual} bales
+                </span>
               </div>
               {totalTarget > 0 && (
                 <div className="ml-auto">
-                  {totalActual >= totalTarget
-                    ? <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Target Met</Badge>
-                    : <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">{totalTarget - totalActual} short</Badge>}
+                  {totalActual >= totalTarget ? (
+                    <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                      Target Met
+                    </Badge>
+                  ) : (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                      {totalTarget - totalActual} short
+                    </Badge>
+                  )}
                 </div>
               )}
             </div>
@@ -272,66 +332,73 @@ export default function ProductionPlannerDialog() {
                         No workers in plan. Add workers below or copy from a previous plan.
                       </td>
                     </tr>
-                  ) : entries.map(entry => {
-                    const actual = actuals[entry.workerId] ?? 0;
-                    const met = entry.targetBales > 0 && actual >= entry.targetBales;
-                    const notMet = entry.targetBales > 0 && actual < entry.targetBales;
+                  ) : (
+                    entries.map((entry) => {
+                      const actual = actuals[entry.workerId] ?? 0;
+                      const met = entry.targetBales > 0 && actual >= entry.targetBales;
+                      const notMet = entry.targetBales > 0 && actual < entry.targetBales;
 
-                    return (
-                      <tr key={entry._key} className="border-b last:border-0 hover:bg-muted/30">
-                        {/* Worker name */}
-                        <td className="px-3 py-2 min-w-[180px]">
-                          <WorkerCombobox
-                            value={entry.workerId}
-                            onChange={(id, name) => updateWorker(entry._key, id, name)}
-                            workers={workers}
-                            entryKey={entry._key}
-                          />
-                        </td>
+                      return (
+                        <tr key={entry._key} className="border-b last:border-0 hover:bg-muted/30">
+                          {/* Worker name */}
+                          <td className="px-3 py-2 min-w-[180px]">
+                            <WorkerCombobox
+                              value={entry.workerId}
+                              onChange={(id, name) => updateWorker(entry._key, id, name)}
+                              workers={workers}
+                              entryKey={entry._key}
+                            />
+                          </td>
 
-                        {/* Worker count */}
-                        <td className="px-3 py-2">
-                          <Input
-                            type="number"
-                            min={0}
-                            value={entry.workerCount}
-                            onChange={e => updateEntry(entry._key, "workerCount", e.target.value)}
-                            className="h-8 text-sm text-right"
-                            data-testid={`input-worker-count-${entry._key}`}
-                          />
-                        </td>
+                          {/* Worker count */}
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              value={entry.workerCount}
+                              onChange={(e) => updateEntry(entry._key, "workerCount", e.target.value)}
+                              className="h-8 text-sm text-right"
+                              data-testid={`input-worker-count-${entry._key}`}
+                            />
+                          </td>
 
-                        {/* Target */}
-                        <td className="px-3 py-2">
-                          <Input
-                            type="number"
-                            min={0}
-                            value={entry.targetBales}
-                            onChange={e => updateEntry(entry._key, "targetBales", e.target.value)}
-                            className="h-8 text-sm text-right"
-                            data-testid={`input-target-${entry._key}`}
-                          />
-                        </td>
+                          {/* Target */}
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number"
+                              min={0}
+                              value={entry.targetBales}
+                              onChange={(e) => updateEntry(entry._key, "targetBales", e.target.value)}
+                              className="h-8 text-sm text-right"
+                              data-testid={`input-target-${entry._key}`}
+                            />
+                          </td>
 
-                        {/* Actual */}
-                        <td className="px-3 py-2 text-right font-mono font-semibold">{actual}</td>
+                          {/* Actual */}
+                          <td className="px-3 py-2 text-right font-mono font-semibold">{actual}</td>
 
-                        {/* Status */}
-                        <td className="px-3 py-2 text-center">
-                          {met && <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />}
-                          {notMet && <XCircle className="h-5 w-5 text-red-500 mx-auto" />}
-                          {!met && !notMet && <span className="text-muted-foreground text-xs">—</span>}
-                        </td>
+                          {/* Status */}
+                          <td className="px-3 py-2 text-center">
+                            {met && <CheckCircle2 className="h-5 w-5 text-green-500 mx-auto" />}
+                            {notMet && <XCircle className="h-5 w-5 text-red-500 mx-auto" />}
+                            {!met && !notMet && <span className="text-muted-foreground text-xs">—</span>}
+                          </td>
 
-                        {/* Remove */}
-                        <td className="px-2 py-2 text-center">
-                          <Button size="icon" variant="ghost" onClick={() => removeRow(entry._key)} data-testid={`button-remove-${entry._key}`}>
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          {/* Remove */}
+                          <td className="px-2 py-2 text-center">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeRow(entry._key)}
+                              data-testid={`button-remove-${entry._key}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -350,16 +417,23 @@ export default function ProductionPlannerDialog() {
             </Button>
             {entries.length > 0 && (
               <div className="flex items-center gap-2 text-sm">
-                <span className="font-semibold">{entries.length} worker{entries.length !== 1 ? "s" : ""}</span>
+                <span className="font-semibold">
+                  {entries.length} worker{entries.length !== 1 ? "s" : ""}
+                </span>
                 <span className="text-muted-foreground">·</span>
                 <span className="text-muted-foreground">{totalActual} bales made</span>
                 {totalTarget > 0 && (
                   <>
                     <span className="text-muted-foreground">·</span>
-                    {totalActual >= totalTarget
-                      ? <span className="font-semibold text-green-600 dark:text-green-400">+{totalActual - totalTarget} exceeded</span>
-                      : <span className="font-semibold text-red-600 dark:text-red-400">{totalTarget - totalActual} short</span>
-                    }
+                    {totalActual >= totalTarget ? (
+                      <span className="font-semibold text-green-600 dark:text-green-400">
+                        +{totalActual - totalTarget} exceeded
+                      </span>
+                    ) : (
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        {totalTarget - totalActual} short
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -371,7 +445,7 @@ export default function ProductionPlannerDialog() {
             <label className="text-sm font-medium">Notes (optional)</label>
             <Input
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. short shift, holiday schedule…"
               className="text-sm"
               data-testid="input-plan-notes"

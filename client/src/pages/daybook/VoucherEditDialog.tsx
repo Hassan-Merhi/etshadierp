@@ -49,24 +49,15 @@ export function VoucherEditDialog({
   formatAmount,
 }: VoucherEditDialogProps) {
   return (
-    <Dialog
-      open={open}
-      onOpenChange={onOpenChange}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Voucher</DialogTitle>
-          <DialogDescription>
-            Edit all voucher details. Debits must equal credits.
-          </DialogDescription>
+          <DialogDescription>Edit all voucher details. Debits must equal credits.</DialogDescription>
         </DialogHeader>
         {voucherToEdit && !entriesLoading && (
           <Form {...editForm}>
-            <form
-              onSubmit={editForm.handleSubmit(handleSaveEdit)}
-              className="space-y-4"
-              noValidate
-            >
+            <form onSubmit={editForm.handleSubmit(handleSaveEdit)} className="space-y-4" noValidate>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Voucher Number</p>
@@ -126,7 +117,11 @@ export function VoucherEditDialog({
                         <div className="text-xs text-muted-foreground">Does not affect books</div>
                       </div>
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-edit-optional" />
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="switch-edit-optional"
+                        />
                       </FormControl>
                     </FormItem>
                   )}
@@ -140,7 +135,12 @@ export function VoucherEditDialog({
                   <FormItem>
                     <FormLabel>Description</FormLabel>
                     <FormControl>
-                      <Textarea {...field} placeholder="Enter voucher description (optional)" rows={2} data-testid="textarea-edit-description" />
+                      <Textarea
+                        {...field}
+                        placeholder="Enter voucher description (optional)"
+                        rows={2}
+                        data-testid="textarea-edit-description"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -177,7 +177,13 @@ export function VoucherEditDialog({
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-muted-foreground">Entry {index + 1}</span>
                       {editFields.length > 2 && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => editRemove(index)} data-testid={`button-edit-remove-entry-${index}`}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => editRemove(index)}
+                          data-testid={`button-edit-remove-entry-${index}`}
+                        >
                           <X className="w-4 h-4" />
                         </Button>
                       )}
@@ -258,7 +264,14 @@ export function VoucherEditDialog({
                               <FormItem>
                                 <FormLabel>Debit Amount</FormLabel>
                                 <FormControl>
-                                  <Input {...field} type="number" step="0.01" min="0" className="font-mono" data-testid={`input-edit-debit-${index}`} />
+                                  <Input
+                                    {...field}
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    className="font-mono"
+                                    data-testid={`input-edit-debit-${index}`}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -272,7 +285,14 @@ export function VoucherEditDialog({
                               <FormItem>
                                 <FormLabel>Credit Amount</FormLabel>
                                 <FormControl>
-                                  <Input {...field} type="number" step="0.01" min="0" className="font-mono" data-testid={`input-edit-credit-${index}`} />
+                                  <Input
+                                    {...field}
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    className="font-mono"
+                                    data-testid={`input-edit-credit-${index}`}
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>
@@ -287,7 +307,11 @@ export function VoucherEditDialog({
                             <FormItem>
                               <FormLabel>Narration (Optional)</FormLabel>
                               <FormControl>
-                                <Input {...field} placeholder="Enter narration" data-testid={`input-edit-narration-${index}`} />
+                                <Input
+                                  {...field}
+                                  placeholder="Enter narration"
+                                  data-testid={`input-edit-narration-${index}`}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -318,26 +342,39 @@ export function VoucherEditDialog({
                         <div className="text-right">
                           <span className="text-muted-foreground mr-2">Total Debits:</span>
                           <span className="font-bold">
-                            ${formatAmount(editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0))}
+                            $
+                            {formatAmount(
+                              editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.debitAmount || "0"), 0)
+                            )}
                           </span>
                         </div>
                         <div className="text-right">
                           <span className="text-muted-foreground mr-2">Total Credits:</span>
                           <span className="font-bold">
-                            ${formatAmount(editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0))}
+                            $
+                            {formatAmount(
+                              editForm.watch("entries").reduce((sum, e) => sum + parseFloat(e?.creditAmount || "0"), 0)
+                            )}
                           </span>
                         </div>
                       </div>
                     )}
                     {editForm.formState.errors.entries && (
-                      <p className="text-sm text-destructive mt-2 text-center">{editForm.formState.errors.entries.message}</p>
+                      <p className="text-sm text-destructive mt-2 text-center">
+                        {editForm.formState.errors.entries.message}
+                      </p>
                     )}
                   </div>
                 )}
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-edit">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  data-testid="button-cancel-edit"
+                >
                   Cancel
                 </Button>
                 <Button type="submit" disabled={editMutationPending} data-testid="button-save-edit">

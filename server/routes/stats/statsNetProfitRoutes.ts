@@ -5,35 +5,97 @@ import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } 
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "../_helpers";
 import { getClientDate } from "../../lib/dateUtils";
 import {
-  inventory, stockItems, stockGroups,
-  stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems,
-  bankAccounts, fixedAssets, ledgerAccounts, insertLedgerAccountSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertContainerSchema,
-  insertStockTransferVoucherSchema, insertStockAdjustmentVoucherSchema,
-  updateStockTransferSchema, updateStockAdjustmentSchema,
-  vouchers, voucherEntries, salesItems, suppliers, customers, customerBalances,
-  employees, locations, userLocations, userCompanyRoles, companies,
-  auditLog, users, FEATURE_KEYS, companySettings,
-  purchaseOrders, poLineItems, interCompanyTransfers,
-  insertInterCompanyTransferSchema, insertContainerSaleSchema, containerSales,
-  insertUserPreferencesSchema, userPreferences,
-  insertDraftPosSaleSchema, InsertDraftPosSale,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  fiscalPeriodClosures, wasteDispatches, wasteDispatchItems,
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  inventory,
+  stockItems,
+  stockGroups,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  bankAccounts,
+  fixedAssets,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertContainerSchema,
+  insertStockTransferVoucherSchema,
+  insertStockAdjustmentVoucherSchema,
+  updateStockTransferSchema,
+  updateStockAdjustmentSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  suppliers,
+  customers,
+  customerBalances,
+  employees,
+  locations,
+  userLocations,
+  userCompanyRoles,
+  companies,
+  auditLog,
+  users,
+  FEATURE_KEYS,
+  companySettings,
+  purchaseOrders,
+  poLineItems,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  insertContainerSaleSchema,
+  containerSales,
+  insertUserPreferencesSchema,
+  userPreferences,
+  insertDraftPosSaleSchema,
+  InsertDraftPosSale,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
-  bales, baleProducts, baleProductCategories, storedFiles,
-  stockItemLocationPrices, exchangeRates,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  storedFiles,
+  stockItemLocationPrices,
+  exchangeRates,
   factoryWorkerAdvances,
-  propertyContracts, propertyMonthlyLedger, propertyPayments,
+  propertyContracts,
+  propertyMonthlyLedger,
+  propertyPayments,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -52,7 +114,10 @@ const _statCache = new Map<string, { data: any; expiresAt: number }>();
 function _getCached(key: string): any | null {
   const e = _statCache.get(key);
   if (!e) return null;
-  if (Date.now() > e.expiresAt) { _statCache.delete(key); return null; }
+  if (Date.now() > e.expiresAt) {
+    _statCache.delete(key);
+    return null;
+  }
   return e.data;
 }
 function _setCached(key: string, data: any, ttlMs = 30_000): void {
@@ -60,10 +125,11 @@ function _setCached(key: string, data: any, ttlMs = 30_000): void {
   // Prune stale entries to prevent unbounded growth (> 500 entries is unusual)
   if (_statCache.size > 500) {
     const now = Date.now();
-    for (const [k, v] of _statCache) { if (v.expiresAt < now) _statCache.delete(k); }
+    for (const [k, v] of _statCache) {
+      if (v.expiresAt < now) _statCache.delete(k);
+    }
   }
 }
-
 
 export function registerStatsNetProfitRoutes(app: Express) {
   app.get("/api/stats/net-profit", requireAuth, requireNonPOS, async (req, res) => {
@@ -83,7 +149,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
 
       // Fetch company to know its base currency (CFA vs USD)
       // Check the 30-second TTL cache before touching the DB
-      const _cacheKey = `net-profit:${companyId}:${toDate || ''}`;
+      const _cacheKey = `net-profit:${companyId}:${toDate || ""}`;
       const _cached = _getCached(_cacheKey);
       if (_cached) return res.json(_cached);
 
@@ -108,41 +174,37 @@ export function registerStatsNetProfitRoutes(app: Express) {
       //      even when some of their vouchers were not moved (shared vouchers).
       //   2. companyEntries    — filters by VOUCHER's companyId.
       //      Used only for supplier and employee balances, which are always in the voucher's company.
-      const voucherNonAcctConditions: any[] = [
-        eq(vouchers.optional, false),
-        isNull(vouchers.deletedAt),
-      ];
+      const voucherNonAcctConditions: any[] = [eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
       if (toDate) voucherNonAcctConditions.push(lte(vouchers.voucherDate, toDate));
 
       const [companyRecord, companyAccounts, companyEntries, ledgerAccEntries, parentCompanyId] = await Promise.all([
         storage.getCompanyById(companyId),
         storage.getAllLedgerAccounts(companyId, true),
         // Supplier + employee entries: scoped to the voucher's company
-        db.select({
-          ledgerAccountId: voucherEntries.ledgerAccountId,
-          supplierId:      voucherEntries.supplierId,
-          employeeId:      voucherEntries.employeeId,
-          debitAmount:     voucherEntries.debitAmount,
-          creditAmount:    voucherEntries.creditAmount,
-        })
+        db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            supplierId: voucherEntries.supplierId,
+            employeeId: voucherEntries.employeeId,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+          })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .where(and(...voucherConditions))
           .execute(),
         // Ledger account entries: scoped to the ACCOUNT's company so that accounts
         // migrated between companies carry their full balance to the new company.
-        db.select({
-          ledgerAccountId: voucherEntries.ledgerAccountId,
-          debitAmount:     voucherEntries.debitAmount,
-          creditAmount:    voucherEntries.creditAmount,
-        })
+        db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+          })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
           .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
-          .where(and(
-            eq(ledgerAccounts.companyId, companyId),
-            ...voucherNonAcctConditions,
-          ))
+          .where(and(eq(ledgerAccounts.companyId, companyId), ...voucherNonAcctConditions))
           .execute(),
         storage.getParentCompanyId(),
       ]);
@@ -204,7 +266,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       const shouldIncludeSuppliers = parentCompanyId === null || companyId === parentCompanyId;
 
       // Build excluded-from-expenses set (needed for the P&L expense pass below)
-      const importChargesParent = companyAccounts.find(acc => acc.code === "IMPORT_CHARGES");
+      const importChargesParent = companyAccounts.find((acc) => acc.code === "IMPORT_CHARGES");
       const excludedFromExpenses = new Set<number>();
       if (importChargesParent) {
         excludedFromExpenses.add(importChargesParent.id);
@@ -214,8 +276,10 @@ export function registerStatsNetProfitRoutes(app: Express) {
       }
       for (const acc of companyAccounts) {
         if (
-          acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES_") ||
-          acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE"
+          acc.code === "PURCHASES" ||
+          acc.code?.startsWith("PURCHASES_") ||
+          acc.code === "PRODUCTION_ADJUSTMENT" ||
+          acc.code === "CONSUMPTION_EXPENSE"
         ) {
           excludedFromExpenses.add(acc.id);
         }
@@ -227,12 +291,8 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // For non-SP: exclude sp_stock (inventory table is authoritative) and sp_cost_clearing (double-counts).
       const isSupplierPartner = (companyRecord as any)?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
-        ? companyAccounts.filter(
-            (a: any) => a.accountType === "Cash" || a.subType === "sp_payable"
-          )
-        : companyAccounts.filter(
-            (a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing"
-          );
+        ? companyAccounts.filter((a: any) => a.accountType === "Cash" || a.subType === "sp_payable")
+        : companyAccounts.filter((a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
       const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
         includeSupplierTypeAccounts: shouldIncludeSuppliers,
       });
@@ -259,17 +319,21 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // Expenses, loans, receivables are locked at their historical CFA values — do NOT revalue them.
       // Only revalue if this company's base currency IS CFA (not a USD company that happens to have
       // a CFA exchange rate stored for reference/inter-company purposes).
-      const cfaRateRows = companyBaseCurrency === "CFA"
-        ? await db.select()
-            .from(exchangeRates)
-            .where(and(
-              eq(exchangeRates.companyId, companyId),
-              eq(exchangeRates.fromCurrency, "USD"),
-              eq(exchangeRates.toCurrency, "CFA"),
-            ))
-            .orderBy(desc(exchangeRates.effectiveDate))
-            .limit(1)
-        : [];
+      const cfaRateRows =
+        companyBaseCurrency === "CFA"
+          ? await db
+              .select()
+              .from(exchangeRates)
+              .where(
+                and(
+                  eq(exchangeRates.companyId, companyId),
+                  eq(exchangeRates.fromCurrency, "USD"),
+                  eq(exchangeRates.toCurrency, "CFA")
+                )
+              )
+              .orderBy(desc(exchangeRates.effectiveDate))
+              .limit(1)
+          : [];
       const currentCfaRate = cfaRateRows.length > 0 ? parseFloat(cfaRateRows[0].rate) : 0;
 
       if (currentCfaRate > 0) {
@@ -307,12 +371,25 @@ export function registerStatsNetProfitRoutes(app: Express) {
         if (isIncomeAccount) {
           if (netBalance < 0) {
             incomeTotal += Math.abs(netBalance);
-            categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) + Math.abs(netBalance);
-            incomeAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: Math.abs(netBalance), category: "Income" });
+            categoryTotals["income_Sales/Revenue"] =
+              (categoryTotals["income_Sales/Revenue"] || 0) + Math.abs(netBalance);
+            incomeAccounts.push({
+              id: acc.id,
+              name: acc.name,
+              code: acc.code || "",
+              value: Math.abs(netBalance),
+              category: "Income",
+            });
           } else if (netBalance > 0) {
             incomeTotal -= netBalance;
             categoryTotals["income_Sales/Revenue"] = (categoryTotals["income_Sales/Revenue"] || 0) - netBalance;
-            incomeAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: -netBalance, category: "Income (Refund)" });
+            incomeAccounts.push({
+              id: acc.id,
+              name: acc.name,
+              code: acc.code || "",
+              value: -netBalance,
+              category: "Income (Refund)",
+            });
           }
         } else if (isAnyExpenseType && !excludedFromExpenses.has(acc.id)) {
           const category = acc.accountType || "Expense";
@@ -324,7 +401,13 @@ export function registerStatsNetProfitRoutes(app: Express) {
             const credit = Math.abs(netBalance);
             expensesTotal -= credit;
             categoryTotals[`exp_${category}`] = (categoryTotals[`exp_${category}`] || 0) - credit;
-            expensesAccounts.push({ id: acc.id, name: acc.name, code: acc.code || "", value: -credit, category: category + " (Refund)" });
+            expensesAccounts.push({
+              id: acc.id,
+              name: acc.name,
+              code: acc.code || "",
+              value: -credit,
+              category: category + " (Refund)",
+            });
           }
         }
       }
@@ -347,7 +430,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
           const acc = forUsAccounts[i] as any;
           const code = (acc.code || "").toUpperCase();
           const nameLower = (acc.name || "").toLowerCase();
-          if (factoryLedgerCodesToStrip.has(code) || factoryLedgerNamesToStrip.some(p => nameLower.includes(p))) {
+          if (factoryLedgerCodesToStrip.has(code) || factoryLedgerNamesToStrip.some((p) => nameLower.includes(p))) {
             forUsTotal -= acc.value;
             const catKey = `asset_${acc.category || acc.name}`;
             if (categoryTotals[catKey] !== undefined) delete categoryTotals[catKey];
@@ -394,7 +477,12 @@ export function registerStatsNetProfitRoutes(app: Express) {
         if (stockOnFloor > 0) {
           forUsTotal += stockOnFloor;
           categoryTotals["asset_Stock In Hand"] = stockOnFloor;
-          forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
+          forUsAccounts.push({
+            name: "Stock In Hand (Inventory)",
+            code: "COMPUTED",
+            value: stockOnFloor,
+            category: "Inventory",
+          });
         }
       }
 
@@ -449,29 +537,46 @@ export function registerStatsNetProfitRoutes(app: Express) {
         .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
       const rawSalaryAdvances = round2(parseFloat((saRow as any)?.total || "0"));
       // For CFA companies, worker balances are stored in CFA → convert to USD
-      const workerLiabilitiesDisplay = currentCfaRate > 0 ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
-      const workerAdvancesDisplay    = currentCfaRate > 0 ? round2(rawSalaryAdvances / currentCfaRate) : rawSalaryAdvances;
+      const workerLiabilitiesDisplay =
+        currentCfaRate > 0 ? round2(workerLiabilities / currentCfaRate) : workerLiabilities;
+      const workerAdvancesDisplay = currentCfaRate > 0 ? round2(rawSalaryAdvances / currentCfaRate) : rawSalaryAdvances;
       if (workerLiabilitiesDisplay > 0) {
         onUsTotal += workerLiabilitiesDisplay;
         categoryTotals["liability_Workers"] = (categoryTotals["liability_Workers"] || 0) + workerLiabilitiesDisplay;
-        onUsAccounts.push({ name: "Workers/Employees Payable", code: "COMPUTED", value: workerLiabilitiesDisplay, category: "Workers" });
+        onUsAccounts.push({
+          name: "Workers/Employees Payable",
+          code: "COMPUTED",
+          value: workerLiabilitiesDisplay,
+          category: "Workers",
+        });
       }
       if (workerAdvancesDisplay > 0) {
         forUsTotal += workerAdvancesDisplay;
-        categoryTotals["asset_Worker Advances"] = (categoryTotals["asset_Worker Advances"] || 0) + workerAdvancesDisplay;
-        forUsAccounts.push({ name: "Worker Advances (Prepaid)", code: "COMPUTED", value: workerAdvancesDisplay, category: "Worker Advances" });
+        categoryTotals["asset_Worker Advances"] =
+          (categoryTotals["asset_Worker Advances"] || 0) + workerAdvancesDisplay;
+        forUsAccounts.push({
+          name: "Worker Advances (Prepaid)",
+          code: "COMPUTED",
+          value: workerAdvancesDisplay,
+          category: "Worker Advances",
+        });
       }
 
       // Add Suppliers (only for parent company or if no parent set)
       if (shouldIncludeSuppliers) {
         // Only fetch suppliers that appear in this company's entries (avoids full-table scan)
         const supplierIdsWithBalance = [...supplierBalances.keys()];
-        const allSuppliers = supplierIdsWithBalance.length > 0
-          ? await db.select().from(suppliers).where(and(isNull(suppliers.deletedAt), inArray(suppliers.id, supplierIdsWithBalance))).execute()
-          : [];
+        const allSuppliers =
+          supplierIdsWithBalance.length > 0
+            ? await db
+                .select()
+                .from(suppliers)
+                .where(and(isNull(suppliers.deletedAt), inArray(suppliers.id, supplierIdsWithBalance)))
+                .execute()
+            : [];
         let supplierLiabilities = 0;
         let supplierAssets = 0;
-        
+
         for (const sup of allSuppliers) {
           const balance = supplierBalances.get(sup.id);
           if (balance) {
@@ -485,15 +590,22 @@ export function registerStatsNetProfitRoutes(app: Express) {
               onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: displayVal, category: "Supplier" });
             } else if (netBalance < 0) {
               supplierAssets += Math.abs(netBalance);
-              const displayVal = currentCfaRate > 0 ? round2(Math.abs(netBalance) / currentCfaRate) : Math.abs(netBalance);
-              forUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: displayVal, category: "Supplier Overpayment" });
+              const displayVal =
+                currentCfaRate > 0 ? round2(Math.abs(netBalance) / currentCfaRate) : Math.abs(netBalance);
+              forUsAccounts.push({
+                name: sup.legalName,
+                code: sup.code || "",
+                value: displayVal,
+                category: "Supplier Overpayment",
+              });
             }
           }
         }
-        
+
         // For CFA companies, supplier balances are in CFA → convert to USD
-        const supplierLiabilitiesDisplay = currentCfaRate > 0 ? round2(supplierLiabilities / currentCfaRate) : supplierLiabilities;
-        const supplierAssetsDisplay      = currentCfaRate > 0 ? round2(supplierAssets      / currentCfaRate) : supplierAssets;
+        const supplierLiabilitiesDisplay =
+          currentCfaRate > 0 ? round2(supplierLiabilities / currentCfaRate) : supplierLiabilities;
+        const supplierAssetsDisplay = currentCfaRate > 0 ? round2(supplierAssets / currentCfaRate) : supplierAssets;
         if (supplierLiabilitiesDisplay > 0) {
           onUsTotal += supplierLiabilitiesDisplay;
           categoryTotals["liability_Suppliers"] = supplierLiabilitiesDisplay;
@@ -539,7 +651,12 @@ export function registerStatsNetProfitRoutes(app: Express) {
         if (stockOtwValue > 0) {
           forUsTotal += stockOtwValue;
           categoryTotals["asset_Stock OTW"] = stockOtwValue;
-          forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
+          forUsAccounts.push({
+            name: "Stock On The Way",
+            code: "STOCK_OTW",
+            value: stockOtwValue,
+            category: "Stock OTW",
+          });
         }
       }
 
@@ -553,17 +670,15 @@ export function registerStatsNetProfitRoutes(app: Express) {
         const activeContracts = await db
           .select({ id: propertyContracts.id, currency: propertyContracts.currency })
           .from(propertyContracts)
-          .where(and(
-            eq(propertyContracts.companyId, companyId),
-            eq(propertyContracts.status, "ACTIVE"),
-          ));
+          .where(and(eq(propertyContracts.companyId, companyId), eq(propertyContracts.status, "ACTIVE")));
         if (activeContracts.length > 0) {
-          const contractIds = activeContracts.map(c => c.id);
+          const contractIds = activeContracts.map((c) => c.id);
           const asOfExpr = toDate ? sql`${toDate}::date` : sql`CURRENT_DATE`;
           // Expected: months on or before the asOf date
-          const expectedRows = await db.select({
-            contractId: propertyMonthlyLedger.contractId,
-            expected: sql<string>`COALESCE(SUM(
+          const expectedRows = await db
+            .select({
+              contractId: propertyMonthlyLedger.contractId,
+              expected: sql<string>`COALESCE(SUM(
               CASE WHEN (
                 ${propertyMonthlyLedger.year} < EXTRACT(YEAR FROM ${asOfExpr})
                 OR (
@@ -572,7 +687,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
                 )
               ) THEN CAST(${propertyMonthlyLedger.expectedAmount} AS numeric) ELSE 0 END
             ), 0)`,
-          })
+            })
             .from(propertyMonthlyLedger)
             .where(inArray(propertyMonthlyLedger.contractId, contractIds))
             .groupBy(propertyMonthlyLedger.contractId);
@@ -584,14 +699,15 @@ export function registerStatsNetProfitRoutes(app: Express) {
             isNotNull(propertyPayments.ledgerRowId),
           ];
           if (toDate) paidConditions.push(lte(propertyPayments.paymentDate, toDate));
-          const paidRows = await db.select({
-            contractId: propertyPayments.contractId,
-            paid: sql<string>`COALESCE(SUM(CAST(${propertyPayments.amount} AS numeric)), 0)`,
-          })
+          const paidRows = await db
+            .select({
+              contractId: propertyPayments.contractId,
+              paid: sql<string>`COALESCE(SUM(CAST(${propertyPayments.amount} AS numeric)), 0)`,
+            })
             .from(propertyPayments)
             .where(and(...paidConditions))
             .groupBy(propertyPayments.contractId);
-          const paidMap = new Map(paidRows.map(r => [r.contractId, parseFloat(r.paid)]));
+          const paidMap = new Map(paidRows.map((r) => [r.contractId, parseFloat(r.paid)]));
 
           let prepaidRent = 0;
           let rentPayable = 0;
@@ -599,7 +715,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
             const expected = parseFloat(row.expected);
             const paid = paidMap.get(row.contractId) ?? 0;
             const net = paid - expected; // positive = overpaid
-            const contract = activeContracts.find(c => c.id === row.contractId);
+            const contract = activeContracts.find((c) => c.id === row.contractId);
             const isCfa = contract?.currency === "CFA";
             const usd = isCfa && currentCfaRate > 0 ? net / currentCfaRate : net;
             if (usd > 0) prepaidRent += usd;
@@ -624,7 +740,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       for (const [key, value] of Object.entries(categoryTotals)) {
         if (value === 0) continue;
         const roundedValue = round2(value);
-        
+
         if (key.startsWith("asset_")) {
           forUsBreakdown.push({ name: key.replace("asset_", ""), value: roundedValue });
         } else if (key.startsWith("liability_")) {
@@ -637,17 +753,17 @@ export function registerStatsNetProfitRoutes(app: Express) {
       }
 
       // Round individual account values
-      forUsAccounts.forEach(acc => acc.value = round2(acc.value));
-      onUsAccounts.forEach(acc => acc.value = round2(acc.value));
-      expensesAccounts.forEach(acc => acc.value = round2(acc.value));
-      incomeAccounts.forEach(acc => acc.value = round2(acc.value));
+      forUsAccounts.forEach((acc) => (acc.value = round2(acc.value)));
+      onUsAccounts.forEach((acc) => (acc.value = round2(acc.value)));
+      expensesAccounts.forEach((acc) => (acc.value = round2(acc.value)));
+      incomeAccounts.forEach((acc) => (acc.value = round2(acc.value)));
 
       // Sort breakdowns by value (highest first)
       forUsBreakdown.sort((a, b) => b.value - a.value);
       onUsBreakdown.sort((a, b) => b.value - a.value);
       expensesBreakdown.sort((a, b) => b.value - a.value);
       incomeBreakdown.sort((a, b) => b.value - a.value);
-      
+
       // Sort individual account arrays by value (highest first)
       forUsAccounts.sort((a, b) => b.value - a.value);
       onUsAccounts.sort((a, b) => b.value - a.value);
@@ -655,13 +771,13 @@ export function registerStatsNetProfitRoutes(app: Express) {
       incomeAccounts.sort((a, b) => b.value - a.value);
 
       // ============ FINAL CALCULATIONS ============
-      
+
       // Round all totals to prevent floating point noise
       forUsTotal = round2(forUsTotal);
       onUsTotal = round2(onUsTotal);
       incomeTotal = round2(incomeTotal);
       expensesTotal = round2(expensesTotal);
-      
+
       // ── Merge stock accounts into one combined Inventory line ────────────────
       // "Stock In Hand (Inventory)" (computed from inventory table) and ledger
       // accounts like "Stock on Floor" (accountType: Asset) represent the same
@@ -670,11 +786,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
         const isStockEntry = (a: any) => {
           const nl = (a.name || "").toLowerCase();
           const cat = (a.category || "").toLowerCase();
-          return (
-            cat === "inventory" ||
-            nl.includes("stock in hand") ||
-            nl.includes("stock on floor")
-          );
+          return cat === "inventory" || nl.includes("stock in hand") || nl.includes("stock on floor");
         };
         const stockEntries = forUsAccounts.filter(isStockEntry);
         if (stockEntries.length > 1) {
@@ -683,7 +795,12 @@ export function registerStatsNetProfitRoutes(app: Express) {
             if (isStockEntry(forUsAccounts[i])) forUsAccounts.splice(i, 1);
           }
           if (combined > 0) {
-            forUsAccounts.push({ name: "Stock In Hand / Stock on Floor", code: "COMPUTED", value: combined, category: "Inventory" });
+            forUsAccounts.push({
+              name: "Stock In Hand / Stock on Floor",
+              code: "COMPUTED",
+              value: combined,
+              category: "Inventory",
+            });
           }
         } else if (stockEntries.length === 1 && stockEntries[0].name !== "Stock In Hand / Stock on Floor") {
           stockEntries[0].name = "Stock In Hand / Stock on Floor";
@@ -695,10 +812,8 @@ export function registerStatsNetProfitRoutes(app: Express) {
       // Negative balance = liability (what we owe)
       // This is a simplified calculation: Assets - Liabilities only
       const netPosition = round2(forUsTotal - onUsTotal);
-      
-      const netPositionLabel = netPosition >= 0 
-        ? "We have more than we owe" 
-        : "We owe more than we have";
+
+      const netPositionLabel = netPosition >= 0 ? "We have more than we owe" : "We owe more than we have";
 
       // SP companies: calculate realized POS profit from salesItems.profit
       // (source of truth: totalSales − totalCost per line, stored at sale time).
@@ -722,7 +837,7 @@ export function registerStatsNetProfitRoutes(app: Express) {
       }
 
       // Owner's Capital for backward compatibility
-      const profitAccounts = companyAccounts.filter(acc => acc.accountType === "Profit");
+      const profitAccounts = companyAccounts.filter((acc) => acc.accountType === "Profit");
       let ownersCapital = 0;
       for (const acc of profitAccounts) {
         const opening = parseFloat(acc.openingBalance || "0");

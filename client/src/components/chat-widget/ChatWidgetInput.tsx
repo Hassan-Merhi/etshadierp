@@ -47,17 +47,13 @@ export function ChatWidgetInput({
           title="Import PO from file"
           data-testid="button-upload-po-file"
         >
-          {poDraftUploading ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Paperclip className="h-4 w-4" />
-          )}
+          {poDraftUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
         </Button>
         <Input
           ref={inputRef}
           placeholder="Ask anything..."
           value={message}
-          onChange={e => setMessage(e.target.value)}
+          onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isPending}
           className="flex-1 border-0 bg-transparent shadow-none focus-visible:ring-0 px-1 h-10 text-sm placeholder:text-muted-foreground/60"
@@ -70,18 +66,11 @@ export function ChatWidgetInput({
           disabled={!message.trim() || isPending}
           data-testid="button-send-message"
         >
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send className="h-4 w-4 ml-0.5" />
-          )}
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4 ml-0.5" />}
         </Button>
       </div>
       {isError && (
-        <p
-          className="text-xs text-destructive mt-2"
-          data-testid="text-chat-error"
-        >
+        <p className="text-xs text-destructive mt-2" data-testid="text-chat-error">
           Failed to send message. Please try again.
         </p>
       )}

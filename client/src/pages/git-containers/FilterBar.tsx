@@ -88,7 +88,11 @@ export function FilterBar({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="ALL">All Companies</SelectItem>
-                {companies.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {companies.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -96,7 +100,7 @@ export function FilterBar({
             <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Supplier</Label>
             <MultiFilterSelect
               allLabel="All Suppliers"
-              options={suppliers.map(s => ({ label: s, value: s }))}
+              options={suppliers.map((s) => ({ label: s, value: s }))}
               selected={supplierFilters}
               onChange={setSupplierFilters}
               testId="multi-filter-supplier"
@@ -106,7 +110,7 @@ export function FilterBar({
             <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Transporter</Label>
             <MultiFilterSelect
               allLabel="All Transporters"
-              options={transporters.map(t => ({ label: t, value: t }))}
+              options={transporters.map((t) => ({ label: t, value: t }))}
               selected={transporterFilters}
               onChange={setTransporterFilters}
               testId="multi-filter-transporter"
@@ -116,7 +120,7 @@ export function FilterBar({
             <Label className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Agent</Label>
             <MultiFilterSelect
               allLabel="All Agents"
-              options={agents.map(a => ({ label: a, value: a }))}
+              options={agents.map((a) => ({ label: a, value: a }))}
               selected={agentFilters}
               onChange={setAgentFilters}
               testId="multi-filter-agent"
@@ -130,7 +134,7 @@ export function FilterBar({
                 { label: "With Truck #", value: "HAS_TRUCK" },
                 { label: "No Truck #", value: "NO_TRUCK" },
                 { label: "────────────────", value: "SEP", dividerBefore: true },
-                ...trucks.map(t => ({ label: t, value: t }))
+                ...trucks.map((t) => ({ label: t, value: t })),
               ]}
               selected={truckFilters}
               onChange={setTruckFilters}
@@ -145,7 +149,7 @@ export function FilterBar({
                 { label: "With Location", value: "HAS_LOCATION" },
                 { label: "No Location", value: "NO_LOCATION" },
                 { label: "────────────────", value: "SEP", dividerBefore: true },
-                ...locations.map(l => ({ label: l, value: l }))
+                ...locations.map((l) => ({ label: l, value: l })),
               ]}
               selected={locationFilters}
               onChange={setLocationFilters}

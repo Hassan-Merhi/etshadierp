@@ -10,7 +10,7 @@ export const NOTIFICATION_EVENT_TYPES = {
   INTERCOMPANY_REQUEST: "INTERCOMPANY_REQUEST",
 } as const;
 
-export type NotificationEventType = typeof NOTIFICATION_EVENT_TYPES[keyof typeof NOTIFICATION_EVENT_TYPES];
+export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[keyof typeof NOTIFICATION_EVENT_TYPES];
 
 interface DispatchOptions {
   eventType: NotificationEventType;
@@ -27,29 +27,19 @@ export async function dispatchNotification(opts: DispatchOptions): Promise<void>
     const rules = await db
       .select({ recipientUserId: notificationRules.recipientUserId })
       .from(notificationRules)
-      .where(
-        and(
-          eq(notificationRules.eventType, opts.eventType),
-          eq(notificationRules.isEnabled, true),
-        ),
-      );
+      .where(and(eq(notificationRules.eventType, opts.eventType), eq(notificationRules.isEnabled, true)));
 
     if (rules.length === 0) return;
 
-    const recipientIds = [...new Set(rules.map(r => r.recipientUserId))];
+    const recipientIds = [...new Set(rules.map((r) => r.recipientUserId))];
 
     // Only deliver to users that exist AND have active=true
     const activeUsers = await db
       .select({ id: users.id })
       .from(users)
-      .where(
-        and(
-          inArray(users.id, recipientIds),
-          eq(users.active, true),
-        ),
-      );
+      .where(and(inArray(users.id, recipientIds), eq(users.active, true)));
 
-    const activeSet = new Set(activeUsers.map(u => u.id));
+    const activeSet = new Set(activeUsers.map((u) => u.id));
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
     for (const recipientUserId of recipientIds) {
@@ -66,8 +56,8 @@ export async function dispatchNotification(opts: DispatchOptions): Promise<void>
               eq(notifications.eventType, opts.eventType),
               eq(notifications.entityType, opts.entityType),
               eq(notifications.entityId, opts.entityId),
-              gte(notifications.createdAt, fiveMinutesAgo),
-            ),
+              gte(notifications.createdAt, fiveMinutesAgo)
+            )
           )
           .limit(1);
         if (recent.length > 0) continue;

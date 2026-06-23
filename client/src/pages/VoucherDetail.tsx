@@ -5,27 +5,10 @@ import { useQuery } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import {
-  ArrowLeft,
-  FileText,
-  Calendar,
-  Hash,
-  User,
-  Building,
-  Package,
-  DollarSign,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowLeft, FileText, Calendar, Hash, User, Building, Package, DollarSign, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -61,10 +44,10 @@ interface VoucherDetailData {
   locationName: string | null;
   narration: string | null;
   supplierInvoiceNo: string | null;
-  
+
   items: VoucherItem[];
   entries: VoucherEntry[];
-  
+
   totals: {
     quantity: number;
     amount: number;
@@ -106,7 +89,7 @@ function IntercompanyStatusPanel({ voucherId }: { voucherId: number }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        {statuses.map(s => (
+        {statuses.map((s) => (
           <div key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
             <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
             <span className="text-muted-foreground">{s.destCompanyName}</span>
@@ -119,9 +102,7 @@ function IntercompanyStatusPanel({ voucherId }: { voucherId: number }) {
             {s.status === "pending" && (
               <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs">Pending approval</Badge>
             )}
-            {s.approvedByUsername && (
-              <span className="text-muted-foreground text-xs">by {s.approvedByUsername}</span>
-            )}
+            {s.approvedByUsername && <span className="text-muted-foreground text-xs">by {s.approvedByUsername}</span>}
             {s.destVoucherId && (
               <span className="text-xs text-muted-foreground">· Mirror voucher #{s.destVoucherId}</span>
             )}
@@ -149,7 +130,7 @@ export default function VoucherDetail() {
   const { formatShortDate } = useDateFormat();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-  
+
   const voucherId = params?.voucherId ? parseInt(params.voucherId) : null;
   const fromDaybook = new URLSearchParams(window.location.search).get("from") === "daybook";
 
@@ -161,10 +142,7 @@ export default function VoucherDetail() {
   const { data, isLoading, isError } = useQuery<VoucherDetailData>({
     queryKey: ["/api/voucher-detail", voucherId],
     queryFn: async () => {
-      const response = await fetch(
-        `/api/voucher-detail/${voucherId}`,
-        { credentials: "include" }
-      );
+      const response = await fetch(`/api/voucher-detail/${voucherId}`, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch voucher detail");
       return response.json();
     },
@@ -193,11 +171,7 @@ export default function VoucherDetail() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div
-        className={`${
-          voucherTypeColors[data?.voucherType || ""] || "bg-primary"
-        } text-white p-3 sm:p-4`}
-      >
+      <div className={`${voucherTypeColors[data?.voucherType || ""] || "bg-primary"} text-white p-3 sm:p-4`}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div className="flex items-center gap-4">
             <Button
@@ -207,19 +181,12 @@ export default function VoucherDetail() {
               data-testid="button-back"
             >
               <ArrowLeft className="h-5 w-5" />
-              {fromDaybook && (
-                <span className="text-sm font-normal hidden sm:inline">Back to Daybook</span>
-              )}
+              {fromDaybook && <span className="text-sm font-normal hidden sm:inline">Back to Daybook</span>}
             </Button>
             <div>
-              <p className="text-sm opacity-80">
-                Accounting Voucher Alteration (Secondary)
-              </p>
+              <p className="text-sm opacity-80">Accounting Voucher Alteration (Secondary)</p>
               <h1 className="text-lg sm:text-xl font-bold flex items-center gap-2 flex-wrap">
-                <Badge
-                  variant="outline"
-                  className="bg-white/20 text-white border-white/40"
-                >
+                <Badge variant="outline" className="bg-white/20 text-white border-white/40">
                   {data?.voucherType || "Voucher"}
                 </Badge>
                 <span>No. {data?.voucherNumber || ""}</span>
@@ -227,11 +194,7 @@ export default function VoucherDetail() {
             </div>
           </div>
           <div className="text-right">
-            {data?.date && (
-              <p className="text-lg font-medium">
-                {formatShortDate(data.date)}
-              </p>
-            )}
+            {data?.date && <p className="text-lg font-medium">{formatShortDate(data.date)}</p>}
           </div>
         </div>
       </div>
@@ -251,39 +214,29 @@ export default function VoucherDetail() {
                   {data.supplierInvoiceNo && (
                     <div className="flex items-center gap-2">
                       <Hash className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        Supplier Invoice No.:
-                      </span>
+                      <span className="text-sm text-muted-foreground">Supplier Invoice No.:</span>
                       <span className="font-medium">{data.supplierInvoiceNo}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-sm text-muted-foreground">Date:</span>
-                    <span className="font-medium">
-                      {formatShortDate(data.date)}
-                    </span>
+                    <span className="font-medium">{formatShortDate(data.date)}</span>
                   </div>
                 </div>
 
                 {data.partyName && (
                   <div className="flex items-center gap-2">
                     <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">
-                      Party A/c name:
-                    </span>
-                    <span className="font-medium text-primary">
-                      {data.partyName}
-                    </span>
+                    <span className="text-sm text-muted-foreground">Party A/c name:</span>
+                    <span className="font-medium text-primary">{data.partyName}</span>
                   </div>
                 )}
 
                 {data.purchaseLedger && (
                   <div className="flex items-center gap-2">
                     <DollarSign className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">
-                      Purchase ledger:
-                    </span>
+                    <span className="text-sm text-muted-foreground">Purchase ledger:</span>
                     <span className="font-medium">{data.purchaseLedger}</span>
                   </div>
                 )}
@@ -291,12 +244,8 @@ export default function VoucherDetail() {
                 {data.locationName && (
                   <div className="flex items-center gap-2">
                     <Building className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">
-                      Repl existing Godown with:
-                    </span>
-                    <span className="font-medium text-blue-600">
-                      {data.locationName}
-                    </span>
+                    <span className="text-sm text-muted-foreground">Repl existing Godown with:</span>
+                    <span className="font-medium text-blue-600">{data.locationName}</span>
                   </div>
                 )}
               </CardContent>
@@ -320,9 +269,7 @@ export default function VoucherDetail() {
                       <TableHeader className="sticky top-0 z-30 bg-background">
                         <TableRow className="bg-muted/50">
                           <TableHead>Name of Item</TableHead>
-                          <TableHead className="text-right w-24">
-                            Quantity
-                          </TableHead>
+                          <TableHead className="text-right w-24">Quantity</TableHead>
                           <TableHead className="text-right w-24">Rate</TableHead>
                           <TableHead className="text-center w-16">per</TableHead>
                           <TableHead className="text-right w-28">Amount</TableHead>
@@ -330,25 +277,14 @@ export default function VoucherDetail() {
                       </TableHeader>
                       <TableBody>
                         {data.items.map((item, index) => (
-                          <TableRow
-                            key={item.id || index}
-                            data-testid={`row-item-${index}`}
-                          >
-                            <TableCell className="font-medium">
-                              {item.stockItemName}
-                            </TableCell>
+                          <TableRow key={item.id || index} data-testid={`row-item-${index}`}>
+                            <TableCell className="font-medium">{item.stockItemName}</TableCell>
                             <TableCell className="text-right font-mono">
                               {formatNumber(item.quantity, 0)} {item.unit}
                             </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatAmount(item.rate)}
-                            </TableCell>
-                            <TableCell className="text-center text-sm text-muted-foreground">
-                              {item.unit}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatAmount(item.amount)}
-                            </TableCell>
+                            <TableCell className="text-right font-mono">{formatAmount(item.rate)}</TableCell>
+                            <TableCell className="text-center text-sm text-muted-foreground">{item.unit}</TableCell>
+                            <TableCell className="text-right font-mono">{formatAmount(item.amount)}</TableCell>
                           </TableRow>
                         ))}
 
@@ -360,9 +296,7 @@ export default function VoucherDetail() {
                           </TableCell>
                           <TableCell></TableCell>
                           <TableCell></TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatAmount(data.totals.amount)}
-                          </TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(data.totals.amount)}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>
@@ -393,18 +327,12 @@ export default function VoucherDetail() {
                       <TableBody>
                         {(Array.isArray(data.entries) ? data.entries : []).map((entry, index) => (
                           <TableRow key={entry.id || index}>
-                            <TableCell className="font-medium">
-                              {entry.ledgerAccountName}
+                            <TableCell className="font-medium">{entry.ledgerAccountName}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {entry.debitAmount > 0 ? formatAmount(entry.debitAmount) : ""}
                             </TableCell>
                             <TableCell className="text-right font-mono">
-                              {entry.debitAmount > 0
-                                ? formatAmount(entry.debitAmount)
-                                : ""}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {entry.creditAmount > 0
-                                ? formatAmount(entry.creditAmount)
-                                : ""}
+                              {entry.creditAmount > 0 ? formatAmount(entry.creditAmount) : ""}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -412,12 +340,8 @@ export default function VoucherDetail() {
                         {/* Totals */}
                         <TableRow className="bg-primary/10 font-bold border-t-2">
                           <TableCell>Total</TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatAmount(data.totals.debit)}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatAmount(data.totals.credit)}
-                          </TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(data.totals.debit)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(data.totals.credit)}</TableCell>
                         </TableRow>
                       </TableBody>
                     </Table>

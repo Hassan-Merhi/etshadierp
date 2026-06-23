@@ -21,23 +21,41 @@ import {
 import { getUserHideAllCosts } from "./factory/_helpers";
 
 export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: any) {
-
-  async function writeDaybookEntry(dbOrTx: any, opts: {
-    companyId: number; txDate: string; txType: string;
-    referenceId?: number; referenceTable?: string; description: string;
-    metaJson?: string; currencyCode?: string; amountCurrency?: number;
-    fxRateToUsd?: number; amountUsd?: number; createdBy?: number;
-  }) {
+  async function writeDaybookEntry(
+    dbOrTx: any,
+    opts: {
+      companyId: number;
+      txDate: string;
+      txType: string;
+      referenceId?: number;
+      referenceTable?: string;
+      description: string;
+      metaJson?: string;
+      currencyCode?: string;
+      amountCurrency?: number;
+      fxRateToUsd?: number;
+      amountUsd?: number;
+      createdBy?: number;
+    }
+  ) {
     const currency = opts.currencyCode || "USD";
     const fxRate = opts.fxRateToUsd || 1;
     const amtCurrency = opts.amountCurrency || 0;
-    const amtUsd = opts.amountUsd !== undefined ? opts.amountUsd : (currency === "USD" ? amtCurrency : amtCurrency * fxRate);
+    const amtUsd =
+      opts.amountUsd !== undefined ? opts.amountUsd : currency === "USD" ? amtCurrency : amtCurrency * fxRate;
     await dbOrTx.insert(factoryDaybookEntries).values({
-      companyId: opts.companyId, txDate: opts.txDate, txType: opts.txType,
-      referenceId: opts.referenceId || null, referenceTable: opts.referenceTable || null,
-      description: opts.description, metaJson: opts.metaJson || null,
-      currencyCode: currency, amountCurrency: String(amtCurrency),
-      fxRateToUsd: String(fxRate), amountUsd: String(amtUsd), createdBy: opts.createdBy || null,
+      companyId: opts.companyId,
+      txDate: opts.txDate,
+      txType: opts.txType,
+      referenceId: opts.referenceId || null,
+      referenceTable: opts.referenceTable || null,
+      description: opts.description,
+      metaJson: opts.metaJson || null,
+      currencyCode: currency,
+      amountCurrency: String(amtCurrency),
+      fxRateToUsd: String(fxRate),
+      amountUsd: String(amtUsd),
+      createdBy: opts.createdBy || null,
     });
   }
 
@@ -53,10 +71,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         return res.status(400).json({ message: "format must be 'pdf' or 'excel'" });
       }
 
-      const [company] = await db
-        .select()
-        .from(companies)
-        .where(eq(companies.id, companyId));
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
 
       if (!company) {
         return res.status(404).json({ message: "Company not found" });
@@ -97,9 +112,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         .from(factoryRawStock)
         .where(eq(factoryRawStock.companyId, companyId));
 
-      const relevantRawStock = allRawStock.filter((rs: any) =>
-        containerIds.includes(rs.containerId)
-      );
+      const relevantRawStock = allRawStock.filter((rs: any) => containerIds.includes(rs.containerId));
 
       const allMixSources = await db
         .select({
@@ -114,10 +127,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         .from(factoryMixBatchSources)
         .where(sql`${factoryMixBatchSources.containerId} = ANY(${sqlArray(containerIds)})`);
 
-      const allMixBatches = await db
-        .select()
-        .from(factoryMixBatches)
-        .where(eq(factoryMixBatches.companyId, companyId));
+      const allMixBatches = await db.select().from(factoryMixBatches).where(eq(factoryMixBatches.companyId, companyId));
 
       const mixBatchMap = new Map<number, any>();
       for (const mb of allMixBatches) {
@@ -130,10 +140,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         .where(eq(factoryBales.companyId, companyId))
         .orderBy(desc(factoryBales.createdAt));
 
-      const suppliers = await db
-        .select()
-        .from(factorySuppliers)
-        .where(eq(factorySuppliers.companyId, companyId));
+      const suppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
 
       const supplierMap = new Map<number, any>();
       for (const s of suppliers) {
@@ -171,9 +178,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         const supplierName = supplier ? supplier.name : `Unknown (ID: ${sid})`;
         const sContainerIds = sContainers.map((c: any) => c.id);
 
-        const sRawStock = relevantRawStock.filter((rs: any) =>
-          sContainerIds.includes(rs.containerId)
-        );
+        const sRawStock = relevantRawStock.filter((rs: any) => sContainerIds.includes(rs.containerId));
 
         let openingReceivedKg = 0;
         let openingUsedKg = 0;
@@ -182,8 +187,11 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         let costCount = 0;
 
         for (const rs of sRawStock) {
-          const rsDate = rs.offloadedAt ? new Date(rs.offloadedAt).toISOString().split("T")[0] : 
-                         rs.createdAt ? new Date(rs.createdAt).toISOString().split("T")[0] : startDate;
+          const rsDate = rs.offloadedAt
+            ? new Date(rs.offloadedAt).toISOString().split("T")[0]
+            : rs.createdAt
+              ? new Date(rs.createdAt).toISOString().split("T")[0]
+              : startDate;
 
           const receivedKg = parseFloat(rs.receivedKg || "0");
           const usedKg = parseFloat(rs.usedKg || "0");
@@ -202,9 +210,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
           }
         }
 
-        const sMixSources = allMixSources.filter((ms: any) =>
-          sContainerIds.includes(ms.containerId)
-        );
+        const sMixSources = allMixSources.filter((ms: any) => sContainerIds.includes(ms.containerId));
 
         let periodUsedKg = 0;
         for (const ms of sMixSources) {
@@ -225,13 +231,14 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
           }
         }
 
-        const sBales = allBales.filter((b: any) =>
-          b.mixBatchId && sMixBatchIds.has(b.mixBatchId)
-        );
+        const sBales = allBales.filter((b: any) => b.mixBatchId && sMixBatchIds.has(b.mixBatchId));
 
         const periodBales = sBales.filter((b: any) => {
-          const bDate = b.finalizedAt ? new Date(b.finalizedAt).toISOString().split("T")[0] :
-                        b.createdAt ? new Date(b.createdAt).toISOString().split("T")[0] : "";
+          const bDate = b.finalizedAt
+            ? new Date(b.finalizedAt).toISOString().split("T")[0]
+            : b.createdAt
+              ? new Date(b.createdAt).toISOString().split("T")[0]
+              : "";
           return bDate >= startDate && bDate <= endDate;
         });
 
@@ -281,8 +288,11 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
             weightKg: parseFloat(bale.weightKg || "0"),
             costPerKg: parseFloat(bale.costPerKg || "0"),
             totalCost: parseFloat(bale.totalCost || "0"),
-            date: bale.finalizedAt ? new Date(bale.finalizedAt).toISOString().split("T")[0] :
-                  bale.createdAt ? new Date(bale.createdAt).toISOString().split("T")[0] : "",
+            date: bale.finalizedAt
+              ? new Date(bale.finalizedAt).toISOString().split("T")[0]
+              : bale.createdAt
+                ? new Date(bale.createdAt).toISOString().split("T")[0]
+                : "",
             materials,
           });
         }
@@ -291,7 +301,18 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
       if (format === "pdf") {
         await generatePdf(res, company.name, startDate, endDate, supplierSummaries, baleBreakdown, hideAllCosts);
       } else {
-        await generateExcel(res, company.name, startDate, endDate, supplierSummaries, baleBreakdown, allMixSources, containerMap, supplierMap, hideAllCosts);
+        await generateExcel(
+          res,
+          company.name,
+          startDate,
+          endDate,
+          supplierSummaries,
+          baleBreakdown,
+          allMixSources,
+          containerMap,
+          supplierMap,
+          hideAllCosts
+        );
       }
 
       const today = getClientDate(req);
@@ -302,7 +323,6 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         description: `Supplier Usage Report (${format.toUpperCase()}) – ${startDate} to ${endDate}${supplierId ? ` – ${supplierMap.get(supplierId)?.name || `Supplier #${supplierId}`}` : " – All Suppliers"}`,
         metaJson: JSON.stringify({ format, startDate, endDate, supplierId: supplierId || null }),
       });
-
     } catch (error: any) {
       console.error("Error generating supplier usage report:", error);
       res.status(500).json({ message: error.message });
@@ -312,7 +332,10 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
   const hmdLogo = path.join(process.cwd(), "server", "hmd-logo.png");
   function addPdfBranding(doc: any) {
     if (fs.existsSync(hmdLogo)) {
-      try { doc.image(hmdLogo, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.4); } catch {}
+      try {
+        doc.image(hmdLogo, (doc.page.width - 220) / 2, doc.y, { width: 220 });
+        doc.moveDown(0.4);
+      } catch {}
     }
     doc.font("Helvetica");
   }
@@ -338,11 +361,20 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Summary");
     let xlLogoId: number | null = null;
-    try { if (fs.existsSync(hmdLogo)) { xlLogoId = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" }); } } catch {}
-    const lr = sheet.addRow([]); lr.height = 90;
+    try {
+      if (fs.existsSync(hmdLogo)) {
+        xlLogoId = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" });
+      }
+    } catch {}
+    const lr = sheet.addRow([]);
+    lr.height = 90;
     if (xlLogoId !== null) sheet.addImage(xlLogoId, { tl: { col: 1.5, row: 0 }, ext: { width: 300, height: 90 } });
-    const rn = sheet.addRow(["HMD INTERNATIONAL GROUP"]); rn.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } }; rn.getCell(1).alignment = { horizontal: "center" };
-    const rnTitle = sheet.addRow(["Supplier Usage Report"]); rnTitle.getCell(1).font = { bold: true, size: 13 }; rnTitle.getCell(1).alignment = { horizontal: "center" };
+    const rn = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
+    rn.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
+    rn.getCell(1).alignment = { horizontal: "center" };
+    const rnTitle = sheet.addRow(["Supplier Usage Report"]);
+    rnTitle.getCell(1).font = { bold: true, size: 13 };
+    rnTitle.getCell(1).alignment = { horizontal: "center" };
     sheet.addRow([`Period: ${startDate} to ${endDate}`]);
     sheet.addRow([]);
     sheet.addRow(["No data found for the selected period and filters."]);
@@ -372,7 +404,9 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     doc.fontSize(14).text("Supplier Usage Report", { align: "center" });
     doc.moveDown(0.2);
     doc.fontSize(9).text(`Period: ${startDate} to ${endDate}`, { align: "center" });
-    doc.fontSize(8).text(`Generated: ${new Date().toISOString().replace("T", " ").substring(0, 19)}`, { align: "center" });
+    doc
+      .fontSize(8)
+      .text(`Generated: ${new Date().toISOString().replace("T", " ").substring(0, 19)}`, { align: "center" });
     doc.moveDown(1);
 
     doc.fontSize(12).text("Supplier Summary", { underline: true });
@@ -380,10 +414,17 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
 
     const summaryHeaders = hideAllCosts
       ? ["Supplier", "Opening (KG)", "Purchased (KG)", "Used (KG)", "Remaining (KG)", "Total Bales"]
-      : ["Supplier", "Opening (KG)", "Purchased (KG)", "Used (KG)", "Remaining (KG)", "Cost/KG", "Cost/Bale", "Total Bales"];
-    const colWidths = hideAllCosts
-      ? [160, 100, 105, 95, 105, 90]
-      : [140, 85, 90, 80, 90, 70, 70, 70];
+      : [
+          "Supplier",
+          "Opening (KG)",
+          "Purchased (KG)",
+          "Used (KG)",
+          "Remaining (KG)",
+          "Cost/KG",
+          "Cost/Bale",
+          "Total Bales",
+        ];
+    const colWidths = hideAllCosts ? [160, 100, 105, 95, 105, 90] : [140, 85, 90, 80, 90, 70, 70, 70];
     let startX = 40;
     let y = doc.y;
 
@@ -498,25 +539,56 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     const moneyFmt = "$#,##0.00";
 
     let xlLogoId2: number | null = null;
-    try { if (fs.existsSync(hmdLogo)) { xlLogoId2 = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" }); } } catch {}
+    try {
+      if (fs.existsSync(hmdLogo)) {
+        xlLogoId2 = workbook.addImage({ buffer: fs.readFileSync(hmdLogo) as Buffer, extension: "jpeg" });
+      }
+    } catch {}
     const sheet1 = workbook.addWorksheet("Summary");
-    const lr1 = sheet1.addRow([]); lr1.height = 90;
+    const lr1 = sheet1.addRow([]);
+    lr1.height = 90;
     if (xlLogoId2 !== null) sheet1.addImage(xlLogoId2, { tl: { col: 1.5, row: 0 }, ext: { width: 300, height: 90 } });
-    const rn1 = sheet1.addRow(["HMD INTERNATIONAL GROUP"]); rn1.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } }; rn1.getCell(1).alignment = { horizontal: "center" };
-    const rn1Title = sheet1.addRow(["Supplier Usage Report"]); rn1Title.getCell(1).font = boldFont; rn1Title.getCell(1).alignment = { horizontal: "center" };
+    const rn1 = sheet1.addRow(["HMD INTERNATIONAL GROUP"]);
+    rn1.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
+    rn1.getCell(1).alignment = { horizontal: "center" };
+    const rn1Title = sheet1.addRow(["Supplier Usage Report"]);
+    rn1Title.getCell(1).font = boldFont;
+    rn1Title.getCell(1).alignment = { horizontal: "center" };
     sheet1.addRow([`Period: ${startDate} to ${endDate}`]);
     sheet1.addRow([`Generated: ${new Date().toISOString().replace("T", " ").substring(0, 19)}`]);
     sheet1.addRow([]);
 
     const summaryHeaderRow = hideAllCosts
-      ? sheet1.addRow(["Supplier", "Opening Balance (KG)", "Total Purchased (KG)", "Total Used (KG)", "Remaining (KG)", "Total Bales"])
-      : sheet1.addRow(["Supplier", "Opening Balance (KG)", "Total Purchased (KG)", "Total Used (KG)", "Remaining (KG)", "Avg Cost/KG (USD)", "Cost/Bale (USD)", "Total Bales", "Total Cost (USD)"]);
+      ? sheet1.addRow([
+          "Supplier",
+          "Opening Balance (KG)",
+          "Total Purchased (KG)",
+          "Total Used (KG)",
+          "Remaining (KG)",
+          "Total Bales",
+        ])
+      : sheet1.addRow([
+          "Supplier",
+          "Opening Balance (KG)",
+          "Total Purchased (KG)",
+          "Total Used (KG)",
+          "Remaining (KG)",
+          "Avg Cost/KG (USD)",
+          "Cost/Bale (USD)",
+          "Total Bales",
+          "Total Cost (USD)",
+        ]);
     summaryHeaderRow.font = boldFont;
 
     for (const s of supplierSummaries) {
       if (hideAllCosts) {
         const row = sheet1.addRow([
-          s.supplierName, s.openingBalance, s.totalPurchasedKg, s.totalUsedKg, s.remaining, s.totalBales,
+          s.supplierName,
+          s.openingBalance,
+          s.totalPurchasedKg,
+          s.totalUsedKg,
+          s.remaining,
+          s.totalBales,
         ]);
         row.getCell(2).numFmt = numberFmt;
         row.getCell(3).numFmt = numberFmt;
@@ -524,8 +596,15 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         row.getCell(5).numFmt = numberFmt;
       } else {
         const row = sheet1.addRow([
-          s.supplierName, s.openingBalance, s.totalPurchasedKg, s.totalUsedKg,
-          s.remaining, s.avgCostPerKg, s.costPerBale, s.totalBales, s.totalCost,
+          s.supplierName,
+          s.openingBalance,
+          s.totalPurchasedKg,
+          s.totalUsedKg,
+          s.remaining,
+          s.avgCostPerKg,
+          s.costPerBale,
+          s.totalBales,
+          s.totalCost,
         ]);
         row.getCell(2).numFmt = numberFmt;
         row.getCell(3).numFmt = numberFmt;
@@ -549,20 +628,42 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     const sheet2 = workbook.addWorksheet("Bale Breakdown");
     const baleHeaderRow = hideAllCosts
       ? sheet2.addRow(["Bale ID", "Reference Number", "Bale Code", "Product", "Supplier", "Weight (KG)", "Date"])
-      : sheet2.addRow(["Bale ID", "Reference Number", "Bale Code", "Product", "Supplier", "Weight (KG)", "Cost/KG (USD)", "Total Cost (USD)", "Date"]);
+      : sheet2.addRow([
+          "Bale ID",
+          "Reference Number",
+          "Bale Code",
+          "Product",
+          "Supplier",
+          "Weight (KG)",
+          "Cost/KG (USD)",
+          "Total Cost (USD)",
+          "Date",
+        ]);
     baleHeaderRow.font = boldFont;
 
     for (const bale of baleBreakdown) {
       if (hideAllCosts) {
         const row = sheet2.addRow([
-          bale.baleId, bale.referenceNumber, bale.baleCode, bale.productName,
-          bale.supplierName, bale.weightKg, bale.date,
+          bale.baleId,
+          bale.referenceNumber,
+          bale.baleCode,
+          bale.productName,
+          bale.supplierName,
+          bale.weightKg,
+          bale.date,
         ]);
         row.getCell(6).numFmt = numberFmt;
       } else {
         const row = sheet2.addRow([
-          bale.baleId, bale.referenceNumber, bale.baleCode, bale.productName,
-          bale.supplierName, bale.weightKg, bale.costPerKg, bale.totalCost, bale.date,
+          bale.baleId,
+          bale.referenceNumber,
+          bale.baleCode,
+          bale.productName,
+          bale.supplierName,
+          bale.weightKg,
+          bale.costPerKg,
+          bale.totalCost,
+          bale.date,
         ]);
         row.getCell(6).numFmt = numberFmt;
         row.getCell(7).numFmt = moneyFmt;
@@ -582,7 +683,15 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
     const sheet3 = workbook.addWorksheet("Mixing Details");
     const mixHeaderRow = hideAllCosts
       ? sheet3.addRow(["Mix Batch ID", "Container ID", "Container Number", "Supplier", "Weight (KG)"])
-      : sheet3.addRow(["Mix Batch ID", "Container ID", "Container Number", "Supplier", "Weight (KG)", "Cost/KG (USD)", "Total Cost (USD)"]);
+      : sheet3.addRow([
+          "Mix Batch ID",
+          "Container ID",
+          "Container Number",
+          "Supplier",
+          "Weight (KG)",
+          "Cost/KG (USD)",
+          "Total Cost (USD)",
+        ]);
     mixHeaderRow.font = boldFont;
 
     for (const ms of allMixSources) {
@@ -624,14 +733,16 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
 
     const sheet4 = workbook.addWorksheet("Balance Calculation");
     const balHeaderRow = sheet4.addRow([
-      "Supplier", "Opening Balance (KG)", "Purchased (KG)", "Used (KG)", "Remaining (KG)"
+      "Supplier",
+      "Opening Balance (KG)",
+      "Purchased (KG)",
+      "Used (KG)",
+      "Remaining (KG)",
     ]);
     balHeaderRow.font = boldFont;
 
     for (const s of supplierSummaries) {
-      const row = sheet4.addRow([
-        s.supplierName, s.openingBalance, s.totalPurchasedKg, s.totalUsedKg, s.remaining,
-      ]);
+      const row = sheet4.addRow([s.supplierName, s.openingBalance, s.totalPurchasedKg, s.totalUsedKg, s.remaining]);
       row.getCell(2).numFmt = numberFmt;
       row.getCell(3).numFmt = numberFmt;
       row.getCell(4).numFmt = numberFmt;
@@ -664,7 +775,8 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
         return res.status(400).json({ message: "date query param required (YYYY-MM-DD)" });
       }
 
-      const batchesResult = await pool.query(`
+      const batchesResult = await pool.query(
+        `
         SELECT b.id, b.batch_code, b.name, b.status, b.total_weight_kg, b.used_kg,
                b.batch_date, b.created_at, b.notes
         FROM factory_mix_batches b
@@ -675,14 +787,17 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
             OR (b.batch_date IS NULL AND DATE(b.created_at AT TIME ZONE 'UTC') = $2::date)
           )
         ORDER BY b.created_at DESC
-      `, [companyId, date]);
+      `,
+        [companyId, date]
+      );
 
       const batches = batchesResult.rows;
       const batchIds = batches.map((b: any) => b.id);
 
       let sources: any[] = [];
       if (batchIds.length > 0) {
-        const sourcesResult = await pool.query(`
+        const sourcesResult = await pool.query(
+          `
           SELECT
             s.id, s.mix_batch_id, s.container_id, s.supplier_id, s.source_batch_id,
             s.weight_kg, s.cost_per_kg, s.total_cost,
@@ -695,58 +810,64 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
           LEFT JOIN factory_mix_batches mb ON mb.id = s.source_batch_id
           WHERE s.mix_batch_id = ANY($1)
           ORDER BY s.id
-        `, [batchIds]);
+        `,
+          [batchIds]
+        );
         sources = sourcesResult.rows;
       }
 
       // Apply the same fallback cost enrichment as /api/factory/mix-batches/:id/sources
       // When costPerKg is 0 in the DB, look up the weighted-average from factoryRawStock.
-      const enrichedSources = await Promise.all(sources.map(async (s: any) => {
-        const storedCost = parseFloat(s.cost_per_kg) || 0;
-        if (storedCost > 0) return s;
+      const enrichedSources = await Promise.all(
+        sources.map(async (s: any) => {
+          const storedCost = parseFloat(s.cost_per_kg) || 0;
+          if (storedCost > 0) return s;
 
-        let fallbackCost = 0;
-        if (s.container_id) {
-          const rsRows = await pool.query(
-            `SELECT cost_per_kg_usd, cost_per_kg, received_kg
+          let fallbackCost = 0;
+          if (s.container_id) {
+            const rsRows = await pool.query(
+              `SELECT cost_per_kg_usd, cost_per_kg, received_kg
              FROM factory_raw_stock
              WHERE container_id = $1 AND company_id = $2`,
-            [s.container_id, companyId]
-          );
-          let wSum = 0, wWeight = 0;
-          for (const r of rsRows.rows) {
-            const kg = parseFloat(r.received_kg) || 0;
-            const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
-            wSum += kg * c;
-            wWeight += kg;
-          }
-          fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
-        } else if (s.supplier_id) {
-          const rsRows = await pool.query(
-            `SELECT rs.cost_per_kg_usd, rs.cost_per_kg, rs.received_kg
+              [s.container_id, companyId]
+            );
+            let wSum = 0,
+              wWeight = 0;
+            for (const r of rsRows.rows) {
+              const kg = parseFloat(r.received_kg) || 0;
+              const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
+              wSum += kg * c;
+              wWeight += kg;
+            }
+            fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
+          } else if (s.supplier_id) {
+            const rsRows = await pool.query(
+              `SELECT rs.cost_per_kg_usd, rs.cost_per_kg, rs.received_kg
              FROM factory_raw_stock rs
              INNER JOIN factory_containers c ON c.id = rs.container_id
              WHERE c.supplier_id = $1 AND rs.company_id = $2`,
-            [s.supplier_id, companyId]
-          );
-          let wSum = 0, wWeight = 0;
-          for (const r of rsRows.rows) {
-            const kg = parseFloat(r.received_kg) || 0;
-            const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
-            wSum += kg * c;
-            wWeight += kg;
+              [s.supplier_id, companyId]
+            );
+            let wSum = 0,
+              wWeight = 0;
+            for (const r of rsRows.rows) {
+              const kg = parseFloat(r.received_kg) || 0;
+              const c = parseFloat(r.cost_per_kg_usd) || parseFloat(r.cost_per_kg) || 0;
+              wSum += kg * c;
+              wWeight += kg;
+            }
+            fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
           }
-          fallbackCost = wWeight > 0 ? wSum / wWeight : 0;
-        }
 
-        if (fallbackCost <= 0) return s;
-        const weightKg = parseFloat(s.weight_kg) || 0;
-        return {
-          ...s,
-          cost_per_kg: String(fallbackCost),
-          total_cost: String(weightKg * fallbackCost),
-        };
-      }));
+          if (fallbackCost <= 0) return s;
+          const weightKg = parseFloat(s.weight_kg) || 0;
+          return {
+            ...s,
+            cost_per_kg: String(fallbackCost),
+            total_cost: String(weightKg * fallbackCost),
+          };
+        })
+      );
 
       const enriched = batches.map((b: any) => {
         const batchSources = enrichedSources.filter((s: any) => s.mix_batch_id === b.id);
@@ -770,7 +891,7 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
             weightKg: parseFloat(s.weight_kg) || 0,
             costPerKg: parseFloat(s.cost_per_kg) || 0,
             totalCost: parseFloat(s.total_cost) || 0,
-            percentOfBatch: totalWeight > 0 ? ((parseFloat(s.weight_kg) || 0) / totalWeight * 100) : 0,
+            percentOfBatch: totalWeight > 0 ? ((parseFloat(s.weight_kg) || 0) / totalWeight) * 100 : 0,
           })),
         };
       });
@@ -793,7 +914,9 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
       );
       const s = r.rows?.[0];
       if (!s?.weekly_report_wa_group_chat_id) {
-        return res.status(400).json({ message: "No WhatsApp group configured. Go to Settings → Export Settings to configure one." });
+        return res
+          .status(400)
+          .json({ message: "No WhatsApp group configured. Go to Settings → Export Settings to configure one." });
       }
       if (!s.instance_id || !s.api_token) {
         return res.status(400).json({ message: "WhatsApp credentials not configured." });
@@ -809,7 +932,13 @@ export function registerFactoryReportRoutes(app: Express, requireAuth: any, db: 
       const caption = `Mix Batch Details — ${today}`;
 
       const { sendWhatsAppFileToChatId } = await import("../services/whatsappService");
-      const result = await sendWhatsAppFileToChatId(s.weekly_report_wa_group_chat_id, buffer, finalFileName, caption, "image/png");
+      const result = await sendWhatsAppFileToChatId(
+        s.weekly_report_wa_group_chat_id,
+        buffer,
+        finalFileName,
+        caption,
+        "image/png"
+      );
       if (!result.success) {
         return res.status(500).json({ message: result.error || "Failed to send" });
       }

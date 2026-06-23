@@ -3,8 +3,21 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  ArrowLeft, Loader2, Save, CheckCircle2, Search, X, ArrowRight,
-  Clock, Package2, Lock, Eye, Pencil, CalendarIcon, Plus, Trash2,
+  ArrowLeft,
+  Loader2,
+  Save,
+  CheckCircle2,
+  Search,
+  X,
+  ArrowRight,
+  Clock,
+  Package2,
+  Lock,
+  Eye,
+  Pencil,
+  CalendarIcon,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,15 +25,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -111,11 +118,19 @@ interface ExtraItem {
 }
 
 function formatDate(dateStr: string) {
-  try { return format(parseISO(dateStr), "MM/dd/yyyy"); } catch { return dateStr; }
+  try {
+    return format(parseISO(dateStr), "MM/dd/yyyy");
+  } catch {
+    return dateStr;
+  }
 }
 
 function formatDateTime(dateStr: string) {
-  try { return format(parseISO(dateStr), "MM/dd/yyyy HH:mm"); } catch { return dateStr; }
+  try {
+    return format(parseISO(dateStr), "MM/dd/yyyy HH:mm");
+  } catch {
+    return dateStr;
+  }
 }
 
 function fmtQty(val: string | number): string {
@@ -157,7 +172,13 @@ function ItemSearchPanel({
           <div className="font-semibold text-sm leading-tight">Add Items</div>
           <div className="text-xs text-muted-foreground truncate">{locationName}</div>
         </div>
-        <Button size="icon" variant="ghost" onClick={onClose} className="shrink-0" data-testid="button-close-search-panel">
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={onClose}
+          className="shrink-0"
+          data-testid="button-close-search-panel"
+        >
           <X className="h-4 w-4" />
         </Button>
       </div>
@@ -204,7 +225,10 @@ function ItemSearchPanel({
 
 // ─── Editable detail view ─────────────────────────────────────────────────────
 function EditableTransferDetail({
-  detail, posUser, voucherId, onBack,
+  detail,
+  posUser,
+  voucherId,
+  onBack,
 }: {
   detail: TransferDetail;
   posUser: PosUser;
@@ -215,9 +239,9 @@ function EditableTransferDetail({
 
   // Pre-populate from any existing pending revision (so user sees their prior adjustments)
   const [deltas, setDeltas] = useState<Record<number, string>>(() => {
-    const pending = detail.revisions.find(r => r.optional);
+    const pending = detail.revisions.find((r) => r.optional);
     if (!pending) return {};
-    const stockItemToId = new Map(detail.items.map(i => [i.stockItemId, i.id]));
+    const stockItemToId = new Map(detail.items.map((i) => [i.stockItemId, i.id]));
     const init: Record<number, string> = {};
     for (const ri of pending.items) {
       const transferItemId = stockItemToId.get(ri.stockItemId);
@@ -230,13 +254,13 @@ function EditableTransferDetail({
   });
 
   const [extraItems, setExtraItems] = useState<ExtraItem[]>(() => {
-    const pending = detail.revisions.find(r => r.optional);
+    const pending = detail.revisions.find((r) => r.optional);
     if (!pending) return [];
-    const baseIds = new Set(detail.items.map(i => i.stockItemId));
+    const baseIds = new Set(detail.items.map((i) => i.stockItemId));
     return pending.items
-      .filter(ri => !baseIds.has(ri.stockItemId) || parseFloat(ri.originalQuantity) === 0)
-      .filter(ri => parseFloat(ri.newQuantity) > 0)
-      .map(ri => ({
+      .filter((ri) => !baseIds.has(ri.stockItemId) || parseFloat(ri.originalQuantity) === 0)
+      .filter((ri) => parseFloat(ri.newQuantity) > 0)
+      .map((ri) => ({
         stockItemId: ri.stockItemId,
         stockItemName: ri.stockItemName,
         qtyDraft: fmtQty(ri.newQuantity),
@@ -266,7 +290,9 @@ function EditableTransferDetail({
   const revisionMutation = useMutation({
     mutationFn: async (payload: { transferId: number; note: string; items: any[] }) => {
       return apiRequest("POST", `/api/stock-transfers/${payload.transferId}/revisions`, {
-        note: payload.note, items: payload.items, optional: true,
+        note: payload.note,
+        items: payload.items,
+        optional: true,
       });
     },
     onSuccess: () => {
@@ -275,7 +301,9 @@ function EditableTransferDetail({
       setNote("");
       onBack();
     },
-    onError: (err: any) => { toast({ title: "Error", description: err.message, variant: "destructive" }); },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const getDeltaNum = (id: number) => {
@@ -283,38 +311,40 @@ function EditableTransferDetail({
     if (!v || v === "-" || v === "+") return 0;
     return parseFloat(v) || 0;
   };
-  const setDeltaVal = (id: number, v: string) => setDeltas(p => ({ ...p, [id]: v }));
+  const setDeltaVal = (id: number, v: string) => setDeltas((p) => ({ ...p, [id]: v }));
   const normalizeDelta = (id: number) => {
     const v = (deltas[id] ?? "").trim();
-    if (!v || v === "-" || v === "+") { setDeltaVal(id, ""); return; }
+    if (!v || v === "-" || v === "+") {
+      setDeltaVal(id, "");
+      return;
+    }
     const n = parseFloat(v) || 0;
     setDeltaVal(id, n === 0 ? "" : String(n));
   };
 
   const myItems = detail.items;
-  const locationInventory = (rawInventory as any[]).map(i => ({
+  const locationInventory = (rawInventory as any[]).map((i) => ({
     stockItemId: i.stockItemId ?? i.id,
     name: i.stockItemName ?? i.name ?? "",
     quantity: i.quantity ?? "0",
   }));
 
-  const alreadyAddedIds = new Set([
-    ...extraItems.map(e => e.stockItemId),
-    ...myItems.map(i => i.stockItemId),
-  ]);
+  const alreadyAddedIds = new Set([...extraItems.map((e) => e.stockItemId), ...myItems.map((i) => i.stockItemId)]);
 
-  const panelMatches = useMemo(() =>
-    locationInventory.filter(i =>
-      !alreadyAddedIds.has(i.stockItemId) &&
-      i.name.toLowerCase().includes(panelSearch.toLowerCase())
-    ),
+  const panelMatches = useMemo(
+    () =>
+      locationInventory.filter(
+        (i) => !alreadyAddedIds.has(i.stockItemId) && i.name.toLowerCase().includes(panelSearch.toLowerCase())
+      ),
     [locationInventory, panelSearch, extraItems, myItems]
   );
 
-  useEffect(() => { setPanelActiveIdx(0); }, [panelSearch]);
+  useEffect(() => {
+    setPanelActiveIdx(0);
+  }, [panelSearch]);
 
   const addExtraItem = (inv: { stockItemId: number; name: string }) => {
-    setExtraItems(p => [...p, { stockItemId: inv.stockItemId, stockItemName: inv.name, qtyDraft: "" }]);
+    setExtraItems((p) => [...p, { stockItemId: inv.stockItemId, stockItemName: inv.name, qtyDraft: "" }]);
     setPanelSearch("");
     // focus the new extra item's adjustment input after render
     setTimeout(() => {
@@ -328,33 +358,36 @@ function EditableTransferDetail({
   };
 
   const updateExtraQty = (idx: number, val: string) =>
-    setExtraItems(p => p.map((it, i) => i === idx ? { ...it, qtyDraft: val } : it));
-  const removeExtra = (idx: number) => setExtraItems(p => p.filter((_, i) => i !== idx));
+    setExtraItems((p) => p.map((it, i) => (i === idx ? { ...it, qtyDraft: val } : it)));
+  const removeExtra = (idx: number) => setExtraItems((p) => p.filter((_, i) => i !== idx));
 
   // Ordered list of all delta input keys for keyboard navigation
-  const getAllInputKeys = useCallback(() => [
-    ...myItems.map(i => `base-${i.id}`),
-    ...extraItems.map(e => `extra-${e.stockItemId}`),
-  ], [myItems, extraItems]);
+  const getAllInputKeys = useCallback(
+    () => [...myItems.map((i) => `base-${i.id}`), ...extraItems.map((e) => `extra-${e.stockItemId}`)],
+    [myItems, extraItems]
+  );
 
-  const focusRelative = useCallback((currentKey: string, direction: 1 | -1) => {
-    const keys = getAllInputKeys();
-    const idx = keys.indexOf(currentKey);
-    if (idx === -1) return;
-    const next = idx + direction;
-    if (next >= 0 && next < keys.length) {
-      const el = deltaRefs.current[keys[next]];
-      el?.focus();
-      el?.select();
-    } else if (direction === 1) {
-      searchBarRef.current?.focus();
-    }
-  }, [getAllInputKeys]);
+  const focusRelative = useCallback(
+    (currentKey: string, direction: 1 | -1) => {
+      const keys = getAllInputKeys();
+      const idx = keys.indexOf(currentKey);
+      if (idx === -1) return;
+      const next = idx + direction;
+      if (next >= 0 && next < keys.length) {
+        const el = deltaRefs.current[keys[next]];
+        el?.focus();
+        el?.select();
+      } else if (direction === 1) {
+        searchBarRef.current?.focus();
+      }
+    },
+    [getAllInputKeys]
+  );
 
   const handleSave = () => {
     // Only send items whose delta is non-zero (supports both + and - adjustments)
     const changedBaseItems = myItems
-      .map(item => {
+      .map((item) => {
         const delta = getDeltaNum(item.id);
         const original = parseFloat(item.quantity) || 0;
         return {
@@ -367,13 +400,13 @@ function EditableTransferDetail({
           newQuantity: String(original + delta),
         };
       })
-      .filter(item => parseFloat(item.delta) !== 0);
+      .filter((item) => parseFloat(item.delta) !== 0);
 
     const myLocationName = myItems[0]?.sourceLocationName ?? detail.sourceLocationName;
     const newItems = extraItems
-      .map(e => ({ ...e, qty: parseFloat(e.qtyDraft) || 0 }))
-      .filter(e => e.qty !== 0)
-      .map(e => ({
+      .map((e) => ({ ...e, qty: parseFloat(e.qtyDraft) || 0 }))
+      .filter((e) => e.qty !== 0)
+      .map((e) => ({
         stockItemId: e.stockItemId,
         stockItemName: e.stockItemName,
         sourceLocationId: posUser.assignedLocationId,
@@ -392,8 +425,7 @@ function EditableTransferDetail({
   };
 
   const hasChanges =
-    myItems.some(i => getDeltaNum(i.id) !== 0) ||
-    extraItems.some(e => (parseFloat(e.qtyDraft) || 0) !== 0);
+    myItems.some((i) => getDeltaNum(i.id) !== 0) || extraItems.some((e) => (parseFloat(e.qtyDraft) || 0) !== 0);
 
   const totalItems = myItems.length + extraItems.length;
 
@@ -406,11 +438,17 @@ function EditableTransferDetail({
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold font-mono text-sm" data-testid="text-voucher-number">{detail.voucherNumber}</span>
+            <span className="font-bold font-mono text-sm" data-testid="text-voucher-number">
+              {detail.voucherNumber}
+            </span>
             <span className="text-xs text-muted-foreground">{formatDate(detail.voucherDate)}</span>
             {detail.inventoryApplied && (
-              <Badge variant="secondary" className="text-xs gap-1 text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30">
-                <Lock className="h-3 w-3" />Applied
+              <Badge
+                variant="secondary"
+                className="text-xs gap-1 text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30"
+              >
+                <Lock className="h-3 w-3" />
+                Applied
               </Badge>
             )}
           </div>
@@ -426,7 +464,6 @@ function EditableTransferDetail({
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: scrollable content */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
           {/* Table */}
           <div className="border rounded-md overflow-hidden">
             {/* Column header */}
@@ -466,18 +503,22 @@ function EditableTransferDetail({
                     {item.stockItemName}
                   </button>
 
-                  <span className="hidden sm:block text-sm font-mono text-right tabular-nums text-muted-foreground">{fmtQty(original)}</span>
+                  <span className="hidden sm:block text-sm font-mono text-right tabular-nums text-muted-foreground">
+                    {fmtQty(original)}
+                  </span>
 
                   <div className="flex justify-center">
                     <input
-                      ref={el => { deltaRefs.current[`base-${item.id}`] = el; }}
+                      ref={(el) => {
+                        deltaRefs.current[`base-${item.id}`] = el;
+                      }}
                       type="text"
                       inputMode="decimal"
                       placeholder="0"
                       value={deltas[item.id] ?? ""}
-                      onChange={e => setDeltaVal(item.id, e.target.value)}
+                      onChange={(e) => setDeltaVal(item.id, e.target.value)}
                       onBlur={() => normalizeDelta(item.id)}
-                      onKeyDown={e => {
+                      onKeyDown={(e) => {
                         if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey) || e.key === "ArrowDown") {
                           e.preventDefault();
                           normalizeDelta(item.id);
@@ -496,14 +537,16 @@ function EditableTransferDetail({
                     />
                   </div>
 
-                  <span className={cn(
-                    "font-mono font-bold text-right tabular-nums",
-                    changed
-                      ? deltaNum > 0
-                        ? "text-base text-green-600 dark:text-green-400"
-                        : "text-base text-destructive"
-                      : "text-sm"
-                  )}>
+                  <span
+                    className={cn(
+                      "font-mono font-bold text-right tabular-nums",
+                      changed
+                        ? deltaNum > 0
+                          ? "text-base text-green-600 dark:text-green-400"
+                          : "text-base text-destructive"
+                        : "text-sm"
+                    )}
+                  >
                     {fmtQty(newQty)}
                   </span>
 
@@ -521,10 +564,14 @@ function EditableTransferDetail({
                   className="grid grid-cols-[2rem_1fr_5rem_5rem] sm:grid-cols-[2rem_1fr_5.5rem_6.5rem_6rem_2rem] items-center px-3 py-2.5 gap-2 border-b last:border-b-0 bg-primary/5 border-l-2 border-l-primary"
                   data-testid={`row-extra-${item.stockItemId}`}
                 >
-                  <span className="text-xs text-muted-foreground tabular-nums font-mono">{myItems.length + idx + 1}</span>
+                  <span className="text-xs text-muted-foreground tabular-nums font-mono">
+                    {myItems.length + idx + 1}
+                  </span>
 
                   <div className="flex items-center gap-1 min-w-0">
-                    <span className="text-sm font-medium truncate flex-1" title={item.stockItemName}>{item.stockItemName}</span>
+                    <span className="text-sm font-medium truncate flex-1" title={item.stockItemName}>
+                      {item.stockItemName}
+                    </span>
                     <button
                       type="button"
                       onClick={() => removeExtra(idx)}
@@ -539,13 +586,15 @@ function EditableTransferDetail({
 
                   <div className="flex justify-center">
                     <input
-                      ref={el => { deltaRefs.current[`extra-${item.stockItemId}`] = el; }}
+                      ref={(el) => {
+                        deltaRefs.current[`extra-${item.stockItemId}`] = el;
+                      }}
                       type="text"
                       inputMode="decimal"
                       placeholder="0"
                       value={item.qtyDraft}
-                      onChange={e => updateExtraQty(idx, e.target.value)}
-                      onKeyDown={e => {
+                      onChange={(e) => updateExtraQty(idx, e.target.value)}
+                      onKeyDown={(e) => {
                         if (e.key === "Enter" || (e.key === "Tab" && !e.shiftKey) || e.key === "ArrowDown") {
                           e.preventDefault();
                           focusRelative(`extra-${item.stockItemId}`, 1);
@@ -559,10 +608,12 @@ function EditableTransferDetail({
                     />
                   </div>
 
-                  <span className={cn(
-                    "font-mono font-bold text-right tabular-nums",
-                    qty > 0 ? "text-base text-green-600 dark:text-green-400" : "text-sm text-muted-foreground"
-                  )}>
+                  <span
+                    className={cn(
+                      "font-mono font-bold text-right tabular-nums",
+                      qty > 0 ? "text-base text-green-600 dark:text-green-400" : "text-sm text-muted-foreground"
+                    )}
+                  >
                     {qty > 0 ? fmtQty(qty) : "—"}
                   </span>
 
@@ -586,18 +637,20 @@ function EditableTransferDetail({
                 type="text"
                 placeholder="Add item by searching…"
                 value={panelSearch}
-                onChange={e => {
+                onChange={(e) => {
                   setPanelSearch(e.target.value);
                   if (!panelOpen) setPanelOpen(true);
                 }}
-                onFocus={() => { if (!panelOpen) setPanelOpen(true); }}
-                onKeyDown={e => {
+                onFocus={() => {
+                  if (!panelOpen) setPanelOpen(true);
+                }}
+                onKeyDown={(e) => {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
-                    setPanelActiveIdx(i => Math.min(i + 1, panelMatches.length - 1));
+                    setPanelActiveIdx((i) => Math.min(i + 1, panelMatches.length - 1));
                   } else if (e.key === "ArrowUp") {
                     e.preventDefault();
-                    setPanelActiveIdx(i => Math.max(i - 1, 0));
+                    setPanelActiveIdx((i) => Math.max(i - 1, 0));
                   } else if (e.key === "Enter") {
                     e.preventDefault();
                     if (panelMatches[panelActiveIdx]) addExtraItem(panelMatches[panelActiveIdx]);
@@ -617,7 +670,10 @@ function EditableTransferDetail({
               {panelSearch && (
                 <button
                   type="button"
-                  onClick={() => { setPanelSearch(""); searchBarRef.current?.focus(); }}
+                  onClick={() => {
+                    setPanelSearch("");
+                    searchBarRef.current?.focus();
+                  }}
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -627,10 +683,10 @@ function EditableTransferDetail({
 
             {/* Footer */}
             <div className="border-t px-3 py-2 bg-muted/30 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{totalItems} {totalItems === 1 ? "item" : "items"} total</span>
-              {hasChanges && (
-                <span className="text-primary font-medium">Unsaved changes</span>
-              )}
+              <span>
+                {totalItems} {totalItems === 1 ? "item" : "items"} total
+              </span>
+              {hasChanges && <span className="text-primary font-medium">Unsaved changes</span>}
             </div>
           </div>
 
@@ -639,7 +695,7 @@ function EditableTransferDetail({
             <Textarea
               placeholder="Notes (optional)..."
               value={note}
-              onChange={e => setNote(e.target.value)}
+              onChange={(e) => setNote(e.target.value)}
               rows={2}
               className="resize-none text-sm flex-1"
               data-testid="textarea-revision-note"
@@ -651,9 +707,17 @@ function EditableTransferDetail({
               className="w-full sm:w-auto shrink-0"
               data-testid="button-save-revision"
             >
-              {revisionMutation.isPending
-                ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Saving...</>
-                : <><Save className="h-4 w-4 mr-1.5" />Save Revision</>}
+              {revisionMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-1.5" />
+                  Save Revision
+                </>
+              )}
             </Button>
           </div>
 
@@ -662,53 +726,74 @@ function EditableTransferDetail({
             <div className="space-y-2 pb-4">
               <div className="flex items-center gap-2">
                 <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revision History</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Revision History
+                </span>
               </div>
-              {detail.revisions.map(rev => {
+              {detail.revisions.map((rev) => {
                 const revLocName = rev.items[0]?.sourceLocationName ?? null;
                 return (
-                <Card key={rev.id} data-testid={`card-revision-${rev.id}`}>
-                  <CardContent className="pt-3 pb-3 space-y-2">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold">Revision #{rev.revisionNumber}</span>
-                        {revLocName && (
-                          <span className="text-xs text-muted-foreground">· From: <span className="font-medium text-foreground">{revLocName}</span></span>
-                        )}
-                        <span className="text-xs text-muted-foreground">{formatDateTime(rev.createdAt)}</span>
-                      </div>
-                      {rev.optional ? (
-                        <Badge variant="outline" className="text-xs" data-testid={`badge-pending-${rev.id}`}>Pending Admin Review</Badge>
-                      ) : (
-                        <Badge variant="default" className="text-xs" data-testid={`badge-approved-${rev.id}`}>
-                          <CheckCircle2 className="h-3 w-3 mr-1" />Approved
-                        </Badge>
-                      )}
-                    </div>
-                    {rev.note && <p className="text-xs text-muted-foreground italic">{rev.note}</p>}
-                    <div className="rounded-md border overflow-hidden">
-                      <div className="grid grid-cols-[1fr_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
-                        <span>Item</span>
-                        <span className="text-right">Was</span>
-                        <span className="text-right">Now</span>
-                        <span className="text-right">Change</span>
-                      </div>
-                      {rev.items.filter((ri) => parseFloat(ri.delta) !== 0).map((ri, i) => {
-                        const delta = parseFloat(ri.delta);
-                        return (
-                          <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0" data-testid={`text-rev-item-${rev.id}-${i}`}>
-                            <span className="font-medium">{ri.stockItemName}</span>
-                            <span className="font-mono text-right text-muted-foreground">{fmtQty(ri.originalQuantity)}</span>
-                            <span className="font-mono font-semibold text-right">{fmtQty(ri.newQuantity)}</span>
-                            <span className={cn("font-mono font-semibold text-right", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-                              {delta > 0 ? "+" : ""}{fmtQty(ri.delta)}
+                  <Card key={rev.id} data-testid={`card-revision-${rev.id}`}>
+                    <CardContent className="pt-3 pb-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold">Revision #{rev.revisionNumber}</span>
+                          {revLocName && (
+                            <span className="text-xs text-muted-foreground">
+                              · From: <span className="font-medium text-foreground">{revLocName}</span>
                             </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </CardContent>
-                </Card>
+                          )}
+                          <span className="text-xs text-muted-foreground">{formatDateTime(rev.createdAt)}</span>
+                        </div>
+                        {rev.optional ? (
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-pending-${rev.id}`}>
+                            Pending Admin Review
+                          </Badge>
+                        ) : (
+                          <Badge variant="default" className="text-xs" data-testid={`badge-approved-${rev.id}`}>
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Approved
+                          </Badge>
+                        )}
+                      </div>
+                      {rev.note && <p className="text-xs text-muted-foreground italic">{rev.note}</p>}
+                      <div className="rounded-md border overflow-hidden">
+                        <div className="grid grid-cols-[1fr_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
+                          <span>Item</span>
+                          <span className="text-right">Was</span>
+                          <span className="text-right">Now</span>
+                          <span className="text-right">Change</span>
+                        </div>
+                        {rev.items
+                          .filter((ri) => parseFloat(ri.delta) !== 0)
+                          .map((ri, i) => {
+                            const delta = parseFloat(ri.delta);
+                            return (
+                              <div
+                                key={i}
+                                className="grid grid-cols-[1fr_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0"
+                                data-testid={`text-rev-item-${rev.id}-${i}`}
+                              >
+                                <span className="font-medium">{ri.stockItemName}</span>
+                                <span className="font-mono text-right text-muted-foreground">
+                                  {fmtQty(ri.originalQuantity)}
+                                </span>
+                                <span className="font-mono font-semibold text-right">{fmtQty(ri.newQuantity)}</span>
+                                <span
+                                  className={cn(
+                                    "font-mono font-semibold text-right",
+                                    delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
+                                  )}
+                                >
+                                  {delta > 0 ? "+" : ""}
+                                  {fmtQty(ri.delta)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    </CardContent>
+                  </Card>
                 );
               })}
             </div>
@@ -730,24 +815,36 @@ function EditableTransferDetail({
               locationName={detail.sourceLocationName}
               onActiveChange={setPanelActiveIdx}
               onPick={addExtraItem}
-              onClose={() => { setPanelOpen(false); setPanelSearch(""); }}
+              onClose={() => {
+                setPanelOpen(false);
+                setPanelSearch("");
+              }}
             />
           </div>
           {/* Mobile: bottom sheet */}
-          <div className="sm:hidden fixed inset-x-0 bottom-0 z-40 bg-card border-t flex flex-col shadow-lg" style={{ height: "55vh" }}>
+          <div
+            className="sm:hidden fixed inset-x-0 bottom-0 z-40 bg-card border-t flex flex-col shadow-lg"
+            style={{ height: "55vh" }}
+          >
             <ItemSearchPanel
               matches={panelMatches}
               activeIdx={panelActiveIdx}
               locationName={detail.sourceLocationName}
               onActiveChange={setPanelActiveIdx}
               onPick={addExtraItem}
-              onClose={() => { setPanelOpen(false); setPanelSearch(""); }}
+              onClose={() => {
+                setPanelOpen(false);
+                setPanelSearch("");
+              }}
             />
           </div>
           {/* Mobile backdrop */}
           <div
             className="sm:hidden fixed inset-0 z-30 bg-black/30"
-            onClick={() => { setPanelOpen(false); setPanelSearch(""); }}
+            onClick={() => {
+              setPanelOpen(false);
+              setPanelSearch("");
+            }}
           />
         </>
       )}
@@ -756,7 +853,15 @@ function EditableTransferDetail({
 }
 
 // ─── Detail shell ─────────────────────────────────────────────────────────────
-function TransferOrderDetail({ voucherId, posUser, onBack }: { voucherId: number; posUser: PosUser; onBack: () => void }) {
+function TransferOrderDetail({
+  voucherId,
+  posUser,
+  onBack,
+}: {
+  voucherId: number;
+  posUser: PosUser;
+  onBack: () => void;
+}) {
   const { data: detail, isLoading } = useQuery<TransferDetail>({
     queryKey: ["/api/pos-transfer-detail", voucherId],
     queryFn: async () => {
@@ -778,7 +883,10 @@ function TransferOrderDetail({ voucherId, posUser, onBack }: { voucherId: number
   if (!detail) {
     return (
       <div className="p-4 space-y-3">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1.5" />Back</Button>
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          Back
+        </Button>
         <p className="text-sm text-destructive">Failed to load order.</p>
       </div>
     );
@@ -827,33 +935,42 @@ function CreateTransferDialog({
     enabled: !!sourceId && open,
   });
 
-  const addedIds = new Set(items.map(i => i.stockItemId));
+  const addedIds = new Set(items.map((i) => i.stockItemId));
 
   const searchMatches = useMemo(() => {
     const s = itemSearch.toLowerCase().trim();
     return (sourceInventory as any[])
-      .filter(i => !addedIds.has(i.stockItemId ?? i.id) && (i.stockItemName ?? i.name ?? "").toLowerCase().includes(s))
+      .filter(
+        (i) => !addedIds.has(i.stockItemId ?? i.id) && (i.stockItemName ?? i.name ?? "").toLowerCase().includes(s)
+      )
       .slice(0, 40);
   }, [sourceInventory, itemSearch, items]);
 
   const addItem = (inv: any) => {
     const id = inv.stockItemId ?? inv.id;
     const name = inv.stockItemName ?? inv.name ?? "";
-    setItems(p => [...p, { stockItemId: id, stockItemName: name, quantity: "" }]);
+    setItems((p) => [...p, { stockItemId: id, stockItemName: name, quantity: "" }]);
     setItemSearch("");
     setTimeout(() => searchRef.current?.focus(), 30);
   };
 
   const updateQty = (idx: number, val: string) =>
-    setItems(p => p.map((it, i) => i === idx ? { ...it, quantity: val } : it));
+    setItems((p) => p.map((it, i) => (i === idx ? { ...it, quantity: val } : it)));
 
-  const removeItem = (idx: number) => setItems(p => p.filter((_, i) => i !== idx));
+  const removeItem = (idx: number) => setItems((p) => p.filter((_, i) => i !== idx));
 
   const reset = () => {
-    setSourceId(""); setDestId(""); setItems([]); setNotes(""); setItemSearch("");
+    setSourceId("");
+    setDestId("");
+    setItems([]);
+    setNotes("");
+    setItemSearch("");
   };
 
-  const handleClose = () => { reset(); onClose(); };
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -861,7 +978,7 @@ function CreateTransferDialog({
         sourceLocationId: parseInt(sourceId),
         destinationLocationId: parseInt(destId),
         notes: notes.trim() || undefined,
-        items: items.map(i => ({
+        items: items.map((i) => ({
           stockItemId: i.stockItemId,
           stockItemName: i.stockItemName,
           sourceLocationId: parseInt(sourceId),
@@ -892,16 +1009,17 @@ function CreateTransferDialog({
   });
 
   const canSubmit =
-    !!sourceId &&
-    !!destId &&
-    sourceId !== destId &&
-    items.length > 0 &&
-    items.every(i => parseFloat(i.quantity) > 0);
+    !!sourceId && !!destId && sourceId !== destId && items.length > 0 && items.every((i) => parseFloat(i.quantity) > 0);
 
-  const destOptions = allLocations.filter(l => String(l.id) !== sourceId);
+  const destOptions = allLocations.filter((l) => String(l.id) !== sourceId);
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) handleClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) handleClose();
+      }}
+    >
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>New Transfer</DialogTitle>
@@ -913,13 +1031,22 @@ function CreateTransferDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">From (Source)</label>
-              <Select value={sourceId} onValueChange={v => { setSourceId(v); setItems([]); setItemSearch(""); }}>
+              <Select
+                value={sourceId}
+                onValueChange={(v) => {
+                  setSourceId(v);
+                  setItems([]);
+                  setItemSearch("");
+                }}
+              >
                 <SelectTrigger data-testid="select-source-location">
                   <SelectValue placeholder="Select location…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {myLocations.map(l => (
-                    <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                  {myLocations.map((l) => (
+                    <SelectItem key={l.id} value={String(l.id)}>
+                      {l.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -931,8 +1058,10 @@ function CreateTransferDialog({
                   <SelectValue placeholder="Select location…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {destOptions.map(l => (
-                    <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                  {destOptions.map((l) => (
+                    <SelectItem key={l.id} value={String(l.id)}>
+                      {l.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -949,7 +1078,7 @@ function CreateTransferDialog({
                   ref={searchRef}
                   placeholder="Search items to add…"
                   value={itemSearch}
-                  onChange={e => setItemSearch(e.target.value)}
+                  onChange={(e) => setItemSearch(e.target.value)}
                   className="pl-8 text-sm"
                   data-testid="input-item-search"
                 />
@@ -967,7 +1096,9 @@ function CreateTransferDialog({
                         data-testid={`button-add-item-${inv.stockItemId ?? inv.id}`}
                       >
                         <span className="font-medium truncate">{inv.stockItemName ?? inv.name}</span>
-                        <span className="text-xs text-muted-foreground shrink-0 font-mono">{qty > 0 ? fmtQty(qty) : "0"} in stock</span>
+                        <span className="text-xs text-muted-foreground shrink-0 font-mono">
+                          {qty > 0 ? fmtQty(qty) : "0"} in stock
+                        </span>
                       </button>
                     );
                   })}
@@ -988,19 +1119,27 @@ function CreateTransferDialog({
                 <span />
               </div>
               {items.map((item, idx) => (
-                <div key={item.stockItemId} className="grid grid-cols-[1fr_120px_36px] items-center px-3 py-2 gap-2 border-b last:border-b-0">
+                <div
+                  key={item.stockItemId}
+                  className="grid grid-cols-[1fr_120px_36px] items-center px-3 py-2 gap-2 border-b last:border-b-0"
+                >
                   <span className="text-sm font-medium truncate">{item.stockItemName}</span>
                   <Input
                     type="number"
                     min="0"
                     step="any"
                     value={item.quantity}
-                    onChange={e => updateQty(idx, e.target.value)}
+                    onChange={(e) => updateQty(idx, e.target.value)}
                     className="h-8 text-sm text-right font-mono"
                     placeholder="0"
                     data-testid={`input-qty-${item.stockItemId}`}
                   />
-                  <Button size="icon" variant="ghost" onClick={() => removeItem(idx)} data-testid={`button-remove-item-${idx}`}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => removeItem(idx)}
+                    data-testid={`button-remove-item-${idx}`}
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -1013,7 +1152,7 @@ function CreateTransferDialog({
             <label className="text-xs font-medium text-muted-foreground">Notes (optional)</label>
             <Textarea
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
               placeholder="Add a note…"
               className="text-sm resize-none"
               rows={2}
@@ -1023,13 +1162,19 @@ function CreateTransferDialog({
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-2 pt-1">
-            <Button variant="outline" onClick={handleClose} data-testid="button-cancel-create">Cancel</Button>
+            <Button variant="outline" onClick={handleClose} data-testid="button-cancel-create">
+              Cancel
+            </Button>
             <Button
               onClick={() => createMutation.mutate()}
               disabled={!canSubmit || createMutation.isPending}
               data-testid="button-submit-create"
             >
-              {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+              {createMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+              ) : (
+                <Save className="h-4 w-4 mr-1.5" />
+              )}
               Submit for Review
             </Button>
           </div>
@@ -1041,8 +1186,14 @@ function CreateTransferDialog({
 
 // ─── View-only dialog ─────────────────────────────────────────────────────────
 function ViewTransferDialog({
-  voucherId, open, onClose,
-}: { voucherId: number | null; open: boolean; onClose: () => void }) {
+  voucherId,
+  open,
+  onClose,
+}: {
+  voucherId: number | null;
+  open: boolean;
+  onClose: () => void;
+}) {
   const { data: detail, isLoading } = useQuery<TransferDetail>({
     queryKey: ["/api/pos-transfer-detail", voucherId],
     queryFn: async () => {
@@ -1054,14 +1205,20 @@ function ViewTransferDialog({
   });
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {detail?.voucherNumber ?? "Transfer Order"}
             {detail?.inventoryApplied && (
               <Badge variant="secondary" className="gap-1 text-xs font-normal">
-                <Lock className="h-3 w-3" />Applied
+                <Lock className="h-3 w-3" />
+                Applied
               </Badge>
             )}
           </DialogTitle>
@@ -1074,7 +1231,9 @@ function ViewTransferDialog({
 
         {isLoading ? (
           <div className="space-y-2 py-2">
-            <Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-3/4" /><Skeleton className="h-48 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+            <Skeleton className="h-48 w-full" />
           </div>
         ) : detail ? (
           <div className="space-y-4">
@@ -1110,47 +1269,73 @@ function ViewTransferDialog({
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Revision History</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Revision History
+                  </span>
                 </div>
-                {detail.revisions.map(rev => {
+                {detail.revisions.map((rev) => {
                   const revLocName = rev.items[0]?.sourceLocationName ?? null;
                   return (
-                  <Card key={rev.id}>
-                    <CardContent className="pt-3 pb-3 space-y-2">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-semibold">Revision #{rev.revisionNumber}</span>
-                          {revLocName && (
-                            <span className="text-xs text-muted-foreground">· From: <span className="font-medium text-foreground">{revLocName}</span></span>
-                          )}
-                          <span className="text-xs text-muted-foreground">{formatDateTime(rev.createdAt)}</span>
-                        </div>
-                        {rev.optional
-                          ? <Badge variant="outline" className="text-xs">Pending Admin Review</Badge>
-                          : <Badge variant="default" className="text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>}
-                      </div>
-                      {rev.note && <p className="text-xs text-muted-foreground italic">{rev.note}</p>}
-                      <div className="rounded-md border overflow-hidden">
-                        <div className="grid grid-cols-[1fr_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
-                          <span>Item</span>
-                          <span className="text-right">Was</span><span className="text-right">Now</span><span className="text-right">Change</span>
-                        </div>
-                        {rev.items.filter((ri) => parseFloat(ri.delta) !== 0).map((ri, i) => {
-                          const delta = parseFloat(ri.delta);
-                          return (
-                            <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0">
-                              <span className="font-medium">{ri.stockItemName}</span>
-                              <span className="font-mono text-right text-muted-foreground">{fmtQty(ri.originalQuantity)}</span>
-                              <span className="font-mono font-semibold text-right">{fmtQty(ri.newQuantity)}</span>
-                              <span className={cn("font-mono font-semibold text-right", delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive")}>
-                                {delta > 0 ? "+" : ""}{fmtQty(ri.delta)}
+                    <Card key={rev.id}>
+                      <CardContent className="pt-3 pb-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold">Revision #{rev.revisionNumber}</span>
+                            {revLocName && (
+                              <span className="text-xs text-muted-foreground">
+                                · From: <span className="font-medium text-foreground">{revLocName}</span>
                               </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
+                            )}
+                            <span className="text-xs text-muted-foreground">{formatDateTime(rev.createdAt)}</span>
+                          </div>
+                          {rev.optional ? (
+                            <Badge variant="outline" className="text-xs">
+                              Pending Admin Review
+                            </Badge>
+                          ) : (
+                            <Badge variant="default" className="text-xs">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Approved
+                            </Badge>
+                          )}
+                        </div>
+                        {rev.note && <p className="text-xs text-muted-foreground italic">{rev.note}</p>}
+                        <div className="rounded-md border overflow-hidden">
+                          <div className="grid grid-cols-[1fr_auto_auto_auto] bg-muted/30 border-b px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide gap-x-4">
+                            <span>Item</span>
+                            <span className="text-right">Was</span>
+                            <span className="text-right">Now</span>
+                            <span className="text-right">Change</span>
+                          </div>
+                          {rev.items
+                            .filter((ri) => parseFloat(ri.delta) !== 0)
+                            .map((ri, i) => {
+                              const delta = parseFloat(ri.delta);
+                              return (
+                                <div
+                                  key={i}
+                                  className="grid grid-cols-[1fr_auto_auto_auto] items-center px-3 py-2 text-xs gap-x-4 bg-card border-b last:border-b-0"
+                                >
+                                  <span className="font-medium">{ri.stockItemName}</span>
+                                  <span className="font-mono text-right text-muted-foreground">
+                                    {fmtQty(ri.originalQuantity)}
+                                  </span>
+                                  <span className="font-mono font-semibold text-right">{fmtQty(ri.newQuantity)}</span>
+                                  <span
+                                    className={cn(
+                                      "font-mono font-semibold text-right",
+                                      delta > 0 ? "text-green-600 dark:text-green-400" : "text-destructive"
+                                    )}
+                                  >
+                                    {delta > 0 ? "+" : ""}
+                                    {fmtQty(ri.delta)}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </CardContent>
+                    </Card>
                   );
                 })}
               </div>
@@ -1185,14 +1370,17 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
     queryKey: ["/api/stock-transfers/list", dateFilter],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (dateFilter) { params.set("startDate", dateFilter); params.set("endDate", dateFilter); }
+      if (dateFilter) {
+        params.set("startDate", dateFilter);
+        params.set("endDate", dateFilter);
+      }
       const res = await fetch(`/api/stock-transfers/list?${params}`, { credentials: "include" });
       return res.ok ? res.json() : [];
     },
   });
 
   const transfers = useMemo(() => {
-    return allTransfers.filter(t => {
+    return allTransfers.filter((t) => {
       if (statusFilter === "applied" && !t.inventoryApplied) return false;
       if (statusFilter === "pending" && t.inventoryApplied) return false;
       if (dateFilter) {
@@ -1207,8 +1395,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
       }
       const s = search.toLowerCase().trim();
       if (!s) return true;
-      return t.voucherNumber?.toLowerCase().includes(s) ||
-        t.stockItemNames?.some(n => n.toLowerCase().includes(s));
+      return t.voucherNumber?.toLowerCase().includes(s) || t.stockItemNames?.some((n) => n.toLowerCase().includes(s));
     });
   }, [allTransfers, search, statusFilter, dateFilter, myLocationIds]);
 
@@ -1218,18 +1405,18 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
   };
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
-  const clearFilters = () => { setSearch(""); setStatusFilter("all"); setDateFilter(todayStr); };
+  const clearFilters = () => {
+    setSearch("");
+    setStatusFilter("all");
+    setDateFilter(todayStr);
+  };
   const hasFilters = !!search || statusFilter !== "all" || dateFilter !== todayStr;
 
   // Edit view — full page, no extra padding (the component handles its own layout)
   if (editVoucherId !== null) {
     return (
       <div className="flex flex-col h-full">
-        <TransferOrderDetail
-          voucherId={editVoucherId}
-          posUser={posUser}
-          onBack={() => setEditVoucherId(null)}
-        />
+        <TransferOrderDetail voucherId={editVoucherId} posUser={posUser} onBack={() => setEditVoucherId(null)} />
       </div>
     );
   }
@@ -1241,7 +1428,8 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
         <PageHeader title="Orders" subtitle="Review and adjust quantities for your location" />
         {myLocations.length > 1 && (
           <Button onClick={() => setCreateOpen(true)} data-testid="button-new-transfer">
-            <Plus className="h-4 w-4 mr-1.5" />New Transfer
+            <Plus className="h-4 w-4 mr-1.5" />
+            New Transfer
           </Button>
         )}
       </div>
@@ -1255,7 +1443,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
             <input
               type="date"
               value={dateFilter}
-              onChange={e => setDateFilter(e.target.value)}
+              onChange={(e) => setDateFilter(e.target.value)}
               className="h-8 pl-8 pr-2 text-sm border rounded-md bg-background outline-none focus:ring-1 focus:ring-ring w-full"
               data-testid="input-date-filter"
             />
@@ -1263,7 +1451,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
         </div>
         <div className="space-y-1">
           <label className="text-xs font-medium text-muted-foreground">Status</label>
-          <Select value={statusFilter} onValueChange={v => setStatusFilter(v as any)}>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
             <SelectTrigger className="h-8 text-sm w-[120px]" data-testid="select-status-filter">
               <SelectValue />
             </SelectTrigger>
@@ -1281,15 +1469,22 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
             <Input
               placeholder="Voucher # or item..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-8 text-sm"
               data-testid="input-list-search"
             />
           </div>
         </div>
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5" data-testid="button-clear-filters">
-            <X className="h-3.5 w-3.5" />Clear
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            className="gap-1.5"
+            data-testid="button-clear-filters"
+          >
+            <X className="h-3.5 w-3.5" />
+            Clear
           </Button>
         )}
       </div>
@@ -1304,7 +1499,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
       {/* Transfer order cards */}
       {isLoading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map(i => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="rounded-md border bg-card p-4 flex items-center gap-4">
               <Skeleton className="h-2.5 w-2.5 rounded-full shrink-0" />
               <div className="flex-1 space-y-2">
@@ -1320,19 +1515,14 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
           ))}
         </div>
       ) : transfers.length === 0 ? (
-        <div
-          className="rounded-md border bg-card text-center py-16 text-muted-foreground"
-          data-testid="text-empty"
-        >
+        <div className="rounded-md border bg-card text-center py-16 text-muted-foreground" data-testid="text-empty">
           <Package2 className="h-10 w-10 mx-auto mb-3 opacity-20" />
           <p className="text-sm font-medium">No transfer orders found</p>
-          {hasFilters && (
-            <p className="text-xs mt-1 opacity-70">Try clearing your filters</p>
-          )}
+          {hasFilters && <p className="text-xs mt-1 opacity-70">Try clearing your filters</p>}
         </div>
       ) : (
         <div className="space-y-2">
-          {transfers.map(t => (
+          {transfers.map((t) => (
             <div
               key={t.voucherId}
               className="rounded-md border bg-card px-4 py-3.5 flex items-center gap-4 hover-elevate"
@@ -1342,9 +1532,7 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
               <div
                 className={cn(
                   "h-2.5 w-2.5 rounded-full shrink-0",
-                  t.inventoryApplied
-                    ? "bg-green-500 dark:bg-green-400"
-                    : "bg-amber-400 dark:bg-amber-400"
+                  t.inventoryApplied ? "bg-green-500 dark:bg-green-400" : "bg-amber-400 dark:bg-amber-400"
                 )}
               />
 
@@ -1361,7 +1549,8 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
                       className="gap-1 text-xs text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30"
                       data-testid={`badge-applied-${t.voucherId}`}
                     >
-                      <CheckCircle2 className="h-3 w-3" />Applied
+                      <CheckCircle2 className="h-3 w-3" />
+                      Applied
                     </Badge>
                   ) : (
                     <Badge
@@ -1369,7 +1558,8 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
                       className="gap-1 text-xs text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30"
                       data-testid={`badge-pending-${t.voucherId}`}
                     >
-                      <Clock className="h-3 w-3" />Pending
+                      <Clock className="h-3 w-3" />
+                      Pending
                     </Badge>
                   )}
                 </div>
@@ -1417,14 +1607,13 @@ export default function PosTransferOrders({ posUser }: PosTransferOrdersProps) {
       <ViewTransferDialog
         voucherId={viewVoucherId}
         open={viewDialogOpen}
-        onClose={() => { setViewDialogOpen(false); setViewVoucherId(null); }}
+        onClose={() => {
+          setViewDialogOpen(false);
+          setViewVoucherId(null);
+        }}
       />
 
-      <CreateTransferDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        myLocations={myLocations}
-      />
+      <CreateTransferDialog open={createOpen} onClose={() => setCreateOpen(false)} myLocations={myLocations} />
     </div>
   );
 }

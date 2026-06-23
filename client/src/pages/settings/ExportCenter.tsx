@@ -1,11 +1,29 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Zap, Download, TrendingUp, MessageCircle, Building2, Calendar, MessageSquare, Mail, Settings2 } from "lucide-react";
+import {
+  Zap,
+  Download,
+  TrendingUp,
+  MessageCircle,
+  Building2,
+  Calendar,
+  MessageSquare,
+  Mail,
+  Settings2,
+} from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-import { Recipient, ExportSettings, Company, BackupStatus, WaSettings, WaRecipient, NpSettings } from "./ExportCenterTypes";
+import {
+  Recipient,
+  ExportSettings,
+  Company,
+  BackupStatus,
+  WaSettings,
+  WaRecipient,
+  NpSettings,
+} from "./ExportCenterTypes";
 import { currentYearDateRange, scheduleLabel } from "./ExportCenterHelpers";
 import { ExportProgressDialog } from "./ExportProgressDialog";
 import { DailyExportTab } from "./DailyExportTab";
@@ -50,7 +68,11 @@ export function ExportCenter() {
   const { data: emailRecipients = [] } = useQuery<Recipient[]>({ queryKey: ["/api/export/recipients"] });
   const { data: exportSettings } = useQuery<ExportSettings>({ queryKey: ["/api/export/settings"] });
   const { data: companies = [] } = useQuery<Company[]>({ queryKey: ["/api/export/companies"] });
-  const { data: backupStatus, isFetching: backupFetching, refetch: refetchBackup } = useQuery<BackupStatus>({
+  const {
+    data: backupStatus,
+    isFetching: backupFetching,
+    refetch: refetchBackup,
+  } = useQuery<BackupStatus>({
     queryKey: ["/api/export/backup-status"],
     refetchInterval: 15000,
   });
@@ -59,21 +81,23 @@ export function ExportCenter() {
   const { data: npSettings } = useQuery<NpSettings>({ queryKey: ["/api/whatsapp/np-settings"] });
 
   // Computed
-  const waGroups = waRecipients.filter(r => r.isGroup && r.active);
+  const waGroups = waRecipients.filter((r) => r.isGroup && r.active);
   const npWaGroupName = npSettings?.recipientName ?? null;
   const waReady = !!(waSettings?.enabled && waSettings?.dailyRecipientId);
-  const dailyWaGroup = waRecipients.find(r => r.id === waSettings?.dailyRecipientId);
-  const npWaGroup = waRecipients.find(r => r.id === (npRecipientId !== undefined ? npRecipientId : npSettings?.recipientId));
+  const dailyWaGroup = waRecipients.find((r) => r.id === waSettings?.dailyRecipientId);
+  const npWaGroup = waRecipients.find(
+    (r) => r.id === (npRecipientId !== undefined ? npRecipientId : npSettings?.recipientId)
+  );
 
   const npEff = {
     recipientId: npRecipientId !== undefined ? npRecipientId : (npSettings?.recipientId ?? null),
-    frequency: npFrequency ?? (npSettings?.frequency ?? "daily"),
-    sendHour: npSendHour ?? (npSettings?.sendHour ?? 18),
-    sendDayOfWeek: npSendDayOfWeek ?? (npSettings?.sendDayOfWeek ?? 1),
+    frequency: npFrequency ?? npSettings?.frequency ?? "daily",
+    sendHour: npSendHour ?? npSettings?.sendHour ?? 18,
+    sendDayOfWeek: npSendDayOfWeek ?? npSettings?.sendDayOfWeek ?? 1,
   };
 
   const npScheduleText = scheduleLabel(npSettings);
-  const filteredRuns = (backupStatus?.recentRuns ?? []).filter(r => {
+  const filteredRuns = (backupStatus?.recentRuns ?? []).filter((r) => {
     if (historyFilter === "all") return true;
     if (historyFilter === "success") return r.status === "success";
     if (historyFilter === "failed") return r.status === "failed" || r.status === "partial_failed";
@@ -103,7 +127,7 @@ export function ExportCenter() {
       if (toDate) body.toDate = toDate;
       const data = (await (await apiRequest("POST", "/api/daily-export/trigger-whatsapp", body)).json()) as any;
       toast({ title: "WhatsApp export started", description: data.message });
-      [5, 20, 45, 75, 120].forEach(s => setTimeout(() => refetchBackup(), s * 1000));
+      [5, 20, 45, 75, 120].forEach((s) => setTimeout(() => refetchBackup(), s * 1000));
     } catch (e: any) {
       toast({ variant: "destructive", title: "WhatsApp send failed", description: e.message });
     }
@@ -143,28 +167,52 @@ export function ExportCenter() {
 
       <Tabs defaultValue="daily" className="w-full">
         <TabsList className="w-full flex h-auto p-1 bg-muted/50 rounded-lg overflow-x-auto no-scrollbar justify-start sm:justify-center gap-1">
-          <TabsTrigger value="daily" className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap">
+          <TabsTrigger
+            value="daily"
+            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+          >
             <Download className="h-4 w-4" /> Daily Export
           </TabsTrigger>
-          <TabsTrigger value="np" className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap">
+          <TabsTrigger
+            value="np"
+            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+          >
             <TrendingUp className="h-4 w-4" /> Net Position
           </TabsTrigger>
-          <TabsTrigger value="stock" className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap">
+          <TabsTrigger
+            value="stock"
+            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+          >
             <Building2 className="h-4 w-4" /> Stock Report
           </TabsTrigger>
-          <TabsTrigger value="wa-groups" className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap">
+          <TabsTrigger
+            value="wa-groups"
+            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+          >
             <MessageCircle className="h-4 w-4" /> POS / WA
           </TabsTrigger>
-          <TabsTrigger value="containers-wa" className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap">
+          <TabsTrigger
+            value="containers-wa"
+            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+          >
             <Calendar className="h-4 w-4" /> Containers
           </TabsTrigger>
-          <TabsTrigger value="transfer-wa" className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap">
+          <TabsTrigger
+            value="transfer-wa"
+            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+          >
             <MessageSquare className="h-4 w-4" /> Transfers
           </TabsTrigger>
-          <TabsTrigger value="agent-duty-wa" className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap">
+          <TabsTrigger
+            value="agent-duty-wa"
+            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+          >
             <Mail className="h-4 w-4" /> Agent / Duty
           </TabsTrigger>
-          <TabsTrigger value="recipients" className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap">
+          <TabsTrigger
+            value="recipients"
+            className="flex items-center gap-2 py-2.5 px-4 rounded-md data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all whitespace-nowrap"
+          >
             <Settings2 className="h-4 w-4" /> Recipients
           </TabsTrigger>
         </TabsList>
@@ -257,7 +305,11 @@ export function ExportCenter() {
           jobId={activeJobId}
           mode={activeMode}
           open={progressOpen}
-          onClose={() => { setProgressOpen(false); setActiveJobId(""); refetchBackup(); }}
+          onClose={() => {
+            setProgressOpen(false);
+            setActiveJobId("");
+            refetchBackup();
+          }}
         />
       )}
     </div>

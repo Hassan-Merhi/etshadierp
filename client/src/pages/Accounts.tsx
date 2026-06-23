@@ -18,18 +18,17 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 import { getDefaultPeriodValue, PeriodFilterValue } from "@/components/ui/period-filter";
 import { useReactToPrint } from "react-to-print";
 
-import { 
-  Account, 
-  Transaction, 
-  GroupedVoucher, 
-  WaRule, 
-  WaChat, 
-  exportLabels 
-} from "./accounts/accountTypes";
+import { Account, Transaction, GroupedVoucher, WaRule, WaChat, exportLabels } from "./accounts/accountTypes";
 import { AccountDialogs } from "./accounts/AccountDialogs";
 import { AccountTable } from "./accounts/AccountTable";
 import { AccountStatementView } from "./accounts/AccountStatementView";
-import { LedgerAccount, BankAccount, insertLedgerAccountSchema, insertBankAccountSchema, updateLedgerAccountSchema } from "@shared/schema";
+import {
+  LedgerAccount,
+  BankAccount,
+  insertLedgerAccountSchema,
+  insertBankAccountSchema,
+  updateLedgerAccountSchema,
+} from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -55,11 +54,15 @@ export default function Accounts() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const fromExternalNavRef = useRef(false);
 
-  useEscapeBack(selectedAccount ? () => {
-    fromExternalNavRef.current = false;
-    setSelectedAccount(null);
-    updateUrlParams({ accountId: null, accountType: null, startDate: null, endDate: null });
-  } : null);
+  useEscapeBack(
+    selectedAccount
+      ? () => {
+          fromExternalNavRef.current = false;
+          setSelectedAccount(null);
+          updateUrlParams({ accountId: null, accountType: null, startDate: null, endDate: null });
+        }
+      : null
+  );
 
   useEffect(() => {
     if (selectedCompany?.id) {
@@ -91,7 +94,11 @@ export default function Accounts() {
       else params.delete(key);
     });
     const newSearch = params.toString();
-    window.history.replaceState(null, "", newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname);
+    window.history.replaceState(
+      null,
+      "",
+      newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname
+    );
   }, []);
 
   useDateJump((date) => {
@@ -146,14 +153,14 @@ export default function Accounts() {
       if (!response.ok) throw new Error("Failed to fetch transactions");
       return await response.json();
     },
-    enabled: !!selectedAccount
+    enabled: !!selectedAccount,
   });
 
   // Derived state
   const vouchersWithBalance = useMemo(() => {
     if (!transactions.length) return [];
     let runBal = selectedAccount?.openingBalance || 0;
-    return transactions.map(t => {
+    return transactions.map((t) => {
       const dr = parseFloat(t.debitAmount) || 0;
       const cr = parseFloat(t.creditAmount) || 0;
       runBal += dr - cr;
@@ -170,21 +177,20 @@ export default function Accounts() {
 
   const filteredAccounts = useMemo(() => {
     const searchLower = searchTerm.toLowerCase();
-    const filtered = allAccounts.filter(a => 
-      a.name.toLowerCase().includes(searchLower) || 
-      a.code.toLowerCase().includes(searchLower)
+    const filtered = allAccounts.filter(
+      (a) => a.name.toLowerCase().includes(searchLower) || a.code.toLowerCase().includes(searchLower)
     );
-    
-    const parents = filtered.filter(a => a.type === "ledger" && !a.code.includes("."));
-    return parents.map(p => ({
+
+    const parents = filtered.filter((a) => a.type === "ledger" && !a.code.includes("."));
+    return parents.map((p) => ({
       ...p,
-      children: filtered.filter(c => c.type === "ledger" && c.code.startsWith(`${p.code}.`))
+      children: filtered.filter((c) => c.type === "ledger" && c.code.startsWith(`${p.code}.`)),
     }));
   }, [allAccounts, searchTerm]);
 
   // Handlers
   const toggleParent = (id: string) => {
-    setExpandedParents(prev => {
+    setExpandedParents((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -193,7 +199,7 @@ export default function Accounts() {
   };
 
   const handleAccountChange = (id: string) => {
-    const acc = allAccounts.find(a => a.id === id);
+    const acc = allAccounts.find((a) => a.id === id);
     if (acc) {
       setSelectedAccount(acc);
       updateUrlParams({ accountId: String(acc.accountId), accountType: acc.type });
@@ -201,7 +207,7 @@ export default function Accounts() {
   };
 
   const toggleVoucherSelection = (voucherId: number) => {
-    setSelectedVoucherIds(prev => {
+    setSelectedVoucherIds((prev) => {
       const next = new Set(prev);
       if (next.has(voucherId)) next.delete(voucherId);
       else next.add(voucherId);
@@ -211,7 +217,7 @@ export default function Accounts() {
 
   const toggleSelectAll = () => {
     if (selectedVoucherIds.size === vouchersWithBalance.length) setSelectedVoucherIds(new Set());
-    else setSelectedVoucherIds(new Set(vouchersWithBalance.map(v => v.voucherId)));
+    else setSelectedVoucherIds(new Set(vouchersWithBalance.map((v) => v.voucherId)));
   };
 
   const handleOpenVoucher = (v: any) => {
@@ -230,22 +236,46 @@ export default function Accounts() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <PageHeader title="Accounts Overview" subtitle="View all accounts, balances, and transaction history" />
-        <Button data-testid="button-create-account" disabled={!selectedCompany} onClick={() => navigate(`${modePrefix}/create`)}>
+        <Button
+          data-testid="button-create-account"
+          disabled={!selectedCompany}
+          onClick={() => navigate(`${modePrefix}/create`)}
+        >
           <Plus className="w-4 h-4 mr-2" /> Create
         </Button>
       </div>
 
       <AccountDialogs
-        bankToEdit={bankToEdit} setBankToEdit={setBankToEdit} bankForm={bankForm}
-        onBankSubmit={() => {}} updateBankMutation={{}} deleteBankMutation={{}}
-        handleDeleteBankAccount={() => {}} accountToEdit={accountToEdit} setAccountToEdit={setAccountToEdit}
-        supplierToEdit={supplierToEdit} setSupplierToEdit={setSupplierToEdit}
-        customerToEdit={customerToEdit} setCustomerToEdit={setCustomerToEdit}
-        employeeToEdit={employeeToEdit} setEmployeeToEdit={setEmployeeToEdit}
-        editForm={editForm} onEditSubmit={() => {}} updateLedgerMutation={{}}
-        handleDeleteAccount={() => {}} pendingDelete={pendingDelete} setPendingDelete={setPendingDelete}
-        waRuleDialogOpen={false} setWaRuleDialogOpen={() => {}} waChatSearch="" setWaChatSearch={() => {}}
-        waRuleDraft={{} as WaRule} setWaRuleDraft={() => {}} filteredWaChats={[]} saveWaRuleMutation={{}} waChatsLoading={false}
+        bankToEdit={bankToEdit}
+        setBankToEdit={setBankToEdit}
+        bankForm={bankForm}
+        onBankSubmit={() => {}}
+        updateBankMutation={{}}
+        deleteBankMutation={{}}
+        handleDeleteBankAccount={() => {}}
+        accountToEdit={accountToEdit}
+        setAccountToEdit={setAccountToEdit}
+        supplierToEdit={supplierToEdit}
+        setSupplierToEdit={setSupplierToEdit}
+        customerToEdit={customerToEdit}
+        setCustomerToEdit={setCustomerToEdit}
+        employeeToEdit={employeeToEdit}
+        setEmployeeToEdit={setEmployeeToEdit}
+        editForm={editForm}
+        onEditSubmit={() => {}}
+        updateLedgerMutation={{}}
+        handleDeleteAccount={() => {}}
+        pendingDelete={pendingDelete}
+        setPendingDelete={setPendingDelete}
+        waRuleDialogOpen={false}
+        setWaRuleDialogOpen={() => {}}
+        waChatSearch=""
+        setWaChatSearch={() => {}}
+        waRuleDraft={{} as WaRule}
+        setWaRuleDraft={() => {}}
+        filteredWaChats={[]}
+        saveWaRuleMutation={{}}
+        waChatsLoading={false}
       />
 
       <Tabs defaultValue="view" className="space-y-6">
@@ -257,58 +287,63 @@ export default function Accounts() {
 
         <TabsContent value="view" className="space-y-4">
           {!selectedAccount ? (
-             <div className="space-y-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Search accounts..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pl-9" />
-                </div>
-                <AccountTable 
-                  filteredAccounts={filteredAccounts} 
-                  expandedParents={expandedParents} 
-                  toggleParent={toggleParent} 
-                  handleAccountChange={handleAccountChange} 
-                  hideBalances={hideBalances} 
-                  formatAmount={formatAmount} 
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search accounts..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
                 />
-             </div>
-          ) : (
-             <AccountStatementView 
-                selectedAccount={selectedAccount} 
-                periodFilter={periodFilter} 
-                setPeriodFilter={setPeriodFilter} 
-                vouchersWithBalance={vouchersWithBalance}
-                closingBalance={closingBalance}
-                openingBalance={selectedAccount.openingBalance || 0}
-                transactionsLoading={transactionsLoading}
-                selectedVoucherIds={selectedVoucherIds}
-                toggleSelectAll={toggleSelectAll}
-                setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
-                filterCurrency={filterCurrency}
-                setFilterCurrency={setFilterCurrency as any}
-                showDeletedVouchers={showDeletedVouchers}
-                setShowDeletedVouchers={setShowDeletedVouchers as any}
-                currentUser={currentUser}
-                formatAmount={formatAmount}
+              </div>
+              <AccountTable
+                filteredAccounts={filteredAccounts}
+                expandedParents={expandedParents}
+                toggleParent={toggleParent}
+                handleAccountChange={handleAccountChange}
                 hideBalances={hideBalances}
-                printRef={printRef}
-                appMode={appMode}
-                formatDisplayDate={formatDisplayDate}
-                toggleVoucherSelection={toggleVoucherSelection}
-                handleOpenVoucher={handleOpenVoucher}
-                waRule={null}
-                openWaRuleDialog={() => {}}
-                sendWaStatementMutation={{}}
-                isMultiCurrency={isMultiCurrency}
-                isBrokerSupplier={false}
-                brokerStatementData={null}
-                factorySupplierStatement={null}
-                factoryStatementLoading={false}
-                brokerStatementLoading={false}
-                handlePrint={handlePrint}
-                exportLang={exportLang}
-                setExportLang={setExportLang}
-                exportLabels={exportLabels}
-             />
+                formatAmount={formatAmount}
+              />
+            </div>
+          ) : (
+            <AccountStatementView
+              selectedAccount={selectedAccount}
+              periodFilter={periodFilter}
+              setPeriodFilter={setPeriodFilter}
+              vouchersWithBalance={vouchersWithBalance}
+              closingBalance={closingBalance}
+              openingBalance={selectedAccount.openingBalance || 0}
+              transactionsLoading={transactionsLoading}
+              selectedVoucherIds={selectedVoucherIds}
+              toggleSelectAll={toggleSelectAll}
+              setShowBulkDeleteConfirm={setShowBulkDeleteConfirm}
+              filterCurrency={filterCurrency}
+              setFilterCurrency={setFilterCurrency as any}
+              showDeletedVouchers={showDeletedVouchers}
+              setShowDeletedVouchers={setShowDeletedVouchers as any}
+              currentUser={currentUser}
+              formatAmount={formatAmount}
+              hideBalances={hideBalances}
+              printRef={printRef}
+              appMode={appMode}
+              formatDisplayDate={formatDisplayDate}
+              toggleVoucherSelection={toggleVoucherSelection}
+              handleOpenVoucher={handleOpenVoucher}
+              waRule={null}
+              openWaRuleDialog={() => {}}
+              sendWaStatementMutation={{}}
+              isMultiCurrency={isMultiCurrency}
+              isBrokerSupplier={false}
+              brokerStatementData={null}
+              factorySupplierStatement={null}
+              factoryStatementLoading={false}
+              brokerStatementLoading={false}
+              handlePrint={handlePrint}
+              exportLang={exportLang}
+              setExportLang={setExportLang}
+              exportLabels={exportLabels}
+            />
           )}
         </TabsContent>
       </Tabs>

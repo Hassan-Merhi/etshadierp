@@ -12,19 +12,19 @@ import FormDataLib from "form-data";
 
 export interface WaSettings {
   instanceId: string;
-  apiToken:   string;
-  enabled:    boolean;
-  monthlyAutoSend:    boolean;
-  dailyAutoSend:      boolean;
-  dailyRecipientId:   number | null;
+  apiToken: string;
+  enabled: boolean;
+  monthlyAutoSend: boolean;
+  dailyAutoSend: boolean;
+  dailyRecipientId: number | null;
 }
 
 export interface WaRecipient {
-  id:       number;
-  chatId:   string;
-  name:     string;
-  isGroup:  boolean;
-  active:   boolean;
+  id: number;
+  chatId: string;
+  name: string;
+  isGroup: boolean;
+  active: boolean;
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -50,56 +50,53 @@ export async function getWaSettings(): Promise<WaSettings | null> {
 export async function getWaSettingsById(id: number): Promise<WaSettings | null> {
   const res = await pool.query(
     "SELECT instance_id, api_token, enabled, monthly_auto_send, daily_auto_send, daily_recipient_id FROM whatsapp_settings WHERE id = $1",
-    [id],
+    [id]
   );
   if (!res.rows?.length) return null;
   const r = res.rows[0];
   return {
-    instanceId:       r.instance_id ?? "",
-    apiToken:         r.api_token   ?? "",
-    enabled:          r.enabled     ?? false,
-    monthlyAutoSend:  r.monthly_auto_send  ?? false,
-    dailyAutoSend:    r.daily_auto_send    ?? false,
+    instanceId: r.instance_id ?? "",
+    apiToken: r.api_token ?? "",
+    enabled: r.enabled ?? false,
+    monthlyAutoSend: r.monthly_auto_send ?? false,
+    dailyAutoSend: r.daily_auto_send ?? false,
     dailyRecipientId: r.daily_recipient_id ?? null,
   };
 }
 
 export async function getActiveRecipients(): Promise<WaRecipient[]> {
   const res = await pool.query(
-    "SELECT id, chat_id, name, is_group, active FROM whatsapp_recipients WHERE active = true ORDER BY id",
+    "SELECT id, chat_id, name, is_group, active FROM whatsapp_recipients WHERE active = true ORDER BY id"
   );
   return (res.rows || []).map((r) => ({
-    id:      r.id,
-    chatId:  r.chat_id,
-    name:    r.name,
+    id: r.id,
+    chatId: r.chat_id,
+    name: r.name,
     isGroup: r.is_group,
-    active:  r.active,
+    active: r.active,
   }));
 }
 
 // ─── Green API: fetch chats so the user can pick a group ──────────────────────
 
 export interface GreenChat {
-  id:   string;   // e.g. 120363198765432@g.us
+  id: string; // e.g. 120363198765432@g.us
   name: string;
   type: "group" | "contact" | string;
 }
 
-export async function fetchGreenApiChats(
-  instanceId: string,
-  apiToken: string,
-): Promise<GreenChat[]> {
-  const url      = baseUrl(instanceId, apiToken, "getChats");
+export async function fetchGreenApiChats(instanceId: string, apiToken: string): Promise<GreenChat[]> {
+  const url = baseUrl(instanceId, apiToken, "getChats");
   const response = await fetch(url, { method: "GET" });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`Green API getChats error ${response.status}: ${body}`);
   }
-  const data = await response.json() as any[];
+  const data = (await response.json()) as any[];
   return data
     .filter((c) => c && c.id)
     .map((c) => ({
-      id:   c.id,
+      id: c.id,
       name: c.name || c.id,
       type: c.type || (String(c.id).endsWith("@g.us") ? "group" : "contact"),
     }));
@@ -127,10 +124,10 @@ async function sendGreenApiFileUpload({
   mimeType,
 }: {
   settings: WaSettings;
-  chatId:   string;
-  buffer:   Buffer;
+  chatId: string;
+  buffer: Buffer;
   fileName: string;
-  caption:  string;
+  caption: string;
   mimeType: string;
 }): Promise<{ success: boolean; error?: string }> {
   const url = baseUrl(settings.instanceId, settings.apiToken, "sendFileByUpload");
@@ -153,16 +150,11 @@ async function sendGreenApiFileUpload({
 
   if (!response.ok) {
     const body = await response.text();
-    console.error(
-      "[WA upload] Green API error",
-      response.status,
-      body,
-      { chatId, fileName, size: buffer.length },
-    );
+    console.error("[WA upload] Green API error", response.status, body, { chatId, fileName, size: buffer.length });
     return { success: false, error: `Green API ${response.status}: ${body}` };
   }
 
-  const json = await response.json().catch(() => ({})) as any;
+  const json = (await response.json().catch(() => ({}))) as any;
   console.log("[WA upload] Green API response", json, { chatId, fileName, size: buffer.length });
   return { success: true };
 }
@@ -170,9 +162,9 @@ async function sendGreenApiFileUpload({
 // ─── Send file ────────────────────────────────────────────────────────────────
 
 interface SendResult {
-  chatId:  string;
+  chatId: string;
   success: boolean;
-  error?:  string;
+  error?: string;
 }
 
 /** Resolve the active WhatsApp settings for POS sending: use instance 2 if configured, else instance 1.
@@ -188,8 +180,8 @@ export async function getPosWaSettings(): Promise<WaSettings | null> {
 
 /** Send a plain text message to one specific chatId */
 export async function sendWhatsAppTextToChatId(
-  chatId:  string,
-  message: string,
+  chatId: string,
+  message: string
 ): Promise<{ success: boolean; error?: string }> {
   const settings = await getWaSettings();
   if (!settings?.instanceId || !settings?.apiToken) {
@@ -215,10 +207,10 @@ export async function sendWhatsAppTextToChatId(
 /** Send a file by URL via the POS instance (id=2 with fallback to id=1).
  *  Uses Green API's sendFileByUrl — more reliable than multipart upload. */
 export async function sendWhatsAppFileByUrlToChatIdPos(
-  chatId:   string,
-  fileUrl:  string,
+  chatId: string,
+  fileUrl: string,
   fileName: string,
-  caption:  string,
+  caption: string
 ): Promise<{ success: boolean; error?: string }> {
   const settings = await getPosWaSettings();
   if (!settings?.instanceId || !settings?.apiToken) {
@@ -247,11 +239,11 @@ export async function sendWhatsAppFileByUrlToChatIdPos(
  * Uses the shared sendGreenApiFileUpload helper (form-data package).
  */
 export async function sendWhatsAppFileByUploadPos(
-  chatId:      string,
-  fileBuffer:  Buffer,
-  fileName:    string,
-  caption:     string,
-  mimeType:    string = "application/pdf",
+  chatId: string,
+  fileBuffer: Buffer,
+  fileName: string,
+  caption: string,
+  mimeType: string = "application/pdf"
 ): Promise<{ success: boolean; error?: string }> {
   const settings = await getPosWaSettings();
   if (!settings?.instanceId || !settings?.apiToken) {
@@ -265,8 +257,8 @@ export async function sendWhatsAppFileByUploadPos(
 
 /** Send a plain text message via the POS instance (id=2 with fallback to id=1) */
 export async function sendWhatsAppTextToChatIdPos(
-  chatId:  string,
-  message: string,
+  chatId: string,
+  message: string
 ): Promise<{ success: boolean; error?: string }> {
   const settings = await getPosWaSettings();
   if (!settings?.instanceId || !settings?.apiToken) {
@@ -291,7 +283,7 @@ export async function sendWhatsAppTextToChatIdPos(
 
 /** Send a plain text message to ALL active recipients */
 export async function sendWhatsAppText(
-  message: string,
+  message: string
 ): Promise<{ success: boolean; sent: number; failed: number; errors: string[] }> {
   const settings = await getWaSettings();
   if (!settings?.instanceId || !settings?.apiToken) {
@@ -339,11 +331,11 @@ export async function sendWhatsAppText(
  * Uses the shared sendGreenApiFileUpload helper (form-data package).
  */
 export async function sendWhatsAppFileToChatIdPos(
-  chatId:   string,
-  buffer:   Buffer,
+  chatId: string,
+  buffer: Buffer,
   fileName: string,
-  caption:  string,
-  mimeType = "application/pdf",
+  caption: string,
+  mimeType = "application/pdf"
 ): Promise<{ success: boolean; error?: string }> {
   const settings = await getPosWaSettings();
   if (!settings?.instanceId || !settings?.apiToken) {
@@ -360,11 +352,11 @@ export async function sendWhatsAppFileToChatIdPos(
  * Uses the shared sendGreenApiFileUpload helper (form-data package).
  */
 export async function sendWhatsAppFileToChatId(
-  chatId:   string,
-  buffer:   Buffer,
+  chatId: string,
+  buffer: Buffer,
   fileName: string,
-  caption:  string,
-  mimeType = "application/octet-stream",
+  caption: string,
+  mimeType = "application/octet-stream"
 ): Promise<{ success: boolean; error?: string }> {
   const settings = await getWaSettings();
   if (!settings?.instanceId || !settings?.apiToken) {
@@ -379,13 +371,13 @@ export async function sendWhatsAppFileToChatId(
 // ─── Containers WhatsApp settings ────────────────────────────────────────────
 
 export interface ContainersWaSettings {
-  groupChatId:     string;
+  groupChatId: string;
   scheduleEnabled: boolean;
-  scheduleHour:    number;
-  lastSentAt:      string | null;
-  instanceId:      string;
-  apiToken:        string;
-  enabled:         boolean;
+  scheduleHour: number;
+  lastSentAt: string | null;
+  instanceId: string;
+  apiToken: string;
+  enabled: boolean;
 }
 
 export async function getContainersWaSettings(): Promise<ContainersWaSettings | null> {
@@ -395,27 +387,25 @@ export async function getContainersWaSettings(): Promise<ContainersWaSettings | 
             containers_wa_schedule_enabled,
             containers_wa_schedule_hour,
             containers_wa_last_sent_at
-     FROM whatsapp_settings WHERE id = 1`,
+     FROM whatsapp_settings WHERE id = 1`
   );
   if (!res.rows?.length) return null;
   const r = res.rows[0];
   return {
-    instanceId:      r.instance_id      ?? "",
-    apiToken:        r.api_token        ?? "",
-    enabled:         r.enabled          ?? false,
-    groupChatId:     r.containers_wa_group_chat_id      ?? "",
-    scheduleEnabled: r.containers_wa_schedule_enabled   ?? false,
-    scheduleHour:    r.containers_wa_schedule_hour      ?? 8,
-    lastSentAt:      r.containers_wa_last_sent_at
-      ? new Date(r.containers_wa_last_sent_at).toISOString()
-      : null,
+    instanceId: r.instance_id ?? "",
+    apiToken: r.api_token ?? "",
+    enabled: r.enabled ?? false,
+    groupChatId: r.containers_wa_group_chat_id ?? "",
+    scheduleEnabled: r.containers_wa_schedule_enabled ?? false,
+    scheduleHour: r.containers_wa_schedule_hour ?? 8,
+    lastSentAt: r.containers_wa_last_sent_at ? new Date(r.containers_wa_last_sent_at).toISOString() : null,
   };
 }
 
 export async function updateContainersWaSettings(
-  groupChatId:     string,
+  groupChatId: string,
   scheduleEnabled: boolean,
-  scheduleHour:    number,
+  scheduleHour: number
 ): Promise<void> {
   await pool.query(
     `UPDATE whatsapp_settings
@@ -423,77 +413,76 @@ export async function updateContainersWaSettings(
          containers_wa_schedule_enabled   = $2,
          containers_wa_schedule_hour      = $3
      WHERE id = 1`,
-    [groupChatId, scheduleEnabled, scheduleHour],
+    [groupChatId, scheduleEnabled, scheduleHour]
   );
 }
 
 export async function markContainersWaSent(): Promise<void> {
-  await pool.query(
-    `UPDATE whatsapp_settings SET containers_wa_last_sent_at = NOW() WHERE id = 1`,
-  );
+  await pool.query(`UPDATE whatsapp_settings SET containers_wa_last_sent_at = NOW() WHERE id = 1`);
 }
 
 // ─── Agent Duty WhatsApp Settings ────────────────────────────────────────────
 
 export async function getAgentDutyWaGroups(): Promise<Record<string, string>> {
   const res = await pool.query(
-    `SELECT instance_id, api_token, enabled, agent_duty_wa_groups FROM whatsapp_settings WHERE id = 1`,
+    `SELECT instance_id, api_token, enabled, agent_duty_wa_groups FROM whatsapp_settings WHERE id = 1`
   );
   if (!res.rows?.length) return {};
   const r = res.rows[0];
   return {
-    groups:     r.agent_duty_wa_groups ?? {},
+    groups: r.agent_duty_wa_groups ?? {},
     instanceId: r.instance_id ?? "",
-    apiToken:   r.api_token ?? "",
-    enabled:    r.enabled ?? false,
+    apiToken: r.api_token ?? "",
+    enabled: r.enabled ?? false,
   } as any;
 }
 
-export async function getAgentDutyWaCredentials(): Promise<{ groups: Record<string, string>; instanceId: string; apiToken: string; enabled: boolean } | null> {
+export async function getAgentDutyWaCredentials(): Promise<{
+  groups: Record<string, string>;
+  instanceId: string;
+  apiToken: string;
+  enabled: boolean;
+} | null> {
   const res = await pool.query(
-    `SELECT instance_id, api_token, enabled, agent_duty_wa_groups FROM whatsapp_settings WHERE id = 1`,
+    `SELECT instance_id, api_token, enabled, agent_duty_wa_groups FROM whatsapp_settings WHERE id = 1`
   );
   if (!res.rows?.length) return null;
   const r = res.rows[0];
   return {
-    groups:     r.agent_duty_wa_groups ?? {},
+    groups: r.agent_duty_wa_groups ?? {},
     instanceId: r.instance_id ?? "",
-    apiToken:   r.api_token ?? "",
-    enabled:    r.enabled ?? false,
+    apiToken: r.api_token ?? "",
+    enabled: r.enabled ?? false,
   };
 }
 
 export async function updateAgentDutyWaGroups(groups: Record<string, string>): Promise<void> {
-  await pool.query(
-    `UPDATE whatsapp_settings SET agent_duty_wa_groups = $1 WHERE id = 1`,
-    [JSON.stringify(groups)],
-  );
+  await pool.query(`UPDATE whatsapp_settings SET agent_duty_wa_groups = $1 WHERE id = 1`, [JSON.stringify(groups)]);
 }
 
 // ── Stock Transfer WhatsApp Settings (per-company) ──────────────────────────
 
 export async function getCompanyTransferWaGroupChatId(companyId: number): Promise<string> {
-  const res = await pool.query(
-    `SELECT transfer_wa_group_chat_id FROM companies WHERE id = $1`,
-    [companyId],
-  );
+  const res = await pool.query(`SELECT transfer_wa_group_chat_id FROM companies WHERE id = $1`, [companyId]);
   return res.rows[0]?.transfer_wa_group_chat_id ?? "";
 }
 
 export async function setCompanyTransferWaGroupChatId(companyId: number, groupChatId: string): Promise<void> {
-  await pool.query(
-    `UPDATE companies SET transfer_wa_group_chat_id = $1 WHERE id = $2`,
-    [groupChatId || null, companyId],
-  );
+  await pool.query(`UPDATE companies SET transfer_wa_group_chat_id = $1 WHERE id = $2`, [
+    groupChatId || null,
+    companyId,
+  ]);
 }
 
-export async function getAllCompanyTransferWaSettings(): Promise<Array<{ companyId: number; companyName: string; groupChatId: string }>> {
+export async function getAllCompanyTransferWaSettings(): Promise<
+  Array<{ companyId: number; companyName: string; groupChatId: string }>
+> {
   const res = await pool.query(
     `SELECT id, name, COALESCE(transfer_wa_group_chat_id, '') AS group_chat_id
-     FROM companies WHERE active = true ORDER BY name`,
+     FROM companies WHERE active = true ORDER BY name`
   );
   return res.rows.map((r: any) => ({
-    companyId:   r.id,
+    companyId: r.id,
     companyName: r.name,
     groupChatId: r.group_chat_id ?? "",
   }));
@@ -504,9 +493,9 @@ export async function getAllCompanyTransferWaSettings(): Promise<Array<{ company
  * Uses the shared sendGreenApiFileUpload helper (form-data package).
  */
 export async function sendWhatsAppFile(
-  buffer:   Buffer,
+  buffer: Buffer,
   fileName: string,
-  caption:  string,
+  caption: string
 ): Promise<{ success: boolean; sent: number; failed: number; errors: string[] }> {
   const settings = await getWaSettings();
   if (!settings?.instanceId || !settings?.apiToken) {
@@ -525,7 +514,7 @@ export async function sendWhatsAppFile(
     recipients.map(async (r): Promise<SendResult> => {
       const res = await sendGreenApiFileUpload({
         settings,
-        chatId:   r.chatId,
+        chatId: r.chatId,
         buffer,
         fileName,
         caption,
@@ -533,7 +522,7 @@ export async function sendWhatsAppFile(
       });
       if (!res.success) throw new Error(res.error ?? "Upload failed");
       return { chatId: r.chatId, success: true };
-    }),
+    })
   );
 
   let sent = 0;

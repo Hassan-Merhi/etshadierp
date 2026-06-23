@@ -54,7 +54,9 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
         })
       );
       const map: Record<number, string> = {};
-      results.flat().forEach((loc: any) => { map[loc.id] = loc.name; });
+      results.flat().forEach((loc: any) => {
+        map[loc.id] = loc.name;
+      });
       return map;
     },
     enabled: posCompanyIds.length > 0,
@@ -105,7 +107,7 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
   const activeEditingRole =
     activeEditorRoleId === "new" || activeEditorRoleId === null
       ? null
-      : companyRoles.find((r: any) => r.id === activeEditorRoleId) ?? null;
+      : (companyRoles.find((r: any) => r.id === activeEditorRoleId) ?? null);
 
   const showEditor = activeEditorRoleId !== null;
 
@@ -153,15 +155,10 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
             <div key={role.id}>
               <RoleSummaryRow
                 role={role}
-                companyName={
-                  companies.find((c: any) => c.id === role.companyId)?.name ||
-                  `Company ${role.companyId}`
-                }
+                companyName={companies.find((c: any) => c.id === role.companyId)?.name || `Company ${role.companyId}`}
                 locationNames={getLocationNames(role)}
                 isEditing={activeEditorRoleId === role.id}
-                onEdit={() =>
-                  setActiveEditorRoleId((prev) => (prev === role.id ? null : role.id))
-                }
+                onEdit={() => setActiveEditorRoleId((prev) => (prev === role.id ? null : role.id))}
                 onDelete={() => setRoleToDelete(role)}
               />
               {activeEditorRoleId === role.id && (
@@ -190,7 +187,12 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
         </CardContent>
       </Card>
 
-      <AlertDialog open={!!roleToDelete} onOpenChange={(v) => { if (!v) setRoleToDelete(null); }}>
+      <AlertDialog
+        open={!!roleToDelete}
+        onOpenChange={(v) => {
+          if (!v) setRoleToDelete(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this role?</AlertDialogTitle>
@@ -199,7 +201,8 @@ export function UserRolesCard({ userId, companies }: UserRolesCardProps) {
               <strong>
                 {companies.find((c: any) => c.id === roleToDelete?.companyId)?.name ||
                   `Company ${roleToDelete?.companyId}`}
-              </strong>?
+              </strong>
+              ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -106,11 +106,21 @@ export function ChatWidget() {
     handleApplyAllPatches,
     handleGitPush: _handleGitPush,
   } = useChatActions({
-    sessionId, location, sessionReadFiles,
-    setMessage, setLastUsedProvider, setSuggestions,
-    setPendingVoucher, setPendingStockAdj, setPendingStockTransfer,
-    setVoucherSearchResults, setPendingStockItem, setPendingPriceUpdate,
-    setAccountQueryResult, setVerifyContainerDraft, setDataQueryResult,
+    sessionId,
+    location,
+    sessionReadFiles,
+    setMessage,
+    setLastUsedProvider,
+    setSuggestions,
+    setPendingVoucher,
+    setPendingStockAdj,
+    setPendingStockTransfer,
+    setVoucherSearchResults,
+    setPendingStockItem,
+    setPendingPriceUpdate,
+    setAccountQueryResult,
+    setVerifyContainerDraft,
+    setDataQueryResult,
     setPendingFilePatches,
     setAppliedPatchFiles: (fn) => setAppliedPatchFiles(fn),
     setPerFilePushResult: (fn) => setPerFilePushResult(fn),
@@ -122,31 +132,59 @@ export function ChatWidget() {
 
   const handleConfirmVoucher = async (edited: VoucherDraft) => {
     setVoucherSubmitting(true);
-    try { await _handleConfirmVoucher(edited); } finally { setVoucherSubmitting(false); }
+    try {
+      await _handleConfirmVoucher(edited);
+    } finally {
+      setVoucherSubmitting(false);
+    }
   };
   const handleConfirmStockTransfer = async (resolved: StockTransferDraft) => {
     setStockTransferSubmitting(true);
-    try { await _handleConfirmStockTransfer(resolved); } finally { setStockTransferSubmitting(false); }
+    try {
+      await _handleConfirmStockTransfer(resolved);
+    } finally {
+      setStockTransferSubmitting(false);
+    }
   };
   const handleConfirmStockAdj = async (resolved: StockAdjustmentDraft) => {
     setStockAdjSubmitting(true);
-    try { await _handleConfirmStockAdj(resolved); } finally { setStockAdjSubmitting(false); }
+    try {
+      await _handleConfirmStockAdj(resolved);
+    } finally {
+      setStockAdjSubmitting(false);
+    }
   };
   const handleConfirmStockItem = async (resolved: StockItemDraft) => {
     setStockItemSubmitting(true);
-    try { await _handleConfirmStockItem(resolved); } finally { setStockItemSubmitting(false); }
+    try {
+      await _handleConfirmStockItem(resolved);
+    } finally {
+      setStockItemSubmitting(false);
+    }
   };
   const handleConfirmPriceUpdate = async (resolved: PriceUpdateDraft) => {
     setPriceUpdateSubmitting(true);
-    try { await _handleConfirmPriceUpdate(resolved); } finally { setPriceUpdateSubmitting(false); }
+    try {
+      await _handleConfirmPriceUpdate(resolved);
+    } finally {
+      setPriceUpdateSubmitting(false);
+    }
   };
   const handleApplyPatch = async (patch: FilePatchDraft) => {
     setPatchApplying(patch.filePath);
-    try { await _handleApplyPatch(patch); } finally { setPatchApplying(null); }
+    try {
+      await _handleApplyPatch(patch);
+    } finally {
+      setPatchApplying(null);
+    }
   };
   const handleGitPush = async (filePath: string, commitMsg: string) => {
     setGitPushing(true);
-    try { await _handleGitPush(filePath, commitMsg); } finally { setGitPushing(false); }
+    try {
+      await _handleGitPush(filePath, commitMsg);
+    } finally {
+      setGitPushing(false);
+    }
   };
 
   useEffect(() => {
@@ -182,11 +220,14 @@ export function ChatWidget() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   const handleFeedback = async (messageId: number, type: "positive" | "negative") => {
-    setFeedbackGiven(prev => ({ ...prev, [messageId]: type }));
+    setFeedbackGiven((prev) => ({ ...prev, [messageId]: type }));
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -200,7 +241,11 @@ export function ChatWidget() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const resp = await fetch("/api/chatbot/parse-po-file", { method: "POST", body: formData, credentials: "include" });
+      const resp = await fetch("/api/chatbot/parse-po-file", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Failed to parse file");
       setPoDraft(data as POImportDraft);
@@ -216,8 +261,10 @@ export function ChatWidget() {
     setPoDraftError(null);
     try {
       const resp = await fetch("/api/chatbot/confirm-po-import", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(resolved), credentials: "include",
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(resolved),
+        credentials: "include",
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Import failed");
@@ -269,7 +316,9 @@ export function ChatWidget() {
   const formatMsgTime = (iso: string) => {
     try {
       return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } catch { return ""; }
+    } catch {
+      return "";
+    }
   };
 
   const pageContext = (() => {
@@ -323,13 +372,32 @@ export function ChatWidget() {
               </div>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={handleNewChat} title="New conversation" data-testid="button-new-chat">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={handleNewChat}
+                title="New conversation"
+                data-testid="button-new-chat"
+              >
                 <RefreshCw className="h-4 w-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setIsMinimized(!isMinimized)} data-testid="button-minimize-chat">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={() => setIsMinimized(!isMinimized)}
+                data-testid="button-minimize-chat"
+              >
                 {isMinimized ? <Maximize2 className="h-4 w-4" /> : <MinimizeIcon className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => setIsOpen(false)} data-testid="button-close-chat">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full"
+                onClick={() => setIsOpen(false)}
+                data-testid="button-close-chat"
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -337,7 +405,10 @@ export function ChatWidget() {
 
           {!isMinimized && (
             <div className="px-5 pt-2.5 pb-1 bg-background">
-              <Badge variant="secondary" className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800 font-medium px-2 py-0.5 flex items-center gap-1.5 w-fit text-[11px]">
+              <Badge
+                variant="secondary"
+                className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-800 font-medium px-2 py-0.5 flex items-center gap-1.5 w-fit text-[11px]"
+              >
                 <Package className="h-3 w-3" />
                 Context: {pageContext}
               </Badge>
@@ -349,7 +420,10 @@ export function ChatWidget() {
               {showAlerts && (
                 <AlertsDigest
                   onClose={() => setShowAlerts(false)}
-                  onPrefill={(text) => { setMessage(text); inputRef.current?.focus(); }}
+                  onPrefill={(text) => {
+                    setMessage(text);
+                    inputRef.current?.focus();
+                  }}
                 />
               )}
 
@@ -416,7 +490,7 @@ export function ChatWidget() {
                 <div className="px-4 pb-1 border-b border-border/40">
                   <button
                     className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors mb-1"
-                    onClick={() => setShowSessionFiles(v => !v)}
+                    onClick={() => setShowSessionFiles((v) => !v)}
                   >
                     {showSessionFiles ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
                     <FileCode className="h-3 w-3" />
@@ -424,15 +498,21 @@ export function ChatWidget() {
                   </button>
                   {showSessionFiles && (
                     <div className="flex flex-wrap gap-1 pb-1">
-                      {sessionReadFiles.map(fp => (
-                        <span key={fp} className="inline-flex items-center gap-1 text-[10px] font-mono bg-muted rounded px-1.5 py-0.5 text-muted-foreground">
+                      {sessionReadFiles.map((fp) => (
+                        <span
+                          key={fp}
+                          className="inline-flex items-center gap-1 text-[10px] font-mono bg-muted rounded px-1.5 py-0.5 text-muted-foreground"
+                        >
                           <FileCode className="h-2.5 w-2.5 shrink-0" />
                           {fp.replace(/^.*\//, "")}
                         </span>
                       ))}
                       <button
                         className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground transition-colors px-1"
-                        onClick={() => { setSessionReadFiles([]); setShowSessionFiles(false); }}
+                        onClick={() => {
+                          setSessionReadFiles([]);
+                          setShowSessionFiles(false);
+                        }}
                       >
                         clear
                       </button>

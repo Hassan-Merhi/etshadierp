@@ -12,26 +12,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
@@ -65,7 +48,14 @@ interface AccountComboboxProps {
   testId?: string;
 }
 
-function AccountCombobox({ value, onValueChange, accounts, placeholder = "Select account", disabled = false, testId }: AccountComboboxProps) {
+function AccountCombobox({
+  value,
+  onValueChange,
+  accounts,
+  placeholder = "Select account",
+  disabled = false,
+  testId,
+}: AccountComboboxProps) {
   const [open, setOpen] = useState(false);
   const selectedAccount = accounts.find((account) => account.id.toString() === value);
 
@@ -100,10 +90,7 @@ function AccountCombobox({ value, onValueChange, accounts, placeholder = "Select
                   }}
                 >
                   <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === account.id.toString() ? "opacity-100" : "opacity-0"
-                    )}
+                    className={cn("mr-2 h-4 w-4", value === account.id.toString() ? "opacity-100" : "opacity-0")}
                   />
                   {account.name}
                 </CommandItem>
@@ -124,7 +111,13 @@ interface LocationComboboxProps {
   testId?: string;
 }
 
-function LocationCombobox({ value, onValueChange, locations, placeholder = "Select location", testId }: LocationComboboxProps) {
+function LocationCombobox({
+  value,
+  onValueChange,
+  locations,
+  placeholder = "Select location",
+  testId,
+}: LocationComboboxProps) {
   const [open, setOpen] = useState(false);
   const selectedLocation = locations.find((location) => location.id.toString() === value);
 
@@ -158,10 +151,7 @@ function LocationCombobox({ value, onValueChange, locations, placeholder = "Sele
                   }}
                 >
                   <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === location.id.toString() ? "opacity-100" : "opacity-0"
-                    )}
+                    className={cn("mr-2 h-4 w-4", value === location.id.toString() ? "opacity-100" : "opacity-0")}
                   />
                   {location.name}
                 </CommandItem>
@@ -174,13 +164,7 @@ function LocationCombobox({ value, onValueChange, locations, placeholder = "Sele
   );
 }
 
-export function OffloadDialog({
-  open,
-  onOpenChange,
-  containerId,
-  containerNumber,
-  totalBales,
-}: OffloadDialogProps) {
+export function OffloadDialog({ open, onOpenChange, containerId, containerNumber, totalBales }: OffloadDialogProps) {
   const [_location, setLocation] = useLocation();
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
@@ -308,19 +292,25 @@ export function OffloadDialog({
         if (!spPrepaidExpAcct) throw new Error("SP Prepaid Expenses account not found. Run SP Setup first.");
         if (!spHadiIcAcct) throw new Error("SP Intercompany account not found. Run SP Setup first.");
 
-        const resolvedDutiesAccountId = dutiesAmt > 0
-          ? (spDutiesMethod === "prepaid_expenses" ? spPrepaidExpAcct.id : spHadiIcAcct.id)
-          : null;
-        const resolvedTransportAccountId = transportAmt > 0
-          ? (spTransportMethod === "prepaid_expenses" ? spPrepaidExpAcct.id : spHadiIcAcct.id)
-          : null;
+        const resolvedDutiesAccountId =
+          dutiesAmt > 0 ? (spDutiesMethod === "prepaid_expenses" ? spPrepaidExpAcct.id : spHadiIcAcct.id) : null;
+        const resolvedTransportAccountId =
+          transportAmt > 0 ? (spTransportMethod === "prepaid_expenses" ? spPrepaidExpAcct.id : spHadiIcAcct.id) : null;
 
         const agentChargeLines: any[] = [];
         if (dutiesAmt > 0 && spDutiesMethod === "parent_agent") {
-          agentChargeLines.push({ description: "Duties", amountUsd: dutiesAmt, parentAgentAccountId: parseInt(spDutiesAgentId) });
+          agentChargeLines.push({
+            description: "Duties",
+            amountUsd: dutiesAmt,
+            parentAgentAccountId: parseInt(spDutiesAgentId),
+          });
         }
         if (transportAmt > 0 && spTransportMethod === "parent_agent") {
-          agentChargeLines.push({ description: "Transport", amountUsd: transportAmt, parentAgentAccountId: parseInt(spTransportAgentId) });
+          agentChargeLines.push({
+            description: "Transport",
+            amountUsd: transportAmt,
+            parentAgentAccountId: parseInt(spTransportAgentId),
+          });
         }
 
         const response = await factoryApiRequest("POST", `/api/containers/${containerId}/offload`, {
@@ -420,10 +410,11 @@ export function OffloadDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5" noValidate>
-
           {/* Offload Date */}
           <div className="space-y-1.5">
-            <Label htmlFor="offload-date" className="text-sm font-medium">Offload Date</Label>
+            <Label htmlFor="offload-date" className="text-sm font-medium">
+              Offload Date
+            </Label>
             <Input
               id="offload-date"
               type="date"
@@ -666,7 +657,9 @@ export function OffloadDialog({
 
           {/* Destination Location */}
           <div className="space-y-1.5">
-            <Label htmlFor="location" className="text-sm font-medium">Destination Location</Label>
+            <Label htmlFor="location" className="text-sm font-medium">
+              Destination Location
+            </Label>
             <LocationCombobox
               value={locationId?.toString() || ""}
               onValueChange={(value) => setLocationId(parseInt(value))}
@@ -695,15 +688,21 @@ export function OffloadDialog({
                 )}
                 <div className="flex justify-between font-semibold border-t pt-2 mt-1">
                   <span>Total Charges</span>
-                  <span className="tabular-nums" data-testid="text-total-charges">${formatNumber(totalCharges)}</span>
+                  <span className="tabular-nums" data-testid="text-total-charges">
+                    ${formatNumber(totalCharges)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Total Bales</span>
-                  <span className="tabular-nums" data-testid="text-total-bales">{formatNumber(totalBales)}</span>
+                  <span className="tabular-nums" data-testid="text-total-bales">
+                    {formatNumber(totalBales)}
+                  </span>
                 </div>
                 <div className="flex justify-between font-semibold border-t pt-2 mt-1">
                   <span>Cost Added per Bale</span>
-                  <span className="tabular-nums" data-testid="text-cost-per-bale">${formatNumber(additionalCostPerBale)}</span>
+                  <span className="tabular-nums" data-testid="text-cost-per-bale">
+                    ${formatNumber(additionalCostPerBale)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -719,11 +718,7 @@ export function OffloadDialog({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={offloadMutation.isPending || !locationId}
-              data-testid="button-offload"
-            >
+            <Button type="submit" disabled={offloadMutation.isPending || !locationId} data-testid="button-offload">
               {offloadMutation.isPending ? "Offloading..." : "Offload Container"}
             </Button>
           </DialogFooter>

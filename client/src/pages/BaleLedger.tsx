@@ -5,19 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Package,
   Trash2,
@@ -109,7 +98,16 @@ function groupByCategory(rows: BucketRow[]): { category: string; items: BucketRo
   return Array.from(map.entries()).map(([category, items]) => ({ category, items }));
 }
 
-function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultOpen = false, showSoldPrice = false }: SectionProps) {
+function SectionTable({
+  title,
+  subtitle,
+  icon,
+  badgeColor,
+  rows,
+  total,
+  defaultOpen = false,
+  showSoldPrice = false,
+}: SectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
@@ -155,9 +153,7 @@ function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultO
                 </Badge>
                 <span className="text-muted-foreground">{fmtKg(total.totalWeightKg)} kg</span>
                 <span className="font-semibold">{fmtMoney(total.totalCost)}</span>
-                {avgRate > 0 && (
-                  <span className="text-muted-foreground">avg {fmtMoney(avgRate)}/bale</span>
-                )}
+                {avgRate > 0 && <span className="text-muted-foreground">avg {fmtMoney(avgRate)}/bale</span>}
               </div>
             </div>
           </CardHeader>
@@ -257,17 +253,25 @@ function SectionTable({ title, subtitle, icon, badgeColor, rows, total, defaultO
                                     <thead className="sticky top-0 z-30 bg-muted/50">
                                       <tr className="border-b border-border/50">
                                         <th className="text-left py-1 pr-4 font-medium text-muted-foreground">Ref #</th>
-                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Weight (kg)</th>
+                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">
+                                          Weight (kg)
+                                        </th>
                                         <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Qty</th>
-                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">Avg Cost/Bale</th>
-                                        <th className="text-right py-1 font-medium text-muted-foreground">Total Cost</th>
+                                        <th className="text-right py-1 pr-4 font-medium text-muted-foreground">
+                                          Avg Cost/Bale
+                                        </th>
+                                        <th className="text-right py-1 font-medium text-muted-foreground">
+                                          Total Cost
+                                        </th>
                                       </tr>
                                     </thead>
                                     <tbody>
                                       {r.baleDetails.map((d, di) => (
                                         <tr key={di} className="border-b border-border/20 last:border-0">
                                           <td className="py-1 pr-4 font-mono">{d.ref || "—"}</td>
-                                          <td className="py-1 pr-4 text-right text-muted-foreground">{fmtKg(d.weightKg)}</td>
+                                          <td className="py-1 pr-4 text-right text-muted-foreground">
+                                            {fmtKg(d.weightKg)}
+                                          </td>
                                           <td className="py-1 pr-4 text-right text-muted-foreground">1</td>
                                           <td className="py-1 pr-4 text-right text-muted-foreground">
                                             {d.totalCost > 0 ? fmtMoney(d.totalCost) : "—"}
@@ -458,9 +462,7 @@ export default function BaleLedger() {
                       </div>
                       {grand.baleCount > 0 && grand.totalCost > 0 && (
                         <div className="text-center">
-                          <p className="text-xl font-bold">
-                            {fmtMoney(grand.totalCost / grand.baleCount)}
-                          </p>
+                          <p className="text-xl font-bold">{fmtMoney(grand.totalCost / grand.baleCount)}</p>
                           <p className="text-xs text-muted-foreground">avg/bale</p>
                         </div>
                       )}
@@ -511,9 +513,7 @@ export default function BaleLedger() {
                           <p className="text-muted-foreground">
                             {fmtN(s.bales)} bales · {fmtKg(s.kg)} kg
                           </p>
-                          {s.cost > 0 && (
-                            <p className="text-muted-foreground">{fmtMoney(s.cost)}</p>
-                          )}
+                          {s.cost > 0 && <p className="text-muted-foreground">{fmtMoney(s.cost)}</p>}
                         </div>
                       ))}
                     </div>

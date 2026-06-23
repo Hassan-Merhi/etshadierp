@@ -6,43 +6,109 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
   factorySupplierCategories,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
@@ -52,21 +118,31 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-
-
 export function registerRawStockBalanceRoutes(app: Express) {
   app.post("/api/factory/raw-stock/opening-balance", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { supplierName, supplierId: reqSupplierId, receivedKg, costPerKg, currencyCode: reqCurrency, fxRateToUsd: reqFxRate, notes,
-        commissionAmount: reqCommAmount, commissionCurrencyCode: reqCommCurrency,
-        commissionFxRateToUsd: reqCommFxRate } = req.body;
+      const {
+        supplierName,
+        supplierId: reqSupplierId,
+        receivedKg,
+        costPerKg,
+        currencyCode: reqCurrency,
+        fxRateToUsd: reqFxRate,
+        notes,
+        commissionAmount: reqCommAmount,
+        commissionCurrencyCode: reqCommCurrency,
+        commissionFxRateToUsd: reqCommFxRate,
+      } = req.body;
 
-      if (!supplierName || !String(supplierName).trim()) return res.status(400).json({ message: "Supplier name is required" });
-      if (!receivedKg || parseFloat(receivedKg) <= 0) return res.status(400).json({ message: "Received KG must be positive" });
-      if (!costPerKg || parseFloat(costPerKg) < 0) return res.status(400).json({ message: "Cost per KG must be non-negative" });
+      if (!supplierName || !String(supplierName).trim())
+        return res.status(400).json({ message: "Supplier name is required" });
+      if (!receivedKg || parseFloat(receivedKg) <= 0)
+        return res.status(400).json({ message: "Received KG must be positive" });
+      if (!costPerKg || parseFloat(costPerKg) < 0)
+        return res.status(400).json({ message: "Cost per KG must be non-negative" });
 
       const currencyCode = reqCurrency || "USD";
       const fxRate = parseFloat(reqFxRate || "1");
@@ -92,10 +168,12 @@ export function registerRawStockBalanceRoutes(app: Express) {
           const [found] = await tx
             .select()
             .from(factorySuppliers)
-            .where(and(
-              eq(factorySuppliers.companyId, companyId),
-              sql`lower(${factorySuppliers.name}) = lower(${trimmedSupplierName})`
-            ))
+            .where(
+              and(
+                eq(factorySuppliers.companyId, companyId),
+                sql`lower(${factorySuppliers.name}) = lower(${trimmedSupplierName})`
+              )
+            )
             .limit(1);
           if (found) {
             existingSupplier = found;
@@ -112,7 +190,12 @@ export function registerRawStockBalanceRoutes(app: Express) {
         const existingOBs = await tx
           .select({ containerNumber: factoryContainers.containerNumber })
           .from(factoryContainers)
-          .where(and(eq(factoryContainers.companyId, companyId), sql`${factoryContainers.containerNumber} LIKE ${"OB-" + year + "-%"}`));
+          .where(
+            and(
+              eq(factoryContainers.companyId, companyId),
+              sql`${factoryContainers.containerNumber} LIKE ${"OB-" + year + "-%"}`
+            )
+          );
 
         let nextNum = 1;
         for (const c of existingOBs) {
@@ -157,11 +240,13 @@ export function registerRawStockBalanceRoutes(app: Express) {
           const [existing] = await tx
             .select()
             .from(factorySuppliers)
-            .where(and(
-              eq(factorySuppliers.companyId, companyId),
-              eq((factorySuppliers as any).parentId, existingSupplier.id),
-              sql`lower(${factorySuppliers.name}) = lower(${commName})`
-            ))
+            .where(
+              and(
+                eq(factorySuppliers.companyId, companyId),
+                eq((factorySuppliers as any).parentId, existingSupplier.id),
+                sql`lower(${factorySuppliers.name}) = lower(${commName})`
+              )
+            )
             .limit(1);
           if (existing) {
             commissionSupplierId = existing.id;
@@ -182,13 +267,15 @@ export function registerRawStockBalanceRoutes(app: Express) {
             receivedKg: String(kgVal),
             costPerKg: String(rateVal),
             costPerKgUsd: String(costPerKgUsd),
-            ...(hasCommission ? {
-              commissionAmount: String(commAmountNum),
-              commissionCurrencyCode: commCurrency,
-              commissionFxRateToUsd: String(commFxRate),
-              commissionAmountUsd: String(commAmountUsd),
-              commissionSupplierId,
-            } : {}),
+            ...(hasCommission
+              ? {
+                  commissionAmount: String(commAmountNum),
+                  commissionCurrencyCode: commCurrency,
+                  commissionFxRateToUsd: String(commFxRate),
+                  commissionAmountUsd: String(commAmountUsd),
+                  commissionSupplierId,
+                }
+              : {}),
           })
           .returning();
 
@@ -274,8 +361,20 @@ export function registerRawStockBalanceRoutes(app: Express) {
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
-      const { supplierId: reqSupplierId, supplierName, receivedKg, costPerKg, currencyCode, fxRateToUsd, notes,
-              commissionAmount, commissionCurrencyCode, commissionPersonName, commissionNotes, commissionFxRateToUsd } = req.body;
+      const {
+        supplierId: reqSupplierId,
+        supplierName,
+        receivedKg,
+        costPerKg,
+        currencyCode,
+        fxRateToUsd,
+        notes,
+        commissionAmount,
+        commissionCurrencyCode,
+        commissionPersonName,
+        commissionNotes,
+        commissionFxRateToUsd,
+      } = req.body;
 
       if (receivedKg !== undefined && parseFloat(receivedKg) <= 0) {
         return res.status(400).json({ message: "Received KG must be positive" });
@@ -291,11 +390,13 @@ export function registerRawStockBalanceRoutes(app: Express) {
         .select({ id: factoryRawStock.id, containerId: factoryRawStock.containerId })
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-        .where(and(
-          eq(factoryRawStock.id, id),
-          eq(factoryRawStock.companyId, companyId),
-          eq(factoryContainers.status, "OPENING_BALANCE")
-        ))
+        .where(
+          and(
+            eq(factoryRawStock.id, id),
+            eq(factoryRawStock.companyId, companyId),
+            eq(factoryContainers.status, "OPENING_BALANCE")
+          )
+        )
         .limit(1);
 
       if (!rawStockRow) return res.status(404).json({ message: "Opening balance record not found" });
@@ -324,7 +425,11 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
         if (effectiveCost !== undefined || effectiveFx !== undefined || effectiveCurrency !== undefined) {
           const [current] = await tx
-            .select({ costPerKg: factoryRawStock.costPerKg, currencyCode: factoryContainers.currencyCode, fxRateToUsd: factoryContainers.fxRateToUsd })
+            .select({
+              costPerKg: factoryRawStock.costPerKg,
+              currencyCode: factoryContainers.currencyCode,
+              fxRateToUsd: factoryContainers.fxRateToUsd,
+            })
             .from(factoryRawStock)
             .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
             .where(eq(factoryRawStock.id, id))
@@ -345,14 +450,26 @@ export function registerRawStockBalanceRoutes(app: Express) {
         if (commissionCurrencyCode !== undefined) rawUpdates.commissionCurrencyCode = commissionCurrencyCode;
         if (commissionPersonName !== undefined) rawUpdates.commissionPersonName = commissionPersonName;
         if (commissionNotes !== undefined) rawUpdates.commissionNotes = commissionNotes;
-        if (commissionFxRateToUsd !== undefined) rawUpdates.commissionFxRateToUsd = String(parseFloat(commissionFxRateToUsd));
-        if (commissionAmount !== undefined || commissionFxRateToUsd !== undefined || commissionCurrencyCode !== undefined) {
-          const [cur] = await tx.select({ commissionCurrencyCode: factoryRawStock.commissionCurrencyCode, commissionFxRateToUsd: factoryRawStock.commissionFxRateToUsd })
-            .from(factoryRawStock).where(eq(factoryRawStock.id, id)).limit(1);
+        if (commissionFxRateToUsd !== undefined)
+          rawUpdates.commissionFxRateToUsd = String(parseFloat(commissionFxRateToUsd));
+        if (
+          commissionAmount !== undefined ||
+          commissionFxRateToUsd !== undefined ||
+          commissionCurrencyCode !== undefined
+        ) {
+          const [cur] = await tx
+            .select({
+              commissionCurrencyCode: factoryRawStock.commissionCurrencyCode,
+              commissionFxRateToUsd: factoryRawStock.commissionFxRateToUsd,
+            })
+            .from(factoryRawStock)
+            .where(eq(factoryRawStock.id, id))
+            .limit(1);
           const resolvedCommCurr = commissionCurrencyCode ?? cur?.commissionCurrencyCode ?? "USD";
           const resolvedCommFx = parseFloat(commissionFxRateToUsd ?? cur?.commissionFxRateToUsd ?? "1");
           const resolvedCommAmt = parseFloat(commissionAmount ?? "0");
-          rawUpdates.commissionAmountUsd = resolvedCommCurr === "USD" ? String(resolvedCommAmt) : String(resolvedCommAmt * resolvedCommFx);
+          rawUpdates.commissionAmountUsd =
+            resolvedCommCurr === "USD" ? String(resolvedCommAmt) : String(resolvedCommAmt * resolvedCommFx);
         }
 
         if (reqSupplierId !== undefined) {
@@ -368,7 +485,9 @@ export function registerRawStockBalanceRoutes(app: Express) {
           const [found] = await tx
             .select({ id: factorySuppliers.id })
             .from(factorySuppliers)
-            .where(and(eq(factorySuppliers.companyId, companyId), sql`lower(${factorySuppliers.name}) = lower(${trimmed})`))
+            .where(
+              and(eq(factorySuppliers.companyId, companyId), sql`lower(${factorySuppliers.name}) = lower(${trimmed})`)
+            )
             .limit(1);
           if (found) {
             containerUpdates.supplierId = found.id;
@@ -385,7 +504,10 @@ export function registerRawStockBalanceRoutes(app: Express) {
           await tx.update(factoryRawStock).set(rawUpdates).where(eq(factoryRawStock.id, id));
         }
         if (Object.keys(containerUpdates).length > 0) {
-          await tx.update(factoryContainers).set(containerUpdates).where(eq(factoryContainers.id, rawStockRow.containerId));
+          await tx
+            .update(factoryContainers)
+            .set(containerUpdates)
+            .where(eq(factoryContainers.id, rawStockRow.containerId));
         }
       });
 
@@ -408,7 +530,11 @@ export function registerRawStockBalanceRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
       const [rawStockRow] = await db
-        .select({ id: factoryRawStock.id, containerId: factoryRawStock.containerId, containerStatus: factoryContainers.status })
+        .select({
+          id: factoryRawStock.id,
+          containerId: factoryRawStock.containerId,
+          containerStatus: factoryContainers.status,
+        })
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
         .where(and(eq(factoryRawStock.id, id), eq(factoryRawStock.companyId, companyId)))
@@ -416,7 +542,9 @@ export function registerRawStockBalanceRoutes(app: Express) {
 
       if (!rawStockRow) return res.status(404).json({ message: "Raw stock record not found" });
       if (rawStockRow.containerStatus !== "OPENING_BALANCE") {
-        return res.status(400).json({ message: "This record is not an opening balance entry and cannot be deleted through this endpoint" });
+        return res
+          .status(400)
+          .json({ message: "This record is not an opening balance entry and cannot be deleted through this endpoint" });
       }
 
       await db.transaction(async (tx: any) => {
@@ -464,8 +592,8 @@ export function registerRawStockBalanceRoutes(app: Express) {
           and(
             eq(factoryBales.companyId, companyId),
             sql`${factoryBales.mixBatchId} IS NULL`,
-            eq(factoryBales.status, "IN_STOCK"),
-          ),
+            eq(factoryBales.status, "IN_STOCK")
+          )
         )
         .orderBy(desc(factoryBales.pressedAt));
 
@@ -639,15 +767,18 @@ export function registerRawStockBalanceRoutes(app: Express) {
         const bales = await db
           .select({ id: factoryBales.id, weightKg: factoryBales.weightKg })
           .from(factoryBales)
-          .where(and(
-            eq(factoryBales.mixBatchId, batch.id),
-            eq(factoryBales.companyId, companyId),
-            sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
-          ));
+          .where(
+            and(
+              eq(factoryBales.mixBatchId, batch.id),
+              eq(factoryBales.companyId, companyId),
+              sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
+            )
+          );
 
         for (const bale of bales) {
           const baleWt = parseFloat(bale.weightKg as string) || 0;
-          await db.update(factoryBales)
+          await db
+            .update(factoryBales)
             .set({
               costPerKg: String(batchCost.toFixed(4)),
               totalCost: String((baleWt * batchCost).toFixed(2)),
@@ -658,7 +789,10 @@ export function registerRawStockBalanceRoutes(app: Express) {
         }
       }
 
-      res.json({ balesUpdated, message: `Updated cost/kg on ${balesUpdated} bale(s) across ${allBatches.length} batch(es).` });
+      res.json({
+        balesUpdated,
+        message: `Updated cost/kg on ${balesUpdated} bale(s) across ${allBatches.length} batch(es).`,
+      });
     } catch (error: any) {
       console.error("Error recalculating bale costs:", error);
       res.status(500).json({ message: error.message });
@@ -668,5 +802,4 @@ export function registerRawStockBalanceRoutes(app: Express) {
   // ───────────────────────────────────────────────
   // 6. Factory Mix Batches
   // ───────────────────────────────────────────────
-
 }

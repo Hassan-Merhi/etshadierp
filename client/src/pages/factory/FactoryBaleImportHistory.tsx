@@ -86,19 +86,25 @@ export default function FactoryBaleImportHistory() {
         <Card>
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground mb-1">Total Imports</p>
-            <p className="text-2xl font-semibold" data-testid="stat-import-count">{batches.length}</p>
+            <p className="text-2xl font-semibold" data-testid="stat-import-count">
+              {batches.length}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground mb-1">Total Bales Imported</p>
-            <p className="text-2xl font-semibold" data-testid="stat-total-bales">{fmt(totalBalesEver)}</p>
+            <p className="text-2xl font-semibold" data-testid="stat-total-bales">
+              {fmt(totalBalesEver)}
+            </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground mb-1">Total Weight Imported</p>
-            <p className="text-2xl font-semibold" data-testid="stat-total-weight">{fmt(totalWeightEver)} <span className="text-sm font-normal text-muted-foreground">kg</span></p>
+            <p className="text-2xl font-semibold" data-testid="stat-total-weight">
+              {fmt(totalWeightEver)} <span className="text-sm font-normal text-muted-foreground">kg</span>
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -185,7 +191,10 @@ export default function FactoryBaleImportHistory() {
               <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-xs text-muted-foreground">
                 <span>{formatDate(selectedBatch.createdAt)}</span>
                 {selectedBatch.importedByName && <span>By: {selectedBatch.importedByName}</span>}
-                <span>{selectedBatch.baleCount.toLocaleString()} bales &bull; {fmt(parseFloat(selectedBatch.totalWeightKg || "0"))} kg total</span>
+                <span>
+                  {selectedBatch.baleCount.toLocaleString()} bales &bull;{" "}
+                  {fmt(parseFloat(selectedBatch.totalWeightKg || "0"))} kg total
+                </span>
                 {selectedBatch.errorCount > 0 && (
                   <span className="text-destructive">{selectedBatch.errorCount} row errors</span>
                 )}
@@ -216,12 +225,20 @@ export default function FactoryBaleImportHistory() {
                     <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
                       <TableCell className="font-mono text-xs">{bale.referenceNumber}</TableCell>
                       <TableCell className="font-mono text-xs">{bale.baleCode}</TableCell>
-                      <TableCell className="text-sm">{bale.articleCode || <span className="text-muted-foreground">—</span>}</TableCell>
-                      <TableCell className="text-sm max-w-[160px] truncate">{bale.productName || <span className="text-muted-foreground">—</span>}</TableCell>
-                      <TableCell className="text-sm">{bale.grade || <span className="text-muted-foreground">—</span>}</TableCell>
+                      <TableCell className="text-sm">
+                        {bale.articleCode || <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-sm max-w-[160px] truncate">
+                        {bale.productName || <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {bale.grade || <span className="text-muted-foreground">—</span>}
+                      </TableCell>
                       <TableCell className="text-right text-sm">{fmt(parseFloat(bale.weightKg))}</TableCell>
                       <TableCell>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[bale.status] || "bg-muted text-muted-foreground"}`}>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[bale.status] || "bg-muted text-muted-foreground"}`}
+                        >
                           {bale.status.replace(/_/g, " ")}
                         </span>
                       </TableCell>

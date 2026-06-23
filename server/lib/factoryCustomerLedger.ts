@@ -14,10 +14,7 @@
  */
 
 import { db } from "../db";
-import {
-  customers, customerOrders, customerBalances,
-  vouchers, voucherEntries,
-} from "@shared/schema";
+import { customers, customerOrders, customerBalances, vouchers, voucherEntries } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
 
 export interface FactoryCustomerLedgerEntry {
@@ -37,7 +34,7 @@ export interface FactoryCustomerLedgerEntry {
  * Returns the customer's id + companyId, or null.
  */
 export async function getCustomerByLedgerId(
-  ledgerAccountId: number,
+  ledgerAccountId: number
 ): Promise<{ id: number; companyId: number } | null> {
   const [row] = await db
     .select({ id: customers.id, companyId: customers.companyId })
@@ -56,7 +53,7 @@ export async function buildFactoryCustomerLedgerEntries(
   ledgerAccountId: number | null,
   companyId: number,
   startDate?: string,
-  endDate?: string,
+  endDate?: string
 ): Promise<FactoryCustomerLedgerEntry[]> {
   // ── 1. Finalized customer orders → SALE-style debit entries
   const orderRows = await db
@@ -72,8 +69,8 @@ export async function buildFactoryCustomerLedgerEntries(
       and(
         eq(customerOrders.companyId, companyId),
         eq(customerOrders.customerId, customerId),
-        eq(customerOrders.status, "FINALIZED"),
-      ),
+        eq(customerOrders.status, "FINALIZED")
+      )
     );
 
   const out: FactoryCustomerLedgerEntry[] = [];
@@ -103,8 +100,8 @@ export async function buildFactoryCustomerLedgerEntries(
       and(
         eq(customerBalances.companyId, companyId),
         eq(customerBalances.customerId, customerId),
-        sql`${customerBalances.referenceType} <> 'INVOICE' OR ${customerBalances.referenceType} IS NULL`,
-      ),
+        sql`${customerBalances.referenceType} <> 'INVOICE' OR ${customerBalances.referenceType} IS NULL`
+      )
     );
 
   for (const b of balRows) {
@@ -114,9 +111,7 @@ export async function buildFactoryCustomerLedgerEntries(
     out.push({
       id: `cb-${b.id}`,
       voucherId: -2000000 - b.id, // synthetic
-      voucherNumber: b.referenceType
-        ? `${b.referenceType}-${b.referenceId ?? b.id}`
-        : `CB-${b.id}`,
+      voucherNumber: b.referenceType ? `${b.referenceType}-${b.referenceId ?? b.id}` : `CB-${b.id}`,
       voucherType: b.transactionType || "Payment",
       voucherDate: dt,
       voucherDescription: b.description || "",
@@ -173,8 +168,8 @@ export async function buildFactoryCustomerLedgerEntries(
         eq(vouchers.optional, false),
         sql`${vouchers.deletedAt} IS NULL`,
         sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
-        ...dateFilters,
-      ),
+        ...dateFilters
+      )
     )
     .where(ledgerExpr);
 
@@ -211,15 +206,9 @@ export async function getFactoryCustomerLedgerPrePeriodTotals(
   customerId: number,
   ledgerAccountId: number | null,
   companyId: number,
-  startDate: string,
+  startDate: string
 ): Promise<{ debit: number; credit: number }> {
-  const entries = await buildFactoryCustomerLedgerEntries(
-    customerId,
-    ledgerAccountId,
-    companyId,
-    undefined,
-    undefined,
-  );
+  const entries = await buildFactoryCustomerLedgerEntries(customerId, ledgerAccountId, companyId, undefined, undefined);
   let d = 0;
   let c = 0;
   for (const e of entries) {

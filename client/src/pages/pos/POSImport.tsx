@@ -12,7 +12,17 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, ShoppingCart, AlertTriangle, CreditCard, Printer } from "lucide-react";
+import {
+  Upload,
+  FileSpreadsheet,
+  CheckCircle,
+  XCircle,
+  Download,
+  ShoppingCart,
+  AlertTriangle,
+  CreditCard,
+  Printer,
+} from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import {
@@ -55,14 +65,14 @@ export default function POSImport() {
   const [selectedCashAccount, setSelectedCashAccount] = useState<string>("");
   const [selectedCustomer, setSelectedCustomer] = useState<string>("");
   const [isCreditSale, setIsCreditSale] = useState(false);
-  const [saleDate, setSaleDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [saleDate, setSaleDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [showWarningDialog, setShowWarningDialog] = useState(false);
   const [saleCurrency, setSaleCurrency] = useState<"USD" | "CFA">("USD");
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [importedSale, setImportedSale] = useState<any>(null);
   const [printTime, setPrintTime] = useState<string>("");
-  const printRef   = useRef<HTMLDivElement>(null);
-  const errorsRef  = useRef<HTMLDivElement>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const errorsRef = useRef<HTMLDivElement>(null);
 
   const fmtPrint = (n: number, prefix = "") => {
     const fixed = Math.abs(n).toFixed(2);
@@ -171,7 +181,7 @@ export default function POSImport() {
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `${(importedSale?.location?.name || "POS").replace(/\s+/g, "_")}_${new Date().toLocaleDateString('en-CA')}`,
+    documentTitle: `${(importedSale?.location?.name || "POS").replace(/\s+/g, "_")}_${new Date().toLocaleDateString("en-CA")}`,
     onAfterPrint: () => {
       setShowPrintDialog(false);
       navigate("/vouchers");
@@ -190,14 +200,15 @@ export default function POSImport() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
-      
-      const location = locations.find(l => l.id === parseInt(selectedLocation));
-      const itemsForPrint = saleCurrency === "CFA" && exchangeRate
-        ? (validationResult?.validatedItems || []).map((item: any) => ({
-            ...item,
-            rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
-          }))
-        : (validationResult?.validatedItems || []);
+
+      const location = locations.find((l) => l.id === parseInt(selectedLocation));
+      const itemsForPrint =
+        saleCurrency === "CFA" && exchangeRate
+          ? (validationResult?.validatedItems || []).map((item: any) => ({
+              ...item,
+              rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
+            }))
+          : validationResult?.validatedItems || [];
       setImportedSale({
         voucher: data.voucher,
         items: itemsForPrint,
@@ -233,15 +244,16 @@ export default function POSImport() {
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customers/for-pos"] });
-      
-      const location = locations.find(l => l.id === parseInt(selectedLocation));
-      const customer = customers.find(c => c.id === parseInt(selectedCustomer));
-      const itemsForPrint = saleCurrency === "CFA" && exchangeRate
-        ? (validationResult?.validatedItems || []).map((item: any) => ({
-            ...item,
-            rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
-          }))
-        : (validationResult?.validatedItems || []);
+
+      const location = locations.find((l) => l.id === parseInt(selectedLocation));
+      const customer = customers.find((c) => c.id === parseInt(selectedCustomer));
+      const itemsForPrint =
+        saleCurrency === "CFA" && exchangeRate
+          ? (validationResult?.validatedItems || []).map((item: any) => ({
+              ...item,
+              rate: (parseFloat(item.rate) / exchangeRate).toFixed(2),
+            }))
+          : validationResult?.validatedItems || [];
       setImportedSale({
         voucher: data.voucher,
         items: itemsForPrint,
@@ -283,7 +295,11 @@ export default function POSImport() {
       return;
     }
     if (!navigator.onLine) {
-      toast({ title: "Not available offline", description: "File imports require a connection", variant: "destructive" });
+      toast({
+        title: "Not available offline",
+        description: "File imports require a connection",
+        variant: "destructive",
+      });
       return;
     }
     const formData = new FormData();
@@ -438,7 +454,7 @@ export default function POSImport() {
 
     // Check if there are inventory warnings
     const hasWarnings = validationResult?.warnings && validationResult.warnings.length > 0;
-    
+
     if (hasWarnings) {
       // Show confirmation dialog
       setShowWarningDialog(true);
@@ -481,9 +497,7 @@ export default function POSImport() {
       <Card>
         <CardHeader>
           <CardTitle>Upload Sales Data</CardTitle>
-          <CardDescription>
-            Upload an Excel file with columns: Barcode, Quantity, Rate
-          </CardDescription>
+          <CardDescription>Upload an Excel file with columns: Barcode, Quantity, Rate</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-4 p-3 rounded-lg bg-muted/50">
@@ -514,18 +528,8 @@ export default function POSImport() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="file">Excel File</Label>
-              <Input
-                id="file"
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileChange}
-                data-testid="input-file"
-              />
-              {file && (
-                <p className="text-sm text-muted-foreground">
-                  Selected: {file.name}
-                </p>
-              )}
+              <Input id="file" type="file" accept=".xlsx,.xls" onChange={handleFileChange} data-testid="input-file" />
+              {file && <p className="text-sm text-muted-foreground">Selected: {file.name}</p>}
             </div>
 
             <div className="space-y-2">
@@ -622,18 +626,20 @@ export default function POSImport() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={handleParse}
-              disabled={!file || parseMutation.isPending}
-              data-testid="button-parse"
-            >
+            <Button onClick={handleParse} disabled={!file || parseMutation.isPending} data-testid="button-parse">
               <FileSpreadsheet className="h-4 w-4 mr-2" />
               {parseMutation.isPending ? "Parsing..." : "Parse File"}
             </Button>
 
             <Button
               onClick={handleValidate}
-              disabled={!preview || !selectedLocation || (!isCreditSale && !selectedCashAccount) || (isCreditSale && !selectedCustomer) || validateMutation.isPending}
+              disabled={
+                !preview ||
+                !selectedLocation ||
+                (!isCreditSale && !selectedCashAccount) ||
+                (isCreditSale && !selectedCustomer) ||
+                validateMutation.isPending
+              }
               variant="outline"
               data-testid="button-validate"
             >
@@ -649,7 +655,9 @@ export default function POSImport() {
 
             <Button
               onClick={handleImport}
-              disabled={!isValidated || hasValidationErrors || importMutation.isPending || creditImportMutation.isPending}
+              disabled={
+                !isValidated || hasValidationErrors || importMutation.isPending || creditImportMutation.isPending
+              }
               data-testid="button-import"
             >
               <Upload className="h-4 w-4 mr-2" />
@@ -669,13 +677,20 @@ export default function POSImport() {
                 {validationResult.errors.length} error{validationResult.errors.length !== 1 ? "s" : ""}
               </span>
             </CardTitle>
-            <p className="text-sm text-muted-foreground">Fix these barcodes or remove the rows from your Excel file before importing.</p>
+            <p className="text-sm text-muted-foreground">
+              Fix these barcodes or remove the rows from your Excel file before importing.
+            </p>
           </CardHeader>
           <CardContent>
             <ul className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
               {validationResult.errors.map((error: string, index: number) => (
-                <li key={index} className="flex items-start gap-2 text-sm text-destructive bg-destructive/5 rounded px-2 py-1">
-                  <span className="font-mono text-xs text-muted-foreground shrink-0 mt-0.5 w-6 text-right">{index + 1}.</span>
+                <li
+                  key={index}
+                  className="flex items-start gap-2 text-sm text-destructive bg-destructive/5 rounded px-2 py-1"
+                >
+                  <span className="font-mono text-xs text-muted-foreground shrink-0 mt-0.5 w-6 text-right">
+                    {index + 1}.
+                  </span>
                   {error}
                 </li>
               ))}
@@ -689,7 +704,8 @@ export default function POSImport() {
           <CardHeader>
             <CardTitle>Preview ({preview.items.length} items)</CardTitle>
             <CardDescription>
-              Total Sales Value: {saleCurrency === "CFA" ? "CFA " : "$"}{formatNumber(preview.totalValue)}
+              Total Sales Value: {saleCurrency === "CFA" ? "CFA " : "$"}
+              {formatNumber(preview.totalValue)}
               {saleCurrency === "CFA" && exchangeRate && (
                 <span className="ml-2 text-muted-foreground">
                   (≈ ${formatNumber(preview.totalValue / exchangeRate)} USD after conversion)
@@ -719,16 +735,16 @@ export default function POSImport() {
                       <TableRow key={index} className={hasError ? "bg-destructive/10" : ""}>
                         <TableCell className="font-mono">{item.barcode}</TableCell>
                         <TableCell>
-                          {validation?.stockItemName || (
-                            <span className="text-muted-foreground italic">Unknown</span>
-                          )}
+                          {validation?.stockItemName || <span className="text-muted-foreground italic">Unknown</span>}
                         </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">
-                          {saleCurrency === "CFA" ? "CFA " : "$"}{formatNumber(item.rate)}
+                          {saleCurrency === "CFA" ? "CFA " : "$"}
+                          {formatNumber(item.rate)}
                         </TableCell>
                         <TableCell className="text-right font-medium">
-                          {saleCurrency === "CFA" ? "CFA " : "$"}{formatNumber(item.quantity * item.rate)}
+                          {saleCurrency === "CFA" ? "CFA " : "$"}
+                          {formatNumber(item.quantity * item.rate)}
                         </TableCell>
                         <TableCell>
                           {validation ? (
@@ -785,8 +801,8 @@ export default function POSImport() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-import">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmImport} 
+            <AlertDialogAction
+              onClick={handleConfirmImport}
               data-testid="button-confirm-import"
               className="bg-amber-600 hover:bg-amber-700"
             >
@@ -805,51 +821,123 @@ export default function POSImport() {
               Sale has been imported successfully. Would you like to print the invoice?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           {/* Hidden Print Template - matches POS invoice style */}
           <div className="hidden">
-            <div ref={printRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
-              <style dangerouslySetInnerHTML={{ __html: `
+            <div
+              ref={printRef}
+              style={{
+                fontFamily: "Arial, Helvetica, sans-serif",
+                fontSize: "11pt",
+                padding: "12px",
+                backgroundColor: "white",
+                color: "black",
+                width: "100%",
+                fontWeight: "normal",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              <style
+                dangerouslySetInnerHTML={{
+                  __html: `
                 @media print {
                   body { font-family: Arial, Helvetica, sans-serif !important; }
                   * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; }
                 }
-              `}} />
+              `,
+                }}
+              />
 
               {/* Title */}
-              <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>
+              <div
+                style={{
+                  textAlign: "center",
+                  fontWeight: "900",
+                  fontSize: "18pt",
+                  letterSpacing: "2px",
+                  marginBottom: "6px",
+                }}
+              >
                 POS INVOICE
               </div>
 
               {/* Invoice Info */}
-              <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
+              <div
+                style={{
+                  fontSize: "11pt",
+                  fontWeight: "700",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderTop: "2px solid black",
+                  borderBottom: "2px solid black",
+                  padding: "5px 0",
+                  marginBottom: "6px",
+                }}
+              >
                 <span>Date: {importedSale?.saleDate}</span>
                 <span>User: {printUserName}</span>
               </div>
 
               {/* Daily Exchange Rate - Only for Mali company */}
-              {selectedCompany?.name?.toLowerCase().includes('mali') && (importedSale?.voucher?.exchangeRate || exchangeRate) && (
-                <div style={{ fontSize: '11pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black', textAlign: 'center' }}>
-                  <span style={{ fontWeight: '900' }}>Daily Rate:</span> $1 = {formatNumber(parseFloat(importedSale?.voucher?.exchangeRate) || exchangeRate || 0)} CFA
-                </div>
-              )}
+              {selectedCompany?.name?.toLowerCase().includes("mali") &&
+                (importedSale?.voucher?.exchangeRate || exchangeRate) && (
+                  <div
+                    style={{
+                      fontSize: "11pt",
+                      fontWeight: "700",
+                      marginBottom: "6px",
+                      padding: "4px",
+                      border: "2px solid black",
+                      textAlign: "center",
+                    }}
+                  >
+                    <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
+                    {formatNumber(parseFloat(importedSale?.voucher?.exchangeRate) || exchangeRate || 0)} CFA
+                  </div>
+                )}
 
               {/* Credit Sale Customer Info */}
               {importedSale?.isCreditSale && importedSale?.customer && (
-                <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black' }}>
-                  <div style={{ fontWeight: '900' }}>CREDIT SALE</div>
+                <div
+                  style={{
+                    fontSize: "10pt",
+                    fontWeight: "700",
+                    marginBottom: "6px",
+                    padding: "4px",
+                    border: "2px solid black",
+                  }}
+                >
+                  <div style={{ fontWeight: "900" }}>CREDIT SALE</div>
                   <div>Customer: {importedSale.customer.name}</div>
                 </div>
               )}
 
               {/* Items Table */}
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums' }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: "11pt",
+                  marginBottom: "0",
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
                 <thead className="sticky top-0 z-30 bg-muted/50">
-                  <tr style={{ borderBottom: '2px solid black' }}>
-                    <th style={{ textAlign: 'left', padding: '4px 3px', width: '48%', fontWeight: '900', borderRight: '2px solid black' }}>Description</th>
-                    <th style={{ textAlign: 'center', padding: '4px 3px', width: '12%', fontWeight: '900' }}>Qty</th>
-                    <th style={{ textAlign: 'center', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Rate</th>
-                    <th style={{ textAlign: 'center', padding: '4px 3px', width: '20%', fontWeight: '900' }}>Amt</th>
+                  <tr style={{ borderBottom: "2px solid black" }}>
+                    <th
+                      style={{
+                        textAlign: "left",
+                        padding: "4px 3px",
+                        width: "48%",
+                        fontWeight: "900",
+                        borderRight: "2px solid black",
+                      }}
+                    >
+                      Description
+                    </th>
+                    <th style={{ textAlign: "center", padding: "4px 3px", width: "12%", fontWeight: "900" }}>Qty</th>
+                    <th style={{ textAlign: "center", padding: "4px 3px", width: "20%", fontWeight: "900" }}>Rate</th>
+                    <th style={{ textAlign: "center", padding: "4px 3px", width: "20%", fontWeight: "900" }}>Amt</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -857,49 +945,133 @@ export default function POSImport() {
                     const rate = parseFloat(item.rate || 0);
                     const qty = parseFloat(item.quantity || 0);
                     return (
-                      <tr key={idx} style={{ borderBottom: '1px solid #b0b8c1', backgroundColor: idx % 2 === 0 ? 'white' : '#f2f5f8' }}>
-                        <td style={{ padding: '4px 3px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3', borderRight: '2px solid black' }}>{item.stockItemName || item.itemCode}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty)}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(rate, printCurrPrefix)}</td>
-                        <td style={{ textAlign: 'center', padding: '4px 3px', verticalAlign: 'top', fontWeight: '600' }}>{fmtPrint(qty * rate, printCurrPrefix)}</td>
+                      <tr
+                        key={idx}
+                        style={{
+                          borderBottom: "1px solid #b0b8c1",
+                          backgroundColor: idx % 2 === 0 ? "white" : "#f2f5f8",
+                        }}
+                      >
+                        <td
+                          style={{
+                            padding: "4px 3px",
+                            verticalAlign: "top",
+                            wordBreak: "break-word",
+                            fontWeight: "600",
+                            lineHeight: "1.3",
+                            borderRight: "2px solid black",
+                          }}
+                        >
+                          {item.stockItemName || item.itemCode}
+                        </td>
+                        <td
+                          style={{ textAlign: "center", padding: "4px 3px", verticalAlign: "top", fontWeight: "600" }}
+                        >
+                          {fmtPrint(qty)}
+                        </td>
+                        <td
+                          style={{ textAlign: "center", padding: "4px 3px", verticalAlign: "top", fontWeight: "600" }}
+                        >
+                          {fmtPrint(rate, printCurrPrefix)}
+                        </td>
+                        <td
+                          style={{ textAlign: "center", padding: "4px 3px", verticalAlign: "top", fontWeight: "600" }}
+                        >
+                          {fmtPrint(qty * rate, printCurrPrefix)}
+                        </td>
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot>
-                  <tr style={{ borderTop: '2px solid black', fontWeight: '900' }}>
-                    <td style={{ padding: '5px 3px', fontWeight: '900', borderRight: '2px solid black' }}>TOTAL</td>
-                    <td style={{ textAlign: 'center', padding: '5px 3px' }}>{fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0), 0))}</td>
-                    <td style={{ padding: '5px 3px' }}></td>
-                    <td style={{ textAlign: 'center', padding: '5px 3px', fontWeight: '900' }}>
-                      {fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0), 0), printCurrPrefix)}
+                  <tr style={{ borderTop: "2px solid black", fontWeight: "900" }}>
+                    <td style={{ padding: "5px 3px", fontWeight: "900", borderRight: "2px solid black" }}>TOTAL</td>
+                    <td style={{ textAlign: "center", padding: "5px 3px" }}>
+                      {fmtPrint(
+                        (importedSale?.items ?? []).reduce(
+                          (sum: number, item: any) => sum + parseFloat(item.quantity || 0),
+                          0
+                        )
+                      )}
+                    </td>
+                    <td style={{ padding: "5px 3px" }}></td>
+                    <td style={{ textAlign: "center", padding: "5px 3px", fontWeight: "900" }}>
+                      {fmtPrint(
+                        (importedSale?.items ?? []).reduce(
+                          (sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
+                          0
+                        ),
+                        printCurrPrefix
+                      )}
                     </td>
                   </tr>
                 </tfoot>
               </table>
 
               {/* Total Paid */}
-              <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '2px solid black', display: 'flex', justifyContent: 'space-between' }}>
+              <div
+                style={{
+                  fontSize: "14pt",
+                  fontWeight: "900",
+                  marginTop: "8px",
+                  paddingTop: "8px",
+                  borderTop: "2px solid black",
+                  display: "flex",
+                  justifyContent: "space-between",
+                }}
+              >
                 <span>TOTAL PAID:</span>
-                <span>{fmtPrint((importedSale?.items ?? []).reduce((sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0), 0), printCurrPrefix)}</span>
+                <span>
+                  {fmtPrint(
+                    (importedSale?.items ?? []).reduce(
+                      (sum: number, item: any) => sum + parseFloat(item.quantity || 0) * parseFloat(item.rate || 0),
+                      0
+                    ),
+                    printCurrPrefix
+                  )}
+                </span>
               </div>
 
               {/* Notes */}
               {importedSale?.voucher?.description && (
-                <div style={{ fontSize: '9pt', fontWeight: '600', marginTop: '8px', padding: '4px', border: '2px solid black' }}>
-                  <span style={{ fontWeight: '900' }}>Note:</span> {importedSale.voucher.description}
+                <div
+                  style={{
+                    fontSize: "9pt",
+                    fontWeight: "600",
+                    marginTop: "8px",
+                    padding: "4px",
+                    border: "2px solid black",
+                  }}
+                >
+                  <span style={{ fontWeight: "900" }}>Note:</span> {importedSale.voucher.description}
                 </div>
               )}
 
               {/* Footer */}
-              <div style={{ textAlign: 'center', fontSize: '9pt', fontWeight: '700', marginTop: '10px', paddingTop: '5px', borderTop: '2px solid black' }}>
+              <div
+                style={{
+                  textAlign: "center",
+                  fontSize: "9pt",
+                  fontWeight: "700",
+                  marginTop: "10px",
+                  paddingTop: "5px",
+                  borderTop: "2px solid black",
+                }}
+              >
                 <div>Thank you for your business!</div>
               </div>
             </div>
           </div>
 
           <AlertDialogFooter>
-            <Button variant="outline" onClick={() => { setShowPrintDialog(false); navigate("/vouchers"); }} data-testid="button-skip-print">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPrintDialog(false);
+                navigate("/vouchers");
+              }}
+              data-testid="button-skip-print"
+            >
               Skip
             </Button>
             <Button onClick={handlePrint} className="gap-2" data-testid="button-print-imported-invoice">

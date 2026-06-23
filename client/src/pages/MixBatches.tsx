@@ -7,28 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreateMixBatchDialog } from "../components/CreateMixBatchDialog";
 import { EditMixBatchDialog } from "../components/EditMixBatchDialog";
@@ -74,27 +55,24 @@ export default function MixBatches() {
     enabled: assignDialogOpen,
   });
 
-  const sourceBatch = sourceBatchId
-    ? batches?.find((b) => b.id === parseInt(sourceBatchId))
-    : null;
+  const sourceBatch = sourceBatchId ? batches?.find((b) => b.id === parseInt(sourceBatchId)) : null;
 
   const availableKg = sourceBatch
     ? parseFloat(sourceBatch.totalWeightKg || "0") - parseFloat(sourceBatch.usedKg || "0")
     : 0;
 
-  const selectedKg = unlinkedBales
-    ?.filter((b) => selectedBaleIds.has(b.id))
-    .reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0) ?? 0;
+  const selectedKg =
+    unlinkedBales
+      ?.filter((b) => selectedBaleIds.has(b.id))
+      .reduce((sum: number, b: any) => sum + parseFloat(b.weightKg || "0"), 0) ?? 0;
 
   const overLimit = selectedKg > availableKg + 0.001;
 
   const assignMutation = useMutation({
     mutationFn: async () => {
-      const res = await modeApiRequest(
-        "POST",
-        `/api/factory/mix-batches/${sourceBatchId}/assign-bales`,
-        { baleIds: Array.from(selectedBaleIds) }
-      );
+      const res = await modeApiRequest("POST", `/api/factory/mix-batches/${sourceBatchId}/assign-bales`, {
+        baleIds: Array.from(selectedBaleIds),
+      });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "Assignment failed");
@@ -141,24 +119,31 @@ export default function MixBatches() {
     return batch.status === statusFilter;
   });
 
-  const activeBatchesWithStock = batches?.filter((b) => {
-    const remaining = parseFloat(b.totalWeightKg || "0") - parseFloat(b.usedKg || "0");
-    return remaining > 0.001;
-  }) ?? [];
+  const activeBatchesWithStock =
+    batches?.filter((b) => {
+      const remaining = parseFloat(b.totalWeightKg || "0") - parseFloat(b.usedKg || "0");
+      return remaining > 0.001;
+    }) ?? [];
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "ACTIVE": return <PlayCircle className="h-4 w-4" />;
-      case "COMPLETED": return <CheckCircle className="h-4 w-4" />;
-      default: return <Package className="h-4 w-4" />;
+      case "ACTIVE":
+        return <PlayCircle className="h-4 w-4" />;
+      case "COMPLETED":
+        return <CheckCircle className="h-4 w-4" />;
+      default:
+        return <Package className="h-4 w-4" />;
     }
   };
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case "ACTIVE": return "default";
-      case "COMPLETED": return "secondary";
-      default: return "outline";
+      case "ACTIVE":
+        return "default";
+      case "COMPLETED":
+        return "secondary";
+      default:
+        return "outline";
     }
   };
 
@@ -169,14 +154,10 @@ export default function MixBatches() {
     }
 
     // Unique batch names (columns), sorted
-    const batchNames = Array.from(
-      new Set(batches.map(b => (b.name || b.batchCode).toUpperCase()))
-    ).sort();
+    const batchNames = Array.from(new Set(batches.map((b) => (b.name || b.batchCode).toUpperCase()))).sort();
 
     // Unique dates, sorted
-    const dates = Array.from(
-      new Set(batches.filter(b => b.batchDate).map(b => b.batchDate as string))
-    ).sort();
+    const dates = Array.from(new Set(batches.filter((b) => b.batchDate).map((b) => b.batchDate as string))).sort();
 
     // Build date × name → kg map
     const matrix: Record<string, Record<string, number>> = {};
@@ -190,7 +171,7 @@ export default function MixBatches() {
 
     // Build row data
     const totals: Record<string, number> = {};
-    const rows: any[] = dates.map(date => {
+    const rows: any[] = dates.map((date) => {
       const row: any = { DATE: date };
       for (const name of batchNames) {
         const val = matrix[date]?.[name] || 0;
@@ -217,7 +198,14 @@ export default function MixBatches() {
 
   if (selectedBatchId !== null) {
     return (
-      <Suspense fallback={<div className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>}>
+      <Suspense
+        fallback={
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-96 w-full" />
+          </div>
+        }
+      >
         <BatchDetail
           batchId={selectedBatchId}
           onBack={() => setSelectedBatchId(null)}
@@ -231,29 +219,29 @@ export default function MixBatches() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <PageHeader title="Mix Batches" subtitle="Combine raw stock containers and existing batches for bale production" />
+          <PageHeader
+            title="Mix Batches"
+            subtitle="Combine raw stock containers and existing batches for bale production"
+          />
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleExportReport}
-            data-testid="button-report"
-          >
+          <Button variant="outline" onClick={handleExportReport} data-testid="button-report">
             <BarChart2 className="h-4 w-4 mr-2" />
             Report
           </Button>
           <Button
             variant="outline"
-            onClick={() => { setSourceBatchId(""); setSelectedBaleIds(new Set()); setAssignDialogOpen(true); }}
+            onClick={() => {
+              setSourceBatchId("");
+              setSelectedBaleIds(new Set());
+              setAssignDialogOpen(true);
+            }}
             data-testid="button-assign-to-bales"
           >
             <Link2 className="h-4 w-4 mr-2" />
             Assign to Bales
           </Button>
-          <Button
-            onClick={() => setCreateDialogOpen(true)}
-            data-testid="button-create-mix-batch"
-          >
+          <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-create-mix-batch">
             <Plus className="h-4 w-4 mr-2" />
             Create Batch
           </Button>
@@ -286,106 +274,114 @@ export default function MixBatches() {
             </div>
           ) : filteredBatches && filteredBatches.length > 0 ? (
             <div>
-            <Table wrapperClassName="overflow-visible">
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="text-right">Total (kg)</TableHead>
-                  <TableHead className="text-right">Cost/kg</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="w-20"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+              <Table wrapperClassName="overflow-visible">
+                <TableHeader className="sticky top-0 z-30 bg-background">
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="text-right">Total (kg)</TableHead>
+                    <TableHead className="text-right">Cost/kg</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="w-20"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(() => {
+                    const sorted = [...filteredBatches].sort((a, b) => {
+                      const da = (a as any).batchDate || a.createdAt || "";
+                      const db = (b as any).batchDate || b.createdAt || "";
+                      return db > da ? 1 : db < da ? -1 : b.id - a.id;
+                    });
+                    return showAllBatches ? sorted : sorted.slice(0, 15);
+                  })().map((batch) => {
+                    const total = parseFloat(batch.totalWeightKg || "0");
+                    return (
+                      <TableRow
+                        key={batch.id}
+                        className="hover-elevate cursor-pointer"
+                        onClick={() => setSelectedBatchId(batch.id)}
+                        data-testid={`row-batch-${batch.id}`}
+                      >
+                        <TableCell className="font-medium" data-testid={`text-batch-name-${batch.id}`}>
+                          {batch.name || batch.batchCode}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{formatNumber(total)}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          ${parseFloat(batch.costPerKg).toFixed(4)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {formatDisplayDate((batch as any).batchDate || batch.createdAt)}
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setEditBatch(batch)}
+                              data-testid={`button-edit-batch-${batch.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeleteId(batch.id)}
+                              data-testid={`button-delete-batch-${batch.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
                 {(() => {
-                  const sorted = [...filteredBatches].sort((a, b) => {
-                    const da = (a as any).batchDate || a.createdAt || "";
-                    const db = (b as any).batchDate || b.createdAt || "";
-                    return db > da ? 1 : db < da ? -1 : b.id - a.id;
-                  });
-                  return (showAllBatches ? sorted : sorted.slice(0, 15));
-                })().map((batch) => {
-                  const total = parseFloat(batch.totalWeightKg || "0");
-                  return (
-                    <TableRow
-                      key={batch.id}
-                      className="hover-elevate cursor-pointer"
-                      onClick={() => setSelectedBatchId(batch.id)}
-                      data-testid={`row-batch-${batch.id}`}
-                    >
-                      <TableCell className="font-medium" data-testid={`text-batch-name-${batch.id}`}>
-                        {batch.name || batch.batchCode}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(total)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        ${parseFloat(batch.costPerKg).toFixed(4)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {formatDisplayDate((batch as any).batchDate || batch.createdAt)}
-                      </TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setEditBatch(batch)}
-                            data-testid={`button-edit-batch-${batch.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setDeleteId(batch.id)}
-                            data-testid={`button-delete-batch-${batch.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                  const summaryTotal = filteredBatches.reduce((s, b) => s + parseFloat(b.totalWeightKg || "0"), 0);
+                  const weightedCost = filteredBatches.reduce(
+                    (s, b) => s + parseFloat(b.totalWeightKg || "0") * parseFloat(b.costPerKg || "0"),
+                    0
                   );
-                })}
-              </TableBody>
-              {(() => {
-                const summaryTotal = filteredBatches.reduce((s, b) => s + parseFloat(b.totalWeightKg || "0"), 0);
-                const weightedCost = filteredBatches.reduce((s, b) => s + parseFloat(b.totalWeightKg || "0") * parseFloat(b.costPerKg || "0"), 0);
-                const blendedCost = summaryTotal > 0 ? weightedCost / summaryTotal : 0;
-                return (
-                  <tfoot className="border-t-2 border-border bg-muted/40">
-                    <tr>
-                      <td className="px-4 py-3 text-sm font-semibold text-foreground">
-                        Combined Total
-                        <div className="text-xs text-muted-foreground font-normal">{filteredBatches.length} batch{filteredBatches.length !== 1 ? "es" : ""}</div>
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-summary-total-kg">
-                        {formatNumber(summaryTotal)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-summary-blended-cost">
-                        ${blendedCost.toFixed(4)}<span className="text-xs text-muted-foreground font-normal">/kg</span>
-                      </td>
-                      <td colSpan={2} />
-                    </tr>
-                  </tfoot>
-                );
-              })()}
-            </Table>
-            {filteredBatches.length > 15 && (
-              <div className="flex justify-center py-3 border-t">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowAllBatches(v => !v)}
-                  data-testid="button-toggle-show-all-batches"
-                >
-                  {showAllBatches
-                    ? `Show less`
-                    : `Show all ${filteredBatches.length} batches`}
-                </Button>
-              </div>
-            )}
+                  const blendedCost = summaryTotal > 0 ? weightedCost / summaryTotal : 0;
+                  return (
+                    <tfoot className="border-t-2 border-border bg-muted/40">
+                      <tr>
+                        <td className="px-4 py-3 text-sm font-semibold text-foreground">
+                          Combined Total
+                          <div className="text-xs text-muted-foreground font-normal">
+                            {filteredBatches.length} batch{filteredBatches.length !== 1 ? "es" : ""}
+                          </div>
+                        </td>
+                        <td
+                          className="px-4 py-3 text-right font-mono font-semibold text-sm"
+                          data-testid="text-summary-total-kg"
+                        >
+                          {formatNumber(summaryTotal)}
+                        </td>
+                        <td
+                          className="px-4 py-3 text-right font-mono font-semibold text-sm"
+                          data-testid="text-summary-blended-cost"
+                        >
+                          ${blendedCost.toFixed(4)}
+                          <span className="text-xs text-muted-foreground font-normal">/kg</span>
+                        </td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  );
+                })()}
+              </Table>
+              {filteredBatches.length > 15 && (
+                <div className="flex justify-center py-3 border-t">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAllBatches((v) => !v)}
+                    data-testid="button-toggle-show-all-batches"
+                  >
+                    {showAllBatches ? `Show less` : `Show all ${filteredBatches.length} batches`}
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-center py-12">
@@ -407,31 +403,45 @@ export default function MixBatches() {
         </CardContent>
       </Card>
 
-      <CreateMixBatchDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-      />
+      <CreateMixBatchDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen} />
 
       <EditMixBatchDialog
         batch={editBatch}
         open={!!editBatch}
-        onOpenChange={(open) => { if (!open) setEditBatch(null); }}
+        onOpenChange={(open) => {
+          if (!open) setEditBatch(null);
+        }}
       />
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteId !== null} onOpenChange={(open) => { if (!open) setDeleteId(null); }}>
+      <Dialog
+        open={deleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteId(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Delete Batch</DialogTitle>
             <DialogDescription>
-              This will permanently delete the batch and unlink any bales associated with it. The bales themselves are not deleted — they will simply become unlinked and available to reassign.
+              This will permanently delete the batch and unlink any bales associated with it. The bales themselves are
+              not deleted — they will simply become unlinked and available to reassign.
             </DialogDescription>
           </DialogHeader>
           {deleteBatch && (
             <div className="p-3 rounded-md bg-muted text-sm space-y-1">
-              <p><span className="text-muted-foreground">Batch:</span> <span className="font-medium">{deleteBatch.name || deleteBatch.batchCode}</span></p>
-              <p><span className="text-muted-foreground">Total weight:</span> <span className="font-mono">{formatNumber(parseFloat(deleteBatch.totalWeightKg || "0"))} kg</span></p>
-              <p><span className="text-muted-foreground">Status:</span> <span className="font-medium">{deleteBatch.status}</span></p>
+              <p>
+                <span className="text-muted-foreground">Batch:</span>{" "}
+                <span className="font-medium">{deleteBatch.name || deleteBatch.batchCode}</span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Total weight:</span>{" "}
+                <span className="font-mono">{formatNumber(parseFloat(deleteBatch.totalWeightKg || "0"))} kg</span>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Status:</span>{" "}
+                <span className="font-medium">{deleteBatch.status}</span>
+              </p>
             </div>
           )}
           <div className="flex justify-end gap-2">
@@ -451,10 +461,16 @@ export default function MixBatches() {
       </Dialog>
 
       {/* Assign to Bales Dialog */}
-      <Dialog open={assignDialogOpen} onOpenChange={(open) => {
-        setAssignDialogOpen(open);
-        if (!open) { setSourceBatchId(""); setSelectedBaleIds(new Set()); }
-      }}>
+      <Dialog
+        open={assignDialogOpen}
+        onOpenChange={(open) => {
+          setAssignDialogOpen(open);
+          if (!open) {
+            setSourceBatchId("");
+            setSelectedBaleIds(new Set());
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Assign Raw Stock to Bales</DialogTitle>
@@ -467,9 +483,17 @@ export default function MixBatches() {
             <div className="space-y-1">
               <p className="text-sm font-medium">Step 1 — Select raw stock (batch)</p>
               {activeBatchesWithStock.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No batches with remaining stock found. Create a batch first.</p>
+                <p className="text-sm text-muted-foreground">
+                  No batches with remaining stock found. Create a batch first.
+                </p>
               ) : (
-                <Select value={sourceBatchId} onValueChange={(v) => { setSourceBatchId(v); setSelectedBaleIds(new Set()); }}>
+                <Select
+                  value={sourceBatchId}
+                  onValueChange={(v) => {
+                    setSourceBatchId(v);
+                    setSelectedBaleIds(new Set());
+                  }}
+                >
                   <SelectTrigger data-testid="select-source-batch">
                     <SelectValue placeholder="Pick a batch…" />
                   </SelectTrigger>
@@ -487,8 +511,12 @@ export default function MixBatches() {
               )}
               {sourceBatch && (
                 <p className="text-xs text-muted-foreground">
-                  Available: <span className="font-mono font-medium text-foreground">{formatNumber(availableKg)} kg</span>
-                  {" · "}Cost/kg: <span className="font-mono font-medium text-foreground">${parseFloat(sourceBatch.costPerKg || "0").toFixed(4)}</span>
+                  Available:{" "}
+                  <span className="font-mono font-medium text-foreground">{formatNumber(availableKg)} kg</span>
+                  {" · "}Cost/kg:{" "}
+                  <span className="font-mono font-medium text-foreground">
+                    ${parseFloat(sourceBatch.costPerKg || "0").toFixed(4)}
+                  </span>
                 </p>
               )}
             </div>
@@ -499,17 +527,31 @@ export default function MixBatches() {
                   <p className="text-sm font-medium">Step 2 — Select bales to assign</p>
                   {unlinkedBales && unlinkedBales.length > 0 && (
                     <span className="text-xs text-muted-foreground flex items-center gap-2">
-                      <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={() => setSelectedBaleIds(new Set(unlinkedBales.map((b) => b.id)))}>All</Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1 text-xs"
+                        onClick={() => setSelectedBaleIds(new Set(unlinkedBales.map((b) => b.id)))}
+                      >
+                        All
+                      </Button>
                       /
-                      <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={() => setSelectedBaleIds(new Set())}>None</Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1 text-xs"
+                        onClick={() => setSelectedBaleIds(new Set())}
+                      >
+                        None
+                      </Button>
                     </span>
                   )}
                 </div>
 
                 {selectedBaleIds.size > 0 && (
                   <p className={`text-xs ${overLimit ? "text-destructive font-medium" : "text-muted-foreground"}`}>
-                    {selectedBaleIds.size} bales · {formatNumber(selectedKg)} kg selected
-                    {" "}({formatNumber(availableKg - selectedKg)} kg remaining after)
+                    {selectedBaleIds.size} bales · {formatNumber(selectedKg)} kg selected (
+                    {formatNumber(availableKg - selectedKg)} kg remaining after)
                   </p>
                 )}
 
@@ -539,21 +581,33 @@ export default function MixBatches() {
                           <TableRow
                             key={bale.id}
                             className="cursor-pointer"
-                            onClick={() => setSelectedBaleIds((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(bale.id)) next.delete(bale.id); else next.add(bale.id);
-                              return next;
-                            })}
+                            onClick={() =>
+                              setSelectedBaleIds((prev) => {
+                                const next = new Set(prev);
+                                if (next.has(bale.id)) next.delete(bale.id);
+                                else next.add(bale.id);
+                                return next;
+                              })
+                            }
                             data-testid={`row-unlinked-bale-${bale.id}`}
                           >
                             <TableCell>
-                              <input type="checkbox" checked={selectedBaleIds.has(bale.id)} readOnly className="cursor-pointer" />
+                              <input
+                                type="checkbox"
+                                checked={selectedBaleIds.has(bale.id)}
+                                readOnly
+                                className="cursor-pointer"
+                              />
                             </TableCell>
                             <TableCell className="font-mono text-sm">{bale.baleCode}</TableCell>
                             <TableCell className="text-sm">{bale.productName || "—"}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{formatNumber(parseFloat(bale.weightKg))}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">
+                              {formatNumber(parseFloat(bale.weightKg))}
+                            </TableCell>
                             <TableCell>
-                              <Badge variant="outline" className="text-xs">{bale.status}</Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {bale.status}
+                              </Badge>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -565,7 +619,8 @@ export default function MixBatches() {
                 {overLimit && (
                   <div className="flex items-center gap-2 text-destructive text-sm">
                     <AlertTriangle className="h-4 w-4 shrink-0" />
-                    Selected bales ({formatNumber(selectedKg)} kg) exceed available stock ({formatNumber(availableKg)} kg)
+                    Selected bales ({formatNumber(selectedKg)} kg) exceed available stock ({formatNumber(availableKg)}{" "}
+                    kg)
                   </div>
                 )}
               </div>

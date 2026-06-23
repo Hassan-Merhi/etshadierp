@@ -11,18 +11,20 @@ export default function FactoryLoadingsHub() {
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
-    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    queryFn: async () => {
+      const r = await fetch("/api/factory/settings");
+      return r.ok ? r.json() : {};
+    },
     staleTime: 60000,
   });
 
   const { data: myAccess } = useQuery<any>({ queryKey: ["/api/factory/my-access"], staleTime: 60000 });
   const hiddenTabs = myAccess?.hiddenCostFields ?? [];
 
-  const showPending = settings?.loadingsTabPendingEnabled !== false && !hiddenTabs.includes("hide_tab_loadings_pending");
+  const showPending =
+    settings?.loadingsTabPendingEnabled !== false && !hiddenTabs.includes("hide_tab_loadings_pending");
 
-  const [activeTab, setActiveTab] = useState<LoadingsTab>(
-    hash === "pending" && showPending ? "pending" : "loadings"
-  );
+  const [activeTab, setActiveTab] = useState<LoadingsTab>(hash === "pending" && showPending ? "pending" : "loadings");
 
   function handleTabChange(value: LoadingsTab) {
     setActiveTab(value);

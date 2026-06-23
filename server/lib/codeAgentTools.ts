@@ -22,9 +22,7 @@ export function resolveWorkspacePath(relPath: string): string {
   // Strip any leading slashes so "abs" paths like /etc/passwd still resolve inside workspace
   const cleaned = relPath.replace(/^\/+/, "");
   const abs = path.resolve(WORKSPACE_ROOT, cleaned);
-  const rootWithSep = WORKSPACE_ROOT.endsWith(path.sep)
-    ? WORKSPACE_ROOT
-    : WORKSPACE_ROOT + path.sep;
+  const rootWithSep = WORKSPACE_ROOT.endsWith(path.sep) ? WORKSPACE_ROOT : WORKSPACE_ROOT + path.sep;
   if (abs !== WORKSPACE_ROOT && !abs.startsWith(rootWithSep)) {
     throw new Error(`Path traversal rejected: ${JSON.stringify(relPath)}`);
   }
@@ -116,14 +114,7 @@ export async function listProjectDir(relPath: string = "."): Promise<string[]> {
   if (!fs.existsSync(abs)) {
     throw new Error(`Directory not found: ${relPath}`);
   }
-  const IGNORED = new Set([
-    "node_modules",
-    ".git",
-    "dist",
-    ".cache",
-    ".local",
-    "__pycache__",
-  ]);
+  const IGNORED = new Set(["node_modules", ".git", "dist", ".cache", ".local", "__pycache__"]);
   const entries = fs.readdirSync(abs, { withFileTypes: true });
   return entries
     .filter((e) => !IGNORED.has(e.name))
@@ -131,26 +122,12 @@ export async function listProjectDir(relPath: string = "."): Promise<string[]> {
     .sort();
 }
 
-export async function grepProjectFiles(
-  pattern: string,
-  relDir: string = "."
-): Promise<string> {
+export async function grepProjectFiles(pattern: string, relDir: string = "."): Promise<string> {
   const abs = resolveWorkspacePath(relDir);
   try {
     const { stdout } = await execFileAsync(
       "grep",
-      [
-        "-r",
-        "-n",
-        "-m",
-        "40",
-        "--include=*.ts",
-        "--include=*.tsx",
-        "--include=*.js",
-        "--include=*.jsx",
-        pattern,
-        abs,
-      ],
+      ["-r", "-n", "-m", "40", "--include=*.ts", "--include=*.tsx", "--include=*.js", "--include=*.jsx", pattern, abs],
       { timeout: 10_000 }
     );
     // Strip workspace root from paths for cleaner output
@@ -164,7 +141,8 @@ export async function grepProjectFiles(
 
 // ── Message parsing helpers ────────────────────────────────────────────────────
 
-const FILE_EXT_RE = /\b((?:server|client|shared|scripts)\/[\w./-]+\.(?:ts|tsx|js|jsx|css|json|md)|[\w-]+\.(?:ts|tsx|js|jsx|css|json|md))\b/gi;
+const FILE_EXT_RE =
+  /\b((?:server|client|shared|scripts)\/[\w./-]+\.(?:ts|tsx|js|jsx|css|json|md)|[\w-]+\.(?:ts|tsx|js|jsx|css|json|md))\b/gi;
 
 /**
  * Extract all file-path-like tokens from a user message.

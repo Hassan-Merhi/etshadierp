@@ -6,43 +6,110 @@ import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, recalculateContainerCosts,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  recalculateContainerCosts,
 } from "./_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -55,7 +122,8 @@ import fs from "fs";
 
 /** Returns true only if the container exists AND belongs to companyId. */
 async function verifyContainerOwnership(containerId: number, companyId: number): Promise<boolean> {
-  const rows = await db.select({ id: containers.id })
+  const rows = await db
+    .select({ id: containers.id })
     .from(containers)
     .where(and(eq(containers.id, containerId), eq(containers.companyId, companyId)));
   return rows.length > 0;
@@ -63,7 +131,8 @@ async function verifyContainerOwnership(containerId: number, companyId: number):
 
 /** Returns the containerId for a freight row — or null if not found / wrong company. */
 async function getFreightContainerId(freightId: number, companyId: number): Promise<number | null> {
-  const rows = await db.select({ containerId: containerFreight.containerId })
+  const rows = await db
+    .select({ containerId: containerFreight.containerId })
     .from(containerFreight)
     .where(and(eq(containerFreight.id, freightId), eq(containerFreight.companyId, companyId)));
   return rows.length > 0 ? rows[0].containerId : null;
@@ -72,7 +141,7 @@ async function getFreightContainerId(freightId: number, companyId: number): Prom
 // Safe file-serving: normalise the path and reject traversal attempts.
 function safeSendFile(res: any, folder: string, filename: string) {
   const safeFolder = path.basename(folder);
-  const safeFile  = path.basename(filename);
+  const safeFile = path.basename(filename);
   if (!safeFolder || !safeFile || safeFolder !== folder || safeFile !== filename) {
     return res.status(400).json({ message: "Invalid file path" });
   }
@@ -82,7 +151,6 @@ function safeSendFile(res: any, folder: string, filename: string) {
 }
 
 export function registerFactoryDocsUsersRoutes(app: Express) {
-
   // ─────────────────────────────────────────────────────────────────────────────
   // ADMIN OVERRIDE VERIFICATION
   // Validates admin credentials and grants a 10-minute session override token
@@ -240,18 +308,24 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             console.warn("Container doc disk cache write failed (non-fatal):", diskErr);
           }
 
-          const [doc] = await db.insert(containerDocuments).values({
-            companyId,
-            containerId,
-            docTypeId,
-            fileName: req.file.originalname,
-            storageKey,
-            mimeType: req.file.mimetype,
-            uploadedBy: (req.session as any).userId || null,
-            fileData,
-          }).returning();
+          const [doc] = await db
+            .insert(containerDocuments)
+            .values({
+              companyId,
+              containerId,
+              docTypeId,
+              fileName: req.file.originalname,
+              storageKey,
+              mimeType: req.file.mimetype,
+              uploadedBy: (req.session as any).userId || null,
+              fileData,
+            })
+            .returning();
 
-          const docType = await db.select().from(containerDocumentTypes).where(eq(containerDocumentTypes.id, docTypeId));
+          const docType = await db
+            .select()
+            .from(containerDocumentTypes)
+            .where(eq(containerDocumentTypes.id, docTypeId));
           const docTypeName = docType[0]?.label || "Document";
 
           await writeDaybookEntry(db, {
@@ -265,7 +339,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             createdBy: (req.session as any).userId || undefined,
           });
 
-          const allDocs = await db.select().from(containerDocuments).where(eq(containerDocuments.containerId, containerId));
+          const allDocs = await db
+            .select()
+            .from(containerDocuments)
+            .where(eq(containerDocuments.containerId, containerId));
           const allDocTypes = await db.select().from(containerDocumentTypes);
           const requiredTypes = allDocTypes.filter((dt: any) => dt.isRequired);
           const uploadedTypeIds = new Set(allDocs.map((d: any) => d.docTypeId));
@@ -293,7 +370,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const [deleted] = await db.delete(containerDocuments)
+      const [deleted] = await db
+        .delete(containerDocuments)
         .where(and(eq(containerDocuments.id, docId), eq(containerDocuments.containerId, containerId)))
         .returning();
       if (!deleted) return res.status(404).json({ message: "Document not found" });
@@ -334,13 +412,17 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(403).json({ message: "Access denied" });
 
-      const folder   = String(req.params.folder);
+      const folder = String(req.params.folder);
       const filename = String(req.params.filename);
 
       // Reject any path-traversal attempts
       if (
-        folder.includes("..") || folder.includes("/") || folder.includes("\\") ||
-        filename.includes("..") || filename.includes("/") || filename.includes("\\")
+        folder.includes("..") ||
+        folder.includes("/") ||
+        folder.includes("\\") ||
+        filename.includes("..") ||
+        filename.includes("/") ||
+        filename.includes("\\")
       ) {
         return res.status(400).json({ message: "Invalid file path" });
       }
@@ -349,7 +431,12 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const storageKey = `${folder}/${filename}`;
       if (folder === "container-docs") {
         const [doc] = await db
-          .select({ companyId: containerDocuments.companyId, fileData: containerDocuments.fileData, mimeType: containerDocuments.mimeType, fileName: containerDocuments.fileName })
+          .select({
+            companyId: containerDocuments.companyId,
+            fileData: containerDocuments.fileData,
+            mimeType: containerDocuments.mimeType,
+            fileName: containerDocuments.fileName,
+          })
           .from(containerDocuments)
           .where(eq(containerDocuments.storageKey, storageKey));
         if (!doc || doc.companyId !== companyId) {
@@ -362,7 +449,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
         // Fall back to DB-stored file data
         if (!doc.fileData) {
-          return res.status(404).json({ message: "File content is not stored in the database. This document was uploaded before cloud storage was enabled. Please delete and re-upload the file." });
+          return res.status(404).json({
+            message:
+              "File content is not stored in the database. This document was uploaded before cloud storage was enabled. Please delete and re-upload the file.",
+          });
         }
         const buffer = Buffer.from(doc.fileData, "base64");
         const ct = doc.mimeType || "application/octet-stream";
@@ -388,14 +478,18 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
       const freightRows = await db.select().from(containerFreight).where(eq(containerFreight.containerId, containerId));
-      const freightWithPayments = await Promise.all(freightRows.map(async (fr: any) => {
-        const payments = await db.select().from(containerFreightPayments)
-          .where(eq(containerFreightPayments.containerFreightId, fr.id));
-        const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
-        const freightAmount = Number(fr.freightAmount);
-        const computedStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
-        return { ...fr, payments, totalPaid, computedStatus };
-      }));
+      const freightWithPayments = await Promise.all(
+        freightRows.map(async (fr: any) => {
+          const payments = await db
+            .select()
+            .from(containerFreightPayments)
+            .where(eq(containerFreightPayments.containerFreightId, fr.id));
+          const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+          const freightAmount = Number(fr.freightAmount);
+          const computedStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
+          return { ...fr, payments, totalPaid, computedStatus };
+        })
+      );
       res.json(freightWithPayments);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -412,17 +506,20 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const [row] = await db.insert(containerFreight).values({
-        companyId,
-        containerId,
-        vendorName: req.body.vendorName || null,
-        vendorSupplierId: req.body.vendorSupplierId || null,
-        freightAmount: String(req.body.freightAmount || 0),
-        currency: req.body.currency || "USD",
-        dueDate: req.body.dueDate || null,
-        status: "UNPAID",
-        notes: req.body.notes || null,
-      }).returning();
+      const [row] = await db
+        .insert(containerFreight)
+        .values({
+          companyId,
+          containerId,
+          vendorName: req.body.vendorName || null,
+          vendorSupplierId: req.body.vendorSupplierId || null,
+          freightAmount: String(req.body.freightAmount || 0),
+          currency: req.body.currency || "USD",
+          dueDate: req.body.dueDate || null,
+          status: "UNPAID",
+          notes: req.body.notes || null,
+        })
+        .returning();
 
       await writeDaybookEntry(db, {
         companyId,
@@ -454,8 +551,15 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       }
 
       await db.delete(containerFreightPayments).where(eq(containerFreightPayments.containerFreightId, freightId));
-      const [deleted] = await db.delete(containerFreight)
-        .where(and(eq(containerFreight.id, freightId), eq(containerFreight.containerId, containerId), eq(containerFreight.companyId, companyId)))
+      const [deleted] = await db
+        .delete(containerFreight)
+        .where(
+          and(
+            eq(containerFreight.id, freightId),
+            eq(containerFreight.containerId, containerId),
+            eq(containerFreight.companyId, companyId)
+          )
+        )
         .returning();
       if (!deleted) return res.status(404).json({ message: "Freight not found" });
 
@@ -489,22 +593,31 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const freightContainerId = await getFreightContainerId(freightId, companyId);
       if (freightContainerId === null) return res.status(403).json({ message: "Access denied" });
 
-      const [payment] = await db.insert(containerFreightPayments).values({
-        companyId,
-        containerFreightId: freightId,
-        paymentDate: req.body.paymentDate,
-        amount: String(req.body.amount),
-        method: req.body.method || null,
-        reference: req.body.reference || null,
-        createdBy: (req.session as any).userId || null,
-      }).returning();
+      const [payment] = await db
+        .insert(containerFreightPayments)
+        .values({
+          companyId,
+          containerFreightId: freightId,
+          paymentDate: req.body.paymentDate,
+          amount: String(req.body.amount),
+          method: req.body.method || null,
+          reference: req.body.reference || null,
+          createdBy: (req.session as any).userId || null,
+        })
+        .returning();
 
       const [fr] = await db.select().from(containerFreight).where(eq(containerFreight.id, freightId));
-      const payments = await db.select().from(containerFreightPayments).where(eq(containerFreightPayments.containerFreightId, freightId));
+      const payments = await db
+        .select()
+        .from(containerFreightPayments)
+        .where(eq(containerFreightPayments.containerFreightId, freightId));
       const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
       const freightAmount = Number(fr.freightAmount);
       const newStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
-      await db.update(containerFreight).set({ status: newStatus, updatedAt: new Date() }).where(eq(containerFreight.id, freightId));
+      await db
+        .update(containerFreight)
+        .set({ status: newStatus, updatedAt: new Date() })
+        .where(eq(containerFreight.id, freightId));
 
       await writeDaybookEntry(db, {
         companyId,
@@ -536,18 +649,31 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const [deleted] = await db.delete(containerFreightPayments)
-        .where(and(eq(containerFreightPayments.id, paymentId), eq(containerFreightPayments.containerFreightId, freightId), eq(containerFreightPayments.companyId, companyId)))
+      const [deleted] = await db
+        .delete(containerFreightPayments)
+        .where(
+          and(
+            eq(containerFreightPayments.id, paymentId),
+            eq(containerFreightPayments.containerFreightId, freightId),
+            eq(containerFreightPayments.companyId, companyId)
+          )
+        )
         .returning();
       if (!deleted) return res.status(404).json({ message: "Payment not found" });
 
       const [fr] = await db.select().from(containerFreight).where(eq(containerFreight.id, freightId));
       if (fr) {
-        const payments = await db.select().from(containerFreightPayments).where(eq(containerFreightPayments.containerFreightId, freightId));
+        const payments = await db
+          .select()
+          .from(containerFreightPayments)
+          .where(eq(containerFreightPayments.containerFreightId, freightId));
         const totalPaid = payments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
         const freightAmount = Number(fr.freightAmount);
         const newStatus = totalPaid >= freightAmount ? "PAID" : totalPaid > 0 ? "PARTIAL" : "UNPAID";
-        await db.update(containerFreight).set({ status: newStatus, updatedAt: new Date() }).where(eq(containerFreight.id, freightId));
+        await db
+          .update(containerFreight)
+          .set({ status: newStatus, updatedAt: new Date() })
+          .where(eq(containerFreight.id, freightId));
       }
 
       await writeDaybookEntry(db, {
@@ -577,11 +703,17 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const freightIds = allFreight.map((f: any) => f.id);
       let allPayments: any[] = [];
       if (freightIds.length > 0) {
-        allPayments = await db.select().from(containerFreightPayments).where(inArray(containerFreightPayments.containerFreightId, freightIds));
+        allPayments = await db
+          .select()
+          .from(containerFreightPayments)
+          .where(inArray(containerFreightPayments.containerFreightId, freightIds));
       }
       const paymentsByFreight = new Map<number, number>();
       for (const p of allPayments) {
-        paymentsByFreight.set(p.containerFreightId, (paymentsByFreight.get(p.containerFreightId) || 0) + Number(p.amount));
+        paymentsByFreight.set(
+          p.containerFreightId,
+          (paymentsByFreight.get(p.containerFreightId) || 0) + Number(p.amount)
+        );
       }
 
       const statusByContainer: Record<number, { totalFreight: number; totalPaid: number; status: string }> = {};
@@ -593,7 +725,14 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       }
       for (const cid of Object.keys(statusByContainer)) {
         const s = statusByContainer[Number(cid)];
-        s.status = s.totalFreight === 0 ? "NONE" : s.totalPaid >= s.totalFreight ? "PAID" : s.totalPaid > 0 ? "PARTIAL" : "UNPAID";
+        s.status =
+          s.totalFreight === 0
+            ? "NONE"
+            : s.totalPaid >= s.totalFreight
+              ? "PAID"
+              : s.totalPaid > 0
+                ? "PARTIAL"
+                : "UNPAID";
       }
       res.json(statusByContainer);
     } catch (error: any) {
@@ -638,24 +777,32 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         const amtUsd = currency === "USD" ? amtCurrency : amtCurrency * fxRate;
 
         // Insert a real daybook entry from this voucher so it can be edited going forward
-        const [inserted] = await db.insert(factoryDaybookEntries).values({
-          companyId,
-          txDate: sourceVoucher.voucherDate,
-          txType: txTypeVal,
-          referenceId: realVoucherId,
-          referenceTable: "vouchers",
-          description: description !== undefined ? description : (sourceVoucher.description || `${sourceVoucher.voucherType} voucher #${sourceVoucher.voucherNumber}`),
-          currencyCode: currency,
-          amountCurrency: String(amtCurrency),
-          fxRateToUsd: String(fxRate),
-          amountUsd: String(amtUsd),
-          createdBy: userId,
-        }).returning();
+        const [inserted] = await db
+          .insert(factoryDaybookEntries)
+          .values({
+            companyId,
+            txDate: sourceVoucher.voucherDate,
+            txType: txTypeVal,
+            referenceId: realVoucherId,
+            referenceTable: "vouchers",
+            description:
+              description !== undefined
+                ? description
+                : sourceVoucher.description || `${sourceVoucher.voucherType} voucher #${sourceVoucher.voucherNumber}`,
+            currencyCode: currency,
+            amountCurrency: String(amtCurrency),
+            fxRateToUsd: String(fxRate),
+            amountUsd: String(amtUsd),
+            createdBy: userId,
+          })
+          .returning();
         existing = inserted;
         realEntryId = inserted.id;
       } else {
         // ── Real daybook entry ────────────────────────────────────────────────
-        const [found] = await db.select().from(factoryDaybookEntries)
+        const [found] = await db
+          .select()
+          .from(factoryDaybookEntries)
           .where(and(eq(factoryDaybookEntries.id, rawEntryId), eq(factoryDaybookEntries.companyId, companyId)));
         if (!found) return res.status(404).json({ message: "Daybook entry not found" });
         existing = found;
@@ -668,7 +815,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - session.daybookEditDays);
         if (entryDate < cutoff) {
-          return res.status(403).json({ message: `Entry is older than ${session.daybookEditDays} days and cannot be edited` });
+          return res
+            .status(403)
+            .json({ message: `Entry is older than ${session.daybookEditDays} days and cannot be edited` });
         }
       }
 
@@ -682,7 +831,11 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       if (fxRateToUsd !== undefined) updates.fxRateToUsd = String(fxRateToUsd);
       if (txDate !== undefined) updates.txDate = txDate;
 
-      const [updated] = await db.update(factoryDaybookEntries).set(updates).where(eq(factoryDaybookEntries.id, realEntryId)).returning();
+      const [updated] = await db
+        .update(factoryDaybookEntries)
+        .set(updates)
+        .where(eq(factoryDaybookEntries.id, realEntryId))
+        .returning();
       const afterJson = JSON.stringify(updated);
 
       await db.insert(factoryDaybookEntryEdits).values({
@@ -699,7 +852,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         if (description !== undefined) voucherUpdates.description = description;
         if (txDate !== undefined) voucherUpdates.voucherDate = txDate;
         if (Object.keys(voucherUpdates).length > 0) {
-          await db.update(vouchers)
+          await db
+            .update(vouchers)
             .set(voucherUpdates)
             .where(and(eq(vouchers.id, updated.referenceId), eq(vouchers.companyId, companyId)));
         }
@@ -715,7 +869,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
   app.get("/api/factory/daybook/:entryId/edits", requireAuth, async (req: any, res: any) => {
     try {
       const entryId = Number(req.params.entryId);
-      const edits = await db.select().from(factoryDaybookEntryEdits)
+      const edits = await db
+        .select()
+        .from(factoryDaybookEntryEdits)
         .where(eq(factoryDaybookEntryEdits.daybookEntryId, entryId))
         .orderBy(desc(factoryDaybookEntryEdits.editedAt));
       res.json(edits);
@@ -753,16 +909,22 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       const COST_TX_TYPES = ["OFFLOAD_RAW_STOCK", "FREIGHT", "COMMISSION", "DUTY", "OTHER_CHARGE"];
 
-      const [entry] = await db.select().from(factoryDaybookEntries)
+      const [entry] = await db
+        .select()
+        .from(factoryDaybookEntries)
         .where(and(eq(factoryDaybookEntries.id, entryId), eq(factoryDaybookEntries.companyId, companyId)));
       if (!entry) return res.status(404).json({ message: "Daybook entry not found" });
       if (!COST_TX_TYPES.includes(entry.txType)) {
-        return res.status(400).json({ message: `txType '${entry.txType}' is not a cost entry — use the standard edit endpoint` });
+        return res
+          .status(400)
+          .json({ message: `txType '${entry.txType}' is not a cost entry — use the standard edit endpoint` });
       }
 
       // Parse metaJson to determine exact source
       let meta: any = {};
-      try { meta = JSON.parse(entry.metaJson || "{}"); } catch {}
+      try {
+        meta = JSON.parse(entry.metaJson || "{}");
+      } catch {}
 
       // Resolve containerId from metaJson or txType + referenceId fallback
       let containerId: number | null = meta.containerId ?? null;
@@ -771,19 +933,25 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           containerId = entry.referenceId;
         } else if (entry.txType === "OFFLOAD_RAW_STOCK") {
           // referenceId = rawStock.id; look up containerId from rawStock
-          const [rs] = await db.select({ containerId: factoryRawStock.containerId })
-            .from(factoryRawStock).where(eq(factoryRawStock.id, entry.referenceId!));
+          const [rs] = await db
+            .select({ containerId: factoryRawStock.containerId })
+            .from(factoryRawStock)
+            .where(eq(factoryRawStock.id, entry.referenceId!));
           containerId = rs?.containerId ?? null;
         } else if (entry.txType === "COMMISSION") {
           // referenceId = commissionRecord.id; look up containerId from commission
-          const [comm] = await db.select({ containerId: factoryContainerCommissions.containerId })
-            .from(factoryContainerCommissions).where(eq(factoryContainerCommissions.id, entry.referenceId!));
+          const [comm] = await db
+            .select({ containerId: factoryContainerCommissions.containerId })
+            .from(factoryContainerCommissions)
+            .where(eq(factoryContainerCommissions.id, entry.referenceId!));
           containerId = comm?.containerId ?? null;
         }
       }
       if (!containerId) return res.status(400).json({ message: "Cannot resolve container from this daybook entry" });
 
-      const [container] = await db.select().from(factoryContainers)
+      const [container] = await db
+        .select()
+        .from(factoryContainers)
         .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
       if (!container) return res.status(404).json({ message: "Container not found" });
 
@@ -798,41 +966,48 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           if (actualKg <= 0) throw new Error("Container has no received weight");
           const newRate = parsedAmount / actualKg;
           const ccy = newCurrencyCode || container.currencyCode || "USD";
-          await tx.update(factoryContainers)
+          await tx
+            .update(factoryContainers)
             .set({ ratePerKg: String(newRate.toFixed(6)), currencyCode: ccy, updatedAt: new Date() })
             .where(eq(factoryContainers.id, containerId!));
-
         } else if (sourceType === "FREIGHT" || entry.txType === "FREIGHT") {
           const ccy = newCurrencyCode || (container as any).freightCurrencyCode || container.currencyCode || "USD";
-          const fx = newFxRate ? String(newFxRate) : (container as any).fxRateToUsdOffload || container.fxRateToUsd || "1";
-          await tx.update(factoryContainers)
+          const fx = newFxRate
+            ? String(newFxRate)
+            : (container as any).fxRateToUsdOffload || container.fxRateToUsd || "1";
+          await tx
+            .update(factoryContainers)
             .set({ freight: String(parsedAmount), updatedAt: new Date() })
             .where(eq(factoryContainers.id, containerId!));
           // Also update the daybook entry currency if it changed
           if (newCurrencyCode) {
-            await tx.update(factoryDaybookEntries)
+            await tx
+              .update(factoryDaybookEntries)
               .set({ currencyCode: ccy, fxRateToUsd: fx })
               .where(eq(factoryDaybookEntries.id, entryId));
           }
-
         } else if (sourceType === "COMMISSION" || entry.txType === "COMMISSION") {
           const commId = meta.commissionId || entry.referenceId;
           if (commId) {
-            await tx.update(factoryContainerCommissions)
+            await tx
+              .update(factoryContainerCommissions)
               .set({ commissionTotal: String(parsedAmount) })
               .where(eq(factoryContainerCommissions.id, commId));
           }
           // Also sync the commissionAmount summary on the container
-          await tx.update(factoryContainers)
+          await tx
+            .update(factoryContainers)
             .set({ commissionAmount: String(parsedAmount), updatedAt: new Date() })
             .where(eq(factoryContainers.id, containerId!));
-
         } else if (sourceType === "DUTY" || entry.txType === "DUTY") {
           if (container.dutyStatus !== "CONFIRMED") {
-            throw new Error("Duty can only be edited when its status is CONFIRMED. Use the confirm-duty flow for PENDING duty.");
+            throw new Error(
+              "Duty can only be edited when its status is CONFIRMED. Use the confirm-duty flow for PENDING duty."
+            );
           }
           const oldDuty = container.dutyAmount;
-          await tx.update(factoryContainers)
+          await tx
+            .update(factoryContainers)
             .set({ dutyAmount: String(parsedAmount), updatedAt: new Date() })
             .where(eq(factoryContainers.id, containerId!));
           // Write duty audit log
@@ -846,23 +1021,28 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             notes: `Edited via daybook cost-edit. Reason: ${reason.trim()}`,
             updatedByUserId: String(userId || "system"),
           });
-
         } else if (sourceType === "CONTAINER_OC") {
-          await tx.update(factoryContainers)
+          await tx
+            .update(factoryContainers)
             .set({ otherCharges: String(parsedAmount), updatedAt: new Date() })
             .where(eq(factoryContainers.id, containerId!));
-
         } else if (sourceType === "OFFLOAD_ADDITIONAL" || sourceType === "POST_OFFLOAD_ADDITIONAL") {
           const chargeId = meta.chargeId;
           if (!chargeId) throw new Error("Missing chargeId in metaJson — cannot update individual additional charge");
-          await tx.update(factoryOffloadAdditionalCharges)
+          await tx
+            .update(factoryOffloadAdditionalCharges)
             .set({ amount: String(parsedAmount) })
-            .where(and(eq(factoryOffloadAdditionalCharges.id, chargeId), eq(factoryOffloadAdditionalCharges.companyId, companyId)));
-
+            .where(
+              and(
+                eq(factoryOffloadAdditionalCharges.id, chargeId),
+                eq(factoryOffloadAdditionalCharges.companyId, companyId)
+              )
+            );
         } else {
           // Legacy fallback for entries with no metaJson — infer from txType
           if (entry.txType === "OTHER_CHARGE") {
-            await tx.update(factoryContainers)
+            await tx
+              .update(factoryContainers)
               .set({ otherCharges: String(parsedAmount), updatedAt: new Date() })
               .where(eq(factoryContainers.id, containerId!));
           }
@@ -876,31 +1056,36 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         const entryCcy = newCurrencyCode || entry.currencyCode || "USD";
         const amtUsd = entryCcy === "USD" ? parsedAmount : parsedAmount * fx;
         const updatedMetaJson = JSON.stringify({ ...meta, containerId, sourceType });
-        await tx.update(factoryDaybookEntries)
+        await tx
+          .update(factoryDaybookEntries)
           .set({ amountCurrency: String(parsedAmount), amountUsd: String(amtUsd), metaJson: updatedMetaJson })
           .where(eq(factoryDaybookEntries.id, entryId));
 
         // ── 4. Sync OFFLOAD_RAW_STOCK daybook entry (total inclusive cost) ────────
         // This entry always shows the total cost of the container
         if (entry.txType !== "OFFLOAD_RAW_STOCK") {
-          const [rawStockRow] = await tx.select({ id: factoryRawStock.id })
+          const [rawStockRow] = await tx
+            .select({ id: factoryRawStock.id })
             .from(factoryRawStock)
             .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId!)));
           if (rawStockRow) {
             const containerCcy = container.currencyCode || "USD";
             const containerFx = parseFloat(container.fxRateToUsd || "1");
             const totalUsd = containerCcy === "USD" ? totalCost : totalCost * containerFx;
-            await tx.update(factoryDaybookEntries)
+            await tx
+              .update(factoryDaybookEntries)
               .set({
                 amountCurrency: String(totalCost.toFixed(4)),
                 amountUsd: String(totalUsd.toFixed(4)),
                 description: `Offloaded container ${container.containerNumber}: ${container.actualReceivedKg} kg at ${inclusiveCostPerKg.toFixed(4)}/kg (inclusive) [edited]`,
               })
-              .where(and(
-                eq(factoryDaybookEntries.companyId, companyId),
-                eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
-                eq(factoryDaybookEntries.referenceId, rawStockRow.id)
-              ));
+              .where(
+                and(
+                  eq(factoryDaybookEntries.companyId, companyId),
+                  eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+                  eq(factoryDaybookEntries.referenceId, rawStockRow.id)
+                )
+              );
           }
         }
 
@@ -916,12 +1101,15 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       // Return updated entry
       const [updated] = await db.select().from(factoryDaybookEntries).where(eq(factoryDaybookEntries.id, entryId));
-      const [updatedContainer] = await db.select({
-        id: factoryContainers.id,
-        containerNumber: factoryContainers.containerNumber,
-        finalPayableAmount: factoryContainers.finalPayableAmount,
-        ratePerKgUsd: factoryContainers.ratePerKgUsd,
-      }).from(factoryContainers).where(eq(factoryContainers.id, containerId));
+      const [updatedContainer] = await db
+        .select({
+          id: factoryContainers.id,
+          containerNumber: factoryContainers.containerNumber,
+          finalPayableAmount: factoryContainers.finalPayableAmount,
+          ratePerKgUsd: factoryContainers.ratePerKgUsd,
+        })
+        .from(factoryContainers)
+        .where(eq(factoryContainers.id, containerId));
 
       res.json({
         entry: updated,
@@ -944,9 +1132,14 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         return res.status(403).json({ message: "Only Admin or Developer can permanently delete entries" });
       }
       const id = Number(req.params.id);
-      if (isNaN(id) || id <= 0) return res.status(400).json({ message: "Invalid entry ID — only real (non-synthetic) entries can be hard deleted" });
+      if (isNaN(id) || id <= 0)
+        return res
+          .status(400)
+          .json({ message: "Invalid entry ID — only real (non-synthetic) entries can be hard deleted" });
 
-      const [entry] = await db.select().from(factoryDaybookEntries)
+      const [entry] = await db
+        .select()
+        .from(factoryDaybookEntries)
         .where(and(eq(factoryDaybookEntries.id, id), eq(factoryDaybookEntries.companyId, companyId)));
       if (!entry) return res.status(404).json({ message: "Entry not found" });
 
@@ -980,7 +1173,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       if (rawId < 0) {
         voucherId = Math.abs(rawId);
       } else {
-        const [entry] = await db.select().from(factoryDaybookEntries)
+        const [entry] = await db
+          .select()
+          .from(factoryDaybookEntries)
           .where(and(eq(factoryDaybookEntries.id, rawId), eq(factoryDaybookEntries.companyId, companyId)));
         if (!entry) return res.status(404).json({ message: "Daybook entry not found" });
         if (entry.referenceTable !== "vouchers" || !entry.referenceId) {
@@ -990,7 +1185,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         daybookEntryId = entry.id;
       }
 
-      const [voucher] = await db.select().from(vouchers)
+      const [voucher] = await db
+        .select()
+        .from(vouchers)
         .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, companyId), sql`${vouchers.deletedAt} IS NULL`));
       if (!voucher) return res.status(404).json({ message: "Voucher not found or already voided" });
 
@@ -1005,7 +1202,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await db.transaction(async (tx: any) => {
         // 0. Read employee-linked entries BEFORE deletion so we can reverse balances
-        const empEntries = await tx.select().from(voucherEntries)
+        const empEntries = await tx
+          .select()
+          .from(voucherEntries)
           .where(and(eq(voucherEntries.voucherId, voucherId), sql`${voucherEntries.employeeId} IS NOT NULL`));
 
         // 1. Delete voucher entries (double-entry lines)
@@ -1026,25 +1225,35 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
         if (advPayMatch) {
           const advanceId = parseInt(advPayMatch[1]);
-          await tx.update(factoryWorkerAdvances).set({ cashAccountId: null })
+          await tx
+            .update(factoryWorkerAdvances)
+            .set({ cashAccountId: null })
             .where(and(eq(factoryWorkerAdvances.id, advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
         } else if (payPayMatch) {
           const payrollId = parseInt(payPayMatch[1]);
-          const [payroll] = await tx.select().from(factoryPayrolls)
+          const [payroll] = await tx
+            .select()
+            .from(factoryPayrolls)
             .where(and(eq(factoryPayrolls.id, payrollId), eq(factoryPayrolls.companyId, companyId)));
 
-          await tx.update(factoryPayrolls).set({ status: "DRAFT", cashAccountId: null, paidAt: null })
+          await tx
+            .update(factoryPayrolls)
+            .set({ status: "DRAFT", cashAccountId: null, paidAt: null })
             .where(and(eq(factoryPayrolls.id, payrollId), eq(factoryPayrolls.companyId, companyId)));
 
           if (payroll) {
             const advAmt = parseFloat(payroll.advances || "0");
             if (advAmt > 0) {
-              const workerAdvances = await tx.select().from(factoryWorkerAdvances)
-                .where(and(
-                  eq(factoryWorkerAdvances.companyId, companyId),
-                  eq(factoryWorkerAdvances.workerId, payroll.workerId),
-                  eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
-                ))
+              const workerAdvances = await tx
+                .select()
+                .from(factoryWorkerAdvances)
+                .where(
+                  and(
+                    eq(factoryWorkerAdvances.companyId, companyId),
+                    eq(factoryWorkerAdvances.workerId, payroll.workerId),
+                    eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
+                  )
+                )
                 .orderBy(desc(factoryWorkerAdvances.advanceDate));
 
               let toRestore = advAmt;
@@ -1056,34 +1265,51 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
                 if (room <= 0) continue;
                 const restoreAmt = Math.min(room, toRestore);
                 const newBal = bal + restoreAmt;
-                await tx.update(factoryWorkerAdvances).set({
-                  remainingBalance: newBal.toFixed(2),
-                  fullyPaid: false,
-                }).where(eq(factoryWorkerAdvances.id, adv.id));
+                await tx
+                  .update(factoryWorkerAdvances)
+                  .set({
+                    remainingBalance: newBal.toFixed(2),
+                    fullyPaid: false,
+                  })
+                  .where(eq(factoryWorkerAdvances.id, adv.id));
                 toRestore -= restoreAmt;
               }
             }
           }
         } else if (repayMatch) {
           const repaymentId = parseInt(repayMatch[1]);
-          const [repayment] = await tx.select().from(factoryAdvanceRepayments)
-            .where(and(eq(factoryAdvanceRepayments.id, repaymentId), eq(factoryAdvanceRepayments.companyId, companyId)));
+          const [repayment] = await tx
+            .select()
+            .from(factoryAdvanceRepayments)
+            .where(
+              and(eq(factoryAdvanceRepayments.id, repaymentId), eq(factoryAdvanceRepayments.companyId, companyId))
+            );
           if (repayment) {
-            const [advance] = await tx.select().from(factoryWorkerAdvances)
-              .where(and(eq(factoryWorkerAdvances.id, repayment.advanceId), eq(factoryWorkerAdvances.companyId, companyId)));
+            const [advance] = await tx
+              .select()
+              .from(factoryWorkerAdvances)
+              .where(
+                and(eq(factoryWorkerAdvances.id, repayment.advanceId), eq(factoryWorkerAdvances.companyId, companyId))
+              );
             if (advance) {
               const newBalance = parseFloat(advance.remainingBalance || "0") + parseFloat(repayment.amount || "0");
-              await tx.update(factoryWorkerAdvances).set({
-                remainingBalance: newBalance.toFixed(2),
-                fullyPaid: false,
-              }).where(eq(factoryWorkerAdvances.id, advance.id));
+              await tx
+                .update(factoryWorkerAdvances)
+                .set({
+                  remainingBalance: newBalance.toFixed(2),
+                  fullyPaid: false,
+                })
+                .where(eq(factoryWorkerAdvances.id, advance.id));
             }
             await tx.delete(factoryAdvanceRepayments).where(eq(factoryAdvanceRepayments.id, repaymentId));
           }
         }
 
         // 4b. Reverse employee balance/deposit/withdrawal for EMP-DEP, EMP-WD, EMP-PAY vouchers
-        if (empEntries.length > 0 && (vNum.startsWith("EMP-DEP-") || vNum.startsWith("EMP-WD-") || vNum.startsWith("EMP-PAY-"))) {
+        if (
+          empEntries.length > 0 &&
+          (vNum.startsWith("EMP-DEP-") || vNum.startsWith("EMP-WD-") || vNum.startsWith("EMP-PAY-"))
+        ) {
           // Group deltas by employeeId
           const empDeltas = new Map<number, { creditTotal: number; debitTotal: number }>();
           for (const entry of empEntries) {
@@ -1096,7 +1322,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             d.debitTotal += dr;
           }
           for (const [empId, delta] of empDeltas) {
-            const [emp] = await tx.select().from(employees)
+            const [emp] = await tx
+              .select()
+              .from(employees)
               .where(and(eq(employees.id, empId), eq(employees.companyId, companyId)));
             if (!emp) continue;
             const curBal = parseFloat(emp.currentBalance || "0");
@@ -1107,11 +1335,14 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             const newBal = curBal - delta.creditTotal + delta.debitTotal;
             const newDep = Math.max(0, curDep - delta.creditTotal);
             const newWith = Math.max(0, curWith - delta.debitTotal);
-            await tx.update(employees).set({
-              currentBalance: newBal.toFixed(2),
-              totalDeposits: newDep.toFixed(2),
-              ...(delta.debitTotal > 0 ? { totalWithdrawals: newWith.toFixed(2) } : {}),
-            }).where(eq(employees.id, empId));
+            await tx
+              .update(employees)
+              .set({
+                currentBalance: newBal.toFixed(2),
+                totalDeposits: newDep.toFixed(2),
+                ...(delta.debitTotal > 0 ? { totalWithdrawals: newWith.toFixed(2) } : {}),
+              })
+              .where(eq(employees.id, empId));
           }
         }
 
@@ -1151,15 +1382,18 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const currentRole = (req.session as any).currentRole;
       const globalRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const isAllowed = ["Admin","Owner","Developer"].includes(currentRole) || ["Admin","Developer"].includes(globalRole);
+      const isAllowed =
+        ["Admin", "Owner", "Developer"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
       if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
 
-      const allUsers = await db.select({
-        id: users.id,
-        username: users.username,
-        active: users.active,
-        createdAt: users.createdAt,
-      }).from(users);
+      const allUsers = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          active: users.active,
+          createdAt: users.createdAt,
+        })
+        .from(users);
 
       // Collect user IDs that have the Developer role in ANY company.
       // Match the ERP user-list behaviour: Developer accounts are globally
@@ -1171,15 +1405,12 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const devUserIds = new Set(devRoles.map((r: any) => r.userId));
       const requesterIsDeveloper = currentRole === "Developer" || globalRole === "Developer";
 
-      const visibleUsers = allUsers.filter((u: any) =>
-        requesterIsDeveloper || !devUserIds.has(u.id)
-      );
+      const visibleUsers = allUsers.filter((u: any) => requesterIsDeveloper || !devUserIds.has(u.id));
 
-      const profiles = await db.select()
-        .from(factoryUserProfiles)
-        .where(eq(factoryUserProfiles.companyId, companyId));
+      const profiles = await db.select().from(factoryUserProfiles).where(eq(factoryUserProfiles.companyId, companyId));
 
-      const access = await db.select()
+      const access = await db
+        .select()
         .from(factoryUserPageAccess)
         .where(eq(factoryUserPageAccess.companyId, companyId));
 
@@ -1216,7 +1447,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const currentRole = (req.session as any).currentRole;
       const globalRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const isAllowed = ["Admin","Owner"].includes(currentRole) || ["Admin","Developer"].includes(globalRole);
+      const isAllowed = ["Admin", "Owner"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
       if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
 
       const { username, password, displayName, pageAccess, hasErpAccess, hasFactoryAccess } = req.body;
@@ -1235,11 +1466,14 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       await db.transaction(async (tx: any) => {
         const hashedPassword = await bcrypt.hash(password, 10);
-        const [newUser] = await tx.insert(users).values({
-          username,
-          password: hashedPassword,
-          active: true,
-        }).returning();
+        const [newUser] = await tx
+          .insert(users)
+          .values({
+            username,
+            password: hashedPassword,
+            active: true,
+          })
+          .returning();
 
         await tx.insert(userCompanyRoles).values({
           userId: newUser.id,
@@ -1286,11 +1520,20 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const currentRole = (req.session as any).currentRole;
       const globalRole = req.user?.role;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const isAllowed = ["Admin","Owner"].includes(currentRole) || ["Admin","Developer"].includes(globalRole);
+      const isAllowed = ["Admin", "Owner"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
       if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
 
       const { userId } = req.params;
-      const { displayName, pageAccess, password, hasErpAccess, hasFactoryAccess, hiddenCostFields, hideAllCosts, username } = req.body;
+      const {
+        displayName,
+        pageAccess,
+        password,
+        hasErpAccess,
+        hasFactoryAccess,
+        hiddenCostFields,
+        hideAllCosts,
+        username,
+      } = req.body;
 
       await db.transaction(async (tx: any) => {
         const userUpdates: any = {};
@@ -1298,7 +1541,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           userUpdates.password = await bcrypt.hash(password, 10);
         }
         if (username && username.trim()) {
-          const existingWithUsername = await tx.select({ id: users.id }).from(users).where(eq(users.username, username.trim()));
+          const existingWithUsername = await tx
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.username, username.trim()));
           if (existingWithUsername.length > 0 && existingWithUsername[0].id !== userId) {
             throw new Error("Username already taken");
           }
@@ -1315,12 +1561,14 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         if (Array.isArray(hiddenCostFields)) profileUpdates.hiddenCostFields = hiddenCostFields;
         if (hideAllCosts !== undefined) profileUpdates.hideAllCosts = !!hideAllCosts;
 
-        const existingProfile = await tx.select()
+        const existingProfile = await tx
+          .select()
           .from(factoryUserProfiles)
           .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
 
         if (existingProfile.length > 0) {
-          await tx.update(factoryUserProfiles)
+          await tx
+            .update(factoryUserProfiles)
             .set(profileUpdates)
             .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
         } else {
@@ -1336,7 +1584,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         }
 
         if (Array.isArray(pageAccess)) {
-          await tx.delete(factoryUserPageAccess)
+          await tx
+            .delete(factoryUserPageAccess)
             .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
 
           if (pageAccess.length > 0) {
@@ -1365,19 +1614,16 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const globalRole = req.user?.role;
       const sessionUserId = (req.session as any).userId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const isAllowed = ["Admin","Owner"].includes(currentRole) || ["Admin","Developer"].includes(globalRole);
+      const isAllowed = ["Admin", "Owner"].includes(currentRole) || ["Admin", "Developer"].includes(globalRole);
       if (!isAllowed) return res.status(403).json({ message: "Only Admin or Owner can manage users" });
       const { userId } = req.params;
       if (userId === sessionUserId) {
         return res.status(400).json({ message: "You cannot delete your own account" });
       }
       await db.transaction(async (tx: any) => {
-        await tx.delete(factoryUserPageAccess)
-          .where(eq(factoryUserPageAccess.userId, userId));
-        await tx.delete(factoryUserProfiles)
-          .where(eq(factoryUserProfiles.userId, userId));
-        await tx.delete(userCompanyRoles)
-          .where(eq(userCompanyRoles.userId, userId));
+        await tx.delete(factoryUserPageAccess).where(eq(factoryUserPageAccess.userId, userId));
+        await tx.delete(factoryUserProfiles).where(eq(factoryUserProfiles.userId, userId));
+        await tx.delete(userCompanyRoles).where(eq(userCompanyRoles.userId, userId));
         await tx.delete(users).where(eq(users.id, userId));
       });
       res.json({ message: "User removed successfully" });
@@ -1402,8 +1648,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       let companyName: string = "";
 
       if (pinnedFactoryId) {
-        const [pinned] = await db.select({ id: companies.id, name: companies.name, companyType: companies.companyType })
-          .from(companies).where(eq(companies.id, pinnedFactoryId));
+        const [pinned] = await db
+          .select({ id: companies.id, name: companies.name, companyType: companies.companyType })
+          .from(companies)
+          .where(eq(companies.id, pinnedFactoryId));
         if (pinned?.companyType === "factory") {
           companyId = pinned.id;
           companyName = pinned.name;
@@ -1411,8 +1659,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       }
 
       if (!companyId && currentCompanyId) {
-        const [current] = await db.select({ id: companies.id, name: companies.name, companyType: companies.companyType })
-          .from(companies).where(eq(companies.id, currentCompanyId));
+        const [current] = await db
+          .select({ id: companies.id, name: companies.name, companyType: companies.companyType })
+          .from(companies)
+          .where(eq(companies.id, currentCompanyId));
         if (current?.companyType === "factory") {
           companyId = current.id;
           companyName = current.name;
@@ -1420,7 +1670,8 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       }
 
       if (!companyId) {
-        const [factoryComp] = await db.select({ id: companies.id, name: companies.name })
+        const [factoryComp] = await db
+          .select({ id: companies.id, name: companies.name })
           .from(companies)
           .where(and(eq(companies.companyType, "factory"), eq(companies.active, true)))
           .limit(1);
@@ -1434,7 +1685,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         // Last resort: use currentCompanyId (single-company or legacy setups)
         companyId = currentCompanyId;
         if (currentCompanyId) {
-          const [c] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, currentCompanyId));
+          const [c] = await db
+            .select({ name: companies.name })
+            .from(companies)
+            .where(eq(companies.id, currentCompanyId));
           companyName = c?.name ?? "";
         }
       }
@@ -1447,15 +1701,25 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       const role = (req.session as any).currentRole;
       if (role === "Admin" || role === "Owner" || role === "Developer") {
-        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess: true, hasFactoryAccess: true, hiddenCostFields: [], hideAllCosts: false, companyId, companyName });
+        return res.json({
+          fullAccess: true,
+          pageKeys: [],
+          hasErpAccess: true,
+          hasFactoryAccess: true,
+          hiddenCostFields: [],
+          hideAllCosts: false,
+          companyId,
+          companyName,
+        });
       }
 
-      const [profile] = await db.select({
-        hasErpAccess: factoryUserProfiles.hasErpAccess,
-        hasFactoryAccess: factoryUserProfiles.hasFactoryAccess,
-        hiddenCostFields: factoryUserProfiles.hiddenCostFields,
-        hideAllCosts: factoryUserProfiles.hideAllCosts,
-      })
+      const [profile] = await db
+        .select({
+          hasErpAccess: factoryUserProfiles.hasErpAccess,
+          hasFactoryAccess: factoryUserProfiles.hasFactoryAccess,
+          hiddenCostFields: factoryUserProfiles.hiddenCostFields,
+          hideAllCosts: factoryUserProfiles.hideAllCosts,
+        })
         .from(factoryUserProfiles)
         .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, userId)));
 
@@ -1464,18 +1728,33 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const hideAllCosts = profile?.hideAllCosts ?? false;
       // When hideAllCosts is set, treat all cost field keys as hidden
       const ALL_COST_KEYS = [
-        "inventory_avg_rate", "inventory_total_value", "inventory_sell_price", "inventory_sell_value",
-        "bale_history_cost_per_kg", "bale_history_total_cost", "bales_list_cost_per_kg",
+        "inventory_avg_rate",
+        "inventory_total_value",
+        "inventory_sell_price",
+        "inventory_sell_value",
+        "bale_history_cost_per_kg",
+        "bale_history_total_cost",
+        "bales_list_cost_per_kg",
         "hide_proforma_price",
       ];
       const hiddenCostFields = hideAllCosts ? ALL_COST_KEYS : (profile?.hiddenCostFields ?? []);
 
-      const access = await db.select({ pageKey: factoryUserPageAccess.pageKey })
+      const access = await db
+        .select({ pageKey: factoryUserPageAccess.pageKey })
         .from(factoryUserPageAccess)
         .where(and(eq(factoryUserPageAccess.companyId, companyId), eq(factoryUserPageAccess.userId, userId)));
 
       if (access.length === 0) {
-        return res.json({ fullAccess: true, pageKeys: [], hasErpAccess, hasFactoryAccess, hiddenCostFields, hideAllCosts, companyId, companyName });
+        return res.json({
+          fullAccess: true,
+          pageKeys: [],
+          hasErpAccess,
+          hasFactoryAccess,
+          hiddenCostFields,
+          hideAllCosts,
+          companyId,
+          companyName,
+        });
       }
 
       res.json({
@@ -1556,11 +1835,14 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
   app.get("/api/chat/users", requireAuth, async (req: any, res: any) => {
     try {
       const currentUserId = (req.session as any).userId;
-      const allUsers = await db.select({
-        id: users.id,
-        username: users.username,
-        active: users.active,
-      }).from(users).where(eq(users.active, true));
+      const allUsers = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          active: users.active,
+        })
+        .from(users)
+        .where(eq(users.active, true));
 
       const filtered = allUsers.filter((u: any) => u.id !== currentUserId);
 
@@ -1568,37 +1850,45 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const presenceRecords = await db.select().from(userPresence);
       const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
 
-      const usersWithUnread = await Promise.all(filtered.map(async (u: any) => {
-        const [unreadResult] = await db.select({ count: sql<number>`count(*)::int` })
-          .from(directMessages)
-          .where(and(
-            eq(directMessages.senderId, u.id),
-            eq(directMessages.receiverId, currentUserId),
-            sql`${directMessages.readAt} IS NULL`
-          ));
-        const [msgResult] = await db.select({ count: sql<number>`count(*)::int` })
-          .from(directMessages)
-          .where(or(
-            and(eq(directMessages.senderId, u.id), eq(directMessages.receiverId, currentUserId)),
-            and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, u.id))
-          ));
+      const usersWithUnread = await Promise.all(
+        filtered.map(async (u: any) => {
+          const [unreadResult] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(directMessages)
+            .where(
+              and(
+                eq(directMessages.senderId, u.id),
+                eq(directMessages.receiverId, currentUserId),
+                sql`${directMessages.readAt} IS NULL`
+              )
+            );
+          const [msgResult] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(directMessages)
+            .where(
+              or(
+                and(eq(directMessages.senderId, u.id), eq(directMessages.receiverId, currentUserId)),
+                and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, u.id))
+              )
+            );
 
-        // Find most recent presence record for this user
-        const userPresenceRecords = presenceRecords.filter((p: any) => p.userId === u.id);
-        const latestPresence = userPresenceRecords.sort((a: any, b: any) =>
-          new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
-        )[0];
-        const isOnline = latestPresence ? new Date(latestPresence.lastSeen) > twoMinutesAgo : false;
-        const lastSeen = latestPresence ? latestPresence.lastSeen : null;
+          // Find most recent presence record for this user
+          const userPresenceRecords = presenceRecords.filter((p: any) => p.userId === u.id);
+          const latestPresence = userPresenceRecords.sort(
+            (a: any, b: any) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+          )[0];
+          const isOnline = latestPresence ? new Date(latestPresence.lastSeen) > twoMinutesAgo : false;
+          const lastSeen = latestPresence ? latestPresence.lastSeen : null;
 
-        return {
-          ...u,
-          unreadCount: unreadResult?.count || 0,
-          hasMessages: (msgResult?.count || 0) > 0,
-          isOnline,
-          lastSeen,
-        };
-      }));
+          return {
+            ...u,
+            unreadCount: unreadResult?.count || 0,
+            hasMessages: (msgResult?.count || 0) > 0,
+            isOnline,
+            lastSeen,
+          };
+        })
+      );
 
       res.json(usersWithUnread);
     } catch (error: any) {
@@ -1611,12 +1901,15 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const currentUserId = (req.session as any).userId;
       const otherUserId = req.params.userId;
 
-      const messages = await db.select()
+      const messages = await db
+        .select()
         .from(directMessages)
-        .where(or(
-          and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, otherUserId)),
-          and(eq(directMessages.senderId, otherUserId), eq(directMessages.receiverId, currentUserId))
-        ))
+        .where(
+          or(
+            and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, otherUserId)),
+            and(eq(directMessages.senderId, otherUserId), eq(directMessages.receiverId, currentUserId))
+          )
+        )
         .orderBy(directMessages.createdAt);
 
       res.json(messages);
@@ -1633,15 +1926,18 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         senderId: currentUserId,
       });
 
-      const [msg] = await db.insert(directMessages).values({
-        senderId: currentUserId,
-        receiverId: parsed.receiverId,
-        message: parsed.message || null,
-        fileUrl: parsed.fileUrl || null,
-        fileName: parsed.fileName || null,
-        fileType: parsed.fileType || null,
-        fileSize: parsed.fileSize || null,
-      }).returning();
+      const [msg] = await db
+        .insert(directMessages)
+        .values({
+          senderId: currentUserId,
+          receiverId: parsed.receiverId,
+          message: parsed.message || null,
+          fileUrl: parsed.fileUrl || null,
+          fileName: parsed.fileName || null,
+          fileType: parsed.fileType || null,
+          fileSize: parsed.fileSize || null,
+        })
+        .returning();
 
       typingStatus.delete(currentUserId);
 
@@ -1657,13 +1953,16 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const currentUserId = (req.session as any).userId;
       const senderId = req.params.userId;
 
-      await db.update(directMessages)
+      await db
+        .update(directMessages)
         .set({ readAt: new Date() })
-        .where(and(
-          eq(directMessages.senderId, senderId),
-          eq(directMessages.receiverId, currentUserId),
-          sql`${directMessages.readAt} IS NULL`
-        ));
+        .where(
+          and(
+            eq(directMessages.senderId, senderId),
+            eq(directMessages.receiverId, currentUserId),
+            sql`${directMessages.readAt} IS NULL`
+          )
+        );
 
       res.json({ success: true });
     } catch (error: any) {
@@ -1676,17 +1975,12 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const currentUserId = (req.session as any).userId;
       const otherUserId = req.params.userId;
 
-      await db.delete(directMessages)
+      await db
+        .delete(directMessages)
         .where(
           or(
-            and(
-              eq(directMessages.senderId, currentUserId),
-              eq(directMessages.receiverId, otherUserId)
-            ),
-            and(
-              eq(directMessages.senderId, otherUserId),
-              eq(directMessages.receiverId, currentUserId)
-            )
+            and(eq(directMessages.senderId, currentUserId), eq(directMessages.receiverId, otherUserId)),
+            and(eq(directMessages.senderId, otherUserId), eq(directMessages.receiverId, currentUserId))
           )
         );
 
@@ -1699,12 +1993,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
   app.get("/api/chat/unread-count", requireAuth, async (req: any, res: any) => {
     try {
       const currentUserId = (req.session as any).userId;
-      const [result] = await db.select({ count: sql<number>`count(*)::int` })
+      const [result] = await db
+        .select({ count: sql<number>`count(*)::int` })
         .from(directMessages)
-        .where(and(
-          eq(directMessages.receiverId, currentUserId),
-          sql`${directMessages.readAt} IS NULL`
-        ));
+        .where(and(eq(directMessages.receiverId, currentUserId), sql`${directMessages.readAt} IS NULL`));
       res.json({ count: result?.count || 0 });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1734,7 +2026,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       const voucherIds = data.vouchers.map((v: any) => v.id);
       if (voucherIds.length > 0) {
-        data.voucher_entries = await db.select().from(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIds));
+        data.voucher_entries = await db
+          .select()
+          .from(voucherEntries)
+          .where(inArray(voucherEntries.voucherId, voucherIds));
       } else {
         data.voucher_entries = [];
       }
@@ -1744,33 +2039,60 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       data.factory_categories = await db.select().from(factoryCategories).where(byCompany(factoryCategories));
       data.factory_bale_products = await db.select().from(factoryBaleProducts).where(byCompany(factoryBaleProducts));
       data.factory_fx_rates = await db.select().from(factoryFxRates).where(byCompany(factoryFxRates));
-      data.factory_bale_sequences = await db.select().from(factoryBaleSequences).where(eq(factoryBaleSequences.companyId, companyId));
+      data.factory_bale_sequences = await db
+        .select()
+        .from(factoryBaleSequences)
+        .where(eq(factoryBaleSequences.companyId, companyId));
       data.factory_containers = await db.select().from(factoryContainers).where(byCompany(factoryContainers));
       data.factory_raw_stock = await db.select().from(factoryRawStock).where(byCompany(factoryRawStock));
-      data.factory_container_commissions = await db.select().from(factoryContainerCommissions).where(byCompany(factoryContainerCommissions));
-      data.factory_offload_additional_charges = await db.select().from(factoryOffloadAdditionalCharges).where(byCompany(factoryOffloadAdditionalCharges));
+      data.factory_container_commissions = await db
+        .select()
+        .from(factoryContainerCommissions)
+        .where(byCompany(factoryContainerCommissions));
+      data.factory_offload_additional_charges = await db
+        .select()
+        .from(factoryOffloadAdditionalCharges)
+        .where(byCompany(factoryOffloadAdditionalCharges));
       data.factory_duty_audit_log = await db.select().from(factoryDutyAuditLog).where(byCompany(factoryDutyAuditLog));
       data.factory_mix_batches = await db.select().from(factoryMixBatches).where(byCompany(factoryMixBatches));
 
       const mixBatchIds = data.factory_mix_batches.map((b: any) => b.id);
       if (mixBatchIds.length > 0) {
-        data.factory_mix_batch_sources = await db.select().from(factoryMixBatchSources).where(inArray(factoryMixBatchSources.mixBatchId, mixBatchIds));
-        data.factory_daily_usages = await db.select().from(factoryDailyUsages).where(inArray(factoryDailyUsages.mixBatchId, mixBatchIds));
+        data.factory_mix_batch_sources = await db
+          .select()
+          .from(factoryMixBatchSources)
+          .where(inArray(factoryMixBatchSources.mixBatchId, mixBatchIds));
+        data.factory_daily_usages = await db
+          .select()
+          .from(factoryDailyUsages)
+          .where(inArray(factoryDailyUsages.mixBatchId, mixBatchIds));
       } else {
         data.factory_mix_batch_sources = [];
         data.factory_daily_usages = [];
       }
 
-      data.factory_pressing_batches = await db.select().from(factoryPressingBatches).where(byCompany(factoryPressingBatches));
+      data.factory_pressing_batches = await db
+        .select()
+        .from(factoryPressingBatches)
+        .where(byCompany(factoryPressingBatches));
       data.factory_bales = await db.select().from(factoryBales).where(byCompany(factoryBales));
       data.factory_workers = await db.select().from(factoryWorkers).where(byCompany(factoryWorkers));
       data.factory_payrolls = await db.select().from(factoryPayrolls).where(byCompany(factoryPayrolls));
-      data.factory_worker_documents = await db.select().from(factoryWorkerDocuments).where(byCompany(factoryWorkerDocuments));
-      data.factory_daybook_entries = await db.select().from(factoryDaybookEntries).where(byCompany(factoryDaybookEntries));
+      data.factory_worker_documents = await db
+        .select()
+        .from(factoryWorkerDocuments)
+        .where(byCompany(factoryWorkerDocuments));
+      data.factory_daybook_entries = await db
+        .select()
+        .from(factoryDaybookEntries)
+        .where(byCompany(factoryDaybookEntries));
 
       const daybookIds = data.factory_daybook_entries.map((e: any) => e.id);
       if (daybookIds.length > 0) {
-        data.factory_daybook_entry_edits = await db.select().from(factoryDaybookEntryEdits).where(inArray(factoryDaybookEntryEdits.daybookEntryId, daybookIds));
+        data.factory_daybook_entry_edits = await db
+          .select()
+          .from(factoryDaybookEntryEdits)
+          .where(inArray(factoryDaybookEntryEdits.daybookEntryId, daybookIds));
       } else {
         data.factory_daybook_entry_edits = [];
       }
@@ -1778,26 +2100,53 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       data.factory_waste_entries = await db.select().from(factoryWasteEntries).where(byCompany(factoryWasteEntries));
       data.factory_bale_photos = await db.select().from(factoryBalePhotos).where(byCompany(factoryBalePhotos));
       data.factory_alerts = await db.select().from(factoryAlerts).where(byCompany(factoryAlerts));
-      data.factory_daily_kpi_snapshots = await db.select().from(factoryDailyKpiSnapshots).where(byCompany(factoryDailyKpiSnapshots));
-      data.factory_supplier_score_snapshots = await db.select().from(factorySupplierScoreSnapshots).where(byCompany(factorySupplierScoreSnapshots));
-      data.factory_bale_cost_snapshots = await db.select().from(factoryBaleCostSnapshots).where(byCompany(factoryBaleCostSnapshots));
-      data.factory_container_profit_snapshots = await db.select().from(factoryContainerProfitSnapshots).where(byCompany(factoryContainerProfitSnapshots));
+      data.factory_daily_kpi_snapshots = await db
+        .select()
+        .from(factoryDailyKpiSnapshots)
+        .where(byCompany(factoryDailyKpiSnapshots));
+      data.factory_supplier_score_snapshots = await db
+        .select()
+        .from(factorySupplierScoreSnapshots)
+        .where(byCompany(factorySupplierScoreSnapshots));
+      data.factory_bale_cost_snapshots = await db
+        .select()
+        .from(factoryBaleCostSnapshots)
+        .where(byCompany(factoryBaleCostSnapshots));
+      data.factory_container_profit_snapshots = await db
+        .select()
+        .from(factoryContainerProfitSnapshots)
+        .where(byCompany(factoryContainerProfitSnapshots));
 
       data.customer_proformas = await db.select().from(customerProformas).where(byCompany(customerProformas));
       const proformaIds = data.customer_proformas.map((p: any) => p.id);
       if (proformaIds.length > 0) {
-        data.customer_proforma_lines = await db.select().from(customerProformaLines).where(inArray(customerProformaLines.proformaId, proformaIds));
+        data.customer_proforma_lines = await db
+          .select()
+          .from(customerProformaLines)
+          .where(inArray(customerProformaLines.proformaId, proformaIds));
       } else {
         data.customer_proforma_lines = [];
       }
 
-      data.customer_invoice_sequences = await db.select().from(customerInvoiceSequences).where(eq(customerInvoiceSequences.companyId, companyId));
+      data.customer_invoice_sequences = await db
+        .select()
+        .from(customerInvoiceSequences)
+        .where(eq(customerInvoiceSequences.companyId, companyId));
       data.customer_orders = await db.select().from(customerOrders).where(byCompany(customerOrders));
       const orderIds = data.customer_orders.map((o: any) => o.id);
       if (orderIds.length > 0) {
-        data.customer_order_lines = await db.select().from(customerOrderLines).where(inArray(customerOrderLines.orderId, orderIds));
-        data.customer_order_bales = await db.select().from(customerOrderBales).where(inArray(customerOrderBales.orderId, orderIds));
-        data.customer_order_charges = await db.select().from(customerOrderCharges).where(inArray(customerOrderCharges.orderId, orderIds));
+        data.customer_order_lines = await db
+          .select()
+          .from(customerOrderLines)
+          .where(inArray(customerOrderLines.orderId, orderIds));
+        data.customer_order_bales = await db
+          .select()
+          .from(customerOrderBales)
+          .where(inArray(customerOrderBales.orderId, orderIds));
+        data.customer_order_charges = await db
+          .select()
+          .from(customerOrderCharges)
+          .where(inArray(customerOrderCharges.orderId, orderIds));
       } else {
         data.customer_order_lines = [];
         data.customer_order_bales = [];
@@ -1813,7 +2162,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
 
       const jsonStr = JSON.stringify(exportPayload, null, 2);
       res.setHeader("Content-Type", "application/json");
-      res.setHeader("Content-Disposition", `attachment; filename="company_${companyId}_export_${getClientDate(req)}.json"`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="company_${companyId}_export_${getClientDate(req)}.json"`
+      );
       res.send(jsonStr);
     } catch (error: any) {
       console.error("Export company data error:", error);
@@ -1847,14 +2199,32 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           }
 
           if (payload.sourceCompanyId === targetCompanyId) {
-            return res.status(400).json({ message: "Cannot import into the same company that was exported. Switch to a different company first." });
+            return res.status(400).json({
+              message: "Cannot import into the same company that was exported. Switch to a different company first.",
+            });
           }
 
-          const [existingBales] = await db.select({ count: sql<number>`count(*)::int` }).from(factoryBales).where(eq(factoryBales.companyId, targetCompanyId));
-          const [existingContainers] = await db.select({ count: sql<number>`count(*)::int` }).from(factoryContainers).where(eq(factoryContainers.companyId, targetCompanyId));
-          const [existingVouchers] = await db.select({ count: sql<number>`count(*)::int` }).from(vouchers).where(eq(vouchers.companyId, targetCompanyId));
-          if ((existingBales?.count || 0) > 0 || (existingContainers?.count || 0) > 0 || (existingVouchers?.count || 0) > 0) {
-            return res.status(400).json({ message: "Target company already has data (bales, containers, or vouchers). Import should only be done on a new/empty company to avoid duplicates." });
+          const [existingBales] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(factoryBales)
+            .where(eq(factoryBales.companyId, targetCompanyId));
+          const [existingContainers] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(factoryContainers)
+            .where(eq(factoryContainers.companyId, targetCompanyId));
+          const [existingVouchers] = await db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(vouchers)
+            .where(eq(vouchers.companyId, targetCompanyId));
+          if (
+            (existingBales?.count || 0) > 0 ||
+            (existingContainers?.count || 0) > 0 ||
+            (existingVouchers?.count || 0) > 0
+          ) {
+            return res.status(400).json({
+              message:
+                "Target company already has data (bales, containers, or vouchers). Import should only be done on a new/empty company to avoid duplicates.",
+            });
           }
 
           await db.delete(factorySettings).where(eq(factorySettings.companyId, targetCompanyId));
@@ -1868,7 +2238,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           const importSuffix = `_C${targetCompanyId}`;
 
           const remap: Record<string, Map<number, number>> = {};
-          const initRemap = (key: string) => { remap[key] = new Map(); };
+          const initRemap = (key: string) => {
+            remap[key] = new Map();
+          };
           const r = (key: string, oldId: number | null | undefined): number | null => {
             if (oldId == null) return null;
             const mapped = remap[key]?.get(oldId);
@@ -1892,27 +2264,74 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           }
 
           const tables = [
-            "locations", "ledger_accounts", "bank_accounts", "stock_groups", "stock_items",
-            "inventory", "company_settings", "exchange_rates", "customers", "customer_balances",
-            "factory_settings", "factory_suppliers", "factory_categories", "factory_bale_products",
-            "factory_fx_rates", "factory_bale_sequences", "factory_containers", "factory_raw_stock",
-            "factory_container_commissions", "factory_offload_additional_charges", "factory_duty_audit_log",
-            "factory_daily_usages", "factory_mix_batches", "factory_mix_batch_sources", "factory_pressing_batches",
-            "factory_bales", "factory_workers", "factory_payrolls", "factory_worker_documents",
-            "factory_daybook_entries", "factory_daybook_entry_edits", "factory_waste_entries",
-            "factory_bale_photos", "factory_alerts", "factory_daily_kpi_snapshots",
-            "factory_supplier_score_snapshots", "factory_bale_cost_snapshots",
-            "factory_container_profit_snapshots", "customer_proformas", "customer_proforma_lines",
-            "customer_invoice_sequences", "customer_orders", "customer_order_lines",
-            "customer_order_bales", "customer_order_charges", "vouchers", "voucher_entries"
+            "locations",
+            "ledger_accounts",
+            "bank_accounts",
+            "stock_groups",
+            "stock_items",
+            "inventory",
+            "company_settings",
+            "exchange_rates",
+            "customers",
+            "customer_balances",
+            "factory_settings",
+            "factory_suppliers",
+            "factory_categories",
+            "factory_bale_products",
+            "factory_fx_rates",
+            "factory_bale_sequences",
+            "factory_containers",
+            "factory_raw_stock",
+            "factory_container_commissions",
+            "factory_offload_additional_charges",
+            "factory_duty_audit_log",
+            "factory_daily_usages",
+            "factory_mix_batches",
+            "factory_mix_batch_sources",
+            "factory_pressing_batches",
+            "factory_bales",
+            "factory_workers",
+            "factory_payrolls",
+            "factory_worker_documents",
+            "factory_daybook_entries",
+            "factory_daybook_entry_edits",
+            "factory_waste_entries",
+            "factory_bale_photos",
+            "factory_alerts",
+            "factory_daily_kpi_snapshots",
+            "factory_supplier_score_snapshots",
+            "factory_bale_cost_snapshots",
+            "factory_container_profit_snapshots",
+            "customer_proformas",
+            "customer_proforma_lines",
+            "customer_invoice_sequences",
+            "customer_orders",
+            "customer_order_lines",
+            "customer_order_bales",
+            "customer_order_charges",
+            "vouchers",
+            "voucher_entries",
           ];
           tables.forEach(initRemap);
 
           const dateFieldNames = new Set([
-            "createdAt", "updatedAt", "deletedAt", "offloadedAt", "pressedAt",
-            "finalizedAt", "paidAt", "generatedAt", "approvedAt", "uploadedAt",
-            "editedAt", "readAt", "logoUpdatedAt", "verifiedAt",
-            "loadingStartedAt", "loadingFinalizedAt", "lastUpdated",
+            "createdAt",
+            "updatedAt",
+            "deletedAt",
+            "offloadedAt",
+            "pressedAt",
+            "finalizedAt",
+            "paidAt",
+            "generatedAt",
+            "approvedAt",
+            "uploadedAt",
+            "editedAt",
+            "readAt",
+            "logoUpdatedAt",
+            "verifiedAt",
+            "loadingStartedAt",
+            "loadingFinalizedAt",
+            "lastUpdated",
           ]);
           function fixDates(rec: any) {
             for (const key of Object.keys(rec)) {
@@ -1925,8 +2344,13 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           }
 
           await db.transaction(async (tx: any) => {
-
-            async function insertAndMap(tableName: string, drizzleTable: any, rows: any[], fkRemaps: Record<string, string>, opts?: { hasCompanyId?: boolean, nullifyFields?: string[] }) {
+            async function insertAndMap(
+              tableName: string,
+              drizzleTable: any,
+              rows: any[],
+              fkRemaps: Record<string, string>,
+              opts?: { hasCompanyId?: boolean; nullifyFields?: string[] }
+            ) {
               const hasCompanyId = opts?.hasCompanyId !== false;
               const nullifyFields = opts?.nullifyFields || [];
               let count = 0;
@@ -1951,7 +2375,14 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
               totalRecords += count;
             }
 
-            async function insertSelfReferencing(tableName: string, drizzleTable: any, rows: any[], parentField: string, fkRemaps: Record<string, string>, opts?: { hasCompanyId?: boolean }) {
+            async function insertSelfReferencing(
+              tableName: string,
+              drizzleTable: any,
+              rows: any[],
+              parentField: string,
+              fkRemaps: Record<string, string>,
+              opts?: { hasCompanyId?: boolean }
+            ) {
               const hasCompanyId = opts?.hasCompanyId !== false;
               const roots = rows.filter((r: any) => r[parentField] == null);
               const children = rows.filter((r: any) => r[parentField] != null);
@@ -2059,11 +2490,16 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.inventory?.length) {
-              await insertAndMap("inventory", inventory, t.inventory, { locationId: "locations", stockItemId: "stock_items" });
+              await insertAndMap("inventory", inventory, t.inventory, {
+                locationId: "locations",
+                stockItemId: "stock_items",
+              });
             }
 
             if (t.company_settings?.length) {
-              await insertAndMap("company_settings", companySettings, t.company_settings, { parentCreditAccountId: "ledger_accounts" });
+              await insertAndMap("company_settings", companySettings, t.company_settings, {
+                parentCreditAccountId: "ledger_accounts",
+              });
             }
 
             if (t.exchange_rates?.length) {
@@ -2075,7 +2511,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.customer_balances?.length) {
-              await insertAndMap("customer_balances", customerBalances, t.customer_balances, { customerId: "customers" });
+              await insertAndMap("customer_balances", customerBalances, t.customer_balances, {
+                customerId: "customers",
+              });
             }
 
             if (t.factory_settings?.length) {
@@ -2091,7 +2529,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.factory_bale_products?.length) {
-              await insertAndMap("factory_bale_products", factoryBaleProducts, t.factory_bale_products, { categoryId: "factory_categories" });
+              await insertAndMap("factory_bale_products", factoryBaleProducts, t.factory_bale_products, {
+                categoryId: "factory_categories",
+              });
             }
 
             if (t.factory_fx_rates?.length) {
@@ -2112,27 +2552,45 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.factory_raw_stock?.length) {
-              await insertAndMap("factory_raw_stock", factoryRawStock, t.factory_raw_stock, { containerId: "factory_containers" });
+              await insertAndMap("factory_raw_stock", factoryRawStock, t.factory_raw_stock, {
+                containerId: "factory_containers",
+              });
             }
 
             if (t.factory_container_commissions?.length) {
-              await insertAndMap("factory_container_commissions", factoryContainerCommissions, t.factory_container_commissions, {
-                containerId: "factory_containers",
-                ledgerAccountId: "ledger_accounts",
-              });
+              await insertAndMap(
+                "factory_container_commissions",
+                factoryContainerCommissions,
+                t.factory_container_commissions,
+                {
+                  containerId: "factory_containers",
+                  ledgerAccountId: "ledger_accounts",
+                }
+              );
             }
 
             if (t.factory_offload_additional_charges?.length) {
-              await insertAndMap("factory_offload_additional_charges", factoryOffloadAdditionalCharges, t.factory_offload_additional_charges, {
-                containerId: "factory_containers",
-                ledgerAccountId: "ledger_accounts",
-              });
+              await insertAndMap(
+                "factory_offload_additional_charges",
+                factoryOffloadAdditionalCharges,
+                t.factory_offload_additional_charges,
+                {
+                  containerId: "factory_containers",
+                  ledgerAccountId: "ledger_accounts",
+                }
+              );
             }
 
             if (t.factory_duty_audit_log?.length) {
-              await insertAndMap("factory_duty_audit_log", factoryDutyAuditLog, t.factory_duty_audit_log, {
-                containerId: "factory_containers",
-              }, { nullifyFields: ["updatedByUserId"] });
+              await insertAndMap(
+                "factory_duty_audit_log",
+                factoryDutyAuditLog,
+                t.factory_duty_audit_log,
+                {
+                  containerId: "factory_containers",
+                },
+                { nullifyFields: ["updatedByUserId"] }
+              );
             }
 
             if (t.factory_mix_batches?.length) {
@@ -2142,12 +2600,18 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.factory_mix_batch_sources?.length) {
-              await insertAndMap("factory_mix_batch_sources", factoryMixBatchSources, t.factory_mix_batch_sources, {
-                mixBatchId: "factory_mix_batches",
-                containerId: "factory_containers",
-                supplierId: "factory_suppliers",
-                sourceBatchId: "factory_mix_batches",
-              }, { hasCompanyId: false });
+              await insertAndMap(
+                "factory_mix_batch_sources",
+                factoryMixBatchSources,
+                t.factory_mix_batch_sources,
+                {
+                  mixBatchId: "factory_mix_batches",
+                  containerId: "factory_containers",
+                  supplierId: "factory_suppliers",
+                  sourceBatchId: "factory_mix_batches",
+                },
+                { hasCompanyId: false }
+              );
             }
 
             if (t.factory_daily_usages?.length) {
@@ -2157,20 +2621,32 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.factory_pressing_batches?.length) {
-              await insertAndMap("factory_pressing_batches", factoryPressingBatches, t.factory_pressing_batches, {
-                mixBatchId: "factory_mix_batches",
-                productId: "factory_bale_products",
-                finalizedLocationId: "locations",
-              }, { nullifyFields: ["createdBy"] });
+              await insertAndMap(
+                "factory_pressing_batches",
+                factoryPressingBatches,
+                t.factory_pressing_batches,
+                {
+                  mixBatchId: "factory_mix_batches",
+                  productId: "factory_bale_products",
+                  finalizedLocationId: "locations",
+                },
+                { nullifyFields: ["createdBy"] }
+              );
             }
 
             if (t.factory_bales?.length) {
-              await insertAndMap("factory_bales", factoryBales, t.factory_bales, {
-                mixBatchId: "factory_mix_batches",
-                productId: "factory_bale_products",
-                pressingBatchId: "factory_pressing_batches",
-                erpLocationId: "locations",
-              }, { nullifyFields: ["finalizedBy"] });
+              await insertAndMap(
+                "factory_bales",
+                factoryBales,
+                t.factory_bales,
+                {
+                  mixBatchId: "factory_mix_batches",
+                  productId: "factory_bale_products",
+                  pressingBatchId: "factory_pressing_batches",
+                  erpLocationId: "locations",
+                },
+                { nullifyFields: ["finalizedBy"] }
+              );
             }
 
             if (t.factory_workers?.length) {
@@ -2178,10 +2654,16 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.factory_payrolls?.length) {
-              await insertAndMap("factory_payrolls", factoryPayrolls, t.factory_payrolls, {
-                workerId: "factory_workers",
-                cashAccountId: "ledger_accounts",
-              }, { nullifyFields: ["approvedBy"] });
+              await insertAndMap(
+                "factory_payrolls",
+                factoryPayrolls,
+                t.factory_payrolls,
+                {
+                  workerId: "factory_workers",
+                  cashAccountId: "ledger_accounts",
+                },
+                { nullifyFields: ["approvedBy"] }
+              );
             }
 
             if (t.factory_worker_documents?.length) {
@@ -2191,27 +2673,51 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.factory_daybook_entries?.length) {
-              await insertAndMap("factory_daybook_entries", factoryDaybookEntries, t.factory_daybook_entries, {}, { nullifyFields: ["createdBy"] });
+              await insertAndMap(
+                "factory_daybook_entries",
+                factoryDaybookEntries,
+                t.factory_daybook_entries,
+                {},
+                { nullifyFields: ["createdBy"] }
+              );
             }
 
             if (t.factory_daybook_entry_edits?.length) {
-              await insertAndMap("factory_daybook_entry_edits", factoryDaybookEntryEdits, t.factory_daybook_entry_edits, {
-                daybookEntryId: "factory_daybook_entries",
-              }, { hasCompanyId: false, nullifyFields: ["editedBy"] });
+              await insertAndMap(
+                "factory_daybook_entry_edits",
+                factoryDaybookEntryEdits,
+                t.factory_daybook_entry_edits,
+                {
+                  daybookEntryId: "factory_daybook_entries",
+                },
+                { hasCompanyId: false, nullifyFields: ["editedBy"] }
+              );
             }
 
             if (t.factory_waste_entries?.length) {
-              await insertAndMap("factory_waste_entries", factoryWasteEntries, t.factory_waste_entries, {
-                mixBatchId: "factory_mix_batches",
-                supplierId: "factory_suppliers",
-                containerId: "factory_containers",
-              }, { nullifyFields: ["createdBy"] });
+              await insertAndMap(
+                "factory_waste_entries",
+                factoryWasteEntries,
+                t.factory_waste_entries,
+                {
+                  mixBatchId: "factory_mix_batches",
+                  supplierId: "factory_suppliers",
+                  containerId: "factory_containers",
+                },
+                { nullifyFields: ["createdBy"] }
+              );
             }
 
             if (t.factory_bale_photos?.length) {
-              await insertAndMap("factory_bale_photos", factoryBalePhotos, t.factory_bale_photos, {
-                baleId: "factory_bales",
-              }, { nullifyFields: ["uploadedBy"] });
+              await insertAndMap(
+                "factory_bale_photos",
+                factoryBalePhotos,
+                t.factory_bale_photos,
+                {
+                  baleId: "factory_bales",
+                },
+                { nullifyFields: ["uploadedBy"] }
+              );
             }
 
             if (t.factory_alerts?.length) {
@@ -2225,41 +2731,76 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.customer_proforma_lines?.length) {
-              await insertAndMap("customer_proforma_lines", customerProformaLines, t.customer_proforma_lines, {
-                proformaId: "customer_proformas",
-              }, { hasCompanyId: false });
+              await insertAndMap(
+                "customer_proforma_lines",
+                customerProformaLines,
+                t.customer_proforma_lines,
+                {
+                  proformaId: "customer_proformas",
+                },
+                { hasCompanyId: false }
+              );
             }
 
             if (t.customer_invoice_sequences?.length) {
-              await insertAndMap("customer_invoice_sequences", customerInvoiceSequences, t.customer_invoice_sequences, {});
+              await insertAndMap(
+                "customer_invoice_sequences",
+                customerInvoiceSequences,
+                t.customer_invoice_sequences,
+                {}
+              );
             }
 
             if (t.customer_orders?.length) {
-              await insertAndMap("customer_orders", customerOrders, t.customer_orders, {
-                customerId: "customers",
-                proformaIdUsed: "customer_proformas",
-                locationId: "locations",
-              }, { nullifyFields: ["verifiedByUserId"] });
+              await insertAndMap(
+                "customer_orders",
+                customerOrders,
+                t.customer_orders,
+                {
+                  customerId: "customers",
+                  proformaIdUsed: "customer_proformas",
+                  locationId: "locations",
+                },
+                { nullifyFields: ["verifiedByUserId"] }
+              );
             }
 
             if (t.customer_order_lines?.length) {
-              await insertAndMap("customer_order_lines", customerOrderLines, t.customer_order_lines, {
-                orderId: "customer_orders",
-              }, { hasCompanyId: false });
+              await insertAndMap(
+                "customer_order_lines",
+                customerOrderLines,
+                t.customer_order_lines,
+                {
+                  orderId: "customer_orders",
+                },
+                { hasCompanyId: false }
+              );
             }
 
             if (t.customer_order_bales?.length) {
-              await insertAndMap("customer_order_bales", customerOrderBales, t.customer_order_bales, {
-                orderId: "customer_orders",
-                baleId: "factory_bales",
-                locationId: "locations",
-              }, { hasCompanyId: false });
+              await insertAndMap(
+                "customer_order_bales",
+                customerOrderBales,
+                t.customer_order_bales,
+                {
+                  orderId: "customer_orders",
+                  baleId: "factory_bales",
+                  locationId: "locations",
+                },
+                { hasCompanyId: false }
+              );
             }
 
             if (t.customer_order_charges?.length) {
-              await insertAndMap("customer_order_charges", customerOrderCharges, t.customer_order_charges, {
-                orderId: "customer_orders",
-              }, { hasCompanyId: false });
+              await insertAndMap(
+                "customer_order_charges",
+                customerOrderCharges,
+                t.customer_order_charges,
+                {
+                  orderId: "customer_orders",
+                },
+                { hasCompanyId: false }
+              );
             }
 
             if (t.vouchers?.length) {
@@ -2278,37 +2819,62 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
             }
 
             if (t.voucher_entries?.length) {
-              await insertAndMap("voucher_entries", voucherEntries, t.voucher_entries, {
-                voucherId: "vouchers",
-                ledgerAccountId: "ledger_accounts",
-                bankAccountId: "bank_accounts",
-              }, { hasCompanyId: false, nullifyFields: ["supplierId", "employeeId", "fixedAssetId"] });
+              await insertAndMap(
+                "voucher_entries",
+                voucherEntries,
+                t.voucher_entries,
+                {
+                  voucherId: "vouchers",
+                  ledgerAccountId: "ledger_accounts",
+                  bankAccountId: "bank_accounts",
+                },
+                { hasCompanyId: false, nullifyFields: ["supplierId", "employeeId", "fixedAssetId"] }
+              );
             }
 
             if (t.factory_daily_kpi_snapshots?.length) {
-              await insertAndMap("factory_daily_kpi_snapshots", factoryDailyKpiSnapshots, t.factory_daily_kpi_snapshots, {
-                topWorkerId: "factory_workers",
-              });
+              await insertAndMap(
+                "factory_daily_kpi_snapshots",
+                factoryDailyKpiSnapshots,
+                t.factory_daily_kpi_snapshots,
+                {
+                  topWorkerId: "factory_workers",
+                }
+              );
             }
 
             if (t.factory_supplier_score_snapshots?.length) {
-              await insertAndMap("factory_supplier_score_snapshots", factorySupplierScoreSnapshots, t.factory_supplier_score_snapshots, {
-                supplierId: "factory_suppliers",
-              });
+              await insertAndMap(
+                "factory_supplier_score_snapshots",
+                factorySupplierScoreSnapshots,
+                t.factory_supplier_score_snapshots,
+                {
+                  supplierId: "factory_suppliers",
+                }
+              );
             }
 
             if (t.factory_bale_cost_snapshots?.length) {
-              await insertAndMap("factory_bale_cost_snapshots", factoryBaleCostSnapshots, t.factory_bale_cost_snapshots, {
-                baleId: "factory_bales",
-              });
+              await insertAndMap(
+                "factory_bale_cost_snapshots",
+                factoryBaleCostSnapshots,
+                t.factory_bale_cost_snapshots,
+                {
+                  baleId: "factory_bales",
+                }
+              );
             }
 
             if (t.factory_container_profit_snapshots?.length) {
-              await insertAndMap("factory_container_profit_snapshots", factoryContainerProfitSnapshots, t.factory_container_profit_snapshots, {
-                containerId: "factory_containers",
-              });
+              await insertAndMap(
+                "factory_container_profit_snapshots",
+                factoryContainerProfitSnapshots,
+                t.factory_container_profit_snapshots,
+                {
+                  containerId: "factory_containers",
+                }
+              );
             }
-
           });
 
           res.json({
@@ -2366,10 +2932,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { startDate, endDate } = req.query as Record<string, string>;
-      const conditions: any[] = [
-        eq(factoryPosSales.companyId, companyId),
-        ne(factoryPosSales.status, "VOID"),
-      ];
+      const conditions: any[] = [eq(factoryPosSales.companyId, companyId), ne(factoryPosSales.status, "VOID")];
       if (startDate) conditions.push(sql`${factoryPosSales.txDate} >= ${startDate}`);
       if (endDate) conditions.push(sql`${factoryPosSales.txDate} <= ${endDate}`);
 
@@ -2402,7 +2965,10 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         .from(factoryPosSales)
         .where(and(...conditions));
 
-      res.json({ byCustomer, grand: grand ?? { sales: 0, totalAmount: "0", depositAmount: "0", cashSales: "0", creditSales: "0" } });
+      res.json({
+        byCustomer,
+        grand: grand ?? { sales: 0, totalAmount: "0", depositAmount: "0", cashSales: "0", creditSales: "0" },
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2481,10 +3047,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
           count: sql<number>`COUNT(${factoryBales.id})`,
         })
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.status, "IN_STOCK"),
-        ));
+        .where(and(eq(factoryBales.companyId, companyId), eq(factoryBales.status, "IN_STOCK")));
 
       const openingStock = parseFloat(rawReceived?.totalCost || "0");
       const closingRaw = parseFloat(rawRemaining?.remainingCost || "0");
@@ -2610,7 +3173,9 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         const baleMap = new Map<string, any>(baleRows.map((b: any) => [b.referenceNumber, b]));
         const notFound = refCodes.filter((r) => !baleMap.has(r));
         if (notFound.length > 0) {
-          throw new Error(`Bales not found: ${notFound.slice(0, 5).join(", ")}${notFound.length > 5 ? ` +${notFound.length - 5} more` : ""}`);
+          throw new Error(
+            `Bales not found: ${notFound.slice(0, 5).join(", ")}${notFound.length > 5 ? ` +${notFound.length - 5} more` : ""}`
+          );
         }
 
         // 2. Allocate sequential new REF codes
@@ -2692,13 +3257,16 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
         }));
         await tx.insert(baleRecodeItems).values(itemValues);
 
-        return { sessionId: session.id, items: recodeMap.map(({ oldRef, newRef, bale }) => ({
-          oldRef,
-          newRef,
-          productName: bale.productName || bale.articleCode || "Unknown",
-          articleCode: bale.articleCode || "",
-          weightKg: bale.weightKg || "0",
-        })) };
+        return {
+          sessionId: session.id,
+          items: recodeMap.map(({ oldRef, newRef, bale }) => ({
+            oldRef,
+            newRef,
+            productName: bale.productName || bale.articleCode || "Unknown",
+            articleCode: bale.articleCode || "",
+            weightKg: bale.weightKg || "0",
+          })),
+        };
       });
 
       res.json(result);
@@ -2726,10 +3294,7 @@ export function registerFactoryDocsUsersRoutes(app: Express) {
       const sessionIds = sessions.map((s: any) => s.id);
       let itemsBySession: Record<number, any[]> = {};
       if (sessionIds.length > 0) {
-        const items = await db
-          .select()
-          .from(baleRecodeItems)
-          .where(inArray(baleRecodeItems.sessionId, sessionIds));
+        const items = await db.select().from(baleRecodeItems).where(inArray(baleRecodeItems.sessionId, sessionIds));
         for (const item of items) {
           if (!itemsBySession[item.sessionId]) itemsBySession[item.sessionId] = [];
           itemsBySession[item.sessionId].push(item);

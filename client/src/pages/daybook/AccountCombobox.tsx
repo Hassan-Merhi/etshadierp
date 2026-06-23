@@ -1,19 +1,8 @@
 import { useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import type { LedgerAccount, BankAccount, Supplier, Employee, FixedAsset } from "./types";
 
@@ -32,11 +21,7 @@ export function AccountCombobox({
   onArrowRight,
 }: {
   value: { type: string; id: number; name: string } | null;
-  onChange: (
-    type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset",
-    id: number,
-    name: string,
-  ) => void;
+  onChange: (type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset", id: number, name: string) => void;
   ledgerAccounts: LedgerAccount[];
   bankAccounts: BankAccount[];
   suppliers: Supplier[];
@@ -94,10 +79,7 @@ export function AccountCombobox({
       </PopoverTrigger>
       <PopoverContent className="w-[min(400px,calc(100vw-2rem))] p-0 bg-popover text-popover-foreground">
         <Command className="bg-popover text-popover-foreground">
-          <CommandInput
-            placeholder="Search accounts..."
-            className="bg-popover text-popover-foreground"
-          />
+          <CommandInput placeholder="Search accounts..." className="bg-popover text-popover-foreground" />
           <CommandList className="bg-popover text-popover-foreground">
             <CommandEmpty>No account found.</CommandEmpty>
             <CommandGroup>
@@ -114,9 +96,7 @@ export function AccountCombobox({
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value?.type === account.type && value?.id === account.id
-                        ? "opacity-100"
-                        : "opacity-0",
+                      value?.type === account.type && value?.id === account.id ? "opacity-100" : "opacity-0"
                     )}
                   />
                   {account.name}

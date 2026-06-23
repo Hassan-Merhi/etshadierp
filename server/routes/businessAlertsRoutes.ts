@@ -160,9 +160,7 @@ export async function runAlertChecks(companyId: number): Promise<void> {
       alertType: "import_errors",
       severity: "info",
       title: `${total} row error(s) in recent imports`,
-      message: importErrorRes.rows
-        .map((r: any) => `${r.file_name} (${r.invalid_rows} errors)`)
-        .join(", "),
+      message: importErrorRes.rows.map((r: any) => `${r.file_name} (${r.invalid_rows} errors)`).join(", "),
       metadata: { batches: importErrorRes.rows },
     });
   } else {
@@ -183,8 +181,7 @@ export function registerBusinessAlertRoutes(app: Express) {
       }
       const { status } = req.query;
       const params: unknown[] = [companyId];
-      let query =
-        `SELECT * FROM business_alerts WHERE company_id = $1`;
+      let query = `SELECT * FROM business_alerts WHERE company_id = $1`;
       if (status && typeof status === "string") {
         query += ` AND status = $2`;
         params.push(status);

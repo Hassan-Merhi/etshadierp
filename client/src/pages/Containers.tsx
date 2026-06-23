@@ -38,24 +38,17 @@ import {
   Wrench,
   Loader2,
 } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -126,9 +119,12 @@ export default function Containers() {
   const tableRef = useRef<HTMLTableElement>(null);
   const { data: myErpPages } = useQuery<{ hiddenErpCostFields?: string[] }>({ queryKey: ["/api/my-erp-pages"] });
   const hideContainerCosts = (myErpPages?.hiddenErpCostFields ?? []).includes("container_costs");
-  const { data: currentUser } = useQuery<{ role?: string; currentRole?: string | null }>({ queryKey: ["/api/auth/me"] });
+  const { data: currentUser } = useQuery<{ role?: string; currentRole?: string | null }>({
+    queryKey: ["/api/auth/me"],
+  });
   const _allowedRoles = ["Admin", "Owner", "Developer"];
-  const isPrivilegedRole = _allowedRoles.includes(currentUser?.currentRole ?? "") || _allowedRoles.includes(currentUser?.role ?? "");
+  const isPrivilegedRole =
+    _allowedRoles.includes(currentUser?.currentRole ?? "") || _allowedRoles.includes(currentUser?.role ?? "");
   const isDeveloper = currentUser?.role === "Developer";
   const [syncAllConfirmOpen, setSyncAllConfirmOpen] = useState(false);
 
@@ -145,9 +141,13 @@ export default function Containers() {
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
       const parts: string[] = [data?.message ?? "All POs and parent JVs have been checked."];
-      if ((data?.updatedFreightVouchers ?? 0) > 0) parts.push(`Freight vouchers fixed: ${data.updatedFreightVouchers}.`);
+      if ((data?.updatedFreightVouchers ?? 0) > 0)
+        parts.push(`Freight vouchers fixed: ${data.updatedFreightVouchers}.`);
       if ((data?.updatedContainerCharges ?? 0) > 0) parts.push(`Charge rows fixed: ${data.updatedContainerCharges}.`);
-      if ((data?.notFoundParentVouchers?.length ?? 0) > 0) parts.push(`${data.notFoundParentVouchers.length} PO(s) have no parent JV yet — import or re-save those POs to create them.`);
+      if ((data?.notFoundParentVouchers?.length ?? 0) > 0)
+        parts.push(
+          `${data.notFoundParentVouchers.length} PO(s) have no parent JV yet — import or re-save those POs to create them.`
+        );
       toast({
         title: "Sync Complete",
         description: parts.join(" "),
@@ -192,12 +192,7 @@ export default function Containers() {
 
   // Auto-size inputs to fit their text.
   // Defaults are slightly wider so fields don't feel cramped (like Description).
-  const autoSizeStyle = (
-    value: unknown,
-    placeholder = "",
-    minCh = 10,
-    maxCh = 32,
-  ) => {
+  const autoSizeStyle = (value: unknown, placeholder = "", minCh = 10, maxCh = 32) => {
     const text = String((value ?? "") as any) || placeholder || "";
     const ch = Math.max(minCh, Math.min(maxCh, text.length + 2));
     return {
@@ -211,29 +206,28 @@ export default function Containers() {
     queryKey: ["/api/containers/active", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
   });
-  const allContainers = rawContainers.slice().sort((a, b) =>
-    new Date(b.importDate).getTime() - new Date(a.importDate).getTime()
-  );
+  const allContainers = rawContainers
+    .slice()
+    .sort((a, b) => new Date(b.importDate).getTime() - new Date(a.importDate).getTime());
 
-  const { data: soldContainers = [], isLoading: isSoldLoading } = useQuery<
-    SoldContainer[]
-  >({
+  const { data: soldContainers = [], isLoading: isSoldLoading } = useQuery<SoldContainer[]>({
     queryKey: ["/api/containers/sold", selectedCompany?.id],
     enabled: !!selectedCompany?.id && !isSupplierPartner,
   });
 
   const { data: spContainersList = [], isLoading: spContainersLoading } = useQuery<any[]>({
     queryKey: ["/api/sp/containers"],
-    queryFn: () => fetch("/api/sp/containers", { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch("/api/sp/containers", { credentials: "include" }).then((r) => r.json()),
     enabled: !!selectedCompany?.id && isSupplierPartner,
   });
-
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
 
-  const { data: freightStatusMap = {} } = useQuery<Record<number, { totalFreight: number; totalPaid: number; status: string }>>({
+  const { data: freightStatusMap = {} } = useQuery<
+    Record<number, { totalFreight: number; totalPaid: number; status: string }>
+  >({
     queryKey: ["/api/factory/containers/freight-status"],
     queryFn: async () => {
       const res = await fetch("/api/factory/containers/freight-status");
@@ -244,18 +238,8 @@ export default function Containers() {
   });
 
   const updateTrackingMutation = useMutation({
-    mutationFn: async ({
-      id,
-      data,
-    }: {
-      id: number;
-      data: Partial<Container>;
-    }) => {
-      const res = await apiRequest(
-        "PATCH",
-        `/api/containers/${id}/tracking`,
-        data,
-      );
+    mutationFn: async ({ id, data }: { id: number; data: Partial<Container> }) => {
+      const res = await apiRequest("PATCH", `/api/containers/${id}/tracking`, data);
       return res.json();
     },
     onSuccess: (_, { id }) => {
@@ -290,7 +274,10 @@ export default function Containers() {
   const editContainerNumberMutation = useMutation({
     mutationFn: async ({ id, containerNumber }: { id: number; containerNumber: string }) => {
       const res = await apiRequest("PATCH", `/api/containers/${id}/number`, { containerNumber });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.message); }
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -310,23 +297,15 @@ export default function Containers() {
 
   // Extract unique values for OTW filters
   const uniqueOtwLocations = Array.from(
-    new Set(
-      otwContainers.map((c) => c.trackingLocation).filter(Boolean) as string[],
-    ),
+    new Set(otwContainers.map((c) => c.trackingLocation).filter(Boolean) as string[])
   ).sort();
-  const uniqueOtwAgents = Array.from(
-    new Set(otwContainers.map((c) => c.agent).filter(Boolean) as string[]),
-  ).sort();
+  const uniqueOtwAgents = Array.from(new Set(otwContainers.map((c) => c.agent).filter(Boolean) as string[])).sort();
   const uniqueOtwTransporters = Array.from(
-    new Set(
-      otwContainers.map((c) => c.transporter).filter(Boolean) as string[],
-    ),
+    new Set(otwContainers.map((c) => c.transporter).filter(Boolean) as string[])
   ).sort();
-  const uniqueOtwSuppliers = Array.from(
-    new Set(otwContainers.map((c) => c.supplierId)),
-  ).sort((a, b) => a - b);
+  const uniqueOtwSuppliers = Array.from(new Set(otwContainers.map((c) => c.supplierId))).sort((a, b) => a - b);
   const uniqueOtwTrucks = Array.from(
-    new Set(otwContainers.map((c) => c.numberPlate).filter(Boolean) as string[]),
+    new Set(otwContainers.map((c) => c.numberPlate).filter(Boolean) as string[])
   ).sort();
 
   const filteredOtwContainers = otwContainers.filter((c) => {
@@ -344,17 +323,11 @@ export default function Containers() {
       }
     }
     // Location filter
-    if (
-      otwLocationFilter !== "ALL" &&
-      (c.trackingLocation || "") !== otwLocationFilter
-    ) {
+    if (otwLocationFilter !== "ALL" && (c.trackingLocation || "") !== otwLocationFilter) {
       return false;
     }
     // Supplier filter
-    if (
-      otwSupplierFilter.length > 0 &&
-      !otwSupplierFilter.includes(c.supplierId.toString())
-    ) {
+    if (otwSupplierFilter.length > 0 && !otwSupplierFilter.includes(c.supplierId.toString())) {
       return false;
     }
     // Agent filter
@@ -362,10 +335,7 @@ export default function Containers() {
       return false;
     }
     // Transporter filter
-    if (
-      otwTransporterFilter !== "ALL" &&
-      (c.transporter || "") !== otwTransporterFilter
-    ) {
+    if (otwTransporterFilter !== "ALL" && (c.transporter || "") !== otwTransporterFilter) {
       return false;
     }
     // Truck # filter
@@ -403,21 +373,13 @@ export default function Containers() {
   });
 
   const containers = allContainers.filter((c) => {
-    if (
-      debouncedSearch &&
-      !(c.containerNumber || "")
-        .toLowerCase()
-        .includes((debouncedSearch || "").toLowerCase())
-    ) {
+    if (debouncedSearch && !(c.containerNumber || "").toLowerCase().includes((debouncedSearch || "").toLowerCase())) {
       return false;
     }
     if (statusFilter !== "ALL" && c.status !== statusFilter) {
       return false;
     }
-    if (
-      supplierFilter.length > 0 &&
-      !supplierFilter.includes(c.supplierId.toString())
-    ) {
+    if (supplierFilter.length > 0 && !supplierFilter.includes(c.supplierId.toString())) {
       return false;
     }
     return true;
@@ -450,7 +412,10 @@ export default function Containers() {
   };
 
   const exportAllContainersFull = async () => {
-    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
+    if (!navigator.onLine) {
+      toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" });
+      return;
+    }
     try {
       const response = await fetch("/api/containers/export-all");
       if (!response.ok) throw new Error("Export failed");
@@ -459,7 +424,7 @@ export default function Containers() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `containers_full_export_${new Date().toLocaleDateString('en-CA')}.xlsx`;
+      a.download = `containers_full_export_${new Date().toLocaleDateString("en-CA")}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -627,69 +592,44 @@ export default function Containers() {
 
       // Validate file has data
       if (jsonData.length === 0) {
-        throw new Error(
-          "The Excel file is empty. Please add data rows and try again.",
-        );
+        throw new Error("The Excel file is empty. Please add data rows and try again.");
       }
 
       // Read header row explicitly to get all column names (avoids issues with blank first-row cells)
-      const headerRow =
-        utils.sheet_to_json<string[]>(sheet, { header: 1 })[0] || [];
+      const headerRow = utils.sheet_to_json<string[]>(sheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h) => String(h || "").trim());
 
       // Check for Container # column (required for matching)
-      const containerColAliases = [
-        "Container #",
-        "Container Number",
-        "containerNumber",
-      ];
-      const hasContainerCol = containerColAliases.some((alias) =>
-        columns.includes(alias),
-      );
+      const containerColAliases = ["Container #", "Container Number", "containerNumber"];
+      const hasContainerCol = containerColAliases.some((alias) => columns.includes(alias));
 
       if (!hasContainerCol) {
         throw new Error(
           `Missing required column: "Container #"\n\n` +
             `Expected columns: Container #, Shop, ETA, Transporter, etc.\n` +
             `Found columns: ${columns.slice(0, 5).join(", ")}${columns.length > 5 ? "..." : ""}\n\n` +
-            `Tip: Download the template to see the expected format.`,
+            `Tip: Download the template to see the expected format.`
         );
       }
 
       // Map Excel columns to API fields (convert Excel date serials to strings)
       const rows = jsonData.map((row: any) => ({
-        containerNumber: cellStr(
-          row["Container #"] ||
-            row["Container Number"] ||
-            row["containerNumber"],
-        ),
+        containerNumber: cellStr(row["Container #"] || row["Container Number"] || row["containerNumber"]),
         shopName: cellStr(row["Shop"] || row["Shop Name"] || row["shopName"]),
         eta: excelDateToString(cellVal(row["ETA"] || row["eta"])),
         transporter: cellStr(row["Transporter"] || row["transporter"]),
         transportFee: cellNum(row["Transport Fee"] || row["transportFee"]),
-        numberPlate: cellStr(
-          row["Number Plate"] || row["Plate"] || row["numberPlate"],
-        ),
-        trackingLocation: cellStr(
-          row["Location"] || row["trackingLocation"],
-        ),
+        numberPlate: cellStr(row["Number Plate"] || row["Plate"] || row["numberPlate"]),
+        trackingLocation: cellStr(row["Location"] || row["trackingLocation"]),
         borderDate: excelDateToString(cellVal(row["Border Date"] || row["borderDate"])),
-        offloadDate: excelDateToString(cellVal(
-          row["Offload Date"] || row["offloadDate"],
-        )),
+        offloadDate: excelDateToString(cellVal(row["Offload Date"] || row["offloadDate"])),
         agent: cellStr(row["Agent"] || row["agent"]),
         dutyFee: cellNum(row["Duty Fee"] || row["dutyFee"]),
         docReceived: cellStr(row["Doc Received"] || row["docReceived"]),
-        trackingDescription: cellStr(
-          row["Description"] || row["trackingDescription"],
-        ),
+        trackingDescription: cellStr(row["Description"] || row["trackingDescription"]),
       }));
 
-      const response = await apiRequest(
-        "POST",
-        "/api/containers/tracking/import",
-        { rows },
-      );
+      const response = await apiRequest("POST", "/api/containers/tracking/import", { rows });
       const result = await response.json();
 
       queryClient.invalidateQueries({ queryKey: ["/api/containers/active"] });
@@ -721,20 +661,13 @@ export default function Containers() {
   };
 
   const getEditValue = (container: Container, field: keyof Container) => {
-    if (
-      trackingEdits[container.id] &&
-      trackingEdits[container.id][field] !== undefined
-    ) {
+    if (trackingEdits[container.id] && trackingEdits[container.id][field] !== undefined) {
       return trackingEdits[container.id][field];
     }
     return container[field];
   };
 
-  const setEditValue = async (
-    containerId: number,
-    field: keyof Container,
-    value: any,
-  ) => {
+  const setEditValue = async (containerId: number, field: keyof Container, value: any) => {
     setTrackingEdits((prev) => ({
       ...prev,
       [containerId]: {
@@ -745,10 +678,7 @@ export default function Containers() {
   };
 
   const hasChanges = (containerId: number) => {
-    return (
-      trackingEdits[containerId] &&
-      Object.keys(trackingEdits[containerId]).length > 0
-    );
+    return trackingEdits[containerId] && Object.keys(trackingEdits[containerId]).length > 0;
   };
 
   const saveTracking = async (containerId: number) => {
@@ -801,9 +731,7 @@ export default function Containers() {
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, containerId: number, fieldIndex: number) => {
-      const containerIndex = filteredOtwContainers.findIndex(
-        (c) => c.id === containerId,
-      );
+      const containerIndex = filteredOtwContainers.findIndex((c) => c.id === containerId);
       if (containerIndex === -1) return;
 
       const getInputId = (cIdx: number, fIdx: number) => {
@@ -850,7 +778,7 @@ export default function Containers() {
         focusInput(prevId);
       }
     },
-    [filteredOtwContainers, trackingFields, hasChanges, saveTracking],
+    [filteredOtwContainers, trackingFields, hasChanges, saveTracking]
   );
 
   if (isLoading && !isSupplierPartner) {
@@ -869,7 +797,7 @@ export default function Containers() {
   // ── SP Company view ───────────────────────────────────────────────────────
   if (isSupplierPartner) {
     // Normalize sp_containers rows to a common display shape
-    const spNative: any[] = (Array.isArray(spContainersList) ? spContainersList : []).map(c => ({
+    const spNative: any[] = (Array.isArray(spContainersList) ? spContainersList : []).map((c) => ({
       _key: `sp-${c.id}`,
       id: c.id,
       _source: "sp",
@@ -884,7 +812,7 @@ export default function Containers() {
     }));
 
     // Normalize regular containers (from PO Import) to same shape
-    const erpNormalized: any[] = allContainers.map(c => {
+    const erpNormalized: any[] = allContainers.map((c) => {
       const sup = suppliers.find((s: any) => s.id === c.supplierId);
       const isOffloaded = c.status === "OFFLOADED";
       return {
@@ -904,11 +832,12 @@ export default function Containers() {
 
     const spSearch = searchTerm.toLowerCase();
     const allSpItems = [...spNative, ...erpNormalized];
-    const filtered = allSpItems.filter(c =>
-      !spSearch ||
-      (c.displayName ?? "").toLowerCase().includes(spSearch) ||
-      (c.subName ?? "").toLowerCase().includes(spSearch) ||
-      (c.supplierName ?? "").toLowerCase().includes(spSearch)
+    const filtered = allSpItems.filter(
+      (c) =>
+        !spSearch ||
+        (c.displayName ?? "").toLowerCase().includes(spSearch) ||
+        (c.subName ?? "").toLowerCase().includes(spSearch) ||
+        (c.supplierName ?? "").toLowerCase().includes(spSearch)
     );
     const isSpLoading = spContainersLoading || isLoading;
 
@@ -916,11 +845,7 @@ export default function Containers() {
       <div className="space-y-4 sm:space-y-6">
         <PageHeader title="Container Tracking" subtitle="Supplier partner containers">
           <div className="flex gap-2 flex-wrap">
-            <Button
-              className="gap-2"
-              onClick={() => setAddDialogOpen(true)}
-              data-testid="button-add-container"
-            >
+            <Button className="gap-2" onClick={() => setAddDialogOpen(true)} data-testid="button-add-container">
               <Plus className="h-4 w-4" />
               Import Container
             </Button>
@@ -933,27 +858,32 @@ export default function Containers() {
             <Input
               placeholder="Search by invoice, container, supplier…"
               value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
               data-testid="input-search-container"
             />
           </div>
           {searchTerm && (
             <Button variant="ghost" size="sm" onClick={() => setSearchTerm("")} data-testid="button-clear-search">
-              <X className="h-4 w-4 mr-1" />Clear
+              <X className="h-4 w-4 mr-1" />
+              Clear
             </Button>
           )}
         </div>
 
         {isSpLoading ? (
           <div className="space-y-3">
-            {[1,2,3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-16 w-full" />
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <Package className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
             <p className="text-sm text-muted-foreground">
-              {allSpItems.length === 0 ? "No containers yet. Click Import Container to add one." : "No containers match your search."}
+              {allSpItems.length === 0
+                ? "No containers yet. Click Import Container to add one."
+                : "No containers match your search."}
             </p>
           </div>
         ) : (
@@ -968,12 +898,12 @@ export default function Containers() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm">{c.displayName}</span>
-                    {c.subName && (
-                      <span className="text-xs text-muted-foreground font-mono">{c.subName}</span>
-                    )}
+                    {c.subName && <span className="text-xs text-muted-foreground font-mono">{c.subName}</span>}
                     <Badge
                       variant="outline"
-                      className={c.statusOffloaded ? "text-green-600 border-green-600/40" : "text-blue-600 border-blue-600/40"}
+                      className={
+                        c.statusOffloaded ? "text-green-600 border-green-600/40" : "text-blue-600 border-blue-600/40"
+                      }
                     >
                       {c.statusLabel}
                     </Badge>
@@ -992,7 +922,7 @@ export default function Containers() {
                 </div>
                 <Link
                   href={c._source === "erp" ? `/containers/${c.id}?src=erp` : `/containers/${c.id}`}
-                  onClick={e => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <Button size="sm" variant="outline" data-testid={`button-view-sp-${c.id}`}>
                     <Eye className="h-4 w-4 mr-1" />
@@ -1009,13 +939,9 @@ export default function Containers() {
     );
   }
 
-
   return (
     <div className="space-y-4 sm:space-y-6">
-      <PageHeader
-        title="Container Tracking"
-        subtitle="Track containers and manage offloading"
-      >
+      <PageHeader title="Container Tracking" subtitle="Track containers and manage offloading">
         <div className="flex gap-2 flex-wrap">
           {isDeveloper && (
             <Button
@@ -1094,7 +1020,9 @@ export default function Containers() {
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
             <Package className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold" data-testid="text-total-containers">{allContainers.length.toLocaleString()}</span>
+            <span className="text-sm font-semibold" data-testid="text-total-containers">
+              {allContainers.length.toLocaleString()}
+            </span>
             <span className="text-xs text-muted-foreground">Containers</span>
           </div>
           {(() => {
@@ -1191,9 +1119,7 @@ export default function Containers() {
                     className="flex items-center gap-2 cursor-pointer"
                     onSelect={(e) => {
                       e.preventDefault();
-                      setSupplierFilter((prev) =>
-                        checked ? prev.filter((v) => v !== val) : [...prev, val]
-                      );
+                      setSupplierFilter((prev) => (checked ? prev.filter((v) => v !== val) : [...prev, val]));
                     }}
                   >
                     <Checkbox checked={checked} className="pointer-events-none" />
@@ -1206,7 +1132,10 @@ export default function Containers() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-muted-foreground text-xs cursor-pointer justify-center"
-                    onSelect={(e) => { e.preventDefault(); setSupplierFilter([]); }}
+                    onSelect={(e) => {
+                      e.preventDefault();
+                      setSupplierFilter([]);
+                    }}
                   >
                     Clear selection
                   </DropdownMenuItem>
@@ -1219,7 +1148,11 @@ export default function Containers() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => { clearFilters(); setSearchTerm(""); setSupplierFilter([]); }}
+            onClick={() => {
+              clearFilters();
+              setSearchTerm("");
+              setSupplierFilter([]);
+            }}
             data-testid="button-clear-filters"
           >
             <X className="h-4 w-4 mr-1" />
@@ -1281,16 +1214,42 @@ export default function Containers() {
                           value={editingNumberValue}
                           onChange={(e) => setEditingNumberValue(e.target.value.toUpperCase())}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") editContainerNumberMutation.mutate({ id: container.id, containerNumber: editingNumberValue });
-                            if (e.key === "Escape") { setEditingNumberId(null); setEditingNumberValue(""); }
+                            if (e.key === "Enter")
+                              editContainerNumberMutation.mutate({
+                                id: container.id,
+                                containerNumber: editingNumberValue,
+                              });
+                            if (e.key === "Escape") {
+                              setEditingNumberId(null);
+                              setEditingNumberValue("");
+                            }
                           }}
                           autoFocus
                           data-testid={`input-container-number-${container.id}`}
                         />
-                        <Button size="icon" variant="ghost" onClick={() => editContainerNumberMutation.mutate({ id: container.id, containerNumber: editingNumberValue })} disabled={editContainerNumberMutation.isPending} data-testid={`button-save-number-${container.id}`}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() =>
+                            editContainerNumberMutation.mutate({
+                              id: container.id,
+                              containerNumber: editingNumberValue,
+                            })
+                          }
+                          disabled={editContainerNumberMutation.isPending}
+                          data-testid={`button-save-number-${container.id}`}
+                        >
                           <Check className="h-3 w-3" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => { setEditingNumberId(null); setEditingNumberValue(""); }} data-testid={`button-cancel-number-${container.id}`}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingNumberId(null);
+                            setEditingNumberValue("");
+                          }}
+                          data-testid={`button-cancel-number-${container.id}`}
+                        >
                           <X className="h-3 w-3" />
                         </Button>
                       </div>
@@ -1301,14 +1260,21 @@ export default function Containers() {
                           size="icon"
                           variant="ghost"
                           className="opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={(e) => { e.stopPropagation(); setEditingNumberId(container.id); setEditingNumberValue(container.containerNumber); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingNumberId(container.id);
+                            setEditingNumberValue(container.containerNumber);
+                          }}
                           data-testid={`button-edit-number-${container.id}`}
                         >
                           <Pencil className="h-3 w-3" />
                         </Button>
                       </div>
                     )}
-                    <Badge className={statusColors[container.status] || "border-transparent"} data-testid={`badge-status-${container.id}`}>
+                    <Badge
+                      className={statusColors[container.status] || "border-transparent"}
+                      data-testid={`badge-status-${container.id}`}
+                    >
                       {container.status}
                     </Badge>
                   </div>
@@ -1322,11 +1288,18 @@ export default function Containers() {
                   {!hideContainerCosts && (
                     <div className="text-right">
                       <p className="text-xs text-muted-foreground hidden sm:block">Total</p>
-                      <p className="text-sm font-mono font-semibold">{formatAmount(parseFloat(container.grandTotal || "0"))}</p>
+                      <p className="text-sm font-mono font-semibold">
+                        {formatAmount(parseFloat(container.grandTotal || "0"))}
+                      </p>
                     </div>
                   )}
                   <Link href={`/containers/${container.id}`}>
-                    <Button size="sm" variant="outline" onClick={(e) => e.stopPropagation()} data-testid={`button-view-${container.id}`}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={(e) => e.stopPropagation()}
+                      data-testid={`button-view-${container.id}`}
+                    >
                       <Eye className="h-4 w-4 mr-1" />
                       View
                     </Button>
@@ -1338,8 +1311,8 @@ export default function Containers() {
         </div>
       )}
 
-          {activeTab === "otw" && (
-          <div className="space-y-4">
+      {activeTab === "otw" && (
+        <div className="space-y-4">
           <div className="flex flex-wrap gap-2">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1373,9 +1346,7 @@ export default function Containers() {
                       className="flex items-center gap-2 cursor-pointer"
                       onSelect={(e) => {
                         e.preventDefault();
-                        setOtwSupplierFilter((prev) =>
-                          checked ? prev.filter((v) => v !== val) : [...prev, val]
-                        );
+                        setOtwSupplierFilter((prev) => (checked ? prev.filter((v) => v !== val) : [...prev, val]));
                       }}
                     >
                       <Checkbox checked={checked} className="pointer-events-none" />
@@ -1388,7 +1359,10 @@ export default function Containers() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       className="text-muted-foreground text-xs cursor-pointer justify-center"
-                      onSelect={(e) => { e.preventDefault(); setOtwSupplierFilter([]); }}
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        setOtwSupplierFilter([]);
+                      }}
                     >
                       Clear selection
                     </DropdownMenuItem>
@@ -1396,14 +1370,8 @@ export default function Containers() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-            <Select
-              value={otwLocationFilter}
-              onValueChange={setOtwLocationFilter}
-            >
-              <SelectTrigger
-                className="w-full sm:w-[130px]"
-                data-testid="select-otw-location"
-              >
+            <Select value={otwLocationFilter} onValueChange={setOtwLocationFilter}>
+              <SelectTrigger className="w-full sm:w-[130px]" data-testid="select-otw-location">
                 <SelectValue placeholder="Location" />
               </SelectTrigger>
               <SelectContent>
@@ -1416,10 +1384,7 @@ export default function Containers() {
               </SelectContent>
             </Select>
             <Select value={otwTruckFilter} onValueChange={setOtwTruckFilter}>
-              <SelectTrigger
-                className="w-full sm:w-[120px]"
-                data-testid="select-otw-truck"
-              >
+              <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-truck">
                 <SelectValue placeholder="Truck #" />
               </SelectTrigger>
               <SelectContent>
@@ -1432,10 +1397,7 @@ export default function Containers() {
               </SelectContent>
             </Select>
             <Select value={otwAgentFilter} onValueChange={setOtwAgentFilter}>
-              <SelectTrigger
-                className="w-full sm:w-[100px]"
-                data-testid="select-otw-agent"
-              >
+              <SelectTrigger className="w-full sm:w-[100px]" data-testid="select-otw-agent">
                 <SelectValue placeholder="Agent" />
               </SelectTrigger>
               <SelectContent>
@@ -1447,14 +1409,8 @@ export default function Containers() {
                 ))}
               </SelectContent>
             </Select>
-            <Select
-              value={otwTransporterFilter}
-              onValueChange={setOtwTransporterFilter}
-            >
-              <SelectTrigger
-                className="w-full sm:w-[120px]"
-                data-testid="select-otw-transporter"
-              >
+            <Select value={otwTransporterFilter} onValueChange={setOtwTransporterFilter}>
+              <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-transporter">
                 <SelectValue placeholder="Transporter" />
               </SelectTrigger>
               <SelectContent>
@@ -1466,10 +1422,7 @@ export default function Containers() {
                 ))}
               </SelectContent>
             </Select>
-            <Select
-              value={otwDocReceivedFilter}
-              onValueChange={setOtwDocReceivedFilter}
-            >
+            <Select value={otwDocReceivedFilter} onValueChange={setOtwDocReceivedFilter}>
               <SelectTrigger className="w-full sm:w-[100px]" data-testid="select-otw-doc">
                 <SelectValue placeholder="Doc" />
               </SelectTrigger>
@@ -1479,10 +1432,7 @@ export default function Containers() {
                 <SelectItem value="NO">No Doc</SelectItem>
               </SelectContent>
             </Select>
-            <Select
-              value={otwFreightStatusFilter}
-              onValueChange={setOtwFreightStatusFilter}
-            >
+            <Select value={otwFreightStatusFilter} onValueChange={setOtwFreightStatusFilter}>
               <SelectTrigger className="w-full sm:w-[120px]" data-testid="select-otw-freight">
                 <SelectValue placeholder="Freight" />
               </SelectTrigger>
@@ -1494,10 +1444,7 @@ export default function Containers() {
                 <SelectItem value="NONE">Not Set</SelectItem>
               </SelectContent>
             </Select>
-            <Select
-              value={otwNotesFilter}
-              onValueChange={setOtwNotesFilter}
-            >
+            <Select value={otwNotesFilter} onValueChange={setOtwNotesFilter}>
               <SelectTrigger className="w-full sm:w-[110px]" data-testid="select-otw-notes">
                 <SelectValue placeholder="Notes" />
               </SelectTrigger>
@@ -1513,9 +1460,7 @@ export default function Containers() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <Truck className="w-16 h-16 text-muted-foreground mb-4" />
-                <h2 className="text-xl font-semibold mb-2">
-                  No OTW containers
-                </h2>
+                <h2 className="text-xl font-semibold mb-2">No OTW containers</h2>
                 <p className="text-muted-foreground">
                   {otwContainers.length === 0
                     ? "All containers have arrived or been offloaded"
@@ -1529,105 +1474,47 @@ export default function Containers() {
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow>
-                      <TableHead className="whitespace-nowrap">
-                        Container #
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap">
-                        Supplier
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap">
-                        Amount
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[100px]">
-                        Shop
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[130px]">
-                        ETA
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[120px]">
-                        Transporter
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[80px]">
-                        Fee
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[100px]">
-                        Plate
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[120px]">
-                        Location
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[130px]">
-                        Border
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[130px]">
-                        Offload
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[80px]">
-                        Agent
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[80px]">
-                        Duty
-                      </TableHead>
+                      <TableHead className="whitespace-nowrap">Container #</TableHead>
+                      <TableHead className="whitespace-nowrap">Supplier</TableHead>
+                      <TableHead className="whitespace-nowrap">Amount</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[100px]">Shop</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[130px]">ETA</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[120px]">Transporter</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[80px]">Fee</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[100px]">Plate</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[120px]">Location</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[130px]">Border</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[130px]">Offload</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[80px]">Agent</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[80px]">Duty</TableHead>
                       <TableHead className="whitespace-nowrap">Doc</TableHead>
                       <TableHead className="whitespace-nowrap">Freight</TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[150px]">
-                        Description
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[130px]">
-                        Docs Sent
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[110px]">
-                        Freight (GIT)
-                      </TableHead>
-                      <TableHead className="whitespace-nowrap min-w-[160px]">
-                        Link
-                      </TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[150px]">Description</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[130px]">Docs Sent</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[110px]">Freight (GIT)</TableHead>
+                      <TableHead className="whitespace-nowrap min-w-[160px]">Link</TableHead>
                       <TableHead></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredOtwContainers.map((container) => (
-                      <TableRow
-                        key={container.id}
-                        data-testid={`row-otw-${container.id}`}
-                      >
+                      <TableRow key={container.id} data-testid={`row-otw-${container.id}`}>
                         <TableCell className="font-mono font-medium">
-                          <Link
-                            href={`/containers/${container.id}`}
-                            className="text-primary hover:underline"
-                          >
+                          <Link href={`/containers/${container.id}`} className="text-primary hover:underline">
                             {container.containerNumber}
                           </Link>
                         </TableCell>
-                        <TableCell className="text-sm">
-                          {getSupplierName(container.supplierId)}
-                        </TableCell>
+                        <TableCell className="text-sm">{getSupplierName(container.supplierId)}</TableCell>
                         <TableCell className="font-mono text-sm">
-                          {formatAmount(
-                            parseFloat(container.grandTotal || "0")
-                          )}
+                          {formatAmount(parseFloat(container.grandTotal || "0"))}
                         </TableCell>
                         <TableCell>
                           <Input
                             id={`tracking-${container.id}-shopName`}
-                            value={
-                              (getEditValue(container, "shopName") as string) ||
-                              ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "shopName",
-                                e.target.value,
-                              )
-                            }
+                            value={(getEditValue(container, "shopName") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "shopName", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 0)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "shopName"),
-                              "Shop",
-                              6,
-                              16,
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "shopName"), "Shop", 6, 16)}
                             className="h-8 text-sm w-auto"
                             placeholder="Shop"
                             data-testid={`input-shop-${container.id}`}
@@ -1637,19 +1524,10 @@ export default function Containers() {
                           <Input
                             id={`tracking-${container.id}-eta`}
                             type="date"
-                            value={
-                              (getEditValue(container, "eta") as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(container.id, "eta", e.target.value)
-                            }
+                            value={(getEditValue(container, "eta") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "eta", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 1)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "eta"),
-                              "yyyy-mm-dd",
-                              12,
-                              12,
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "eta"), "yyyy-mm-dd", 12, 12)}
                             className="h-8 text-sm w-auto"
                             data-testid={`input-eta-${container.id}`}
                           />
@@ -1657,26 +1535,10 @@ export default function Containers() {
                         <TableCell>
                           <Input
                             id={`tracking-${container.id}-transporter`}
-                            value={
-                              (getEditValue(
-                                container,
-                                "transporter",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "transporter",
-                                e.target.value,
-                              )
-                            }
+                            value={(getEditValue(container, "transporter") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "transporter", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 2)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "transporter"),
-                              "Transporter",
-                              12,
-                              40,
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "transporter"), "Transporter", 12, 40)}
                             className="h-8 text-sm w-auto"
                             placeholder="Transporter"
                             data-testid={`input-transporter-${container.id}`}
@@ -1686,24 +1548,10 @@ export default function Containers() {
                           <Input
                             id={`tracking-${container.id}-transportFee`}
                             type="number"
-                            value={
-                              (getEditValue(
-                                container,
-                                "transportFee",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "transportFee",
-                                e.target.value,
-                              )
-                            }
+                            value={(getEditValue(container, "transportFee") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "transportFee", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 3)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "transportFee"),
-                              "0.00",
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "transportFee"), "0.00")}
                             className="h-8 text-sm w-auto"
                             placeholder="0.00"
                             data-testid={`input-transport-${container.id}`}
@@ -1712,26 +1560,10 @@ export default function Containers() {
                         <TableCell>
                           <Input
                             id={`tracking-${container.id}-numberPlate`}
-                            value={
-                              (getEditValue(
-                                container,
-                                "numberPlate",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "numberPlate",
-                                e.target.value,
-                              )
-                            }
+                            value={(getEditValue(container, "numberPlate") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "numberPlate", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 4)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "numberPlate"),
-                              "Plate",
-                              10,
-                              20,
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "numberPlate"), "Plate", 10, 20)}
                             className="h-8 text-sm w-auto"
                             placeholder="Plate"
                             data-testid={`input-plate-${container.id}`}
@@ -1740,26 +1572,10 @@ export default function Containers() {
                         <TableCell>
                           <Input
                             id={`tracking-${container.id}-trackingLocation`}
-                            value={
-                              (getEditValue(
-                                container,
-                                "trackingLocation",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "trackingLocation",
-                                e.target.value,
-                              )
-                            }
+                            value={(getEditValue(container, "trackingLocation") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "trackingLocation", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 5)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "trackingLocation"),
-                              "Location",
-                              12,
-                              40,
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "trackingLocation"), "Location", 12, 40)}
                             className="h-8 text-sm w-auto"
                             placeholder="Location"
                             data-testid={`input-location-${container.id}`}
@@ -1769,26 +1585,10 @@ export default function Containers() {
                           <Input
                             id={`tracking-${container.id}-borderDate`}
                             type="date"
-                            value={
-                              (getEditValue(
-                                container,
-                                "borderDate",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "borderDate",
-                                e.target.value,
-                              )
-                            }
+                            value={(getEditValue(container, "borderDate") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "borderDate", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 6)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "borderDate"),
-                              "yyyy-mm-dd",
-                              12,
-                              12,
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "borderDate"), "yyyy-mm-dd", 12, 12)}
                             className="h-8 text-sm w-auto"
                             data-testid={`input-border-${container.id}`}
                           />
@@ -1797,26 +1597,10 @@ export default function Containers() {
                           <Input
                             id={`tracking-${container.id}-offloadDate`}
                             type="date"
-                            value={
-                              (getEditValue(
-                                container,
-                                "offloadDate",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "offloadDate",
-                                e.target.value,
-                              )
-                            }
+                            value={(getEditValue(container, "offloadDate") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "offloadDate", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 7)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "offloadDate"),
-                              "yyyy-mm-dd",
-                              12,
-                              12,
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "offloadDate"), "yyyy-mm-dd", 12, 12)}
                             className="h-8 text-sm w-auto"
                             data-testid={`input-offload-${container.id}`}
                           />
@@ -1824,21 +1608,10 @@ export default function Containers() {
                         <TableCell>
                           <Input
                             id={`tracking-${container.id}-agent`}
-                            value={
-                              (getEditValue(container, "agent") as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "agent",
-                                e.target.value,
-                              )
-                            }
+                            value={(getEditValue(container, "agent") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "agent", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 8)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "agent"),
-                              "Agent",
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "agent"), "Agent")}
                             className="h-8 text-sm w-auto"
                             placeholder="Agent"
                             data-testid={`input-agent-${container.id}`}
@@ -1848,22 +1621,10 @@ export default function Containers() {
                           <Input
                             id={`tracking-${container.id}-dutyFee`}
                             type="number"
-                            value={
-                              (getEditValue(container, "dutyFee") as string) ||
-                              ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "dutyFee",
-                                e.target.value,
-                              )
-                            }
+                            value={(getEditValue(container, "dutyFee") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "dutyFee", e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, container.id, 9)}
-                            style={autoSizeStyle(
-                              getEditValue(container, "dutyFee"),
-                              "0.00",
-                            )}
+                            style={autoSizeStyle(getEditValue(container, "dutyFee"), "0.00")}
                             className="h-8 text-sm w-auto"
                             placeholder="0.00"
                             data-testid={`input-duty-${container.id}`}
@@ -1873,22 +1634,26 @@ export default function Containers() {
                           <Checkbox
                             id={`tracking-${container.id}-docReceived`}
                             checked={!!getEditValue(container, "docReceived")}
-                            onCheckedChange={(checked) =>
-                              setEditValue(
-                                container.id,
-                                "docReceived",
-                                !!checked,
-                              )
-                            }
+                            onCheckedChange={(checked) => setEditValue(container.id, "docReceived", !!checked)}
                             data-testid={`checkbox-doc-${container.id}`}
                           />
                         </TableCell>
                         <TableCell>
                           {(() => {
                             const fs = freightStatusMap[container.id];
-                            if (!fs || fs.status === "NONE") return <span className="text-xs text-muted-foreground">--</span>;
+                            if (!fs || fs.status === "NONE")
+                              return <span className="text-xs text-muted-foreground">--</span>;
                             return (
-                              <Badge variant={fs.status === "PAID" ? "default" : fs.status === "PARTIAL" ? "secondary" : "destructive"} data-testid={`badge-freight-${container.id}`}>
+                              <Badge
+                                variant={
+                                  fs.status === "PAID"
+                                    ? "default"
+                                    : fs.status === "PARTIAL"
+                                      ? "secondary"
+                                      : "destructive"
+                                }
+                                data-testid={`badge-freight-${container.id}`}
+                              >
                                 {fs.status}
                               </Badge>
                             );
@@ -1897,28 +1662,10 @@ export default function Containers() {
                         <TableCell>
                           <Input
                             id={`tracking-${container.id}-trackingDescription`}
-                            value={
-                              (getEditValue(
-                                container,
-                                "trackingDescription",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "trackingDescription",
-                                e.target.value,
-                              )
-                            }
-                            onKeyDown={(e) =>
-                              handleKeyDown(e, container.id, 11)
-                            }
-                            style={autoSizeStyle(
-                              getEditValue(container, "trackingDescription"),
-                              "Notes...",
-                              10,
-                              32,
-                            )}
+                            value={(getEditValue(container, "trackingDescription") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "trackingDescription", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 11)}
+                            style={autoSizeStyle(getEditValue(container, "trackingDescription"), "Notes...", 10, 32)}
                             className="h-8 text-sm w-auto"
                             placeholder="Notes..."
                             data-testid={`input-desc-${container.id}`}
@@ -1928,28 +1675,10 @@ export default function Containers() {
                           <Input
                             id={`tracking-${container.id}-docsSentDate`}
                             type="date"
-                            value={
-                              (getEditValue(
-                                container,
-                                "docsSentDate",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "docsSentDate",
-                                e.target.value,
-                              )
-                            }
-                            onKeyDown={(e) =>
-                              handleKeyDown(e, container.id, 12)
-                            }
-                            style={autoSizeStyle(
-                              getEditValue(container, "docsSentDate"),
-                              "yyyy-mm-dd",
-                              12,
-                              12,
-                            )}
+                            value={(getEditValue(container, "docsSentDate") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "docsSentDate", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 12)}
+                            style={autoSizeStyle(getEditValue(container, "docsSentDate"), "yyyy-mm-dd", 12, 12)}
                             className="h-8 text-sm w-auto"
                             data-testid={`input-docs-sent-${container.id}`}
                           />
@@ -1957,19 +1686,8 @@ export default function Containers() {
                         <TableCell>
                           <select
                             id={`tracking-${container.id}-freightStatus`}
-                            value={
-                              (getEditValue(
-                                container,
-                                "freightStatus",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "freightStatus",
-                                e.target.value || null,
-                              )
-                            }
+                            value={(getEditValue(container, "freightStatus") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "freightStatus", e.target.value || null)}
                             className="h-8 text-sm rounded-md border border-input bg-background px-2 py-1"
                             data-testid={`select-freight-git-${container.id}`}
                           >
@@ -1982,28 +1700,10 @@ export default function Containers() {
                         <TableCell>
                           <Input
                             id={`tracking-${container.id}-trackingLink`}
-                            value={
-                              (getEditValue(
-                                container,
-                                "trackingLink",
-                              ) as string) || ""
-                            }
-                            onChange={(e) =>
-                              setEditValue(
-                                container.id,
-                                "trackingLink",
-                                e.target.value,
-                              )
-                            }
-                            onKeyDown={(e) =>
-                              handleKeyDown(e, container.id, 13)
-                            }
-                            style={autoSizeStyle(
-                              getEditValue(container, "trackingLink"),
-                              "https://...",
-                              12,
-                              32,
-                            )}
+                            value={(getEditValue(container, "trackingLink") as string) || ""}
+                            onChange={(e) => setEditValue(container.id, "trackingLink", e.target.value)}
+                            onKeyDown={(e) => handleKeyDown(e, container.id, 13)}
+                            style={autoSizeStyle(getEditValue(container, "trackingLink"), "https://...", 12, 32)}
                             className="h-8 text-sm w-auto"
                             placeholder="https://..."
                             data-testid={`input-link-${container.id}`}
@@ -2033,11 +1733,11 @@ export default function Containers() {
               </CardContent>
             </Card>
           )}
-          </div>
-          )}
+        </div>
+      )}
 
-          {activeTab === "sold" && (
-          <div className="space-y-4">
+      {activeTab === "sold" && (
+        <div className="space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -2058,13 +1758,9 @@ export default function Containers() {
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <HandCoins className="w-16 h-16 text-muted-foreground mb-4" />
-                <h2 className="text-xl font-semibold mb-2">
-                  No sold containers found
-                </h2>
+                <h2 className="text-xl font-semibold mb-2">No sold containers found</h2>
                 <p className="text-muted-foreground">
-                  {soldContainers.length === 0
-                    ? "No containers have been sold yet"
-                    : "Try adjusting your search"}
+                  {soldContainers.length === 0 ? "No containers have been sold yet" : "Try adjusting your search"}
                 </p>
               </CardContent>
             </Card>
@@ -2077,9 +1773,7 @@ export default function Containers() {
                       <TableHead>Container Number</TableHead>
                       <TableHead>Customer</TableHead>
                       <TableHead>Sale Date</TableHead>
-                      <TableHead className="text-right">
-                        Container Cost
-                      </TableHead>
+                      <TableHead className="text-right">Container Cost</TableHead>
                       <TableHead className="text-right">Commission</TableHead>
                       <TableHead className="text-right">Total Amount</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -2087,47 +1781,24 @@ export default function Containers() {
                   </TableHeader>
                   <TableBody>
                     {filteredSoldContainers.map((sale) => (
-                      <TableRow
-                        key={sale.saleId}
-                        data-testid={`row-sale-${sale.saleId}`}
-                      >
-                        <TableCell className="font-mono font-medium">
-                          {sale.containerNumber}
-                        </TableCell>
-                        <TableCell data-testid={`text-customer-${sale.saleId}`}>
-                          {sale.customerName}
-                        </TableCell>
-                        <TableCell
-                          className="font-mono"
-                          data-testid={`text-sale-date-${sale.saleId}`}
-                        >
+                      <TableRow key={sale.saleId} data-testid={`row-sale-${sale.saleId}`}>
+                        <TableCell className="font-mono font-medium">{sale.containerNumber}</TableCell>
+                        <TableCell data-testid={`text-customer-${sale.saleId}`}>{sale.customerName}</TableCell>
+                        <TableCell className="font-mono" data-testid={`text-sale-date-${sale.saleId}`}>
                           {formatDisplayDate(sale.saleDate)}
                         </TableCell>
-                        <TableCell
-                          className="text-right font-mono"
-                          data-testid={`text-sale-price-${sale.saleId}`}
-                        >
-                          {formatAmount(
-                            parseFloat(sale.containerCost)
-                          )}
+                        <TableCell className="text-right font-mono" data-testid={`text-sale-price-${sale.saleId}`}>
+                          {formatAmount(parseFloat(sale.containerCost))}
                         </TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatAmount(
-                            parseFloat(sale.commission || "0")
-                          )}
+                          {formatAmount(parseFloat(sale.commission || "0"))}
                         </TableCell>
                         <TableCell className="text-right font-mono font-semibold">
-                          {formatAmount(
-                            parseFloat(sale.totalAmount)
-                          )}
+                          {formatAmount(parseFloat(sale.totalAmount))}
                         </TableCell>
                         <TableCell className="text-right">
                           <Link href={`/containers/${sale.containerId}`}>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              data-testid={`button-view-sale-${sale.saleId}`}
-                            >
+                            <Button size="sm" variant="outline" data-testid={`button-view-sale-${sale.saleId}`}>
                               <Eye className="h-4 w-4 mr-2" />
                               View
                             </Button>
@@ -2170,20 +1841,18 @@ export default function Containers() {
               </div>
             </Card>
           )}
-          </div>
-          )}
+        </div>
+      )}
 
-      <AddContainerDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-      />
+      <AddContainerDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
 
       <AlertDialog open={syncAllConfirmOpen} onOpenChange={setSyncAllConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Fix all PO and Parent JV sync?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will scan all purchase orders and update only vouchers and totals that are out of sync. It is safe to run multiple times.
+              This will scan all purchase orders and update only vouchers and totals that are out of sync. It is safe to
+              run multiple times.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -2,16 +2,16 @@ import { useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 
 const HEARTBEAT_INTERVAL = 90000; // 90 seconds (well within the 3-minute presence expiry window)
-const ROUTE_DEBOUNCE_MS  = 10000;  // 10 seconds
+const ROUTE_DEBOUNCE_MS = 10000; // 10 seconds
 
 type PresenceType = "route_change" | "heartbeat";
 
 export function usePresence() {
   const [location] = useLocation();
-  const lastRouteRef   = useRef(location);
-  const intervalRef    = useRef<NodeJS.Timeout | null>(null);
-  const isMountedRef   = useRef(true);
-  const lastSentAtRef  = useRef<number>(0);
+  const lastRouteRef = useRef(location);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
+  const lastSentAtRef = useRef<number>(0);
 
   const sendHeartbeat = useCallback((route: string, type: PresenceType) => {
     fetch("/api/user-presence", {

@@ -118,11 +118,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
   }
 }
 
-function parseEvents(
-  containerNumber: string,
-  rawEvents: DcsaEvent[],
-  base: CarrierTrackResult,
-): CarrierTrackResult {
+function parseEvents(containerNumber: string, rawEvents: DcsaEvent[], base: CarrierTrackResult): CarrierTrackResult {
   // Extract ETA: PLN ARRI event at POD (shipmentLocationType === "POD")
   let eta: string | null = null;
   for (const ev of rawEvents) {
@@ -136,7 +132,9 @@ function parseEvents(
       const d = parseDate(ev.eventDateTime);
       if (d) {
         eta = d.toISOString().slice(0, 10);
-        console.log(`[CmaCgmApi] ${containerNumber}: ETA from POD arrival = ${eta} (${ev.transportCall?.location?.locationName ?? "?"})`);
+        console.log(
+          `[CmaCgmApi] ${containerNumber}: ETA from POD arrival = ${eta} (${ev.transportCall?.location?.locationName ?? "?"})`
+        );
         break;
       }
     }
@@ -144,18 +142,18 @@ function parseEvents(
 
   // Build normalised event list
   const events: TrackingEvent[] = rawEvents
-    .map((ev): TrackingEvent => ({
-      date: parseDate(ev.eventDateTime),
-      status: ev.carrierSpecificData?.internalEventLabel ??
-        ev.transportEventTypeCode ??
-        ev.equipmentEventTypeCode ??
-        ev.eventType,
-      location:
-        ev.transportCall?.location?.locationName ??
-        ev.transportCall?.location?.UNLocationCode ??
-        null,
-      description: ev.carrierSpecificData?.internalEventLabel ?? null,
-    }))
+    .map(
+      (ev): TrackingEvent => ({
+        date: parseDate(ev.eventDateTime),
+        status:
+          ev.carrierSpecificData?.internalEventLabel ??
+          ev.transportEventTypeCode ??
+          ev.equipmentEventTypeCode ??
+          ev.eventType,
+        location: ev.transportCall?.location?.locationName ?? ev.transportCall?.location?.UNLocationCode ?? null,
+        description: ev.carrierSpecificData?.internalEventLabel ?? null,
+      })
+    )
     .filter((e) => e.date !== null)
     .sort((a, b) => b.date!.getTime() - a.date!.getTime());
 
@@ -164,30 +162,25 @@ function parseEvents(
     .filter((ev) => ev.eventClassifierCode === "ACT" && ev.eventDateTime)
     .sort((a, b) => new Date(b.eventDateTime).getTime() - new Date(a.eventDateTime).getTime())[0];
 
-  const latestStatus = latestAct?.carrierSpecificData?.internalEventLabel ??
+  const latestStatus =
+    latestAct?.carrierSpecificData?.internalEventLabel ??
     latestAct?.transportEventTypeCode ??
     latestAct?.equipmentEventTypeCode ??
     events[0]?.status ??
     null;
 
-  const latestLocation =
-    latestAct?.transportCall?.location?.locationName ??
-    events[0]?.location ??
-    null;
+  const latestLocation = latestAct?.transportCall?.location?.locationName ?? events[0]?.location ?? null;
 
-  const latestEventDate = latestAct
-    ? parseDate(latestAct.eventDateTime)
-    : events[0]?.date ?? null;
+  const latestEventDate = latestAct ? parseDate(latestAct.eventDateTime) : (events[0]?.date ?? null);
 
   const vesselName = latestAct?.transportCall?.vessel?.vesselName ?? null;
   const voyage = latestAct?.transportCall?.exportVoyageNumber ?? latestAct?.transportCall?.importVoyageNumber ?? null;
 
-  const latestDescription = [latestStatus, vesselName, voyage ? `voyage ${voyage}` : null]
-    .filter(Boolean)
-    .join(", ") || null;
+  const latestDescription =
+    [latestStatus, vesselName, voyage ? `voyage ${voyage}` : null].filter(Boolean).join(", ") || null;
 
   console.log(
-    `[CmaCgmApi] ${containerNumber}: success — status="${latestStatus}" eta=${eta ?? "none"} events=${rawEvents.length}`,
+    `[CmaCgmApi] ${containerNumber}: success — status="${latestStatus}" eta=${eta ?? "none"} events=${rawEvents.length}`
   );
 
   return {

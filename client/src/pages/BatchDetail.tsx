@@ -8,21 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -88,9 +75,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
     queryKey: ["/api/factory/suppliers"],
   });
 
-  const supplierMap = Object.fromEntries(
-    (suppliers || []).map((s: any) => [s.id, s.name])
-  );
+  const supplierMap = Object.fromEntries((suppliers || []).map((s: any) => [s.id, s.name]));
 
   const editMutation = useMutation({
     mutationFn: async () => {
@@ -172,23 +157,20 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
 
   const bales = balesData || [];
   const totalBalesCount = bales.length;
-  const totalBalesWeight = bales.reduce(
-    (sum: number, row: any) => sum + parseFloat(row.bale?.weightKg || "0"),
-    0
-  );
+  const totalBalesWeight = bales.reduce((sum: number, row: any) => sum + parseFloat(row.bale?.weightKg || "0"), 0);
   const avgCost =
     totalBalesCount > 0
-      ? bales.reduce(
-          (sum: number, row: any) => sum + parseFloat(row.bale?.costPerKg || "0"),
-          0
-        ) / totalBalesCount
+      ? bales.reduce((sum: number, row: any) => sum + parseFloat(row.bale?.costPerKg || "0"), 0) / totalBalesCount
       : 0;
 
   const getStatusVariant = (status: string) => {
     switch (status) {
-      case "ACTIVE": return "default";
-      case "COMPLETED": return "secondary";
-      default: return "outline";
+      case "ACTIVE":
+        return "default";
+      case "COMPLETED":
+        return "secondary";
+      default:
+        return "outline";
     }
   };
 
@@ -212,12 +194,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
           >
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button
-            size="icon"
-            variant="outline"
-            onClick={() => setDeleteOpen(true)}
-            data-testid="button-delete-batch"
-          >
+          <Button size="icon" variant="outline" onClick={() => setDeleteOpen(true)} data-testid="button-delete-batch">
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
@@ -228,13 +205,8 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-3 flex-wrap">
               <Boxes className="h-5 w-5 text-muted-foreground" />
-              <CardTitle data-testid="text-batch-name">
-                {batch.name || batch.batchCode}
-              </CardTitle>
-              <Badge
-                variant={getStatusVariant(batch.status) as any}
-                data-testid="badge-batch-status"
-              >
+              <CardTitle data-testid="text-batch-name">{batch.name || batch.batchCode}</CardTitle>
+              <Badge variant={getStatusVariant(batch.status) as any} data-testid="badge-batch-status">
                 {batch.status}
               </Badge>
             </div>
@@ -273,7 +245,8 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
           <div className="space-y-1">
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>
-                Utilization: <span className="font-mono font-medium text-foreground">{formatNumber(usedWeight)}</span> / {formatNumber(totalWeight)} kg
+                Utilization: <span className="font-mono font-medium text-foreground">{formatNumber(usedWeight)}</span> /{" "}
+                {formatNumber(totalWeight)} kg
               </span>
               <span>{usagePercent.toFixed(0)}%</span>
             </div>
@@ -313,8 +286,8 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
                         {source.containerId
                           ? `Container #${source.containerId}`
                           : source.sourceBatchId
-                          ? `Batch #${source.sourceBatchId}`
-                          : "-"}
+                            ? `Batch #${source.sourceBatchId}`
+                            : "-"}
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatNumber(parseFloat(source.weightKg))}
@@ -373,9 +346,7 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
                       const location = row.location;
                       return (
                         <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
-                          <TableCell className="font-mono text-xs">
-                            {bale.baleCode}
-                          </TableCell>
+                          <TableCell className="font-mono text-xs">{bale.baleCode}</TableCell>
                           <TableCell>{product?.name || "-"}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {product?.articleCode || bale.category || "-"}
@@ -407,12 +378,16 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
                 </Table>
               </div>
 
-              <div className="flex items-center gap-6 flex-wrap mt-4 pt-4 border-t text-sm text-muted-foreground" data-testid="summary-footer">
+              <div
+                className="flex items-center gap-6 flex-wrap mt-4 pt-4 border-t text-sm text-muted-foreground"
+                data-testid="summary-footer"
+              >
                 <span>
                   Total Bales: <span className="font-mono font-medium text-foreground">{totalBalesCount}</span>
                 </span>
                 <span>
-                  Total Weight: <span className="font-mono font-medium text-foreground">{formatNumber(totalBalesWeight)} kg</span>
+                  Total Weight:{" "}
+                  <span className="font-mono font-medium text-foreground">{formatNumber(totalBalesWeight)} kg</span>
                 </span>
                 <span>
                   Avg Cost/kg: <span className="font-mono font-medium text-foreground">${avgCost.toFixed(4)}</span>
@@ -475,13 +450,23 @@ export default function BatchDetail({ batchId, onBack, onDeleted }: BatchDetailP
           <DialogHeader>
             <DialogTitle>Delete Batch</DialogTitle>
             <DialogDescription>
-              This will permanently delete the batch and unlink any bales associated with it. The bales themselves are not deleted — they will simply become unlinked and available to reassign.
+              This will permanently delete the batch and unlink any bales associated with it. The bales themselves are
+              not deleted — they will simply become unlinked and available to reassign.
             </DialogDescription>
           </DialogHeader>
           <div className="p-3 rounded-md bg-muted text-sm space-y-1">
-            <p><span className="text-muted-foreground">Batch:</span> <span className="font-medium">{batch.name || batch.batchCode}</span></p>
-            <p><span className="text-muted-foreground">Bales linked:</span> <span className="font-mono">{totalBalesCount}</span></p>
-            <p><span className="text-muted-foreground">Total weight:</span> <span className="font-mono">{formatNumber(totalWeight)} kg</span></p>
+            <p>
+              <span className="text-muted-foreground">Batch:</span>{" "}
+              <span className="font-medium">{batch.name || batch.batchCode}</span>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Bales linked:</span>{" "}
+              <span className="font-mono">{totalBalesCount}</span>
+            </p>
+            <p>
+              <span className="text-muted-foreground">Total weight:</span>{" "}
+              <span className="font-mono">{formatNumber(totalWeight)} kg</span>
+            </p>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDeleteOpen(false)} data-testid="button-cancel-delete">

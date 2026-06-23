@@ -49,14 +49,14 @@ export function registerWhatsAppRoutes(app: Express) {
       }
       const s = r.rows[0];
       res.json({
-        instanceId:          s.instance_id,
-        apiToken:            s.api_token ? "••••••" : "",
-        enabled:             s.enabled,
-        monthlyAutoSend:     s.monthly_auto_send,
-        dailyAutoSend:       s.daily_auto_send,
-        dailyRecipientId:    s.daily_recipient_id,
-        dailyRecipientName:  s.daily_recipient_name ?? null,
-        hasCredentials:      !!(s.instance_id && s.api_token),
+        instanceId: s.instance_id,
+        apiToken: s.api_token ? "••••••" : "",
+        enabled: s.enabled,
+        monthlyAutoSend: s.monthly_auto_send,
+        dailyAutoSend: s.daily_auto_send,
+        dailyRecipientId: s.daily_recipient_id,
+        dailyRecipientName: s.daily_recipient_name ?? null,
+        hasCredentials: !!(s.instance_id && s.api_token),
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -70,14 +70,17 @@ export function registerWhatsAppRoutes(app: Express) {
       // Fetch existing row so we can preserve fields not sent by the caller
       const existing = await getWaSettings();
 
-      const instanceId       = body.instanceId       ?? existing?.instanceId      ?? "";
-      const apiToken         = body.apiToken         ?? existing?.apiToken        ?? "";
-      const enabled          = body.enabled          !== undefined ? body.enabled         : (existing?.enabled         ?? false);
-      const monthlyAutoSend  = body.monthlyAutoSend  !== undefined ? body.monthlyAutoSend  : (existing?.monthlyAutoSend  ?? false);
-      const dailyAutoSend    = body.dailyAutoSend    !== undefined ? body.dailyAutoSend    : (existing?.dailyAutoSend    ?? false);
-      const dailyRecipientId = body.dailyRecipientId !== undefined ? body.dailyRecipientId : (existing?.dailyRecipientId ?? null);
+      const instanceId = body.instanceId ?? existing?.instanceId ?? "";
+      const apiToken = body.apiToken ?? existing?.apiToken ?? "";
+      const enabled = body.enabled !== undefined ? body.enabled : (existing?.enabled ?? false);
+      const monthlyAutoSend =
+        body.monthlyAutoSend !== undefined ? body.monthlyAutoSend : (existing?.monthlyAutoSend ?? false);
+      const dailyAutoSend = body.dailyAutoSend !== undefined ? body.dailyAutoSend : (existing?.dailyAutoSend ?? false);
+      const dailyRecipientId =
+        body.dailyRecipientId !== undefined ? body.dailyRecipientId : (existing?.dailyRecipientId ?? null);
 
-      await pool.query(`
+      await pool.query(
+        `
         INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled, monthly_auto_send, daily_auto_send, daily_recipient_id)
         VALUES (1, $1, $2, $3, $4, $5, $6)
         ON CONFLICT (id) DO UPDATE SET
@@ -87,14 +90,9 @@ export function registerWhatsAppRoutes(app: Express) {
           monthly_auto_send  = EXCLUDED.monthly_auto_send,
           daily_auto_send    = EXCLUDED.daily_auto_send,
           daily_recipient_id = EXCLUDED.daily_recipient_id
-      `, [
-        instanceId,
-        apiToken,
-        enabled,
-        monthlyAutoSend,
-        dailyAutoSend,
-        dailyRecipientId,
-      ]);
+      `,
+        [instanceId, apiToken, enabled, monthlyAutoSend, dailyAutoSend, dailyRecipientId]
+      );
 
       res.json({ message: "Saved" });
     } catch (err: any) {
@@ -110,15 +108,17 @@ export function registerWhatsAppRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const result = await pool.query(
         "SELECT id, chat_id, name, is_group, active FROM whatsapp_recipients WHERE company_id = $1 ORDER BY id",
-        [companyId],
+        [companyId]
       );
-      res.json(result.rows.map((r) => ({
-        id:      r.id,
-        chatId:  r.chat_id,
-        name:    r.name,
-        isGroup: r.is_group,
-        active:  r.active,
-      })));
+      res.json(
+        result.rows.map((r) => ({
+          id: r.id,
+          chatId: r.chat_id,
+          name: r.name,
+          isGroup: r.is_group,
+          active: r.active,
+        }))
+      );
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -131,16 +131,16 @@ export function registerWhatsAppRoutes(app: Express) {
       const { chatId: rawChatId, name } = req.body as { chatId: string; name?: string };
       if (!rawChatId?.trim()) return res.status(400).json({ message: "chatId is required" });
 
-      const chatId  = normaliseChatId(rawChatId);
+      const chatId = normaliseChatId(rawChatId);
       const isGroup = chatId.endsWith("@g.us");
-      const label   = (name?.trim()) || chatId;
+      const label = name?.trim() || chatId;
 
       const result = await pool.query(
         `INSERT INTO whatsapp_recipients (company_id, chat_id, name, is_group, active)
          VALUES ($1, $2, $3, $4, true)
          ON CONFLICT (company_id, chat_id) DO UPDATE SET name = $3, active = true
          RETURNING id, chat_id, name, is_group, active`,
-        [companyId, chatId, label, isGroup],
+        [companyId, chatId, label, isGroup]
       );
       const r = result.rows[0];
       res.json({ id: r.id, chatId: r.chat_id, name: r.name, isGroup: r.is_group, active: r.active });
@@ -160,7 +160,7 @@ export function registerWhatsAppRoutes(app: Express) {
            name   = COALESCE($1, name),
            active = COALESCE($2, active)
          WHERE id = $3 AND company_id = $4`,
-        [name ?? null, active ?? null, id, companyId],
+        [name ?? null, active ?? null, id, companyId]
       );
       if (result.rowCount === 0) {
         return res.status(404).json({ message: "Recipient not found" });
@@ -176,10 +176,10 @@ export function registerWhatsAppRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
-      const result = await pool.query(
-        "DELETE FROM whatsapp_recipients WHERE id = $1 AND company_id = $2",
-        [id, companyId],
-      );
+      const result = await pool.query("DELETE FROM whatsapp_recipients WHERE id = $1 AND company_id = $2", [
+        id,
+        companyId,
+      ]);
       if (result.rowCount === 0) {
         return res.status(404).json({ message: "Recipient not found" });
       }
@@ -213,9 +213,9 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.json({ instanceId: "", apiToken: "", enabled: true, hasCredentials: false });
       }
       res.json({
-        instanceId:     s.instanceId,
-        apiToken:       s.apiToken ? "••••••" : "",
-        enabled:        s.enabled,
+        instanceId: s.instanceId,
+        apiToken: s.apiToken ? "••••••" : "",
+        enabled: s.enabled,
         hasCredentials: !!(s.instanceId && s.apiToken),
       });
     } catch (err: any) {
@@ -225,21 +225,24 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/settings/pos", requireAuth, async (req, res) => {
     try {
-      const body     = req.body as Record<string, any>;
+      const body = req.body as Record<string, any>;
       const existing = await getWaSettingsById(2);
 
       const instanceId = body.instanceId ?? existing?.instanceId ?? "";
-      const apiToken   = body.apiToken   ?? existing?.apiToken   ?? "";
-      const enabled    = body.enabled !== undefined ? body.enabled : (existing?.enabled ?? true);
+      const apiToken = body.apiToken ?? existing?.apiToken ?? "";
+      const enabled = body.enabled !== undefined ? body.enabled : (existing?.enabled ?? true);
 
-      await pool.query(`
+      await pool.query(
+        `
         INSERT INTO whatsapp_settings (id, instance_id, api_token, enabled)
         VALUES (2, $1, $2, $3)
         ON CONFLICT (id) DO UPDATE SET
           instance_id = EXCLUDED.instance_id,
           api_token   = CASE WHEN $2 = '' OR $2 = '••••••' THEN whatsapp_settings.api_token ELSE EXCLUDED.api_token END,
           enabled     = EXCLUDED.enabled
-      `, [instanceId, apiToken, enabled]);
+      `,
+        [instanceId, apiToken, enabled]
+      );
 
       res.json({ message: "Saved" });
     } catch (err: any) {
@@ -264,34 +267,34 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.post("/api/whatsapp/send-net-position", requireAuth, async (req, res) => {
     try {
-      const user    = req.session.user as any;
+      const user = req.session.user as any;
       const isAdmin = user?.role === "Admin" || user?.role === "Developer";
       const requestedCompanyId = req.body.companyId ? parseInt(req.body.companyId) : null;
-      const companyId = isAdmin && requestedCompanyId
-        ? requestedCompanyId
-        : req.session.currentCompanyId;
+      const companyId = isAdmin && requestedCompanyId ? requestedCompanyId : req.session.currentCompanyId;
 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allCompanies = await storage.getAllCompanies();
-      const company      = allCompanies.find((c: any) => c.id === companyId);
-      const companyName  = company?.name || "Company";
+      const company = allCompanies.find((c: any) => c.id === companyId);
+      const companyName = company?.name || "Company";
 
-      const endDate   = (req.body.endDate   as string) || getClientDate(req);
-      const startDate = (req.body.startDate as string) || (() => {
-        const d = new Date(endDate);
-        d.setFullYear(d.getFullYear() - 1);
-        return d.toISOString().split("T")[0];
-      })();
+      const endDate = (req.body.endDate as string) || getClientDate(req);
+      const startDate =
+        (req.body.startDate as string) ||
+        (() => {
+          const d = new Date(endDate);
+          d.setFullYear(d.getFullYear() - 1);
+          return d.toISOString().split("T")[0];
+        })();
 
       if (generateMonthEnds(startDate, endDate).length === 0) {
         return res.status(400).json({ message: "No months in range" });
       }
 
-      const buffer   = await generateNetPositionExcel(companyId, companyName, startDate, endDate);
-      const safe     = companyName.replace(/[^a-z0-9]/gi, "_");
+      const buffer = await generateNetPositionExcel(companyId, companyName, startDate, endDate);
+      const safe = companyName.replace(/[^a-z0-9]/gi, "_");
       const fileName = `NetPosition_${safe}_${endDate}.xlsx`;
-      const caption  = `Net Position Report — ${companyName}\nPeriod: ${startDate} → ${endDate}`;
+      const caption = `Net Position Report — ${companyName}\nPeriod: ${startDate} → ${endDate}`;
 
       const result = await sendWhatsAppFile(buffer, fileName, caption);
 
@@ -313,24 +316,30 @@ export function registerWhatsAppRoutes(app: Express) {
       const r = await pool.query(
         `SELECT id, company_id, recipient_id, auto_send, enabled,
                 frequency, send_hour, send_day_of_week, last_sent_at
-         FROM whatsapp_stock_settings ORDER BY id LIMIT 1`,
+         FROM whatsapp_stock_settings ORDER BY id LIMIT 1`
       );
       if (!r.rows.length) {
         return res.json({
-          companyId: null, recipientId: null, autoSend: false, enabled: false,
-          frequency: "daily", sendHour: 18, sendDayOfWeek: 1, lastSentAt: null,
+          companyId: null,
+          recipientId: null,
+          autoSend: false,
+          enabled: false,
+          frequency: "daily",
+          sendHour: 18,
+          sendDayOfWeek: 1,
+          lastSentAt: null,
         });
       }
       const row = r.rows[0];
       res.json({
-        companyId:     row.company_id,
-        recipientId:   row.recipient_id,
-        autoSend:      row.auto_send,
-        enabled:       row.enabled,
-        frequency:     row.frequency     ?? "daily",
-        sendHour:      row.send_hour     ?? 18,
+        companyId: row.company_id,
+        recipientId: row.recipient_id,
+        autoSend: row.auto_send,
+        enabled: row.enabled,
+        frequency: row.frequency ?? "daily",
+        sendHour: row.send_hour ?? 18,
         sendDayOfWeek: row.send_day_of_week ?? 1,
-        lastSentAt:    row.last_sent_at  ?? null,
+        lastSentAt: row.last_sent_at ?? null,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -339,7 +348,10 @@ export function registerWhatsAppRoutes(app: Express) {
 
   app.put("/api/whatsapp/stock-settings", requireAuth, async (req, res) => {
     try {
-      const { companyId, recipientId, autoSend, enabled, frequency, sendHour, sendDayOfWeek } = req.body as Record<string, any>;
+      const { companyId, recipientId, autoSend, enabled, frequency, sendHour, sendDayOfWeek } = req.body as Record<
+        string,
+        any
+      >;
       await pool.query(
         `INSERT INTO whatsapp_stock_settings (id, company_id, recipient_id, auto_send, enabled, frequency, send_hour, send_day_of_week)
          VALUES (1, $1, $2, $3, $4, $5, $6, $7)
@@ -352,14 +364,14 @@ export function registerWhatsAppRoutes(app: Express) {
            send_hour        = EXCLUDED.send_hour,
            send_day_of_week = EXCLUDED.send_day_of_week`,
         [
-          companyId    ?? null,
-          recipientId  ?? null,
-          autoSend     ?? false,
-          enabled      ?? false,
-          frequency    ?? "daily",
-          sendHour     ?? 18,
+          companyId ?? null,
+          recipientId ?? null,
+          autoSend ?? false,
+          enabled ?? false,
+          frequency ?? "daily",
+          sendHour ?? 18,
           sendDayOfWeek ?? null,
-        ],
+        ]
       );
       res.json({ message: "Saved" });
     } catch (err: any) {
@@ -377,24 +389,30 @@ export function registerWhatsAppRoutes(app: Express) {
                 wr.name AS recipient_name
            FROM net_position_export_settings npe
            LEFT JOIN whatsapp_recipients wr ON wr.id = npe.recipient_id
-          WHERE npe.id = 1`,
+          WHERE npe.id = 1`
       );
       if (!r.rows.length) {
         return res.json({
-          recipientId: null, recipientName: null, frequency: "daily", sendHour: 18,
-          sendDayOfWeek: 1, enabled: false, autoSend: false, lastSentAt: null,
+          recipientId: null,
+          recipientName: null,
+          frequency: "daily",
+          sendHour: 18,
+          sendDayOfWeek: 1,
+          enabled: false,
+          autoSend: false,
+          lastSentAt: null,
         });
       }
       const row = r.rows[0];
       res.json({
-        recipientId:   row.recipient_id,
+        recipientId: row.recipient_id,
         recipientName: row.recipient_name ?? null,
-        frequency:     row.frequency      ?? "daily",
-        sendHour:      row.send_hour      ?? 18,
+        frequency: row.frequency ?? "daily",
+        sendHour: row.send_hour ?? 18,
         sendDayOfWeek: row.send_day_of_week ?? 1,
-        enabled:       row.enabled        ?? false,
-        autoSend:      row.auto_send      ?? false,
-        lastSentAt:    row.last_sent_at   ?? null,
+        enabled: row.enabled ?? false,
+        autoSend: row.auto_send ?? false,
+        lastSentAt: row.last_sent_at ?? null,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -416,13 +434,13 @@ export function registerWhatsAppRoutes(app: Express) {
            enabled          = EXCLUDED.enabled,
            auto_send        = EXCLUDED.auto_send`,
         [
-          recipientId  ?? null,
-          frequency    ?? "daily",
-          sendHour     ?? 18,
+          recipientId ?? null,
+          frequency ?? "daily",
+          sendHour ?? 18,
           sendDayOfWeek ?? null,
-          enabled      ?? false,
-          autoSend     ?? false,
-        ],
+          enabled ?? false,
+          autoSend ?? false,
+        ]
       );
       res.json({ message: "Saved" });
     } catch (err: any) {
@@ -442,21 +460,21 @@ export function registerWhatsAppRoutes(app: Express) {
 
     // Run the actual work asynchronously after the response is sent
     triggerDailyWhatsAppSendNow(fromDate || undefined, toDate || undefined)
-      .then(r  => console.log(`[ManualWhatsApp] Completed: ${r.message}`))
-      .catch(e => console.error(`[ManualWhatsApp] Failed: ${e.message}`));
+      .then((r) => console.log(`[ManualWhatsApp] Completed: ${r.message}`))
+      .catch((e) => console.error(`[ManualWhatsApp] Failed: ${e.message}`));
   });
 
   app.post("/api/whatsapp/send-np-all-now", requireAuth, async (req, res) => {
     try {
       const { recipientId: reqRecipientId } = req.body as Record<string, any>;
 
-      const allCompanies = await storage.getAllCompanies() as any[];
+      const allCompanies = (await storage.getAllCompanies()) as any[];
       if (!allCompanies.length) return res.status(400).json({ message: "No companies found" });
 
-      const today    = getClientDate(req);
-      const year     = new Date(today).getFullYear();
-      const npStart  = `${year}-01-01`;
-      const npEnd    = today;
+      const today = getClientDate(req);
+      const year = new Date(today).getFullYear();
+      const npStart = `${year}-01-01`;
+      const npEnd = today;
 
       // Build ZIP
       const zipBuf = await new Promise<Buffer>(async (resolve, reject) => {
@@ -487,17 +505,18 @@ export function registerWhatsAppRoutes(app: Express) {
       if (recipientId) {
         const rq = await pool.query(
           "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true AND company_id = $2",
-          [recipientId, sessCompanyId],
+          [recipientId, sessCompanyId]
         );
         if (rq.rows.length) {
           const chatId = rq.rows[0].chat_id as string;
           const waSettings = await getWaSettings();
           if (waSettings?.enabled) {
             const waRes = await sendWhatsAppFileToChatId(
-              chatId, zipBuf,
+              chatId,
+              zipBuf,
               `NetPosition_AllCompanies_${today}.zip`,
               `Net Position Report — All Companies\nPeriod: ${npStart} → ${npEnd}`,
-              "application/zip",
+              "application/zip"
             );
             messages.push(`WhatsApp: ${waRes.success ? "sent" : waRes.error}`);
           } else {
@@ -511,8 +530,12 @@ export function registerWhatsAppRoutes(app: Express) {
       }
 
       // Email send
-      const emailResult = await sendExportEmail(zipBuf, today, allCompanies.map((c) => c.name));
-      messages.push(`Email: ${emailResult.success ? "sent" : (emailResult.error || "failed")}`);
+      const emailResult = await sendExportEmail(
+        zipBuf,
+        today,
+        allCompanies.map((c) => c.name)
+      );
+      messages.push(`Email: ${emailResult.success ? "sent" : emailResult.error || "failed"}`);
 
       res.json({ message: messages.join(" | ") });
     } catch (err: any) {
@@ -532,7 +555,7 @@ export function registerWhatsAppRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "companyId is required" });
 
       const allCompanies = await storage.getAllCompanies();
-      const company      = allCompanies.find((c: any) => c.id === companyId);
+      const company = allCompanies.find((c: any) => c.id === companyId);
       if (!company) return res.status(404).json({ message: "Company not found" });
 
       // Resolve recipient chatId
@@ -542,19 +565,25 @@ export function registerWhatsAppRoutes(app: Express) {
       const sessCompanyId = req.session.currentCompanyId;
       const rResult = await pool.query(
         "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true AND company_id = $2",
-        [recipientId, sessCompanyId],
+        [recipientId, sessCompanyId]
       );
       if (!rResult.rows.length) return res.status(404).json({ message: "Recipient not found or inactive" });
       const chatId = rResult.rows[0].chat_id as string;
 
-      const today    = getClientDate(req);
+      const today = getClientDate(req);
       const yearStart = `${new Date(today).getFullYear()}-01-01`;
 
       // 1. Stock PDF
       console.log(`[WhatsApp] Generating stock PDF for ${company.name} (companyId=${companyId})…`);
-      const { buffer: pdfBuf, pageCount, rowCount } = await generateStockPdf(companyId, company.name, undefined, undefined, true);
+      const {
+        buffer: pdfBuf,
+        pageCount,
+        rowCount,
+      } = await generateStockPdf(companyId, company.name, undefined, undefined, true);
       const maxExpectedPages = Math.ceil(rowCount / 20) + 5;
-      console.log(`[WhatsApp] Stock PDF generated: companyId=${companyId} company="${company.name}" rowCount=${rowCount} pageCount=${pageCount} maxExpectedPages=${maxExpectedPages}`);
+      console.log(
+        `[WhatsApp] Stock PDF generated: companyId=${companyId} company="${company.name}" rowCount=${rowCount} pageCount=${pageCount} maxExpectedPages=${maxExpectedPages}`
+      );
 
       // Safety guard: refuse to send a suspiciously over-paginated PDF.
       // Root cause of the 177-page bug: PDFKit ≥0.17 exposes page.maxY as a function;
@@ -566,26 +595,29 @@ export function registerWhatsAppRoutes(app: Express) {
         return res.status(500).json({ message });
       }
 
-      const pdfName  = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
-      const pdfCap   = "";
+      const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
+      const pdfCap = "";
       console.log(`[WhatsApp] Uploading stock PDF — chatId=${chatId} file=${pdfName} size=${pdfBuf.length}`);
-      const pdfRes   = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
+      const pdfRes = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
       if (!pdfRes.success) {
         console.error(
           `[WhatsApp] send-stock-report: PDF upload failed — chatId=${chatId} file=${pdfName} ` +
-          `size=${pdfBuf.length} pageCount=${pageCount} rowCount=${rowCount} greenApiError="${pdfRes.error}"`,
+            `size=${pdfBuf.length} pageCount=${pageCount} rowCount=${rowCount} greenApiError="${pdfRes.error}"`
         );
         return res.status(502).json({ message: pdfRes.error || "Failed to send stock PDF" });
       }
 
       // 2. Net Position Excel (Jan 1 → today)
       console.log(`[WhatsApp] Generating net-position Excel for ${company.name} (${yearStart}→${today})…`);
-      const xlsBuf  = await generateNetPositionExcel(companyId, company.name, yearStart, today);
+      const xlsBuf = await generateNetPositionExcel(companyId, company.name, yearStart, today);
       const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
-      const xlsCap  = "";
-      const xlsRes  = await sendWhatsAppFileToChatId(
-        chatId, xlsBuf, xlsName, xlsCap,
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      const xlsCap = "";
+      const xlsRes = await sendWhatsAppFileToChatId(
+        chatId,
+        xlsBuf,
+        xlsName,
+        xlsCap,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
       );
       if (!xlsRes.success) {
         return res.status(502).json({ message: xlsRes.error || "Failed to send net position Excel" });

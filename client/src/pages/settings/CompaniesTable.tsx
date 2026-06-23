@@ -14,9 +14,8 @@ interface CompaniesTableProps {
 export function CompaniesTable({ companies, onEdit, onDelete }: CompaniesTableProps) {
   const [search, setSearch] = useState("");
 
-  const filtered = companies.filter(c => 
-    c.name.toLowerCase().includes(search.toLowerCase()) || 
-    c.code.toLowerCase().includes(search.toLowerCase())
+  const filtered = companies.filter(
+    (c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase())
   );
 
   return (

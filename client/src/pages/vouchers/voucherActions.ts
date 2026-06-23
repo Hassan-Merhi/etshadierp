@@ -13,12 +13,14 @@ export async function exportVoucherHelper({ formData, activeTab, toast, detailed
   const voucherDate = formData.voucherDate
     ? format(formData.voucherDate, "yyyy-MM-dd")
     : format(new Date(), "yyyy-MM-dd");
-  const validEntries = formData.entries.filter(
-    (e: any) => e.accountId > 0 && parseFloat(e.amount) > 0
-  );
+  const validEntries = formData.entries.filter((e: any) => e.accountId > 0 && parseFloat(e.amount) > 0);
 
   if (validEntries.length === 0) {
-    toast({ title: "No data to export", description: "Add at least one entry before exporting.", variant: "destructive" });
+    toast({
+      title: "No data to export",
+      description: "Add at least one entry before exporting.",
+      variant: "destructive",
+    });
     return;
   }
 
@@ -27,13 +29,13 @@ export async function exportVoucherHelper({ formData, activeTab, toast, detailed
   if (detailed) {
     const exportData = validEntries.map((entry: any) => ({
       "Voucher Type": voucherType,
-      "Date": voucherDate,
+      Date: voucherDate,
       "Pay From/Receive In": formData.paymentAccountName || "",
-      "Account": entry.accountName || "",
+      Account: entry.accountName || "",
       "Account Type": entry.accountType || "",
-      "Amount": parseFloat(entry.amount).toFixed(2),
-      "Notes": formData.notes || "",
-      "Optional": formData.optional ? "Yes" : "No",
+      Amount: parseFloat(entry.amount).toFixed(2),
+      Notes: formData.notes || "",
+      Optional: formData.optional ? "Yes" : "No",
     }));
     const worksheet = utils.json_to_sheet(exportData);
     const workbook = utils.book_new();
@@ -42,15 +44,17 @@ export async function exportVoucherHelper({ formData, activeTab, toast, detailed
     await writeFile(workbook, fileName);
     toast({ title: "Export successful", description: `Downloaded ${fileName} with ${validEntries.length} entries.` });
   } else {
-    const exportData = [{
-      "Voucher Type": voucherType,
-      "Date": voucherDate,
-      "Pay From/Receive In": formData.paymentAccountName || "",
-      "Total Amount": total.toFixed(2),
-      "Number of Entries": validEntries.length,
-      "Notes": formData.notes || "",
-      "Optional": formData.optional ? "Yes" : "No",
-    }];
+    const exportData = [
+      {
+        "Voucher Type": voucherType,
+        Date: voucherDate,
+        "Pay From/Receive In": formData.paymentAccountName || "",
+        "Total Amount": total.toFixed(2),
+        "Number of Entries": validEntries.length,
+        Notes: formData.notes || "",
+        Optional: formData.optional ? "Yes" : "No",
+      },
+    ];
     const worksheet = utils.json_to_sheet(exportData);
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, `${voucherType} Summary`);

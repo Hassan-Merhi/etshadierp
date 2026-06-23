@@ -34,22 +34,41 @@ function getFactoryCompanyId(req: any): number | undefined {
 }
 
 /** Write a single daybook entry (factory audit log). */
-async function writeDaybookEntry(dbOrTx: any, opts: {
-  companyId: number; txDate: string; txType: string;
-  referenceId?: number; referenceTable?: string; description: string;
-  metaJson?: string; currencyCode?: string; amountCurrency?: number;
-  fxRateToUsd?: number; amountUsd?: number; createdBy?: number;
-}) {
+async function writeDaybookEntry(
+  dbOrTx: any,
+  opts: {
+    companyId: number;
+    txDate: string;
+    txType: string;
+    referenceId?: number;
+    referenceTable?: string;
+    description: string;
+    metaJson?: string;
+    currencyCode?: string;
+    amountCurrency?: number;
+    fxRateToUsd?: number;
+    amountUsd?: number;
+    createdBy?: number;
+  }
+) {
   const currency = opts.currencyCode || "USD";
   const fxRate = opts.fxRateToUsd || 1;
   const amtCurrency = opts.amountCurrency || 0;
-  const amtUsd = opts.amountUsd !== undefined ? opts.amountUsd : (currency === "USD" ? amtCurrency : amtCurrency * fxRate);
+  const amtUsd =
+    opts.amountUsd !== undefined ? opts.amountUsd : currency === "USD" ? amtCurrency : amtCurrency * fxRate;
   await dbOrTx.insert(factoryDaybookEntries).values({
-    companyId: opts.companyId, txDate: opts.txDate, txType: opts.txType,
-    referenceId: opts.referenceId || null, referenceTable: opts.referenceTable || null,
-    description: opts.description, metaJson: opts.metaJson || null,
-    currencyCode: currency, amountCurrency: String(amtCurrency),
-    fxRateToUsd: String(fxRate), amountUsd: String(amtUsd), createdBy: opts.createdBy || null,
+    companyId: opts.companyId,
+    txDate: opts.txDate,
+    txType: opts.txType,
+    referenceId: opts.referenceId || null,
+    referenceTable: opts.referenceTable || null,
+    description: opts.description,
+    metaJson: opts.metaJson || null,
+    currencyCode: currency,
+    amountCurrency: String(amtCurrency),
+    fxRateToUsd: String(fxRate),
+    amountUsd: String(amtUsd),
+    createdBy: opts.createdBy || null,
   });
 }
 
@@ -90,16 +109,16 @@ const workerUpload = multer({
 
 function computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
   const start = new Date(startStr + "T00:00:00");
-  const end   = new Date(endStr   + "T00:00:00");
+  const end = new Date(endStr + "T00:00:00");
   let total = 0;
   let cur = new Date(start.getFullYear(), start.getMonth(), 1);
   while (cur <= end) {
-    const year  = cur.getFullYear();
+    const year = cur.getFullYear();
     const month = cur.getMonth();
-    const monthLastDay    = new Date(year, month + 1, 0);
+    const monthLastDay = new Date(year, month + 1, 0);
     const daysInThisMonth = monthLastDay.getDate();
     const segStart = new Date(Math.max(cur.getTime(), start.getTime()));
-    const segEnd   = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
+    const segEnd = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
     const daysInSeg = Math.floor((segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     total += salary * (daysInSeg / daysInThisMonth);
     cur = new Date(year, month + 1, 1);
@@ -130,13 +149,13 @@ function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string
   return attendedDays * dailyRate;
 }
 
-
 export function registerPayrollCoreRoutes(app: Express) {
   app.get("/api/factory/cash-accounts", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const accounts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name, code: ledgerAccounts.code })
+      const accounts = await db
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, code: ledgerAccounts.code })
         .from(ledgerAccounts)
         .where(eq(ledgerAccounts.companyId, companyId))
         .orderBy(ledgerAccounts.name);
@@ -151,13 +170,24 @@ export function registerPayrollCoreRoutes(app: Express) {
     try {
       const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const payrolls = await db.select().from(factoryPayrolls)
+      const payrolls = await db
+        .select()
+        .from(factoryPayrolls)
         .where(eq(factoryPayrolls.companyId, companyId))
         .orderBy(desc(factoryPayrolls.periodEnd));
       // Attach worker names
       const workerIds = [...new Set(payrolls.map((p: any) => p.workerId))];
-      const workers = workerIds.length ? await db.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName, employeeCode: factoryWorkers.employeeCode, position: factoryWorkers.position })
-        .from(factoryWorkers).where(inArray(factoryWorkers.id, workerIds)) : [];
+      const workers = workerIds.length
+        ? await db
+            .select({
+              id: factoryWorkers.id,
+              fullName: factoryWorkers.fullName,
+              employeeCode: factoryWorkers.employeeCode,
+              position: factoryWorkers.position,
+            })
+            .from(factoryWorkers)
+            .where(inArray(factoryWorkers.id, workerIds))
+        : [];
       const workerMap = new Map(workers.map((w: any) => [w.id, w]));
       const result = payrolls.map((p: any) => ({ ...p, worker: workerMap.get(p.workerId) || null }));
       res.json(result);
@@ -173,7 +203,9 @@ export function registerPayrollCoreRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const payrolls = await db.select().from(factoryPayrolls)
+      const payrolls = await db
+        .select()
+        .from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.workerId, id), eq(factoryPayrolls.companyId, companyId)))
         .orderBy(desc(factoryPayrolls.periodEnd));
       res.json(payrolls);
@@ -197,24 +229,31 @@ export function registerPayrollCoreRoutes(app: Express) {
 
       let targetWorkers;
       if (workerIds && workerIds.length > 0) {
-        targetWorkers = await db.select().from(factoryWorkers)
+        targetWorkers = await db
+          .select()
+          .from(factoryWorkers)
           .where(and(eq(factoryWorkers.companyId, companyId), inArray(factoryWorkers.id, workerIds)));
       } else {
-        targetWorkers = await db.select().from(factoryWorkers)
+        targetWorkers = await db
+          .select()
+          .from(factoryWorkers)
           .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
       }
 
       // Fetch all attendance records for the period in one query
       const workerIdList = targetWorkers.map((w: any) => w.id);
       const attendanceRecords = workerIdList.length
-        ? await db.select().from(factoryAttendance).where(
-            and(
-              eq(factoryAttendance.companyId, companyId),
-              gte(factoryAttendance.attendanceDate, periodStart),
-              lte(factoryAttendance.attendanceDate, periodEnd),
-              inArray(factoryAttendance.workerId, workerIdList)
+        ? await db
+            .select()
+            .from(factoryAttendance)
+            .where(
+              and(
+                eq(factoryAttendance.companyId, companyId),
+                gte(factoryAttendance.attendanceDate, periodStart),
+                lte(factoryAttendance.attendanceDate, periodEnd),
+                inArray(factoryAttendance.workerId, workerIdList)
+              )
             )
-          )
         : [];
 
       const attendanceByWorker = new Map<number, any[]>();
@@ -225,12 +264,16 @@ export function registerPayrollCoreRoutes(app: Express) {
       }
 
       // Outstanding advances (salary deduction type)
-      const allAdvances = await db.select().from(factoryWorkerAdvances)
-        .where(and(
-          eq(factoryWorkerAdvances.companyId, companyId),
-          eq(factoryWorkerAdvances.fullyPaid, false),
-          eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
-        ))
+      const allAdvances = await db
+        .select()
+        .from(factoryWorkerAdvances)
+        .where(
+          and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            eq(factoryWorkerAdvances.fullyPaid, false),
+            eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
+          )
+        )
         .orderBy(factoryWorkerAdvances.advanceDate);
       const advanceByWorker: Record<number, number> = {};
       const advanceListByWorker: Record<number, typeof allAdvances> = {};
@@ -294,7 +337,9 @@ export function registerPayrollCoreRoutes(app: Express) {
         halfDayDates.sort((a, b) => a.date.localeCompare(b.date));
 
         const workerTransportDefault = parseFloat((worker as any).transportAllowance || "0");
-        const transportOverrideAmt = transportOverrides ? parseFloat(transportOverrides[String(worker.id)] ?? "-1") : -1;
+        const transportOverrideAmt = transportOverrides
+          ? parseFloat(transportOverrides[String(worker.id)] ?? "-1")
+          : -1;
         const transportMonthly = transportOverrideAmt >= 0 ? transportOverrideAmt : workerTransportDefault;
 
         let transport = 0;
@@ -331,7 +376,7 @@ export function registerPayrollCoreRoutes(app: Express) {
           totalAdvanceBalance,
           pendingAdvances,
           net,
-          totalWorkingDays: transportMonthDays,   // full month days — denominator used for proration
+          totalWorkingDays: transportMonthDays, // full month days — denominator used for proration
           presentDays,
           absentDays,
           presentDates,
@@ -351,33 +396,57 @@ export function registerPayrollCoreRoutes(app: Express) {
     try {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { workerIds, periodStart, periodEnd, daysCount, bonusPerWorker, cashAccountId, notes, advanceOverrides, transportOverrides } = req.body;
+      const {
+        workerIds,
+        periodStart,
+        periodEnd,
+        daysCount,
+        bonusPerWorker,
+        cashAccountId,
+        notes,
+        advanceOverrides,
+        transportOverrides,
+      } = req.body;
       if (!periodStart || !periodEnd) return res.status(400).json({ message: "Period dates required" });
       // advanceOverrides: { [workerId: string]: number } — user-approved deduction per worker
 
-      const days = daysCount ? parseInt(daysCount) : Math.floor((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const days = daysCount
+        ? parseInt(daysCount)
+        : Math.floor((new Date(periodEnd).getTime() - new Date(periodStart).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       const bonus = parseFloat(bonusPerWorker || "0");
 
       let targetWorkers;
       if (workerIds && workerIds.length > 0) {
-        targetWorkers = await db.select().from(factoryWorkers).where(and(eq(factoryWorkers.companyId, companyId), inArray(factoryWorkers.id, workerIds)));
+        targetWorkers = await db
+          .select()
+          .from(factoryWorkers)
+          .where(and(eq(factoryWorkers.companyId, companyId), inArray(factoryWorkers.id, workerIds)));
       } else {
-        targetWorkers = await db.select().from(factoryWorkers).where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
+        targetWorkers = await db
+          .select()
+          .from(factoryWorkers)
+          .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
       }
 
-      const daysInMonth = (d: string) => { const dt = new Date(d); return new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate(); };
+      const daysInMonth = (d: string) => {
+        const dt = new Date(d);
+        return new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
+      };
 
       // Fetch all attendance records for the period (for monthly attendance-based calculation)
       const workerIdList = targetWorkers.map((w: any) => w.id);
       const attendanceRecords = workerIdList.length
-        ? await db.select().from(factoryAttendance).where(
-            and(
-              eq(factoryAttendance.companyId, companyId),
-              gte(factoryAttendance.attendanceDate, periodStart),
-              lte(factoryAttendance.attendanceDate, periodEnd),
-              inArray(factoryAttendance.workerId, workerIdList)
+        ? await db
+            .select()
+            .from(factoryAttendance)
+            .where(
+              and(
+                eq(factoryAttendance.companyId, companyId),
+                gte(factoryAttendance.attendanceDate, periodStart),
+                lte(factoryAttendance.attendanceDate, periodEnd),
+                inArray(factoryAttendance.workerId, workerIdList)
+              )
             )
-          )
         : [];
       const attendanceByWorker = new Map<number, any[]>();
       for (const att of attendanceRecords) {
@@ -386,15 +455,25 @@ export function registerPayrollCoreRoutes(app: Express) {
         attendanceByWorker.set(att.workerId, list);
       }
 
-      const allOutstandingAdvances = await db.select().from(factoryWorkerAdvances)
-        .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false), eq(factoryWorkerAdvances.repaymentType, "salary_deduction")));
+      const allOutstandingAdvances = await db
+        .select()
+        .from(factoryWorkerAdvances)
+        .where(
+          and(
+            eq(factoryWorkerAdvances.companyId, companyId),
+            eq(factoryWorkerAdvances.fullyPaid, false),
+            eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
+          )
+        );
       const advanceByWorker: Record<number, number> = {};
       for (const adv of allOutstandingAdvances) {
         advanceByWorker[adv.workerId] = (advanceByWorker[adv.workerId] || 0) + parseFloat(adv.remainingBalance || "0");
       }
 
       // Fetch pending (unapplied) deductions per worker
-      const allPendingDeductions = await db.select().from(factoryWorkerDeductions)
+      const allPendingDeductions = await db
+        .select()
+        .from(factoryWorkerDeductions)
         .where(and(eq(factoryWorkerDeductions.companyId, companyId), eq(factoryWorkerDeductions.applied, false)));
       const deductionByWorker: Record<number, number[]> = {};
       for (const ded of allPendingDeductions) {
@@ -422,7 +501,8 @@ export function registerPayrollCoreRoutes(app: Express) {
           const freq = (worker as any).payFrequency || worker.salaryType || "Monthly";
           let base = 0;
           if (freq === "Weekly") base = (days / 7) * parseFloat((worker as any).weeklySalary || baseSal.toString());
-          else if (freq === "Bi-Weekly") base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
+          else if (freq === "Bi-Weekly")
+            base = (days / 14) * parseFloat((worker as any).biWeeklySalary || baseSal.toString());
           else if (freq === "Daily" || worker.salaryType === "Daily") base = days * baseSal;
           else {
             // Monthly: use attendance-based calculation if records exist
@@ -445,7 +525,9 @@ export function registerPayrollCoreRoutes(app: Express) {
 
           const monthDaysForTransport = daysInMonth(periodStart);
           const workerTransportDefault2 = parseFloat((worker as any).transportAllowance || "0");
-          const transportOverrideAmt2 = transportOverrides ? parseFloat(transportOverrides[String(worker.id)] ?? "-1") : -1;
+          const transportOverrideAmt2 = transportOverrides
+            ? parseFloat(transportOverrides[String(worker.id)] ?? "-1")
+            : -1;
           const transportMonthly2 = transportOverrideAmt2 >= 0 ? transportOverrideAmt2 : workerTransportDefault2;
           let transport = 0;
           if (transportMonthly2 > 0) {
@@ -459,26 +541,41 @@ export function registerPayrollCoreRoutes(app: Express) {
           const workerAdvanceBalance = advanceByWorker[worker.id] || 0;
           // Use user-approved override if provided, otherwise auto-deduct full balance
           const overrideAmt = advanceOverrides ? parseFloat(advanceOverrides[String(worker.id)] ?? "-1") : -1;
-          const advanceDeduction = overrideAmt >= 0
-            ? Math.min(overrideAmt, base + bonus + transport, workerAdvanceBalance)
-            : Math.min(workerAdvanceBalance, base + bonus + transport);
+          const advanceDeduction =
+            overrideAmt >= 0
+              ? Math.min(overrideAmt, base + bonus + transport, workerAdvanceBalance)
+              : Math.min(workerAdvanceBalance, base + bonus + transport);
           // Include pending worker deductions
           const workerPendingDeductions = deductionAmtByWorker[worker.id] || 0;
           const net = base + bonus + transport - advanceDeduction - workerPendingDeductions;
-          const [newPayroll] = await tx.insert(factoryPayrolls).values({
-            companyId, workerId: worker.id, periodStart, periodEnd,
-            baseSalary: base.toFixed(2), bonuses: bonus.toFixed(2),
-            transport: transport.toFixed(2),
-            baleEarnings: "0", kgEarnings: "0", overtimePay: "0",
-            deductions: workerPendingDeductions.toFixed(2),
-            advances: advanceDeduction.toFixed(2),
-            netSalary: net.toFixed(2), balesCount: 0, kgProcessed: "0", overtimeHours: "0",
-            status: "DRAFT", notes: notes || null,
-            cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
-          } as any).returning({ id: factoryPayrolls.id });
+          const [newPayroll] = await tx
+            .insert(factoryPayrolls)
+            .values({
+              companyId,
+              workerId: worker.id,
+              periodStart,
+              periodEnd,
+              baseSalary: base.toFixed(2),
+              bonuses: bonus.toFixed(2),
+              transport: transport.toFixed(2),
+              baleEarnings: "0",
+              kgEarnings: "0",
+              overtimePay: "0",
+              deductions: workerPendingDeductions.toFixed(2),
+              advances: advanceDeduction.toFixed(2),
+              netSalary: net.toFixed(2),
+              balesCount: 0,
+              kgProcessed: "0",
+              overtimeHours: "0",
+              status: "DRAFT",
+              notes: notes || null,
+              cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
+            } as any)
+            .returning({ id: factoryPayrolls.id });
           // Mark pending deductions as applied
           if (deductionByWorker[worker.id]?.length) {
-            await tx.update(factoryWorkerDeductions)
+            await tx
+              .update(factoryWorkerDeductions)
               .set({ applied: true, payrollId: newPayroll.id } as any)
               .where(inArray(factoryWorkerDeductions.id, deductionByWorker[worker.id]));
           }
@@ -493,25 +590,46 @@ export function registerPayrollCoreRoutes(app: Express) {
         if (totalGross > 0) {
           const payableAcc = payableAccGen;
           const desc = `Payroll expense: ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`;
-          const [genVoucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherNumber: `PAYROLL-GEN-${Date.now()}`,
-            voucherType: "Journal",
-            voucherDate: periodStart,
-            description: desc,
-            totalAmount: totalGross.toFixed(2),
-            currency: "USD",
-            sourceModule: "FACTORY",
-          }).returning();
+          const [genVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherNumber: `PAYROLL-GEN-${Date.now()}`,
+              voucherType: "Journal",
+              voucherDate: periodStart,
+              description: desc,
+              totalAmount: totalGross.toFixed(2),
+              currency: "USD",
+              sourceModule: "FACTORY",
+            })
+            .returning();
           const journalEntries: any[] = [
-            { voucherId: genVoucher.id, ledgerAccountId: expenseAcc.id, debitAmount: totalGross.toFixed(2), creditAmount: "0", narration: desc },
+            {
+              voucherId: genVoucher.id,
+              ledgerAccountId: expenseAcc.id,
+              debitAmount: totalGross.toFixed(2),
+              creditAmount: "0",
+              narration: desc,
+            },
           ];
           if (totalNet > 0) {
-            journalEntries.push({ voucherId: genVoucher.id, ledgerAccountId: payableAcc.id, debitAmount: "0", creditAmount: totalNet.toFixed(2), narration: desc });
+            journalEntries.push({
+              voucherId: genVoucher.id,
+              ledgerAccountId: payableAcc.id,
+              debitAmount: "0",
+              creditAmount: totalNet.toFixed(2),
+              narration: desc,
+            });
           }
           // Credit Factory Worker Advances to reduce the asset as deductions are settled
           if (totalAdvanceDeductions > 0) {
-            journalEntries.push({ voucherId: genVoucher.id, ledgerAccountId: advancesAccGen.id, debitAmount: "0", creditAmount: totalAdvanceDeductions.toFixed(2), narration: `Advance deductions settled - ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})` });
+            journalEntries.push({
+              voucherId: genVoucher.id,
+              ledgerAccountId: advancesAccGen.id,
+              debitAmount: "0",
+              creditAmount: totalAdvanceDeductions.toFixed(2),
+              narration: `Advance deductions settled - ${count} worker${count !== 1 ? "s" : ""} (${periodStart} – ${periodEnd})`,
+            });
           }
           await tx.insert(voucherEntries).values(journalEntries);
         }
@@ -539,17 +657,23 @@ export function registerPayrollCoreRoutes(app: Express) {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [payroll] = await db.select().from(factoryPayrolls)
+      const [payroll] = await db
+        .select()
+        .from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
       if (!payroll) return res.status(404).json({ message: "Payroll not found" });
 
-      const attendanceRows = await db.select().from(factoryAttendance)
-        .where(and(
-          eq(factoryAttendance.companyId, companyId),
-          eq(factoryAttendance.workerId, payroll.workerId),
-          gte(factoryAttendance.attendanceDate, payroll.periodStart),
-          lte(factoryAttendance.attendanceDate, payroll.periodEnd),
-        ))
+      const attendanceRows = await db
+        .select()
+        .from(factoryAttendance)
+        .where(
+          and(
+            eq(factoryAttendance.companyId, companyId),
+            eq(factoryAttendance.workerId, payroll.workerId),
+            gte(factoryAttendance.attendanceDate, payroll.periodStart),
+            lte(factoryAttendance.attendanceDate, payroll.periodEnd)
+          )
+        )
         .orderBy(factoryAttendance.attendanceDate);
 
       res.json({ payroll, attendance: attendanceRows });
@@ -574,14 +698,17 @@ export function registerPayrollCoreRoutes(app: Express) {
         : null;
 
       const updated = await db.transaction(async (tx: any) => {
-        const [payroll] = await tx.update(factoryPayrolls)
+        const [payroll] = await tx
+          .update(factoryPayrolls)
           .set({ status: "PAID", paidAt: new Date(paymentDate), cashAccountId } as any)
           .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)))
           .returning();
         if (!payroll) throw new Error("Payroll record not found");
 
-        const [prWorker] = await tx.select({ fullName: factoryWorkers.fullName })
-          .from(factoryWorkers).where(eq(factoryWorkers.id, payroll.workerId));
+        const [prWorker] = await tx
+          .select({ fullName: factoryWorkers.fullName })
+          .from(factoryWorkers)
+          .where(eq(factoryWorkers.id, payroll.workerId));
         const workerName = prWorker?.fullName?.trim() || `Worker #${payroll.workerId}`;
         const prToday = paymentDate;
 
@@ -592,16 +719,19 @@ export function registerPayrollCoreRoutes(app: Express) {
           const netAmt = parseFloat(payroll.netSalary || "0");
           const narration = `Payroll payment: ${workerName} (${payroll.periodStart} – ${payroll.periodEnd})`;
 
-          const [pVoucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherNumber: `PAYMENT-PAY-${payroll.id}-${Date.now()}`,
-            voucherType: "Payment",
-            voucherDate: prToday,
-            description: narration,
-            totalAmount: netAmt.toFixed(2),
-            currency: "USD",
-            sourceModule: "FACTORY",
-          }).returning();
+          const [pVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherNumber: `PAYMENT-PAY-${payroll.id}-${Date.now()}`,
+              voucherType: "Payment",
+              voucherDate: prToday,
+              description: narration,
+              totalAmount: netAmt.toFixed(2),
+              currency: "USD",
+              sourceModule: "FACTORY",
+            })
+            .returning();
 
           await tx.insert(voucherEntries).values([
             {
@@ -651,38 +781,47 @@ export function registerPayrollCoreRoutes(app: Express) {
       const cashAccountId = req.body.cashAccountId ? parseInt(req.body.cashAccountId) : null;
       if (!cashAccountId) return res.status(400).json({ message: "cashAccountId is required" });
 
-      const [payroll] = await db.select().from(factoryPayrolls)
+      const [payroll] = await db
+        .select()
+        .from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
       if (!payroll) return res.status(404).json({ message: "Payroll not found" });
-      if (!["PAID", "APPROVED"].includes(payroll.status)) return res.status(400).json({ message: "Payroll must be in PAID or APPROVED status" });
-      if (payroll.cashAccountId) return res.status(400).json({ message: "Accounting entry already exists for this payroll" });
+      if (!["PAID", "APPROVED"].includes(payroll.status))
+        return res.status(400).json({ message: "Payroll must be in PAID or APPROVED status" });
+      if (payroll.cashAccountId)
+        return res.status(400).json({ message: "Accounting entry already exists for this payroll" });
 
-      const [cashAcc] = await db.select().from(ledgerAccounts)
+      const [cashAcc] = await db
+        .select()
+        .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, companyId)));
       if (!cashAcc) return res.status(400).json({ message: "Cash account not found" });
 
       const payableAcc = await findOrCreateLedger(companyId, "Payroll Payable", "Liability");
 
-      const [prWorker] = await db.select({ fullName: factoryWorkers.fullName })
-        .from(factoryWorkers).where(eq(factoryWorkers.id, payroll.workerId));
+      const [prWorker] = await db
+        .select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers)
+        .where(eq(factoryWorkers.id, payroll.workerId));
       const workerName = prWorker?.fullName?.trim() || `Worker #${payroll.workerId}`;
-      const paidDate = payroll.paidAt
-        ? new Date(payroll.paidAt).toISOString().split("T")[0]
-        : getClientDate(req);
+      const paidDate = payroll.paidAt ? new Date(payroll.paidAt).toISOString().split("T")[0] : getClientDate(req);
 
       const netAmt = parseFloat(payroll.netSalary || "0");
       const narration = `Payroll payment (backdated): ${workerName} (${payroll.periodStart} – ${payroll.periodEnd})`;
 
-      const [pVoucher] = await db.insert(vouchers).values({
-        companyId,
-        voucherNumber: `PAYMENT-PAY-${payroll.id}-${Date.now()}`,
-        voucherType: "Payment",
-        voucherDate: paidDate,
-        description: narration,
-        totalAmount: netAmt.toFixed(2),
-        currency: "USD",
-        sourceModule: "FACTORY",
-      }).returning();
+      const [pVoucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId,
+          voucherNumber: `PAYMENT-PAY-${payroll.id}-${Date.now()}`,
+          voucherType: "Payment",
+          voucherDate: paidDate,
+          description: narration,
+          totalAmount: netAmt.toFixed(2),
+          currency: "USD",
+          sourceModule: "FACTORY",
+        })
+        .returning();
 
       await db.insert(voucherEntries).values([
         {
@@ -702,7 +841,9 @@ export function registerPayrollCoreRoutes(app: Express) {
       ]);
 
       // Update payroll to record which account was used
-      await db.update(factoryPayrolls).set({ cashAccountId } as any)
+      await db
+        .update(factoryPayrolls)
+        .set({ cashAccountId } as any)
         .where(eq(factoryPayrolls.id, id));
 
       res.json({ message: "Accounting entry generated", voucherId: pVoucher.id });
@@ -713,13 +854,17 @@ export function registerPayrollCoreRoutes(app: Express) {
 
   async function settleAdvancesForPayroll(tx: any, companyId: number, workerId: number, advanceAmount: number) {
     if (advanceAmount <= 0) return;
-    const outstanding = await tx.select().from(factoryWorkerAdvances)
-      .where(and(
-        eq(factoryWorkerAdvances.companyId, companyId),
-        eq(factoryWorkerAdvances.workerId, workerId),
-        eq(factoryWorkerAdvances.fullyPaid, false),
-        eq(factoryWorkerAdvances.repaymentType, "salary_deduction"),
-      ))
+    const outstanding = await tx
+      .select()
+      .from(factoryWorkerAdvances)
+      .where(
+        and(
+          eq(factoryWorkerAdvances.companyId, companyId),
+          eq(factoryWorkerAdvances.workerId, workerId),
+          eq(factoryWorkerAdvances.fullyPaid, false),
+          eq(factoryWorkerAdvances.repaymentType, "salary_deduction")
+        )
+      )
       .orderBy(factoryWorkerAdvances.advanceDate);
     let remaining = advanceAmount;
     for (const adv of outstanding) {
@@ -727,10 +872,13 @@ export function registerPayrollCoreRoutes(app: Express) {
       const bal = parseFloat(adv.remainingBalance || "0");
       const reduce = Math.min(bal, remaining);
       const newBal = bal - reduce;
-      await tx.update(factoryWorkerAdvances).set({
-        remainingBalance: newBal.toFixed(2),
-        fullyPaid: newBal <= 0,
-      }).where(eq(factoryWorkerAdvances.id, adv.id));
+      await tx
+        .update(factoryWorkerAdvances)
+        .set({
+          remainingBalance: newBal.toFixed(2),
+          fullyPaid: newBal <= 0,
+        })
+        .where(eq(factoryWorkerAdvances.id, adv.id));
       remaining -= reduce;
     }
   }
@@ -746,24 +894,25 @@ export function registerPayrollCoreRoutes(app: Express) {
       const bulkPrToday = req.body.paymentDate || getClientDate(req);
 
       // Pre-resolve ledger OUTSIDE the transaction to prevent concurrent insert conflicts
-      const payableAccBulk = cashId
-        ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability")
-        : null;
+      const payableAccBulk = cashId ? await findOrCreateLedger(companyId, "Payroll Payable", "Liability") : null;
 
       await db.transaction(async (tx: any) => {
-        const payrollsToMark = await tx.select().from(factoryPayrolls)
+        const payrollsToMark = await tx
+          .select()
+          .from(factoryPayrolls)
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
 
-        await tx.update(factoryPayrolls)
+        await tx
+          .update(factoryPayrolls)
           .set({ status: "PAID", paidAt: new Date(bulkPrToday), cashAccountId: cashId } as any)
           .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
-
 
         // Accounting: Dr Payroll Payable / Cr Cash (settling liability created at run time)
         const payableAcc = payableAccBulk;
 
         const workerIds = [...new Set(payrollsToMark.map((p: any) => p.workerId))];
-        const workerRows = await tx.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+        const workerRows = await tx
+          .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
           .from(factoryWorkers)
           .where(inArray(factoryWorkers.id, workerIds));
         const workerMap = new Map(workerRows.map((w: any) => [w.id, w.fullName]));
@@ -774,16 +923,19 @@ export function registerPayrollCoreRoutes(app: Express) {
             const workerName = (workerMap.get(pr.workerId) as string)?.trim() || `Worker #${pr.workerId}`;
             const narration = `Payroll payment: ${workerName} (${pr.periodStart} – ${pr.periodEnd})`;
 
-            const [pVoucher] = await tx.insert(vouchers).values({
-              companyId,
-              voucherNumber: `PAYMENT-PAY-${pr.id}-${Date.now()}`,
-              voucherType: "Payment",
-              voucherDate: bulkPrToday,
-              description: narration,
-              totalAmount: netAmt.toFixed(2),
-              currency: "USD",
-              sourceModule: "FACTORY",
-            }).returning();
+            const [pVoucher] = await tx
+              .insert(vouchers)
+              .values({
+                companyId,
+                voucherNumber: `PAYMENT-PAY-${pr.id}-${Date.now()}`,
+                voucherType: "Payment",
+                voucherDate: bulkPrToday,
+                description: narration,
+                totalAmount: netAmt.toFixed(2),
+                currency: "USD",
+                sourceModule: "FACTORY",
+              })
+              .returning();
 
             await tx.insert(voucherEntries).values([
               {
@@ -826,17 +978,20 @@ export function registerPayrollCoreRoutes(app: Express) {
       const { payrollIds } = req.body;
       if (!payrollIds?.length) return res.status(400).json({ message: "payrollIds required" });
 
-      const payrollRows = await db.select().from(factoryPayrolls)
+      const payrollRows = await db
+        .select()
+        .from(factoryPayrolls)
         .where(and(eq(factoryPayrolls.companyId, companyId), inArray(factoryPayrolls.id, payrollIds)));
       if (!payrollRows.length) return res.status(404).json({ message: "No payroll records found" });
 
       const workerIdList = [...new Set(payrollRows.map((p: any) => p.workerId))];
-      const workerRows = await db.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
-        .from(factoryWorkers).where(inArray(factoryWorkers.id, workerIdList));
+      const workerRows = await db
+        .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+        .from(factoryWorkers)
+        .where(inArray(factoryWorkers.id, workerIdList));
       const workerMap = new Map(workerRows.map((w: any) => [w.id, w.fullName]));
 
-      const [companyRow] = await db.select({ name: companies.name })
-        .from(companies).where(eq(companies.id, companyId));
+      const [companyRow] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId));
       const companyName = companyRow?.name || "Company";
 
       const PDFDocument = (await import("pdfkit")).default;
@@ -861,7 +1016,10 @@ export function registerPayrollCoreRoutes(app: Express) {
 
       // Arabic reshaping helpers
       let psumConvertArabic: ((t: string) => string) | null = null;
-      let psumBidi: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
+      let psumBidi: {
+        getEmbeddingLevels: (t: string, d: string) => any;
+        getReorderedString: (t: string, l: any) => string;
+      } | null = null;
       try {
         psumConvertArabic = (require("arabic-reshaper") as any).convertArabic;
         psumBidi = (require("bidi-js") as any)();
@@ -877,30 +1035,46 @@ export function registerPayrollCoreRoutes(app: Express) {
             return psumBidi.getReorderedString(reshaped, levels);
           }
           return reshaped;
-        } catch { return text; }
+        } catch {
+          return text;
+        }
       };
 
       // Render text with automatic Arabic/Unicode font switching
-      const psumRenderText = (text: string, x: number, yPos: number, w: number, align: "left" | "right" | "center", size = 8) => {
+      const psumRenderText = (
+        text: string,
+        x: number,
+        yPos: number,
+        w: number,
+        align: "left" | "right" | "center",
+        size = 8
+      ) => {
         const hasAr = psumHasArabicFont && psumContainsArabic(text);
-        doc.font(hasAr ? "Arabic" : "Helvetica").fontSize(size)
+        doc
+          .font(hasAr ? "Arabic" : "Helvetica")
+          .fontSize(size)
           .text(hasAr ? psumShapeText(text) : text, x, yPos, { width: w, align: hasAr ? "right" : align });
       };
 
       // Header logo
       const hmdLogoPathPay = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(hmdLogoPathPay)) {
-        try { doc.image(hmdLogoPathPay, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.5); } catch {}
+        try {
+          doc.image(hmdLogoPathPay, (doc.page.width - 220) / 2, doc.y, { width: 220 });
+          doc.moveDown(0.5);
+        } catch {}
       }
       doc.fontSize(10).font("Helvetica").text("Payment Summary", { align: "center" });
       doc.moveDown(0.3);
-      doc.fontSize(8).fillColor("#666666")
-        .text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
+      doc.fontSize(8).fillColor("#666666").text(`Generated: ${new Date().toLocaleDateString()}`, { align: "center" });
       doc.moveDown(0.8);
 
       // Period range
       const periods = [...new Set(payrollRows.map((p: any) => `${p.periodStart} – ${p.periodEnd}`))];
-      doc.fontSize(8).fillColor("#333333").text(`Period: ${periods.join(", ")}`);
+      doc
+        .fontSize(8)
+        .fillColor("#333333")
+        .text(`Period: ${periods.join(", ")}`);
       doc.moveDown(0.5);
 
       // Table layout — 5 columns: Name | Present | Absent | Amount | Signature
@@ -936,14 +1110,28 @@ export function registerPayrollCoreRoutes(app: Express) {
         psumRenderText(name, COL.name, y + 6, COL_W.name, "left");
 
         doc.font("Helvetica").fontSize(8);
-        doc.text(typeof present === "number" ? (present % 1 === 0 ? present.toFixed(0) : present.toFixed(1)) : "—", COL.present, y + 6, { width: COL_W.present, align: "center" });
-        doc.text(typeof absent === "number" ? (absent % 1 === 0 ? absent.toFixed(0) : absent.toFixed(1)) : "—", COL.absent, y + 6, { width: COL_W.absent, align: "center" });
+        doc.text(
+          typeof present === "number" ? (present % 1 === 0 ? present.toFixed(0) : present.toFixed(1)) : "—",
+          COL.present,
+          y + 6,
+          { width: COL_W.present, align: "center" }
+        );
+        doc.text(
+          typeof absent === "number" ? (absent % 1 === 0 ? absent.toFixed(0) : absent.toFixed(1)) : "—",
+          COL.absent,
+          y + 6,
+          { width: COL_W.absent, align: "center" }
+        );
         doc.text(net.toFixed(2), COL.amount, y + 6, { width: COL_W.amount, align: "right" });
 
         // Signature box — a horizontal line for the worker to sign
         const sigLineY = y + rowH - 5;
-        doc.moveTo(COL.signature + 8, sigLineY).lineTo(COL.signature + COL_W.signature - 8, sigLineY)
-          .strokeColor("#aaaaaa").lineWidth(0.5).stroke();
+        doc
+          .moveTo(COL.signature + 8, sigLineY)
+          .lineTo(COL.signature + COL_W.signature - 8, sigLineY)
+          .strokeColor("#aaaaaa")
+          .lineWidth(0.5)
+          .stroke();
 
         y += rowH;
       });

@@ -1,18 +1,18 @@
-import ExcelJS from 'exceljs';
-import path from 'path';
-import fs from 'fs';
-import { db } from '../db';
-import { sql } from 'drizzle-orm';
+import ExcelJS from "exceljs";
+import path from "path";
+import fs from "fs";
+import { db } from "../db";
+import { sql } from "drizzle-orm";
 
 // ── Public interface ──────────────────────────────────────────────────────────
 
 export interface SpSalesFormParams {
   companyId: number;
-  fromDate: string;      // YYYY-MM-DD
-  toDate: string;        // YYYY-MM-DD
+  fromDate: string; // YYYY-MM-DD
+  toDate: string; // YYYY-MM-DD
   supplierName?: string;
   locationName?: string; // kept for API compat / filename use
-  locationId?: number;   // kept for API compat but ignored
+  locationId?: number; // kept for API compat but ignored
 }
 
 // ── Internal types ────────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ interface DaySales {
 // ── Pure helpers ──────────────────────────────────────────────────────────────
 
 function pn(v: unknown): number {
-  const n = parseFloat(String(v ?? '0'));
+  const n = parseFloat(String(v ?? "0"));
   return isNaN(n) ? 0 : n;
 }
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -35,7 +35,7 @@ const r3 = (n: number) => Math.round((n + Number.EPSILON) * 1000) / 1000;
 
 /** YYYY-MM-DD → UTC midnight Date */
 function toUtcDate(s: string): Date {
-  const [y, m, d] = s.split('-').map(Number);
+  const [y, m, d] = s.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d));
 }
 
@@ -56,36 +56,36 @@ function dateStr(d: Date): string {
  */
 function isFormula(cell: ExcelJS.Cell): boolean {
   if (cell.value === null || cell.value === undefined) return false;
-  if (typeof cell.value !== 'object') return false;
+  if (typeof cell.value !== "object") return false;
   const v = cell.value as Record<string, unknown>;
-  return 'formula' in v || 'sharedFormula' in v;
+  return "formula" in v || "sharedFormula" in v;
 }
 
 // ── Template column / row constants ──────────────────────────────────────────
 
 // ENTRY sheet
-const E_DATE_ROW   = 3;
+const E_DATE_ROW = 3;
 const E_DATA_START = 5;
-const E_DATA_END   = 128;
-const E_NAME_COL   = 3;   // C – display name (matches article_code / canonical stock code)
-const E_CODE_COL   = 4;   // D – optional system code override
-const E_DATE_START = 7;   // G – first date block
+const E_DATA_END = 128;
+const E_NAME_COL = 3; // C – display name (matches article_code / canonical stock code)
+const E_CODE_COL = 4; // D – optional system code override
+const E_DATE_START = 7; // G – first date block
 // Pattern per day d: baseCol = E_DATE_START + d*3
 //   baseCol   = Qty          (plain)
 //   baseCol+1 = Sale Price   (plain)
 //   baseCol+2 = Profit/Bag   (formula in template – we always overwrite with computed value)
 
 // Costing sheet
-const C_NAME_COL = 4;   // D – item name (same as ENTRY col C)
-const C_QTY_COL  = 5;   // E – On Hand qty  (opening stock)
-const C_AVG_COL  = 7;   // G – Avg Cost (formula =H/E – we write 0 when qty=0 to prevent #DIV/0!)
-const C_VAL_COL  = 8;   // H – Asset value  (opening value)
+const C_NAME_COL = 4; // D – item name (same as ENTRY col C)
+const C_QTY_COL = 5; // E – On Hand qty  (opening stock)
+const C_AVG_COL = 7; // G – Avg Cost (formula =H/E – we write 0 when qty=0 to prevent #DIV/0!)
+const C_VAL_COL = 8; // H – Asset value  (opening value)
 
 // Sales sheet
-const S_DATE_ROW   = 1;
+const S_DATE_ROW = 1;
 const S_DATA_START = 2;
-const S_NAME_COL   = 3;   // C – item name
-const S_DATE_START = 6;   // F – first date column
+const S_NAME_COL = 3; // C – item name
+const S_DATE_START = 6; // F – first date column
 // The Sales date row is a mix: F1 is plain, G1–L1 are formulas (=F1+1 chain),
 // then further cols (13, 14 … 36) revert to plain values in the template.
 // We must write ALL plain cells in row 1, not just F1.
@@ -95,22 +95,19 @@ const S_DATE_START = 6;   // F – first date column
 export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promise<Buffer> {
   const { companyId, fromDate, toDate } = params;
 
-  const templatePath = path.join(
-    process.cwd(), 'server', 'templates', 'supplier_partner_sales_form_template.xlsx'
-  );
+  const templatePath = path.join(process.cwd(), "server", "templates", "supplier_partner_sales_form_template.xlsx");
   if (!fs.existsSync(templatePath)) {
-    throw new Error('Template not found: server/templates/supplier_partner_sales_form_template.xlsx');
+    throw new Error("Template not found: server/templates/supplier_partner_sales_form_template.xlsx");
   }
 
   // ── Build date list ────────────────────────────────────────────────────────
   const startDate = toUtcDate(fromDate);
-  const endDate   = toUtcDate(toDate);
-  const dayCount  = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
+  const endDate = toUtcDate(toDate);
+  const dayCount = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1);
   const dates: string[] = Array.from({ length: dayCount }, (_, i) => dateStr(addDays(startDate, i)));
 
   // ── DB queries ─────────────────────────────────────────────────────────────
   const [salesRes, openingRes] = await Promise.all([
-
     // ── Query 1: daily SP sales within the export range ─────────────────────
     // • article_code normalized via stock_item_code_aliases → stock_items.code
     // • per-qty deduction: sp_sale_lines.movement_id → sp_stock_movements.location_id
@@ -186,7 +183,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     `),
   ]);
 
-  const salesRows   = (salesRes   as any).rows ?? (salesRes   as any[]);
+  const salesRows = (salesRes as any).rows ?? (salesRes as any[]);
   const openingRows = (openingRes as any).rows ?? (openingRes as any[]);
 
   // ── Build in-memory data structures ──────────────────────────────────────
@@ -194,16 +191,16 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   // salesMap: resolvedItemCode → dateStr → DaySales
   const salesMap = new Map<string, Map<string, DaySales>>();
   for (const r of salesRows) {
-    const code = String(r.item_code ?? '').trim();
+    const code = String(r.item_code ?? "").trim();
     if (!code) continue;
     if (!salesMap.has(code)) salesMap.set(code, new Map());
-    const dm  = salesMap.get(code)!;
+    const dm = salesMap.get(code)!;
     const key = String(r.sale_date).slice(0, 10);
     const prev = dm.get(key) ?? { qty: 0, totalSales: 0, totalCost: 0, totalDeduction: 0 };
     dm.set(key, {
-      qty:            prev.qty            + pn(r.qty),
-      totalSales:     prev.totalSales     + pn(r.total_sales),
-      totalCost:      prev.totalCost      + pn(r.total_cost),
+      qty: prev.qty + pn(r.qty),
+      totalSales: prev.totalSales + pn(r.total_sales),
+      totalCost: prev.totalCost + pn(r.total_cost),
       totalDeduction: prev.totalDeduction + pn(r.total_deduction),
     });
   }
@@ -212,16 +209,14 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   const openingMap = new Map<string, { qty: number; avgCost: number }>();
   for (const r of openingRows) {
     openingMap.set(String(r.item_code).trim(), {
-      qty:     pn(r.qty),
+      qty: pn(r.qty),
       avgCost: pn(r.avg_cost),
     });
   }
 
   /** Opening stock — try displayName first, then systemCode fallback. */
   const getOpening = (displayName: string, systemCode: string) =>
-    openingMap.get(displayName) ??
-    openingMap.get(systemCode) ??
-    { qty: 0, avgCost: 0 };
+    openingMap.get(displayName) ?? openingMap.get(systemCode) ?? { qty: 0, avgCost: 0 };
 
   /** DaySales map — try displayName first, then systemCode fallback. */
   const getSalesMap = (displayName: string, systemCode: string) =>
@@ -232,34 +227,32 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   await wb.xlsx.readFile(templatePath);
   wb.calcProperties.fullCalcOnLoad = true;
 
-  const entryWs    = wb.getWorksheet('ENTRY');
-  const costingWs  = wb.getWorksheet('Costing');
-  const salesWs    = wb.getWorksheet('Sales');
-  const ageingWs   = wb.getWorksheet('Ageing');
-  const summaryIWs = wb.getWorksheet('Summary-Itemwise');
+  const entryWs = wb.getWorksheet("ENTRY");
+  const costingWs = wb.getWorksheet("Costing");
+  const salesWs = wb.getWorksheet("Sales");
+  const ageingWs = wb.getWorksheet("Ageing");
+  const summaryIWs = wb.getWorksheet("Summary-Itemwise");
 
-  if (!entryWs || !costingWs) throw new Error('ENTRY or Costing sheet missing from template');
+  if (!entryWs || !costingWs) throw new Error("ENTRY or Costing sheet missing from template");
 
   // ── Scan ENTRY rows 5-128: build name → systemCode + row-number maps ───────
   const nameToSystemCode = new Map<string, string>();
-  const itemRows          = new Map<string, number>();
+  const itemRows = new Map<string, number>();
 
   for (let r = E_DATA_START; r <= E_DATA_END; r++) {
-    const row      = entryWs.getRow(r);
+    const row = entryWs.getRow(r);
     const nameCell = row.getCell(E_NAME_COL).value;
     const codeCell = row.getCell(E_CODE_COL).value;
 
-    const rawName = typeof nameCell === 'string'
-      ? nameCell.trim()
-      : typeof (nameCell as any)?.result === 'string'
-        ? (nameCell as any).result.trim()
-        : '';
-    if (!rawName || rawName.startsWith('Total ')) continue;
+    const rawName =
+      typeof nameCell === "string"
+        ? nameCell.trim()
+        : typeof (nameCell as any)?.result === "string"
+          ? (nameCell as any).result.trim()
+          : "";
+    if (!rawName || rawName.startsWith("Total ")) continue;
 
-    const systemCode =
-      typeof codeCell === 'string' && codeCell.trim()
-        ? codeCell.trim()
-        : rawName;
+    const systemCode = typeof codeCell === "string" && codeCell.trim() ? codeCell.trim() : rawName;
 
     nameToSystemCode.set(rawName, systemCode);
     itemRows.set(rawName, r);
@@ -274,28 +267,29 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   // replaces the formula entirely so Excel shows 0 instead of the error.
   const costingLastRow = costingWs.rowCount;
   for (let r = 2; r <= costingLastRow; r++) {
-    const row     = costingWs.getRow(r);
+    const row = costingWs.getRow(r);
     const nameRaw = row.getCell(C_NAME_COL).value;
-    const displayName = typeof nameRaw === 'string'
-      ? nameRaw.trim()
-      : typeof (nameRaw as any)?.result === 'string'
-        ? (nameRaw as any).result.trim()
-        : '';
-    if (!displayName || displayName.startsWith('Total ') || displayName === 'Inventory') continue;
+    const displayName =
+      typeof nameRaw === "string"
+        ? nameRaw.trim()
+        : typeof (nameRaw as any)?.result === "string"
+          ? (nameRaw as any).result.trim()
+          : "";
+    if (!displayName || displayName.startsWith("Total ") || displayName === "Inventory") continue;
 
     const systemCode = nameToSystemCode.get(displayName) ?? displayName;
-    const stock      = getOpening(displayName, systemCode);
+    const stock = getOpening(displayName, systemCode);
 
-    const qtyCell    = row.getCell(C_QTY_COL);
+    const qtyCell = row.getCell(C_QTY_COL);
     const avgCostCell = row.getCell(C_AVG_COL);
-    const valCell    = row.getCell(C_VAL_COL);
+    const valCell = row.getCell(C_VAL_COL);
 
     if (!isFormula(qtyCell)) {
       qtyCell.value = stock.qty > 0 ? r3(stock.qty) : null;
     }
     if (!isFormula(valCell)) {
       const assetVal = stock.qty * stock.avgCost;
-      valCell.value  = assetVal > 0 ? r2(assetVal) : null;
+      valCell.value = assetVal > 0 ? r2(assetVal) : null;
     }
 
     // Always set avg cost cell to prevent #DIV/0!:
@@ -313,7 +307,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   // those stale dates intact. Fix: iterate every cell in row 1 and write the
   // correct date to any non-formula cell, clear anything beyond the export range.
   if (salesWs) {
-    const sDateRow  = salesWs.getRow(S_DATE_ROW);
+    const sDateRow = salesWs.getRow(S_DATE_ROW);
     // Write dates to all non-formula cells within the export range
     for (let d = 0; d < dayCount; d++) {
       const cell = sDateRow.getCell(S_DATE_START + d);
@@ -329,16 +323,17 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     // Item rows: write qty per day
     const salesWsLast = salesWs.rowCount;
     for (let r = S_DATA_START; r <= salesWsLast; r++) {
-      const row     = salesWs.getRow(r);
+      const row = salesWs.getRow(r);
       const nameRaw = row.getCell(S_NAME_COL).value;
-      const displayName = typeof nameRaw === 'string'
-        ? nameRaw.trim()
-        : typeof (nameRaw as any)?.result === 'string'
-          ? (nameRaw as any).result.trim()
-          : '';
-      if (!displayName || displayName.startsWith('Total ')) continue;
+      const displayName =
+        typeof nameRaw === "string"
+          ? nameRaw.trim()
+          : typeof (nameRaw as any)?.result === "string"
+            ? (nameRaw as any).result.trim()
+            : "";
+      if (!displayName || displayName.startsWith("Total ")) continue;
 
-      const systemCode  = nameToSystemCode.get(displayName) ?? displayName;
+      const systemCode = nameToSystemCode.get(displayName) ?? displayName;
       const daySalesMap = getSalesMap(displayName, systemCode);
 
       for (let d = 0; d < dayCount; d++) {
@@ -377,7 +372,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
     for (let d = 0; d < dayCount + 20; d++) {
       const profitCell = row.getCell(E_DATE_START + d * 3 + 2);
       const v = profitCell.value as any;
-      if (v && typeof v === 'object' && 'sharedFormula' in v) {
+      if (v && typeof v === "object" && "sharedFormula" in v) {
         profitCell.value = null;
         rowChanged = true;
       }
@@ -416,39 +411,39 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
   //   Writing a plain value replaces the formula in the output file; fullCalcOnLoad
   //   does not undo plain cell overwrites.
   for (const [displayName, rowNum] of itemRows) {
-    const systemCode  = nameToSystemCode.get(displayName) ?? displayName;
+    const systemCode = nameToSystemCode.get(displayName) ?? displayName;
     const daySalesMap = getSalesMap(displayName, systemCode);
-    const row         = entryWs.getRow(rowNum);
+    const row = entryWs.getRow(rowNum);
 
     for (let d = 0; d < dayCount; d++) {
-      const baseCol    = E_DATE_START + d * 3;
-      const qtyCell    = row.getCell(baseCol);
-      const priceCell  = row.getCell(baseCol + 1);
+      const baseCol = E_DATE_START + d * 3;
+      const qtyCell = row.getCell(baseCol);
+      const priceCell = row.getCell(baseCol + 1);
       const profitCell = row.getCell(baseCol + 2);
 
       const ds = daySalesMap?.get(dates[d]);
 
       if (ds && ds.qty > 0) {
-        const avgPrice    = ds.totalSales / ds.qty;
+        const avgPrice = ds.totalSales / ds.qty;
         const netProfitPB = (ds.totalSales - ds.totalCost - ds.totalDeduction) / ds.qty;
 
-        if (!isFormula(qtyCell))   qtyCell.value   = r3(ds.qty);
+        if (!isFormula(qtyCell)) qtyCell.value = r3(ds.qty);
         if (!isFormula(priceCell)) priceCell.value = r2(avgPrice);
         profitCell.value = r2(netProfitPB); // always write — bypasses formula guard
       } else {
-        if (!isFormula(qtyCell))   qtyCell.value   = null;
+        if (!isFormula(qtyCell)) qtyCell.value = null;
         if (!isFormula(priceCell)) priceCell.value = null;
-        profitCell.value = null;            // always clear — bypasses formula guard
+        profitCell.value = null; // always clear — bypasses formula guard
       }
     }
 
     // Clear stale data beyond the export range
     for (let d = dayCount; d < dayCount + 15; d++) {
       const baseCol = E_DATE_START + d * 3;
-      const qtyCell    = row.getCell(baseCol);
-      const priceCell  = row.getCell(baseCol + 1);
+      const qtyCell = row.getCell(baseCol);
+      const priceCell = row.getCell(baseCol + 1);
       const profitCell = row.getCell(baseCol + 2);
-      if (!isFormula(qtyCell))   qtyCell.value   = null;
+      if (!isFormula(qtyCell)) qtyCell.value = null;
       if (!isFormula(priceCell)) priceCell.value = null;
       profitCell.value = null;
     }
@@ -465,7 +460,7 @@ export async function generateSpSalesFormExcel(params: SpSalesFormParams): Promi
 
   // ── 5. Hide Ageing (preserve formula refs) ────────────────────────────────
   if (ageingWs) {
-    (ageingWs as any).state = 'hidden';
+    (ageingWs as any).state = "hidden";
   }
 
   // ── 6. Output ─────────────────────────────────────────────────────────────

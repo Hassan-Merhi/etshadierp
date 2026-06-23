@@ -7,7 +7,44 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCompany } from "@/contexts/CompanyContext";
-import { Building2, Users, Settings2, Shield, Database, History, Upload, Zap, ShoppingCart, TrendingUp, CheckCircle2, AlertTriangle, Wrench, Clock, Search, Trash2, PieChart, Bot, Bell, Layers, ArrowLeftRight, Eraser, Printer, RefreshCw, ChevronLeft, ChevronRight, X, ExternalLink, Calculator, Loader2, Package, Check, ChevronDown, ChevronUp, Info, TrendingDown } from "lucide-react";
+import {
+  Building2,
+  Users,
+  Settings2,
+  Shield,
+  Database,
+  History,
+  Upload,
+  Zap,
+  ShoppingCart,
+  TrendingUp,
+  CheckCircle2,
+  AlertTriangle,
+  Wrench,
+  Clock,
+  Search,
+  Trash2,
+  PieChart,
+  Bot,
+  Bell,
+  Layers,
+  ArrowLeftRight,
+  Eraser,
+  Printer,
+  RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  ExternalLink,
+  Calculator,
+  Loader2,
+  Package,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  TrendingDown,
+} from "lucide-react";
 
 import { FxRatesCard } from "./settings/FxRatesCard";
 import { CompaniesTab } from "./settings/CompaniesTab";
@@ -24,7 +61,16 @@ import { ExportCenter } from "./settings/ExportCenter";
 import { UsersPermissionsHub } from "./settings/UsersPermissionsHub";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -86,15 +132,11 @@ export default function Settings() {
     },
     {
       label: "POS",
-      items: appMode !== "factory" ? [
-        { key: "pos-setup", label: "POS Setup", icon: ShoppingCart, devOnly: true },
-      ] : [],
+      items: appMode !== "factory" ? [{ key: "pos-setup", label: "POS Setup", icon: ShoppingCart, devOnly: true }] : [],
     },
     {
       label: "Factory",
-      items: appMode === "factory" ? [
-        { key: "fx-rates", label: "FX Rates", icon: TrendingUp },
-      ] : [],
+      items: appMode === "factory" ? [{ key: "fx-rates", label: "FX Rates", icon: TrendingUp }] : [],
     },
     {
       label: "Controls",
@@ -105,15 +147,11 @@ export default function Settings() {
     },
     {
       label: "System",
-      items: [
-        { key: "system", label: "System Tools", icon: Wrench },
-      ],
+      items: [{ key: "system", label: "System Tools", icon: Wrench }],
     },
   ];
 
-  const allowedItems = (items: any[]) => items.filter(item => 
-    !item.devOnly || currentUser?.role === "Developer"
-  );
+  const allowedItems = (items: any[]) => items.filter((item) => !item.devOnly || currentUser?.role === "Developer");
 
   return (
     <div className="flex flex-col sm:flex-row sm:h-full">
@@ -123,9 +161,11 @@ export default function Settings() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {sidebarGroups.map(group => 
-              allowedItems(group.items).map(item => (
-                <SelectItem key={item.key} value={item.key}>{item.label}</SelectItem>
+            {sidebarGroups.map((group) =>
+              allowedItems(group.items).map((item) => (
+                <SelectItem key={item.key} value={item.key}>
+                  {item.label}
+                </SelectItem>
               ))
             )}
           </SelectContent>
@@ -134,11 +174,13 @@ export default function Settings() {
 
       <nav className="hidden sm:flex sm:flex-col w-56 shrink-0 border-r bg-muted/30 p-3 gap-3 overflow-y-auto">
         <div className="space-y-4">
-          {sidebarGroups.map(group => (
+          {sidebarGroups.map((group) => (
             <div key={group.label}>
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">{group.label}</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-1">
+                {group.label}
+              </p>
               <div className="space-y-0.5">
-                {allowedItems(group.items).map(item => {
+                {allowedItems(group.items).map((item) => {
                   const Icon = item.icon;
                   return (
                     <button
@@ -159,20 +201,43 @@ export default function Settings() {
 
       <div className="flex-1 sm:overflow-y-auto p-4 sm:p-6">
         {activeSection === "companies" && <CompaniesTab />}
-        {activeSection === "users-permissions" && <UsersPermissionsHub userRole={currentUser?.role} appMode={appMode} />}
-        {activeSection === "sessions-hub" && currentUser?.role === "Developer" && <SessionsHub isAdmin={true} isDev={true} />}
+        {activeSection === "users-permissions" && (
+          <UsersPermissionsHub userRole={currentUser?.role} appMode={appMode} />
+        )}
+        {activeSection === "sessions-hub" && currentUser?.role === "Developer" && (
+          <SessionsHub isAdmin={true} isDev={true} />
+        )}
         {activeSection === "edit-log" && <EditLogTab selectedCompany={selectedCompany} />}
         {activeSection === "approvals" && <ApprovalsPage currentUser={currentUser} />}
         {activeSection === "business-alerts" && <BusinessAlertsPage currentUser={currentUser} />}
         {activeSection === "data-tools" && currentUser?.role === "Developer" && <DataToolsTab />}
-        {activeSection === "pos-setup" && currentUser?.role === "Developer" && <PosSetupHub userRole={currentUser?.role} />}
-        {activeSection === "fx-rates" && appMode === "factory" && <div className="space-y-5 max-w-2xl"><FxRatesCard /></div>}
+        {activeSection === "pos-setup" && currentUser?.role === "Developer" && (
+          <PosSetupHub userRole={currentUser?.role} />
+        )}
+        {activeSection === "fx-rates" && appMode === "factory" && (
+          <div className="space-y-5 max-w-2xl">
+            <FxRatesCard />
+          </div>
+        )}
         {activeSection === "files-export" && <FileStorageAndExport />}
         {activeSection === "export-center" && <ExportCenter />}
-        {activeSection === "preferences" && <PreferencesTab dateFormat={dateFormat} setDateFormat={setDateFormat} isDateFormatPending={isDateFormatPending} />}
-        {activeSection === "system" && <SystemToolsTab appMode={appMode} currentUser={currentUser} selectedCompany={selectedCompany} companies={companies} />}
+        {activeSection === "preferences" && (
+          <PreferencesTab
+            dateFormat={dateFormat}
+            setDateFormat={setDateFormat}
+            isDateFormatPending={isDateFormatPending}
+          />
+        )}
+        {activeSection === "system" && (
+          <SystemToolsTab
+            appMode={appMode}
+            currentUser={currentUser}
+            selectedCompany={selectedCompany}
+            companies={companies}
+          />
+        )}
 
-        <AlertDialog open={!!userToDelete} onOpenChange={open => !open && setUserToDelete(null)}>
+        <AlertDialog open={!!userToDelete} onOpenChange={(open) => !open && setUserToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete User</AlertDialogTitle>
@@ -180,7 +245,12 @@ export default function Settings() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => deleteUserMutation.mutate(userToDelete.id)} className="bg-destructive text-destructive-foreground">Delete</AlertDialogAction>
+              <AlertDialogAction
+                onClick={() => deleteUserMutation.mutate(userToDelete.id)}
+                className="bg-destructive text-destructive-foreground"
+              >
+                Delete
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

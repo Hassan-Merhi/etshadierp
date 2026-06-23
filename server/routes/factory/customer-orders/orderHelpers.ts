@@ -10,44 +10,112 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, recalculateOrderTotals,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  recalculateOrderTotals,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  customerOrderBaleRemovals, customerOrderExpectedLines,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
+  customerOrderBaleRemovals,
+  customerOrderExpectedLines,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -56,11 +124,15 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-
 export function buildExportFilename(parts: (string | null | undefined)[], ext: string): string {
   const safe = parts
     .filter((p): p is string => Boolean(p && p.trim()))
-    .map((p) => p.replace(/[\\/*?:[\]<>|]/g, "").replace(/\s+/g, "_").trim())
+    .map((p) =>
+      p
+        .replace(/[\\/*?:[\]<>|]/g, "")
+        .replace(/\s+/g, "_")
+        .trim()
+    )
     .filter((p) => p.length > 0);
   const base = safe.join("_") || "export";
   return ext ? `${base}.${ext}` : base;
@@ -74,7 +146,7 @@ export function buildExportFilename(parts: (string | null | undefined)[], ext: s
 export async function buildOrderExcelBuffer(
   orderId: number,
   companyId: number,
-  hideSelling: boolean,
+  hideSelling: boolean
 ): Promise<{ buffer: Buffer; fileName: string }> {
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
   const [order] = await db
@@ -96,7 +168,10 @@ export async function buildOrderExcelBuffer(
 
   if (!order) throw new Error(`Order ${orderId} not found for company ${companyId}`);
 
-  const orderChargesHelper = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+  const orderChargesHelper = await db
+    .select()
+    .from(customerOrderCharges)
+    .where(eq(customerOrderCharges.orderId, orderId));
   const rawLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
 
   const articleCodes = [...new Set(rawLines.map((l: any) => l.articleCode).filter(Boolean))];
@@ -104,7 +179,11 @@ export async function buildOrderExcelBuffer(
   const wtPerBaleMap = new Map<string, number>();
   if (articleCodes.length > 0) {
     const products = await db
-      .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg })
+      .select({
+        articleCode: factoryBaleProducts.articleCode,
+        name: factoryBaleProducts.name,
+        weightPerBaleKg: factoryBaleProducts.weightPerBaleKg,
+      })
       .from(factoryBaleProducts)
       .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes)));
     for (const p of products) {
@@ -128,13 +207,20 @@ export async function buildOrderExcelBuffer(
       pricePerKg: parseFloat(l.pricePerKg || "0"),
     }))
     .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
-  const anyPerKgH = helperLines.some((l: any) => l.pricingMode === 'per_kg');
+  const anyPerKgH = helperLines.some((l: any) => l.pricingMode === "per_kg");
 
   const baseCurrency = (company as any)?.baseCurrency || "USD";
-  const currencySymbolMap: Record<string, string> = { USD: "$", GBP: "£", EUR: "€", CFA: "CFA", XOF: "CFA", XAF: "CFA" };
+  const currencySymbolMap: Record<string, string> = {
+    USD: "$",
+    GBP: "£",
+    EUR: "€",
+    CFA: "CFA",
+    XOF: "CFA",
+    XAF: "CFA",
+  };
   const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? baseCurrency;
   const fmtMoney = (n: number) => `${currSym}${n % 1 === 0 ? n.toLocaleString() : n.toFixed(2)}`;
-  const fmtNum = (n: number) => n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
+  const fmtNum = (n: number) => (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
 
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
@@ -157,7 +243,9 @@ export async function buildOrderExcelBuffer(
   const WHITE = "FFFFFFFF";
 
   const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
-  const setFill = (cell: any, argb: string) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } }; };
+  const setFill = (cell: any, argb: string) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
+  };
   const setBorderH = (row: any) => {
     row.eachCell((cell: any) => {
       cell.border = {
@@ -216,28 +304,47 @@ export async function buildOrderExcelBuffer(
   sheet.addRow([]);
 
   const unitPriceLabelH = anyPerKgH ? "Price/KG" : "Price/Bale";
-  const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSelling ? [] : [unitPriceLabelH, "Total"])]);
+  const hdrRow = sheet.addRow([
+    "#",
+    "Article Code",
+    "Product",
+    "Qty",
+    "Wt/Bale",
+    "Total Wt",
+    ...(hideSelling ? [] : [unitPriceLabelH, "Total"]),
+  ]);
   hdrRow.height = 24;
   hdrRow.eachCell((cell: any) => {
     cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
     setFill(cell, DARK_BLUE);
     cell.alignment = { horizontal: "center", vertical: "middle" };
-    cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
+    cell.border = {
+      top: { style: "thin", color: { argb: WHITE } },
+      bottom: { style: "thin", color: { argb: WHITE } },
+      left: { style: "thin", color: { argb: WHITE } },
+      right: { style: "thin", color: { argb: WHITE } },
+    };
   });
 
-  let totalQtyH = 0, totalWtH = 0, totalH = 0;
+  let totalQtyH = 0,
+    totalWtH = 0,
+    totalH = 0;
   helperLines.forEach((g: any, idx: number) => {
     totalQtyH += g.qty;
     totalWtH += g.totalWt;
     totalH += g.total;
-    const unitPriceH = g.pricingMode === 'per_kg'
-      ? (g.totalWt > 0 ? g.total / g.totalWt : (g.pricePerKg || 0))
-      : g.pricePerBale;
+    const unitPriceH =
+      g.pricingMode === "per_kg" ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg || 0) : g.pricePerBale;
     const rowCells: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
-    if (!hideSelling) { rowCells.push(fmtMoney(unitPriceH)); rowCells.push(fmtMoney(g.total)); }
+    if (!hideSelling) {
+      rowCells.push(fmtMoney(unitPriceH));
+      rowCells.push(fmtMoney(g.total));
+    }
     const dr = sheet.addRow(rowCells);
     dr.height = 20;
-    dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
+    dr.eachCell((cell: any) => {
+      cell.font = { size: 11 };
+    });
     if (idx % 2 === 1) dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
     dr.getCell(1).alignment = { horizontal: "center" };
     dr.getCell(4).alignment = { horizontal: "right" };
@@ -251,7 +358,10 @@ export async function buildOrderExcelBuffer(
   });
 
   const totRowCells: any[] = ["", "", "Totals", totalQtyH, "", fmtNum(totalWtH)];
-  if (!hideSelling) { totRowCells.push(""); totRowCells.push(fmtMoney(totalH)); }
+  if (!hideSelling) {
+    totRowCells.push("");
+    totRowCells.push(fmtMoney(totalH));
+  }
   const totRow = sheet.addRow(totRowCells);
   totRow.height = 22;
   totRow.eachCell((cell: any) => {
@@ -269,9 +379,12 @@ export async function buildOrderExcelBuffer(
     const grandTotal = parseFloat(order.grandTotal || "0");
 
     const otherChargeLines = orderChargesHelper.filter((ch: any) => ch.chargeType !== "FREIGHT");
-    const chargeRows: [string, number][] = otherChargeLines.length > 0
-      ? otherChargeLines.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
-      : otherChargesTotal > 0 ? [["Other Charges", otherChargesTotal]] : [];
+    const chargeRows: [string, number][] =
+      otherChargeLines.length > 0
+        ? otherChargeLines.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+        : otherChargesTotal > 0
+          ? [["Other Charges", otherChargesTotal]]
+          : [];
 
     const summaryData: [string, number][] = [
       ["Subtotal (Bales)", subtotal],
@@ -293,7 +406,7 @@ export async function buildOrderExcelBuffer(
       const sr = sheet.addRow(["", "", "", "", "", "", label, fmtMoney(amount)]);
       sr.height = 20;
       const isGrandTotal = idx === summaryData.length - 1;
-      const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
+      const bg = isGrandTotal ? DARK_BLUE : idx % 2 === 0 ? WHITE : LIGHT_GRAY;
       const fg = isGrandTotal ? WHITE : "FF000000";
       setFill(sr.getCell(7), bg);
       setFill(sr.getCell(8), bg);
@@ -301,8 +414,18 @@ export async function buildOrderExcelBuffer(
       sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
       sr.getCell(7).alignment = { horizontal: "left" };
       sr.getCell(8).alignment = { horizontal: "right" };
-      sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
-      sr.getCell(8).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+      sr.getCell(7).border = {
+        top: { style: "thin", color: { argb: "FFDDDDDD" } },
+        bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+        left: { style: "thin", color: { argb: "FFDDDDDD" } },
+        right: { style: "thin", color: { argb: "FFDDDDDD" } },
+      };
+      sr.getCell(8).border = {
+        top: { style: "thin", color: { argb: "FFDDDDDD" } },
+        bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+        left: { style: "thin", color: { argb: "FFDDDDDD" } },
+        right: { style: "thin", color: { argb: "FFDDDDDD" } },
+      };
     });
   }
 

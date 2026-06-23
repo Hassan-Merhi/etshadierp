@@ -10,14 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
@@ -41,14 +42,18 @@ interface BonusRecord {
   employeeCode: string;
 }
 
-interface CashAccount { id: number; name: string; code: string; }
+interface CashAccount {
+  id: number;
+  name: string;
+  code: string;
+}
 
 function fmt(val: string | number | null | undefined) {
   const n = parseFloat(String(val || 0));
   return isNaN(n) ? "0.00" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const today = () => new Date().toLocaleDateString('en-CA');
+const today = () => new Date().toLocaleDateString("en-CA");
 
 export default function FactoryWorkerBonusesTab() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -93,9 +98,10 @@ export default function FactoryWorkerBonusesTab() {
     },
   });
 
-  const pendingTotal = useMemo(() =>
-    bonuses.filter((b) => b.status === "pending").reduce((s, b) => s + parseFloat(b.amount || "0"), 0)
-  , [bonuses]);
+  const pendingTotal = useMemo(
+    () => bonuses.filter((b) => b.status === "pending").reduce((s, b) => s + parseFloat(b.amount || "0"), 0),
+    [bonuses]
+  );
 
   const addMutation = useMutation({
     mutationFn: async () => {
@@ -110,7 +116,10 @@ export default function FactoryWorkerBonusesTab() {
           notes: addForm.notes || null,
         }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -131,7 +140,10 @@ export default function FactoryWorkerBonusesTab() {
         credentials: "include",
         body: JSON.stringify({ cashAccountId: parseInt(payForm.cashAccountId), paidDate: payForm.paidDate }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -146,7 +158,10 @@ export default function FactoryWorkerBonusesTab() {
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/factory/worker-bonuses/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
     },
     onSuccess: () => {
       toast({ title: "Bonus deleted" });
@@ -169,7 +184,9 @@ export default function FactoryWorkerBonusesTab() {
               <SelectContent>
                 <SelectItem value="all">All Workers</SelectItem>
                 {workers.map((w) => (
-                  <SelectItem key={w.id} value={String(w.id)}>{w.fullName}</SelectItem>
+                  <SelectItem key={w.id} value={String(w.id)}>
+                    {w.fullName}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -203,7 +220,11 @@ export default function FactoryWorkerBonusesTab() {
       )}
 
       {isLoading ? (
-        <div className="space-y-2">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
       ) : bonuses.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -241,10 +262,23 @@ export default function FactoryWorkerBonusesTab() {
                       <div className="flex gap-1 justify-end">
                         {b.status === "pending" && (
                           <>
-                            <Button size="sm" variant="outline" onClick={() => { setPayOpen(b); setPayForm({ cashAccountId: "", paidDate: today() }); }} data-testid={`button-pay-bonus-${b.id}`}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setPayOpen(b);
+                                setPayForm({ cashAccountId: "", paidDate: today() });
+                              }}
+                              data-testid={`button-pay-bonus-${b.id}`}
+                            >
                               <Banknote className="h-3 w-3 mr-1" /> Pay
                             </Button>
-                            <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(b)} data-testid={`button-delete-worker-bonus-${b.id}`}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setDeleteConfirm(b)}
+                              data-testid={`button-delete-worker-bonus-${b.id}`}
+                            >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           </>
@@ -276,7 +310,15 @@ export default function FactoryWorkerBonusesTab() {
                   {b.notes && <p className="text-xs text-muted-foreground">{b.notes}</p>}
                   {b.status === "pending" && (
                     <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="outline" className="flex-1" onClick={() => { setPayOpen(b); setPayForm({ cashAccountId: "", paidDate: today() }); }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setPayOpen(b);
+                          setPayForm({ cashAccountId: "", paidDate: today() });
+                        }}
+                      >
                         <Banknote className="h-3 w-3 mr-1" /> Mark Paid
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(b)}>
@@ -295,7 +337,9 @@ export default function FactoryWorkerBonusesTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Worker Bonus</DialogTitle>
-            <DialogDescription>Record a bonus for a worker. It will remain pending until you mark it as paid.</DialogDescription>
+            <DialogDescription>
+              Record a bonus for a worker. It will remain pending until you mark it as paid.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -306,7 +350,9 @@ export default function FactoryWorkerBonusesTab() {
                 </SelectTrigger>
                 <SelectContent>
                   {workers.map((w) => (
-                    <SelectItem key={w.id} value={String(w.id)}>{w.fullName}</SelectItem>
+                    <SelectItem key={w.id} value={String(w.id)}>
+                      {w.fullName}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -314,21 +360,44 @@ export default function FactoryWorkerBonusesTab() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Date</Label>
-                <Input type="date" value={addForm.bonusDate} onChange={(e) => setAddForm((f) => ({ ...f, bonusDate: e.target.value }))} data-testid="input-worker-bonus-date" />
+                <Input
+                  type="date"
+                  value={addForm.bonusDate}
+                  onChange={(e) => setAddForm((f) => ({ ...f, bonusDate: e.target.value }))}
+                  data-testid="input-worker-bonus-date"
+                />
               </div>
               <div>
                 <Label>Amount</Label>
-                <Input type="number" placeholder="0.00" value={addForm.amount} onChange={(e) => setAddForm((f) => ({ ...f, amount: e.target.value }))} data-testid="input-worker-bonus-amount" />
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={addForm.amount}
+                  onChange={(e) => setAddForm((f) => ({ ...f, amount: e.target.value }))}
+                  data-testid="input-worker-bonus-amount"
+                />
               </div>
             </div>
             <div>
               <Label>Notes (optional)</Label>
-              <Textarea placeholder="e.g. Production bonus..." value={addForm.notes} onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))} rows={2} data-testid="input-worker-bonus-notes" />
+              <Textarea
+                placeholder="e.g. Production bonus..."
+                value={addForm.notes}
+                onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                data-testid="input-worker-bonus-notes"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={() => wrapAdminAction(() => addMutation.mutate(), "Credit Bonus")} disabled={addMutation.isPending || !addForm.workerId || !addForm.amount} data-testid="button-confirm-add-worker-bonus">
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(() => addMutation.mutate(), "Credit Bonus")}
+              disabled={addMutation.isPending || !addForm.workerId || !addForm.amount}
+              data-testid="button-confirm-add-worker-bonus"
+            >
               {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Save Bonus
             </Button>
@@ -347,25 +416,41 @@ export default function FactoryWorkerBonusesTab() {
           <div className="space-y-3">
             <div>
               <Label>Payment Date</Label>
-              <Input type="date" value={payForm.paidDate} onChange={(e) => setPayForm((f) => ({ ...f, paidDate: e.target.value }))} data-testid="input-pay-date" />
+              <Input
+                type="date"
+                value={payForm.paidDate}
+                onChange={(e) => setPayForm((f) => ({ ...f, paidDate: e.target.value }))}
+                data-testid="input-pay-date"
+              />
             </div>
             <div>
               <Label>Cash Account</Label>
-              <Select value={payForm.cashAccountId} onValueChange={(v) => setPayForm((f) => ({ ...f, cashAccountId: v }))}>
+              <Select
+                value={payForm.cashAccountId}
+                onValueChange={(v) => setPayForm((f) => ({ ...f, cashAccountId: v }))}
+              >
                 <SelectTrigger data-testid="select-pay-account">
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPayOpen(null)}>Cancel</Button>
-            <Button onClick={() => wrapAdminAction(() => payMutation.mutate(), "Pay Bonus")} disabled={payMutation.isPending || !payForm.cashAccountId} data-testid="button-confirm-pay-bonus">
+            <Button variant="outline" onClick={() => setPayOpen(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(() => payMutation.mutate(), "Pay Bonus")}
+              disabled={payMutation.isPending || !payForm.cashAccountId}
+              data-testid="button-confirm-pay-bonus"
+            >
               {payMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Mark Paid
             </Button>
@@ -378,12 +463,22 @@ export default function FactoryWorkerBonusesTab() {
           <DialogHeader>
             <DialogTitle>Delete Bonus</DialogTitle>
             <DialogDescription>
-              Delete pending bonus of {deleteConfirm && fmt(deleteConfirm.amount)} for {deleteConfirm?.workerName}? Only pending bonuses can be deleted.
+              Delete pending bonus of {deleteConfirm && fmt(deleteConfirm.amount)} for {deleteConfirm?.workerName}? Only
+              pending bonuses can be deleted.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => wrapAdminAction(() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id), "Reverse Bonus")} disabled={deleteMutation.isPending} data-testid="button-confirm-delete-worker-bonus">
+            <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                wrapAdminAction(() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id), "Reverse Bonus")
+              }
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-worker-bonus"
+            >
               {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Delete
             </Button>

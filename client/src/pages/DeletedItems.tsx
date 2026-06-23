@@ -7,28 +7,9 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -67,13 +48,7 @@ import {
   Eye,
   X,
 } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 
 interface DeletedItem {
@@ -243,9 +218,7 @@ export default function DeletedItems() {
   const bulkDeleteMutation = useMutation({
     mutationFn: async (itemsToDelete: { type: string; id: number }[]) => {
       await Promise.all(
-        itemsToDelete.map(({ type, id }) =>
-          modeApiRequest("DELETE", `/api/deleted-items/${type}/${id}/permanent`)
-        )
+        itemsToDelete.map(({ type, id }) => modeApiRequest("DELETE", `/api/deleted-items/${type}/${id}/permanent`))
       );
     },
     onSuccess: () => {
@@ -397,16 +370,30 @@ export default function DeletedItems() {
                   <SelectItem value="supplier">Suppliers ({data?.suppliers.length || 0})</SelectItem>
                   <SelectItem value="bankAccount">Bank Accounts ({data?.bankAccounts.length || 0})</SelectItem>
                   <SelectItem value="voucher">Vouchers ({data?.vouchers?.length || 0})</SelectItem>
-                  <SelectItem value="orphanedPosSale">Orphaned POS Sales ({data?.orphanedPosSales?.length || 0})</SelectItem>
-                  <SelectItem value="factoryCategory">Factory Categories ({data?.factoryCategories?.length || 0})</SelectItem>
-                  <SelectItem value="factoryBaleProduct">Bale Products ({data?.factoryBaleProducts?.length || 0})</SelectItem>
+                  <SelectItem value="orphanedPosSale">
+                    Orphaned POS Sales ({data?.orphanedPosSales?.length || 0})
+                  </SelectItem>
+                  <SelectItem value="factoryCategory">
+                    Factory Categories ({data?.factoryCategories?.length || 0})
+                  </SelectItem>
+                  <SelectItem value="factoryBaleProduct">
+                    Bale Products ({data?.factoryBaleProducts?.length || 0})
+                  </SelectItem>
                   <SelectItem value="factoryContainer">Containers ({data?.factoryContainers?.length || 0})</SelectItem>
-                  <SelectItem value="factoryRawStock">Raw Stock Receipts ({data?.factoryRawStock?.length || 0})</SelectItem>
-                  <SelectItem value="factoryRawMaterialAdjustment">Raw Material Adjustments ({data?.factoryRawMaterialAdjustments?.length || 0})</SelectItem>
+                  <SelectItem value="factoryRawStock">
+                    Raw Stock Receipts ({data?.factoryRawStock?.length || 0})
+                  </SelectItem>
+                  <SelectItem value="factoryRawMaterialAdjustment">
+                    Raw Material Adjustments ({data?.factoryRawMaterialAdjustments?.length || 0})
+                  </SelectItem>
                   <SelectItem value="factoryMixBatch">Mix Batches ({data?.factoryMixBatches?.length || 0})</SelectItem>
                   <SelectItem value="factoryBale">Bales ({data?.factoryBales?.length || 0})</SelectItem>
-                  <SelectItem value="customerProforma">Proforma Invoices ({data?.customerProformas?.length || 0})</SelectItem>
-                  <SelectItem value="customerOrder">Customer Invoices/Orders ({data?.customerOrders?.length || 0})</SelectItem>
+                  <SelectItem value="customerProforma">
+                    Proforma Invoices ({data?.customerProformas?.length || 0})
+                  </SelectItem>
+                  <SelectItem value="customerOrder">
+                    Customer Invoices/Orders ({data?.customerOrders?.length || 0})
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -454,172 +441,183 @@ export default function DeletedItems() {
             </div>
           ) : (
             <>
-            <div className="hidden md:block">
-            <Table>
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox
-                      checked={items.length > 0 && items.every((item) => selectedItems.has(itemKey(item)))}
-                      onCheckedChange={() => toggleAll(items)}
-                      data-testid="checkbox-select-all"
-                    />
-                  </TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Deleted At</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+              <div className="hidden md:block">
+                <Table>
+                  <TableHeader className="sticky top-0 z-30 bg-background">
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={items.length > 0 && items.every((item) => selectedItems.has(itemKey(item)))}
+                          onCheckedChange={() => toggleAll(items)}
+                          data-testid="checkbox-select-all"
+                        />
+                      </TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Deleted At</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((item) => {
+                      const IconComponent = typeIcons[item.type] || Package;
+                      return (
+                        <TableRow
+                          key={`${item.type}-${item.id}`}
+                          data-testid={`row-deleted-${item.type}-${item.id}`}
+                          className="cursor-pointer hover-elevate"
+                          onClick={() => setDetailItem(item)}
+                        >
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedItems.has(itemKey(item))}
+                              onCheckedChange={() => toggleItem(item)}
+                              data-testid={`checkbox-item-${item.type}-${item.id}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <IconComponent className="h-4 w-4 text-muted-foreground" />
+                              <Badge variant="outline">{typeLabels[item.type] || item.type}</Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{item.code || "-"}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span>{item.name}</span>
+                              {item.accountType && (
+                                <span className="text-xs text-muted-foreground">{item.accountType}</span>
+                              )}
+                              {item.type === "orphanedPosSale" && (
+                                <span className="text-xs text-muted-foreground">
+                                  {item.locationName} | ${item.amount?.toLocaleString() || "0"}
+                                </span>
+                              )}
+                              {item.type === "voucher" && (
+                                <span className="text-xs text-muted-foreground">
+                                  {item.voucherType} | ${item.amount?.toLocaleString() || "0"}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {item.deletedAt
+                              ? `${formatDisplayDate(item.deletedAt)} ${format(new Date(item.deletedAt), "h:mm a")}`
+                              : "-"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDetailItem(item);
+                                }}
+                                data-testid={`button-view-${item.type}-${item.id}`}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {item.type !== "orphanedPosSale" && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRestore(item);
+                                  }}
+                                  disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
+                                  data-testid={`button-restore-${item.type}-${item.id}`}
+                                >
+                                  <RotateCcw className="h-4 w-4 mr-1" />
+                                  Restore
+                                </Button>
+                              )}
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handlePermanentDelete(item);
+                                }}
+                                disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
+                                data-testid={`button-delete-permanent-${item.type}-${item.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Delete Forever
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="md:hidden space-y-3">
                 {items.map((item) => {
                   const IconComponent = typeIcons[item.type] || Package;
                   return (
-                    <TableRow 
-                      key={`${item.type}-${item.id}`} 
-                      data-testid={`row-deleted-${item.type}-${item.id}`}
-                      className="cursor-pointer hover-elevate"
+                    <Card
+                      key={`${item.type}-${item.id}`}
+                      className="p-4 cursor-pointer hover-elevate"
                       onClick={() => setDetailItem(item)}
+                      data-testid={`card-deleted-${item.type}-${item.id}`}
                     >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selectedItems.has(itemKey(item))}
-                          onCheckedChange={() => toggleItem(item)}
-                          data-testid={`checkbox-item-${item.type}-${item.id}`}
-                        />
-                      </TableCell>
-                      <TableCell>
+                      <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="flex items-center gap-2">
+                          <div onClick={(e) => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedItems.has(itemKey(item))}
+                              onCheckedChange={() => toggleItem(item)}
+                              data-testid={`checkbox-card-${item.type}-${item.id}`}
+                            />
+                          </div>
                           <IconComponent className="h-4 w-4 text-muted-foreground" />
-                          <Badge variant="outline">
-                            {typeLabels[item.type] || item.type}
-                          </Badge>
+                          <Badge variant="outline">{typeLabels[item.type] || item.type}</Badge>
                         </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {item.code || "-"}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span>{item.name}</span>
-                          {item.accountType && (
-                            <span className="text-xs text-muted-foreground">{item.accountType}</span>
-                          )}
-                          {item.type === "orphanedPosSale" && (
-                            <span className="text-xs text-muted-foreground">
-                              {item.locationName} | ${item.amount?.toLocaleString() || "0"}
-                            </span>
-                          )}
-                          {item.type === "voucher" && (
-                            <span className="text-xs text-muted-foreground">
-                              {item.voucherType} | ${item.amount?.toLocaleString() || "0"}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
+                        <span className="font-mono text-xs text-muted-foreground">{item.code || "-"}</span>
+                      </div>
+                      <p className="font-medium text-sm">{item.name}</p>
+                      {item.accountType && <p className="text-xs text-muted-foreground">{item.accountType}</p>}
+                      <p className="text-xs text-muted-foreground mt-1">
                         {item.deletedAt
                           ? `${formatDisplayDate(item.deletedAt)} ${format(new Date(item.deletedAt), "h:mm a")}`
                           : "-"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {item.type !== "orphanedPosSale" && (
                           <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => { e.stopPropagation(); setDetailItem(item); }}
-                            data-testid={`button-view-${item.type}-${item.id}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {item.type !== "orphanedPosSale" && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={(e) => { e.stopPropagation(); handleRestore(item); }}
-                              disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
-                              data-testid={`button-restore-${item.type}-${item.id}`}
-                            >
-                              <RotateCcw className="h-4 w-4 mr-1" />
-                              Restore
-                            </Button>
-                          )}
-                          <Button
-                            variant="destructive"
+                            variant="outline"
                             size="sm"
-                            onClick={(e) => { e.stopPropagation(); handlePermanentDelete(item); }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRestore(item);
+                            }}
                             disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
-                            data-testid={`button-delete-permanent-${item.type}-${item.id}`}
                           >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete Forever
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Restore
                           </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            </div>
-            <div className="md:hidden space-y-3">
-              {items.map((item) => {
-                const IconComponent = typeIcons[item.type] || Package;
-                return (
-                  <Card
-                    key={`${item.type}-${item.id}`}
-                    className="p-4 cursor-pointer hover-elevate"
-                    onClick={() => setDetailItem(item)}
-                    data-testid={`card-deleted-${item.type}-${item.id}`}
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <div onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedItems.has(itemKey(item))}
-                            onCheckedChange={() => toggleItem(item)}
-                            data-testid={`checkbox-card-${item.type}-${item.id}`}
-                          />
-                        </div>
-                        <IconComponent className="h-4 w-4 text-muted-foreground" />
-                        <Badge variant="outline">
-                          {typeLabels[item.type] || item.type}
-                        </Badge>
-                      </div>
-                      <span className="font-mono text-xs text-muted-foreground">{item.code || "-"}</span>
-                    </div>
-                    <p className="font-medium text-sm">{item.name}</p>
-                    {item.accountType && <p className="text-xs text-muted-foreground">{item.accountType}</p>}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {item.deletedAt ? `${formatDisplayDate(item.deletedAt)} ${format(new Date(item.deletedAt), "h:mm a")}` : "-"}
-                    </p>
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {item.type !== "orphanedPosSale" && (
+                        )}
                         <Button
-                          variant="outline"
+                          variant="destructive"
                           size="sm"
-                          onClick={(e) => { e.stopPropagation(); handleRestore(item); }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handlePermanentDelete(item);
+                          }}
                           disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
                         >
-                          <RotateCcw className="h-4 w-4 mr-1" />
-                          Restore
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
                         </Button>
-                      )}
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={(e) => { e.stopPropagation(); handlePermanentDelete(item); }}
-                        disabled={restoreMutation.isPending || permanentDeleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
             </>
           )}
         </CardContent>
@@ -649,30 +647,19 @@ export default function DeletedItems() {
               }}
               data-testid="button-confirm-bulk-delete"
             >
-              {bulkDeleteMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
+              {bulkDeleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Delete Forever
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={confirmDialog.open}
-        onOpenChange={(open) =>
-          setConfirmDialog({ ...confirmDialog, open })
-        }
-      >
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              {confirmDialog.action === "delete" && (
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-              )}
-              {confirmDialog.action === "restore"
-                ? "Restore Item?"
-                : "Permanently Delete Item?"}
+              {confirmDialog.action === "delete" && <AlertTriangle className="h-5 w-5 text-destructive" />}
+              {confirmDialog.action === "restore" ? "Restore Item?" : "Permanently Delete Item?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDialog.action === "restore" ? (
@@ -718,15 +705,14 @@ export default function DeletedItems() {
         <SheetContent className="w-[95vw] sm:w-[400px] md:w-[540px]">
           <SheetHeader>
             <SheetTitle className="flex items-center gap-2">
-              {detailItem && (() => {
-                const IconComponent = typeIcons[detailItem.type] || Package;
-                return <IconComponent className="h-5 w-5" />;
-              })()}
+              {detailItem &&
+                (() => {
+                  const IconComponent = typeIcons[detailItem.type] || Package;
+                  return <IconComponent className="h-5 w-5" />;
+                })()}
               {typeLabels[detailItem?.type || ""] || detailItem?.type} Details
             </SheetTitle>
-            <SheetDescription>
-              Viewing deleted item information
-            </SheetDescription>
+            <SheetDescription>Viewing deleted item information</SheetDescription>
           </SheetHeader>
           {detailItem && (
             <div className="mt-6 space-y-4 overflow-y-auto max-h-[calc(100vh-10rem)] pr-1">
@@ -786,7 +772,9 @@ export default function DeletedItems() {
                     <p className="text-sm font-medium mb-2">Journal Entries</p>
                     {entriesLoading ? (
                       <div className="space-y-2">
-                        {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+                        {[1, 2, 3].map((i) => (
+                          <Skeleton key={i} className="h-10 w-full" />
+                        ))}
                       </div>
                     ) : voucherEntries.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No entries found</p>
@@ -826,10 +814,16 @@ export default function DeletedItems() {
                             <tr className="bg-muted/50 font-semibold">
                               <td className="px-3 py-2 text-xs">Total</td>
                               <td className="px-3 py-2 text-right font-mono text-xs">
-                                ${voucherEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                $
+                                {voucherEntries
+                                  .reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0)
+                                  .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                               <td className="px-3 py-2 text-right font-mono text-xs">
-                                ${voucherEntries.reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                $
+                                {voucherEntries
+                                  .reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0)
+                                  .toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
                             </tr>
                           </tfoot>

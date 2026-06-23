@@ -48,35 +48,44 @@ function AccountCombobox({
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
 
-  const filtered = useMemo(() =>
-    accounts
-      .filter(a => a.id !== excludeId)
-      .filter(a =>
-        a.name.toLowerCase().includes(search.toLowerCase()) ||
-        a.code.toLowerCase().includes(search.toLowerCase())
-      )
-      .slice(0, 50),
+  const filtered = useMemo(
+    () =>
+      accounts
+        .filter((a) => a.id !== excludeId)
+        .filter(
+          (a) =>
+            a.name.toLowerCase().includes(search.toLowerCase()) || a.code.toLowerCase().includes(search.toLowerCase())
+        )
+        .slice(0, 50),
     [accounts, search, excludeId]
   );
 
-  const selected = accounts.find(a => a.id === value);
+  const selected = accounts.find((a) => a.id === value);
 
   return (
     <div className="relative">
       <div
         className="flex items-center gap-2 border rounded-md px-3 py-2 cursor-pointer bg-background hover-elevate"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => setOpen((o) => !o)}
         data-testid={testId}
       >
         {selected ? (
-          <span className="flex-1 text-sm font-medium truncate">{selected.name}
+          <span className="flex-1 text-sm font-medium truncate">
+            {selected.name}
             <span className="ml-2 text-xs text-muted-foreground font-normal">{selected.code}</span>
           </span>
         ) : (
           <span className="flex-1 text-sm text-muted-foreground">{placeholder}</span>
         )}
         {selected && (
-          <X className="h-4 w-4 text-muted-foreground shrink-0" onClick={e => { e.stopPropagation(); onChange(null); setSearch(""); }} />
+          <X
+            className="h-4 w-4 text-muted-foreground shrink-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange(null);
+              setSearch("");
+            }}
+          />
         )}
       </div>
       {open && (
@@ -88,7 +97,7 @@ function AccountCombobox({
                 className="h-7 border-0 p-0 focus-visible:ring-0 text-sm"
                 placeholder="Search accounts…"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={(e) => setSearch(e.target.value)}
                 autoFocus
                 data-testid={`${testId}-search`}
               />
@@ -98,16 +107,22 @@ function AccountCombobox({
             {filtered.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No accounts found</p>
             )}
-            {filtered.map(a => (
+            {filtered.map((a) => (
               <div
                 key={a.id}
                 className="flex items-center gap-3 px-3 py-2 text-sm cursor-pointer hover-elevate"
-                onClick={() => { onChange(a.id); setSearch(""); setOpen(false); }}
+                onClick={() => {
+                  onChange(a.id);
+                  setSearch("");
+                  setOpen(false);
+                }}
                 data-testid={`${testId}-option-${a.id}`}
               >
                 <span className="flex-1 font-medium truncate">{a.name}</span>
                 <span className="text-xs text-muted-foreground">{a.code}</span>
-                <Badge variant="outline" className="text-xs">{a.accountType}</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {a.accountType}
+                </Badge>
                 {a.id === value && <Check className="h-4 w-4 text-primary shrink-0" />}
               </div>
             ))}
@@ -135,54 +150,56 @@ export default function AccountTransfer() {
 
   const { data: entries = [], isLoading: loadingEntries } = useQuery<Entry[]>({
     queryKey: ["/api/voucher-entries/by-account", fromAccountId],
-    queryFn: () => fetch(`/api/voucher-entries/by-account/${fromAccountId}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () =>
+      fetch(`/api/voucher-entries/by-account/${fromAccountId}`, { credentials: "include" }).then((r) => r.json()),
     enabled: !!fromAccountId,
   });
 
   const filteredEntries = useMemo(() => {
     if (!searchEntries.trim()) return entries;
     const q = searchEntries.toLowerCase();
-    return entries.filter(e =>
-      e.voucherNumber?.toLowerCase().includes(q) ||
-      e.narration?.toLowerCase().includes(q) ||
-      e.voucherDescription?.toLowerCase().includes(q) ||
-      e.voucherType?.toLowerCase().includes(q)
+    return entries.filter(
+      (e) =>
+        e.voucherNumber?.toLowerCase().includes(q) ||
+        e.narration?.toLowerCase().includes(q) ||
+        e.voucherDescription?.toLowerCase().includes(q) ||
+        e.voucherType?.toLowerCase().includes(q)
     );
   }, [entries, searchEntries]);
 
-  const allChecked = filteredEntries.length > 0 && filteredEntries.every(e => selectedIds.has(e.id));
-  const someChecked = filteredEntries.some(e => selectedIds.has(e.id));
+  const allChecked = filteredEntries.length > 0 && filteredEntries.every((e) => selectedIds.has(e.id));
+  const someChecked = filteredEntries.some((e) => selectedIds.has(e.id));
 
   function toggleAll() {
     if (allChecked) {
-      setSelectedIds(prev => {
+      setSelectedIds((prev) => {
         const next = new Set(prev);
-        filteredEntries.forEach(e => next.delete(e.id));
+        filteredEntries.forEach((e) => next.delete(e.id));
         return next;
       });
     } else {
-      setSelectedIds(prev => {
+      setSelectedIds((prev) => {
         const next = new Set(prev);
-        filteredEntries.forEach(e => next.add(e.id));
+        filteredEntries.forEach((e) => next.add(e.id));
         return next;
       });
     }
   }
 
   function toggleOne(id: number) {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   }
 
-  const selectedEntries = entries.filter(e => selectedIds.has(e.id));
+  const selectedEntries = entries.filter((e) => selectedIds.has(e.id));
   const totalDebit = selectedEntries.reduce((s, e) => s + Number(e.debitAmount || 0), 0);
   const totalCredit = selectedEntries.reduce((s, e) => s + Number(e.creditAmount || 0), 0);
 
-  const fromAccount = accounts.find(a => a.id === fromAccountId);
-  const toAccount = accounts.find(a => a.id === toAccountId);
+  const fromAccount = accounts.find((a) => a.id === fromAccountId);
+  const toAccount = accounts.find((a) => a.id === toAccountId);
 
   const transfer = useMutation({
     mutationFn: () =>
@@ -226,7 +243,8 @@ export default function AccountTransfer() {
                 <div>
                   <p className="font-semibold text-green-700 dark:text-green-300">Transfer complete</p>
                   <p className="text-sm text-muted-foreground">
-                    {done.moved} {done.moved === 1 ? "entry" : "entries"} moved to <span className="font-medium">{done.toAccount}</span>
+                    {done.moved} {done.moved === 1 ? "entry" : "entries"} moved to{" "}
+                    <span className="font-medium">{done.toAccount}</span>
                   </p>
                 </div>
               </div>
@@ -248,7 +266,11 @@ export default function AccountTransfer() {
             <AccountCombobox
               accounts={accounts}
               value={fromAccountId}
-              onChange={id => { setFromAccountId(id); setSelectedIds(new Set()); setDone(null); }}
+              onChange={(id) => {
+                setFromAccountId(id);
+                setSelectedIds(new Set());
+                setDone(null);
+              }}
               placeholder="Select source account…"
               excludeId={toAccountId}
               testId="combobox-from-account"
@@ -265,7 +287,10 @@ export default function AccountTransfer() {
             <AccountCombobox
               accounts={accounts}
               value={toAccountId}
-              onChange={id => { setToAccountId(id); setDone(null); }}
+              onChange={(id) => {
+                setToAccountId(id);
+                setDone(null);
+              }}
               placeholder="Select destination account…"
               excludeId={fromAccountId}
               testId="combobox-to-account"
@@ -282,7 +307,9 @@ export default function AccountTransfer() {
                 <CardTitle className="text-base">
                   Entries under <span className="text-primary">{fromAccount?.name}</span>
                   {!loadingEntries && (
-                    <Badge variant="secondary" className="ml-2">{entries.length}</Badge>
+                    <Badge variant="secondary" className="ml-2">
+                      {entries.length}
+                    </Badge>
                   )}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-0.5">Select which entries to transfer</p>
@@ -294,7 +321,7 @@ export default function AccountTransfer() {
                     className="pl-8 h-8 text-sm w-52"
                     placeholder="Filter entries…"
                     value={searchEntries}
-                    onChange={e => setSearchEntries(e.target.value)}
+                    onChange={(e) => setSearchEntries(e.target.value)}
                     data-testid="input-search-entries"
                   />
                 </div>
@@ -316,19 +343,23 @@ export default function AccountTransfer() {
                           checked={allChecked}
                           onCheckedChange={toggleAll}
                           data-testid="checkbox-select-all"
-                          ref={el => { if (el) (el as any).indeterminate = someChecked && !allChecked; }}
+                          ref={(el) => {
+                            if (el) (el as any).indeterminate = someChecked && !allChecked;
+                          }}
                         />
                       </th>
                       <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">Voucher #</th>
                       <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">Date</th>
                       <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">Type</th>
-                      <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">Description / Narration</th>
+                      <th className="px-3 py-2 text-left font-semibold text-xs uppercase tracking-wide">
+                        Description / Narration
+                      </th>
                       <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide">Debit</th>
                       <th className="px-3 py-2 text-right font-semibold text-xs uppercase tracking-wide">Credit</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredEntries.map(e => {
+                    {filteredEntries.map((e) => {
                       const checked = selectedIds.has(e.id);
                       const label = e.narration || e.voucherDescription || "—";
                       const dr = fmtMoney(e.debitAmount);
@@ -340,7 +371,7 @@ export default function AccountTransfer() {
                           onClick={() => toggleOne(e.id)}
                           data-testid={`row-entry-${e.id}`}
                         >
-                          <td className="px-4 py-2" onClick={ev => ev.stopPropagation()}>
+                          <td className="px-4 py-2" onClick={(ev) => ev.stopPropagation()}>
                             <Checkbox
                               checked={checked}
                               onCheckedChange={() => toggleOne(e.id)}
@@ -352,14 +383,26 @@ export default function AccountTransfer() {
                             {e.voucherDate ? format(new Date(e.voucherDate), "dd MMM yyyy") : "—"}
                           </td>
                           <td className="px-3 py-2">
-                            <Badge variant="outline" className="text-xs">{e.voucherType}</Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {e.voucherType}
+                            </Badge>
                           </td>
-                          <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs truncate" title={label}>{label}</td>
-                          <td className="px-3 py-2 text-right tabular-nums text-xs">
-                            {dr ? <span className="font-medium">${dr}</span> : <span className="text-muted-foreground">—</span>}
+                          <td className="px-3 py-2 text-xs text-muted-foreground max-w-xs truncate" title={label}>
+                            {label}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-xs">
-                            {cr ? <span className="font-medium">${cr}</span> : <span className="text-muted-foreground">—</span>}
+                            {dr ? (
+                              <span className="font-medium">${dr}</span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums text-xs">
+                            {cr ? (
+                              <span className="font-medium">${cr}</span>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -381,8 +424,22 @@ export default function AccountTransfer() {
                   {selectedIds.size} {selectedIds.size === 1 ? "entry" : "entries"} selected
                 </p>
                 <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  {totalDebit > 0 && <span>Debit: <span className="font-medium text-foreground">${totalDebit.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></span>}
-                  {totalCredit > 0 && <span>Credit: <span className="font-medium text-foreground">${totalCredit.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></span>}
+                  {totalDebit > 0 && (
+                    <span>
+                      Debit:{" "}
+                      <span className="font-medium text-foreground">
+                        ${totalDebit.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </span>
+                    </span>
+                  )}
+                  {totalCredit > 0 && (
+                    <span>
+                      Credit:{" "}
+                      <span className="font-medium text-foreground">
+                        ${totalCredit.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </span>
+                    </span>
+                  )}
                 </div>
                 {fromAccount && toAccount && (
                   <div className="flex items-center gap-2 text-xs mt-1">
@@ -411,8 +468,8 @@ export default function AccountTransfer() {
                   {transfer.isPending
                     ? "Transferring…"
                     : !toAccountId
-                    ? "Choose destination first"
-                    : `Transfer ${selectedIds.size} ${selectedIds.size === 1 ? "entry" : "entries"}`}
+                      ? "Choose destination first"
+                      : `Transfer ${selectedIds.size} ${selectedIds.size === 1 ? "entry" : "entries"}`}
                 </Button>
               </div>
             </div>

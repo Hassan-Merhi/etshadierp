@@ -7,7 +7,9 @@ import * as schema from "@shared/schema";
 // ---------------------------------------------------------------------------
 
 export async function getAllLocations(companyId: number): Promise<schema.Location[]> {
-  return await db.select().from(schema.locations)
+  return await db
+    .select()
+    .from(schema.locations)
     .where(and(eq(schema.locations.companyId, companyId), isNull(schema.locations.deletedAt)))
     .orderBy(asc(schema.locations.name));
 }
@@ -32,8 +34,16 @@ export async function deleteLocation(id: number): Promise<void> {
 }
 
 export async function getLocationByCode(code: string, companyId: number): Promise<schema.Location | undefined> {
-  const [location] = await db.select().from(schema.locations)
-    .where(and(eq(schema.locations.code, code), eq(schema.locations.companyId, companyId), isNull(schema.locations.deletedAt)));
+  const [location] = await db
+    .select()
+    .from(schema.locations)
+    .where(
+      and(
+        eq(schema.locations.code, code),
+        eq(schema.locations.companyId, companyId),
+        isNull(schema.locations.deletedAt)
+      )
+    );
   return location;
 }
 
@@ -42,7 +52,9 @@ export async function getLocationByCode(code: string, companyId: number): Promis
 // ---------------------------------------------------------------------------
 
 export async function getAllStockGroups(companyId: number): Promise<schema.StockGroup[]> {
-  return await db.select().from(schema.stockGroups)
+  return await db
+    .select()
+    .from(schema.stockGroups)
     .where(eq(schema.stockGroups.companyId, companyId))
     .orderBy(asc(schema.stockGroups.name));
 }
@@ -57,7 +69,10 @@ export async function createStockGroup(group: schema.InsertStockGroup): Promise<
   return created;
 }
 
-export async function updateStockGroup(id: number, updates: Partial<schema.InsertStockGroup>): Promise<schema.StockGroup> {
+export async function updateStockGroup(
+  id: number,
+  updates: Partial<schema.InsertStockGroup>
+): Promise<schema.StockGroup> {
   const [updated] = await db.update(schema.stockGroups).set(updates).where(eq(schema.stockGroups.id, id)).returning();
   return updated;
 }
@@ -67,7 +82,9 @@ export async function deleteStockGroup(id: number): Promise<void> {
 }
 
 export async function getStockGroupByCode(code: string, companyId: number): Promise<schema.StockGroup | undefined> {
-  const [group] = await db.select().from(schema.stockGroups)
+  const [group] = await db
+    .select()
+    .from(schema.stockGroups)
     .where(and(eq(schema.stockGroups.code, code), eq(schema.stockGroups.companyId, companyId)));
   return group;
 }
@@ -76,10 +93,17 @@ export async function getStockGroupByCode(code: string, companyId: number): Prom
 // Stock Items
 // ---------------------------------------------------------------------------
 
-export async function getAllStockItems(companyId: number, includeDeleted: boolean = false): Promise<schema.StockItem[]> {
+export async function getAllStockItems(
+  companyId: number,
+  includeDeleted: boolean = false
+): Promise<schema.StockItem[]> {
   const conditions = [eq(schema.stockItems.companyId, companyId)];
   if (!includeDeleted) conditions.push(isNull(schema.stockItems.deletedAt));
-  return await db.select().from(schema.stockItems).where(and(...conditions)).orderBy(asc(schema.stockItems.name));
+  return await db
+    .select()
+    .from(schema.stockItems)
+    .where(and(...conditions))
+    .orderBy(asc(schema.stockItems.name));
 }
 
 export async function getStockItemById(id: number): Promise<schema.StockItem | undefined> {
@@ -88,13 +112,33 @@ export async function getStockItemById(id: number): Promise<schema.StockItem | u
 }
 
 export async function getStockItemByCode(code: string, companyId: number): Promise<schema.StockItem | undefined> {
-  const [item] = await db.select().from(schema.stockItems).where(and(eq(schema.stockItems.code, code), eq(schema.stockItems.companyId, companyId), isNull(schema.stockItems.deletedAt)));
+  const [item] = await db
+    .select()
+    .from(schema.stockItems)
+    .where(
+      and(
+        eq(schema.stockItems.code, code),
+        eq(schema.stockItems.companyId, companyId),
+        isNull(schema.stockItems.deletedAt)
+      )
+    );
   return item;
 }
 
-export async function getStockItemByCodeOrAlias(codeOrAlias: string, companyId: number): Promise<schema.StockItem | undefined> {
-  const [directMatch] = await db.select().from(schema.stockItems)
-    .where(and(eq(schema.stockItems.code, codeOrAlias), eq(schema.stockItems.companyId, companyId), isNull(schema.stockItems.deletedAt)))
+export async function getStockItemByCodeOrAlias(
+  codeOrAlias: string,
+  companyId: number
+): Promise<schema.StockItem | undefined> {
+  const [directMatch] = await db
+    .select()
+    .from(schema.stockItems)
+    .where(
+      and(
+        eq(schema.stockItems.code, codeOrAlias),
+        eq(schema.stockItems.companyId, companyId),
+        isNull(schema.stockItems.deletedAt)
+      )
+    )
     .limit(1);
   if (directMatch) return directMatch;
 
@@ -102,14 +146,28 @@ export async function getStockItemByCodeOrAlias(codeOrAlias: string, companyId: 
     .select({ stockItem: schema.stockItems })
     .from(schema.codeAliases)
     .innerJoin(schema.stockItems, eq(schema.codeAliases.stockItemId, schema.stockItems.id))
-    .where(and(eq(schema.codeAliases.alias, codeOrAlias), eq(schema.stockItems.companyId, companyId), isNull(schema.stockItems.deletedAt)))
+    .where(
+      and(
+        eq(schema.codeAliases.alias, codeOrAlias),
+        eq(schema.stockItems.companyId, companyId),
+        isNull(schema.stockItems.deletedAt)
+      )
+    )
     .limit(1);
   return aliasMatch?.stockItem;
 }
 
 export async function getStockItemByBarcode(barcode: string, companyId: number): Promise<schema.StockItem | undefined> {
-  const [item] = await db.select().from(schema.stockItems)
-    .where(and(eq(schema.stockItems.barcode, barcode), eq(schema.stockItems.companyId, companyId), isNull(schema.stockItems.deletedAt)));
+  const [item] = await db
+    .select()
+    .from(schema.stockItems)
+    .where(
+      and(
+        eq(schema.stockItems.barcode, barcode),
+        eq(schema.stockItems.companyId, companyId),
+        isNull(schema.stockItems.deletedAt)
+      )
+    );
   return item;
 }
 
@@ -127,13 +185,21 @@ export async function deleteStockItem(id: number): Promise<void> {
   await db.update(schema.stockItems).set({ deletedAt: new Date() }).where(eq(schema.stockItems.id, id));
 }
 
-export async function searchStockItems(companyId: number, query: string, limit: number = 20): Promise<schema.StockItem[]> {
-  return await db.select().from(schema.stockItems)
-    .where(and(
-      eq(schema.stockItems.companyId, companyId),
-      isNull(schema.stockItems.deletedAt),
-      or(ilike(schema.stockItems.name, `%${query}%`), ilike(schema.stockItems.code, `%${query}%`))
-    ))
+export async function searchStockItems(
+  companyId: number,
+  query: string,
+  limit: number = 20
+): Promise<schema.StockItem[]> {
+  return await db
+    .select()
+    .from(schema.stockItems)
+    .where(
+      and(
+        eq(schema.stockItems.companyId, companyId),
+        isNull(schema.stockItems.deletedAt),
+        or(ilike(schema.stockItems.name, `%${query}%`), ilike(schema.stockItems.code, `%${query}%`))
+      )
+    )
     .orderBy(asc(schema.stockItems.name))
     .limit(limit);
 }
@@ -143,7 +209,10 @@ export async function searchStockItems(companyId: number, query: string, limit: 
 // ---------------------------------------------------------------------------
 
 export async function getCodeAliasesByStockItem(stockItemId: number): Promise<schema.StockItemCodeAlias[]> {
-  return await db.select().from(schema.stockItemCodeAliases).where(eq(schema.stockItemCodeAliases.stockItemId, stockItemId));
+  return await db
+    .select()
+    .from(schema.stockItemCodeAliases)
+    .where(eq(schema.stockItemCodeAliases.stockItemId, stockItemId));
 }
 
 export async function getStockItemCodeAliases(stockItemId: number): Promise<schema.StockItemCodeAlias[]> {
@@ -151,7 +220,10 @@ export async function getStockItemCodeAliases(stockItemId: number): Promise<sche
 }
 
 export async function getStockItemCodeAliasById(aliasId: number): Promise<schema.StockItemCodeAlias | undefined> {
-  const [alias] = await db.select().from(schema.stockItemCodeAliases).where(eq(schema.stockItemCodeAliases.id, aliasId));
+  const [alias] = await db
+    .select()
+    .from(schema.stockItemCodeAliases)
+    .where(eq(schema.stockItemCodeAliases.id, aliasId));
   return alias;
 }
 
@@ -168,35 +240,53 @@ export async function deleteCodeAlias(id: number): Promise<void> {
 // Location Prices
 // ---------------------------------------------------------------------------
 
-export async function getLocationPrices(companyId: number, locationId: number): Promise<schema.StockItemLocationPrice[]> {
-  return await db.select().from(schema.stockItemLocationPrices)
+export async function getLocationPrices(
+  companyId: number,
+  locationId: number
+): Promise<schema.StockItemLocationPrice[]> {
+  return await db
+    .select()
+    .from(schema.stockItemLocationPrices)
     .where(eq(schema.stockItemLocationPrices.locationId, locationId));
 }
 
 export async function getAllLocationPrices(companyId: number): Promise<schema.StockItemLocationPrice[]> {
-  return await db.select({
-    id: schema.stockItemLocationPrices.id,
-    stockItemId: schema.stockItemLocationPrices.stockItemId,
-    locationId: schema.stockItemLocationPrices.locationId,
-    sellingPrice: schema.stockItemLocationPrices.sellingPrice,
-    createdAt: schema.stockItemLocationPrices.createdAt,
-    updatedAt: schema.stockItemLocationPrices.updatedAt,
-  })
+  return await db
+    .select({
+      id: schema.stockItemLocationPrices.id,
+      stockItemId: schema.stockItemLocationPrices.stockItemId,
+      locationId: schema.stockItemLocationPrices.locationId,
+      sellingPrice: schema.stockItemLocationPrices.sellingPrice,
+      createdAt: schema.stockItemLocationPrices.createdAt,
+      updatedAt: schema.stockItemLocationPrices.updatedAt,
+    })
     .from(schema.stockItemLocationPrices)
     .innerJoin(schema.locations, eq(schema.stockItemLocationPrices.locationId, schema.locations.id))
     .where(eq(schema.locations.companyId, companyId));
 }
 
-export async function getLocationPricesByStockItem(stockItemId: number, companyId: number): Promise<schema.StockItemLocationPrice[]> {
-  return await db.select().from(schema.stockItemLocationPrices)
+export async function getLocationPricesByStockItem(
+  stockItemId: number,
+  companyId: number
+): Promise<schema.StockItemLocationPrice[]> {
+  return await db
+    .select()
+    .from(schema.stockItemLocationPrices)
     .where(eq(schema.stockItemLocationPrices.stockItemId, stockItemId));
 }
 
-export async function getStockItemLocationPrices(stockItemId: number, companyId: number): Promise<schema.StockItemLocationPrice[]> {
+export async function getStockItemLocationPrices(
+  stockItemId: number,
+  companyId: number
+): Promise<schema.StockItemLocationPrice[]> {
   return getLocationPricesByStockItem(stockItemId, companyId);
 }
 
-export async function upsertLocationPrice(stockItemId: number, locationId: number, sellingPrice: string): Promise<schema.StockItemLocationPrice> {
+export async function upsertLocationPrice(
+  stockItemId: number,
+  locationId: number,
+  sellingPrice: string
+): Promise<schema.StockItemLocationPrice> {
   const [result] = await db
     .insert(schema.stockItemLocationPrices)
     .values({ stockItemId, locationId, sellingPrice })
@@ -209,8 +299,7 @@ export async function upsertLocationPrice(stockItemId: number, locationId: numbe
 }
 
 export async function deleteLocationPrice(priceId: number): Promise<void> {
-  await db.delete(schema.stockItemLocationPrices)
-    .where(eq(schema.stockItemLocationPrices.id, priceId));
+  await db.delete(schema.stockItemLocationPrices).where(eq(schema.stockItemLocationPrices.id, priceId));
 }
 
 // ---------------------------------------------------------------------------
@@ -244,12 +333,14 @@ export async function getLocationInventory(companyId: number, locationId: number
       .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
       .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
       .leftJoin(schema.stockCategories, eq(schema.stockItems.categoryId, schema.stockCategories.id))
-      .where(and(
-        eq(schema.inventory.companyId, companyId),
-        eq(schema.inventory.locationId, locationId),
-        isNotNull(schema.stockItems.id),
-        isNull(schema.stockItems.deletedAt)
-      ))
+      .where(
+        and(
+          eq(schema.inventory.companyId, companyId),
+          eq(schema.inventory.locationId, locationId),
+          isNotNull(schema.stockItems.id),
+          isNull(schema.stockItems.deletedAt)
+        )
+      )
       .orderBy(asc(schema.stockItems.code));
   }
 
@@ -311,11 +402,13 @@ export async function getCompanyInventory(companyId: number): Promise<any[]> {
     .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
     .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
     .innerJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
-    .where(and(
-      eq(schema.inventory.companyId, companyId),
-      isNull(schema.locations.deletedAt),
-      isNull(schema.stockItems.deletedAt),
-    ))
+    .where(
+      and(
+        eq(schema.inventory.companyId, companyId),
+        isNull(schema.locations.deletedAt),
+        isNull(schema.stockItems.deletedAt)
+      )
+    )
     .orderBy(asc(schema.stockItems.code), asc(schema.locations.name));
 }
 
@@ -344,11 +437,14 @@ export async function updateInventory(
   quantity: string,
   averageRate: string,
   totalValue: string,
-  companyId?: number,
+  companyId?: number
 ): Promise<void> {
   let resolvedCompanyId = companyId;
   if (!resolvedCompanyId) {
-    const [loc] = await db.select({ companyId: schema.locations.companyId }).from(schema.locations).where(eq(schema.locations.id, locationId));
+    const [loc] = await db
+      .select({ companyId: schema.locations.companyId })
+      .from(schema.locations)
+      .where(eq(schema.locations.id, locationId));
     resolvedCompanyId = loc?.companyId ?? 0;
   }
   await db
@@ -381,10 +477,9 @@ export async function getLowStockItems(companyId: number, threshold: number = 10
     .from(schema.inventory)
     .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
     .leftJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
-    .where(and(
-      eq(schema.inventory.companyId, companyId),
-      sql`CAST(${schema.inventory.quantity} AS numeric) < ${threshold}`
-    ));
+    .where(
+      and(eq(schema.inventory.companyId, companyId), sql`CAST(${schema.inventory.quantity} AS numeric) < ${threshold}`)
+    );
 }
 
 export async function getInventorySummary(companyId: number): Promise<any[]> {
@@ -423,10 +518,13 @@ export async function getStockItemsWithInventory(companyId: number, locationId?:
     .from(schema.inventory)
     .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
     .leftJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
-    .leftJoin(schema.locationPrices, and(
-      eq(schema.locationPrices.stockItemId, schema.inventory.stockItemId),
-      eq(schema.locationPrices.locationId, schema.inventory.locationId)
-    ))
+    .leftJoin(
+      schema.locationPrices,
+      and(
+        eq(schema.locationPrices.stockItemId, schema.inventory.stockItemId),
+        eq(schema.locationPrices.locationId, schema.inventory.locationId)
+      )
+    )
     .where(and(...conditions, isNull(schema.stockItems.deletedAt)));
 }
 
@@ -447,14 +545,19 @@ export async function archiveStockGroupAtLocation(
   let uncategorizedGroupId: number | null = null;
 
   if (stockGroupId !== null) {
-    const stockGroup = await db.select().from(schema.stockGroups).where(eq(schema.stockGroups.id, stockGroupId)).limit(1);
+    const stockGroup = await db
+      .select()
+      .from(schema.stockGroups)
+      .where(eq(schema.stockGroups.id, stockGroupId))
+      .limit(1);
     if (!stockGroup.length) throw new Error("Stock group not found");
     stockGroupName = stockGroup[0].name;
   } else {
-    const uncategorizedGroup = await db.select().from(schema.stockGroups).where(and(
-      eq(schema.stockGroups.companyId, companyId),
-      sql`UPPER(${schema.stockGroups.code}) = 'UNCATEGORIZED'`
-    )).limit(1);
+    const uncategorizedGroup = await db
+      .select()
+      .from(schema.stockGroups)
+      .where(and(eq(schema.stockGroups.companyId, companyId), sql`UPPER(${schema.stockGroups.code}) = 'UNCATEGORIZED'`))
+      .limit(1);
     if (uncategorizedGroup.length > 0) uncategorizedGroupId = uncategorizedGroup[0].id;
   }
 
@@ -462,30 +565,45 @@ export async function archiveStockGroupAtLocation(
 
   let stockItems;
   if (stockGroupId !== null) {
-    stockItems = await db.select().from(schema.stockItems).where(and(
-      eq(schema.stockItems.companyId, companyId),
-      eq(schema.stockItems.stockGroupId, stockGroupId),
-      isNull(schema.stockItems.deletedAt)
-    ));
+    stockItems = await db
+      .select()
+      .from(schema.stockItems)
+      .where(
+        and(
+          eq(schema.stockItems.companyId, companyId),
+          eq(schema.stockItems.stockGroupId, stockGroupId),
+          isNull(schema.stockItems.deletedAt)
+        )
+      );
   } else {
     if (uncategorizedGroupId !== null) {
-      stockItems = await db.select().from(schema.stockItems).where(and(
-        eq(schema.stockItems.companyId, companyId),
-        or(isNull(schema.stockItems.stockGroupId), eq(schema.stockItems.stockGroupId, uncategorizedGroupId)),
-        isNull(schema.stockItems.deletedAt)
-      ));
+      stockItems = await db
+        .select()
+        .from(schema.stockItems)
+        .where(
+          and(
+            eq(schema.stockItems.companyId, companyId),
+            or(isNull(schema.stockItems.stockGroupId), eq(schema.stockItems.stockGroupId, uncategorizedGroupId)),
+            isNull(schema.stockItems.deletedAt)
+          )
+        );
     } else {
-      stockItems = await db.select().from(schema.stockItems).where(and(
-        eq(schema.stockItems.companyId, companyId),
-        isNull(schema.stockItems.stockGroupId),
-        isNull(schema.stockItems.deletedAt)
-      ));
+      stockItems = await db
+        .select()
+        .from(schema.stockItems)
+        .where(
+          and(
+            eq(schema.stockItems.companyId, companyId),
+            isNull(schema.stockItems.stockGroupId),
+            isNull(schema.stockItems.deletedAt)
+          )
+        );
     }
   }
 
   if (stockItems.length === 0) throw new Error("No stock items found in this stock group");
 
-  const stockItemIds = stockItems.map(item => item.id);
+  const stockItemIds = stockItems.map((item) => item.id);
   const inventoryRecords = await db
     .select({
       stockItemId: schema.inventory.stockItemId,
@@ -494,12 +612,14 @@ export async function archiveStockGroupAtLocation(
       totalValue: schema.inventory.totalValue,
     })
     .from(schema.inventory)
-    .where(and(
-      eq(schema.inventory.locationId, locationId),
-      eq(schema.inventory.companyId, companyId),
-      inArray(schema.inventory.stockItemId, stockItemIds),
-      sql`${schema.inventory.quantity}::numeric > 0`
-    ));
+    .where(
+      and(
+        eq(schema.inventory.locationId, locationId),
+        eq(schema.inventory.companyId, companyId),
+        inArray(schema.inventory.stockItemId, stockItemIds),
+        sql`${schema.inventory.quantity}::numeric > 0`
+      )
+    );
 
   if (inventoryRecords.length === 0) throw new Error("No inventory found for this stock group at this location");
 
@@ -510,23 +630,29 @@ export async function archiveStockGroupAtLocation(
     totalValue += parseFloat(inv.totalValue);
   }
 
-  const [archive] = await db.insert(schema.stockGroupLocationArchives).values({
-    companyId, locationId, stockGroupId,
-    locationName: location.name,
-    stockGroupName,
-    totalQuantity: totalQuantity.toString(),
-    totalValue: totalValue.toString(),
-    itemCount: inventoryRecords.length,
-    archivedBy, notes,
-  }).returning();
+  const [archive] = await db
+    .insert(schema.stockGroupLocationArchives)
+    .values({
+      companyId,
+      locationId,
+      stockGroupId,
+      locationName: location.name,
+      stockGroupName,
+      totalQuantity: totalQuantity.toString(),
+      totalValue: totalValue.toString(),
+      itemCount: inventoryRecords.length,
+      archivedBy,
+      notes,
+    })
+    .returning();
 
-  const archiveItems = inventoryRecords.map(inv => {
-    const item = stockItems.find(s => s.id === inv.stockItemId);
+  const archiveItems = inventoryRecords.map((inv) => {
+    const item = stockItems.find((s) => s.id === inv.stockItemId);
     return {
       archiveId: archive.id,
       stockItemId: inv.stockItemId,
-      stockItemCode: item?.code || '',
-      stockItemName: item?.name || '',
+      stockItemCode: item?.code || "",
+      stockItemName: item?.name || "",
       quantity: inv.quantity,
       averageRate: inv.averageRate,
       totalValue: inv.totalValue,
@@ -534,39 +660,60 @@ export async function archiveStockGroupAtLocation(
   });
   await db.insert(schema.stockGroupLocationArchiveItems).values(archiveItems);
 
-  await db.update(schema.inventory)
+  await db
+    .update(schema.inventory)
     .set({ quantity: "0", totalValue: "0", lastUpdated: sql`now()` })
-    .where(and(
-      eq(schema.inventory.locationId, locationId),
-      eq(schema.inventory.companyId, companyId),
-      inArray(schema.inventory.stockItemId, stockItemIds)
-    ));
+    .where(
+      and(
+        eq(schema.inventory.locationId, locationId),
+        eq(schema.inventory.companyId, companyId),
+        inArray(schema.inventory.stockItemId, stockItemIds)
+      )
+    );
 
   return archive;
 }
 
 export async function getStockGroupLocationArchives(companyId: number): Promise<schema.StockGroupLocationArchive[]> {
-  return await db.select().from(schema.stockGroupLocationArchives)
-    .where(and(
-      eq(schema.stockGroupLocationArchives.companyId, companyId),
-      isNull(schema.stockGroupLocationArchives.deletedAt),
-      isNull(schema.stockGroupLocationArchives.restoredAt)
-    ))
+  return await db
+    .select()
+    .from(schema.stockGroupLocationArchives)
+    .where(
+      and(
+        eq(schema.stockGroupLocationArchives.companyId, companyId),
+        isNull(schema.stockGroupLocationArchives.deletedAt),
+        isNull(schema.stockGroupLocationArchives.restoredAt)
+      )
+    )
     .orderBy(desc(schema.stockGroupLocationArchives.archivedAt));
 }
 
-export async function getStockGroupLocationArchiveById(id: number, companyId: number): Promise<schema.StockGroupLocationArchive | undefined> {
-  const [archive] = await db.select().from(schema.stockGroupLocationArchives)
-    .where(and(eq(schema.stockGroupLocationArchives.id, id), eq(schema.stockGroupLocationArchives.companyId, companyId)));
+export async function getStockGroupLocationArchiveById(
+  id: number,
+  companyId: number
+): Promise<schema.StockGroupLocationArchive | undefined> {
+  const [archive] = await db
+    .select()
+    .from(schema.stockGroupLocationArchives)
+    .where(
+      and(eq(schema.stockGroupLocationArchives.id, id), eq(schema.stockGroupLocationArchives.companyId, companyId))
+    );
   return archive;
 }
 
-export async function getStockGroupLocationArchiveItems(archiveId: number): Promise<schema.StockGroupLocationArchiveItem[]> {
-  return await db.select().from(schema.stockGroupLocationArchiveItems)
+export async function getStockGroupLocationArchiveItems(
+  archiveId: number
+): Promise<schema.StockGroupLocationArchiveItem[]> {
+  return await db
+    .select()
+    .from(schema.stockGroupLocationArchiveItems)
     .where(eq(schema.stockGroupLocationArchiveItems.archiveId, archiveId));
 }
 
-export async function restoreStockGroupLocationArchive(archiveId: number, companyId: number): Promise<schema.StockGroupLocationArchive> {
+export async function restoreStockGroupLocationArchive(
+  archiveId: number,
+  companyId: number
+): Promise<schema.StockGroupLocationArchive> {
   const archive = await getStockGroupLocationArchiveById(archiveId, companyId);
   if (!archive) throw new Error("Archive not found");
   if (archive.restoredAt) throw new Error("Archive has already been restored");
@@ -575,12 +722,16 @@ export async function restoreStockGroupLocationArchive(archiveId: number, compan
   const archiveItems = await getStockGroupLocationArchiveItems(archiveId);
 
   for (const item of archiveItems) {
-    const [existing] = await db.select().from(schema.inventory)
-      .where(and(
-        eq(schema.inventory.stockItemId, item.stockItemId),
-        eq(schema.inventory.locationId, archive.locationId),
-        eq(schema.inventory.companyId, companyId)
-      ));
+    const [existing] = await db
+      .select()
+      .from(schema.inventory)
+      .where(
+        and(
+          eq(schema.inventory.stockItemId, item.stockItemId),
+          eq(schema.inventory.locationId, archive.locationId),
+          eq(schema.inventory.companyId, companyId)
+        )
+      );
 
     if (existing) {
       const existingQty = parseFloat(existing.quantity);
@@ -591,12 +742,15 @@ export async function restoreStockGroupLocationArchive(archiveId: number, compan
       const newValue = existingValue + archivedValue;
       const newRate = newQty > 0 ? newValue / newQty : 0;
 
-      await db.update(schema.inventory).set({
-        quantity: newQty.toString(),
-        averageRate: newRate.toFixed(2),
-        totalValue: newValue.toFixed(2),
-        lastUpdated: sql`now()`,
-      }).where(eq(schema.inventory.id, existing.id));
+      await db
+        .update(schema.inventory)
+        .set({
+          quantity: newQty.toString(),
+          averageRate: newRate.toFixed(2),
+          totalValue: newValue.toFixed(2),
+          lastUpdated: sql`now()`,
+        })
+        .where(eq(schema.inventory.id, existing.id));
     } else {
       await db.insert(schema.inventory).values({
         companyId,
@@ -609,7 +763,8 @@ export async function restoreStockGroupLocationArchive(archiveId: number, compan
     }
   }
 
-  const [updated] = await db.update(schema.stockGroupLocationArchives)
+  const [updated] = await db
+    .update(schema.stockGroupLocationArchives)
     .set({ restoredAt: sql`now()` })
     .where(eq(schema.stockGroupLocationArchives.id, archiveId))
     .returning();
@@ -619,7 +774,8 @@ export async function restoreStockGroupLocationArchive(archiveId: number, compan
 export async function deleteStockGroupLocationArchive(archiveId: number, companyId: number): Promise<void> {
   const archive = await getStockGroupLocationArchiveById(archiveId, companyId);
   if (!archive) throw new Error("Archive not found");
-  await db.update(schema.stockGroupLocationArchives)
+  await db
+    .update(schema.stockGroupLocationArchives)
     .set({ deletedAt: sql`now()` })
     .where(eq(schema.stockGroupLocationArchives.id, archiveId));
 }
@@ -627,6 +783,8 @@ export async function deleteStockGroupLocationArchive(archiveId: number, company
 export async function permanentlyDeleteStockGroupLocationArchive(archiveId: number, companyId: number): Promise<void> {
   const archive = await getStockGroupLocationArchiveById(archiveId, companyId);
   if (!archive) throw new Error("Archive not found");
-  await db.delete(schema.stockGroupLocationArchiveItems).where(eq(schema.stockGroupLocationArchiveItems.archiveId, archiveId));
+  await db
+    .delete(schema.stockGroupLocationArchiveItems)
+    .where(eq(schema.stockGroupLocationArchiveItems.archiveId, archiveId));
   await db.delete(schema.stockGroupLocationArchives).where(eq(schema.stockGroupLocationArchives.id, archiveId));
 }

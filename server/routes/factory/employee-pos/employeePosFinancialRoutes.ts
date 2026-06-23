@@ -6,44 +6,112 @@ import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  propertyContracts, propertyMonthlyLedger, propertyPayments,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
+  propertyContracts,
+  propertyMonthlyLedger,
+  propertyPayments,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -52,7 +120,6 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
 
 export function registerEmployeePosFinancialRoutes(app: Express) {
   app.get("/api/factory/pos/sales", requireAuth, async (req: any, res: any) => {
@@ -76,7 +143,10 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const saleId = parseInt(req.params.id);
-      const [sale] = await db.select().from(factoryPosSales).where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
+      const [sale] = await db
+        .select()
+        .from(factoryPosSales)
+        .where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
       if (!sale) return res.status(404).json({ message: "Sale not found" });
       const items = await db.select().from(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
       res.json({ ...sale, items });
@@ -93,7 +163,19 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const userId: number | null = rawUserId && !isNaN(Number(rawUserId)) ? Number(rawUserId) : null;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { locationId, customerName, customerId, notes, txDate, currencyCode, cashAccountId, paymentType, depositAmount, items, expenses } = req.body;
+      const {
+        locationId,
+        customerName,
+        customerId,
+        notes,
+        txDate,
+        currencyCode,
+        cashAccountId,
+        paymentType,
+        depositAmount,
+        items,
+        expenses,
+      } = req.body;
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
       }
@@ -108,7 +190,10 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const parsedCustomerId = customerId ? parseInt(customerId) : null;
       const depositAmt = isCredit ? Math.max(0, parseFloat(depositAmount || "0")) : 0;
 
-      const totalAmount = items.reduce((s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"), 0);
+      const totalAmount = items.reduce(
+        (s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
+        0
+      );
 
       // Expense deductions (optional array of {accountId, description, amount})
       const expenseRows: Array<{ accountId: number; description: string; amount: number }> = [];
@@ -125,29 +210,35 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const netCash = isCredit ? depositAmt - totalExpenses : totalAmount - totalExpenses;
 
       // Generate sale number
-      const [seqRow] = await db.select({ count: sql<number>`count(*)` }).from(factoryPosSales).where(eq(factoryPosSales.companyId, companyId));
+      const [seqRow] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(factoryPosSales)
+        .where(eq(factoryPosSales.companyId, companyId));
       const nextNum = (Number(seqRow?.count || 0) + 1).toString().padStart(4, "0");
       const saleNumber = `FPOS-${nextNum}`;
 
       const result = await db.transaction(async (tx: any) => {
         // 1. Create sale record
-        const [sale] = await tx.insert(factoryPosSales).values({
-          companyId,
-          saleNumber,
-          txDate: txDate || getClientDate(req),
-          locationId: locationId || null,
-          customerName: customerName || null,
-          customerId: parsedCustomerId,
-          notes: notes || null,
-          totalAmount: totalAmount.toFixed(2),
-          currencyCode: currencyCode || "USD",
-          cashAccountId: cashAccountId || null,
-          paymentType: isCredit ? "CREDIT" : "CASH",
-          depositAmount: isCredit ? depositAmt.toFixed(2) : "0",
-          status: "COMPLETED",
-          createdBy: userId,
-          expensesJson: expenseRows.length > 0 ? JSON.stringify(expenseRows) : null,
-        }).returning();
+        const [sale] = await tx
+          .insert(factoryPosSales)
+          .values({
+            companyId,
+            saleNumber,
+            txDate: txDate || getClientDate(req),
+            locationId: locationId || null,
+            customerName: customerName || null,
+            customerId: parsedCustomerId,
+            notes: notes || null,
+            totalAmount: totalAmount.toFixed(2),
+            currencyCode: currencyCode || "USD",
+            cashAccountId: cashAccountId || null,
+            paymentType: isCredit ? "CREDIT" : "CASH",
+            depositAmount: isCredit ? depositAmt.toFixed(2) : "0",
+            status: "COMPLETED",
+            createdBy: userId,
+            expensesJson: expenseRows.length > 0 ? JSON.stringify(expenseRows) : null,
+          })
+          .returning();
 
         // 2. Create sale items
         for (const item of items) {
@@ -176,22 +267,25 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
             const availableBales = await tx
               .select({ id: factoryBales.id })
               .from(factoryBales)
-              .where(and(
-                eq(factoryBales.companyId, companyId),
-                eq(factoryBales.productId, item.productId),
-                eq(factoryBales.erpLocationId, locationId),
-                eq(factoryBales.status, "IN_STOCK"),
-              ))
+              .where(
+                and(
+                  eq(factoryBales.companyId, companyId),
+                  eq(factoryBales.productId, item.productId),
+                  eq(factoryBales.erpLocationId, locationId),
+                  eq(factoryBales.status, "IN_STOCK")
+                )
+              )
               .orderBy(factoryBales.id)
               .limit(qty)
               .for("update");
             if (availableBales.length < qty) {
               throw new Error(
-                `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`,
+                `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`
               );
             }
             const baleIds = availableBales.map((b: any) => b.id);
-            await tx.update(factoryBales)
+            await tx
+              .update(factoryBales)
               .set({ status: "SOLD", updatedAt: new Date() })
               .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
           }
@@ -278,17 +372,20 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         const voucherCashAmt = isCredit ? depositAmt : totalAmount;
         if (cashAccountId && voucherCashAmt > 0) {
           const voucherNum = `FPOS-${sale.id}-${Date.now()}`;
-          const [vch] = await tx.insert(vouchers).values({
-            companyId,
-            voucherType: "Receipt",
-            voucherNumber: voucherNum,
-            voucherDate: txDate || getClientDate(req),
-            description: `Factory POS Sale ${saleNumber}${customerName ? ` – ${customerName}` : ""}`,
-            totalAmount: voucherCashAmt.toFixed(2),
-            currency: currencyCode || "USD",
-            exchangeRate: "1",
-            sourceModule: "FACTORY_POS",
-          }).returning();
+          const [vch] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Receipt",
+              voucherNumber: voucherNum,
+              voucherDate: txDate || getClientDate(req),
+              description: `Factory POS Sale ${saleNumber}${customerName ? ` – ${customerName}` : ""}`,
+              totalAmount: voucherCashAmt.toFixed(2),
+              currency: currencyCode || "USD",
+              exchangeRate: "1",
+              sourceModule: "FACTORY_POS",
+            })
+            .returning();
           // DR Cash (net of deposit after expense deductions)
           const netDeposit = Math.max(0, netCash);
           if (netDeposit > 0) {
@@ -297,7 +394,9 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
               ledgerAccountId: cashAccountId,
               debitAmount: netDeposit.toFixed(2),
               creditAmount: "0",
-              narration: isCredit ? `Deposit on credit sale – ${saleNumber}` : `Factory POS cash receipt – ${saleNumber}`,
+              narration: isCredit
+                ? `Deposit on credit sale – ${saleNumber}`
+                : `Factory POS cash receipt – ${saleNumber}`,
             });
           }
           // DR each expense account
@@ -311,7 +410,12 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
             });
           }
           // CR Factory Sales Income (gross amount entering cash)
-          const salesIncomeAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_BALE_SALES_INCOME", "Factory Bale Sales Income", "Revenue");
+          const salesIncomeAccId = await getOrCreateLedgerAccount(
+            companyId,
+            "FACTORY_BALE_SALES_INCOME",
+            "Factory Bale Sales Income",
+            "Revenue"
+          );
           await tx.insert(voucherEntries).values({
             voucherId: vch.id,
             ledgerAccountId: salesIncomeAccId,
@@ -338,11 +442,26 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const saleId = parseInt(req.params.id);
 
-      const [existingSale] = await db.select().from(factoryPosSales).where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
+      const [existingSale] = await db
+        .select()
+        .from(factoryPosSales)
+        .where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
       if (!existingSale) return res.status(404).json({ message: "Sale not found" });
       if (existingSale.status === "VOIDED") return res.status(400).json({ message: "Cannot edit a voided sale" });
 
-      const { locationId, customerName, customerId, notes, txDate, currencyCode, cashAccountId, paymentType, depositAmount, items, expenses } = req.body;
+      const {
+        locationId,
+        customerName,
+        customerId,
+        notes,
+        txDate,
+        currencyCode,
+        cashAccountId,
+        paymentType,
+        depositAmount,
+        items,
+        expenses,
+      } = req.body;
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
       }
@@ -350,7 +469,10 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const isCredit = (paymentType || "CASH") === "CREDIT";
       const parsedCustomerId = customerId ? parseInt(customerId) : null;
       const depositAmt = isCredit ? Math.max(0, parseFloat(depositAmount || "0")) : 0;
-      const totalAmount = items.reduce((s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"), 0);
+      const totalAmount = items.reduce(
+        (s: number, it: any) => s + parseFloat(it.unitPrice || "0") * parseInt(it.quantity || "1"),
+        0
+      );
 
       const expenseRows: Array<{ accountId: number; description: string; amount: number }> = [];
       if (Array.isArray(expenses)) {
@@ -372,18 +494,21 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
             const soldBales = await tx
               .select({ id: factoryBales.id })
               .from(factoryBales)
-              .where(and(
-                eq(factoryBales.companyId, companyId),
-                eq(factoryBales.productId, oldItem.productId),
-                eq(factoryBales.erpLocationId, existingSale.locationId),
-                eq(factoryBales.status, "SOLD"),
-              ))
+              .where(
+                and(
+                  eq(factoryBales.companyId, companyId),
+                  eq(factoryBales.productId, oldItem.productId),
+                  eq(factoryBales.erpLocationId, existingSale.locationId),
+                  eq(factoryBales.status, "SOLD")
+                )
+              )
               .orderBy(desc(factoryBales.id))
               .limit(oldItem.quantity)
               .for("update");
             const baleIds = soldBales.map((b: any) => b.id);
             if (baleIds.length > 0) {
-              await tx.update(factoryBales)
+              await tx
+                .update(factoryBales)
                 .set({ status: "IN_STOCK", updatedAt: new Date() })
                 .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
             }
@@ -394,7 +519,8 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         await tx.delete(factoryPosSaleItems).where(eq(factoryPosSaleItems.saleId, saleId));
 
         // Step 3: Update sale record
-        const [updatedSale] = await tx.update(factoryPosSales)
+        const [updatedSale] = await tx
+          .update(factoryPosSales)
           .set({
             txDate: txDate || existingSale.txDate,
             locationId: locationId || null,
@@ -431,48 +557,57 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
             const availableBales = await tx
               .select({ id: factoryBales.id })
               .from(factoryBales)
-              .where(and(
-                eq(factoryBales.companyId, companyId),
-                eq(factoryBales.productId, item.productId),
-                eq(factoryBales.erpLocationId, locationId),
-                eq(factoryBales.status, "IN_STOCK"),
-              ))
+              .where(
+                and(
+                  eq(factoryBales.companyId, companyId),
+                  eq(factoryBales.productId, item.productId),
+                  eq(factoryBales.erpLocationId, locationId),
+                  eq(factoryBales.status, "IN_STOCK")
+                )
+              )
               .orderBy(factoryBales.id)
               .limit(qty)
               .for("update");
             if (availableBales.length < qty) {
               throw new Error(
-                `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`,
+                `INSUFFICIENT_BALE_STOCK: requested ${qty} bale(s) of "${item.productName || item.articleCode || item.productId}" at this location, only ${availableBales.length} available`
               );
             }
             const baleIds = availableBales.map((b: any) => b.id);
-            await tx.update(factoryBales)
+            await tx
+              .update(factoryBales)
               .set({ status: "SOLD", updatedAt: new Date() })
               .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
           }
         }
 
         // Step 5: Update factory daybook BALE_SALE entry and rebuild POS_EXPENSE entries
-        await tx.update(factoryDaybookEntries)
+        await tx
+          .update(factoryDaybookEntries)
           .set({
             amountCurrency: totalAmount.toFixed(2),
             amountUsd: totalAmount.toFixed(2),
             txDate: txDate || existingSale.txDate,
             description: `Factory POS Sale ${existingSale.saleNumber}${customerName ? ` – ${customerName}` : ""}${isCredit ? " [CREDIT]" : ""}`,
           })
-          .where(and(
-            eq(factoryDaybookEntries.referenceTable, "factory_pos_sales"),
-            eq(factoryDaybookEntries.referenceId, saleId),
-            eq(factoryDaybookEntries.txType, "BALE_SALE"),
-          ));
+          .where(
+            and(
+              eq(factoryDaybookEntries.referenceTable, "factory_pos_sales"),
+              eq(factoryDaybookEntries.referenceId, saleId),
+              eq(factoryDaybookEntries.txType, "BALE_SALE")
+            )
+          );
 
         // Delete old expense daybook rows, then re-insert fresh ones
-        await tx.delete(factoryDaybookEntries)
-          .where(and(
-            eq(factoryDaybookEntries.referenceTable, "factory_pos_sales"),
-            eq(factoryDaybookEntries.referenceId, saleId),
-            eq(factoryDaybookEntries.txType, "POS_EXPENSE"),
-          ));
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.referenceTable, "factory_pos_sales"),
+              eq(factoryDaybookEntries.referenceId, saleId),
+              eq(factoryDaybookEntries.txType, "POS_EXPENSE")
+            )
+          );
         for (const exp of expenseRows) {
           await tx.insert(factoryDaybookEntries).values({
             companyId,
@@ -491,15 +626,18 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         // Step 6: Update customer balance entries if applicable
         if (isCredit && parsedCustomerId) {
           // Remove old SALE and DEPOSIT balance entries for this sale
-          await tx.delete(customerBalances)
-            .where(and(
-              eq(customerBalances.referenceId, saleId),
-              eq(customerBalances.companyId, companyId),
-              or(
-                eq(customerBalances.referenceType, "FACTORY_POS_SALE"),
-                eq(customerBalances.referenceType, "FACTORY_POS_DEPOSIT"),
-              ),
-            ));
+          await tx
+            .delete(customerBalances)
+            .where(
+              and(
+                eq(customerBalances.referenceId, saleId),
+                eq(customerBalances.companyId, companyId),
+                or(
+                  eq(customerBalances.referenceType, "FACTORY_POS_SALE"),
+                  eq(customerBalances.referenceType, "FACTORY_POS_DEPOSIT")
+                )
+              )
+            );
 
           // Re-compute running balance and re-insert
           const [balRow] = await tx
@@ -540,17 +678,22 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         }
 
         // Step 7: Update the ERP receipt voucher if it exists
-        const existingVouchers = await tx.select().from(vouchers)
-          .where(and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.sourceModule, "FACTORY_POS"),
-            sql`voucher_number LIKE ${'FPOS-' + saleId + '-%'}`,
-          ));
+        const existingVouchers = await tx
+          .select()
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.sourceModule, "FACTORY_POS"),
+              sql`voucher_number LIKE ${"FPOS-" + saleId + "-%"}`
+            )
+          );
         if (existingVouchers.length > 0) {
           const vchId = existingVouchers[0].id;
           const voucherCashAmt = isCredit ? depositAmt : totalAmount;
           if (cashAccountId && voucherCashAmt > 0) {
-            await tx.update(vouchers)
+            await tx
+              .update(vouchers)
               .set({
                 voucherDate: txDate || existingSale.txDate,
                 description: `Factory POS Sale ${existingSale.saleNumber}${customerName ? ` – ${customerName}` : ""}`,
@@ -568,7 +711,9 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
                 ledgerAccountId: parseInt(cashAccountId),
                 debitAmount: netDeposit.toFixed(2),
                 creditAmount: "0",
-                narration: isCredit ? `Deposit on credit sale – ${existingSale.saleNumber}` : `Factory POS cash receipt – ${existingSale.saleNumber}`,
+                narration: isCredit
+                  ? `Deposit on credit sale – ${existingSale.saleNumber}`
+                  : `Factory POS cash receipt – ${existingSale.saleNumber}`,
               });
             }
             for (const exp of expenseRows) {
@@ -580,7 +725,12 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
                 narration: exp.description || `POS deduction – ${existingSale.saleNumber}`,
               });
             }
-            const salesIncomeAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_BALE_SALES_INCOME", "Factory Bale Sales Income", "Revenue");
+            const salesIncomeAccId = await getOrCreateLedgerAccount(
+              companyId,
+              "FACTORY_BALE_SALES_INCOME",
+              "Factory Bale Sales Income",
+              "Revenue"
+            );
             await tx.insert(voucherEntries).values({
               voucherId: vchId,
               ledgerAccountId: salesIncomeAccId,
@@ -607,7 +757,10 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const saleId = parseInt(req.params.id);
-      const [sale] = await db.select().from(factoryPosSales).where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
+      const [sale] = await db
+        .select()
+        .from(factoryPosSales)
+        .where(and(eq(factoryPosSales.id, saleId), eq(factoryPosSales.companyId, companyId)));
       if (!sale) return res.status(404).json({ message: "Sale not found" });
       if (sale.status === "VOIDED") return res.status(400).json({ message: "Sale already voided" });
 
@@ -620,18 +773,21 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
             const soldBales = await tx
               .select({ id: factoryBales.id })
               .from(factoryBales)
-              .where(and(
-                eq(factoryBales.companyId, companyId),
-                eq(factoryBales.productId, item.productId),
-                eq(factoryBales.erpLocationId, sale.locationId),
-                eq(factoryBales.status, "SOLD"),
-              ))
+              .where(
+                and(
+                  eq(factoryBales.companyId, companyId),
+                  eq(factoryBales.productId, item.productId),
+                  eq(factoryBales.erpLocationId, sale.locationId),
+                  eq(factoryBales.status, "SOLD")
+                )
+              )
               .orderBy(desc(factoryBales.id))
               .limit(item.quantity)
               .for("update");
             const baleIds = soldBales.map((b: any) => b.id);
             if (baleIds.length > 0) {
-              await tx.update(factoryBales)
+              await tx
+                .update(factoryBales)
                 .set({ status: "IN_STOCK", updatedAt: new Date() })
                 .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, baleIds)));
             }
@@ -653,11 +809,15 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const cats = await db.select().from(factoryWorkerCategories)
+      const cats = await db
+        .select()
+        .from(factoryWorkerCategories)
         .where(eq(factoryWorkerCategories.companyId, companyId))
         .orderBy(factoryWorkerCategories.name);
       res.json(cats);
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   app.post("/api/factory/worker-categories", requireAuth, async (req: any, res: any) => {
@@ -667,7 +827,9 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const body = insertFactoryWorkerCategorySchema.parse({ ...req.body, companyId });
       const [cat] = await db.insert(factoryWorkerCategories).values(body).returning();
       res.json(cat);
-    } catch (e: any) { res.status(400).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
   });
 
   app.patch("/api/factory/worker-categories/:id", requireAuth, async (req: any, res: any) => {
@@ -676,13 +838,16 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       const body = insertFactoryWorkerCategorySchema.partial().parse(req.body);
-      const [cat] = await db.update(factoryWorkerCategories)
+      const [cat] = await db
+        .update(factoryWorkerCategories)
         .set(body)
         .where(and(eq(factoryWorkerCategories.id, id), eq(factoryWorkerCategories.companyId, companyId)))
         .returning();
       if (!cat) return res.status(404).json({ message: "Not found" });
       res.json(cat);
-    } catch (e: any) { res.status(400).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
   });
 
   app.delete("/api/factory/worker-categories/:id", requireAuth, async (req: any, res: any) => {
@@ -690,10 +855,13 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const companyId = req.session.currentCompanyId || req.session.factoryCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
-      await db.delete(factoryWorkerCategories)
+      await db
+        .delete(factoryWorkerCategories)
         .where(and(eq(factoryWorkerCategories.id, id), eq(factoryWorkerCategories.companyId, companyId)));
       res.json({ ok: true });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -707,12 +875,15 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
       // ── 1. Raw material value (remaining kg × cost per kg USD) ────────────
-      const rawStockRows = await db.select({
-        receivedKg: factoryRawStock.receivedKg,
-        usedKg: factoryRawStock.usedKg,
-        costPerKg: factoryRawStock.costPerKg,
-        costPerKgUsd: factoryRawStock.costPerKgUsd,
-      }).from(factoryRawStock).where(eq(factoryRawStock.companyId, companyId));
+      const rawStockRows = await db
+        .select({
+          receivedKg: factoryRawStock.receivedKg,
+          usedKg: factoryRawStock.usedKg,
+          costPerKg: factoryRawStock.costPerKg,
+          costPerKgUsd: factoryRawStock.costPerKgUsd,
+        })
+        .from(factoryRawStock)
+        .where(eq(factoryRawStock.companyId, companyId));
 
       let rawMaterialValue = 0;
       for (const r of rawStockRows as any[]) {
@@ -722,18 +893,21 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       }
 
       // ── 2. Mix batch value (non-finalized batches: not COMPLETED or CLOSED) ─
-      const mixBatchRows = await db.select({
-        totalWeightKg: factoryMixBatches.totalWeightKg,
-        usedKg: factoryMixBatches.usedKg,
-        costPerKg: factoryMixBatches.costPerKg,
-        status: factoryMixBatches.status,
-      }).from(factoryMixBatches).where(
-        and(
-          eq(factoryMixBatches.companyId, companyId),
-          ne(factoryMixBatches.status, "COMPLETED"),
-          ne(factoryMixBatches.status, "CLOSED"),
-        )
-      );
+      const mixBatchRows = await db
+        .select({
+          totalWeightKg: factoryMixBatches.totalWeightKg,
+          usedKg: factoryMixBatches.usedKg,
+          costPerKg: factoryMixBatches.costPerKg,
+          status: factoryMixBatches.status,
+        })
+        .from(factoryMixBatches)
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            ne(factoryMixBatches.status, "COMPLETED"),
+            ne(factoryMixBatches.status, "CLOSED")
+          )
+        );
 
       let mixBatchValue = 0;
       for (const b of mixBatchRows as any[]) {
@@ -745,71 +919,83 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
       // ── 3. Bale stock weight — only physically-present bales ──────────────
       // IN_STOCK = available, RESERVED_FOR_ORDER = allocated to a pending order
       // but physically still in the warehouse. Excludes SOLD / DISPATCHED / etc.
-      const baleAgg = await db.select({
-        totalWeight: sql<string>`COALESCE(SUM(CAST(${factoryBales.weightKg} AS numeric)), 0)`,
-        totalCount: sql<string>`COUNT(*)`,
-        totalValue: sql<string>`COALESCE(SUM(CAST(${factoryBales.totalCost} AS numeric)), 0)`,
-      }).from(factoryBales).where(
-        and(
-          eq(factoryBales.companyId, companyId),
-          inArray(factoryBales.status, ["IN_STOCK", "RESERVED_FOR_ORDER"]),
-        )
-      );
+      const baleAgg = await db
+        .select({
+          totalWeight: sql<string>`COALESCE(SUM(CAST(${factoryBales.weightKg} AS numeric)), 0)`,
+          totalCount: sql<string>`COUNT(*)`,
+          totalValue: sql<string>`COALESCE(SUM(CAST(${factoryBales.totalCost} AS numeric)), 0)`,
+        })
+        .from(factoryBales)
+        .where(
+          and(eq(factoryBales.companyId, companyId), inArray(factoryBales.status, ["IN_STOCK", "RESERVED_FOR_ORDER"]))
+        );
 
       const baleWeightTotal = parseFloat((baleAgg[0] as any)?.totalWeight || "0");
       const baleCount = parseInt((baleAgg[0] as any)?.totalCount || "0");
       const baleValueTotal = parseFloat((baleAgg[0] as any)?.totalValue || "0");
 
       // ── 4. Outstanding worker advances ────────────────────────────────────
-      const advanceAgg = await db.select({
-        total: sql<string>`COALESCE(SUM(CAST(${factoryWorkerAdvances.remainingBalance} AS numeric)), 0)`,
-        count: sql<string>`COUNT(*)`,
-      }).from(factoryWorkerAdvances).where(
-        and(
-          eq(factoryWorkerAdvances.companyId, companyId),
-          eq(factoryWorkerAdvances.fullyPaid, false),
-        )
-      );
+      const advanceAgg = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(CAST(${factoryWorkerAdvances.remainingBalance} AS numeric)), 0)`,
+          count: sql<string>`COUNT(*)`,
+        })
+        .from(factoryWorkerAdvances)
+        .where(and(eq(factoryWorkerAdvances.companyId, companyId), eq(factoryWorkerAdvances.fullyPaid, false)));
 
       const outstandingAdvances = parseFloat((advanceAgg[0] as any)?.total || "0");
       const advanceCount = parseInt((advanceAgg[0] as any)?.count || "0");
 
       // ── 5. Active worker count ────────────────────────────────────────────
-      const workerAgg = await db.select({
-        total: sql<string>`COUNT(*)`,
-      }).from(factoryWorkers).where(
-        and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true))
-      );
+      const workerAgg = await db
+        .select({
+          total: sql<string>`COUNT(*)`,
+        })
+        .from(factoryWorkers)
+        .where(and(eq(factoryWorkers.companyId, companyId), eq(factoryWorkers.active, true)));
       const activeWorkerCount = parseInt((workerAgg[0] as any)?.total || "0");
 
       // ── 6. Equity / Capital ledger accounts with balances ─────────────────
-      const equityAccounts = await db.select({
-        id: ledgerAccounts.id,
-        name: ledgerAccounts.name,
-        code: ledgerAccounts.code,
-        accountType: ledgerAccounts.accountType,
-        openingBalance: ledgerAccounts.openingBalance,
-        openingBalanceSide: ledgerAccounts.openingBalanceSide,
-      }).from(ledgerAccounts).where(
-        and(
-          eq(ledgerAccounts.companyId, companyId),
-          or(
-            sql`LOWER(${ledgerAccounts.accountType}) IN ('equity', 'capital', 'owner equity', 'owners equity', 'share capital')`,
-            sql`LOWER(${ledgerAccounts.name}) ILIKE '%capital%'`,
+      const equityAccounts = await db
+        .select({
+          id: ledgerAccounts.id,
+          name: ledgerAccounts.name,
+          code: ledgerAccounts.code,
+          accountType: ledgerAccounts.accountType,
+          openingBalance: ledgerAccounts.openingBalance,
+          openingBalanceSide: ledgerAccounts.openingBalanceSide,
+        })
+        .from(ledgerAccounts)
+        .where(
+          and(
+            eq(ledgerAccounts.companyId, companyId),
+            or(
+              sql`LOWER(${ledgerAccounts.accountType}) IN ('equity', 'capital', 'owner equity', 'owners equity', 'share capital')`,
+              sql`LOWER(${ledgerAccounts.name}) ILIKE '%capital%'`
+            )
           )
-        )
-      );
+        );
 
       // Get voucher entries for equity accounts
       let capitalTotal = 0;
       if ((equityAccounts as any[]).length > 0) {
         const equityIds = (equityAccounts as any[]).map((a: any) => a.id);
-        const equityEntries = await db.select({
-          ledgerAccountId: voucherEntries.ledgerAccountId,
-          debit: sql<string>`SUM(CAST(${voucherEntries.debitAmount} AS numeric))`,
-          credit: sql<string>`SUM(CAST(${voucherEntries.creditAmount} AS numeric))`,
-        }).from(voucherEntries)
-          .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)))
+        const equityEntries = await db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            debit: sql<string>`SUM(CAST(${voucherEntries.debitAmount} AS numeric))`,
+            credit: sql<string>`SUM(CAST(${voucherEntries.creditAmount} AS numeric))`,
+          })
+          .from(voucherEntries)
+          .innerJoin(
+            vouchers,
+            and(
+              eq(voucherEntries.voucherId, vouchers.id),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
+            )
+          )
           .where(inArray(voucherEntries.ledgerAccountId, equityIds))
           .groupBy(voucherEntries.ledgerAccountId);
 
@@ -838,7 +1024,12 @@ export function registerEmployeePosFinancialRoutes(app: Express) {
         advanceCount,
         activeWorkerCount,
         capitalTotal: round2(capitalTotal),
-        equityAccounts: (equityAccounts as any[]).map((a: any) => ({ id: a.id, name: a.name, code: a.code, accountType: a.accountType })),
+        equityAccounts: (equityAccounts as any[]).map((a: any) => ({
+          id: a.id,
+          name: a.name,
+          code: a.code,
+          accountType: a.accountType,
+        })),
       });
     } catch (error: any) {
       console.error("Factory financial-snapshot error:", error);

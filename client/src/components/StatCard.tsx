@@ -3,19 +3,29 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LucideIcon, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type StatTone = "default" | "primary" | "success" | "warning" | "destructive" | "info" | "chart-2" | "chart-3" | "chart-4" | "chart-5";
+export type StatTone =
+  | "default"
+  | "primary"
+  | "success"
+  | "warning"
+  | "destructive"
+  | "info"
+  | "chart-2"
+  | "chart-3"
+  | "chart-4"
+  | "chart-5";
 
 const toneStyles: Record<StatTone, { bg: string; fg: string }> = {
-  default:     { bg: "bg-muted",                fg: "text-foreground" },
-  primary:     { bg: "bg-primary/10",           fg: "text-primary" },
-  success:     { bg: "bg-success-soft",         fg: "text-success-soft-foreground" },
-  warning:     { bg: "bg-warning-soft",         fg: "text-warning-soft-foreground" },
-  destructive: { bg: "bg-destructive-soft",    fg: "text-destructive" },
-  info:        { bg: "bg-info-soft",            fg: "text-info-soft-foreground" },
-  "chart-2":   { bg: "bg-[hsl(var(--chart-2)/0.12)]", fg: "text-[hsl(var(--chart-2))]" },
-  "chart-3":   { bg: "bg-[hsl(var(--chart-3)/0.12)]", fg: "text-[hsl(var(--chart-3))]" },
-  "chart-4":   { bg: "bg-[hsl(var(--chart-4)/0.12)]", fg: "text-[hsl(var(--chart-4))]" },
-  "chart-5":   { bg: "bg-[hsl(var(--chart-5)/0.12)]", fg: "text-[hsl(var(--chart-5))]" },
+  default: { bg: "bg-muted", fg: "text-foreground" },
+  primary: { bg: "bg-primary/10", fg: "text-primary" },
+  success: { bg: "bg-success-soft", fg: "text-success-soft-foreground" },
+  warning: { bg: "bg-warning-soft", fg: "text-warning-soft-foreground" },
+  destructive: { bg: "bg-destructive-soft", fg: "text-destructive" },
+  info: { bg: "bg-info-soft", fg: "text-info-soft-foreground" },
+  "chart-2": { bg: "bg-[hsl(var(--chart-2)/0.12)]", fg: "text-[hsl(var(--chart-2))]" },
+  "chart-3": { bg: "bg-[hsl(var(--chart-3)/0.12)]", fg: "text-[hsl(var(--chart-3))]" },
+  "chart-4": { bg: "bg-[hsl(var(--chart-4)/0.12)]", fg: "text-[hsl(var(--chart-4))]" },
+  "chart-5": { bg: "bg-[hsl(var(--chart-5)/0.12)]", fg: "text-[hsl(var(--chart-5))]" },
 };
 
 export interface StatCardProps {
@@ -51,12 +61,12 @@ export function StatCard({
   "data-testid": testId,
 }: StatCardProps) {
   const isClickable = !!onClick;
-  const ChangeIcon =
-    changeType === "positive" ? ArrowUpRight :
-    changeType === "negative" ? ArrowDownRight :
-    Minus;
+  const ChangeIcon = changeType === "positive" ? ArrowUpRight : changeType === "negative" ? ArrowDownRight : Minus;
   const t = toneStyles[tone];
-  const slug = title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const slug = title
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
 
   return (
     <Card
@@ -83,9 +93,11 @@ export function StatCard({
             <span
               className={cn(
                 "inline-flex items-center gap-0.5 text-xs font-medium tabular-nums truncate",
-                changeType === "positive" ? "text-success" :
-                changeType === "negative" ? "text-destructive" :
-                "text-muted-foreground"
+                changeType === "positive"
+                  ? "text-success"
+                  : changeType === "negative"
+                    ? "text-destructive"
+                    : "text-muted-foreground"
               )}
               data-testid={`text-stat-delta-${slug}`}
             >
@@ -93,12 +105,12 @@ export function StatCard({
               {change}
             </span>
           )}
-          {!loading && hint && !change && (
-            <span className="text-xs text-muted-foreground truncate">{hint}</span>
-          )}
+          {!loading && hint && !change && <span className="text-xs text-muted-foreground truncate">{hint}</span>}
         </div>
         {Icon && (
-          <div className={cn("flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-lg shrink-0", t.bg, t.fg)}>
+          <div
+            className={cn("flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-lg shrink-0", t.bg, t.fg)}
+          >
             <Icon className="h-5 w-5" />
           </div>
         )}

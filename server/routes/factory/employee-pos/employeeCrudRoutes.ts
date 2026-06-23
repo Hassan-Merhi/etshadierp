@@ -6,44 +6,112 @@ import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  propertyContracts, propertyMonthlyLedger, propertyPayments,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
+  propertyContracts,
+  propertyMonthlyLedger,
+  propertyPayments,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -52,7 +120,6 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
 
 export function registerEmployeeCrudRoutes(app: Express) {
   app.get("/api/factory/employees", requireAuth, async (req: any, res: any) => {
@@ -117,29 +184,38 @@ export function registerEmployeeCrudRoutes(app: Express) {
         let baseCode = firstPart + lastPart || "EMP";
         empCode = baseCode;
         let suffix = 1;
-        const existing = await db.select({ code: employees.code }).from(employees).where(eq(employees.companyId, companyId));
+        const existing = await db
+          .select({ code: employees.code })
+          .from(employees)
+          .where(eq(employees.companyId, companyId));
         const existingCodes = new Set(existing.map((e: any) => e.code));
         while (existingCodes.has(empCode)) {
           empCode = `${baseCode}${suffix}`;
           suffix++;
         }
       } else {
-        const [existing] = await db.select().from(employees).where(and(eq(employees.companyId, companyId), eq(employees.code, empCode)));
+        const [existing] = await db
+          .select()
+          .from(employees)
+          .where(and(eq(employees.companyId, companyId), eq(employees.code, empCode)));
         if (existing) return res.status(400).json({ message: "Employee code already exists" });
       }
 
-      const [emp] = await db.insert(employees).values({
-        companyId,
-        code: empCode,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: phone || null,
-        department: department || null,
-        monthlySalary: monthlySalary ? String(monthlySalary) : "0",
-        joinDate,
-        employeeType: "Employee",
-        active: active !== false,
-      }).returning();
+      const [emp] = await db
+        .insert(employees)
+        .values({
+          companyId,
+          code: empCode,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          phone: phone || null,
+          department: department || null,
+          monthlySalary: monthlySalary ? String(monthlySalary) : "0",
+          joinDate,
+          employeeType: "Employee",
+          active: active !== false,
+        })
+        .returning();
 
       res.status(201).json(emp);
     } catch (error: any) {
@@ -165,9 +241,11 @@ export function registerEmployeeCrudRoutes(app: Express) {
       if (monthlySalary !== undefined) updates.monthlySalary = String(monthlySalary);
       if (active !== undefined) updates.active = active;
 
-      const [updated] = await db.update(employees).set(updates).where(
-        and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
-      ).returning();
+      const [updated] = await db
+        .update(employees)
+        .set(updates)
+        .where(and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee")))
+        .returning();
 
       if (!updated) return res.status(404).json({ message: "Employee not found" });
       res.json(updated);
@@ -185,7 +263,8 @@ export function registerEmployeeCrudRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
 
-      const [deleted] = await db.update(employees)
+      const [deleted] = await db
+        .update(employees)
         .set({ deletedAt: new Date(), active: false })
         .where(and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee")))
         .returning({ id: employees.id });
@@ -206,9 +285,10 @@ export function registerEmployeeCrudRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
 
-      const [emp] = await db.select().from(employees).where(
-        and(eq(employees.id, id), eq(employees.companyId, companyId))
-      );
+      const [emp] = await db
+        .select()
+        .from(employees)
+        .where(and(eq(employees.id, id), eq(employees.companyId, companyId)));
       if (!emp) return res.status(404).json({ message: "Employee not found" });
 
       // Pull all voucher entries for this employee
@@ -226,12 +306,7 @@ export function registerEmployeeCrudRoutes(app: Express) {
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(
-          and(
-            eq(voucherEntries.employeeId, id),
-            eq(vouchers.companyId, companyId)
-          )
-        )
+        .where(and(eq(voucherEntries.employeeId, id), eq(vouchers.companyId, companyId)))
         .orderBy(vouchers.voucherDate, vouchers.id);
 
       // Build running balance
@@ -272,36 +347,44 @@ export function registerEmployeeCrudRoutes(app: Express) {
       if (!date) return res.status(400).json({ message: "Date is required" });
 
       const result = await db.transaction(async (tx) => {
-        const [emp] = await tx.select().from(employees).where(
-          and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
-        );
+        const [emp] = await tx
+          .select()
+          .from(employees)
+          .where(and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee")));
         if (!emp) throw new Error("EMPLOYEE_NOT_FOUND");
 
         // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account
-        let [payrollExpenseAccount] = await tx.select().from(ledgerAccounts).where(
-          and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE"))
-        );
+        let [payrollExpenseAccount] = await tx
+          .select()
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE")));
         if (!payrollExpenseAccount) {
-          [payrollExpenseAccount] = await tx.insert(ledgerAccounts).values({
-            companyId,
-            code: "PAYROLL_DEPOSIT_EXPENSE",
-            name: "Payroll Deposit Expense",
-            accountType: "Indirect Expense",
-            openingBalance: "0",
-            active: true,
-          }).returning();
+          [payrollExpenseAccount] = await tx
+            .insert(ledgerAccounts)
+            .values({
+              companyId,
+              code: "PAYROLL_DEPOSIT_EXPENSE",
+              name: "Payroll Deposit Expense",
+              accountType: "Indirect Expense",
+              openingBalance: "0",
+              active: true,
+            })
+            .returning();
         }
 
         const voucherNumber = `EMP-DEP-${Date.now()}`;
-        const [voucher] = await tx.insert(vouchers).values({
-          companyId,
-          voucherNumber,
-          voucherType: "Journal",
-          voucherDate: date,
-          effectiveDate: (effectiveDate as string) || null,
-          description: notes || `Salary deposit for ${emp.firstName} ${emp.lastName}`,
-          totalAmount: depositAmount.toFixed(2),
-        }).returning();
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherNumber,
+            voucherType: "Journal",
+            voucherDate: date,
+            effectiveDate: (effectiveDate as string) || null,
+            description: notes || `Salary deposit for ${emp.firstName} ${emp.lastName}`,
+            totalAmount: depositAmount.toFixed(2),
+          })
+          .returning();
 
         // DR: Payroll Expense
         await tx.insert(voucherEntries).values({
@@ -325,10 +408,13 @@ export function registerEmployeeCrudRoutes(app: Express) {
         // Update employee balance
         const newBalance = parseFloat(emp.currentBalance || "0") + depositAmount;
         const newDeposits = parseFloat(emp.totalDeposits || "0") + depositAmount;
-        await tx.update(employees).set({
-          currentBalance: newBalance.toFixed(2),
-          totalDeposits: newDeposits.toFixed(2),
-        }).where(eq(employees.id, id));
+        await tx
+          .update(employees)
+          .set({
+            currentBalance: newBalance.toFixed(2),
+            totalDeposits: newDeposits.toFixed(2),
+          })
+          .where(eq(employees.id, id));
 
         const [updated] = await tx.select().from(employees).where(eq(employees.id, id));
         return { voucher, employee: updated };
@@ -359,26 +445,31 @@ export function registerEmployeeCrudRoutes(app: Express) {
       if (!cashAccountId) return res.status(400).json({ message: "Cash account is required" });
 
       const result = await db.transaction(async (tx) => {
-        const [emp] = await tx.select().from(employees).where(
-          and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"))
-        );
+        const [emp] = await tx
+          .select()
+          .from(employees)
+          .where(and(eq(employees.id, id), eq(employees.companyId, companyId), eq(employees.employeeType, "Employee")));
         if (!emp) throw new Error("EMPLOYEE_NOT_FOUND");
 
         // Verify cash account belongs to this company
-        const [cashAccount] = await tx.select().from(ledgerAccounts).where(
-          and(eq(ledgerAccounts.id, parseInt(cashAccountId)), eq(ledgerAccounts.companyId, companyId))
-        );
+        const [cashAccount] = await tx
+          .select()
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.id, parseInt(cashAccountId)), eq(ledgerAccounts.companyId, companyId)));
         if (!cashAccount) throw new Error("CASH_ACCOUNT_NOT_FOUND");
 
         const voucherNumber = `EMP-WD-${Date.now()}`;
-        const [voucher] = await tx.insert(vouchers).values({
-          companyId,
-          voucherNumber,
-          voucherType: "Journal",
-          voucherDate: date,
-          description: notes || `Withdrawal for ${emp.firstName} ${emp.lastName}`,
-          totalAmount: withdrawAmount.toFixed(2),
-        }).returning();
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherNumber,
+            voucherType: "Journal",
+            voucherDate: date,
+            description: notes || `Withdrawal for ${emp.firstName} ${emp.lastName}`,
+            totalAmount: withdrawAmount.toFixed(2),
+          })
+          .returning();
 
         // DR: Employee
         await tx.insert(voucherEntries).values({
@@ -402,10 +493,13 @@ export function registerEmployeeCrudRoutes(app: Express) {
         // Update employee balance (can go negative)
         const newBalance = parseFloat(emp.currentBalance || "0") - withdrawAmount;
         const newWithdrawals = parseFloat(emp.totalWithdrawals || "0") + withdrawAmount;
-        await tx.update(employees).set({
-          currentBalance: newBalance.toFixed(2),
-          totalWithdrawals: newWithdrawals.toFixed(2),
-        }).where(eq(employees.id, id));
+        await tx
+          .update(employees)
+          .set({
+            currentBalance: newBalance.toFixed(2),
+            totalWithdrawals: newWithdrawals.toFixed(2),
+          })
+          .where(eq(employees.id, id));
 
         const [updated] = await tx.select().from(employees).where(eq(employees.id, id));
         return { voucher, employee: updated };
@@ -446,45 +540,56 @@ export function registerEmployeeCrudRoutes(app: Express) {
 
       const txResult = await db.transaction(async (tx) => {
         // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account
-        let [payrollExpenseAccount] = await tx.select().from(ledgerAccounts).where(
-          and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE"))
-        );
+        let [payrollExpenseAccount] = await tx
+          .select()
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEPOSIT_EXPENSE")));
         if (!payrollExpenseAccount) {
-          [payrollExpenseAccount] = await tx.insert(ledgerAccounts).values({
-            companyId,
-            code: "PAYROLL_DEPOSIT_EXPENSE",
-            name: "Payroll Deposit Expense",
-            accountType: "Indirect Expense",
-            openingBalance: "0",
-            active: true,
-          }).returning();
+          [payrollExpenseAccount] = await tx
+            .insert(ledgerAccounts)
+            .values({
+              companyId,
+              code: "PAYROLL_DEPOSIT_EXPENSE",
+              name: "Payroll Deposit Expense",
+              accountType: "Indirect Expense",
+              openingBalance: "0",
+              active: true,
+            })
+            .returning();
         }
 
         // Get or create PAYROLL_DEDUCTION_RECOVERY account for deductions
-        let [deductionAccount] = await tx.select().from(ledgerAccounts).where(
-          and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEDUCTION_RECOVERY"))
-        );
+        let [deductionAccount] = await tx
+          .select()
+          .from(ledgerAccounts)
+          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "PAYROLL_DEDUCTION_RECOVERY")));
         if (!deductionAccount) {
-          [deductionAccount] = await tx.insert(ledgerAccounts).values({
-            companyId,
-            code: "PAYROLL_DEDUCTION_RECOVERY",
-            name: "Payroll Deduction Recovery",
-            accountType: "Indirect Income",
-            openingBalance: "0",
-            active: true,
-          }).returning();
+          [deductionAccount] = await tx
+            .insert(ledgerAccounts)
+            .values({
+              companyId,
+              code: "PAYROLL_DEDUCTION_RECOVERY",
+              name: "Payroll Deduction Recovery",
+              accountType: "Indirect Income",
+              openingBalance: "0",
+              active: true,
+            })
+            .returning();
         }
 
         // Single bulk voucher (totalAmount = gross salary for accounting)
-        const [bulkVoucher] = await tx.insert(vouchers).values({
-          companyId,
-          voucherNumber,
-          voucherType: "Journal",
-          voucherDate: date,
-          effectiveDate: (effectiveDate as string) || null,
-          description: notes || `Bulk payroll - ${validDeposits.length} employees`,
-          totalAmount: Math.abs(totalNet).toFixed(2),
-        }).returning();
+        const [bulkVoucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherNumber,
+            voucherType: "Journal",
+            voucherDate: date,
+            effectiveDate: (effectiveDate as string) || null,
+            description: notes || `Bulk payroll - ${validDeposits.length} employees`,
+            totalAmount: Math.abs(totalNet).toFixed(2),
+          })
+          .returning();
 
         // DR: Payroll Expense (gross salary)
         if (totalSalary > 0) {
@@ -516,9 +621,10 @@ export function registerEmployeeCrudRoutes(app: Express) {
           const deduction = parseFloat(dep.deduction) || 0;
           const net = amount - deduction;
 
-          const [emp] = await tx.select().from(employees).where(
-            and(eq(employees.id, empId), eq(employees.companyId, companyId))
-          );
+          const [emp] = await tx
+            .select()
+            .from(employees)
+            .where(and(eq(employees.id, empId), eq(employees.companyId, companyId)));
           if (!emp) continue;
 
           // CR employee: salary earned
@@ -579,11 +685,14 @@ export function registerEmployeeCrudRoutes(app: Express) {
           const newBalance = currentBal + net;
           const newDeposits = parseFloat(emp.totalDeposits || "0") + amount;
           const newWithdrawals = parseFloat(emp.totalWithdrawals || "0") + deduction;
-          await tx.update(employees).set({
-            currentBalance: newBalance.toFixed(2),
-            totalDeposits: newDeposits.toFixed(2),
-            ...(deduction > 0 ? { totalWithdrawals: newWithdrawals.toFixed(2) } : {}),
-          }).where(eq(employees.id, empId));
+          await tx
+            .update(employees)
+            .set({
+              currentBalance: newBalance.toFixed(2),
+              totalDeposits: newDeposits.toFixed(2),
+              ...(deduction > 0 ? { totalWithdrawals: newWithdrawals.toFixed(2) } : {}),
+            })
+            .where(eq(employees.id, empId));
 
           results.push({ employeeId: empId, amount, deduction, net, name: `${emp.firstName} ${emp.lastName}` });
         }
@@ -611,8 +720,16 @@ export function registerEmployeeCrudRoutes(app: Express) {
       }
 
       // Get all employees for this company
-      const allEmployees = await db.select().from(employees)
-        .where(and(eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"), sql`${employees.deletedAt} IS NULL`));
+      const allEmployees = await db
+        .select()
+        .from(employees)
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            eq(employees.employeeType, "Employee"),
+            sql`${employees.deletedAt} IS NULL`
+          )
+        );
 
       if (allEmployees.length === 0) return res.json({ updated: 0, employees: [] });
 
@@ -639,7 +756,7 @@ export function registerEmployeeCrudRoutes(app: Express) {
         const empId = Number(row.employee_id);
         sumMap.set(empId, {
           credits: parseFloat(row.total_credits || "0"),
-          debits:  parseFloat(row.total_debits  || "0"),
+          debits: parseFloat(row.total_debits || "0"),
         });
       }
 
@@ -647,20 +764,23 @@ export function registerEmployeeCrudRoutes(app: Express) {
       for (const emp of allEmployees) {
         const sums = sumMap.get(emp.id) || { credits: 0, debits: 0 };
         const openingBal = parseFloat(emp.openingBalance || "0");
-        const newBalance      = openingBal + sums.credits - sums.debits;
-        const newDeposits     = sums.credits;
-        const newWithdrawals  = sums.debits;
+        const newBalance = openingBal + sums.credits - sums.debits;
+        const newDeposits = sums.credits;
+        const newWithdrawals = sums.debits;
 
-        await db.update(employees).set({
-          currentBalance:   newBalance.toFixed(2),
-          totalDeposits:    newDeposits.toFixed(2),
-          totalWithdrawals: newWithdrawals.toFixed(2),
-        }).where(eq(employees.id, emp.id));
+        await db
+          .update(employees)
+          .set({
+            currentBalance: newBalance.toFixed(2),
+            totalDeposits: newDeposits.toFixed(2),
+            totalWithdrawals: newWithdrawals.toFixed(2),
+          })
+          .where(eq(employees.id, emp.id));
 
         results.push({
           id: emp.id,
           name: `${emp.firstName} ${emp.lastName}`,
-          oldBalance:   parseFloat(emp.currentBalance || "0"),
+          oldBalance: parseFloat(emp.currentBalance || "0"),
           newBalance,
           newDeposits,
           newWithdrawals,
@@ -682,7 +802,9 @@ export function registerEmployeeCrudRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const empId = parseInt(req.params.id);
 
-      const [emp] = await db.select().from(employees)
+      const [emp] = await db
+        .select()
+        .from(employees)
         .where(and(eq(employees.id, empId), eq(employees.companyId, companyId), sql`${employees.deletedAt} IS NULL`));
       if (!emp) return res.status(404).json({ message: "Employee not found" });
 
@@ -698,23 +820,28 @@ export function registerEmployeeCrudRoutes(app: Express) {
 
       const row = ((entrySums as any).rows || (entrySums as any))[0] || {};
       const credits = parseFloat(row.total_credits || "0");
-      const debits  = parseFloat(row.total_debits  || "0");
+      const debits = parseFloat(row.total_debits || "0");
       const openingBal = parseFloat(emp.openingBalance || "0");
-      const newBalance     = openingBal + credits - debits;
-      const newDeposits    = credits;
+      const newBalance = openingBal + credits - debits;
+      const newDeposits = credits;
       const newWithdrawals = debits;
 
-      await db.update(employees).set({
-        currentBalance:   newBalance.toFixed(2),
-        totalDeposits:    newDeposits.toFixed(2),
-        totalWithdrawals: newWithdrawals.toFixed(2),
-      }).where(eq(employees.id, empId));
+      await db
+        .update(employees)
+        .set({
+          currentBalance: newBalance.toFixed(2),
+          totalDeposits: newDeposits.toFixed(2),
+          totalWithdrawals: newWithdrawals.toFixed(2),
+        })
+        .where(eq(employees.id, empId));
 
       res.json({
         id: emp.id,
         name: `${emp.firstName} ${emp.lastName}`,
         oldBalance: parseFloat(emp.currentBalance || "0"),
-        newBalance, newDeposits, newWithdrawals,
+        newBalance,
+        newDeposits,
+        newWithdrawals,
       });
     } catch (error: any) {
       console.error("Error recalculating employee balance:", error);
@@ -731,9 +858,17 @@ export function registerEmployeeCrudRoutes(app: Express) {
       const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
       if (!startDate || !endDate) return res.status(400).json({ message: "startDate and endDate are required" });
 
-      const emps = await db.select()
+      const emps = await db
+        .select()
         .from(employees)
-        .where(and(eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"), eq(employees.active, true), sql`${employees.deletedAt} IS NULL`))
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            eq(employees.employeeType, "Employee"),
+            eq(employees.active, true),
+            sql`${employees.deletedAt} IS NULL`
+          )
+        )
         .orderBy(employees.firstName);
 
       if (emps.length === 0) return res.json({ preview: [] });
@@ -811,7 +946,9 @@ export function registerEmployeeCrudRoutes(app: Express) {
       });
 
       res.json({ preview });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   // ─── Employee Attendance ──────────────────────────────────────────────────────
@@ -823,9 +960,23 @@ export function registerEmployeeCrudRoutes(app: Express) {
       const { date } = req.query as { date?: string };
       if (!date) return res.status(400).json({ message: "date is required" });
 
-      const emps = await db.select({ id: employees.id, firstName: employees.firstName, lastName: employees.lastName, code: employees.code, department: employees.department })
+      const emps = await db
+        .select({
+          id: employees.id,
+          firstName: employees.firstName,
+          lastName: employees.lastName,
+          code: employees.code,
+          department: employees.department,
+        })
         .from(employees)
-        .where(and(eq(employees.companyId, companyId), eq(employees.employeeType, "Employee"), eq(employees.active, true), sql`${employees.deletedAt} IS NULL`))
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            eq(employees.employeeType, "Employee"),
+            eq(employees.active, true),
+            sql`${employees.deletedAt} IS NULL`
+          )
+        )
         .orderBy(employees.firstName);
 
       if (emps.length === 0) return res.json({ employees: [], attendance: [] });
@@ -845,15 +996,20 @@ export function registerEmployeeCrudRoutes(app: Express) {
         notes: r.notes,
       }));
       res.json({ employees: emps, attendance });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   app.post("/api/factory/employee-attendance/bulk", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { records } = req.body as { records: Array<{ employeeId: number; attendanceDate: string; status: string; notes?: string }> };
-      if (!Array.isArray(records) || records.length === 0) return res.status(400).json({ message: "records array is required" });
+      const { records } = req.body as {
+        records: Array<{ employeeId: number; attendanceDate: string; status: string; notes?: string }>;
+      };
+      if (!Array.isArray(records) || records.length === 0)
+        return res.status(400).json({ message: "records array is required" });
 
       for (const r of records) {
         await db.execute(sql`
@@ -863,7 +1019,9 @@ export function registerEmployeeCrudRoutes(app: Express) {
         `);
       }
       res.json({ saved: records.length });
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   // GET /api/factory/employee-attendance/employee/:id — per-employee attendance for a date range
@@ -890,7 +1048,9 @@ export function registerEmployeeCrudRoutes(app: Express) {
         notes: r.notes,
       }));
       res.json(attendance);
-    } catch (err: any) { res.status(500).json({ message: err.message }); }
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   // POST /api/factory/employees/bulk-withdraw — withdraw from multiple employees at once
@@ -911,22 +1071,26 @@ export function registerEmployeeCrudRoutes(app: Express) {
       if (validWithdrawals.length === 0)
         return res.status(400).json({ message: "No valid withdrawal amounts provided" });
 
-      const [cashAccount] = await db.select().from(ledgerAccounts).where(
-        and(eq(ledgerAccounts.id, parseInt(cashAccountId)), eq(ledgerAccounts.companyId, companyId))
-      );
+      const [cashAccount] = await db
+        .select()
+        .from(ledgerAccounts)
+        .where(and(eq(ledgerAccounts.id, parseInt(cashAccountId)), eq(ledgerAccounts.companyId, companyId)));
       if (!cashAccount) return res.status(404).json({ message: "Cash account not found" });
 
       const totalAmount = validWithdrawals.reduce((s: number, w: any) => s + parseFloat(w.amount), 0);
       const voucherNumber = `EMP-WD-BULK-${Date.now()}`;
 
-      const [bulkVoucher] = await db.insert(vouchers).values({
-        companyId,
-        voucherNumber,
-        voucherType: "Journal",
-        voucherDate: date,
-        description: notes || `Bulk withdrawal - ${validWithdrawals.length} employees`,
-        totalAmount: totalAmount.toFixed(2),
-      }).returning();
+      const [bulkVoucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Bulk withdrawal - ${validWithdrawals.length} employees`,
+          totalAmount: totalAmount.toFixed(2),
+        })
+        .returning();
 
       // CR: Cash (total)
       await db.insert(voucherEntries).values({
@@ -941,9 +1105,10 @@ export function registerEmployeeCrudRoutes(app: Express) {
       for (const wd of validWithdrawals) {
         const empId = parseInt(wd.employeeId);
         const amount = parseFloat(wd.amount);
-        const [emp] = await db.select().from(employees).where(
-          and(eq(employees.id, empId), eq(employees.companyId, companyId))
-        );
+        const [emp] = await db
+          .select()
+          .from(employees)
+          .where(and(eq(employees.id, empId), eq(employees.companyId, companyId)));
         if (!emp) continue;
 
         // DR: Employee
@@ -958,10 +1123,13 @@ export function registerEmployeeCrudRoutes(app: Express) {
 
         const newBalance = parseFloat(emp.currentBalance || "0") - amount;
         const newWithdrawals = parseFloat(emp.totalWithdrawals || "0") + amount;
-        await db.update(employees).set({
-          currentBalance: newBalance.toFixed(2),
-          totalWithdrawals: newWithdrawals.toFixed(2),
-        }).where(eq(employees.id, empId));
+        await db
+          .update(employees)
+          .set({
+            currentBalance: newBalance.toFixed(2),
+            totalWithdrawals: newWithdrawals.toFixed(2),
+          })
+          .where(eq(employees.id, empId));
 
         results.push({ employeeId: empId, amount, name: `${emp.firstName} ${emp.lastName}` });
       }
@@ -973,5 +1141,4 @@ export function registerEmployeeCrudRoutes(app: Express) {
   });
 
   // ─── Employee Advances ────────────────────────────────────────────────────────
-
 }

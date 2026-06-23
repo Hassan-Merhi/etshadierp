@@ -4,43 +4,109 @@ import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "./_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -48,7 +114,6 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
 
 export function registerFactoryDaybookRoutes(app: Express) {
   app.get("/api/factory/daybook", requireAuth, async (req: any, res: any) => {
@@ -61,7 +126,8 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // ── Check if this user has "daybook_own_only" restriction ─────────────
       let ownOnly = false;
       if (currentUserId) {
-        const [profile] = await db.select({ hiddenCostFields: factoryUserProfiles.hiddenCostFields })
+        const [profile] = await db
+          .select({ hiddenCostFields: factoryUserProfiles.hiddenCostFields })
           .from(factoryUserProfiles)
           .where(and(eq(factoryUserProfiles.companyId, companyId), eq(factoryUserProfiles.userId, currentUserId)));
         if (profile?.hiddenCostFields?.includes("daybook_own_only")) ownOnly = true;
@@ -94,17 +160,16 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // If user is restricted to own entries only, show their entries + unattributed ones (NULL createdBy)
       if (ownOnly && currentUserId) {
         conditions.push(
-          or(
-            eq(factoryDaybookEntries.createdBy, currentUserId),
-            isNull(factoryDaybookEntries.createdBy)
-          )!
+          or(eq(factoryDaybookEntries.createdBy, currentUserId), isNull(factoryDaybookEntries.createdBy))!
         );
       }
       if (startDate) conditions.push(sql`${factoryDaybookEntries.txDate} >= ${startDate}`);
       if (endDate) conditions.push(sql`${factoryDaybookEntries.txDate} <= ${endDate}`);
       if (txType) conditions.push(eq(factoryDaybookEntries.txType, txType as string));
       if (currencyCode) conditions.push(eq(factoryDaybookEntries.currencyCode, currencyCode as string));
-      const daybookRows = await db.select().from(factoryDaybookEntries)
+      const daybookRows = await db
+        .select()
+        .from(factoryDaybookEntries)
         .where(and(...conditions))
         .orderBy(desc(factoryDaybookEntries.txDate), desc(factoryDaybookEntries.id));
 
@@ -118,14 +183,17 @@ export function registerFactoryDaybookRoutes(app: Express) {
       const voucherOptionalMap = new Map<number, boolean>();
       // Also store live description/amount so stale daybook entries always show
       // current voucher data after an edit.
-      const voucherLiveDataMap = new Map<number, {
-        description: string;
-        amountCurrency: string;
-        amountUsd: string;
-        fxRateToUsd: string;
-        voucherNumber: string;
-        effectiveDate: string | null;
-      }>();
+      const voucherLiveDataMap = new Map<
+        number,
+        {
+          description: string;
+          amountCurrency: string;
+          amountUsd: string;
+          fxRateToUsd: string;
+          voucherNumber: string;
+          effectiveDate: string | null;
+        }
+      >();
       if (voucherRefIds.length > 0) {
         const liveVouchers = await db
           .select({
@@ -140,10 +208,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
             effectiveDate: vouchers.effectiveDate,
           })
           .from(vouchers)
-          .where(and(
-            inArray(vouchers.id, voucherRefIds),
-            sql`${vouchers.deletedAt} IS NULL`
-          ));
+          .where(and(inArray(vouchers.id, voucherRefIds), sql`${vouchers.deletedAt} IS NULL`));
         liveVouchers.forEach((v: any) => {
           validVoucherIds.add(v.id);
           voucherOptionalMap.set(v.id, !!v.optional);
@@ -167,9 +232,9 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // NOTE: older entries were written without referenceTable, so also match by txType.
       const PAYROLL_TX_TYPES = new Set(["PAYROLL_PAYMENT", "PAYROLL_GENERATED"]);
       const payrollRefIds = daybookRows
-        .filter((r: any) =>
-          (r.referenceTable === "factory_payrolls" || PAYROLL_TX_TYPES.has(r.txType)) &&
-          r.referenceId != null
+        .filter(
+          (r: any) =>
+            (r.referenceTable === "factory_payrolls" || PAYROLL_TX_TYPES.has(r.txType)) && r.referenceId != null
         )
         .map((r: any) => r.referenceId as number);
 
@@ -189,9 +254,9 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // never be verified so they are always excluded.
       const ADVANCE_TX_TYPES = new Set(["ADVANCE_GIVEN", "ADVANCE_CASH_UPDATED"]);
       const advanceRefIds = daybookRows
-        .filter((r: any) =>
-          (r.referenceTable === "factory_worker_advances" || ADVANCE_TX_TYPES.has(r.txType)) &&
-          r.referenceId != null
+        .filter(
+          (r: any) =>
+            (r.referenceTable === "factory_worker_advances" || ADVANCE_TX_TYPES.has(r.txType)) && r.referenceId != null
         )
         .map((r: any) => r.referenceId as number);
 
@@ -207,9 +272,10 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // ── 1e. Safety-net: drop repayment-backed daybook entries whose repayment was deleted ─
       const REPAYMENT_TX_TYPES = new Set(["ADVANCE_REPAYMENT"]);
       const repaymentRefIds = daybookRows
-        .filter((r: any) =>
-          (r.referenceTable === "factory_advance_repayments" || REPAYMENT_TX_TYPES.has(r.txType)) &&
-          r.referenceId != null
+        .filter(
+          (r: any) =>
+            (r.referenceTable === "factory_advance_repayments" || REPAYMENT_TX_TYPES.has(r.txType)) &&
+            r.referenceId != null
         )
         .map((r: any) => r.referenceId as number);
 
@@ -230,10 +296,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
           }
           // Drop payroll-backed entries whose payroll was deleted
           // Match by referenceTable OR txType (older entries lack referenceTable)
-          if (
-            (r.referenceTable === "factory_payrolls" || PAYROLL_TX_TYPES.has(r.txType)) &&
-            r.referenceId != null
-          ) {
+          if ((r.referenceTable === "factory_payrolls" || PAYROLL_TX_TYPES.has(r.txType)) && r.referenceId != null) {
             return validPayrollIds.has(r.referenceId);
           }
           // Drop advance-backed entries whose advance was deleted.
@@ -257,14 +320,16 @@ export function registerFactoryDaybookRoutes(app: Express) {
               ...r,
               optional: voucherOptionalMap.get(r.referenceId) ?? false,
               // Always use live voucher description and amount so edits reflect immediately
-              ...(live ? {
-                description: live.description,
-                amountCurrency: live.amountCurrency,
-                amountUsd: live.amountUsd,
-                fxRateToUsd: live.fxRateToUsd,
-                voucherNumber: live.voucherNumber,
-                effectiveDate: live.effectiveDate ?? r.effectiveDate ?? null,
-              } : {}),
+              ...(live
+                ? {
+                    description: live.description,
+                    amountCurrency: live.amountCurrency,
+                    amountUsd: live.amountUsd,
+                    fxRateToUsd: live.fxRateToUsd,
+                    voucherNumber: live.voucherNumber,
+                    effectiveDate: live.effectiveDate ?? r.effectiveDate ?? null,
+                  }
+                : {}),
             };
           }
           return { ...r, optional: false };
@@ -295,21 +360,22 @@ export function registerFactoryDaybookRoutes(app: Express) {
         const allCapturedRows = await db
           .select({ referenceId: factoryDaybookEntries.referenceId })
           .from(factoryDaybookEntries)
-          .where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.referenceTable, "vouchers"),
-            sql`${factoryDaybookEntries.referenceId} IS NOT NULL`,
-          ));
-        const capturedVoucherIds = new Set<number>(
-          allCapturedRows.map((r: any) => r.referenceId as number)
-        );
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.referenceTable, "vouchers"),
+              sql`${factoryDaybookEntries.referenceId} IS NOT NULL`
+            )
+          );
+        const capturedVoucherIds = new Set<number>(allCapturedRows.map((r: any) => r.referenceId as number));
 
         const voucherConds: any[] = [
           eq(vouchers.companyId, companyId),
           sql`${vouchers.deletedAt} IS NULL`,
           inArray(vouchers.voucherType, ["Payment", "Receipt", "Journal"]),
         ];
-        if (startDate) voucherConds.push(sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${startDate}`);
+        if (startDate)
+          voucherConds.push(sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) >= ${startDate}`);
         if (endDate) voucherConds.push(sql`COALESCE(${vouchers.effectiveDate}, ${vouchers.voucherDate}) <= ${endDate}`);
         if (txType && txType in voucherTypesReversed) {
           voucherConds.push(eq(vouchers.voucherType, voucherTypesReversed[txType as string]));
@@ -318,7 +384,10 @@ export function registerFactoryDaybookRoutes(app: Express) {
           voucherConds.push(eq(vouchers.currency, currencyCode as string));
         }
 
-        const rawVouchers = await db.select().from(vouchers).where(and(...voucherConds));
+        const rawVouchers = await db
+          .select()
+          .from(vouchers)
+          .where(and(...voucherConds));
 
         syntheticRows = rawVouchers
           .filter((v: any) => !capturedVoucherIds.has(v.id))
@@ -329,7 +398,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
             const amtCurrency = parseFloat(v.totalAmount || "0");
             const amtUsd = currency === "USD" ? amtCurrency : amtCurrency * fxRate;
             return {
-              id: -(v.id),          // negative id so FE can distinguish; won't clash with real ids
+              id: -v.id, // negative id so FE can distinguish; won't clash with real ids
               companyId: v.companyId,
               txDate: v.voucherDate,
               txType: txTypeVal,
@@ -356,8 +425,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       const baleStockAndZeroRows = filteredDaybookRows.filter(
         (r: any) =>
           r.txType === "BALE_STOCK_ENTRY" ||
-          (parseFloat(r.amountCurrency || "0") === 0 &&
-            ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType))
+          (parseFloat(r.amountCurrency || "0") === 0 && ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType))
       );
       // Alias kept so the rest of the block compiles unchanged
       const zeroRows = baleStockAndZeroRows;
@@ -384,25 +452,32 @@ export function registerFactoryDaybookRoutes(app: Express) {
           if (baleIdToEntry.size > 0) {
             const allBaleIds = Array.from(baleIdToEntry.keys());
             // Fetch costPerKg, productId, and articleCode for multi-level fallback
-            const baleRecords = await db.select({
-              id: factoryBales.id,
-              costPerKg: factoryBales.costPerKg,
-              productId: factoryBales.productId,
-              articleCode: factoryBales.articleCode,
-            }).from(factoryBales).where(inArray(factoryBales.id, allBaleIds));
+            const baleRecords = await db
+              .select({
+                id: factoryBales.id,
+                costPerKg: factoryBales.costPerKg,
+                productId: factoryBales.productId,
+                articleCode: factoryBales.articleCode,
+              })
+              .from(factoryBales)
+              .where(inArray(factoryBales.id, allBaleIds));
 
             // Build product production price map: by id (primary) and by articleCode (fallback)
             // Production price is what was spent to produce the bale — used for cost-side daybook entries.
             const productProductionPriceById = new Map<number, number>();
             const productProductionPriceByArticleCode = new Map<string, number>();
-            const allProducts = await db.select({
-              id: factoryBaleProducts.id,
-              articleCode: factoryBaleProducts.articleCode,
-              productionPrice: (factoryBaleProducts as any).productionPrice,
-            }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+            const allProducts = await db
+              .select({
+                id: factoryBaleProducts.id,
+                articleCode: factoryBaleProducts.articleCode,
+                productionPrice: (factoryBaleProducts as any).productionPrice,
+              })
+              .from(factoryBaleProducts)
+              .where(eq(factoryBaleProducts.companyId, companyId));
             allProducts.forEach((p: any) => {
               productProductionPriceById.set(p.id, parseFloat(p.productionPrice || "0"));
-              if (p.articleCode) productProductionPriceByArticleCode.set(p.articleCode, parseFloat(p.productionPrice || "0"));
+              if (p.articleCode)
+                productProductionPriceByArticleCode.set(p.articleCode, parseFloat(p.productionPrice || "0"));
             });
 
             // Accumulate value per daybook row id using productionPrice (per bale)
@@ -413,7 +488,8 @@ export function registerFactoryDaybookRoutes(app: Express) {
               // primary: productId → productionPrice
               if (baleRec.productId) val = productProductionPriceById.get(baleRec.productId) || 0;
               // fallback: articleCode → productionPrice
-              if (val === 0 && baleRec.articleCode) val = productProductionPriceByArticleCode.get(baleRec.articleCode) || 0;
+              if (val === 0 && baleRec.articleCode)
+                val = productProductionPriceByArticleCode.get(baleRec.articleCode) || 0;
               for (const { row } of entries) {
                 rowValueMap.set(row.id, (rowValueMap.get(row.id) || 0) + val);
               }
@@ -436,15 +512,18 @@ export function registerFactoryDaybookRoutes(app: Express) {
 
         // LOADING_SUBMITTED / ORDER_VERIFIED: derive from customerOrders.grandTotal
         // (grandTotal includes bales + all charges/surcharges, not just bale prices)
-        const loadingRows = zeroRows.filter((r: any) =>
-          ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType) && r.referenceId
+        const loadingRows = zeroRows.filter(
+          (r: any) => ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(r.txType) && r.referenceId
         );
         if (loadingRows.length > 0) {
           const orderIds = [...new Set(loadingRows.map((r: any) => r.referenceId as number))];
-          const orderGrandTotals = await db.select({
-            id: customerOrders.id,
-            grandTotal: customerOrders.grandTotal,
-          }).from(customerOrders).where(inArray(customerOrders.id, orderIds));
+          const orderGrandTotals = await db
+            .select({
+              id: customerOrders.id,
+              grandTotal: customerOrders.grandTotal,
+            })
+            .from(customerOrders)
+            .where(inArray(customerOrders.id, orderIds));
 
           const orderTotals = new Map<number, number>();
           for (const o of orderGrandTotals) {
@@ -452,7 +531,10 @@ export function registerFactoryDaybookRoutes(app: Express) {
           }
 
           for (const row of filteredDaybookRows as any[]) {
-            if (["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(row.txType) && parseFloat(row.amountCurrency || "0") === 0) {
+            if (
+              ["LOADING_SUBMITTED", "ORDER_VERIFIED"].includes(row.txType) &&
+              parseFloat(row.amountCurrency || "0") === 0
+            ) {
               const total = orderTotals.get(row.referenceId);
               if (total && total > 0) {
                 row.amountCurrency = String(total.toFixed(2));
@@ -469,9 +551,7 @@ export function registerFactoryDaybookRoutes(app: Express) {
       // approved → reverted → re-approved repeatedly. Keep only the latest entry
       // (highest id) per (txType, referenceId). The array is already sorted
       // desc by id so the first occurrence of each key is the most recent.
-      const SINGLETON_TX_TYPES = new Set([
-        "INVOICE", "INVOICE_REVERTED", "ORDER_VERIFIED", "ORDER_CANCELLED",
-      ]);
+      const SINGLETON_TX_TYPES = new Set(["INVOICE", "INVOICE_REVERTED", "ORDER_VERIFIED", "ORDER_CANCELLED"]);
       const _seenSingletonKeys = new Set<string>();
       const deduplicatedRows = (filteredDaybookRows as any[]).filter((r: any) => {
         if (!SINGLETON_TX_TYPES.has(r.txType) || r.referenceId == null) return true;
@@ -499,5 +579,4 @@ export function registerFactoryDaybookRoutes(app: Express) {
   // ───────────────────────────────────────────────
   // FACTORY CUSTOMERS CRUD
   // ───────────────────────────────────────────────
-
 }

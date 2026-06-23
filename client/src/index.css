@@ -4,12 +4,12 @@
 
 /* LIGHT MODE */
 :root {
-  --button-outline: rgba(0,0,0, .10);
-  --badge-outline: rgba(0,0,0, .05);
+  --button-outline: rgba(0, 0, 0, 0.1);
+  --badge-outline: rgba(0, 0, 0, 0.05);
 
   /* Backgrounds applied on top of other backgrounds when hovered/active */
-  --elevate-1: rgba(0,0,0, .03);
-  --elevate-2: rgba(0,0,0, .08);
+  --elevate-1: rgba(0, 0, 0, 0.03);
+  --elevate-2: rgba(0, 0, 0, 0.08);
 
   --background: 210 20% 98%;
 
@@ -92,15 +92,15 @@
   --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: "JetBrains Mono", Menlo, monospace;
-  --radius: .5rem; /* 8px */
+  --radius: 0.5rem; /* 8px */
   --shadow-2xs: 0px 1px 2px 0px hsl(210 8% 12% / 0.05);
   --shadow-xs: 0px 1px 3px 0px hsl(210 8% 12% / 0.08);
   --shadow-sm: 0px 2px 4px 0px hsl(210 8% 12% / 0.06), 0px 1px 2px -1px hsl(210 8% 12% / 0.08);
   --shadow: 0px 4px 6px -1px hsl(210 8% 12% / 0.08), 0px 2px 4px -2px hsl(210 8% 12% / 0.06);
-  --shadow-md: 0px 6px 12px -2px hsl(210 8% 12% / 0.10), 0px 3px 6px -3px hsl(210 8% 12% / 0.08);
+  --shadow-md: 0px 6px 12px -2px hsl(210 8% 12% / 0.1), 0px 3px 6px -3px hsl(210 8% 12% / 0.08);
   --shadow-lg: 0px 10px 20px -4px hsl(210 8% 12% / 0.12), 0px 4px 8px -4px hsl(210 8% 12% / 0.08);
-  --shadow-xl: 0px 20px 30px -6px hsl(210 8% 12% / 0.15), 0px 8px 12px -6px hsl(210 8% 12% / 0.10);
-  --shadow-2xl: 0px 25px 50px -12px hsl(210 8% 12% / 0.20);
+  --shadow-xl: 0px 20px 30px -6px hsl(210 8% 12% / 0.15), 0px 8px 12px -6px hsl(210 8% 12% / 0.1);
+  --shadow-2xl: 0px 25px 50px -12px hsl(210 8% 12% / 0.2);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 
@@ -135,12 +135,12 @@
 }
 
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(255, 255, 255, 0.1);
+  --badge-outline: rgba(255, 255, 255, 0.05);
 
   /* Backgrounds applied on top of other backgrounds when hovered/active */
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
+  --elevate-1: rgba(255, 255, 255, 0.04);
+  --elevate-2: rgba(255, 255, 255, 0.09);
 
   --background: 210 6% 8%;
 
@@ -220,7 +220,7 @@
   --destructive-soft: 0 60% 16%;
   --destructive-soft-foreground: 0 80% 80%;
 
-  --shadow-2xs: 0px 1px 2px 0px hsl(210 8% 0% / 0.20);
+  --shadow-2xs: 0px 1px 2px 0px hsl(210 8% 0% / 0.2);
   --shadow-xs: 0px 1px 3px 0px hsl(210 8% 0% / 0.25);
   --shadow-sm: 0px 2px 4px 0px hsl(210 8% 0% / 0.22), 0px 1px 2px -1px hsl(210 8% 0% / 0.25);
   --shadow: 0px 4px 6px -1px hsl(210 8% 0% / 0.28), 0px 2px 4px -2px hsl(210 8% 0% / 0.22);
@@ -270,12 +270,20 @@
   }
 
   /* Tabular numerals everywhere — keeps numeric columns aligned in tables/KPIs */
-  .font-mono, [class*="tabular-nums"], td, th {
+  .font-mono,
+  [class*="tabular-nums"],
+  td,
+  th {
     font-variant-numeric: tabular-nums;
   }
 
   /* Cleaner heading hierarchy */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply tracking-tight;
   }
 
@@ -309,7 +317,6 @@
  * need to be distinguished from eachother visually.
  */
 @layer utilities {
-
   /* Hide ugly search cancel button in Chrome until we can style it properly */
   input[type="search"]::-webkit-search-cancel-button {
     @apply hidden;
@@ -325,10 +332,11 @@
   /* .no-default-hover-elevate/no-default-active-elevate is an escape hatch so consumers of
    * buttons/badges can remove the automatic brightness adjustment on interactions
    * and program their own. */
-  .no-default-hover-elevate {}
+  .no-default-hover-elevate {
+  }
 
-  .no-default-active-elevate {}
-
+  .no-default-active-elevate {
+  }
 
   /**
    * Toggleable backgrounds go behind the content. Hoverable/active goes on top.
@@ -460,16 +468,13 @@
     position: absolute;
     inset: 0;
     transform: translateX(-100%);
-    background: linear-gradient(
-      90deg,
-      transparent,
-      hsl(var(--foreground) / 0.04),
-      transparent
-    );
+    background: linear-gradient(90deg, transparent, hsl(var(--foreground) / 0.04), transparent);
     animation: shimmer 1.6s infinite;
   }
   @keyframes shimmer {
-    100% { transform: translateX(100%); }
+    100% {
+      transform: translateX(100%);
+    }
   }
 
   /* Empty-state container — used by tables/lists when there is no data */
@@ -492,11 +497,21 @@
   }
 
   /* Status pill swatches — designed to compose with Badge variant="outline" */
-  .status-success { @apply text-[hsl(var(--success-soft-foreground))] bg-[hsl(var(--success-soft))] [border-color:hsl(var(--success)/0.25)]; }
-  .status-warning { @apply text-[hsl(var(--warning-soft-foreground))] bg-[hsl(var(--warning-soft))] [border-color:hsl(var(--warning)/0.25)]; }
-  .status-info    { @apply text-[hsl(var(--info-soft-foreground))]    bg-[hsl(var(--info-soft))]    [border-color:hsl(var(--info)/0.25)]; }
-  .status-danger  { @apply text-[hsl(var(--destructive-soft-foreground))] bg-[hsl(var(--destructive-soft))] [border-color:hsl(var(--destructive)/0.25)]; }
-  .status-muted   { @apply text-muted-foreground bg-muted/60 [border-color:hsl(var(--border))]; }
+  .status-success {
+    @apply text-[hsl(var(--success-soft-foreground))] bg-[hsl(var(--success-soft))] [border-color:hsl(var(--success)/0.25)];
+  }
+  .status-warning {
+    @apply text-[hsl(var(--warning-soft-foreground))] bg-[hsl(var(--warning-soft))] [border-color:hsl(var(--warning)/0.25)];
+  }
+  .status-info {
+    @apply text-[hsl(var(--info-soft-foreground))]    bg-[hsl(var(--info-soft))]    [border-color:hsl(var(--info)/0.25)];
+  }
+  .status-danger {
+    @apply text-[hsl(var(--destructive-soft-foreground))] bg-[hsl(var(--destructive-soft))] [border-color:hsl(var(--destructive)/0.25)];
+  }
+  .status-muted {
+    @apply text-muted-foreground bg-muted/60 [border-color:hsl(var(--border))];
+  }
 }
 
 /* Print styles for account statements */
@@ -676,8 +691,13 @@
   }
 }
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
 /* ─────────────────────────────────────────────────────────────────────────
    MOBILE RESPONSIVENESS — Phase 1
@@ -687,7 +707,6 @@
    No business logic, API, or auth logic is touched.
    ───────────────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
-
   /* ── 1. Page-level overflow protection ──────────────────────────────────
      Prevents any child element from causing the whole page to scroll
      horizontally. Scoped to html/body only — does NOT use overflow:hidden
@@ -791,7 +810,6 @@
   .table-responsive {
     -webkit-overflow-scrolling: touch;
   }
-
 }
 
 /* ── Button click feedback — persistent ring on last-clicked button ── */
@@ -804,4 +822,6 @@
 input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear,
 input[type="password"]::-webkit-credentials-auto-fill-button,
-input[type="password"]::-webkit-strong-password-auto-fill-button { display: none !important; }
+input[type="password"]::-webkit-strong-password-auto-fill-button {
+  display: none !important;
+}

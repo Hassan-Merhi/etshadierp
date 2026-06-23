@@ -7,7 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
@@ -65,15 +72,18 @@ export default function Chat() {
 
   const isTyping = false;
 
-  const sendTypingSignal = useCallback((isTyping: boolean) => {
-    if (!selectedUserId) return;
-    fetch("/api/chat/typing", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ receiverId: selectedUserId, isTyping }),
-    }).catch(() => {});
-  }, [selectedUserId]);
+  const sendTypingSignal = useCallback(
+    (isTyping: boolean) => {
+      if (!selectedUserId) return;
+      fetch("/api/chat/typing", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ receiverId: selectedUserId, isTyping }),
+      }).catch(() => {});
+    },
+    [selectedUserId]
+  );
 
   const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessageText(e.target.value);
@@ -224,7 +234,11 @@ export default function Chat() {
     const now = new Date();
     const isToday = d.toDateString() === now.toDateString();
     if (isToday) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    return d.toLocaleDateString([], { month: "short", day: "numeric" }) + " " + d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return (
+      d.toLocaleDateString([], { month: "short", day: "numeric" }) +
+      " " +
+      d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    );
   };
 
   const formatLastSeen = (user: ChatUser): string => {
@@ -239,7 +253,8 @@ export default function Chat() {
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24 && d.toDateString() === now.toDateString())
       return `Last seen today at ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-    if (diffHours < 48) return `Last seen yesterday at ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    if (diffHours < 48)
+      return `Last seen yesterday at ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
     return `Last seen ${d.toLocaleDateString([], { month: "short", day: "numeric" })}`;
   };
 
@@ -251,9 +266,7 @@ export default function Chat() {
 
   const selectedUser = chatUsers.find((u) => u.id === selectedUserId);
   const conversationUsers = chatUsers.filter((u) => u.hasMessages || u.unreadCount > 0 || u.id === selectedUserId);
-  const filteredAllUsers = chatUsers.filter((u) =>
-    u.username.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredAllUsers = chatUsers.filter((u) => u.username.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const isSending = sendMutation.isPending || isUploading;
 
@@ -263,19 +276,16 @@ export default function Chat() {
       <Card className="w-64 shrink-0 flex flex-col">
         <div className="p-3 border-b flex items-center justify-between gap-2">
           <h3 className="font-semibold text-sm">Messages</h3>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => setNewChatOpen(true)}
-            data-testid="button-new-chat"
-          >
+          <Button size="icon" variant="ghost" onClick={() => setNewChatOpen(true)} data-testid="button-new-chat">
             <Plus className="h-4 w-4" />
           </Button>
         </div>
         <div className="flex-1 overflow-y-auto">
           {usersLoading ? (
             <div className="p-3 space-y-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
           ) : conversationUsers.length === 0 ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
@@ -303,7 +313,9 @@ export default function Chat() {
                   <div className="flex items-center justify-between gap-1">
                     <span className="text-sm font-medium truncate">{user.username}</span>
                     {user.unreadCount > 0 && (
-                      <Badge variant="default" className="text-xs min-w-5 justify-center">{user.unreadCount}</Badge>
+                      <Badge variant="default" className="text-xs min-w-5 justify-center">
+                        {user.unreadCount}
+                      </Badge>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground truncate">
@@ -332,7 +344,9 @@ export default function Chat() {
             <div className="p-3 border-b flex items-center gap-3">
               <div className="relative shrink-0">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="text-xs">{selectedUser ? getInitials(selectedUser.username) : "?"}</AvatarFallback>
+                  <AvatarFallback className="text-xs">
+                    {selectedUser ? getInitials(selectedUser.username) : "?"}
+                  </AvatarFallback>
                 </Avatar>
                 {selectedUser?.isOnline && (
                   <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background" />
@@ -341,7 +355,9 @@ export default function Chat() {
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm leading-tight">{selectedUser?.username}</p>
                 {selectedUser && (
-                  <p className={`text-xs leading-tight ${isTyping ? "text-muted-foreground italic" : selectedUser.isOnline ? "text-green-500" : "text-muted-foreground"}`}>
+                  <p
+                    className={`text-xs leading-tight ${isTyping ? "text-muted-foreground italic" : selectedUser.isOnline ? "text-green-500" : "text-muted-foreground"}`}
+                  >
                     {isTyping ? "typing..." : formatLastSeen(selectedUser)}
                   </p>
                 )}
@@ -362,12 +378,12 @@ export default function Chat() {
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {messagesLoading ? (
                 <div className="space-y-3">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-3/4" />)}
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-10 w-3/4" />
+                  ))}
                 </div>
               ) : messages.length === 0 ? (
-                <div className="text-center text-muted-foreground text-sm py-8">
-                  No messages yet. Say hello!
-                </div>
+                <div className="text-center text-muted-foreground text-sm py-8">No messages yet. Say hello!</div>
               ) : (
                 messages.map((msg) => {
                   const isMine = msg.senderId !== selectedUserId;
@@ -404,7 +420,9 @@ export default function Chat() {
                                 <FileText className="h-4 w-4 shrink-0" />
                                 <span className="truncate max-w-[180px]">{msg.fileName ?? "File"}</span>
                                 {msg.fileSize && (
-                                  <span className={`text-xs shrink-0 ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                                  <span
+                                    className={`text-xs shrink-0 ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}
+                                  >
                                     {formatFileSize(msg.fileSize)}
                                   </span>
                                 )}
@@ -413,18 +431,23 @@ export default function Chat() {
                             )}
                           </div>
                         )}
-                        {msg.message && (
-                          <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
-                        )}
+                        {msg.message && <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>}
                         <div className={`flex items-center gap-1 mt-1 ${isMine ? "justify-end" : "justify-start"}`}>
-                          <span className={`text-xs ${isMine ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                          <span
+                            className={`text-xs ${isMine ? "text-primary-foreground/70" : "text-muted-foreground"}`}
+                          >
                             {formatTime(msg.createdAt as unknown as string)}
                           </span>
-                          {isMine && (
-                            msg.readAt
-                              ? <span title="Read"><CheckCheck className="h-3 w-3 text-sky-300" /></span>
-                              : <span title="Delivered"><CheckCheck className="h-3 w-3 text-primary-foreground/50" /></span>
-                          )}
+                          {isMine &&
+                            (msg.readAt ? (
+                              <span title="Read">
+                                <CheckCheck className="h-3 w-3 text-sky-300" />
+                              </span>
+                            ) : (
+                              <span title="Delivered">
+                                <CheckCheck className="h-3 w-3 text-primary-foreground/50" />
+                              </span>
+                            ))}
                         </div>
                       </div>
                     </div>
@@ -450,7 +473,11 @@ export default function Chat() {
               {pendingFile && (
                 <div className="flex items-center gap-2 p-2 rounded-md bg-muted" data-testid="pending-file-preview">
                   {pendingFile.previewUrl ? (
-                    <img src={pendingFile.previewUrl} alt="preview" className="h-12 w-12 object-cover rounded-md shrink-0" />
+                    <img
+                      src={pendingFile.previewUrl}
+                      alt="preview"
+                      className="h-12 w-12 object-cover rounded-md shrink-0"
+                    />
                   ) : (
                     <div className="h-12 w-12 rounded-md bg-background flex items-center justify-center shrink-0">
                       <FileText className="h-6 w-6 text-muted-foreground" />
@@ -512,15 +539,12 @@ export default function Chat() {
           <DialogHeader>
             <DialogTitle>Clear Conversation</DialogTitle>
             <DialogDescription>
-              This will permanently delete all messages with <strong>{selectedUser?.username}</strong>. This cannot be undone.
+              This will permanently delete all messages with <strong>{selectedUser?.username}</strong>. This cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setClearConfirmOpen(false)}
-              data-testid="button-cancel-clear"
-            >
+            <Button variant="outline" onClick={() => setClearConfirmOpen(false)} data-testid="button-cancel-clear">
               Cancel
             </Button>
             <Button
@@ -568,7 +592,9 @@ export default function Chat() {
                     </Avatar>
                     <span className="text-sm font-medium">{user.username}</span>
                     {user.unreadCount > 0 && (
-                      <Badge variant="default" className="ml-auto text-xs min-w-5 justify-center">{user.unreadCount}</Badge>
+                      <Badge variant="default" className="ml-auto text-xs min-w-5 justify-center">
+                        {user.unreadCount}
+                      </Badge>
                     )}
                   </button>
                 ))

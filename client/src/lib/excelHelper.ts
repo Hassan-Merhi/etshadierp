@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs';
+import ExcelJS from "exceljs";
 
 export interface ExcelRange {
   s: { r: number; c: number };
@@ -14,7 +14,7 @@ const colToNum = (col: string): number => {
 };
 
 const numToCol = (num: number): string => {
-  let col = '';
+  let col = "";
   num++;
   while (num > 0) {
     num--;
@@ -26,7 +26,7 @@ const numToCol = (num: number): string => {
 
 const parseOrigin = (origin: string | { r: number; c: number } | undefined): { r: number; c: number } => {
   if (!origin) return { r: 0, c: 0 };
-  if (typeof origin === 'object') return origin;
+  if (typeof origin === "object") return origin;
   const m = origin.match(/^([A-Z]+)(\d+)$/);
   if (!m) return { r: 0, c: 0 };
   return { r: parseInt(m[2]) - 1, c: colToNum(m[1]) };
@@ -34,19 +34,19 @@ const parseOrigin = (origin: string | { r: number; c: number } | undefined): { r
 
 export const utils = {
   book_new: () => new ExcelJS.Workbook(),
-  
+
   json_to_sheet: (
     data: Record<string, any>[],
     options?: { header?: string[] }
-  ): { data: Record<string, any>[], headers: string[], [key: string]: any } => {
+  ): { data: Record<string, any>[]; headers: string[]; [key: string]: any } => {
     if (!data || data.length === 0) {
       return { data: [], headers: options?.header ?? [] };
     }
     const headers = options?.header ?? Object.keys(data[0]);
     return { data, headers };
   },
-  
-  aoa_to_sheet: (data: any[][]): { aoa: any[][], [key: string]: any } => {
+
+  aoa_to_sheet: (data: any[][]): { aoa: any[][]; [key: string]: any } => {
     return { aoa: data ?? [] };
   },
 
@@ -80,52 +80,54 @@ export const utils = {
     }
     return {
       s: { r: parseInt(match[2]) - 1, c: colToNum(match[1]) },
-      e: { r: parseInt(match[4]) - 1, c: colToNum(match[3]) }
+      e: { r: parseInt(match[4]) - 1, c: colToNum(match[3]) },
     };
   },
-  
+
   encode_cell: (cell: { r: number; c: number }): string => {
     return numToCol(cell.c) + (cell.r + 1);
   },
-  
+
   book_append_sheet: (workbook: ExcelJS.Workbook, sheetData: any, name: string) => {
     const worksheet = workbook.addWorksheet(name);
-    
-    if ('aoa' in sheetData) {
+
+    if ("aoa" in sheetData) {
       for (const row of sheetData.aoa as any[][]) {
         worksheet.addRow(row || []);
       }
-    } else if ('data' in sheetData && 'headers' in sheetData) {
+    } else if ("data" in sheetData && "headers" in sheetData) {
       worksheet.addRow(sheetData.headers);
       for (const item of sheetData.data) {
         const row: any[] = [];
         for (const header of sheetData.headers) {
-          row.push(item[header] ?? '');
+          row.push(item[header] ?? "");
         }
         worksheet.addRow(row);
       }
     }
-    
-    if (sheetData['!cols']) {
-      sheetData['!cols'].forEach((col: { wch?: number }, idx: number) => {
+
+    if (sheetData["!cols"]) {
+      sheetData["!cols"].forEach((col: { wch?: number }, idx: number) => {
         if (col?.wch) {
           worksheet.getColumn(idx + 1).width = col.wch;
         }
       });
     }
 
-    if (sheetData['!freeze']) {
-      const fz = sheetData['!freeze'];
-      worksheet.views = [{
-        state: 'frozen',
-        xSplit: fz.xSplit ?? 0,
-        ySplit: fz.ySplit ?? 0,
-      }];
+    if (sheetData["!freeze"]) {
+      const fz = sheetData["!freeze"];
+      worksheet.views = [
+        {
+          state: "frozen",
+          xSplit: fz.xSplit ?? 0,
+          ySplit: fz.ySplit ?? 0,
+        },
+      ];
     }
-    
+
     return worksheet;
   },
-  
+
   sheet_to_json: <T = Record<string, any>>(
     worksheet: ExcelJS.Worksheet,
     options?: { header?: number | string; defval?: any }
@@ -133,16 +135,16 @@ export const utils = {
     const data: any[] = [];
     const headers: string[] = [];
     const defval = options?.defval;
-    
+
     if (options?.header === 1) {
       worksheet.eachRow((row) => {
         const rowData: any[] = [];
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
           let value: any = cell.value;
-          if (value && typeof value === 'object' && 'result' in value) {
+          if (value && typeof value === "object" && "result" in value) {
             value = (value as any).result;
           }
-          if (value && typeof value === 'object' && 'text' in value) {
+          if (value && typeof value === "object" && "text" in value) {
             value = (value as any).text;
           }
           rowData[colNumber - 1] = value;
@@ -151,11 +153,11 @@ export const utils = {
       });
       return data as T[];
     }
-    
+
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) {
         row.eachCell((cell, colNumber) => {
-          headers[colNumber - 1] = String(cell.value || '');
+          headers[colNumber - 1] = String(cell.value || "");
         });
       } else {
         const rowData: Record<string, any> = {};
@@ -163,10 +165,10 @@ export const utils = {
           const header = headers[colNumber - 1];
           if (header) {
             let value: any = cell.value;
-            if (value && typeof value === 'object' && 'result' in value) {
+            if (value && typeof value === "object" && "result" in value) {
               value = (value as any).result;
             }
-            if (value && typeof value === 'object' && 'text' in value) {
+            if (value && typeof value === "object" && "text" in value) {
               value = (value as any).text;
             }
             rowData[header] = value;
@@ -182,9 +184,9 @@ export const utils = {
         }
       }
     });
-    
+
     return data as T[];
-  }
+  },
 };
 
 function binaryStringToArrayBuffer(s: string): ArrayBuffer {
@@ -196,11 +198,11 @@ function binaryStringToArrayBuffer(s: string): ArrayBuffer {
 
 export async function writeFile(workbook: ExcelJS.Workbook, filename: string): Promise<void> {
   const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { 
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
@@ -230,31 +232,31 @@ export interface WorkbookData {
 
 export async function read(
   data: ArrayBuffer | Uint8Array | File | string | null | undefined,
-  _options?: { type?: 'array' | 'binary' | 'buffer' | 'string' }
+  _options?: { type?: "array" | "binary" | "buffer" | "string" }
 ): Promise<WorkbookData> {
   const workbook = new ExcelJS.Workbook();
   if (data == null) {
-    throw new Error('read: no data provided');
+    throw new Error("read: no data provided");
   }
-  if (typeof File !== 'undefined' && data instanceof File) {
+  if (typeof File !== "undefined" && data instanceof File) {
     const buffer = await data.arrayBuffer();
     await workbook.xlsx.load(buffer);
-  } else if (typeof data === 'string') {
+  } else if (typeof data === "string") {
     await workbook.xlsx.load(binaryStringToArrayBuffer(data));
   } else if (data instanceof ArrayBuffer) {
     await workbook.xlsx.load(data);
   } else {
     await workbook.xlsx.load((data as Uint8Array).buffer as ArrayBuffer);
   }
-  
+
   const SheetNames: string[] = [];
   const Sheets: Record<string, ExcelJS.Worksheet> = {};
-  
+
   workbook.eachSheet((worksheet) => {
     SheetNames.push(worksheet.name);
     Sheets[worksheet.name] = worksheet;
   });
-  
+
   return { workbook, SheetNames, Sheets };
 }
 

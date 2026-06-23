@@ -40,12 +40,7 @@ export function registerApprovalRoutes(app: Express) {
       const rows = await db
         .select()
         .from(approvalRequests)
-        .where(
-          and(
-            eq(approvalRequests.companyId, companyId),
-            eq(approvalRequests.requestedByUserId, userId)
-          )
-        )
+        .where(and(eq(approvalRequests.companyId, companyId), eq(approvalRequests.requestedByUserId, userId)))
         .orderBy(desc(approvalRequests.requestedAt))
         .limit(100);
       res.json(rows);
@@ -61,16 +56,8 @@ export function registerApprovalRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const userId = req.session.userId!;
       const username = req.session.username ?? "Unknown";
-      const {
-        actionType,
-        targetTable,
-        targetRecordId,
-        targetIdentifier,
-        payload,
-        oldValue,
-        newValue,
-        amountValue,
-      } = req.body;
+      const { actionType, targetTable, targetRecordId, targetIdentifier, payload, oldValue, newValue, amountValue } =
+        req.body;
       if (!actionType) return res.status(400).json({ message: "actionType is required" });
       const [row] = await db
         .insert(approvalRequests)
@@ -262,10 +249,7 @@ export function registerApprovalRoutes(app: Express) {
       if (existing.status !== "pending") {
         return res.status(400).json({ message: "Only pending requests can be cancelled" });
       }
-      await db
-        .update(approvalRequests)
-        .set({ status: "cancelled" })
-        .where(eq(approvalRequests.id, id));
+      await db.update(approvalRequests).set({ status: "cancelled" }).where(eq(approvalRequests.id, id));
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ message: e.message });

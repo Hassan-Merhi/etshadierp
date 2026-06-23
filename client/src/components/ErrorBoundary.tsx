@@ -28,8 +28,12 @@ function isChunkLoadError(error: unknown): boolean {
   } else if (error && typeof error === "object") {
     const e = error as any;
     if (e.message) candidates.push(String(e.message));
-    if (e.name)    candidates.push(String(e.name));
-    try { candidates.push(e.toString()); } catch { /* ignore */ }
+    if (e.name) candidates.push(String(e.name));
+    try {
+      candidates.push(e.toString());
+    } catch {
+      /* ignore */
+    }
   }
   const combined = candidates.join(" ");
   return (
@@ -54,7 +58,9 @@ function getRetryState(path: string): { count: number; firstAt: number } {
   try {
     const raw = sessionStorage.getItem("chunkRetry:" + path);
     if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return { count: 0, firstAt: 0 };
 }
 
@@ -64,17 +70,24 @@ function recordRetry(path: string) {
     const state = getRetryState(path);
     // Reset window if it's been long enough
     const base = now - state.firstAt < RETRY_WINDOW_MS ? state : { count: 0, firstAt: now };
-    sessionStorage.setItem("chunkRetry:" + path, JSON.stringify({
-      count: base.count + 1,
-      firstAt: base.count === 0 ? now : state.firstAt,
-    }));
-  } catch { /* ignore */ }
+    sessionStorage.setItem(
+      "chunkRetry:" + path,
+      JSON.stringify({
+        count: base.count + 1,
+        firstAt: base.count === 0 ? now : state.firstAt,
+      })
+    );
+  } catch {
+    /* ignore */
+  }
 }
 
 function clearRetries(path: string) {
   try {
     sessionStorage.removeItem("chunkRetry:" + path);
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 function canAutoRetry(path: string): boolean {
@@ -100,10 +113,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (error instanceof Error) {
       normalized = error;
     } else {
-      const msg =
-        (error as any)?.message ||
-        (error as any)?.stack?.split?.("\n")?.[0] ||
-        String(error);
+      const msg = (error as any)?.message || (error as any)?.stack?.split?.("\n")?.[0] || String(error);
       normalized = new Error(msg || "Unknown error");
     }
     return { hasError: true, error: normalized, isChunkError: isChunk };
@@ -152,9 +162,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
-      const isChunk =
-        this.state.isChunkError ||
-        isChunkLoadError(this.state.error);
+      const isChunk = this.state.isChunkError || isChunkLoadError(this.state.error);
 
       if (isChunk) {
         // When offline, the chunk simply isn't cached yet — reload won't help.
@@ -166,8 +174,8 @@ export class ErrorBoundary extends Component<Props, State> {
               <div>
                 <p className="font-semibold text-lg">Page not available offline</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  This page hasn't been cached yet. Visit it while connected, or run
-                  "Prepare for offline" again to download all pages.
+                  This page hasn't been cached yet. Visit it while connected, or run "Prepare for offline" again to
+                  download all pages.
                 </p>
               </div>
               <Button variant="outline" onClick={() => window.history.back()} data-testid="button-go-back-offline">
@@ -183,9 +191,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="flex flex-col items-center justify-center h-full min-h-[40vh] gap-4 p-6 text-center">
             <RefreshCw className="h-10 w-10 text-muted-foreground" />
             <div>
-              <p className="font-semibold text-lg">
-                {isDev ? "Page needs a reload" : "New version available"}
-              </p>
+              <p className="font-semibold text-lg">{isDev ? "Page needs a reload" : "New version available"}</p>
               <p className="text-sm text-muted-foreground mt-1">
                 {isDev
                   ? "The dev server restarted. Click below to reload this page."

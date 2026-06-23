@@ -5,23 +5,41 @@ import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation as useRoute } from "wouter";
 import {
-  ArrowUpDown, Package, Warehouse, Search, X, ChevronDown, Download, List, Eye,
-  Printer, Trash2, ArrowLeft, ArrowRight, Layers, FileSpreadsheet,
-  MessageCircle, Pencil, AlertCircle, Globe, MapPin, ChevronRight, Plus,
+  ArrowUpDown,
+  Package,
+  Warehouse,
+  Search,
+  X,
+  ChevronDown,
+  Download,
+  List,
+  Eye,
+  Printer,
+  Trash2,
+  ArrowLeft,
+  ArrowRight,
+  Layers,
+  FileSpreadsheet,
+  MessageCircle,
+  Pencil,
+  AlertCircle,
+  Globe,
+  MapPin,
+  ChevronRight,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
-  DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -140,9 +158,18 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // ─── Mutations ──────────────────────────────────────────────────────────────
 
   const renameLocationMutation = useMutation({
-    mutationFn: async ({ id, name, supplierPartnerPayableDeductionPerQty }: { id: number; name: string; supplierPartnerPayableDeductionPerQty?: number }) => {
+    mutationFn: async ({
+      id,
+      name,
+      supplierPartnerPayableDeductionPerQty,
+    }: {
+      id: number;
+      name: string;
+      supplierPartnerPayableDeductionPerQty?: number;
+    }) => {
       const payload: Record<string, any> = { name };
-      if (supplierPartnerPayableDeductionPerQty !== undefined) payload.supplierPartnerPayableDeductionPerQty = supplierPartnerPayableDeductionPerQty;
+      if (supplierPartnerPayableDeductionPerQty !== undefined)
+        payload.supplierPartnerPayableDeductionPerQty = supplierPartnerPayableDeductionPerQty;
       const res = await apiRequest("PATCH", `/api/locations/${id}`, payload);
       return res.json();
     },
@@ -170,7 +197,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   });
 
   const waGroupMutation = useMutation({
-    mutationFn: async ({ id, name, whatsappGroupChatId }: { id: number; name: string; whatsappGroupChatId: string | null }) => {
+    mutationFn: async ({
+      id,
+      name,
+      whatsappGroupChatId,
+    }: {
+      id: number;
+      name: string;
+      whatsappGroupChatId: string | null;
+    }) => {
       const res = await apiRequest("PATCH", `/api/locations/${id}`, { name, whatsappGroupChatId });
       return res.json();
     },
@@ -231,16 +266,18 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   });
 
   const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationLocal && fromDate
-      ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`]
-      : [],
+    queryKey:
+      selectedLocationLocal && fromDate
+        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`]
+        : [],
     enabled: !!selectedLocationLocal && !!fromDate,
   });
 
   const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationLocal && asOfDate
-      ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`]
-      : [],
+    queryKey:
+      selectedLocationLocal && asOfDate
+        ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`]
+        : [],
     enabled: !!selectedLocationLocal && !!asOfDate,
   });
 
@@ -260,7 +297,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const allInventoryLocations = useMemo(() => {
     const locs = new Map<number, { id: number; name: string }>();
     allInventoryData.forEach((item: any) => {
-      if (item.locationId && !locs.has(item.locationId)) locs.set(item.locationId, { id: item.locationId, name: item.locationName || "" });
+      if (item.locationId && !locs.has(item.locationId))
+        locs.set(item.locationId, { id: item.locationId, name: item.locationName || "" });
     });
     return [...locs.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [allInventoryData]);
@@ -269,7 +307,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     const groups = new Map<string, { id: number | null; name: string }>();
     allInventoryData.forEach((item: any) => {
       const key = String(item.stockGroupId ?? "null");
-      if (!groups.has(key)) groups.set(key, { id: item.stockGroupId ?? null, name: item.stockGroupName || "Unassigned" });
+      if (!groups.has(key))
+        groups.set(key, { id: item.stockGroupId ?? null, name: item.stockGroupName || "Unassigned" });
     });
     return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [allInventoryData]);
@@ -301,33 +340,48 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       row.weightedCostSum += qty * avgRate;
       row.totalValue += parseFloat(item.totalValue || "0");
     });
-    return [...itemMap.values()].map((row) => ({ ...row, avgCost: row.totalQty > 0 ? row.weightedCostSum / row.totalQty : 0 }));
+    return [...itemMap.values()].map((row) => ({
+      ...row,
+      avgCost: row.totalQty > 0 ? row.weightedCostSum / row.totalQty : 0,
+    }));
   }, [allInventoryData]);
 
   const filteredCombinedRows = useMemo(() => {
-    return combinedStockRows.filter((row) => {
-      if (allStockGroupFilter) {
-        if (allStockGroupFilter === "null") { if (row.stockGroupId !== null) return false; }
-        else { if (String(row.stockGroupId) !== allStockGroupFilter) return false; }
-      }
-      if (allStockCategoryFilter.length > 0) {
-        const rowCatId = row.categoryId == null ? "none" : String(row.categoryId);
-        if (!allStockCategoryFilter.includes(rowCatId)) return false;
-      }
-      if (allStockLocationFilter) {
-        const matchingIds = allInventoryLocations
-          .filter((l) => l.name === allStockLocationFilter)
-          .map((l) => l.id);
-        const hasQty = matchingIds.some((id) => (row.qtyByLocation[id] || 0) > 0);
-        if (!hasQty) return false;
-      }
-      if (allStockSearchTerm) {
-        const s = allStockSearchTerm.toLowerCase();
-        return row.stockItemName.toLowerCase().includes(s) || row.stockItemCode.toLowerCase().includes(s);
-      }
-      return true;
-    }).sort((a, b) => a.stockGroupName.localeCompare(b.stockGroupName) || a.stockItemName.localeCompare(b.stockItemName));
-  }, [combinedStockRows, allStockGroupFilter, allStockCategoryFilter, allStockLocationFilter, allStockSearchTerm, allInventoryLocations]);
+    return combinedStockRows
+      .filter((row) => {
+        if (allStockGroupFilter) {
+          if (allStockGroupFilter === "null") {
+            if (row.stockGroupId !== null) return false;
+          } else {
+            if (String(row.stockGroupId) !== allStockGroupFilter) return false;
+          }
+        }
+        if (allStockCategoryFilter.length > 0) {
+          const rowCatId = row.categoryId == null ? "none" : String(row.categoryId);
+          if (!allStockCategoryFilter.includes(rowCatId)) return false;
+        }
+        if (allStockLocationFilter) {
+          const matchingIds = allInventoryLocations.filter((l) => l.name === allStockLocationFilter).map((l) => l.id);
+          const hasQty = matchingIds.some((id) => (row.qtyByLocation[id] || 0) > 0);
+          if (!hasQty) return false;
+        }
+        if (allStockSearchTerm) {
+          const s = allStockSearchTerm.toLowerCase();
+          return row.stockItemName.toLowerCase().includes(s) || row.stockItemCode.toLowerCase().includes(s);
+        }
+        return true;
+      })
+      .sort(
+        (a, b) => a.stockGroupName.localeCompare(b.stockGroupName) || a.stockItemName.localeCompare(b.stockItemName)
+      );
+  }, [
+    combinedStockRows,
+    allStockGroupFilter,
+    allStockCategoryFilter,
+    allStockLocationFilter,
+    allStockSearchTerm,
+    allInventoryLocations,
+  ]);
 
   const openingInventoryMap = useMemo(() => {
     const map = new Map<number, number>();
@@ -337,21 +391,30 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   const showMovement = !!(fromDate && asOfDate);
   const activeInventoryData = showMovement ? closingInventoryData : inventoryData;
-  const activeInventoryLoading = showMovement ? (closingInventoryLoading || openingInventoryLoading) : inventoryLoading;
+  const activeInventoryLoading = showMovement ? closingInventoryLoading || openingInventoryLoading : inventoryLoading;
 
   // All items (respecting zero filter)
   const inventory: InventoryItem[] = showZeroStock
     ? activeInventoryData
-    : activeInventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
+    : activeInventoryData.filter((item) => parseFloat(item.quantity || "0") !== 0);
 
   // Stock groups built from inventory
   const stockGroups: StockGroupSummary[] = useMemo(() => {
     const groups: StockGroupSummary[] = [];
-    inventory.forEach(item => {
+    inventory.forEach((item) => {
       const groupId = item.stockGroupId ?? null;
-      let group = groups.find(g => g.groupId === groupId);
+      let group = groups.find((g) => g.groupId === groupId);
       if (!group) {
-        group = { groupId, groupCode: item.stockGroupCode, groupName: item.stockGroupName || "Ungrouped", totalQuantity: 0, totalValue: 0, averageRate: 0, itemCount: 0, items: [] };
+        group = {
+          groupId,
+          groupCode: item.stockGroupCode,
+          groupName: item.stockGroupName || "Ungrouped",
+          totalQuantity: 0,
+          totalValue: 0,
+          averageRate: 0,
+          itemCount: 0,
+          items: [],
+        };
         groups.push(group);
       }
       const qty = parseFloat(item.quantity || "0");
@@ -360,19 +423,24 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       group.itemCount += 1;
       group.items.push(item);
     });
-    groups.forEach(g => { if (g.totalQuantity > 0) g.averageRate = g.totalValue / g.totalQuantity; });
+    groups.forEach((g) => {
+      if (g.totalQuantity > 0) g.averageRate = g.totalValue / g.totalQuantity;
+    });
     return groups.sort((a, b) => a.groupName.localeCompare(b.groupName));
   }, [inventory]);
 
   // Filter stock groups by search + category
   const filteredStockGroups = useMemo(() => {
-    return stockGroups.filter(g => {
+    return stockGroups.filter((g) => {
       if (groupSearchTerm && !g.groupName.toLowerCase().includes(groupSearchTerm.toLowerCase())) return false;
       if (groupCategoryFilter) {
-        if (!g.items.some(item => {
-          if (groupCategoryFilter === "none") return item.categoryId == null;
-          return String(item.categoryId) === groupCategoryFilter;
-        })) return false;
+        if (
+          !g.items.some((item) => {
+            if (groupCategoryFilter === "none") return item.categoryId == null;
+            return String(item.categoryId) === groupCategoryFilter;
+          })
+        )
+          return false;
       }
       return true;
     });
@@ -381,24 +449,36 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   // Items within the selected group, with search + category
   const filteredStockItems = useMemo(() => {
     if (!selectedGroup) return [];
-    return selectedGroup.items.filter(item => {
-      if (itemCategoryFilter.length > 0) {
-        const itemCatId = item.categoryId == null ? "none" : String(item.categoryId);
-        if (!itemCategoryFilter.includes(itemCatId)) return false;
-      }
-      if (!itemSearchTerm) return true;
-      const s = itemSearchTerm.toLowerCase();
-      return (item.stockItemName || "").toLowerCase().includes(s) || (item.stockItemCode || "").toLowerCase().includes(s);
-    }).sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
+    return selectedGroup.items
+      .filter((item) => {
+        if (itemCategoryFilter.length > 0) {
+          const itemCatId = item.categoryId == null ? "none" : String(item.categoryId);
+          if (!itemCategoryFilter.includes(itemCatId)) return false;
+        }
+        if (!itemSearchTerm) return true;
+        const s = itemSearchTerm.toLowerCase();
+        return (
+          (item.stockItemName || "").toLowerCase().includes(s) || (item.stockItemCode || "").toLowerCase().includes(s)
+        );
+      })
+      .sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
   }, [selectedGroup, itemSearchTerm, itemCategoryFilter]);
 
   // All items flat list (for view-all mode)
   const allItemsFiltered = useMemo(() => {
-    return inventory.filter(item => {
-      if (!itemSearchTerm) return true;
-      const s = itemSearchTerm.toLowerCase();
-      return (item.stockItemName || "").toLowerCase().includes(s) || (item.stockItemCode || "").toLowerCase().includes(s);
-    }).sort((a, b) => (a.stockGroupName || "").localeCompare(b.stockGroupName || "") || a.stockItemName.localeCompare(b.stockItemName));
+    return inventory
+      .filter((item) => {
+        if (!itemSearchTerm) return true;
+        const s = itemSearchTerm.toLowerCase();
+        return (
+          (item.stockItemName || "").toLowerCase().includes(s) || (item.stockItemCode || "").toLowerCase().includes(s)
+        );
+      })
+      .sort(
+        (a, b) =>
+          (a.stockGroupName || "").localeCompare(b.stockGroupName || "") ||
+          a.stockItemName.localeCompare(b.stockItemName)
+      );
   }, [inventory, itemSearchTerm]);
 
   // Totals across all stock groups
@@ -419,27 +499,36 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       setDeleteDialogOpen(false);
     } catch (error: any) {
       toast({ title: "Delete Failed", description: error.message, variant: "destructive" });
-    } finally { setIsDeleting(false); }
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleArchiveStockGroup = async () => {
     if (!selectedLocationLocal || !selectedGroup) return;
     setIsArchiving(true);
     try {
-      await apiRequest("POST", "/api/stock-group-archives", { locationId: selectedLocationLocal.id, stockGroupId: selectedGroup.groupId });
+      await apiRequest("POST", "/api/stock-group-archives", {
+        locationId: selectedLocationLocal.id,
+        stockGroupId: selectedGroup.groupId,
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       toast({ title: "Stock Group Archived" });
       setSelectedGroup(null);
       setArchiveDialogOpen(false);
     } catch (error: any) {
       toast({ title: "Archive Failed", description: error.message, variant: "destructive" });
-    } finally { setIsArchiving(false); }
+    } finally {
+      setIsArchiving(false);
+    }
   };
 
   const handleExportInventory = async () => {
     if (!selectedLocationLocal) return;
     try {
-      const response = await fetch(`/api/locations/${selectedLocationLocal.id}/inventory/export`, { credentials: "include" });
+      const response = await fetch(`/api/locations/${selectedLocationLocal.id}/inventory/export`, {
+        credentials: "include",
+      });
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -449,7 +538,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       a.click();
       window.URL.revokeObjectURL(url);
       toast({ title: "Export Successful" });
-    } catch (error: any) { toast({ title: "Export Failed", description: error.message, variant: "destructive" }); }
+    } catch (error: any) {
+      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
+    }
   };
 
   const goBackToLocations = () => {
@@ -465,7 +556,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   return (
     <div className="flex flex-col min-h-0 h-full">
-
       {/* ── Page header ─────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
         <div>
@@ -514,7 +604,15 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             />
           </div>
           {(fromDate || asOfDate) && (
-            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs gap-1" onClick={() => { setFromDate(""); setAsOfDate(""); }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 text-xs gap-1"
+              onClick={() => {
+                setFromDate("");
+                setAsOfDate("");
+              }}
+            >
               <X className="h-3 w-3" /> Clear
             </Button>
           )}
@@ -546,7 +644,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
               allStockCategoryFilter={allStockCategoryFilter}
               setAllStockCategoryFilter={setAllStockCategoryFilter}
               allStockSelectedRowIndex={allStockSelectedRowIndex}
-              openMovement={(l, n, sId, sName) => { setStockMovementItem({ stockItemId: sId, stockItemName: sName, locationId: l, locationName: n }); setStockMovementOpen(true); }}
+              openMovement={(l, n, sId, sName) => {
+                setStockMovementItem({ stockItemId: sId, stockItemName: sName, locationId: l, locationName: n });
+                setStockMovementOpen(true);
+              }}
               formatAmount={formatAmount}
               posUser={posUser}
               allStockTableRef={allStockTableRef}
@@ -554,7 +655,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
           </div>
         ) : (
           <div className="px-6 py-4 space-y-4">
-
             {/* ── Breadcrumb ───────────────────────────────────────────────── */}
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <MapPin className="h-3.5 w-3.5 shrink-0" />
@@ -573,7 +673,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     <>
                       <button
                         className="hover:underline hover:text-foreground transition-colors"
-                        onClick={() => { setSelectedGroup(null); setViewAllItems(false); setItemSearchTerm(""); }}
+                        onClick={() => {
+                          setSelectedGroup(null);
+                          setViewAllItems(false);
+                          setItemSearchTerm("");
+                        }}
                       >
                         {selectedLocationLocal.name}
                       </button>
@@ -584,7 +688,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     <>
                       <button
                         className="hover:underline hover:text-foreground transition-colors"
-                        onClick={() => { setViewAllItems(false); setItemSearchTerm(""); }}
+                        onClick={() => {
+                          setViewAllItems(false);
+                          setItemSearchTerm("");
+                        }}
                       >
                         {selectedLocationLocal.name}
                       </button>
@@ -660,10 +767,20 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         <h2 className="text-2xl font-bold truncate">{selectedLocationLocal.name}</h2>
                         {!posUser && (
                           <>
-                            <Button variant="ghost" size="icon" onClick={() => openRenameDialog(selectedLocationLocal)} data-testid="button-rename-location">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openRenameDialog(selectedLocationLocal)}
+                              data-testid="button-rename-location"
+                            >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => openWaGroupDialog(selectedLocationLocal)} data-testid="button-wa-location">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openWaGroupDialog(selectedLocationLocal)}
+                              data-testid="button-wa-location"
+                            >
                               <MessageCircle className="h-4 w-4" />
                             </Button>
                           </>
@@ -711,7 +828,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="menu-export-pdf-cost">
                         <Printer className="h-4 w-4 mr-2" /> Export to PDF (with cost)
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handlePrintWithOption(false)} data-testid="menu-export-pdf-nocost">
+                      <DropdownMenuItem
+                        onClick={() => handlePrintWithOption(false)}
+                        data-testid="menu-export-pdf-nocost"
+                      >
                         <Printer className="h-4 w-4 mr-2" /> Export to PDF (without cost)
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -721,7 +841,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     variant="outline"
                     size="sm"
                     className="gap-1.5"
-                    onClick={() => { setViewAllItems(true); setItemSearchTerm(""); }}
+                    onClick={() => {
+                      setViewAllItems(true);
+                      setItemSearchTerm("");
+                    }}
                     data-testid="button-view-all-items"
                   >
                     <List className="h-4 w-4" /> View All Stock Items
@@ -740,7 +863,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   {!posUser && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-1.5 ml-auto" data-testid="button-location-menu">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 ml-auto"
+                          data-testid="button-location-menu"
+                        >
                           Location <ChevronDown className="h-3 w-3" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -776,15 +904,20 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       data-testid="input-group-search"
                     />
                   </div>
-                  <Select value={groupCategoryFilter || "all"} onValueChange={(v) => setGroupCategoryFilter(v === "all" ? "" : v)}>
+                  <Select
+                    value={groupCategoryFilter || "all"}
+                    onValueChange={(v) => setGroupCategoryFilter(v === "all" ? "" : v)}
+                  >
                     <SelectTrigger className="w-48" data-testid="select-category-filter">
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
                       <SelectItem value="none">Uncategorized</SelectItem>
-                      {categoriesList.map(cat => (
-                        <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                      {categoriesList.map((cat) => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>
+                          {cat.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -803,7 +936,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                       ? "No groups match your search."
                       : showZeroStock
                         ? "No stock items found for this location."
-                        : "No items with stock. Toggle \"Show zero stock\" to see all items."}
+                        : 'No items with stock. Toggle "Show zero stock" to see all items.'}
                   </div>
                 ) : (
                   <div className="rounded-lg border overflow-hidden">
@@ -826,7 +959,11 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                           <tr
                             key={g.groupId}
                             className="border-b hover-elevate cursor-pointer"
-                            onClick={() => { setSelectedGroup(g); setItemSearchTerm(""); setItemCategoryFilter([]); }}
+                            onClick={() => {
+                              setSelectedGroup(g);
+                              setItemSearchTerm("");
+                              setItemCategoryFilter([]);
+                            }}
                             data-testid={`row-group-${g.groupId}`}
                           >
                             <td className="px-4 py-3 font-medium">{g.groupName}</td>
@@ -854,7 +991,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                         <tr className="bg-muted/50 border-t-2 font-semibold">
                           <td className="px-4 py-3 font-bold">Total</td>
                           <td className="px-4 py-3 text-center">
-                            <Badge variant="secondary">{filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}</Badge>
+                            <Badge variant="secondary">
+                              {filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}
+                            </Badge>
                           </td>
                           <td className="px-4 py-3 text-right font-mono font-bold">
                             {Math.floor(filteredStockGroups.reduce((s, g) => s + g.totalQuantity, 0)).toLocaleString()}
@@ -876,7 +1015,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
                 {filteredStockGroups.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Showing {filteredStockGroups.length} of {stockGroups.length} stock {stockGroups.length === 1 ? "group" : "groups"}
+                    Showing {filteredStockGroups.length} of {stockGroups.length} stock{" "}
+                    {stockGroups.length === 1 ? "group" : "groups"}
                   </p>
                 )}
               </>
@@ -893,10 +1033,22 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                   <div>
                     <h2 className="text-xl font-bold">{selectedGroup.groupName}</h2>
                     <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                      <span><span className="font-semibold text-foreground">{selectedGroup.itemCount}</span> Items</span>
-                      <span><span className="font-semibold text-foreground font-mono">{Math.floor(selectedGroup.totalQuantity).toLocaleString()}</span> BL total</span>
+                      <span>
+                        <span className="font-semibold text-foreground">{selectedGroup.itemCount}</span> Items
+                      </span>
+                      <span>
+                        <span className="font-semibold text-foreground font-mono">
+                          {Math.floor(selectedGroup.totalQuantity).toLocaleString()}
+                        </span>{" "}
+                        BL total
+                      </span>
                       {!posUser && (
-                        <span><span className="font-semibold text-foreground">{formatAmount(selectedGroup.totalValue)}</span> total value</span>
+                        <span>
+                          <span className="font-semibold text-foreground">
+                            {formatAmount(selectedGroup.totalValue)}
+                          </span>{" "}
+                          total value
+                        </span>
                       )}
                     </div>
                   </div>
@@ -935,8 +1087,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                     <SelectContent>
                       <SelectItem value="all">All Categories</SelectItem>
                       <SelectItem value="none">Uncategorized</SelectItem>
-                      {categoriesList.map(cat => (
-                        <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                      {categoriesList.map((cat) => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>
+                          {cat.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -965,7 +1119,10 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
                   <span className="font-semibold text-foreground">{totalItems}</span> Items
                   <span className="text-muted-foreground">·</span>
-                  <span className="font-semibold text-foreground font-mono">{Math.floor(totalQty).toLocaleString()}</span> BL total
+                  <span className="font-semibold text-foreground font-mono">
+                    {Math.floor(totalQty).toLocaleString()}
+                  </span>{" "}
+                  BL total
                   {!posUser && (
                     <>
                       <span className="text-muted-foreground">·</span>
@@ -1046,7 +1203,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateLocationOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateLocationOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => createLocationMutation.mutate(createLocationName.trim())}
               disabled={createLocationMutation.isPending || !createLocationName.trim()}

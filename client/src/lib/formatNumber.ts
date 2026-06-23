@@ -7,9 +7,7 @@ export type CurrencyCode = "USD" | "CFA";
  */
 export function drCrClass(side: string | null | undefined): string {
   if (!side) return "";
-  return side.toUpperCase() === "CR"
-    ? "text-red-500 dark:text-red-400"
-    : "text-green-600 dark:text-green-400";
+  return side.toUpperCase() === "CR" ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400";
 }
 
 /**
@@ -43,7 +41,7 @@ export function formatCurrency(num: number): string {
 export function formatCurrencyWithLabel(num: number | string, currency: CurrencyCode = "USD"): string {
   const numValue = typeof num === "string" ? parseFloat(num) : num;
   if (isNaN(numValue)) return "";
-  
+
   if (currency === "USD") {
     const isWhole = Math.abs(numValue) % 1 === 0;
     return `$ ${numValue.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;

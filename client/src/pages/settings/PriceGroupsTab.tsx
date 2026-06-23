@@ -6,13 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MapPin, Layers, Plus, Trash2, Save } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Location {
   id: number;
@@ -76,9 +70,7 @@ export function PriceGroupsTab() {
 
   const setMaster = (idx: number, locationId: number) => {
     setGroups((prev) =>
-      prev.map((g, i) =>
-        i === idx ? { ...g, masterLocationId: locationId, followerLocationIds: [] } : g
-      )
+      prev.map((g, i) => (i === idx ? { ...g, masterLocationId: locationId, followerLocationIds: [] } : g))
     );
     setDirty(true);
   };
@@ -104,7 +96,9 @@ export function PriceGroupsTab() {
   if (locLoading || groupsLoading) {
     return (
       <div className="space-y-3 p-4">
-        {[1, 2].map((i) => <Skeleton key={i} className="h-24 w-full" />)}
+        {[1, 2].map((i) => (
+          <Skeleton key={i} className="h-24 w-full" />
+        ))}
       </div>
     );
   }
@@ -114,7 +108,8 @@ export function PriceGroupsTab() {
       <div>
         <h2 className="text-base font-semibold">Price Groups</h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Configure master locations whose prices automatically cascade to their follower locations. The Price List will show one column per master location.
+          Configure master locations whose prices automatically cascade to their follower locations. The Price List will
+          show one column per master location.
         </p>
       </div>
 
@@ -127,12 +122,8 @@ export function PriceGroupsTab() {
 
         {groups.map((group, idx) => {
           const masterLoc = locations.find((l) => l.id === group.masterLocationId);
-          const availableFollowers = locations.filter(
-            (l) => l.id !== group.masterLocationId && !usedMasters.has(l.id)
-          );
-          const availableMasters = locations.filter(
-            (l) => !usedMasters.has(l.id) || l.id === group.masterLocationId
-          );
+          const availableFollowers = locations.filter((l) => l.id !== group.masterLocationId && !usedMasters.has(l.id));
+          const availableMasters = locations.filter((l) => !usedMasters.has(l.id) || l.id === group.masterLocationId);
 
           return (
             <div key={idx} className="border rounded-md p-4 space-y-3">
@@ -144,10 +135,7 @@ export function PriceGroupsTab() {
                     value={group.masterLocationId ? String(group.masterLocationId) : ""}
                     onValueChange={(v) => setMaster(idx, parseInt(v))}
                   >
-                    <SelectTrigger
-                      data-testid={`select-master-location-${idx}`}
-                      className="w-48"
-                    >
+                    <SelectTrigger data-testid={`select-master-location-${idx}`} className="w-48">
                       <SelectValue placeholder="Select master…" />
                     </SelectTrigger>
                     <SelectContent>
@@ -200,7 +188,9 @@ export function PriceGroupsTab() {
                   {group.followerLocationIds.length > 0 && (
                     <p className="text-xs text-muted-foreground">
                       Pricing for{" "}
-                      <strong>{group.followerLocationIds.length} location{group.followerLocationIds.length > 1 ? "s" : ""}</strong>{" "}
+                      <strong>
+                        {group.followerLocationIds.length} location{group.followerLocationIds.length > 1 ? "s" : ""}
+                      </strong>{" "}
                       will follow <strong>{masterLoc?.name}</strong>.
                     </p>
                   )}

@@ -13,8 +13,38 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, LayoutGrid, Download, RefreshCw, Search, BookOpen, PenLine, Truck, ArrowRightLeft, Upload, AlertCircle, Layers, BookmarkCheck, ChevronDown, ChevronRight, Users, Package, MoreHorizontal, X } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Plus,
+  Trash2,
+  Star,
+  Pencil,
+  FileText,
+  LayoutGrid,
+  Download,
+  RefreshCw,
+  Search,
+  BookOpen,
+  PenLine,
+  Truck,
+  ArrowRightLeft,
+  Upload,
+  AlertCircle,
+  Layers,
+  BookmarkCheck,
+  ChevronDown,
+  ChevronRight,
+  Users,
+  Package,
+  MoreHorizontal,
+  X,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -82,7 +112,12 @@ export default function FactoryProformas() {
   const [addLineProformaId, setAddLineProformaId] = useState<number | null>(null);
   const [newLine, setNewLine] = useState({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
   const [editingLine, setEditingLine] = useState<ProformaLine | null>(null);
-  const [editLineValues, setEditLineValues] = useState({ productName: "", quantity: "", pricePerBale: "", weightPerBaleKg: "" });
+  const [editLineValues, setEditLineValues] = useState({
+    productName: "",
+    quantity: "",
+    pricePerBale: "",
+    weightPerBaleKg: "",
+  });
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [inlineQtyLineId, setInlineQtyLineId] = useState<number | null>(null);
   const [inlineQtyValue, setInlineQtyValue] = useState<string>("");
@@ -101,7 +136,9 @@ export default function FactoryProformas() {
   // Excel import state
   const [isExcelImportOpen, setIsExcelImportOpen] = useState(false);
   const [excelImportName, setExcelImportName] = useState("");
-  const [excelImportLines, setExcelImportLines] = useState<{ articleCode: string; productName: string; quantity: string; pricePerBale: string }[]>([]);
+  const [excelImportLines, setExcelImportLines] = useState<
+    { articleCode: string; productName: string; quantity: string; pricePerBale: string }[]
+  >([]);
   const [excelImportErrors, setExcelImportErrors] = useState<string[]>([]);
   const [excelImportLoading, setExcelImportLoading] = useState(false);
   const excelFileInputRef = useRef<HTMLInputElement>(null);
@@ -136,9 +173,7 @@ export default function FactoryProformas() {
     enabled: !!customerId && isAddLineOpen,
   });
 
-  const priceListMap = Object.fromEntries(
-    customerPriceList.map((p) => [p.articleCode, p.pricePerBale])
-  );
+  const priceListMap = Object.fromEntries(customerPriceList.map((p) => [p.articleCode, p.pricePerBale]));
 
   const { data: locations = [] } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/locations"],
@@ -147,8 +182,13 @@ export default function FactoryProformas() {
 
   const createLoadingMutation = useMutation({
     mutationFn: async ({ proformaId, locationId }: { proformaId: number; locationId: string }) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-proformas/${proformaId}/create-loading`, { locationId: parseInt(locationId) });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      const res = await modeApiRequest("POST", `/api/factory/customer-proformas/${proformaId}/create-loading`, {
+        locationId: parseInt(locationId),
+      });
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: (data) => {
@@ -174,7 +214,9 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma created successfully" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       setIsCreateOpen(false);
       setNewProformaName("");
     },
@@ -190,7 +232,9 @@ export default function FactoryProformas() {
     },
     onSuccess: (_, vars) => {
       toast({ title: vars.isActive ? "Proforma activated" : "Proforma deactivated" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -198,7 +242,9 @@ export default function FactoryProformas() {
       const isStockError = msg.includes("insufficient") || msg.includes("free stock") || msg.includes("needs");
       toast({
         title: isStockError ? "Cannot activate — insufficient stock" : "Error",
-        description: isStockError ? "One or more articles don't have enough available stock to fulfil this proforma." : msg.slice(0, 200),
+        description: isStockError
+          ? "One or more articles don't have enough available stock to fulfil this proforma."
+          : msg.slice(0, 200),
         variant: "destructive",
       });
     },
@@ -210,7 +256,9 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma deleted" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -224,7 +272,9 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma renamed successfully" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       setRenamingProforma(null);
       setRenameValue("");
     },
@@ -240,7 +290,9 @@ export default function FactoryProformas() {
     },
     onSuccess: (data: any) => {
       toast({ title: "Proforma transferred", description: `Proforma moved to ${data.targetCustomerName}` });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       setTransferProforma(null);
       setTransferTargetCustomerId("");
     },
@@ -251,12 +303,20 @@ export default function FactoryProformas() {
   });
 
   const addLineMutation = useMutation({
-    mutationFn: async (data: { proformaId: number; articleCode: string; productName: string; quantity: number; pricePerBale: string }) => {
+    mutationFn: async (data: {
+      proformaId: number;
+      articleCode: string;
+      productName: string;
+      quantity: number;
+      pricePerBale: string;
+    }) => {
       return await modeApiRequest("POST", "/api/factory/customer-proforma-lines", data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line added" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-price-lists/${customerId}`, customerId] });
       setIsAddLineOpen(false);
       setAddLineProformaId(null);
@@ -271,7 +331,13 @@ export default function FactoryProformas() {
   });
 
   const editLineMutation = useMutation({
-    mutationFn: async (data: { id: number; pricePerBale: string; productName: string; quantity: string; weightPerBaleKg: string }) => {
+    mutationFn: async (data: {
+      id: number;
+      pricePerBale: string;
+      productName: string;
+      quantity: string;
+      weightPerBaleKg: string;
+    }) => {
       return await modeApiRequest("PUT", `/api/factory/customer-proforma-lines/${data.id}`, {
         pricePerBale: data.pricePerBale,
         productName: data.productName,
@@ -281,7 +347,9 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line updated" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-price-lists/${customerId}`, customerId] });
       setEditingLine(null);
     },
@@ -297,7 +365,9 @@ export default function FactoryProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line deleted" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -308,10 +378,15 @@ export default function FactoryProformas() {
   const inlineQtyMutation = useMutation({
     mutationFn: async ({ id, quantity }: { id: number; quantity: number }) => {
       const res = await modeApiRequest("PUT", `/api/factory/customer-proforma-lines/${id}`, { quantity });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       setInlineQtyLineId(null);
     },
     onError: (error: Error) => {
@@ -334,7 +409,7 @@ export default function FactoryProformas() {
     const created = createdAt ? new Date(createdAt) : null;
     const updated = updatedAt ? new Date(updatedAt) : null;
     const fmt = (d: Date) => d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-    if (updated && created && (updated.getTime() - created.getTime() > 60_000)) {
+    if (updated && created && updated.getTime() - created.getTime() > 60_000) {
       return { label: "Edited", value: fmt(updated) };
     }
     if (created) {
@@ -346,7 +421,10 @@ export default function FactoryProformas() {
   const bulkImportMutation = useMutation({
     mutationFn: async (data: { customerId: number; name: string; isActive: boolean; lines: any[] }) => {
       const res = await modeApiRequest("POST", "/api/factory/customer-proformas/bulk", data);
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -366,9 +444,9 @@ export default function FactoryProformas() {
   const downloadProformaTemplate = async () => {
     const wb = excelUtils.book_new();
     const sampleData = [
-      { "Article Code": "A001", "Product Name": "Mixed Cotton Bales", "Quantity": 50, "Price Per Bale": 45.00 },
-      { "Article Code": "A002", "Product Name": "White Cotton Bales", "Quantity": 30, "Price Per Bale": 52.50 },
-      { "Article Code": "B001", "Product Name": "Polyester Mix Bales", "Quantity": 20, "Price Per Bale": 38.00 },
+      { "Article Code": "A001", "Product Name": "Mixed Cotton Bales", Quantity: 50, "Price Per Bale": 45.0 },
+      { "Article Code": "A002", "Product Name": "White Cotton Bales", Quantity: 30, "Price Per Bale": 52.5 },
+      { "Article Code": "B001", "Product Name": "Polyester Mix Bales", Quantity: 20, "Price Per Bale": 38.0 },
     ];
     const sheet = excelUtils.json_to_sheet(sampleData);
     excelUtils.book_append_sheet(wb, sheet, "Proforma");
@@ -382,12 +460,21 @@ export default function FactoryProformas() {
     try {
       const workbook = await readExcel(file);
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      if (!firstSheet) { setExcelImportErrors(["No sheets found in this file"]); return; }
+      if (!firstSheet) {
+        setExcelImportErrors(["No sheets found in this file"]);
+        return;
+      }
       const rows = excelUtils.sheet_to_json<Record<string, any>>(firstSheet);
-      if (rows.length === 0) { setExcelImportErrors(["The sheet appears to be empty"]); return; }
+      if (rows.length === 0) {
+        setExcelImportErrors(["The sheet appears to be empty"]);
+        return;
+      }
 
       // Smart column detection — case-insensitive, multiple aliases
-      const normalize = (s: string) => String(s ?? "").toLowerCase().replace(/[\s_\-]/g, "");
+      const normalize = (s: string) =>
+        String(s ?? "")
+          .toLowerCase()
+          .replace(/[\s_\-]/g, "");
       const findCol = (row: Record<string, any>, aliases: string[]): string => {
         const keys = Object.keys(row);
         for (const alias of aliases) {
@@ -410,23 +497,38 @@ export default function FactoryProformas() {
           errors.push(`Row ${i + 2}: Missing article code and product name — skipped`);
           return;
         }
-        if (!articleCode) { errors.push(`Row ${i + 2}: Missing article code — skipped`); return; }
-        if (!productName) { errors.push(`Row ${i + 2}: Missing product name — skipped`); return; }
+        if (!articleCode) {
+          errors.push(`Row ${i + 2}: Missing article code — skipped`);
+          return;
+        }
+        if (!productName) {
+          errors.push(`Row ${i + 2}: Missing product name — skipped`);
+          return;
+        }
         const qty = parseInt(quantity);
-        if (isNaN(qty) || qty <= 0) { errors.push(`Row ${i + 2}: Invalid quantity "${quantity}" — skipped`); return; }
+        if (isNaN(qty) || qty <= 0) {
+          errors.push(`Row ${i + 2}: Invalid quantity "${quantity}" — skipped`);
+          return;
+        }
 
         parsed.push({ articleCode, productName, quantity: String(qty), pricePerBale: pricePerBale || "0" });
       });
 
       if (errors.length > 0) setExcelImportErrors(errors);
       if (parsed.length === 0) {
-        setExcelImportErrors((prev) => [...prev, "No valid rows found. Check that columns are named: Article Code, Product Name, Quantity, Price Per Bale"]);
+        setExcelImportErrors((prev) => [
+          ...prev,
+          "No valid rows found. Check that columns are named: Article Code, Product Name, Quantity, Price Per Bale",
+        ]);
         return;
       }
       setExcelImportLines(parsed);
       // Suggest a proforma name from the filename
       if (!excelImportName) {
-        const base = file.name.replace(/\.(xlsx?|csv)$/i, "").replace(/[_\-]+/g, " ").trim();
+        const base = file.name
+          .replace(/\.(xlsx?|csv)$/i, "")
+          .replace(/[_\-]+/g, " ")
+          .trim();
         setExcelImportName(base || "Imported Proforma");
       }
     } catch (err: any) {
@@ -442,15 +544,18 @@ export default function FactoryProformas() {
       const res = await modeApiRequest(
         "POST",
         `/api/factory/customer-price-lists/${customerId}/from-proforma/${proformaId}`,
-        {},
+        {}
       );
       return res.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
-      const backfillNote = result.backfilled > 0
-        ? ` Updated ${result.backfilled} line${result.backfilled !== 1 ? "s" : ""} across all existing proformas.`
-        : "";
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
+      const backfillNote =
+        result.backfilled > 0
+          ? ` Updated ${result.backfilled} line${result.backfilled !== 1 ? "s" : ""} across all existing proformas.`
+          : "";
       toast({
         title: "Agreed prices saved",
         description: `${result.saved} price${result.saved !== 1 ? "s" : ""} saved.${backfillNote}`,
@@ -464,14 +569,21 @@ export default function FactoryProformas() {
 
   const applyCatalogPricesMutation = useMutation({
     mutationFn: async (proformaId: number) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-proformas/${proformaId}/apply-catalog-prices`, {});
+      const res = await modeApiRequest(
+        "POST",
+        `/api/factory/customer-proformas/${proformaId}/apply-catalog-prices`,
+        {}
+      );
       return res.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
-      const msg = result.skipped > 0
-        ? `${result.updated} line(s) updated, ${result.skipped} skipped (no catalog price)`
-        : `${result.updated} line(s) updated with catalog prices`;
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
+      const msg =
+        result.skipped > 0
+          ? `${result.updated} line(s) updated, ${result.skipped} skipped (no catalog price)`
+          : `${result.updated} line(s) updated with catalog prices`;
       toast({ title: "Prices Applied", description: msg });
     },
     onError: (error: Error) => {
@@ -490,7 +602,14 @@ export default function FactoryProformas() {
   };
 
   const handleAddLine = () => {
-    if (!addLineProformaId || !newLine.articleCode.trim() || !newLine.productName.trim() || !newLine.quantity || !newLine.pricePerBale) return;
+    if (
+      !addLineProformaId ||
+      !newLine.articleCode.trim() ||
+      !newLine.productName.trim() ||
+      !newLine.quantity ||
+      !newLine.pricePerBale
+    )
+      return;
     addLineMutation.mutate({
       proformaId: addLineProformaId,
       articleCode: newLine.articleCode.trim(),
@@ -535,11 +654,7 @@ export default function FactoryProformas() {
               <Upload className="mr-1.5 h-3.5 w-3.5" />
               Import Excel
             </Button>
-            <Button
-              size="sm"
-              data-testid="button-create-proforma"
-              onClick={() => setIsCreateOpen(true)}
-            >
+            <Button size="sm" data-testid="button-create-proforma" onClick={() => setIsCreateOpen(true)}>
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               New Proforma
             </Button>
@@ -555,11 +670,14 @@ export default function FactoryProformas() {
             {customersLoading ? (
               <Skeleton className="h-9 flex-1" />
             ) : (
-              <Select value={selectedCustomerId} onValueChange={(val) => {
-                setSelectedCustomerId(val);
-                setExpandedProformaIds(new Set());
-                setProformaSearch("");
-              }}>
+              <Select
+                value={selectedCustomerId}
+                onValueChange={(val) => {
+                  setSelectedCustomerId(val);
+                  setExpandedProformaIds(new Set());
+                  setProformaSearch("");
+                }}
+              >
                 <SelectTrigger data-testid="select-customer" className="flex-1">
                   <SelectValue placeholder="Select a customer to view proformas..." />
                 </SelectTrigger>
@@ -578,7 +696,7 @@ export default function FactoryProformas() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <Input
                 value={proformaSearch}
-                onChange={e => setProformaSearch(e.target.value)}
+                onChange={(e) => setProformaSearch(e.target.value)}
                 placeholder="Search proformas…"
                 className="pl-8 h-9 w-52 text-sm"
                 data-testid="input-proforma-search"
@@ -599,7 +717,6 @@ export default function FactoryProformas() {
 
       {/* ── Content area ─────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto px-6 py-5">
-
         {/* Loading skeletons */}
         {customerId && proformasLoading && (
           <div className="space-y-3">
@@ -611,7 +728,10 @@ export default function FactoryProformas() {
 
         {/* Empty: no customer selected */}
         {!customerId && !customersLoading && (
-          <div className="flex flex-col items-center justify-center py-20 text-center" data-testid="text-select-customer">
+          <div
+            className="flex flex-col items-center justify-center py-20 text-center"
+            data-testid="text-select-customer"
+          >
             <div className="rounded-full bg-muted p-4 mb-4">
               <Users className="h-8 w-8 text-muted-foreground" />
             </div>
@@ -640,12 +760,13 @@ export default function FactoryProformas() {
           <div className="space-y-3">
             {/* Inactive toggle + search status */}
             {(() => {
-              const inactiveCount = proformas.filter(p => !p.isActive).length;
+              const inactiveCount = proformas.filter((p) => !p.isActive).length;
               const searchTerm = proformaSearch.trim().toLowerCase();
               const visibleProformas = proformas
-                .filter(p => p.isActive || showInactive)
-                .filter(p => !searchTerm || p.name.toLowerCase().includes(searchTerm));
-              const allExpanded = visibleProformas.length > 0 && visibleProformas.every(p => expandedProformaIds.has(p.id));
+                .filter((p) => p.isActive || showInactive)
+                .filter((p) => !searchTerm || p.name.toLowerCase().includes(searchTerm));
+              const allExpanded =
+                visibleProformas.length > 0 && visibleProformas.every((p) => expandedProformaIds.has(p.id));
               return (
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   {searchTerm ? (
@@ -654,7 +775,9 @@ export default function FactoryProformas() {
                         ? `No proformas match "${proformaSearch}"`
                         : `${visibleProformas.length} proforma${visibleProformas.length !== 1 ? "s" : ""} matching "${proformaSearch}"`}
                     </p>
-                  ) : <div />}
+                  ) : (
+                    <div />
+                  )}
                   <div className="flex items-center gap-2 ml-auto">
                     <Button
                       variant="ghost"
@@ -663,7 +786,7 @@ export default function FactoryProformas() {
                         if (allExpanded) {
                           setExpandedProformaIds(new Set());
                         } else {
-                          setExpandedProformaIds(new Set(visibleProformas.map(p => p.id)));
+                          setExpandedProformaIds(new Set(visibleProformas.map((p) => p.id)));
                         }
                       }}
                       data-testid="button-expand-collapse-all"
@@ -675,7 +798,7 @@ export default function FactoryProformas() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setShowInactive(v => !v)}
+                        onClick={() => setShowInactive((v) => !v)}
                         data-testid="button-toggle-inactive-proformas"
                         className="text-muted-foreground"
                       >
@@ -687,333 +810,175 @@ export default function FactoryProformas() {
               );
             })()}
 
-            {proformas.filter(p => p.isActive || showInactive).filter(p => !proformaSearch.trim() || p.name.toLowerCase().includes(proformaSearch.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name)).map((proforma) => {
-              const isExpanded = expandedProformaIds.has(proforma.id);
-              const totalQty = proforma.lines?.reduce((s, l) => s + l.quantity, 0) ?? 0;
-              const totalWeight = proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0) ?? 0;
-              const totalAmount = proforma.lines?.reduce((s, l) => s + l.quantity * effectivePricePerBale(l), 0) ?? 0;
-              const lineCount = proforma.lines?.length ?? 0;
-              const d = formatProformaDate(proforma.createdAt, proforma.updatedAt);
+            {proformas
+              .filter((p) => p.isActive || showInactive)
+              .filter(
+                (p) => !proformaSearch.trim() || p.name.toLowerCase().includes(proformaSearch.trim().toLowerCase())
+              )
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((proforma) => {
+                const isExpanded = expandedProformaIds.has(proforma.id);
+                const totalQty = proforma.lines?.reduce((s, l) => s + l.quantity, 0) ?? 0;
+                const totalWeight =
+                  proforma.lines?.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0) ?? 0;
+                const totalAmount = proforma.lines?.reduce((s, l) => s + l.quantity * effectivePricePerBale(l), 0) ?? 0;
+                const lineCount = proforma.lines?.length ?? 0;
+                const d = formatProformaDate(proforma.createdAt, proforma.updatedAt);
 
-              return (
-                <div
-                  key={proforma.id}
-                  data-testid={`card-proforma-${proforma.id}`}
-                  className={`rounded-lg border bg-card transition-shadow ${isExpanded ? "shadow-sm" : ""} ${!proforma.isActive ? "opacity-60" : ""}`}
-                >
-                  {/* Card header row */}
-                  <div className="flex items-center gap-2 px-4 py-3">
-                    {/* Expand toggle */}
-                    <button
-                      className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
-                      onClick={() => setExpandedProformaIds(prev => {
-                        const next = new Set(prev);
-                        if (next.has(proforma.id)) next.delete(proforma.id); else next.add(proforma.id);
-                        return next;
-                      })}
-                      data-testid={`button-expand-proforma-${proforma.id}`}
-                    >
-                      {isExpanded
-                        ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                        : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
-                      <span className="font-semibold truncate">{proforma.name}</span>
-                      {proforma.isActive && (
-                        <Badge className="bg-green-600 text-white shrink-0 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-active-${proforma.id}`}>
-                          Active
-                        </Badge>
-                      )}
-                    </button>
-
-                    {/* Stats chips (hidden on tiny screens) */}
-                    <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground shrink-0">
-                      <span data-testid={`badge-lines-count-${proforma.id}`} className="flex items-center gap-1">
-                        <Package className="h-3 w-3" />{lineCount} lines
-                      </span>
-                      {totalQty > 0 && (
-                        <span data-testid={`text-total-qty-${proforma.id}`} className="font-mono">
-                          {totalQty.toLocaleString()} bales
-                        </span>
-                      )}
-                      {totalWeight > 0 && (
-                        <span data-testid={`text-total-weight-${proforma.id}`} className="font-mono">
-                          {totalWeight.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })} kg
-                        </span>
-                      )}
-                      {!hideProformaPrice && totalAmount > 0 && (
-                        <span data-testid={`text-total-amount-${proforma.id}`} className="font-mono font-medium text-foreground">
-                          {formatAmount(totalAmount)}
-                        </span>
-                      )}
-                      {d.value && (
-                        <span data-testid={`text-proforma-date-${proforma.id}`} className="text-muted-foreground/70">
-                          {d.label} {d.value}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="flex items-center gap-0.5 shrink-0 ml-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => toggleActiveMutation.mutate({ id: proforma.id, isActive: !proforma.isActive })}
-                        disabled={toggleActiveMutation.isPending}
-                        data-testid={`button-toggle-active-proforma-${proforma.id}`}
-                        title={proforma.isActive ? "Deactivate" : "Set active"}
+                return (
+                  <div
+                    key={proforma.id}
+                    data-testid={`card-proforma-${proforma.id}`}
+                    className={`rounded-lg border bg-card transition-shadow ${isExpanded ? "shadow-sm" : ""} ${!proforma.isActive ? "opacity-60" : ""}`}
+                  >
+                    {/* Card header row */}
+                    <div className="flex items-center gap-2 px-4 py-3">
+                      {/* Expand toggle */}
+                      <button
+                        className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+                        onClick={() =>
+                          setExpandedProformaIds((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(proforma.id)) next.delete(proforma.id);
+                            else next.add(proforma.id);
+                            return next;
+                          })
+                        }
+                        data-testid={`button-expand-proforma-${proforma.id}`}
                       >
-                        <Star className={proforma.isActive ? "h-4 w-4 fill-yellow-400 text-yellow-500" : "h-4 w-4 text-muted-foreground"} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => navigate(`/factory/dispatch-batches?customerId=${customerId}&proformaId=${proforma.id}&openCreate=1`)}
-                        data-testid={`button-create-dispatch-batch-${proforma.id}`}
-                        title="Create dispatch batch"
-                      >
-                        <Truck className="h-4 w-4 text-muted-foreground" />
-                      </Button>
-                      {canEdit && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" data-testid={`button-proforma-menu-${proforma.id}`}>
-                              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => { setRenamingProforma(proforma); setRenameValue(proforma.name); }}
-                              data-testid={`button-rename-proforma-${proforma.id}`}
-                            >
-                              <Pencil className="h-3.5 w-3.5 mr-2" />
-                              Rename
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => { setTransferProforma(proforma); setTransferTargetCustomerId(""); }}
-                              data-testid={`button-transfer-proforma-${proforma.id}`}
-                            >
-                              <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
-                              Transfer customer
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setPendingDelete(() => () => deleteProformaMutation.mutate(proforma.id))}
-                              data-testid={`button-delete-proforma-${proforma.id}`}
-                            >
-                              <Trash2 className="h-3.5 w-3.5 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </div>
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        )}
+                        <span className="font-semibold truncate">{proforma.name}</span>
+                        {proforma.isActive && (
+                          <Badge
+                            className="bg-green-600 text-white shrink-0 no-default-hover-elevate no-default-active-elevate"
+                            data-testid={`badge-active-${proforma.id}`}
+                          >
+                            Active
+                          </Badge>
+                        )}
+                      </button>
 
-                  {/* Expanded content */}
-                  {isExpanded && (
-                    <div className="border-t">
-                      {/* Toolbar */}
-                      <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 flex-wrap">
-                        {canEdit && (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setAddLineProformaId(proforma.id);
-                              setAddLineMode("catalog");
-                              setCatalogSelectedItem(null);
-                              setCatalogSearch("");
-                              setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
-                              setIsAddLineOpen(true);
-                            }}
-                            data-testid={`button-add-line-${proforma.id}`}
-                          >
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            Add Item
-                          </Button>
+                      {/* Stats chips (hidden on tiny screens) */}
+                      <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground shrink-0">
+                        <span data-testid={`badge-lines-count-${proforma.id}`} className="flex items-center gap-1">
+                          <Package className="h-3 w-3" />
+                          {lineCount} lines
+                        </span>
+                        {totalQty > 0 && (
+                          <span data-testid={`text-total-qty-${proforma.id}`} className="font-mono">
+                            {totalQty.toLocaleString()} bales
+                          </span>
                         )}
-                        {canEdit && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => navigate(`/factory/stock-allocation-v5?proformaId=${proforma.id}&openEdit=true`)}
-                            data-testid={`button-edit-in-allocation-${proforma.id}`}
-                          >
-                            <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                            Edit in Stock Allocation
-                          </Button>
+                        {totalWeight > 0 && (
+                          <span data-testid={`text-total-weight-${proforma.id}`} className="font-mono">
+                            {totalWeight.toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 0,
+                            })}{" "}
+                            kg
+                          </span>
                         )}
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => saveAgreedPricesMutation.mutate(proforma.id)}
-                          disabled={saveAgreedPricesMutation.isPending}
-                          data-testid={`button-save-agreed-prices-${proforma.id}`}
-                          title="Save these prices as the customer's agreed prices"
-                        >
-                          <BookmarkCheck className="mr-1.5 h-3.5 w-3.5" />
-                          Save as Agreed Prices
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => window.open(`/api/factory/customer-proformas/${proforma.id}/export/excel`, "_blank")}
-                          data-testid={`button-export-excel-${proforma.id}`}
-                        >
-                          <Download className="mr-1.5 h-3.5 w-3.5" />
-                          Excel
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            if (!navigator.onLine) { window.print(); return; }
-                            window.open(`/api/factory/customer-proformas/${proforma.id}/export/pdf`, "_blank");
-                          }}
-                          data-testid={`button-export-pdf-${proforma.id}`}
-                        >
-                          <Download className="mr-1.5 h-3.5 w-3.5" />
-                          PDF
-                        </Button>
+                        {!hideProformaPrice && totalAmount > 0 && (
+                          <span
+                            data-testid={`text-total-amount-${proforma.id}`}
+                            className="font-mono font-medium text-foreground"
+                          >
+                            {formatAmount(totalAmount)}
+                          </span>
+                        )}
+                        {d.value && (
+                          <span data-testid={`text-proforma-date-${proforma.id}`} className="text-muted-foreground/70">
+                            {d.label} {d.value}
+                          </span>
+                        )}
                       </div>
 
-                      {/* Price lines table */}
-                      {proforma.lines && proforma.lines.length > 0 ? (
-                        <div>
-                          <Table wrapperClassName="max-h-[400px] overflow-auto">
-                            <TableHeader className="sticky top-0 z-30 bg-background">
-                              <TableRow>
-                                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Article Code</TableHead>
-                                <TableHead className="text-xs uppercase tracking-wide text-muted-foreground font-medium">Product Name</TableHead>
-                                <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">Qty</TableHead>
-                                <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">Kg/Bale</TableHead>
-                                <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">Total Kg</TableHead>
-                                {!hideProformaPrice && <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">Price/Bale</TableHead>}
-                                {canEdit && <TableHead className="w-[72px]"></TableHead>}
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {[...proforma.lines].sort((a, b) => (a.productName || a.articleCode || "").localeCompare(b.productName || b.articleCode || "")).map((line) => {
-                                const lineWt = parseFloat(line.weightPerBaleKg || "0");
-                                const lineTotal = line.quantity * lineWt;
-                                const isEditingQty = inlineQtyLineId === line.id;
-                                return (
-                                  <TableRow key={line.id} className="hover:bg-muted/40" data-testid={`row-line-${line.id}`}>
-                                    <TableCell className="font-mono text-xs text-muted-foreground py-2.5" data-testid={`text-article-code-${line.id}`}>
-                                      {line.articleCode}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium py-2.5" data-testid={`text-product-name-${line.id}`}>
-                                      {line.productName}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono py-2.5" data-testid={`text-quantity-${line.id}`}>
-                                      {canEdit && isEditingQty ? (
-                                        <Input
-                                          type="number"
-                                          min="1"
-                                          className="w-20 h-7 text-right font-mono text-sm ml-auto"
-                                          value={inlineQtyValue}
-                                          onChange={(e) => setInlineQtyValue(e.target.value)}
-                                          onBlur={() => commitInlineQty(line.id)}
-                                          onKeyDown={(e) => {
-                                            if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
-                                            if (e.key === "Enter") commitInlineQty(line.id);
-                                            if (e.key === "Escape") setInlineQtyLineId(null);
-                                          }}
-                                          autoFocus
-                                          data-testid={`input-inline-qty-${line.id}`}
-                                        />
-                                      ) : canEdit ? (
-                                        <button
-                                          className="font-mono hover:underline hover:text-primary cursor-pointer w-full text-right"
-                                          title="Click to edit quantity"
-                                          onClick={() => { setInlineQtyLineId(line.id); setInlineQtyValue(String(line.quantity)); }}
-                                          data-testid={`button-inline-qty-${line.id}`}
-                                        >
-                                          {line.quantity}
-                                        </button>
-                                      ) : (
-                                        <span className="font-mono">{line.quantity}</span>
-                                      )}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono text-sm text-muted-foreground py-2.5" data-testid={`text-kg-bale-${line.id}`}>
-                                      {lineWt % 1 === 0 ? lineWt.toLocaleString() : lineWt.toFixed(2)}
-                                    </TableCell>
-                                    <TableCell className="text-right font-mono text-sm text-muted-foreground py-2.5" data-testid={`text-total-kg-${line.id}`}>
-                                      {lineTotal > 0 ? (lineTotal % 1 === 0 ? lineTotal.toLocaleString() : lineTotal.toFixed(1)) : "—"}
-                                    </TableCell>
-                                    {!hideProformaPrice && (
-                                      <TableCell className="text-right font-mono font-medium py-2.5" data-testid={`text-price-${line.id}`}>
-                                        {formatAmount(effectivePricePerBale(line))}
-                                        {line.pricingMode === "per_kg" && line.pricePerKg && (
-                                          <div className="text-[10px] text-muted-foreground font-normal">${parseFloat(line.pricePerKg).toFixed(2)}/kg</div>
-                                        )}
-                                      </TableCell>
-                                    )}
-                                    {canEdit && (
-                                      <TableCell className="py-2.5">
-                                        <div className="flex items-center gap-0.5 justify-end">
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7"
-                                            onClick={() => {
-                                              setEditingLine(line);
-                                              setEditLineValues({
-                                                productName: line.productName,
-                                                quantity: String(line.quantity),
-                                                pricePerBale: line.pricePerBale,
-                                                weightPerBaleKg: line.weightPerBaleKg ?? "",
-                                              });
-                                            }}
-                                            data-testid={`button-edit-line-${line.id}`}
-                                          >
-                                            <Pencil className="h-3 w-3" />
-                                          </Button>
-                                          <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-7 w-7"
-                                            onClick={() => setPendingDelete(() => () => deleteLineMutation.mutate(line.id))}
-                                            disabled={deleteLineMutation.isPending}
-                                            data-testid={`button-delete-line-${line.id}`}
-                                          >
-                                            <Trash2 className="h-3 w-3 text-destructive/70" />
-                                          </Button>
-                                        </div>
-                                      </TableCell>
-                                    )}
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-0.5 shrink-0 ml-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => toggleActiveMutation.mutate({ id: proforma.id, isActive: !proforma.isActive })}
+                          disabled={toggleActiveMutation.isPending}
+                          data-testid={`button-toggle-active-proforma-${proforma.id}`}
+                          title={proforma.isActive ? "Deactivate" : "Set active"}
+                        >
+                          <Star
+                            className={
+                              proforma.isActive
+                                ? "h-4 w-4 fill-yellow-400 text-yellow-500"
+                                : "h-4 w-4 text-muted-foreground"
+                            }
+                          />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            navigate(
+                              `/factory/dispatch-batches?customerId=${customerId}&proformaId=${proforma.id}&openCreate=1`
+                            )
+                          }
+                          data-testid={`button-create-dispatch-batch-${proforma.id}`}
+                          title="Create dispatch batch"
+                        >
+                          <Truck className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                        {canEdit && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" data-testid={`button-proforma-menu-${proforma.id}`}>
+                                <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setRenamingProforma(proforma);
+                                  setRenameValue(proforma.name);
+                                }}
+                                data-testid={`button-rename-proforma-${proforma.id}`}
+                              >
+                                <Pencil className="h-3.5 w-3.5 mr-2" />
+                                Rename
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setTransferProforma(proforma);
+                                  setTransferTargetCustomerId("");
+                                }}
+                                data-testid={`button-transfer-proforma-${proforma.id}`}
+                              >
+                                <ArrowRightLeft className="h-3.5 w-3.5 mr-2" />
+                                Transfer customer
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setPendingDelete(() => () => deleteProformaMutation.mutate(proforma.id))}
+                                data-testid={`button-delete-proforma-${proforma.id}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                    </div>
 
-                          {/* Summary footer */}
-                          <div className="flex items-center gap-6 px-4 py-3 bg-muted/20 border-t text-sm flex-wrap">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground">Bales</span>
-                              <span className="font-semibold font-mono" data-testid={`text-total-qty-${proforma.id}`}>{totalQty.toLocaleString()}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs text-muted-foreground">Weight</span>
-                              <span className="font-semibold font-mono" data-testid={`text-total-weight-${proforma.id}`}>{totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</span>
-                            </div>
-                            {!hideProformaPrice && (
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-xs text-muted-foreground">Total</span>
-                                <span className="font-semibold font-mono" data-testid={`text-total-amount-${proforma.id}`}>{formatAmount(totalAmount)}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center py-10 text-center" data-testid={`text-no-lines-${proforma.id}`}>
-                          <Package className="h-8 w-8 text-muted-foreground/40 mb-2" />
-                          <p className="text-sm text-muted-foreground">No price lines yet</p>
+                    {/* Expanded content */}
+                    {isExpanded && (
+                      <div className="border-t">
+                        {/* Toolbar */}
+                        <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 flex-wrap">
                           {canEdit && (
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="mt-3"
                               onClick={() => {
                                 setAddLineProformaId(proforma.id);
                                 setAddLineMode("catalog");
@@ -1022,18 +987,294 @@ export default function FactoryProformas() {
                                 setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
                                 setIsAddLineOpen(true);
                               }}
+                              data-testid={`button-add-line-${proforma.id}`}
                             >
                               <Plus className="mr-1.5 h-3.5 w-3.5" />
-                              Add first item
+                              Add Item
                             </Button>
                           )}
+                          {canEdit && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                navigate(`/factory/stock-allocation-v5?proformaId=${proforma.id}&openEdit=true`)
+                              }
+                              data-testid={`button-edit-in-allocation-${proforma.id}`}
+                            >
+                              <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                              Edit in Stock Allocation
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => saveAgreedPricesMutation.mutate(proforma.id)}
+                            disabled={saveAgreedPricesMutation.isPending}
+                            data-testid={`button-save-agreed-prices-${proforma.id}`}
+                            title="Save these prices as the customer's agreed prices"
+                          >
+                            <BookmarkCheck className="mr-1.5 h-3.5 w-3.5" />
+                            Save as Agreed Prices
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              window.open(`/api/factory/customer-proformas/${proforma.id}/export/excel`, "_blank")
+                            }
+                            data-testid={`button-export-excel-${proforma.id}`}
+                          >
+                            <Download className="mr-1.5 h-3.5 w-3.5" />
+                            Excel
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              if (!navigator.onLine) {
+                                window.print();
+                                return;
+                              }
+                              window.open(`/api/factory/customer-proformas/${proforma.id}/export/pdf`, "_blank");
+                            }}
+                            data-testid={`button-export-pdf-${proforma.id}`}
+                          >
+                            <Download className="mr-1.5 h-3.5 w-3.5" />
+                            PDF
+                          </Button>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+
+                        {/* Price lines table */}
+                        {proforma.lines && proforma.lines.length > 0 ? (
+                          <div>
+                            <Table wrapperClassName="max-h-[400px] overflow-auto">
+                              <TableHeader className="sticky top-0 z-30 bg-background">
+                                <TableRow>
+                                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                                    Article Code
+                                  </TableHead>
+                                  <TableHead className="text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                                    Product Name
+                                  </TableHead>
+                                  <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                                    Qty
+                                  </TableHead>
+                                  <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                                    Kg/Bale
+                                  </TableHead>
+                                  <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                                    Total Kg
+                                  </TableHead>
+                                  {!hideProformaPrice && (
+                                    <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground font-medium">
+                                      Price/Bale
+                                    </TableHead>
+                                  )}
+                                  {canEdit && <TableHead className="w-[72px]"></TableHead>}
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {[...proforma.lines]
+                                  .sort((a, b) =>
+                                    (a.productName || a.articleCode || "").localeCompare(
+                                      b.productName || b.articleCode || ""
+                                    )
+                                  )
+                                  .map((line) => {
+                                    const lineWt = parseFloat(line.weightPerBaleKg || "0");
+                                    const lineTotal = line.quantity * lineWt;
+                                    const isEditingQty = inlineQtyLineId === line.id;
+                                    return (
+                                      <TableRow
+                                        key={line.id}
+                                        className="hover:bg-muted/40"
+                                        data-testid={`row-line-${line.id}`}
+                                      >
+                                        <TableCell
+                                          className="font-mono text-xs text-muted-foreground py-2.5"
+                                          data-testid={`text-article-code-${line.id}`}
+                                        >
+                                          {line.articleCode}
+                                        </TableCell>
+                                        <TableCell
+                                          className="text-sm font-medium py-2.5"
+                                          data-testid={`text-product-name-${line.id}`}
+                                        >
+                                          {line.productName}
+                                        </TableCell>
+                                        <TableCell
+                                          className="text-right font-mono py-2.5"
+                                          data-testid={`text-quantity-${line.id}`}
+                                        >
+                                          {canEdit && isEditingQty ? (
+                                            <Input
+                                              type="number"
+                                              min="1"
+                                              className="w-20 h-7 text-right font-mono text-sm ml-auto"
+                                              value={inlineQtyValue}
+                                              onChange={(e) => setInlineQtyValue(e.target.value)}
+                                              onBlur={() => commitInlineQty(line.id)}
+                                              onKeyDown={(e) => {
+                                                if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                                                if (e.key === "Enter") commitInlineQty(line.id);
+                                                if (e.key === "Escape") setInlineQtyLineId(null);
+                                              }}
+                                              autoFocus
+                                              data-testid={`input-inline-qty-${line.id}`}
+                                            />
+                                          ) : canEdit ? (
+                                            <button
+                                              className="font-mono hover:underline hover:text-primary cursor-pointer w-full text-right"
+                                              title="Click to edit quantity"
+                                              onClick={() => {
+                                                setInlineQtyLineId(line.id);
+                                                setInlineQtyValue(String(line.quantity));
+                                              }}
+                                              data-testid={`button-inline-qty-${line.id}`}
+                                            >
+                                              {line.quantity}
+                                            </button>
+                                          ) : (
+                                            <span className="font-mono">{line.quantity}</span>
+                                          )}
+                                        </TableCell>
+                                        <TableCell
+                                          className="text-right font-mono text-sm text-muted-foreground py-2.5"
+                                          data-testid={`text-kg-bale-${line.id}`}
+                                        >
+                                          {lineWt % 1 === 0 ? lineWt.toLocaleString() : lineWt.toFixed(2)}
+                                        </TableCell>
+                                        <TableCell
+                                          className="text-right font-mono text-sm text-muted-foreground py-2.5"
+                                          data-testid={`text-total-kg-${line.id}`}
+                                        >
+                                          {lineTotal > 0
+                                            ? lineTotal % 1 === 0
+                                              ? lineTotal.toLocaleString()
+                                              : lineTotal.toFixed(1)
+                                            : "—"}
+                                        </TableCell>
+                                        {!hideProformaPrice && (
+                                          <TableCell
+                                            className="text-right font-mono font-medium py-2.5"
+                                            data-testid={`text-price-${line.id}`}
+                                          >
+                                            {formatAmount(effectivePricePerBale(line))}
+                                            {line.pricingMode === "per_kg" && line.pricePerKg && (
+                                              <div className="text-[10px] text-muted-foreground font-normal">
+                                                ${parseFloat(line.pricePerKg).toFixed(2)}/kg
+                                              </div>
+                                            )}
+                                          </TableCell>
+                                        )}
+                                        {canEdit && (
+                                          <TableCell className="py-2.5">
+                                            <div className="flex items-center gap-0.5 justify-end">
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={() => {
+                                                  setEditingLine(line);
+                                                  setEditLineValues({
+                                                    productName: line.productName,
+                                                    quantity: String(line.quantity),
+                                                    pricePerBale: line.pricePerBale,
+                                                    weightPerBaleKg: line.weightPerBaleKg ?? "",
+                                                  });
+                                                }}
+                                                data-testid={`button-edit-line-${line.id}`}
+                                              >
+                                                <Pencil className="h-3 w-3" />
+                                              </Button>
+                                              <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-7 w-7"
+                                                onClick={() =>
+                                                  setPendingDelete(() => () => deleteLineMutation.mutate(line.id))
+                                                }
+                                                disabled={deleteLineMutation.isPending}
+                                                data-testid={`button-delete-line-${line.id}`}
+                                              >
+                                                <Trash2 className="h-3 w-3 text-destructive/70" />
+                                              </Button>
+                                            </div>
+                                          </TableCell>
+                                        )}
+                                      </TableRow>
+                                    );
+                                  })}
+                              </TableBody>
+                            </Table>
+
+                            {/* Summary footer */}
+                            <div className="flex items-center gap-6 px-4 py-3 bg-muted/20 border-t text-sm flex-wrap">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-muted-foreground">Bales</span>
+                                <span className="font-semibold font-mono" data-testid={`text-total-qty-${proforma.id}`}>
+                                  {totalQty.toLocaleString()}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-muted-foreground">Weight</span>
+                                <span
+                                  className="font-semibold font-mono"
+                                  data-testid={`text-total-weight-${proforma.id}`}
+                                >
+                                  {totalWeight.toLocaleString(undefined, {
+                                    minimumFractionDigits: 1,
+                                    maximumFractionDigits: 1,
+                                  })}{" "}
+                                  kg
+                                </span>
+                              </div>
+                              {!hideProformaPrice && (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs text-muted-foreground">Total</span>
+                                  <span
+                                    className="font-semibold font-mono"
+                                    data-testid={`text-total-amount-${proforma.id}`}
+                                  >
+                                    {formatAmount(totalAmount)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div
+                            className="flex flex-col items-center py-10 text-center"
+                            data-testid={`text-no-lines-${proforma.id}`}
+                          >
+                            <Package className="h-8 w-8 text-muted-foreground/40 mb-2" />
+                            <p className="text-sm text-muted-foreground">No price lines yet</p>
+                            {canEdit && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="mt-3"
+                                onClick={() => {
+                                  setAddLineProformaId(proforma.id);
+                                  setAddLineMode("catalog");
+                                  setCatalogSelectedItem(null);
+                                  setCatalogSearch("");
+                                  setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
+                                  setIsAddLineOpen(true);
+                                }}
+                              >
+                                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                Add first item
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         )}
       </div>
@@ -1054,7 +1295,9 @@ export default function FactoryProformas() {
               />
             </div>
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setIsCreateOpen(false)} data-testid="button-cancel-create">Cancel</Button>
+              <Button variant="outline" onClick={() => setIsCreateOpen(false)} data-testid="button-cancel-create">
+                Cancel
+              </Button>
               <Button
                 onClick={handleCreateProforma}
                 disabled={!newProformaName.trim() || createProformaMutation.isPending}
@@ -1067,7 +1310,15 @@ export default function FactoryProformas() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!renamingProforma} onOpenChange={(open) => { if (!open) { setRenamingProforma(null); setRenameValue(""); } }}>
+      <Dialog
+        open={!!renamingProforma}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRenamingProforma(null);
+            setRenameValue("");
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Rename Proforma</DialogTitle>
@@ -1088,10 +1339,23 @@ export default function FactoryProformas() {
               />
             </div>
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => { setRenamingProforma(null); setRenameValue(""); }} data-testid="button-cancel-rename">Cancel</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRenamingProforma(null);
+                  setRenameValue("");
+                }}
+                data-testid="button-cancel-rename"
+              >
+                Cancel
+              </Button>
               <Button
                 onClick={() => renameProformaMutation.mutate({ id: renamingProforma!.id, name: renameValue.trim() })}
-                disabled={renameProformaMutation.isPending || !renameValue.trim() || renameValue.trim() === renamingProforma?.name}
+                disabled={
+                  renameProformaMutation.isPending ||
+                  !renameValue.trim() ||
+                  renameValue.trim() === renamingProforma?.name
+                }
                 data-testid="button-submit-rename"
               >
                 {renameProformaMutation.isPending ? "Saving..." : "Save"}
@@ -1102,12 +1366,21 @@ export default function FactoryProformas() {
       </Dialog>
 
       {/* ── Transfer Proforma Dialog ────────────────────────────────────── */}
-      <Dialog open={!!transferProforma} onOpenChange={(open) => { if (!open) { setTransferProforma(null); setTransferTargetCustomerId(""); } }}>
+      <Dialog
+        open={!!transferProforma}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTransferProforma(null);
+            setTransferTargetCustomerId("");
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Transfer Proforma</DialogTitle>
             <DialogDescription>
-              Move <strong>{transferProforma?.name}</strong> to a different customer. All lines and reservations will be moved with it.
+              Move <strong>{transferProforma?.name}</strong> to a different customer. All lines and reservations will be
+              moved with it.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1119,10 +1392,7 @@ export default function FactoryProformas() {
             </div>
             <div>
               <label className="text-sm font-medium mb-1 block">Transfer To</label>
-              <Select
-                value={transferTargetCustomerId}
-                onValueChange={setTransferTargetCustomerId}
-              >
+              <Select value={transferTargetCustomerId} onValueChange={setTransferTargetCustomerId}>
                 <SelectTrigger data-testid="select-transfer-customer">
                   <SelectValue placeholder="Select customer..." />
                 </SelectTrigger>
@@ -1140,7 +1410,10 @@ export default function FactoryProformas() {
             <div className="flex justify-end gap-3 pt-2">
               <Button
                 variant="outline"
-                onClick={() => { setTransferProforma(null); setTransferTargetCustomerId(""); }}
+                onClick={() => {
+                  setTransferProforma(null);
+                  setTransferTargetCustomerId("");
+                }}
                 data-testid="button-cancel-transfer"
               >
                 Cancel
@@ -1148,7 +1421,10 @@ export default function FactoryProformas() {
               <Button
                 onClick={() => {
                   if (!transferProforma || !transferTargetCustomerId) return;
-                  transferProformaMutation.mutate({ id: transferProforma.id, targetCustomerId: parseInt(transferTargetCustomerId) });
+                  transferProformaMutation.mutate({
+                    id: transferProforma.id,
+                    targetCustomerId: parseInt(transferTargetCustomerId),
+                  });
                 }}
                 disabled={!transferTargetCustomerId || transferProformaMutation.isPending}
                 data-testid="button-confirm-transfer"
@@ -1160,10 +1436,16 @@ export default function FactoryProformas() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isAddLineOpen} onOpenChange={(open) => {
-        setIsAddLineOpen(open);
-        if (!open) { setCatalogSelectedItem(null); setCatalogSearch(""); }
-      }}>
+      <Dialog
+        open={isAddLineOpen}
+        onOpenChange={(open) => {
+          setIsAddLineOpen(open);
+          if (!open) {
+            setCatalogSelectedItem(null);
+            setCatalogSearch("");
+          }
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Add Price Line</DialogTitle>
@@ -1173,7 +1455,17 @@ export default function FactoryProformas() {
           <div className="flex rounded-md border overflow-hidden w-full">
             <button
               className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors ${addLineMode === "catalog" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover-elevate"}`}
-              onClick={() => { setAddLineMode("catalog"); setCatalogSelectedItem(null); setCatalogSearch(""); setNewLine({ articleCode: "", productName: "", quantity: newLine.quantity, pricePerBale: newLine.pricePerBale }); }}
+              onClick={() => {
+                setAddLineMode("catalog");
+                setCatalogSelectedItem(null);
+                setCatalogSearch("");
+                setNewLine({
+                  articleCode: "",
+                  productName: "",
+                  quantity: newLine.quantity,
+                  pricePerBale: newLine.pricePerBale,
+                });
+              }}
               data-testid="button-mode-catalog"
             >
               <BookOpen className="h-4 w-4" />
@@ -1181,7 +1473,11 @@ export default function FactoryProformas() {
             </button>
             <button
               className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium transition-colors ${addLineMode === "manual" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover-elevate"}`}
-              onClick={() => { setAddLineMode("manual"); setCatalogSelectedItem(null); setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" }); }}
+              onClick={() => {
+                setAddLineMode("manual");
+                setCatalogSelectedItem(null);
+                setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
+              }}
               data-testid="button-mode-manual"
             >
               <PenLine className="h-4 w-4" />
@@ -1209,42 +1505,54 @@ export default function FactoryProformas() {
                     <div className="border rounded-md overflow-hidden max-h-64 overflow-y-auto">
                       {allStockItems.length === 0 ? (
                         <p className="text-sm text-muted-foreground text-center py-6">Loading items...</p>
-                      ) : (() => {
-                        const q = catalogSearch.toLowerCase().trim();
-                        const filtered = q
-                          ? allStockItems.filter((item: any) =>
-                              item.name?.toLowerCase().includes(q) ||
-                              item.code?.toLowerCase().includes(q)
-                            )
-                          : allStockItems;
-                        if (filtered.length === 0) return (
-                          <p className="text-sm text-muted-foreground text-center py-6">No items match "{catalogSearch}"</p>
-                        );
-                        return filtered.map((item: any) => (
-                          <button
-                            key={item.id}
-                            className="w-full flex items-center justify-between px-3 py-2.5 text-left hover-elevate border-b last:border-b-0"
-                            onClick={() => {
-                              setCatalogSelectedItem(item);
-                              setNewLine((prev) => ({ ...prev, articleCode: item.code || "", productName: item.name || "", pricePerBale: (item.code && priceListMap[item.code]) ? priceListMap[item.code] : "" }));
-                            }}
-                            data-testid={`button-catalog-item-${item.id}`}
-                          >
-                            <div>
-                              <p className="text-sm font-medium">{item.name}</p>
-                              {item.code && <p className="text-xs text-muted-foreground font-mono">{item.code}</p>}
-                            </div>
-                            <div className="flex items-center gap-2 ml-2 shrink-0">
-                              {item.code && priceListMap[item.code] && (
-                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">${parseFloat(priceListMap[item.code]).toFixed(2)}</span>
-                              )}
-                              {item.stockGroup?.name && (
-                                <span className="text-xs text-muted-foreground">{item.stockGroup.name}</span>
-                              )}
-                            </div>
-                          </button>
-                        ));
-                      })()}
+                      ) : (
+                        (() => {
+                          const q = catalogSearch.toLowerCase().trim();
+                          const filtered = q
+                            ? allStockItems.filter(
+                                (item: any) =>
+                                  item.name?.toLowerCase().includes(q) || item.code?.toLowerCase().includes(q)
+                              )
+                            : allStockItems;
+                          if (filtered.length === 0)
+                            return (
+                              <p className="text-sm text-muted-foreground text-center py-6">
+                                No items match "{catalogSearch}"
+                              </p>
+                            );
+                          return filtered.map((item: any) => (
+                            <button
+                              key={item.id}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover-elevate border-b last:border-b-0"
+                              onClick={() => {
+                                setCatalogSelectedItem(item);
+                                setNewLine((prev) => ({
+                                  ...prev,
+                                  articleCode: item.code || "",
+                                  productName: item.name || "",
+                                  pricePerBale: item.code && priceListMap[item.code] ? priceListMap[item.code] : "",
+                                }));
+                              }}
+                              data-testid={`button-catalog-item-${item.id}`}
+                            >
+                              <div>
+                                <p className="text-sm font-medium">{item.name}</p>
+                                {item.code && <p className="text-xs text-muted-foreground font-mono">{item.code}</p>}
+                              </div>
+                              <div className="flex items-center gap-2 ml-2 shrink-0">
+                                {item.code && priceListMap[item.code] && (
+                                  <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                                    ${parseFloat(priceListMap[item.code]).toFixed(2)}
+                                  </span>
+                                )}
+                                {item.stockGroup?.name && (
+                                  <span className="text-xs text-muted-foreground">{item.stockGroup.name}</span>
+                                )}
+                              </div>
+                            </button>
+                          ));
+                        })()
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground">{allStockItems.length} items in catalog</p>
                   </div>
@@ -1254,12 +1562,24 @@ export default function FactoryProformas() {
                     <div className="flex items-center gap-2 p-3 rounded-md bg-muted">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate">{catalogSelectedItem.name}</p>
-                        {catalogSelectedItem.code && <p className="text-xs text-muted-foreground font-mono">{catalogSelectedItem.code}</p>}
+                        {catalogSelectedItem.code && (
+                          <p className="text-xs text-muted-foreground font-mono">{catalogSelectedItem.code}</p>
+                        )}
                       </div>
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => { setCatalogSelectedItem(null); setCatalogSearch(""); setNewLine((prev) => ({ ...prev, articleCode: "", productName: "", quantity: "", pricePerBale: "" })); }}
+                        onClick={() => {
+                          setCatalogSelectedItem(null);
+                          setCatalogSearch("");
+                          setNewLine((prev) => ({
+                            ...prev,
+                            articleCode: "",
+                            productName: "",
+                            quantity: "",
+                            pricePerBale: "",
+                          }));
+                        }}
                         data-testid="button-change-item"
                       >
                         Change
@@ -1274,7 +1594,9 @@ export default function FactoryProformas() {
                           placeholder="e.g. 10"
                           value={newLine.quantity}
                           onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })}
-                          onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                          }}
                           autoFocus
                           data-testid="input-line-quantity"
                         />
@@ -1287,7 +1609,9 @@ export default function FactoryProformas() {
                           placeholder="e.g. 45.00"
                           value={newLine.pricePerBale}
                           onChange={(e) => setNewLine({ ...newLine, pricePerBale: e.target.value })}
-                          onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
+                          onKeyDown={(e) => {
+                            if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                          }}
                           data-testid="input-line-price"
                         />
                         {catalogSelectedItem?.code && priceListMap[catalogSelectedItem.code] && (
@@ -1328,7 +1652,9 @@ export default function FactoryProformas() {
                       type="number"
                       value={newLine.quantity}
                       onChange={(e) => setNewLine({ ...newLine, quantity: e.target.value })}
-                      onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
+                      onKeyDown={(e) => {
+                        if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                      }}
                       data-testid="input-line-quantity"
                     />
                   </div>
@@ -1339,7 +1665,9 @@ export default function FactoryProformas() {
                       step="0.01"
                       value={newLine.pricePerBale}
                       onChange={(e) => setNewLine({ ...newLine, pricePerBale: e.target.value })}
-                      onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
+                      onKeyDown={(e) => {
+                        if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                      }}
                       data-testid="input-line-price"
                     />
                   </div>
@@ -1348,7 +1676,9 @@ export default function FactoryProformas() {
             )}
 
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setIsAddLineOpen(false)} data-testid="button-cancel-add-line">Cancel</Button>
+              <Button variant="outline" onClick={() => setIsAddLineOpen(false)} data-testid="button-cancel-add-line">
+                Cancel
+              </Button>
               <Button
                 onClick={handleAddLine}
                 disabled={
@@ -1393,7 +1723,9 @@ export default function FactoryProformas() {
                   type="number"
                   value={editLineValues.quantity}
                   onChange={(e) => setEditLineValues({ ...editLineValues, quantity: e.target.value })}
-                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                  }}
                   data-testid="input-edit-line-quantity"
                 />
               </div>
@@ -1404,7 +1736,9 @@ export default function FactoryProformas() {
                   step="0.01"
                   value={editLineValues.pricePerBale}
                   onChange={(e) => setEditLineValues({ ...editLineValues, pricePerBale: e.target.value })}
-                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                  }}
                   data-testid="input-edit-line-price"
                 />
               </div>
@@ -1416,13 +1750,17 @@ export default function FactoryProformas() {
                   placeholder="e.g. 97"
                   value={editLineValues.weightPerBaleKg}
                   onChange={(e) => setEditLineValues({ ...editLineValues, weightPerBaleKg: e.target.value })}
-                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                  }}
                   data-testid="input-edit-line-weight"
                 />
               </div>
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <Button variant="outline" onClick={() => setEditingLine(null)} data-testid="button-cancel-edit-line">Cancel</Button>
+              <Button variant="outline" onClick={() => setEditingLine(null)} data-testid="button-cancel-edit-line">
+                Cancel
+              </Button>
               <Button
                 onClick={handleEditLine}
                 disabled={!editLineValues.pricePerBale || !editLineValues.quantity || editLineMutation.isPending}
@@ -1434,12 +1772,21 @@ export default function FactoryProformas() {
           </div>
         </DialogContent>
       </Dialog>
-      <Dialog open={!!createLoadingProforma} onOpenChange={(open) => { if (!open) { setCreateLoadingProforma(null); setCreateLoadingLocationId(""); } }}>
+      <Dialog
+        open={!!createLoadingProforma}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateLoadingProforma(null);
+            setCreateLoadingLocationId("");
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Create Pending Loading</DialogTitle>
             <DialogDescription>
-              A new loading will be created from <strong>{createLoadingProforma?.name}</strong>. Bales matching each proforma line will be automatically reserved from the selected location.
+              A new loading will be created from <strong>{createLoadingProforma?.name}</strong>. Bales matching each
+              proforma line will be automatically reserved from the selected location.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
@@ -1460,13 +1807,23 @@ export default function FactoryProformas() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setCreateLoadingProforma(null); setCreateLoadingLocationId(""); }} data-testid="button-cancel-create-loading">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCreateLoadingProforma(null);
+                setCreateLoadingLocationId("");
+              }}
+              data-testid="button-cancel-create-loading"
+            >
               Cancel
             </Button>
             <Button
               onClick={() => {
                 if (!createLoadingProforma || !createLoadingLocationId) return;
-                createLoadingMutation.mutate({ proformaId: createLoadingProforma.id, locationId: createLoadingLocationId });
+                createLoadingMutation.mutate({
+                  proformaId: createLoadingProforma.id,
+                  locationId: createLoadingLocationId,
+                });
               }}
               disabled={!createLoadingLocationId || createLoadingMutation.isPending}
               data-testid="button-confirm-create-loading"
@@ -1493,7 +1850,9 @@ export default function FactoryProformas() {
           <DialogHeader>
             <DialogTitle>Import Proforma from Excel</DialogTitle>
             <DialogDescription>
-              Upload an Excel file (.xlsx) with columns: <strong>Article Code</strong>, <strong>Product Name</strong>, <strong>Quantity</strong>, <strong>Price Per Bale</strong>. Column names are flexible — any common variation is detected automatically.
+              Upload an Excel file (.xlsx) with columns: <strong>Article Code</strong>, <strong>Product Name</strong>,{" "}
+              <strong>Quantity</strong>, <strong>Price Per Bale</strong>. Column names are flexible — any common
+              variation is detected automatically.
             </DialogDescription>
           </DialogHeader>
 
@@ -1555,7 +1914,10 @@ export default function FactoryProformas() {
                 type="file"
                 accept=".xlsx,.xls"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleExcelFile(f); }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleExcelFile(f);
+                }}
                 data-testid="input-file-excel"
               />
             </div>
@@ -1570,7 +1932,9 @@ export default function FactoryProformas() {
                   </p>
                 </div>
                 {excelImportErrors.map((err, i) => (
-                  <p key={i} className="text-xs text-muted-foreground pl-6">{err}</p>
+                  <p key={i} className="text-xs text-muted-foreground pl-6">
+                    {err}
+                  </p>
                 ))}
               </div>
             )}
@@ -1598,7 +1962,9 @@ export default function FactoryProformas() {
                             <TableCell className="font-mono text-xs py-1.5">{row.articleCode}</TableCell>
                             <TableCell className="text-xs py-1.5">{row.productName}</TableCell>
                             <TableCell className="text-right font-mono text-xs py-1.5">{row.quantity}</TableCell>
-                            <TableCell className="text-right font-mono text-xs py-1.5">{parseFloat(row.pricePerBale) > 0 ? parseFloat(row.pricePerBale).toFixed(2) : "—"}</TableCell>
+                            <TableCell className="text-right font-mono text-xs py-1.5">
+                              {parseFloat(row.pricePerBale) > 0 ? parseFloat(row.pricePerBale).toFixed(2) : "—"}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -1643,8 +2009,13 @@ export default function FactoryProformas() {
 
       <DeleteConfirmDialog
         open={!!pendingDelete}
-        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
-        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          pendingDelete?.();
+          setPendingDelete(null);
+        }}
       />
     </div>
   );

@@ -32,19 +32,19 @@ import {
 } from "lucide-react";
 
 interface CompanyWaSetting {
-  companyId:   number;
+  companyId: number;
   companyName: string;
   groupChatId: string;
 }
 
 interface TransferWaSettings {
-  companies:      CompanyWaSetting[];
+  companies: CompanyWaSetting[];
   hasCredentials: boolean;
-  waEnabled:      boolean;
+  waEnabled: boolean;
 }
 
 interface GreenChat {
-  id:   string;
+  id: string;
   name: string;
   type: string;
 }
@@ -56,29 +56,29 @@ interface LocationItem {
 }
 
 interface CompanyRowProps {
-  company:        CompanyWaSetting;
-  chats:          GreenChat[];
-  chatsLoading:   boolean;
+  company: CompanyWaSetting;
+  chats: GreenChat[];
+  chatsLoading: boolean;
   hasCredentials: boolean;
-  onLoadChats:    () => void;
-  onSave:         (companyId: number, groupChatId: string) => void;
-  isSaving:       boolean;
+  onLoadChats: () => void;
+  onSave: (companyId: number, groupChatId: string) => void;
+  isSaving: boolean;
 }
 
 import { CompanyRow } from "./CompanyRow";
 
 export function TransferWhatsAppSection() {
   const { toast } = useToast();
-  const [expanded,      setExpanded]      = useState(false);
-  const [chatsLoading,  setChatsLoading]  = useState(false);
-  const [chats,         setChats]         = useState<GreenChat[]>([]);
+  const [expanded, setExpanded] = useState(false);
+  const [chatsLoading, setChatsLoading] = useState(false);
+  const [chats, setChats] = useState<GreenChat[]>([]);
   const [savingCompany, setSavingCompany] = useState<number | null>(null);
 
   // Per-location dialog state
-  const [locDialogOpen,    setLocDialogOpen]    = useState(false);
-  const [editingLoc,       setEditingLoc]       = useState<LocationItem | null>(null);
-  const [selectedChatId,   setSelectedChatId]   = useState("");
-  const [chatSearch,       setChatSearch]       = useState("");
+  const [locDialogOpen, setLocDialogOpen] = useState(false);
+  const [editingLoc, setEditingLoc] = useState<LocationItem | null>(null);
+  const [selectedChatId, setSelectedChatId] = useState("");
+  const [chatSearch, setChatSearch] = useState("");
 
   const { data: settings, isLoading } = useQuery<TransferWaSettings>({
     queryKey: ["/api/git/transfer-wa-settings"],
@@ -123,7 +123,15 @@ export function TransferWhatsAppSection() {
   }
 
   const saveLocGroupMutation = useMutation({
-    mutationFn: async ({ id, name, transferWaGroupChatId }: { id: number; name: string; transferWaGroupChatId: string | null }) => {
+    mutationFn: async ({
+      id,
+      name,
+      transferWaGroupChatId,
+    }: {
+      id: number;
+      name: string;
+      transferWaGroupChatId: string | null;
+    }) => {
       const res = await apiRequest("PATCH", `/api/locations/${id}`, { name, transferWaGroupChatId });
       return res.json();
     },
@@ -152,12 +160,10 @@ export function TransferWhatsAppSection() {
     });
   }
 
-  const filteredChats = chats.filter((c) =>
-    c.name.toLowerCase().includes(chatSearch.toLowerCase())
-  );
+  const filteredChats = chats.filter((c) => c.name.toLowerCase().includes(chatSearch.toLowerCase()));
 
-  const configuredCount    = settings?.companies.filter((c) => c.groupChatId).length ?? 0;
-  const totalCount         = settings?.companies.length ?? 0;
+  const configuredCount = settings?.companies.filter((c) => c.groupChatId).length ?? 0;
+  const totalCount = settings?.companies.length ?? 0;
   const locConfiguredCount = locations.filter((l) => l.transferWaGroupChatId).length;
 
   return (
@@ -183,15 +189,16 @@ export function TransferWhatsAppSection() {
               {locConfiguredCount} location{locConfiguredCount !== 1 ? "s" : ""} configured
             </Badge>
           )}
-          {expanded
-            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          {expanded ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
         </div>
       </button>
 
       {expanded && (
         <div className="border-t p-4 space-y-5">
-
           {isLoading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -209,9 +216,7 @@ export function TransferWhatsAppSection() {
                 ) : settings?.hasCredentials ? (
                   <>
                     <XCircle className="h-4 w-4 text-amber-500" />
-                    <span className="text-muted-foreground">
-                      Credentials set but WhatsApp sending is disabled.
-                    </span>
+                    <span className="text-muted-foreground">Credentials set but WhatsApp sending is disabled.</span>
                   </>
                 ) : (
                   <>
@@ -231,8 +236,8 @@ export function TransferWhatsAppSection() {
                   <MapPin className="h-3.5 w-3.5" /> Group per Destination Location
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  When a transfer arrives at a location, the image is sent to that location's group.
-                  If a location has no group set, it falls back to the company-wide group below.
+                  When a transfer arrives at a location, the image is sent to that location's group. If a location has
+                  no group set, it falls back to the company-wide group below.
                 </p>
               </div>
 
@@ -255,7 +260,9 @@ export function TransferWhatsAppSection() {
                         data-testid={`row-transfer-loc-${loc.id}`}
                       >
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <div className={`h-2 w-2 rounded-full shrink-0 ${chatId ? "bg-green-500" : "bg-muted-foreground/30"}`} />
+                          <div
+                            className={`h-2 w-2 rounded-full shrink-0 ${chatId ? "bg-green-500" : "bg-muted-foreground/30"}`}
+                          />
                           <div className="min-w-0">
                             <p className="text-sm font-medium leading-tight">{loc.name}</p>
                             {chatId ? (
@@ -273,7 +280,9 @@ export function TransferWhatsAppSection() {
                               size="sm"
                               variant="ghost"
                               disabled={saveLocGroupMutation.isPending}
-                              onClick={() => saveLocGroupMutation.mutate({ id: loc.id, name: loc.name, transferWaGroupChatId: null })}
+                              onClick={() =>
+                                saveLocGroupMutation.mutate({ id: loc.id, name: loc.name, transferWaGroupChatId: null })
+                              }
                               data-testid={`button-clear-loc-transfer-wa-${loc.id}`}
                             >
                               <X className="h-3.5 w-3.5 mr-1" />
@@ -286,7 +295,9 @@ export function TransferWhatsAppSection() {
                             onClick={() => openLocDialog(loc)}
                             data-testid={`button-set-loc-transfer-wa-${loc.id}`}
                           >
-                            <MapPin className={`h-3.5 w-3.5 mr-1.5 ${chatId ? "text-green-600 dark:text-green-400" : ""}`} />
+                            <MapPin
+                              className={`h-3.5 w-3.5 mr-1.5 ${chatId ? "text-green-600 dark:text-green-400" : ""}`}
+                            />
                             {chatId ? "Change" : "Set Group"}
                           </Button>
                         </div>
@@ -340,7 +351,12 @@ export function TransferWhatsAppSection() {
       )}
 
       {/* ── Location group picker dialog ── */}
-      <Dialog open={locDialogOpen} onOpenChange={(o) => { if (!o) setLocDialogOpen(false); }}>
+      <Dialog
+        open={locDialogOpen}
+        onOpenChange={(o) => {
+          if (!o) setLocDialogOpen(false);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Set Transfer Group</DialogTitle>
@@ -363,7 +379,10 @@ export function TransferWhatsAppSection() {
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => { setChats([]); loadChats(); }}
+              onClick={() => {
+                setChats([]);
+                loadChats();
+              }}
               disabled={chatsLoading}
               data-testid="button-refresh-loc-transfer-chats"
               title="Refresh groups"
@@ -405,7 +424,9 @@ export function TransferWhatsAppSection() {
                   >
                     <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="truncate">{chat.name}</span>
-                    {selectedChatId === chat.id && <Check className="h-4 w-4 ml-auto shrink-0 text-green-600 dark:text-green-400" />}
+                    {selectedChatId === chat.id && (
+                      <Check className="h-4 w-4 ml-auto shrink-0 text-green-600 dark:text-green-400" />
+                    )}
                   </button>
                 ))}
               </>
@@ -419,7 +440,11 @@ export function TransferWhatsAppSection() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLocDialogOpen(false)} data-testid="button-cancel-loc-transfer-wa">
+            <Button
+              variant="outline"
+              onClick={() => setLocDialogOpen(false)}
+              data-testid="button-cancel-loc-transfer-wa"
+            >
               Cancel
             </Button>
             <Button

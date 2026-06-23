@@ -4,7 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
@@ -48,21 +53,27 @@ export function ContainerDetailDialog({
   const commAmt = parseFloat(vc.commissionAmount || "0");
   const commCcy = vc.commissionCurrencyCode || "USD";
   const brokerSupId = vc.commissionSupplierId;
-  const brokerName = brokerSupId ? suppliers?.find((s: any) => s.id === brokerSupId)?.name ?? null : null;
+  const brokerName = brokerSupId ? (suppliers?.find((s: any) => s.id === brokerSupId)?.name ?? null) : null;
   const freightAccName = vc.freightAccountId
-    ? ledgerAccounts.find((a: any) => a.id === vc.freightAccountId)?.name ?? `Account #${vc.freightAccountId}`
+    ? (ledgerAccounts.find((a: any) => a.id === vc.freightAccountId)?.name ?? `Account #${vc.freightAccountId}`)
     : null;
   const commAccName = vc.commissionAccountId
-    ? ledgerAccounts.find((a: any) => a.id === vc.commissionAccountId)?.name ?? `Account #${vc.commissionAccountId}`
+    ? (ledgerAccounts.find((a: any) => a.id === vc.commissionAccountId)?.name ?? `Account #${vc.commissionAccountId}`)
     : null;
   const legacyOtherAmt = parseFloat(vc.otherCharges || "0");
   const legacyOtherAccName = vc.otherChargesAccountId
-    ? ledgerAccounts.find((a: any) => a.id === vc.otherChargesAccountId)?.name ?? `Account #${vc.otherChargesAccountId}`
+    ? (ledgerAccounts.find((a: any) => a.id === vc.otherChargesAccountId)?.name ??
+      `Account #${vc.otherChargesAccountId}`)
     : null;
   const fxRate = parseFloat(vc.fxRateToUsd || "1");
 
   return (
-    <Dialog open={!!container} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={!!container}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 font-mono">
@@ -85,15 +96,21 @@ export function ContainerDetailDialog({
               <span className="text-muted-foreground">Weight</span>
               <span className="font-mono text-right">{formatNumber(totalKg)} kg</span>
               <span className="text-muted-foreground">Rate</span>
-              <span className="font-mono text-right">{ccy} {formatNumber(ratePerKg)} / kg</span>
+              <span className="font-mono text-right">
+                {ccy} {formatNumber(ratePerKg)} / kg
+              </span>
               {ccy !== "USD" && fxRate !== 1 && (
                 <>
                   <span className="text-muted-foreground">FX Rate</span>
-                  <span className="font-mono text-right">1 {ccy} = {fxRate} USD</span>
+                  <span className="font-mono text-right">
+                    1 {ccy} = {fxRate} USD
+                  </span>
                 </>
               )}
               <span className="text-muted-foreground font-medium">Base Value</span>
-              <span className="font-mono font-semibold text-right">{ccy} {formatNumber(baseValue)}</span>
+              <span className="font-mono font-semibold text-right">
+                {ccy} {formatNumber(baseValue)}
+              </span>
             </div>
           </div>
           <Separator />
@@ -103,7 +120,9 @@ export function ContainerDetailDialog({
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Freight</p>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                   <span className="text-muted-foreground">Amount</span>
-                  <span className="font-mono text-right">{freightCcy} {formatNumber(freightAmt)}</span>
+                  <span className="font-mono text-right">
+                    {freightCcy} {formatNumber(freightAmt)}
+                  </span>
                   {freightAccName && (
                     <>
                       <span className="text-muted-foreground">Account</span>
@@ -123,7 +142,9 @@ export function ContainerDetailDialog({
                   {legacyOtherAmt > 0 && (
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                       <span className="text-muted-foreground">Other Charges (legacy)</span>
-                      <span className="font-mono text-right">{ccy} {formatNumber(legacyOtherAmt)}</span>
+                      <span className="font-mono text-right">
+                        {ccy} {formatNumber(legacyOtherAmt)}
+                      </span>
                       {legacyOtherAccName && (
                         <>
                           <span className="text-muted-foreground">Account</span>
@@ -134,12 +155,15 @@ export function ContainerDetailDialog({
                   )}
                   {viewContainerCharges.map((ch: any) => {
                     const accName = ch.ledgerAccountId
-                      ? ledgerAccounts.find((a: any) => a.id === ch.ledgerAccountId)?.name ?? `Account #${ch.ledgerAccountId}`
+                      ? (ledgerAccounts.find((a: any) => a.id === ch.ledgerAccountId)?.name ??
+                        `Account #${ch.ledgerAccountId}`)
                       : null;
                     return (
                       <div key={ch.id} className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                         <span className="text-muted-foreground">{ch.description || "Charge"}</span>
-                        <span className="font-mono text-right">{ch.currencyCode || ccy} {formatNumber(parseFloat(ch.amount || "0"))}</span>
+                        <span className="font-mono text-right">
+                          {ch.currencyCode || ccy} {formatNumber(parseFloat(ch.amount || "0"))}
+                        </span>
                         {accName && (
                           <>
                             <span className="text-muted-foreground pl-3">↳ Account</span>
@@ -159,7 +183,9 @@ export function ContainerDetailDialog({
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Commission</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                 <span className="text-muted-foreground">Amount</span>
-                <span className="font-mono text-right">{commCcy} {formatNumber(commAmt)}</span>
+                <span className="font-mono text-right">
+                  {commCcy} {formatNumber(commAmt)}
+                </span>
                 {brokerName && (
                   <>
                     <span className="text-muted-foreground">Broker</span>
@@ -184,8 +210,16 @@ export function ContainerDetailDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button variant="ghost" onClick={() => { onClose(); onEdit(container); }}>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              onClose();
+              onEdit(container);
+            }}
+          >
             <Pencil className="h-4 w-4 mr-2" />
             Edit
           </Button>

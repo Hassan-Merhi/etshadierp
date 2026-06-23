@@ -14,21 +14,31 @@ export function fmtTime(iso?: string | null): string {
 
 export function runTypeLabel(t: string): string {
   switch (t) {
-    case "scheduled":         return "Scheduled";
-    case "manual_email":      return "Manual — Email";
-    case "manual_whatsapp":   return "Manual — WhatsApp";
-    case "manual_download":   return "Manual — Download";
-    default: return t;
+    case "scheduled":
+      return "Scheduled";
+    case "manual_email":
+      return "Manual — Email";
+    case "manual_whatsapp":
+      return "Manual — WhatsApp";
+    case "manual_download":
+      return "Manual — Download";
+    default:
+      return t;
   }
 }
 
 export function runTypeBadgeClass(t: string): string {
   switch (t) {
-    case "scheduled":       return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
-    case "manual_email":    return "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300";
-    case "manual_whatsapp": return "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300";
-    case "manual_download": return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
-    default: return "bg-muted text-muted-foreground";
+    case "scheduled":
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
+    case "manual_email":
+      return "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300";
+    case "manual_whatsapp":
+      return "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300";
+    case "manual_download":
+      return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300";
+    default:
+      return "bg-muted text-muted-foreground";
   }
 }
 

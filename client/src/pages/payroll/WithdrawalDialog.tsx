@@ -1,12 +1,6 @@
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from "@/components/ui/form";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -23,8 +17,14 @@ interface WithdrawalDialogProps {
 }
 
 export function WithdrawalDialog({
-  open, onOpenChange, selectedEmployee, form, mutation,
-  cashAccounts, bankAccounts, bankAccountsLoading,
+  open,
+  onOpenChange,
+  selectedEmployee,
+  form,
+  mutation,
+  cashAccounts,
+  bankAccounts,
+  bankAccountsLoading,
 }: WithdrawalDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -32,7 +32,8 @@ export function WithdrawalDialog({
         <DialogHeader>
           <DialogTitle>Withdraw Salary</DialogTitle>
           <DialogDescription>
-            Withdraw from {selectedEmployee?.firstName} {selectedEmployee?.lastName}'s balance: {selectedEmployee?.currentBalance}
+            Withdraw from {selectedEmployee?.firstName} {selectedEmployee?.lastName}'s balance:{" "}
+            {selectedEmployee?.currentBalance}
           </DialogDescription>
         </DialogHeader>
 
@@ -45,7 +46,13 @@ export function WithdrawalDialog({
                 <FormItem>
                   <FormLabel>Amount</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-withdrawal-amount" />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      {...field}
+                      data-testid="input-withdrawal-amount"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -79,9 +86,7 @@ export function WithdrawalDialog({
               name="paymentAccountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    {form.watch("paymentAccountType") === "cash" ? "Cash Account" : "Bank Account"}
-                  </FormLabel>
+                  <FormLabel>{form.watch("paymentAccountType") === "cash" ? "Cash Account" : "Bank Account"}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-withdrawal-account">
@@ -91,7 +96,9 @@ export function WithdrawalDialog({
                     <SelectContent>
                       {form.watch("paymentAccountType") === "cash" ? (
                         cashAccounts.length === 0 ? (
-                          <SelectItem value="none" disabled>No cash accounts available</SelectItem>
+                          <SelectItem value="none" disabled>
+                            No cash accounts available
+                          </SelectItem>
                         ) : (
                           cashAccounts.map((account) => (
                             <SelectItem key={account.id} value={account.id.toString()}>
@@ -100,7 +107,9 @@ export function WithdrawalDialog({
                           ))
                         )
                       ) : bankAccountsLoading ? (
-                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                        <SelectItem value="loading" disabled>
+                          Loading...
+                        </SelectItem>
                       ) : (
                         bankAccounts?.map((account) => (
                           <SelectItem key={account.id} value={account.id.toString()}>
@@ -144,7 +153,12 @@ export function WithdrawalDialog({
             />
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-withdrawal">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-cancel-withdrawal"
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-withdrawal">

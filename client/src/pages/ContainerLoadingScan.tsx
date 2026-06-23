@@ -12,7 +12,20 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation } from "wouter";
-import { ScanLine, Trash2, Package, MapPin, Play, CheckCircle, Clock, Save, AlertTriangle, Rows3, AlignJustify, StickyNote } from "lucide-react";
+import {
+  ScanLine,
+  Trash2,
+  Package,
+  MapPin,
+  Play,
+  CheckCircle,
+  Clock,
+  Save,
+  AlertTriangle,
+  Rows3,
+  AlignJustify,
+  StickyNote,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -75,7 +88,7 @@ export default function ContainerLoadingScan() {
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
-  const [orderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [orderDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [orderId, setOrderId] = useState<number | null>(null);
   const [isResuming, setIsResuming] = useState(false);
   const [loadingNote, setLoadingNote] = useState<string>("");
@@ -84,7 +97,11 @@ export default function ContainerLoadingScan() {
   const [showFinalizeDialog, setShowFinalizeDialog] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"detailed" | "condensed">("detailed");
-  const [lastScannedRef, setLastScannedRef] = useState<{ baleReference: string; baleName: string; articleCode: string } | null>(null);
+  const [lastScannedRef, setLastScannedRef] = useState<{
+    baleReference: string;
+    baleName: string;
+    articleCode: string;
+  } | null>(null);
   const [showScanSuccessPopup, setShowScanSuccessPopup] = useState(false);
   const [showScanErrorPopup, setShowScanErrorPopup] = useState(false);
   const [pendingBypassBaleRef, setPendingBypassBaleRef] = useState<string | null>(null);
@@ -151,7 +168,11 @@ export default function ContainerLoadingScan() {
       setLoadingNote(orderDetail.containerNotes || "");
       const stored = localStorage.getItem(`lastScannedBale_${orderDetail.id}`);
       if (stored) {
-        try { setLastScannedRef(JSON.parse(stored)); } catch { setLastScannedRef({ baleReference: stored, baleName: "", articleCode: "" }); }
+        try {
+          setLastScannedRef(JSON.parse(stored));
+        } catch {
+          setLastScannedRef({ baleReference: stored, baleName: "", articleCode: "" });
+        }
         setShowLastScannedPopup(true);
       }
       setTimeout(() => scannerRef.current?.focus(), 200);
@@ -159,7 +180,13 @@ export default function ContainerLoadingScan() {
   }, [isResuming, orderDetail, selectedCustomerId]);
 
   const createOrderMutation = useMutation({
-    mutationFn: async (data: { customerId: number; proformaIdUsed: number | null; locationId: number; orderDate: string; containerNotes?: string }) => {
+    mutationFn: async (data: {
+      customerId: number;
+      proformaIdUsed: number | null;
+      locationId: number;
+      orderDate: string;
+      containerNotes?: string;
+    }) => {
       const res = await modeApiRequest("POST", "/api/factory/customer-orders-loading", data);
       return await res.json();
     },
@@ -175,11 +202,19 @@ export default function ContainerLoadingScan() {
   });
 
   const addBaleMutation = useMutation({
-    mutationFn: async (data: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }) => {
+    mutationFn: async (data: {
+      scanCode: string;
+      locationId: number;
+      allowBypassProforma?: boolean;
+      allowBypassOverload?: boolean;
+    }) => {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales`, data);
       return await res.json();
     },
-    onSuccess: (data: any, variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }) => {
+    onSuccess: (
+      data: any,
+      variables: { scanCode: string; locationId: number; allowBypassProforma?: boolean; allowBypassOverload?: boolean }
+    ) => {
       setPendingBypassBaleRef(null);
       setPendingBypassOverloadRef(null);
       setScanFlash("success");
@@ -192,14 +227,26 @@ export default function ContainerLoadingScan() {
         osc.frequency.value = 1000;
         ctx.resume().then(() => {
           osc.start();
-          setTimeout(() => { osc.stop(); ctx.close(); }, 120);
+          setTimeout(() => {
+            osc.stop();
+            ctx.close();
+          }, 120);
         });
-      } catch { /* no audio support */ }
-      setTimeout(() => { setScanFlash(null); setShowScanSuccessPopup(false); }, 500);
+      } catch {
+        /* no audio support */
+      }
+      setTimeout(() => {
+        setScanFlash(null);
+        setShowScanSuccessPopup(false);
+      }, 500);
       if (orderId) {
         const scanned = variables.scanCode;
         const newestForRef = [...(data?.bales || [])].sort((a: any, b: any) => b.id - a.id)[0];
-        const lastScanned = { baleReference: newestForRef?.baleReference || scanned, baleName: newestForRef?.baleName || "", articleCode: newestForRef?.articleCode || "" };
+        const lastScanned = {
+          baleReference: newestForRef?.baleReference || scanned,
+          baleName: newestForRef?.baleName || "",
+          articleCode: newestForRef?.articleCode || "",
+        };
         localStorage.setItem(`lastScannedBale_${orderId}`, JSON.stringify(lastScanned));
         setLastScannedRef(lastScanned);
       }
@@ -227,9 +274,14 @@ export default function ContainerLoadingScan() {
           osc.frequency.value = 550;
           ctx.resume().then(() => {
             osc.start();
-            setTimeout(() => { osc.stop(); ctx.close(); }, 180);
+            setTimeout(() => {
+              osc.stop();
+              ctx.close();
+            }, 180);
           });
-        } catch { /* no audio support */ }
+        } catch {
+          /* no audio support */
+        }
         setTimeout(() => setScanFlash(null), 600);
         setScanCode("");
         scannerRef.current?.focus();
@@ -246,9 +298,14 @@ export default function ContainerLoadingScan() {
           osc.frequency.value = 600;
           ctx.resume().then(() => {
             osc.start();
-            setTimeout(() => { osc.stop(); ctx.close(); }, 180);
+            setTimeout(() => {
+              osc.stop();
+              ctx.close();
+            }, 180);
           });
-        } catch { /* no audio support */ }
+        } catch {
+          /* no audio support */
+        }
         setTimeout(() => setScanFlash(null), 600);
         setScanCode("");
         scannerRef.current?.focus();
@@ -265,10 +322,18 @@ export default function ContainerLoadingScan() {
           osc.frequency.setValueAtTime(700, ctx.currentTime);
           osc.frequency.linearRampToValueAtTime(200, ctx.currentTime + 0.18);
           osc.start();
-          setTimeout(() => { osc.stop(); ctx.close(); }, 220);
+          setTimeout(() => {
+            osc.stop();
+            ctx.close();
+          }, 220);
         });
-      } catch { /* no audio support */ }
-      setTimeout(() => { setScanFlash(null); setShowScanErrorPopup(false); }, 1500);
+      } catch {
+        /* no audio support */
+      }
+      setTimeout(() => {
+        setScanFlash(null);
+        setShowScanErrorPopup(false);
+      }, 1500);
       toast({ title: "Scan Error", description: error.message, variant: "destructive" });
       setScanCode("");
       scannerRef.current?.focus();
@@ -308,7 +373,9 @@ export default function ContainerLoadingScan() {
 
   const saveNoteMutation = useMutation({
     mutationFn: async (note: string) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/assign-container`, { containerNotes: note });
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/assign-container`, {
+        containerNotes: note,
+      });
       return await res.json();
     },
     onSuccess: () => {
@@ -334,16 +401,24 @@ export default function ContainerLoadingScan() {
     });
   }, [customerId, selectedLocationId, proformas, orderDate, loadingNote, createOrderMutation]);
 
-  const handleScan = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
-    e.preventDefault();
-    const trimmed = scanCode.trim();
-    const isBypassProforma = pendingBypassBaleRef !== null && pendingBypassBaleRef === trimmed;
-    const isBypassOverload = pendingBypassOverloadRef !== null && pendingBypassOverloadRef === trimmed;
-    if (pendingBypassBaleRef !== null && !isBypassProforma) setPendingBypassBaleRef(null);
-    if (pendingBypassOverloadRef !== null && !isBypassOverload) setPendingBypassOverloadRef(null);
-    addBaleMutation.mutate({ scanCode: trimmed, locationId: parseInt(selectedLocationId), allowBypassProforma: isBypassProforma || undefined, allowBypassOverload: isBypassOverload || undefined });
-  }, [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, addBaleMutation]);
+  const handleScan = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
+      e.preventDefault();
+      const trimmed = scanCode.trim();
+      const isBypassProforma = pendingBypassBaleRef !== null && pendingBypassBaleRef === trimmed;
+      const isBypassOverload = pendingBypassOverloadRef !== null && pendingBypassOverloadRef === trimmed;
+      if (pendingBypassBaleRef !== null && !isBypassProforma) setPendingBypassBaleRef(null);
+      if (pendingBypassOverloadRef !== null && !isBypassOverload) setPendingBypassOverloadRef(null);
+      addBaleMutation.mutate({
+        scanCode: trimmed,
+        locationId: parseInt(selectedLocationId),
+        allowBypassProforma: isBypassProforma || undefined,
+        allowBypassOverload: isBypassOverload || undefined,
+      });
+    },
+    [scanCode, orderId, selectedLocationId, pendingBypassBaleRef, pendingBypassOverloadRef, addBaleMutation]
+  );
 
   const toggleGroup = useCallback((articleCode: string) => {
     setExpandedGroups((prev) => {
@@ -356,7 +431,9 @@ export default function ContainerLoadingScan() {
 
   const bales = orderDetail?.bales || [];
 
-  const groupedBalesMap = bales.reduce<Record<string, { articleCode: string; baleName: string; bales: OrderBale[]; totalWeight: number }>>((acc, bale) => {
+  const groupedBalesMap = bales.reduce<
+    Record<string, { articleCode: string; baleName: string; bales: OrderBale[]; totalWeight: number }>
+  >((acc, bale) => {
     const key = bale.articleCode;
     if (!acc[key]) {
       acc[key] = { articleCode: bale.articleCode, baleName: bale.baleName, bales: [], totalWeight: 0 };
@@ -384,16 +461,27 @@ export default function ContainerLoadingScan() {
     return map;
   }, {});
 
-  const proformaProgress = linkedProforma?.lines.map((line) => {
-    const loaded = loadedByArticle[line.articleCode] || 0;
-    const remaining = line.quantity - loaded;
-    const status: "fulfilled" | "overloaded" | "short" | "none" =
-      loaded === 0 ? "none"
-      : loaded > line.quantity ? "overloaded"
-      : loaded === line.quantity ? "fulfilled"
-      : "short";
-    return { ...line, loaded, remaining, fulfilled: loaded >= line.quantity, status, excess: Math.max(0, loaded - line.quantity) };
-  }) || [];
+  const proformaProgress =
+    linkedProforma?.lines.map((line) => {
+      const loaded = loadedByArticle[line.articleCode] || 0;
+      const remaining = line.quantity - loaded;
+      const status: "fulfilled" | "overloaded" | "short" | "none" =
+        loaded === 0
+          ? "none"
+          : loaded > line.quantity
+            ? "overloaded"
+            : loaded === line.quantity
+              ? "fulfilled"
+              : "short";
+      return {
+        ...line,
+        loaded,
+        remaining,
+        fulfilled: loaded >= line.quantity,
+        status,
+        excess: Math.max(0, loaded - line.quantity),
+      };
+    }) || [];
 
   const fulfilledCount = proformaProgress.filter((l) => l.status === "fulfilled" || l.status === "overloaded").length;
   const totalLines = proformaProgress.length;
@@ -402,11 +490,12 @@ export default function ContainerLoadingScan() {
   const proformaArticleCodes = new Set(linkedProforma?.lines.map((l) => l.articleCode) || []);
   const extraArticles = Object.keys(loadedByArticle).filter((code) => !proformaArticleCodes.has(code));
 
-  const scanInputClass = scanFlash === "success"
-    ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950 transition-all"
-    : scanFlash === "error"
-    ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
-    : "";
+  const scanInputClass =
+    scanFlash === "success"
+      ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950 transition-all"
+      : scanFlash === "error"
+        ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
+        : "";
 
   const activeProforma = proformas.find((p) => p.isActive) || null;
 
@@ -429,7 +518,10 @@ export default function ContainerLoadingScan() {
         </div>
       )}
       {pendingBypassOverloadRef !== null && (
-        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none" style={{ top: "4rem" }}>
+        <div
+          className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{ top: "4rem" }}
+        >
           <div className="bg-orange-500 text-white rounded-xl px-12 py-6 shadow-2xl border-4 border-orange-700 text-center">
             <div className="text-3xl font-black tracking-wide">QUANTITY EXCEEDED</div>
             <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
@@ -437,7 +529,10 @@ export default function ContainerLoadingScan() {
         </div>
       )}
       {pendingBypassBaleRef !== null && (
-        <div className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none" style={{ top: "4rem" }}>
+        <div
+          className="fixed inset-x-0 top-0 z-50 flex items-center justify-center pointer-events-none"
+          style={{ top: "4rem" }}
+        >
           <div className="bg-amber-400 text-amber-950 rounded-xl px-12 py-6 shadow-2xl border-4 border-amber-600 text-center">
             <div className="text-3xl font-black tracking-wide">ITEM NOT REQUESTED</div>
             <div className="text-2xl font-bold mt-1">Scan again to bypass</div>
@@ -450,7 +545,11 @@ export default function ContainerLoadingScan() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {isResuming && orderId && (
-            <Badge variant="outline" className="status-warning no-default-hover-elevate no-default-active-elevate" data-testid="badge-resuming">
+            <Badge
+              variant="outline"
+              className="status-warning no-default-hover-elevate no-default-active-elevate"
+              data-testid="badge-resuming"
+            >
               <Clock className="h-3 w-3 mr-1" />
               Resuming Loading #{orderId}
             </Badge>
@@ -466,13 +565,21 @@ export default function ContainerLoadingScan() {
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
         {/* Left: scanned bales */}
         <div className="lg:w-[60%] flex flex-col min-h-0">
-          <Card className={`flex-1 flex flex-col min-h-0 p-4 transition-colors duration-300 ${scanFlash === "success" ? "ring-4 ring-green-500 bg-green-50 dark:bg-green-950" : scanFlash === "error" ? "ring-2 ring-red-500" : ""}`}>
+          <Card
+            className={`flex-1 flex flex-col min-h-0 p-4 transition-colors duration-300 ${scanFlash === "success" ? "ring-4 ring-green-500 bg-green-50 dark:bg-green-950" : scanFlash === "error" ? "ring-2 ring-red-500" : ""}`}
+          >
             <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
-              <h2 className="font-semibold text-lg" data-testid="text-bales-header">Scanned Bales</h2>
+              <h2 className="font-semibold text-lg" data-testid="text-bales-header">
+                Scanned Bales
+              </h2>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" data-testid="badge-bale-count">{bales.length} bales</Badge>
+                <Badge variant="secondary" data-testid="badge-bale-count">
+                  {bales.length} bales
+                </Badge>
                 {bales.length > 0 && (
-                  <Badge variant="outline" data-testid="badge-total-weight">{totalWeight.toFixed(2)} kg</Badge>
+                  <Badge variant="outline" data-testid="badge-total-weight">
+                    {totalWeight.toFixed(2)} kg
+                  </Badge>
                 )}
                 <Button
                   size="icon"
@@ -507,22 +614,32 @@ export default function ContainerLoadingScan() {
             )}
 
             {viewMode === "detailed" && lastScannedRef && (
-              <div className="mb-3 flex items-center gap-3 rounded-md status-success px-3 py-2" data-testid="banner-last-scanned">
+              <div
+                className="mb-3 flex items-center gap-3 rounded-md status-success px-3 py-2"
+                data-testid="banner-last-scanned"
+              >
                 <div className="text-xs font-medium uppercase tracking-wide shrink-0 opacity-80">Last Scanned</div>
                 <div className="min-w-0">
                   <div className="font-mono font-bold text-sm truncate">{lastScannedRef.baleReference}</div>
-                  {lastScannedRef.baleName && <div className="text-xs opacity-80 truncate">{lastScannedRef.baleName}</div>}
+                  {lastScannedRef.baleName && (
+                    <div className="text-xs opacity-80 truncate">{lastScannedRef.baleName}</div>
+                  )}
                 </div>
               </div>
             )}
 
             <div className="flex-1 overflow-y-auto">
               {orderedGroups.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground" data-testid="text-no-bales">
+                <div
+                  className="flex flex-col items-center justify-center py-12 text-muted-foreground"
+                  data-testid="text-no-bales"
+                >
                   <Package className="h-12 w-12 mb-3 opacity-40" />
                   <p>No bales scanned yet</p>
                   <p className="text-sm mt-1">
-                    {!orderId ? "Set up the loading order first, then scan bales" : "Scan bales using the scanner above"}
+                    {!orderId
+                      ? "Set up the loading order first, then scan bales"
+                      : "Scan bales using the scanner above"}
                   </p>
                 </div>
               ) : (
@@ -536,7 +653,9 @@ export default function ContainerLoadingScan() {
                         data-testid={`button-toggle-group-${group.articleCode}`}
                       >
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" data-testid={`badge-article-${group.articleCode}`}>{group.articleCode}</Badge>
+                          <Badge variant="outline" data-testid={`badge-article-${group.articleCode}`}>
+                            {group.articleCode}
+                          </Badge>
                           <span className="text-sm font-medium">{group.baleName}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
@@ -547,26 +666,30 @@ export default function ContainerLoadingScan() {
                       {viewMode === "detailed" && (
                         <Table>
                           <TableBody>
-                            {[...group.bales].sort((a, b) => b.id - a.id).map((bale) => (
-                              <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
-                                <TableCell className="font-mono text-sm" data-testid={`text-bale-ref-${bale.id}`}>{bale.baleReference}</TableCell>
-                                <TableCell className="text-sm">{bale.baleName}</TableCell>
-                                <TableCell className="text-right text-sm text-muted-foreground">
-                                  {parseFloat(bale.weight || "0").toFixed(2)} kg
-                                </TableCell>
-                                <TableCell className="w-[40px]">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => removeBaleMutation.mutate(bale.id)}
-                                    disabled={removeBaleMutation.isPending}
-                                    data-testid={`button-remove-bale-${bale.id}`}
-                                  >
-                                    <Trash2 className="h-3 w-3" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {[...group.bales]
+                              .sort((a, b) => b.id - a.id)
+                              .map((bale) => (
+                                <TableRow key={bale.id} data-testid={`row-bale-${bale.id}`}>
+                                  <TableCell className="font-mono text-sm" data-testid={`text-bale-ref-${bale.id}`}>
+                                    {bale.baleReference}
+                                  </TableCell>
+                                  <TableCell className="text-sm">{bale.baleName}</TableCell>
+                                  <TableCell className="text-right text-sm text-muted-foreground">
+                                    {parseFloat(bale.weight || "0").toFixed(2)} kg
+                                  </TableCell>
+                                  <TableCell className="w-[40px]">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => removeBaleMutation.mutate(bale.id)}
+                                      disabled={removeBaleMutation.isPending}
+                                      data-testid={`button-remove-bale-${bale.id}`}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
                           </TableBody>
                         </Table>
                       )}
@@ -619,7 +742,11 @@ export default function ContainerLoadingScan() {
 
             {customerId && activeProforma && !orderId && (
               <div className="flex items-center gap-2">
-                <Badge variant="default" className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate" data-testid="badge-active-proforma">
+                <Badge
+                  variant="default"
+                  className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
+                  data-testid="badge-active-proforma"
+                >
                   {activeProforma.name}
                 </Badge>
                 <span className="text-sm text-muted-foreground">Active proforma</span>
@@ -695,7 +822,11 @@ export default function ContainerLoadingScan() {
                 </div>
                 <Badge
                   variant={fulfilledCount === totalLines && totalLines > 0 ? "default" : "secondary"}
-                  className={fulfilledCount === totalLines && totalLines > 0 ? "bg-green-600 text-white no-default-hover-elevate no-default-active-elevate" : ""}
+                  className={
+                    fulfilledCount === totalLines && totalLines > 0
+                      ? "bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
+                      : ""
+                  }
                   data-testid="badge-proforma-progress"
                 >
                   {fulfilledCount}/{totalLines}
@@ -717,36 +848,56 @@ export default function ContainerLoadingScan() {
                       <TableRow
                         key={line.id}
                         className={
-                          line.status === "fulfilled" ? "bg-green-50 dark:bg-green-950/40"
-                          : line.status === "overloaded" ? "bg-orange-50 dark:bg-orange-950/30"
-                          : ""
+                          line.status === "fulfilled"
+                            ? "bg-green-50 dark:bg-green-950/40"
+                            : line.status === "overloaded"
+                              ? "bg-orange-50 dark:bg-orange-950/30"
+                              : ""
                         }
                         data-testid={`row-progress-${line.articleCode}`}
                       >
                         <TableCell className="text-xs font-mono py-1.5">
                           <div className="flex items-center gap-1">
                             {line.status === "fulfilled" && <CheckCircle className="h-3 w-3 text-green-600 shrink-0" />}
-                            {line.status === "overloaded" && <AlertTriangle className="h-3 w-3 text-orange-500 shrink-0" />}
-                            <span className={
-                              line.status === "fulfilled" ? "text-green-700 dark:text-green-400"
-                              : line.status === "overloaded" ? "text-orange-600 dark:text-orange-400"
-                              : ""
-                            }>{line.articleCode}</span>
+                            {line.status === "overloaded" && (
+                              <AlertTriangle className="h-3 w-3 text-orange-500 shrink-0" />
+                            )}
+                            <span
+                              className={
+                                line.status === "fulfilled"
+                                  ? "text-green-700 dark:text-green-400"
+                                  : line.status === "overloaded"
+                                    ? "text-orange-600 dark:text-orange-400"
+                                    : ""
+                              }
+                            >
+                              {line.articleCode}
+                            </span>
                           </div>
                           <div className="text-muted-foreground truncate max-w-[100px]">{line.productName}</div>
                         </TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">{line.quantity}</TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">
-                          <span className={
-                            line.status === "fulfilled" ? "text-green-600 dark:text-green-400 font-semibold"
-                            : line.status === "overloaded" ? "text-orange-600 dark:text-orange-400 font-semibold"
-                            : ""
-                          }>{line.loaded}</span>
+                          <span
+                            className={
+                              line.status === "fulfilled"
+                                ? "text-green-600 dark:text-green-400 font-semibold"
+                                : line.status === "overloaded"
+                                  ? "text-orange-600 dark:text-orange-400 font-semibold"
+                                  : ""
+                            }
+                          >
+                            {line.loaded}
+                          </span>
                         </TableCell>
                         <TableCell className="text-xs text-right font-mono py-1.5">
                           {line.status === "fulfilled" && <span className="text-green-600 dark:text-green-400">✓</span>}
-                          {line.status === "overloaded" && <span className="text-orange-600 dark:text-orange-400">+{line.excess}</span>}
-                          {line.status === "short" && <span className="text-amber-600 dark:text-amber-400">{line.remaining}</span>}
+                          {line.status === "overloaded" && (
+                            <span className="text-orange-600 dark:text-orange-400">+{line.excess}</span>
+                          )}
+                          {line.status === "short" && (
+                            <span className="text-amber-600 dark:text-amber-400">{line.remaining}</span>
+                          )}
                           {line.status === "none" && <span className="text-muted-foreground">{line.quantity}</span>}
                         </TableCell>
                       </TableRow>
@@ -758,9 +909,16 @@ export default function ContainerLoadingScan() {
                           <div className="text-red-500 dark:text-red-500 text-[10px]">Not on proforma</div>
                         </TableCell>
                         <TableCell className="text-xs text-right py-1.5 text-muted-foreground">—</TableCell>
-                        <TableCell className="text-xs text-right font-mono py-1.5 text-red-600 dark:text-red-400 font-semibold">{loadedByArticle[code]}</TableCell>
+                        <TableCell className="text-xs text-right font-mono py-1.5 text-red-600 dark:text-red-400 font-semibold">
+                          {loadedByArticle[code]}
+                        </TableCell>
                         <TableCell className="text-xs text-right py-1.5">
-                          <Badge variant="destructive" className="text-[10px] px-1 py-0 no-default-hover-elevate no-default-active-elevate">!</Badge>
+                          <Badge
+                            variant="destructive"
+                            className="text-[10px] px-1 py-0 no-default-hover-elevate no-default-active-elevate"
+                          >
+                            !
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -769,7 +927,9 @@ export default function ContainerLoadingScan() {
               </div>
 
               <div className="border-t pt-2 text-xs text-muted-foreground flex items-center justify-between gap-2">
-                <span>{bales.length} bales scanned · {totalWeight.toFixed(1)} kg</span>
+                <span>
+                  {bales.length} bales scanned · {totalWeight.toFixed(1)} kg
+                </span>
               </div>
             </Card>
           ) : orderId ? (
@@ -777,15 +937,21 @@ export default function ContainerLoadingScan() {
               <h3 className="font-semibold text-sm">Order Summary</h3>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Total Bales</span>
-                <span className="font-mono" data-testid="text-total-bales">{bales.length}</span>
+                <span className="font-mono" data-testid="text-total-bales">
+                  {bales.length}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Total Weight</span>
-                <span className="font-mono" data-testid="text-total-weight">{totalWeight.toFixed(2)} kg</span>
+                <span className="font-mono" data-testid="text-total-weight">
+                  {totalWeight.toFixed(2)} kg
+                </span>
               </div>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Article Groups</span>
-                <span className="font-mono" data-testid="text-article-groups">{Object.keys(groupedBalesMap).length}</span>
+                <span className="font-mono" data-testid="text-article-groups">
+                  {Object.keys(groupedBalesMap).length}
+                </span>
               </div>
             </Card>
           ) : null}
@@ -844,9 +1010,11 @@ export default function ContainerLoadingScan() {
                         <TableRow
                           key={line.id}
                           className={
-                            line.status === "fulfilled" ? "bg-green-50 dark:bg-green-950/40"
-                            : line.status === "overloaded" ? "bg-orange-50 dark:bg-orange-950/30"
-                            : ""
+                            line.status === "fulfilled"
+                              ? "bg-green-50 dark:bg-green-950/40"
+                              : line.status === "overloaded"
+                                ? "bg-orange-50 dark:bg-orange-950/30"
+                                : ""
                           }
                         >
                           <TableCell className="text-sm">
@@ -881,9 +1049,16 @@ export default function ContainerLoadingScan() {
                             <div className="text-red-500 text-xs">Not on proforma</div>
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm text-muted-foreground">—</TableCell>
-                          <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-400 font-semibold">{loadedByArticle[code]}</TableCell>
+                          <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-400 font-semibold">
+                            {loadedByArticle[code]}
+                          </TableCell>
                           <TableCell className="text-right text-sm">
-                            <Badge variant="destructive" className="text-xs no-default-hover-elevate no-default-active-elevate">Not on proforma</Badge>
+                            <Badge
+                              variant="destructive"
+                              className="text-xs no-default-hover-elevate no-default-active-elevate"
+                            >
+                              Not on proforma
+                            </Badge>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -892,18 +1067,28 @@ export default function ContainerLoadingScan() {
                 </div>
                 <div className="flex items-center justify-between gap-2 text-sm border-t pt-2 flex-wrap gap-y-1">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-green-600 dark:text-green-400 font-medium">{proformaProgress.filter(l => l.status === "fulfilled").length} fulfilled</span>
-                    {proformaProgress.filter(l => l.status === "overloaded").length > 0 && (
-                      <span className="text-orange-600 dark:text-orange-400 font-medium">{proformaProgress.filter(l => l.status === "overloaded").length} overloaded</span>
+                    <span className="text-green-600 dark:text-green-400 font-medium">
+                      {proformaProgress.filter((l) => l.status === "fulfilled").length} fulfilled
+                    </span>
+                    {proformaProgress.filter((l) => l.status === "overloaded").length > 0 && (
+                      <span className="text-orange-600 dark:text-orange-400 font-medium">
+                        {proformaProgress.filter((l) => l.status === "overloaded").length} overloaded
+                      </span>
                     )}
-                    {proformaProgress.filter(l => l.status === "short" || l.status === "none").length > 0 && (
-                      <span className="text-amber-600 dark:text-amber-400 font-medium">{proformaProgress.filter(l => l.status === "short" || l.status === "none").length} short</span>
+                    {proformaProgress.filter((l) => l.status === "short" || l.status === "none").length > 0 && (
+                      <span className="text-amber-600 dark:text-amber-400 font-medium">
+                        {proformaProgress.filter((l) => l.status === "short" || l.status === "none").length} short
+                      </span>
                     )}
                     {extraArticles.length > 0 && (
-                      <span className="text-red-600 dark:text-red-400 font-medium">{extraArticles.length} not on proforma</span>
+                      <span className="text-red-600 dark:text-red-400 font-medium">
+                        {extraArticles.length} not on proforma
+                      </span>
                     )}
                   </div>
-                  <span className="text-muted-foreground">{bales.length} bales · {totalWeight.toFixed(1)} kg</span>
+                  <span className="text-muted-foreground">
+                    {bales.length} bales · {totalWeight.toFixed(1)} kg
+                  </span>
                 </div>
               </>
             ) : (
@@ -914,17 +1099,25 @@ export default function ContainerLoadingScan() {
                 <div className="space-y-1 text-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span>Total Bales:</span>
-                    <span className="font-mono font-semibold" data-testid="text-dialog-total-bales">{bales.length}</span>
+                    <span className="font-mono font-semibold" data-testid="text-dialog-total-bales">
+                      {bales.length}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span>Total Weight:</span>
-                    <span className="font-mono font-semibold" data-testid="text-dialog-total-weight">{totalWeight.toFixed(2)} kg</span>
+                    <span className="font-mono font-semibold" data-testid="text-dialog-total-weight">
+                      {totalWeight.toFixed(2)} kg
+                    </span>
                   </div>
                 </div>
               </>
             )}
             <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowFinalizeDialog(false)} data-testid="button-cancel-finalize">
+              <Button
+                variant="outline"
+                onClick={() => setShowFinalizeDialog(false)}
+                data-testid="button-cancel-finalize"
+              >
                 Cancel
               </Button>
               <Button
@@ -947,11 +1140,20 @@ export default function ContainerLoadingScan() {
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">Last bale scanned in this session:</p>
-            <div className="bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold text-center" data-testid="text-last-scanned-ref">
+            <div
+              className="bg-muted rounded-md px-4 py-3 font-mono text-lg font-semibold text-center"
+              data-testid="text-last-scanned-ref"
+            >
               {lastScannedRef?.baleReference}
-              {lastScannedRef?.baleName && <div className="text-sm font-normal text-muted-foreground mt-1">{lastScannedRef.baleName}</div>}
+              {lastScannedRef?.baleName && (
+                <div className="text-sm font-normal text-muted-foreground mt-1">{lastScannedRef.baleName}</div>
+              )}
             </div>
-            <Button className="w-full" onClick={() => setShowLastScannedPopup(false)} data-testid="button-dismiss-last-scanned">
+            <Button
+              className="w-full"
+              onClick={() => setShowLastScannedPopup(false)}
+              data-testid="button-dismiss-last-scanned"
+            >
               Continue Scanning
             </Button>
           </div>

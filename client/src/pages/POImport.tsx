@@ -12,19 +12,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Download, Check, ChevronsUpDown, Printer } from "lucide-react";
@@ -48,9 +37,15 @@ interface SupplierComboboxProps {
   testId?: string;
 }
 
-function SupplierCombobox({ value, onValueChange, suppliers, placeholder = "Select supplier", testId }: SupplierComboboxProps) {
+function SupplierCombobox({
+  value,
+  onValueChange,
+  suppliers,
+  placeholder = "Select supplier",
+  testId,
+}: SupplierComboboxProps) {
   const [open, setOpen] = useState(false);
-  
+
   const selectedSupplier = suppliers.find((supplier) => supplier.id.toString() === value);
 
   return (
@@ -83,10 +78,7 @@ function SupplierCombobox({ value, onValueChange, suppliers, placeholder = "Sele
                   }}
                 >
                   <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === supplier.id.toString() ? "opacity-100" : "opacity-0"
-                    )}
+                    className={cn("mr-2 h-4 w-4", value === supplier.id.toString() ? "opacity-100" : "opacity-0")}
                   />
                   {supplier.legalName}
                 </CommandItem>
@@ -107,7 +99,7 @@ export default function POImport() {
   const [validationResult, setValidationResult] = useState<any>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string>("");
   const [containerNumber, setContainerNumber] = useState<string>("");
-  const [importDate, setImportDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [importDate, setImportDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [importResult, setImportResult] = useState<any>(null);
   const [freightPaidBy, setFreightPaidBy] = useState<"supplier" | "parent">("supplier");
@@ -228,7 +220,11 @@ export default function POImport() {
       return;
     }
     if (!navigator.onLine) {
-      toast({ title: "Not available offline", description: "File imports require a connection", variant: "destructive" });
+      toast({
+        title: "Not available offline",
+        description: "File imports require a connection",
+        variant: "destructive",
+      });
       return;
     }
     const formData = new FormData();
@@ -366,11 +362,7 @@ export default function POImport() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <PageHeader title="PO Import (Excel)" />
-        <Button
-          variant="outline"
-          onClick={handleDownloadTemplate}
-          data-testid="button-download-template"
-        >
+        <Button variant="outline" onClick={handleDownloadTemplate} data-testid="button-download-template">
           <Download className="w-4 h-4 mr-2" />
           Download Template
         </Button>
@@ -380,7 +372,8 @@ export default function POImport() {
         <CardHeader>
           <CardTitle>Upload Purchase Order Excel File</CardTitle>
           <CardDescription>
-            Three-step process: Parse → Validate → Import. Need help? Download the template above to see the required format.
+            Three-step process: Parse → Validate → Import. Need help? Download the template above to see the required
+            format.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -394,11 +387,7 @@ export default function POImport() {
                 onChange={handleFileChange}
                 data-testid="input-file-upload"
               />
-              <Button
-                onClick={handleParse}
-                disabled={!file || parseMutation.isPending}
-                data-testid="button-parse"
-              >
+              <Button onClick={handleParse} disabled={!file || parseMutation.isPending} data-testid="button-parse">
                 {parseMutation.isPending ? (
                   "Parsing..."
                 ) : (
@@ -409,11 +398,7 @@ export default function POImport() {
                 )}
               </Button>
             </div>
-            {file && (
-              <p className="text-sm text-muted-foreground">
-                Selected: {file.name}
-              </p>
-            )}
+            {file && <p className="text-sm text-muted-foreground">Selected: {file.name}</p>}
           </div>
 
           {preview && (
@@ -471,7 +456,10 @@ export default function POImport() {
                           type="button"
                           size="sm"
                           variant={freightPaidBy === "supplier" ? "default" : "outline"}
-                          onClick={() => { setFreightPaidBy("supplier"); setFreightParentAccountId(""); }}
+                          onClick={() => {
+                            setFreightPaidBy("supplier");
+                            setFreightParentAccountId("");
+                          }}
                           data-testid="button-freight-by-supplier"
                         >
                           By Supplier
@@ -489,10 +477,7 @@ export default function POImport() {
                       {freightPaidBy === "parent" && (
                         <div className="space-y-1">
                           <Label>Parent Freight Account *</Label>
-                          <Select
-                            value={freightParentAccountId}
-                            onValueChange={setFreightParentAccountId}
-                          >
+                          <Select value={freightParentAccountId} onValueChange={setFreightParentAccountId}>
                             <SelectTrigger data-testid="select-freight-parent-account">
                               <SelectValue placeholder="Select account..." />
                             </SelectTrigger>
@@ -546,9 +531,7 @@ export default function POImport() {
                   <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
                   <div>
                     <h3 className="font-semibold text-green-600">Validation Passed</h3>
-                    <p className="mt-1 text-sm text-green-600">
-                      All items validated successfully. Ready to import.
-                    </p>
+                    <p className="mt-1 text-sm text-green-600">All items validated successfully. Ready to import.</p>
                   </div>
                 </div>
               </div>
@@ -556,16 +539,10 @@ export default function POImport() {
             {preview.preview.map((container: any, idx: number) => (
               <div key={idx} className="space-y-4 mb-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">
-                    Container: {container.containerNumber}
-                  </h3>
+                  <h3 className="text-lg font-semibold">Container: {container.containerNumber}</h3>
                   <div className="flex gap-4 text-sm">
-                    <span className="text-muted-foreground">
-                      {container.itemsCount} items
-                    </span>
-                    <span className="text-muted-foreground">
-                      {container.posCount} PO(s)
-                    </span>
+                    <span className="text-muted-foreground">{container.itemsCount} items</span>
+                    <span className="text-muted-foreground">{container.posCount} PO(s)</span>
                   </div>
                 </div>
 
@@ -587,7 +564,9 @@ export default function POImport() {
                           <TableCell>{item.itemName}</TableCell>
                           <TableCell className="text-right">{formatCurrency(Number(item.quantity))}</TableCell>
                           <TableCell className="text-right">${formatCurrency(Number(item.rate))}</TableCell>
-                          <TableCell className="text-right font-medium">${formatCurrency(Number(item.lineTotal))}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            ${formatCurrency(Number(item.lineTotal))}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -620,13 +599,17 @@ export default function POImport() {
                   {container.charges.discount > 0 && (
                     <div>
                       <p className="text-sm text-muted-foreground">Discount</p>
-                      <p className="text-lg font-semibold text-red-500">-${formatCurrency(Number(container.charges.discount))}</p>
+                      <p className="text-lg font-semibold text-red-500">
+                        -${formatCurrency(Number(container.charges.discount))}
+                      </p>
                     </div>
                   )}
                   {container.charges.documentCharges > 0 && (
                     <div>
                       <p className="text-sm text-muted-foreground">Document Charges</p>
-                      <p className="text-lg font-semibold">${formatCurrency(Number(container.charges.documentCharges))}</p>
+                      <p className="text-lg font-semibold">
+                        ${formatCurrency(Number(container.charges.documentCharges))}
+                      </p>
                     </div>
                   )}
                   <div className="col-span-full border-t pt-2">
@@ -685,8 +668,8 @@ export default function POImport() {
           <DialogHeader>
             <DialogTitle>Import Successful</DialogTitle>
             <DialogDescription>
-              Container {importResult?.containerNumber} was imported with {importResult?.itemsCount} items.
-              Would you like to print or view the container?
+              Container {importResult?.containerNumber} was imported with {importResult?.itemsCount} items. Would you
+              like to print or view the container?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2">

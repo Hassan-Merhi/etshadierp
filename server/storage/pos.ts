@@ -6,33 +6,34 @@ import * as schema from "@shared/schema";
 
 export async function getAllDraftPosSales(userId: string, locationId?: number): Promise<schema.DraftPosSale[]> {
   if (locationId) {
-    return await db.select().from(schema.draftPosSales)
-      .where(and(
-        eq(schema.draftPosSales.userId, userId),
-        eq(schema.draftPosSales.locationId, locationId)
-      ))
+    return await db
+      .select()
+      .from(schema.draftPosSales)
+      .where(and(eq(schema.draftPosSales.userId, userId), eq(schema.draftPosSales.locationId, locationId)))
       .orderBy(sql`${schema.draftPosSales.updatedAt} DESC`);
   }
-  return await db.select().from(schema.draftPosSales)
+  return await db
+    .select()
+    .from(schema.draftPosSales)
     .where(eq(schema.draftPosSales.userId, userId))
     .orderBy(sql`${schema.draftPosSales.updatedAt} DESC`);
 }
 
 export async function getDraftPosSaleById(id: number): Promise<any | undefined> {
-  const [draft] = await db.select().from(schema.draftPosSales)
-    .where(eq(schema.draftPosSales.id, id));
+  const [draft] = await db.select().from(schema.draftPosSales).where(eq(schema.draftPosSales.id, id));
 
   if (!draft) return undefined;
 
-  const items = await db.select({
-    id: schema.draftPosSaleItems.id,
-    stockItemId: schema.draftPosSaleItems.stockItemId,
-    stockItemName: schema.stockItems.name,
-    stockItemCode: schema.stockItems.code,
-    quantity: schema.draftPosSaleItems.quantity,
-    rate: schema.draftPosSaleItems.rate,
-    amount: schema.draftPosSaleItems.amount,
-  })
+  const items = await db
+    .select({
+      id: schema.draftPosSaleItems.id,
+      stockItemId: schema.draftPosSaleItems.stockItemId,
+      stockItemName: schema.stockItems.name,
+      stockItemCode: schema.stockItems.code,
+      quantity: schema.draftPosSaleItems.quantity,
+      rate: schema.draftPosSaleItems.rate,
+      amount: schema.draftPosSaleItems.amount,
+    })
     .from(schema.draftPosSaleItems)
     .leftJoin(schema.stockItems, eq(schema.draftPosSaleItems.stockItemId, schema.stockItems.id))
     .where(eq(schema.draftPosSaleItems.draftId, id));
@@ -47,7 +48,7 @@ export async function createDraftPosSale(
   const [newDraft] = await db.insert(schema.draftPosSales).values(draft).returning();
 
   if (items && items.length > 0) {
-    const draftItems = items.map(item => ({
+    const draftItems = items.map((item) => ({
       draftId: newDraft.id,
       stockItemId: item.stockItemId,
       quantity: item.quantity,
@@ -66,17 +67,17 @@ export async function updateDraftPosSale(
   items?: Array<{ stockItemId: number; quantity: string; rate: string; amount: string }>
 ): Promise<schema.DraftPosSale> {
   const updateData = { ...draft, updatedAt: sql`now()` };
-  const [updatedDraft] = await db.update(schema.draftPosSales)
+  const [updatedDraft] = await db
+    .update(schema.draftPosSales)
     .set(updateData)
     .where(eq(schema.draftPosSales.id, id))
     .returning();
 
   if (items) {
-    await db.delete(schema.draftPosSaleItems)
-      .where(eq(schema.draftPosSaleItems.draftId, id));
+    await db.delete(schema.draftPosSaleItems).where(eq(schema.draftPosSaleItems.draftId, id));
 
     if (items.length > 0) {
-      const draftItems = items.map(item => ({
+      const draftItems = items.map((item) => ({
         draftId: id,
         stockItemId: item.stockItemId,
         quantity: item.quantity,
@@ -91,10 +92,8 @@ export async function updateDraftPosSale(
 }
 
 export async function deleteDraftPosSale(id: number): Promise<void> {
-  await db.delete(schema.draftPosSaleItems)
-    .where(eq(schema.draftPosSaleItems.draftId, id));
-  await db.delete(schema.draftPosSales)
-    .where(eq(schema.draftPosSales.id, id));
+  await db.delete(schema.draftPosSaleItems).where(eq(schema.draftPosSaleItems.draftId, id));
+  await db.delete(schema.draftPosSales).where(eq(schema.draftPosSales.id, id));
 }
 
 // POS Shifts
@@ -116,10 +115,7 @@ export async function getCurrentShift(userId: string, locationId: number): Promi
 }
 
 export async function getShiftById(id: number): Promise<schema.PosShift | undefined> {
-  const [shift] = await db
-    .select()
-    .from(schema.posShifts)
-    .where(eq(schema.posShifts.id, id));
+  const [shift] = await db.select().from(schema.posShifts).where(eq(schema.posShifts.id, id));
   return shift;
 }
 
@@ -133,10 +129,7 @@ export async function getShiftsByLocation(locationId: number, limit: number = 50
 }
 
 export async function openShift(shift: schema.InsertPosShift): Promise<schema.PosShift> {
-  const [created] = await db
-    .insert(schema.posShifts)
-    .values(shift)
-    .returning();
+  const [created] = await db.insert(schema.posShifts).values(shift).returning();
   return created;
 }
 
@@ -150,11 +143,7 @@ export async function closeShift(id: number, closingCash: string, notes?: string
     .select()
     .from(schema.vouchers)
     .where(
-      and(
-        eq(schema.vouchers.shiftId, id),
-        eq(schema.vouchers.voucherType, "Sales"),
-        isNull(schema.vouchers.deletedAt)
-      )
+      and(eq(schema.vouchers.shiftId, id), eq(schema.vouchers.voucherType, "Sales"), isNull(schema.vouchers.deletedAt))
     );
 
   const salesCount = salesVouchers.length;

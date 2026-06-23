@@ -7,41 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Play,
-  Trash2,
-  MessageSquare,
-  ClipboardList,
-} from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Play, Trash2, MessageSquare, ClipboardList } from "lucide-react";
 import type { ApprovalRequest } from "@shared/schema";
 
-const STATUS_META: Record<
-  string,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
-> = {
-  pending:   { label: "Pending",   variant: "outline" },
-  approved:  { label: "Approved",  variant: "default" },
-  rejected:  { label: "Rejected",  variant: "destructive" },
-  executed:  { label: "Executed",  variant: "secondary" },
+const STATUS_META: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  pending: { label: "Pending", variant: "outline" },
+  approved: { label: "Approved", variant: "default" },
+  rejected: { label: "Rejected", variant: "destructive" },
+  executed: { label: "Executed", variant: "secondary" },
   cancelled: { label: "Cancelled", variant: "secondary" },
 };
 
@@ -80,17 +56,14 @@ function ReviewDialog({ request, action, onClose, onDone }: ReviewDialogProps) {
       queryClient.invalidateQueries({ queryKey: ["/api/approvals/my"] });
       onDone();
     },
-    onError: (e: any) =>
-      toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {action === "approve" ? "Approve request" : "Reject request"}
-          </DialogTitle>
+          <DialogTitle>{action === "approve" ? "Approve request" : "Reject request"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="rounded-md bg-muted p-3 text-sm space-y-1">
@@ -136,11 +109,7 @@ function ReviewDialog({ request, action, onClose, onDone }: ReviewDialogProps) {
             onClick={() => mutation.mutate()}
             data-testid={`button-confirm-${action}`}
           >
-            {mutation.isPending
-              ? "Saving…"
-              : action === "approve"
-              ? "Approve"
-              : "Reject"}
+            {mutation.isPending ? "Saving…" : action === "approve" ? "Approve" : "Reject"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -164,20 +133,14 @@ function RequestRow({
   return (
     <TableRow key={r.id} data-testid={`row-approval-${r.id}`}>
       <TableCell className="font-medium text-sm">{r.actionType}</TableCell>
-      <TableCell className="text-sm text-muted-foreground">
-        {r.targetIdentifier ?? r.targetTable ?? "—"}
-      </TableCell>
-      <TableCell className="text-sm">
-        {r.amountValue ? parseFloat(r.amountValue).toLocaleString() : "—"}
-      </TableCell>
+      <TableCell className="text-sm text-muted-foreground">{r.targetIdentifier ?? r.targetTable ?? "—"}</TableCell>
+      <TableCell className="text-sm">{r.amountValue ? parseFloat(r.amountValue).toLocaleString() : "—"}</TableCell>
       <TableCell className="text-sm">{r.requestedByUsername}</TableCell>
       <TableCell className="text-sm text-muted-foreground">{fmtDate(r.requestedAt)}</TableCell>
       <TableCell>
         <StatusBadge status={r.status} />
       </TableCell>
-      <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">
-        {r.reviewerNote ?? "—"}
-      </TableCell>
+      <TableCell className="text-sm text-muted-foreground max-w-[160px] truncate">{r.reviewerNote ?? "—"}</TableCell>
       <TableCell>
         <div className="flex items-center gap-1">
           {r.status === "pending" && isAdmin && !isOwn && (
@@ -269,8 +232,7 @@ export function ApprovalsPage({ currentUser }: Props) {
       toast({ title: "Marked as executed" });
       queryClient.invalidateQueries({ queryKey: ["/api/approvals"] });
     },
-    onError: (e: any) =>
-      toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const cancelMutation = useMutation({
@@ -280,14 +242,10 @@ export function ApprovalsPage({ currentUser }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/approvals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/approvals/my"] });
     },
-    onError: (e: any) =>
-      toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const handleAction = (
-    r: ApprovalRequest,
-    act: "approve" | "reject" | "execute" | "cancel"
-  ) => {
+  const handleAction = (r: ApprovalRequest, act: "approve" | "reject" | "execute" | "cancel") => {
     if (act === "approve" || act === "reject") {
       setReviewing({ request: r, action: act });
     } else if (act === "execute") {
@@ -318,9 +276,7 @@ export function ApprovalsPage({ currentUser }: Props) {
 
   const renderTable = (rows: ApprovalRequest[], empty: string) => {
     if (isLoading) {
-      return (
-        <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
-      );
+      return <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>;
     }
     if (!rows.length) return <EmptyState message={empty} />;
     return (
@@ -328,13 +284,7 @@ export function ApprovalsPage({ currentUser }: Props) {
         <TableHeader>{tableHeader}</TableHeader>
         <TableBody>
           {rows.map((r) => (
-            <RequestRow
-              key={r.id}
-              r={r}
-              isAdmin={isAdmin}
-              currentUserId={currentUser?.id}
-              onAction={handleAction}
-            />
+            <RequestRow key={r.id} r={r} isAdmin={isAdmin} currentUserId={currentUser?.id} onAction={handleAction} />
           ))}
         </TableBody>
       </Table>
@@ -357,28 +307,48 @@ export function ApprovalsPage({ currentUser }: Props) {
               <TabsList className="bg-transparent p-0 h-auto gap-1">
                 {isAdmin && (
                   <>
-                    <TabsTrigger value="pending" className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm" data-testid="tab-approvals-pending">
+                    <TabsTrigger
+                      value="pending"
+                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+                      data-testid="tab-approvals-pending"
+                    >
                       <Clock className="h-3.5 w-3.5 mr-1.5" />
                       Pending
                       {byStatus("pending").length > 0 && (
                         <Badge className="ml-1.5 h-4 text-[10px] px-1">{byStatus("pending").length}</Badge>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="approved" className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm" data-testid="tab-approvals-approved">
+                    <TabsTrigger
+                      value="approved"
+                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+                      data-testid="tab-approvals-approved"
+                    >
                       <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                       Approved
                     </TabsTrigger>
-                    <TabsTrigger value="rejected" className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm" data-testid="tab-approvals-rejected">
+                    <TabsTrigger
+                      value="rejected"
+                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+                      data-testid="tab-approvals-rejected"
+                    >
                       <XCircle className="h-3.5 w-3.5 mr-1.5" />
                       Rejected
                     </TabsTrigger>
-                    <TabsTrigger value="executed" className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm" data-testid="tab-approvals-executed">
+                    <TabsTrigger
+                      value="executed"
+                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+                      data-testid="tab-approvals-executed"
+                    >
                       <Play className="h-3.5 w-3.5 mr-1.5" />
                       Executed
                     </TabsTrigger>
                   </>
                 )}
-                <TabsTrigger value="mine" className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm" data-testid="tab-approvals-mine">
+                <TabsTrigger
+                  value="mine"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-foreground data-[state=active]:bg-transparent pb-2 px-3 text-sm"
+                  data-testid="tab-approvals-mine"
+                >
                   <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                   My Requests
                 </TabsTrigger>
@@ -399,8 +369,7 @@ export function ApprovalsPage({ currentUser }: Props) {
                 <TabsContent value="executed" className="m-0">
                   {renderTable(
                     [...byStatus("executed"), ...byStatus("cancelled")].sort(
-                      (a, b) =>
-                        new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()
+                      (a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()
                     ),
                     "No executed requests yet"
                   )}

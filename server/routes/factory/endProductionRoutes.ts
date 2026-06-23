@@ -76,12 +76,14 @@ async function getProductionWaGroupId(companyId: number): Promise<string | null>
 
 // ── Helper: sanitise filename ─────────────────────────────────────────────────
 function safeFileName(companyName: string, date: string): string {
-  const safe = companyName.replace(/[^a-zA-Z0-9 \-_.]/g, "").trim().slice(0, 60);
+  const safe = companyName
+    .replace(/[^a-zA-Z0-9 \-_.]/g, "")
+    .trim()
+    .slice(0, 60);
   return `Worker Matrix ${safe} ${date}.pdf`;
 }
 
 export function registerEndProductionRoutes(app: Express, requireAuth: any) {
-
   // ── GET production session ─────────────────────────────────────────────────
   app.get("/api/factory/stock-entry/production-session", requireAuth, async (req: any, res: any) => {
     try {
@@ -93,10 +95,9 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
       const [session] = await db
         .select()
         .from(factoryProductionSessions)
-        .where(and(
-          eq(factoryProductionSessions.companyId, companyId),
-          eq(factoryProductionSessions.sessionDate, date),
-        ));
+        .where(
+          and(eq(factoryProductionSessions.companyId, companyId), eq(factoryProductionSessions.sessionDate, date))
+        );
 
       res.json(session ?? null);
     } catch (err: any) {
@@ -118,10 +119,9 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
       const [existing] = await db
         .select()
         .from(factoryProductionSessions)
-        .where(and(
-          eq(factoryProductionSessions.companyId, companyId),
-          eq(factoryProductionSessions.sessionDate, date),
-        ));
+        .where(
+          and(eq(factoryProductionSessions.companyId, companyId), eq(factoryProductionSessions.sessionDate, date))
+        );
 
       if (existing?.productionEndedAt) {
         return res.status(409).json({
@@ -154,7 +154,7 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
         pdfBuffer,
         fileName,
         `Worker Matrix — ${companyName} — ${date}`,
-        "application/pdf",
+        "application/pdf"
       );
 
       if (!waResult?.success) {
@@ -169,21 +169,21 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
         .insert(factoryProductionSessions)
         .values({
           companyId,
-          sessionDate:                   date,
-          productionEndedAt:             now,
-          productionEndedBy:             endedBy ? String(endedBy) : null,
-          workerMatrixWhatsappSentAt:    now,
+          sessionDate: date,
+          productionEndedAt: now,
+          productionEndedBy: endedBy ? String(endedBy) : null,
+          workerMatrixWhatsappSentAt: now,
           workerMatrixWhatsappMessageId: null,
-          updatedAt:                     now,
+          updatedAt: now,
         })
         .onConflictDoUpdate({
           target: [factoryProductionSessions.companyId, factoryProductionSessions.sessionDate],
           set: {
-            productionEndedAt:             now,
-            productionEndedBy:             endedBy ? String(endedBy) : null,
-            workerMatrixWhatsappSentAt:    now,
+            productionEndedAt: now,
+            productionEndedBy: endedBy ? String(endedBy) : null,
+            workerMatrixWhatsappSentAt: now,
             workerMatrixWhatsappMessageId: null,
-            updatedAt:                     now,
+            updatedAt: now,
           },
         })
         .returning();
@@ -226,7 +226,7 @@ export function registerEndProductionRoutes(app: Express, requireAuth: any) {
         pdfBuffer,
         fileName,
         `Worker Matrix — ${companyName} — ${date}`,
-        "application/pdf",
+        "application/pdf"
       );
 
       if (!waResult?.success) {

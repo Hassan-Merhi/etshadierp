@@ -3,12 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  AlertTriangle, FileX, Search, CheckCircle2, XCircle, LayoutGrid, List, Building2,
-} from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertTriangle, FileX, Search, CheckCircle2, XCircle, LayoutGrid, List, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fmt, fmtD, parseNum, COMPANY_COLORS, getRealRowBg } from "./helpers";
 import { WorkbookLegend, RealWorkbookBlock } from "./WorkbookBlock";
@@ -19,9 +15,7 @@ export function TabDetail() {
   const [view, setView] = useState<"workbook" | "flat">("workbook");
   const [search, setSearch] = useState("");
 
-  const queryUrl = companyMode === "all"
-    ? "/api/git/containers?allCompanies=true"
-    : "/api/git/containers";
+  const queryUrl = companyMode === "all" ? "/api/git/containers?allCompanies=true" : "/api/git/containers";
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],
@@ -34,21 +28,25 @@ export function TabDetail() {
   const filtered = useMemo(() => {
     if (!search) return allContainers;
     const q = search.toLowerCase();
-    return allContainers.filter((r) =>
-      r.containerNumber.toLowerCase().includes(q) ||
-      r.companyName.toLowerCase().includes(q) ||
-      (r.transporter ?? "").toLowerCase().includes(q) ||
-      (r.agent ?? "").toLowerCase().includes(q) ||
-      (r.numberPlate ?? "").toLowerCase().includes(q) ||
-      (r.trackingLocation ?? "").toLowerCase().includes(q)
+    return allContainers.filter(
+      (r) =>
+        r.containerNumber.toLowerCase().includes(q) ||
+        r.companyName.toLowerCase().includes(q) ||
+        (r.transporter ?? "").toLowerCase().includes(q) ||
+        (r.agent ?? "").toLowerCase().includes(q) ||
+        (r.numberPlate ?? "").toLowerCase().includes(q) ||
+        (r.trackingLocation ?? "").toLowerCase().includes(q)
     );
   }, [allContainers, search]);
 
-  const totals = useMemo(() => ({
-    amount: filtered.reduce((s, r) => s + parseNum(r.grandTotal), 0),
-    fee:    filtered.reduce((s, r) => s + parseNum(r.transportFee), 0),
-    duty:   filtered.reduce((s, r) => s + parseNum(r.dutyFee), 0),
-  }), [filtered]);
+  const totals = useMemo(
+    () => ({
+      amount: filtered.reduce((s, r) => s + parseNum(r.grandTotal), 0),
+      fee: filtered.reduce((s, r) => s + parseNum(r.transportFee), 0),
+      duty: filtered.reduce((s, r) => s + parseNum(r.dutyFee), 0),
+    }),
+    [filtered]
+  );
 
   const companies = useMemo(() => {
     const seen = new Map<number, { id: number; name: string; rows: EnrichedContainerApi[] }>();
@@ -63,30 +61,50 @@ export function TabDetail() {
     <div className="flex items-center gap-2 flex-wrap" data-testid="detail-mode-selector">
       <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       <span className="text-xs text-muted-foreground">View:</span>
-      <Button size="sm" variant={companyMode === "session" ? "default" : "outline"} className="text-xs gap-1.5" onClick={() => setCompanyMode("session")} data-testid="button-detail-my-company">My Company</Button>
-      <Button size="sm" variant={companyMode === "all" ? "default" : "outline"} className="text-xs gap-1.5" onClick={() => setCompanyMode("all")} data-testid="button-detail-all-companies">All Accessible Companies</Button>
+      <Button
+        size="sm"
+        variant={companyMode === "session" ? "default" : "outline"}
+        className="text-xs gap-1.5"
+        onClick={() => setCompanyMode("session")}
+        data-testid="button-detail-my-company"
+      >
+        My Company
+      </Button>
+      <Button
+        size="sm"
+        variant={companyMode === "all" ? "default" : "outline"}
+        className="text-xs gap-1.5"
+        onClick={() => setCompanyMode("all")}
+        data-testid="button-detail-all-companies"
+      >
+        All Accessible Companies
+      </Button>
     </div>
   );
 
-  if (isLoading) return (
-    <div className="space-y-3">
-      {modeSelector}
-      {[1, 2, 3].map(i => <Skeleton key={i} className="h-32 w-full rounded-md" />)}
-    </div>
-  );
+  if (isLoading)
+    return (
+      <div className="space-y-3">
+        {modeSelector}
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-32 w-full rounded-md" />
+        ))}
+      </div>
+    );
 
-  if (isError) return (
-    <div className="space-y-3">
-      {modeSelector}
-      <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 px-4 py-3 flex gap-3 items-start text-sm text-red-800 dark:text-red-300">
-        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-        <div>
-          <div className="font-semibold">Failed to load container data</div>
-          <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+  if (isError)
+    return (
+      <div className="space-y-3">
+        {modeSelector}
+        <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 px-4 py-3 flex gap-3 items-start text-sm text-red-800 dark:text-red-300">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold">Failed to load container data</div>
+            <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
 
   return (
     <div className="space-y-3">
@@ -112,11 +130,25 @@ export function TabDetail() {
             </div>
             <span className="text-xs text-muted-foreground">{filtered.length} rows</span>
             <div className="flex items-center gap-1 ml-auto">
-              <Button size="sm" variant={view === "workbook" ? "default" : "outline"} className="gap-1.5" onClick={() => setView("workbook")} data-testid="button-view-workbook">
-                <LayoutGrid className="h-3.5 w-3.5" />Workbook
+              <Button
+                size="sm"
+                variant={view === "workbook" ? "default" : "outline"}
+                className="gap-1.5"
+                onClick={() => setView("workbook")}
+                data-testid="button-view-workbook"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                Workbook
               </Button>
-              <Button size="sm" variant={view === "flat" ? "default" : "outline"} className="gap-1.5" onClick={() => setView("flat")} data-testid="button-view-flat">
-                <List className="h-3.5 w-3.5" />Flat Table
+              <Button
+                size="sm"
+                variant={view === "flat" ? "default" : "outline"}
+                className="gap-1.5"
+                onClick={() => setView("flat")}
+                data-testid="button-view-flat"
+              >
+                <List className="h-3.5 w-3.5" />
+                Flat Table
               </Button>
             </div>
           </div>
@@ -180,16 +212,28 @@ export function TabDetail() {
                       <TableCell>{fmtD(r.borderDate)}</TableCell>
                       <TableCell className={cn(r.isOverdue ? "text-red-600 font-bold" : "")}>
                         {fmtD(r.maxOffloadDate)}
-                        {r.daysDelayed ? <span className="ml-1 text-red-600 text-[10px]">+{r.daysDelayed}d</span> : null}
+                        {r.daysDelayed ? (
+                          <span className="ml-1 text-red-600 text-[10px]">+{r.daysDelayed}d</span>
+                        ) : null}
                       </TableCell>
                       <TableCell className="text-center">
-                        {r.docReceived ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" /> : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
+                        {r.docReceived ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />
+                        )}
                       </TableCell>
                       <TableCell>{r.transporter ?? "—"}</TableCell>
-                      <TableCell className="text-right">{parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}
+                      </TableCell>
                       <TableCell>{r.agent ?? "—"}</TableCell>
-                      <TableCell className="text-right">{parseNum(r.dutyFee) > 0 ? `$${fmt(parseNum(r.dutyFee), 0)}` : "—"}</TableCell>
-                      <TableCell className="max-w-32 truncate text-muted-foreground">{r.trackingDescription ?? "—"}</TableCell>
+                      <TableCell className="text-right">
+                        {parseNum(r.dutyFee) > 0 ? `$${fmt(parseNum(r.dutyFee), 0)}` : "—"}
+                      </TableCell>
+                      <TableCell className="max-w-32 truncate text-muted-foreground">
+                        {r.trackingDescription ?? "—"}
+                      </TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 font-semibold bg-muted/40">

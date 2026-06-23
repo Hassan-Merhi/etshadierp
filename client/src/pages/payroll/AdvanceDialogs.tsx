@@ -1,16 +1,16 @@
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from "@/components/ui/form";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Calendar } from "@/components/ui/calendar";
@@ -43,10 +43,22 @@ interface AdvanceDialogsProps {
 }
 
 export function AdvanceDialogs({
-  advanceDialogOpen, setAdvanceDialogOpen, advanceForm, advanceMutation,
-  advanceWorkerComboOpen, setAdvanceWorkerComboOpen, workerStaff, cashAccounts,
-  deductionDialogOpen, setDeductionDialogOpen, selectedAdvance, deductionForm, deductionMutation,
-  advanceToDelete, setAdvanceToDelete, deleteAdvanceMutation,
+  advanceDialogOpen,
+  setAdvanceDialogOpen,
+  advanceForm,
+  advanceMutation,
+  advanceWorkerComboOpen,
+  setAdvanceWorkerComboOpen,
+  workerStaff,
+  cashAccounts,
+  deductionDialogOpen,
+  setDeductionDialogOpen,
+  selectedAdvance,
+  deductionForm,
+  deductionMutation,
+  advanceToDelete,
+  setAdvanceToDelete,
+  deleteAdvanceMutation,
 }: AdvanceDialogsProps) {
   const { formatAmount } = useCurrencyContext();
   const { formatDisplayDate } = useDateFormat() as any;
@@ -62,7 +74,11 @@ export function AdvanceDialogs({
           </DialogHeader>
 
           <Form {...advanceForm}>
-            <form noValidate onSubmit={advanceForm.handleSubmit((data: any) => advanceMutation.mutate(data))} className="space-y-4">
+            <form
+              noValidate
+              onSubmit={advanceForm.handleSubmit((data: any) => advanceMutation.mutate(data))}
+              className="space-y-4"
+            >
               <FormField
                 control={advanceForm.control}
                 name="employeeId"
@@ -76,7 +92,10 @@ export function AdvanceDialogs({
                             variant="outline"
                             role="combobox"
                             data-testid="select-advance-employee"
-                            className={cn("w-full justify-between font-normal", !field.value && "text-muted-foreground")}
+                            className={cn(
+                              "w-full justify-between font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
                           >
                             {field.value
                               ? (() => {
@@ -103,7 +122,12 @@ export function AdvanceDialogs({
                                     setAdvanceWorkerComboOpen(false);
                                   }}
                                 >
-                                  <Check className={cn("mr-2 h-4 w-4", field.value === worker.id.toString() ? "opacity-100" : "opacity-0")} />
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      field.value === worker.id.toString() ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
                                   {[worker.firstName, worker.lastName].filter(Boolean).join(" ")} ({worker.code})
                                 </CommandItem>
                               ))}
@@ -117,15 +141,25 @@ export function AdvanceDialogs({
                 )}
               />
 
-              <FormField control={advanceForm.control} name="amount" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Advance Amount</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-advance-amount" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <FormField
+                control={advanceForm.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Advance Amount</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-advance-amount"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={advanceForm.control}
@@ -167,12 +201,17 @@ export function AdvanceDialogs({
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-muted/50">
                     <FormControl>
-                      <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-opening-balance" />
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="checkbox-opening-balance"
+                      />
                     </FormControl>
                     <div className="space-y-1 leading-none">
                       <FormLabel>Opening Balance (from Tally)</FormLabel>
                       <p className="text-sm text-muted-foreground">
-                        Check this if importing an existing balance from your old system. This will not create any cash transaction.
+                        Check this if importing an existing balance from your old system. This will not create any cash
+                        transaction.
                       </p>
                     </div>
                   </FormItem>
@@ -180,44 +219,61 @@ export function AdvanceDialogs({
               />
 
               {!advanceForm.watch("isOpeningBalance") && (
-                <FormField control={advanceForm.control} name="cashAccountId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cash Account</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-advance-cash-account">
-                          <SelectValue placeholder="Select cash account" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {cashAccounts.length === 0 ? (
-                          <SelectItem value="none" disabled>No cash accounts available</SelectItem>
-                        ) : (
-                          cashAccounts.map((account) => (
-                            <SelectItem key={account.id} value={account.id.toString()}>
-                              {account.name} ({account.code})
+                <FormField
+                  control={advanceForm.control}
+                  name="cashAccountId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cash Account</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-advance-cash-account">
+                            <SelectValue placeholder="Select cash account" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {cashAccounts.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              No cash accounts available
                             </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                          ) : (
+                            cashAccounts.map((account) => (
+                              <SelectItem key={account.id} value={account.id.toString()}>
+                                {account.name} ({account.code})
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
 
-              <FormField control={advanceForm.control} name="notes" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes / Reason (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Reason for advance..." {...field} data-testid="input-advance-notes" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <FormField
+                control={advanceForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes / Reason (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Reason for advance..." {...field} data-testid="input-advance-notes" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setAdvanceDialogOpen(false)} data-testid="button-cancel-advance">Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setAdvanceDialogOpen(false)}
+                  data-testid="button-cancel-advance"
+                >
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={advanceMutation.isPending} data-testid="button-submit-advance">
                   {advanceMutation.isPending ? "Processing..." : "Create Advance"}
                 </Button>
@@ -255,35 +311,65 @@ export function AdvanceDialogs({
           )}
 
           <Form {...deductionForm}>
-            <form noValidate onSubmit={deductionForm.handleSubmit((data: any) => deductionMutation.mutate(data))} className="space-y-4">
-              <FormField control={deductionForm.control} name="deductionAmount" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Deduction Amount</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-deduction-amount" />
-                  </FormControl>
-                  <FormMessage />
-                  {selectedAdvance && (
-                    <p className="text-sm text-muted-foreground">
-                      Maximum: {formatAmount(parseFloat(selectedAdvance.remainingBalance))}
-                    </p>
-                  )}
-                </FormItem>
-              )} />
+            <form
+              noValidate
+              onSubmit={deductionForm.handleSubmit((data: any) => deductionMutation.mutate(data))}
+              className="space-y-4"
+            >
+              <FormField
+                control={deductionForm.control}
+                name="deductionAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Deduction Amount</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-deduction-amount"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                    {selectedAdvance && (
+                      <p className="text-sm text-muted-foreground">
+                        Maximum: {formatAmount(parseFloat(selectedAdvance.remainingBalance))}
+                      </p>
+                    )}
+                  </FormItem>
+                )}
+              />
 
-              <FormField control={deductionForm.control} name="payrollMonth" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Payroll Month</FormLabel>
-                  <FormControl>
-                    <Input type="text" placeholder="YYYY-MM (e.g., 2024-01)" {...field} data-testid="input-payroll-month" />
-                  </FormControl>
-                  <FormMessage />
-                  <p className="text-sm text-muted-foreground">Format: YYYY-MM (e.g., 2024-01 for January 2024)</p>
-                </FormItem>
-              )} />
+              <FormField
+                control={deductionForm.control}
+                name="payrollMonth"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Payroll Month</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="text"
+                        placeholder="YYYY-MM (e.g., 2024-01)"
+                        {...field}
+                        data-testid="input-payroll-month"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                    <p className="text-sm text-muted-foreground">Format: YYYY-MM (e.g., 2024-01 for January 2024)</p>
+                  </FormItem>
+                )}
+              />
 
               <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setDeductionDialogOpen(false)} data-testid="button-cancel-deduction">Cancel</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setDeductionDialogOpen(false)}
+                  data-testid="button-cancel-deduction"
+                >
+                  Cancel
+                </Button>
                 <Button type="submit" disabled={deductionMutation.isPending} data-testid="button-submit-deduction">
                   {deductionMutation.isPending ? "Processing..." : "Record Deduction"}
                 </Button>
@@ -299,7 +385,8 @@ export function AdvanceDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Salary Advance</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the advance and all associated deduction records. This action cannot be undone.
+              This will permanently delete the advance and all associated deduction records. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

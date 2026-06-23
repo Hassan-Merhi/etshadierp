@@ -53,9 +53,17 @@ export function RemoveFromStockTable({
         </TableHeader>
         <TableBody>
           {loading ? (
-            <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">Loading inventory...</TableCell></TableRow>
+            <TableRow>
+              <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                Loading inventory...
+              </TableCell>
+            </TableRow>
           ) : (viewMode === "detailed" ? filteredBales : condensedRows)?.length === 0 ? (
-            <TableRow><TableCell colSpan={8} className="h-32 text-center text-muted-foreground">No matching bales in stock.</TableCell></TableRow>
+            <TableRow>
+              <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
+                No matching bales in stock.
+              </TableCell>
+            </TableRow>
           ) : viewMode === "detailed" ? (
             filteredBales?.map((bale: any) => (
               <TableRow key={bale.id} className={selectedBaleIds.has(bale.id) ? "bg-primary/5" : ""}>
@@ -75,14 +83,12 @@ export function RemoveFromStockTable({
                 <TableCell className="text-xs">{bale.locationName}</TableCell>
                 <TableCell className="text-xs text-muted-foreground">{formatDisplayDate(bale.finalizedAt)}</TableCell>
                 <TableCell className="text-xs">{bale.finalizedByName || "-"}</TableCell>
-                <TableCell className="text-right font-bold text-sm">{parseFloat(bale.weightKg || "0").toFixed(1)} <span className="text-[10px] text-muted-foreground">KG</span></TableCell>
+                <TableCell className="text-right font-bold text-sm">
+                  {parseFloat(bale.weightKg || "0").toFixed(1)}{" "}
+                  <span className="text-[10px] text-muted-foreground">KG</span>
+                </TableCell>
                 <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => onPrintBale(bale)}
-                  >
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onPrintBale(bale)}>
                     <Printer className="h-3.5 w-3.5" />
                   </Button>
                 </TableCell>
@@ -90,19 +96,24 @@ export function RemoveFromStockTable({
             ))
           ) : (
             condensedRows.map((row) => (
-              <TableRow key={row.groupKey} className={row.baleIds.every(id => selectedBaleIds.has(id)) ? "bg-primary/5" : ""}>
+              <TableRow
+                key={row.groupKey}
+                className={row.baleIds.every((id) => selectedBaleIds.has(id)) ? "bg-primary/5" : ""}
+              >
                 <TableCell>
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                    checked={row.baleIds.every(id => selectedBaleIds.has(id))}
+                    checked={row.baleIds.every((id) => selectedBaleIds.has(id))}
                     onChange={() => onToggleCondensedRow(row.baleIds)}
                   />
                 </TableCell>
                 <TableCell className="font-mono text-xs font-bold">{row.articleCode}</TableCell>
                 <TableCell className="font-medium text-sm">{row.productName}</TableCell>
                 <TableCell className="text-center font-bold">{row.qty}</TableCell>
-                <TableCell className="text-right font-bold text-sm">{row.totalWeight.toFixed(1)} <span className="text-[10px] text-muted-foreground">KG</span></TableCell>
+                <TableCell className="text-right font-bold text-sm">
+                  {row.totalWeight.toFixed(1)} <span className="text-[10px] text-muted-foreground">KG</span>
+                </TableCell>
               </TableRow>
             ))
           )}

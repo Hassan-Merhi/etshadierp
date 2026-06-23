@@ -60,10 +60,7 @@ export default function ClosingStockDetail() {
   const { data, isLoading } = useQuery<ClosingStockDetailData>({
     queryKey: ["/api/reports/closing-stock-summary", groupId, "items", selectedCompany?.id],
     queryFn: async () => {
-      const response = await fetch(
-        `/api/reports/closing-stock-summary/${groupId}/items`,
-        { credentials: "include" }
-      );
+      const response = await fetch(`/api/reports/closing-stock-summary/${groupId}/items`, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to fetch closing stock items");
       return response.json();
     },
@@ -86,9 +83,7 @@ export default function ClosingStockDetail() {
             <Package className="h-6 w-6" />
             {groupName}
           </h1>
-          <p className="text-muted-foreground text-sm">
-            Closing Stock Items - {selectedCompany?.name}
-          </p>
+          <p className="text-muted-foreground text-sm">Closing Stock Items - {selectedCompany?.name}</p>
         </div>
       </div>
 
@@ -96,9 +91,7 @@ export default function ClosingStockDetail() {
         <div className="bg-primary text-primary-foreground">
           <div className="grid grid-cols-5 p-3 font-semibold text-sm">
             <div className="col-span-2">Item Name</div>
-            <div className="col-span-3 text-center border-l border-primary-foreground/30">
-              Closing Balance
-            </div>
+            <div className="col-span-3 text-center border-l border-primary-foreground/30">Closing Balance</div>
           </div>
           <div className="grid grid-cols-5 px-3 pb-2 text-xs">
             <div className="col-span-2"></div>
@@ -118,31 +111,19 @@ export default function ClosingStockDetail() {
           ) : data?.items && data.items.length > 0 ? (
             <>
               {data.items.map((item) => (
-                <div
-                  key={item.id}
-                  className="grid grid-cols-5 p-3"
-                  data-testid={`row-stock-item-${item.id}`}
-                >
+                <div key={item.id} className="grid grid-cols-5 p-3" data-testid={`row-stock-item-${item.id}`}>
                   <div className="col-span-2 font-medium">
                     <span className="text-muted-foreground text-sm mr-2">[{item.code}]</span>
                     {item.name}
                   </div>
-                  <div className="text-right font-mono text-sm">
-                    {formatQty(item.closing.quantity)}
-                  </div>
-                  <div className="text-right font-mono text-sm">
-                    {formatAmount(item.closing.rate)}
-                  </div>
-                  <div className="text-right font-mono text-sm">
-                    {formatAmount(item.closing.value)}
-                  </div>
+                  <div className="text-right font-mono text-sm">{formatQty(item.closing.quantity)}</div>
+                  <div className="text-right font-mono text-sm">{formatAmount(item.closing.rate)}</div>
+                  <div className="text-right font-mono text-sm">{formatAmount(item.closing.value)}</div>
                 </div>
               ))}
             </>
           ) : (
-            <div className="p-8 text-center text-muted-foreground">
-              No items found in this stock group.
-            </div>
+            <div className="p-8 text-center text-muted-foreground">No items found in this stock group.</div>
           )}
         </div>
 
@@ -150,15 +131,9 @@ export default function ClosingStockDetail() {
           <div className="bg-muted/50 border-t-2 border-primary">
             <div className="grid grid-cols-5 p-3 font-bold">
               <div className="col-span-2">Total</div>
-              <div className="text-right font-mono">
-                {formatNumber(data.totals.quantity)} BL
-              </div>
-              <div className="text-right font-mono">
-                {formatAmount(data.totals.rate)}
-              </div>
-              <div className="text-right font-mono">
-                {formatAmount(data.totals.value)}
-              </div>
+              <div className="text-right font-mono">{formatNumber(data.totals.quantity)} BL</div>
+              <div className="text-right font-mono">{formatAmount(data.totals.rate)}</div>
+              <div className="text-right font-mono">{formatAmount(data.totals.value)}</div>
             </div>
           </div>
         )}

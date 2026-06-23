@@ -2,15 +2,32 @@ import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import FactoryOtwTrackingTab from "./FactoryOtwTrackingTab";
 import {
-  Plus, Download, ArrowDown, Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Trash2, Ship, Radio,
+  Plus,
+  Download,
+  ArrowDown,
+  Upload,
+  FileSpreadsheet,
+  AlertCircle,
+  CheckCircle2,
+  Trash2,
+  Ship,
+  Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,17 +88,29 @@ export default function FactoryContainers() {
   const { data: ledgerAccounts = [] } = useQuery<any[]>({ queryKey: ["/api/ledger-accounts"] });
 
   // ── OTW Summary computed values ──────────────────────────────────────────
-  const otwContainers = useMemo(
-    () => (containers || []).filter((c) => STATUS_ACTIVE.has(c.status)),
-    [containers],
-  );
+  const otwContainers = useMemo(() => (containers || []).filter((c) => STATUS_ACTIVE.has(c.status)), [containers]);
 
   const otwSupplierGroups = useMemo(() => {
-    const map = new Map<string, { supplierId: number | null; supplierName: string; containers: ContainerWithSupplier[]; totalKg: number; totalsByCurrency: Record<string, number> }>();
+    const map = new Map<
+      string,
+      {
+        supplierId: number | null;
+        supplierName: string;
+        containers: ContainerWithSupplier[];
+        totalKg: number;
+        totalsByCurrency: Record<string, number>;
+      }
+    >();
     for (const c of otwContainers) {
       const key = String((c as any).supplierId ?? "none");
       if (!map.has(key)) {
-        map.set(key, { supplierId: (c as any).supplierId ?? null, supplierName: c.supplierName || "No Supplier", containers: [], totalKg: 0, totalsByCurrency: {} });
+        map.set(key, {
+          supplierId: (c as any).supplierId ?? null,
+          supplierName: c.supplierName || "No Supplier",
+          containers: [],
+          totalKg: 0,
+          totalsByCurrency: {},
+        });
       }
       const group = map.get(key)!;
       group.containers.push(c);
@@ -93,28 +122,44 @@ export default function FactoryContainers() {
 
   const otwGrandTotals = useMemo(() => {
     const totalsByCurrency: Record<string, number> = {};
-    let count = 0; let kg = 0;
-    for (const g of otwSupplierGroups) { count += g.containers.length; kg += g.totalKg; otwMergeCurrencyMaps(totalsByCurrency, g.totalsByCurrency); }
+    let count = 0;
+    let kg = 0;
+    for (const g of otwSupplierGroups) {
+      count += g.containers.length;
+      kg += g.totalKg;
+      otwMergeCurrencyMaps(totalsByCurrency, g.totalsByCurrency);
+    }
     return { containers: count, kg, totalsByCurrency };
   }, [otwSupplierGroups]);
 
   const fmtOtwKg = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: 0 });
   const toggleOtwGroup = (key: string) => {
-    setOpenOtwGroups(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+    setOpenOtwGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   };
 
   // ── Import ────────────────────────────────────────────────────────────────
   const importMutation = useMutation({
     mutationFn: async (rows: any[]) => {
       const res = await factoryApiRequest("POST", "/api/factory/containers/import-excel", { rows });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Import failed"); }
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Import failed");
+      }
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/suppliers"] });
       setImportResult(data);
-      toast({ title: "Import Complete", description: `${data.imported} of ${data.total} containers imported${data.errors.length > 0 ? ` (${data.errors.length} errors)` : ""}` });
+      toast({
+        title: "Import Complete",
+        description: `${data.imported} of ${data.total} containers imported${data.errors.length > 0 ? ` (${data.errors.length} errors)` : ""}`,
+      });
     },
     onError: (err: Error) => {
       if ((err as any)?._handledGlobally) return;
@@ -131,41 +176,55 @@ export default function FactoryContainers() {
     const ws = wb.Sheets[wb.SheetNames[0]];
     const jsonRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: "" });
     const get = (row: any, keys: string[]) => {
-      for (const k of keys) { const val = row[k] ?? row[k.toLowerCase()] ?? row[k.toUpperCase()]; if (val !== undefined && val !== "") return String(val).trim(); }
+      for (const k of keys) {
+        const val = row[k] ?? row[k.toLowerCase()] ?? row[k.toUpperCase()];
+        if (val !== undefined && val !== "") return String(val).trim();
+      }
       return "";
     };
-    const mapped = jsonRows.map((row) => ({
-      containerNumber: get(row, ["Container Number", "Container #", "ContainerNumber", "container_number"]),
-      supplierName: get(row, ["Supplier", "Supplier Name", "SupplierName"]),
-      origin: get(row, ["Origin", "Country"]),
-      totalKg: get(row, ["Total Kg", "TotalKg", "Weight", "KG", "Kg"]),
-      ratePerKg: get(row, ["Rate/Kg", "Rate Per Kg", "RatePerKg", "Rate", "Price"]),
-      currencyCode: get(row, ["Currency", "CurrencyCode"]) || "USD",
-      fxRateToUsd: get(row, ["FX Rate", "FxRate", "fx_rate_to_usd"]) || "",
-      fxSource: get(row, ["FX Source", "FxSource"]) || "",
-      arrivalDate: get(row, ["Arrival Date", "ArrivalDate", "Date"]),
-      notes: get(row, ["Notes", "Remarks"]),
-      status: get(row, ["Status"]) || "PENDING",
-      commissionAmount: get(row, ["Commission Amount", "CommissionAmount", "Commission"]) || "",
-      commissionCurrencyCode: get(row, ["Commission Currency", "CommissionCurrency"]) || "USD",
-    })).filter((r) => r.containerNumber);
+    const mapped = jsonRows
+      .map((row) => ({
+        containerNumber: get(row, ["Container Number", "Container #", "ContainerNumber", "container_number"]),
+        supplierName: get(row, ["Supplier", "Supplier Name", "SupplierName"]),
+        origin: get(row, ["Origin", "Country"]),
+        totalKg: get(row, ["Total Kg", "TotalKg", "Weight", "KG", "Kg"]),
+        ratePerKg: get(row, ["Rate/Kg", "Rate Per Kg", "RatePerKg", "Rate", "Price"]),
+        currencyCode: get(row, ["Currency", "CurrencyCode"]) || "USD",
+        fxRateToUsd: get(row, ["FX Rate", "FxRate", "fx_rate_to_usd"]) || "",
+        fxSource: get(row, ["FX Source", "FxSource"]) || "",
+        arrivalDate: get(row, ["Arrival Date", "ArrivalDate", "Date"]),
+        notes: get(row, ["Notes", "Remarks"]),
+        status: get(row, ["Status"]) || "PENDING",
+        commissionAmount: get(row, ["Commission Amount", "CommissionAmount", "Commission"]) || "",
+        commissionCurrencyCode: get(row, ["Commission Currency", "CommissionCurrency"]) || "USD",
+      }))
+      .filter((r) => r.containerNumber);
     setImportPreview(mapped);
     setImportResult(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const filteredContainers = containers?.filter((c) => {
-    if (statusFilter === "HAS_WEIGHT") { if (!(parseFloat((c as any).totalKg) > 0)) return false; }
-    else if (statusFilter === "NO_WEIGHT") { if (parseFloat((c as any).totalKg) > 0) return false; }
-    else if (statusFilter !== "all" && c.status !== statusFilter) return false;
+    if (statusFilter === "HAS_WEIGHT") {
+      if (!(parseFloat((c as any).totalKg) > 0)) return false;
+    } else if (statusFilter === "NO_WEIGHT") {
+      if (parseFloat((c as any).totalKg) > 0) return false;
+    } else if (statusFilter !== "all" && c.status !== statusFilter) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
-      if (!c.containerNumber?.toLowerCase().includes(q) && !c.supplierName?.toLowerCase().includes(q) && !c.origin?.toLowerCase().includes(q)) return false;
+      if (
+        !c.containerNumber?.toLowerCase().includes(q) &&
+        !c.supplierName?.toLowerCase().includes(q) &&
+        !c.origin?.toLowerCase().includes(q)
+      )
+        return false;
     }
     return true;
   });
 
-  const openEdit = (c: ContainerWithSupplier) => { setEditingContainer(c); };
+  const openEdit = (c: ContainerWithSupplier) => {
+    setEditingContainer(c);
+  };
 
   if (isLoading) {
     return (
@@ -198,20 +257,40 @@ export default function FactoryContainers() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => exportContainers(containers || [], suppliers)} data-testid="button-export-containers">
+                <DropdownMenuItem
+                  onClick={() => exportContainers(containers || [], suppliers)}
+                  data-testid="button-export-containers"
+                >
                   <Download className="h-4 w-4 mr-2" /> Export All
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => { setImportOpen(true); setImportPreview([]); setImportResult(null); }} data-testid="button-import-containers">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setImportOpen(true);
+                    setImportPreview([]);
+                    setImportResult(null);
+                  }}
+                  data-testid="button-import-containers"
+                >
                   <Upload className="h-4 w-4 mr-2" /> Import Excel
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
           <div className="flex rounded-md border overflow-hidden">
-            <Button variant={viewMode === "summary" ? "default" : "ghost"} className="rounded-none" onClick={() => setViewMode("summary")} data-testid="button-view-summary">
+            <Button
+              variant={viewMode === "summary" ? "default" : "ghost"}
+              className="rounded-none"
+              onClick={() => setViewMode("summary")}
+              data-testid="button-view-summary"
+            >
               <Ship className="h-4 w-4 mr-2" /> OTW Summary
             </Button>
-            <Button variant={viewMode === "tracking" ? "default" : "ghost"} className="rounded-none" onClick={() => setViewMode("tracking")} data-testid="button-view-tracking">
+            <Button
+              variant={viewMode === "tracking" ? "default" : "ghost"}
+              className="rounded-none"
+              onClick={() => setViewMode("tracking")}
+              data-testid="button-view-tracking"
+            >
               <Radio className="h-4 w-4 mr-2" /> OTW Tracking
             </Button>
           </div>
@@ -253,9 +332,7 @@ export default function FactoryContainers() {
         />
       )}
 
-      {viewMode === "tracking" && (
-        <FactoryOtwTrackingTab onEdit={openEdit} />
-      )}
+      {viewMode === "tracking" && <FactoryOtwTrackingTab onEdit={openEdit} />}
 
       {/* ── Dialogs ───────────────────────────────────────────────────────── */}
       <ContainerFormDialog
@@ -263,7 +340,10 @@ export default function FactoryContainers() {
         editingContainer={editingContainer}
         suppliers={suppliers}
         ledgerAccounts={ledgerAccounts}
-        onClose={() => { setCreateOpen(false); setEditingContainer(null); }}
+        onClose={() => {
+          setCreateOpen(false);
+          setEditingContainer(null);
+        }}
       />
 
       <ContainerDetailDialog
@@ -271,7 +351,10 @@ export default function FactoryContainers() {
         suppliers={suppliers}
         ledgerAccounts={ledgerAccounts}
         onClose={() => setViewContainer(null)}
-        onEdit={(c) => { setViewContainer(null); openEdit(c); }}
+        onEdit={(c) => {
+          setViewContainer(null);
+          openEdit(c);
+        }}
       />
 
       <PostOffloadDialog
@@ -287,18 +370,21 @@ export default function FactoryContainers() {
         onDeleted={() => setSelectedIds(new Set())}
       />
 
-      <SingleDeleteDialog
-        containerId={pendingDeleteId}
-        onClose={() => setPendingDeleteId(null)}
-      />
+      <SingleDeleteDialog containerId={pendingDeleteId} onClose={() => setPendingDeleteId(null)} />
 
-      <ReverseOffloadDialog
-        container={reversingContainer}
-        onClose={() => setReversingContainer(null)}
-      />
+      <ReverseOffloadDialog container={reversingContainer} onClose={() => setReversingContainer(null)} />
 
       {/* ── Import Dialog ─────────────────────────────────────────────────── */}
-      <Dialog open={importOpen} onOpenChange={(v) => { if (!v) { setImportOpen(false); setImportPreview([]); setImportResult(null); } }}>
+      <Dialog
+        open={importOpen}
+        onOpenChange={(v) => {
+          if (!v) {
+            setImportOpen(false);
+            setImportPreview([]);
+            setImportResult(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -311,11 +397,17 @@ export default function FactoryContainers() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="flex items-center gap-3 flex-wrap">
-              <Button variant="outline" size="sm" onClick={downloadContainerTemplate} data-testid="button-download-template">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadContainerTemplate}
+                data-testid="button-download-template"
+              >
                 <Download className="h-4 w-4 mr-2" /> Download Template
               </Button>
               <div className="text-sm text-muted-foreground">
-                Expected columns: Container Number, Supplier, Origin, Total Kg, Rate/Kg, Currency, FX Rate (optional), FX Source, Arrival Date, Status, Notes
+                Expected columns: Container Number, Supplier, Origin, Total Kg, Rate/Kg, Currency, FX Rate (optional),
+                FX Source, Arrival Date, Status, Notes
               </div>
             </div>
             <div>
@@ -332,7 +424,11 @@ export default function FactoryContainers() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <p className="text-sm font-medium">{importPreview.length} rows ready to import</p>
-                  <Button onClick={() => importMutation.mutate(importPreview)} disabled={importMutation.isPending} data-testid="button-confirm-import">
+                  <Button
+                    onClick={() => importMutation.mutate(importPreview)}
+                    disabled={importMutation.isPending}
+                    data-testid="button-confirm-import"
+                  >
                     {importMutation.isPending ? "Importing..." : `Import ${importPreview.length} Containers`}
                   </Button>
                 </div>
@@ -360,7 +456,9 @@ export default function FactoryContainers() {
                           <TableCell className="text-right font-mono">{row.totalKg || "-"}</TableCell>
                           <TableCell className="text-right font-mono">{row.ratePerKg || "-"}</TableCell>
                           <TableCell>{row.currencyCode}</TableCell>
-                          <TableCell><ContainerStatusBadge status={row.status} /></TableCell>
+                          <TableCell>
+                            <ContainerStatusBadge status={row.status} />
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -372,7 +470,9 @@ export default function FactoryContainers() {
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <p className="font-medium">{importResult.imported} of {importResult.total} containers imported successfully</p>
+                  <p className="font-medium">
+                    {importResult.imported} of {importResult.total} containers imported successfully
+                  </p>
                 </div>
                 {importResult.errors.length > 0 && (
                   <div className="border border-destructive/30 rounded-md p-3 space-y-1">
@@ -381,7 +481,9 @@ export default function FactoryContainers() {
                       {importResult.errors.length} error(s):
                     </p>
                     {importResult.errors.map((err, i) => (
-                      <p key={i} className="text-sm text-muted-foreground">{err}</p>
+                      <p key={i} className="text-sm text-muted-foreground">
+                        {err}
+                      </p>
                     ))}
                   </div>
                 )}
@@ -389,7 +491,16 @@ export default function FactoryContainers() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setImportOpen(false); setImportPreview([]); setImportResult(null); }}>Close</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportOpen(false);
+                setImportPreview([]);
+                setImportResult(null);
+              }}
+            >
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

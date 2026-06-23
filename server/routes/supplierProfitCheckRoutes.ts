@@ -3,20 +3,22 @@ import { pool } from "../db";
 import ExcelJS from "exceljs";
 
 export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any) {
-
   // ── GET location groups (master locations with configured price groups) ──
   app.get("/api/supplier-profit-check/location-groups", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const result = await pool.query(`
+      const result = await pool.query(
+        `
         SELECT DISTINCT l.id, l.name
         FROM location_price_groups lpg
         JOIN locations l ON l.id = lpg.master_location_id
         WHERE lpg.company_id = $1
         ORDER BY l.name
-      `, [companyId]);
+      `,
+        [companyId]
+      );
 
       res.json(result.rows);
     } catch (err: any) {
@@ -34,7 +36,8 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       const supplierId = req.query.supplierId;
       if (!supplierId) return res.status(400).json({ message: "supplierId required" });
 
-      const result = await pool.query(`
+      const result = await pool.query(
+        `
         SELECT c.id, c.container_number, c.eta, c.status, c.items_total,
           c.import_date, c.item_name,
           (SELECT COUNT(*) FROM supplier_container_loaded_items scli WHERE scli.container_id = c.id) AS loaded_items_count
@@ -43,7 +46,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           AND c.supplier_id = $2
           AND c.status = 'OTW'
         ORDER BY c.created_at DESC
-      `, [companyId, supplierId]);
+      `,
+        [companyId, supplierId]
+      );
 
       res.json(result.rows);
     } catch (err: any) {
@@ -57,14 +62,16 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { supplierId, fromDate, toDate, sourceType, proformaId, containerIds, sellPriceSource, locationId } = req.body;
+      const { supplierId, fromDate, toDate, sourceType, proformaId, containerIds, sellPriceSource, locationId } =
+        req.body;
       if (!supplierId) return res.status(400).json({ message: "supplierId required" });
       const allTime = !fromDate || !toDate;
 
       // 1. Get stock items (all for company OR from proforma lines OR from OTW containers)
       let itemsResult;
       if (sourceType === "proforma" && proformaId) {
-        itemsResult = await pool.query(`
+        itemsResult = await pool.query(
+          `
           SELECT si.id, si.code, si.name, si.stock_group_id,
             sg.name as stock_group_name,
             spl.qty as proforma_qty,
@@ -79,9 +86,12 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
             AND si.company_id = $2
             AND si.deleted_at IS NULL
           ORDER BY si.code
-        `, [proformaId, companyId]);
+        `,
+          [proformaId, companyId]
+        );
       } else if (sourceType === "otw_containers" && Array.isArray(containerIds) && containerIds.length > 0) {
-        itemsResult = await pool.query(`
+        itemsResult = await pool.query(
+          `
           SELECT DISTINCT ON (si.id)
             si.id, si.code, si.name, si.stock_group_id,
             sg.name as stock_group_name,
@@ -95,17 +105,17 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
             AND si.company_id = $2
             AND si.deleted_at IS NULL
           ORDER BY si.id, si.code
-        `, [containerIds, companyId]);
+        `,
+          [containerIds, companyId]
+        );
       } else {
         // Look up the supplier's linked stock group (if any)
-        const supplierRow = await pool.query(
-          `SELECT stock_group_id FROM suppliers WHERE id = $1`,
-          [supplierId]
-        );
+        const supplierRow = await pool.query(`SELECT stock_group_id FROM suppliers WHERE id = $1`, [supplierId]);
         const linkedStockGroupId = supplierRow.rows[0]?.stock_group_id ?? null;
 
         if (linkedStockGroupId) {
-          itemsResult = await pool.query(`
+          itemsResult = await pool.query(
+            `
             SELECT si.id, si.code, si.name, si.stock_group_id,
               sg.name as stock_group_name,
               NULL::integer as proforma_qty,
@@ -117,9 +127,12 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
               AND si.deleted_at IS NULL
               AND si.stock_group_id = $2
             ORDER BY si.code
-          `, [companyId, linkedStockGroupId]);
+          `,
+            [companyId, linkedStockGroupId]
+          );
         } else {
-          itemsResult = await pool.query(`
+          itemsResult = await pool.query(
+            `
             SELECT si.id, si.code, si.name, si.stock_group_id,
               sg.name as stock_group_name,
               NULL::integer as proforma_qty,
@@ -130,7 +143,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
             WHERE si.company_id = $1
               AND si.deleted_at IS NULL
             ORDER BY si.code
-          `, [companyId]);
+          `,
+            [companyId]
+          );
         }
       }
       const items = itemsResult.rows;
@@ -141,7 +156,8 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       // 2. Average selling price + total sales qty per item in date range
       const avgSellResult = allTime
-        ? await pool.query(`
+        ? await pool.query(
+            `
             SELECT si.stock_item_id,
               SUM(si.total_sales::numeric) / NULLIF(SUM(si.quantity::numeric), 0) AS avg_selling_price,
               AVG(si.configured_price::numeric) FILTER (WHERE si.configured_price IS NOT NULL AND si.configured_price::numeric > 0) AS avg_config_price,
@@ -153,8 +169,11 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
               AND v.deleted_at IS NULL
               AND si.stock_item_id = ANY($2::int[])
             GROUP BY si.stock_item_id
-          `, [companyId, stockItemIds])
-        : await pool.query(`
+          `,
+            [companyId, stockItemIds]
+          )
+        : await pool.query(
+            `
             SELECT si.stock_item_id,
               SUM(si.total_sales::numeric) / NULLIF(SUM(si.quantity::numeric), 0) AS avg_selling_price,
               AVG(si.configured_price::numeric) FILTER (WHERE si.configured_price IS NOT NULL AND si.configured_price::numeric > 0) AS avg_config_price,
@@ -168,8 +187,13 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
               AND v.deleted_at IS NULL
               AND si.stock_item_id = ANY($4::int[])
             GROUP BY si.stock_item_id
-          `, [companyId, fromDate, toDate, stockItemIds]);
-      const avgSellMap = new Map<number, { avgSellingPrice: number | null; avgConfigPrice: number; salesQty: number }>();
+          `,
+            [companyId, fromDate, toDate, stockItemIds]
+          );
+      const avgSellMap = new Map<
+        number,
+        { avgSellingPrice: number | null; avgConfigPrice: number; salesQty: number }
+      >();
       for (const row of avgSellResult.rows) {
         avgSellMap.set(Number(row.stock_item_id), {
           avgSellingPrice: row.avg_selling_price != null ? Number(row.avg_selling_price) : null,
@@ -179,7 +203,8 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       }
 
       // 3. N Cost (most recent PO line for this supplier — kept for proforma save only, not shown in UI)
-      const nCostResult = await pool.query(`
+      const nCostResult = await pool.query(
+        `
         SELECT DISTINCT ON (pli.stock_item_id)
           pli.stock_item_id,
           pli.rate::numeric AS rate
@@ -189,14 +214,17 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           AND po.supplier_id = $2
           AND pli.stock_item_id = ANY($3::int[])
         ORDER BY pli.stock_item_id, po.created_at DESC
-      `, [companyId, supplierId, stockItemIds]);
+      `,
+        [companyId, supplierId, stockItemIds]
+      );
       const nCostMap = new Map<number, number>();
       for (const row of nCostResult.rows) {
         nCostMap.set(Number(row.stock_item_id), Number(row.rate));
       }
 
       // 3b. Hassan's Price — base selling_price on the stock item; fall back to max location-specific price
-      const hassansPriceResult = await pool.query(`
+      const hassansPriceResult = await pool.query(
+        `
         SELECT si.id AS stock_item_id,
           COALESCE(
             NULLIF(si.selling_price::numeric, 0),
@@ -207,14 +235,17 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         FROM stock_items si
         WHERE si.company_id = $1
           AND si.id = ANY($2::int[])
-      `, [companyId, stockItemIds]);
+      `,
+        [companyId, stockItemIds]
+      );
       const hassansPriceMap = new Map<number, number>();
       for (const row of hassansPriceResult.rows) {
         hassansPriceMap.set(Number(row.stock_item_id), Number(row.hassans_price) || 0);
       }
 
       // 4. Current stock + weighted average inventory cost (primary avg cost source)
-      const stockResult = await pool.query(`
+      const stockResult = await pool.query(
+        `
         SELECT i.stock_item_id,
           SUM(i.quantity::numeric) AS current_stock,
           SUM(i.quantity::numeric * i.average_rate::numeric) / NULLIF(SUM(i.quantity::numeric), 0) AS avg_cost,
@@ -223,19 +254,22 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         WHERE i.company_id = $1
           AND i.stock_item_id = ANY($2::int[])
         GROUP BY i.stock_item_id
-      `, [companyId, stockItemIds]);
+      `,
+        [companyId, stockItemIds]
+      );
       const stockMap = new Map<number, { currentStock: number; avgCost: number }>();
       for (const row of stockResult.rows) {
         stockMap.set(Number(row.stock_item_id), {
           currentStock: Number(row.current_stock),
           // use weighted avg_cost; if qty is 0 but rows exist, fall back to max avg_rate so we keep last known cost
-          avgCost: row.avg_cost != null ? Number(row.avg_cost)
-                 : (row.max_avg_rate != null ? Number(row.max_avg_rate) : 0),
+          avgCost:
+            row.avg_cost != null ? Number(row.avg_cost) : row.max_avg_rate != null ? Number(row.max_avg_rate) : 0,
         });
       }
 
       // 4b. Fallback avg cost: most recent PO line rate from ANY PO in this company (when no inventory record)
-      const avgCostFallbackResult = await pool.query(`
+      const avgCostFallbackResult = await pool.query(
+        `
         SELECT DISTINCT ON (pli.stock_item_id)
           pli.stock_item_id,
           pli.rate::numeric AS rate
@@ -244,7 +278,9 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         WHERE po.company_id = $1
           AND pli.stock_item_id = ANY($2::int[])
         ORDER BY pli.stock_item_id, po.created_at DESC
-      `, [companyId, stockItemIds]);
+      `,
+        [companyId, stockItemIds]
+      );
       const avgCostFallbackMap = new Map<number, number>();
       for (const row of avgCostFallbackResult.rows) {
         avgCostFallbackMap.set(Number(row.stock_item_id), Number(row.rate));
@@ -253,12 +289,15 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       // 4c. Location group price (when sellPriceSource === 'location_group')
       const groupPriceMap = new Map<number, number>();
       if (sellPriceSource === "location_group" && locationId) {
-        const groupPriceResult = await pool.query(`
+        const groupPriceResult = await pool.query(
+          `
           SELECT stock_item_id, selling_price::numeric AS selling_price
           FROM stock_item_location_prices
           WHERE location_id = $1
             AND stock_item_id = ANY($2::int[])
-        `, [locationId, stockItemIds]);
+        `,
+          [locationId, stockItemIds]
+        );
         for (const row of groupPriceResult.rows) {
           if (row.selling_price != null && Number(row.selling_price) > 0) {
             groupPriceMap.set(Number(row.stock_item_id), Number(row.selling_price));
@@ -284,10 +323,8 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         const inventoryData = stockMap.get(id);
         const currentStock = inventoryData?.currentStock ?? 0;
         const invAvgCost = inventoryData?.avgCost ?? 0;
-        const offloadingCost = invAvgCost > 0
-          ? invAvgCost
-          : (avgCostFallbackMap.get(id) ?? 0);
-        const avgCostSource = invAvgCost > 0 ? "inventory" : (avgCostFallbackMap.has(id) ? "po_fallback" : "missing");
+        const offloadingCost = invAvgCost > 0 ? invAvgCost : (avgCostFallbackMap.get(id) ?? 0);
+        const avgCostSource = invAvgCost > 0 ? "inventory" : avgCostFallbackMap.has(id) ? "po_fallback" : "missing";
 
         // Hassan's Profit = Hassan's Price − Avg Cost
         const hassansProfit = configPrice - offloadingCost;
@@ -325,10 +362,14 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
           // Dubai / PO Price — selected supplier first, fall back to any PO for this company
           poPrice: nCostMap.has(id)
             ? nCostMap.get(id)!
-            : (avgCostFallbackMap.has(id) ? avgCostFallbackMap.get(id)! : null),
+            : avgCostFallbackMap.has(id)
+              ? avgCostFallbackMap.get(id)!
+              : null,
           poPriceSource: nCostMap.has(id)
             ? "selected_supplier_po"
-            : (avgCostFallbackMap.has(id) ? "any_po_fallback" : "missing"),
+            : avgCostFallbackMap.has(id)
+              ? "any_po_fallback"
+              : "missing",
           // Inventory avg cost (separate from Dubai price)
           inventoryAvgCost: offloadingCost,
           // Keep for proforma save compat
@@ -363,11 +404,14 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       const proformaRef = reference || `PC-${new Date().toISOString().slice(0, 10)}-${Date.now().toString().slice(-4)}`;
 
-      const proformaResult = await pool.query(`
+      const proformaResult = await pool.query(
+        `
         INSERT INTO supplier_proformas (company_id, supplier_id, reference, notes, created_at, updated_at)
         VALUES ($1, $2, $3, $4, now(), now())
         RETURNING id, reference
-      `, [companyId, supplierId, proformaRef, notes || null]);
+      `,
+        [companyId, supplierId, proformaRef, notes || null]
+      );
 
       const proforma = proformaResult.rows[0];
 
@@ -384,13 +428,16 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
             String(item.weight || "0"),
             String(Number(item.supplierPrice || 0).toFixed(2))
           );
-          linePlaceholders.push(`($${pIdx},$${pIdx+1},$${pIdx+2},$${pIdx+3},$${pIdx+4},$${pIdx+5})`);
+          linePlaceholders.push(`($${pIdx},$${pIdx + 1},$${pIdx + 2},$${pIdx + 3},$${pIdx + 4},$${pIdx + 5})`);
           pIdx += 6;
         }
-        await pool.query(`
+        await pool.query(
+          `
           INSERT INTO supplier_proforma_lines (proforma_id, barcode, item_name, qty, weight_per_bale, price_per_bale)
           VALUES ${linePlaceholders.join(",")}
-        `, lineValues);
+        `,
+          lineValues
+        );
       }
 
       res.json({ id: proforma.id, reference: proforma.reference });
@@ -408,10 +455,10 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       const proformaId = parseInt(req.params.id);
       if (isNaN(proformaId)) return res.status(400).json({ message: "Invalid proforma ID" });
 
-      const check = await pool.query(
-        `SELECT id FROM supplier_proformas WHERE id = $1 AND company_id = $2`,
-        [proformaId, companyId]
-      );
+      const check = await pool.query(`SELECT id FROM supplier_proformas WHERE id = $1 AND company_id = $2`, [
+        proformaId,
+        companyId,
+      ]);
       if (!check.rows.length) return res.status(404).json({ message: "Proforma not found" });
 
       const { items } = req.body;
@@ -432,7 +479,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
             String(item.weight || "0"),
             String(Number(item.supplierPrice || 0).toFixed(2))
           );
-          linePlaceholders.push(`($${pIdx},$${pIdx+1},$${pIdx+2},$${pIdx+3},$${pIdx+4},$${pIdx+5})`);
+          linePlaceholders.push(`($${pIdx},$${pIdx + 1},$${pIdx + 2},$${pIdx + 3},$${pIdx + 4},$${pIdx + 5})`);
           pIdx += 6;
         }
         await pool.query(
@@ -448,146 +495,150 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
     }
   });
 
-  app.get("/api/supplier-profit-check/proforma/:proformaId/export-supplier", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const proformaId = parseInt(req.params.proformaId);
-      if (isNaN(proformaId)) return res.status(400).json({ message: "Invalid proformaId" });
+  app.get(
+    "/api/supplier-profit-check/proforma/:proformaId/export-supplier",
+    requireAuth,
+    async (req: any, res: any) => {
+      try {
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+        const proformaId = parseInt(req.params.proformaId);
+        if (isNaN(proformaId)) return res.status(400).json({ message: "Invalid proformaId" });
 
-      const proformaResult = await pool.query(`
+        const proformaResult = await pool.query(
+          `
         SELECT sp.*, s.legal_name as supplier_name
         FROM supplier_proformas sp
         JOIN suppliers s ON s.id = sp.supplier_id
         WHERE sp.id = $1 AND sp.company_id = $2
-      `, [proformaId, companyId]);
-      if (!proformaResult.rows.length) return res.status(404).json({ message: "Proforma not found" });
-      const proforma = proformaResult.rows[0];
+      `,
+          [proformaId, companyId]
+        );
+        if (!proformaResult.rows.length) return res.status(404).json({ message: "Proforma not found" });
+        const proforma = proformaResult.rows[0];
 
-      const linesResult = await pool.query(`
+        const linesResult = await pool.query(
+          `
         SELECT barcode, item_name, qty, weight_per_bale, price_per_bale,
           (qty * price_per_bale::numeric) as total_price
         FROM supplier_proforma_lines
         WHERE proforma_id = $1
         ORDER BY barcode
-      `, [proformaId]);
-      const lines = linesResult.rows;
+      `,
+          [proformaId]
+        );
+        const lines = linesResult.rows;
 
-      const wb = new ExcelJS.Workbook();
-      wb.creator = "ERP System";
-      const ws = wb.addWorksheet("Proforma");
+        const wb = new ExcelJS.Workbook();
+        wb.creator = "ERP System";
+        const ws = wb.addWorksheet("Proforma");
 
-      const NAVY = "1A2C5B";
-      const GOLD = "C9A84C";
-      const LIGHT_GOLD = "F7EFD8";
-      const WHITE = "FFFFFF";
+        const NAVY = "1A2C5B";
+        const GOLD = "C9A84C";
+        const LIGHT_GOLD = "F7EFD8";
+        const WHITE = "FFFFFF";
 
-      ws.columns = [
-        { key: "item_code", width: 18 },
-        { key: "item_name", width: 35 },
-        { key: "qty", width: 12 },
-        { key: "unit_price", width: 15 },
-        { key: "total_price", width: 18 },
-      ];
+        ws.columns = [
+          { key: "item_code", width: 18 },
+          { key: "item_name", width: 35 },
+          { key: "qty", width: 12 },
+          { key: "unit_price", width: 15 },
+          { key: "total_price", width: 18 },
+        ];
 
-      // Header banner (rows 1-3)
-      ws.mergeCells("A1:E1");
-      const title = ws.getCell("A1");
-      title.value = "SUPPLIER PROFORMA";
-      title.font = { bold: true, size: 16, color: { argb: WHITE } };
-      title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
-      title.alignment = { horizontal: "center", vertical: "middle" };
-      ws.getRow(1).height = 30;
+        // Header banner (rows 1-3)
+        ws.mergeCells("A1:E1");
+        const title = ws.getCell("A1");
+        title.value = "SUPPLIER PROFORMA";
+        title.font = { bold: true, size: 16, color: { argb: WHITE } };
+        title.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+        title.alignment = { horizontal: "center", vertical: "middle" };
+        ws.getRow(1).height = 30;
 
-      ws.mergeCells("A2:C2");
-      ws.getCell("A2").value = `Supplier: ${proforma.supplier_name}`;
-      ws.getCell("A2").font = { bold: true, size: 11, color: { argb: NAVY } };
-      ws.getCell("A2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
+        ws.mergeCells("A2:C2");
+        ws.getCell("A2").value = `Supplier: ${proforma.supplier_name}`;
+        ws.getCell("A2").font = { bold: true, size: 11, color: { argb: NAVY } };
+        ws.getCell("A2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
 
-      ws.mergeCells("D2:E2");
-      ws.getCell("D2").value = `Ref: ${proforma.reference}`;
-      ws.getCell("D2").font = { bold: true, size: 11, color: { argb: NAVY } };
-      ws.getCell("D2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
-      ws.getCell("D2").alignment = { horizontal: "right" };
+        ws.mergeCells("D2:E2");
+        ws.getCell("D2").value = `Ref: ${proforma.reference}`;
+        ws.getCell("D2").font = { bold: true, size: 11, color: { argb: NAVY } };
+        ws.getCell("D2").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
+        ws.getCell("D2").alignment = { horizontal: "right" };
 
-      ws.mergeCells("A3:C3");
-      ws.getCell("A3").value = `Date: ${new Date().toLocaleDateString()}`;
-      ws.getCell("A3").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
+        ws.mergeCells("A3:C3");
+        ws.getCell("A3").value = `Date: ${new Date().toLocaleDateString()}`;
+        ws.getCell("A3").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
 
-      if (proforma.notes) {
-        ws.mergeCells("D3:E3");
-        ws.getCell("D3").value = proforma.notes;
-        ws.getCell("D3").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
-      }
-      ws.getRow(2).height = 22;
-      ws.getRow(3).height = 20;
-
-      // Column headers
-      const headerRow = ws.addRow(["Item Code", "Item Name", "Qty", "Unit Price (USD)", "Total (USD)"]);
-      headerRow.eachCell(c => {
-        c.font = { bold: true, color: { argb: WHITE } };
-        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GOLD } };
-        c.alignment = { horizontal: "center" };
-        c.border = {
-          bottom: { style: "thin", color: { argb: NAVY } },
-        };
-      });
-      headerRow.height = 20;
-
-      let totalQty = 0;
-      let grandTotal = 0;
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const qty = Number(line.qty);
-        const unitPrice = Number(line.price_per_bale);
-        const total = qty * unitPrice;
-        totalQty += qty;
-        grandTotal += total;
-
-        const row = ws.addRow([
-          line.barcode,
-          line.item_name,
-          qty,
-          unitPrice,
-          total,
-        ]);
-        if (i % 2 === 0) {
-          row.eachCell(c => {
-            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F4F6FA" } };
-          });
+        if (proforma.notes) {
+          ws.mergeCells("D3:E3");
+          ws.getCell("D3").value = proforma.notes;
+          ws.getCell("D3").fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GOLD } };
         }
-        row.getCell(3).numFmt = "#,##0";
-        row.getCell(4).numFmt = "#,##0.00";
-        row.getCell(5).numFmt = "#,##0.00";
-        row.getCell(3).alignment = { horizontal: "right" };
-        row.getCell(4).alignment = { horizontal: "right" };
-        row.getCell(5).alignment = { horizontal: "right" };
+        ws.getRow(2).height = 22;
+        ws.getRow(3).height = 20;
+
+        // Column headers
+        const headerRow = ws.addRow(["Item Code", "Item Name", "Qty", "Unit Price (USD)", "Total (USD)"]);
+        headerRow.eachCell((c) => {
+          c.font = { bold: true, color: { argb: WHITE } };
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GOLD } };
+          c.alignment = { horizontal: "center" };
+          c.border = {
+            bottom: { style: "thin", color: { argb: NAVY } },
+          };
+        });
+        headerRow.height = 20;
+
+        let totalQty = 0;
+        let grandTotal = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const qty = Number(line.qty);
+          const unitPrice = Number(line.price_per_bale);
+          const total = qty * unitPrice;
+          totalQty += qty;
+          grandTotal += total;
+
+          const row = ws.addRow([line.barcode, line.item_name, qty, unitPrice, total]);
+          if (i % 2 === 0) {
+            row.eachCell((c) => {
+              c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "F4F6FA" } };
+            });
+          }
+          row.getCell(3).numFmt = "#,##0";
+          row.getCell(4).numFmt = "#,##0.00";
+          row.getCell(5).numFmt = "#,##0.00";
+          row.getCell(3).alignment = { horizontal: "right" };
+          row.getCell(4).alignment = { horizontal: "right" };
+          row.getCell(5).alignment = { horizontal: "right" };
+        }
+
+        // Grand total row
+        const totRow = ws.addRow(["", "GRAND TOTAL", totalQty, "", grandTotal]);
+        totRow.eachCell((c) => {
+          c.font = { bold: true, color: { argb: WHITE } };
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
+          c.border = {
+            top: { style: "double", color: { argb: GOLD } },
+          };
+        });
+        totRow.getCell(3).numFmt = "#,##0";
+        totRow.getCell(5).numFmt = "#,##0.00";
+        totRow.getCell(3).alignment = { horizontal: "right" };
+        totRow.getCell(5).alignment = { horizontal: "right" };
+
+        res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        res.setHeader("Content-Disposition", `attachment; filename="proforma-${proforma.reference}.xlsx"`);
+        const buffer = await wb.xlsx.writeBuffer();
+        res.send(buffer);
+      } catch (err: any) {
+        console.error("[export-supplier]", err.message);
+        res.status(500).json({ message: err.message });
       }
-
-      // Grand total row
-      const totRow = ws.addRow(["", "GRAND TOTAL", totalQty, "", grandTotal]);
-      totRow.eachCell(c => {
-        c.font = { bold: true, color: { argb: WHITE } };
-        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
-        c.border = {
-          top: { style: "double", color: { argb: GOLD } },
-        };
-      });
-      totRow.getCell(3).numFmt = "#,##0";
-      totRow.getCell(5).numFmt = "#,##0.00";
-      totRow.getCell(3).alignment = { horizontal: "right" };
-      totRow.getCell(5).alignment = { horizontal: "right" };
-
-      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="proforma-${proforma.reference}.xlsx"`);
-      const buffer = await wb.xlsx.writeBuffer();
-      res.send(buffer);
-    } catch (err: any) {
-      console.error("[export-supplier]", err.message);
-      res.status(500).json({ message: err.message });
     }
-  });
+  );
 
   app.post("/api/supplier-profit-check/export-internal", requireAuth, async (req: any, res: any) => {
     try {
@@ -649,16 +700,26 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       ws.getRow(2).height = 18;
 
       const headers = [
-        "Item Code", "Item Name", "Current Stock",
-        "Avg Sell Price", "Hassan's Price", "Avg Cost",
+        "Item Code",
+        "Item Name",
+        "Current Stock",
+        "Avg Sell Price",
+        "Hassan's Price",
+        "Avg Cost",
         "Cost Source",
-        "Hassan's Profit", "Hassan's Profit %",
-        "Cost Profit", "Cost Profit %",
-        "Status", "Qty to Order", "Total Avg Cost", "Est. Total Sales",
-        "Est. Hassan's Profit", "Est. Cost Profit",
+        "Hassan's Profit",
+        "Hassan's Profit %",
+        "Cost Profit",
+        "Cost Profit %",
+        "Status",
+        "Qty to Order",
+        "Total Avg Cost",
+        "Est. Total Sales",
+        "Est. Hassan's Profit",
+        "Est. Cost Profit",
       ];
       const hRow = ws.addRow(headers);
-      hRow.eachCell(c => {
+      hRow.eachCell((c) => {
         c.font = { bold: true, color: { argb: WHITE }, size: 10 };
         c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GOLD } };
         c.alignment = { horizontal: "center", wrapText: true };
@@ -682,7 +743,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
         // Cost Profit = Avg Sell − Avg Cost
         const costProfit = sell != null ? sell - avgCost : null;
-        const costProfitPct = (sell != null && sell > 0 && costProfit != null) ? (costProfit / sell) * 100 : null;
+        const costProfitPct = sell != null && sell > 0 && costProfit != null ? (costProfit / sell) * 100 : null;
 
         const qty = Number(r.qty) || 0;
         const totalAvgCost = qty * avgCost;
@@ -690,10 +751,13 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         const estHassansProfit = qty * hassansProfit;
         const estCostProfit = costProfit != null ? qty * costProfit : 0;
 
-        const statusByHassans = hassansProfit > 0 ? "gaining" : hassansProfit < 0 ? "losing" : (sell == null ? "no_sales_data" : "break_even");
+        const statusByHassans =
+          hassansProfit > 0 ? "gaining" : hassansProfit < 0 ? "losing" : sell == null ? "no_sales_data" : "break_even";
 
         const dataRow = ws.addRow([
-          r.code, r.name, Number(r.currentStock) || 0,
+          r.code,
+          r.name,
+          Number(r.currentStock) || 0,
           sell ?? "",
           hassansPrice,
           avgCost,
@@ -716,7 +780,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         else if (statusByHassans === "gaining") rowColor = LIGHT_GREEN;
         else if (statusByHassans === "no_sales_data") rowColor = LIGHT_YELLOW;
         if (rowColor) {
-          dataRow.eachCell(c => {
+          dataRow.eachCell((c) => {
             c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: rowColor! } };
           });
         }
@@ -728,19 +792,22 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         else if (statusByHassans === "no_sales_data") statusCell.font = { bold: true, color: { argb: YELLOW } };
 
         // Number formats: 3=stock, 4=sell, 5=hassansPrice, 6=avgCost, 8=hassansProfit, 10=costProfit, 14=totalAvgCost, 15=estSales, 16=estHassans, 17=estCost
-        [4, 5, 6, 8, 10, 14, 15, 16, 17].forEach(col => {
+        [4, 5, 6, 8, 10, 14, 15, 16, 17].forEach((col) => {
           dataRow.getCell(col).numFmt = numFmt2;
         });
         dataRow.getCell(3).numFmt = numFmt2;
-        dataRow.getCell(9).numFmt = numFmtPct;  // Hassan's Profit %
+        dataRow.getCell(9).numFmt = numFmtPct; // Hassan's Profit %
         dataRow.getCell(11).numFmt = numFmtPct; // Cost Profit %
-        dataRow.getCell(13).numFmt = numFmt0;   // Qty
+        dataRow.getCell(13).numFmt = numFmt0; // Qty
       }
 
       // Summary totals
       const hasQty = rows.filter((r: any) => Number(r.qty) > 0);
       const totalQtyOrdered = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0), 0);
-      const totalAvgCostSum = hasQty.reduce((s: number, r: any) => s + (Number(r.qty) || 0) * (Number(r.offloadingCost) || 0), 0);
+      const totalAvgCostSum = hasQty.reduce(
+        (s: number, r: any) => s + (Number(r.qty) || 0) * (Number(r.offloadingCost) || 0),
+        0
+      );
       const totalEstSales = hasQty.reduce((s: number, r: any) => {
         return r.avgSellingPrice != null ? s + (Number(r.qty) || 0) * Number(r.avgSellingPrice) : s;
       }, 0);
@@ -756,21 +823,34 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
 
       ws.addRow([]);
       const sumRow = ws.addRow([
-        "TOTALS", "", "", "", "", "", "", "",
-        "", "", "",
-        `${hasQty.length} items`, totalQtyOrdered,
-        totalAvgCostSum, totalEstSales, totalEstHassansProfit, totalEstCostProfit,
+        "TOTALS",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        `${hasQty.length} items`,
+        totalQtyOrdered,
+        totalAvgCostSum,
+        totalEstSales,
+        totalEstHassansProfit,
+        totalEstCostProfit,
       ]);
-      sumRow.eachCell(c => {
+      sumRow.eachCell((c) => {
         c.font = { bold: true, color: { argb: WHITE } };
         c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: NAVY } };
         c.border = { top: { style: "double", color: { argb: GOLD } } };
       });
-      sumRow.getCell(13).numFmt = numFmt0;   // qty
-      sumRow.getCell(14).numFmt = numFmt2;   // total avg cost
-      sumRow.getCell(15).numFmt = numFmt2;   // est sales
-      sumRow.getCell(16).numFmt = numFmt2;   // est hassan's profit
-      sumRow.getCell(17).numFmt = numFmt2;   // est cost profit
+      sumRow.getCell(13).numFmt = numFmt0; // qty
+      sumRow.getCell(14).numFmt = numFmt2; // total avg cost
+      sumRow.getCell(15).numFmt = numFmt2; // est sales
+      sumRow.getCell(16).numFmt = numFmt2; // est hassan's profit
+      sumRow.getCell(17).numFmt = numFmt2; // est cost profit
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="profit-analysis-${proformaRef || "export"}.xlsx"`);
@@ -829,8 +909,7 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { code, name, stockGroupId, supplierId, dubaiPrice, avgSellPrice } = req.body;
-      if (!code?.trim() || !name?.trim())
-        return res.status(400).json({ message: "Code and name are required" });
+      if (!code?.trim() || !name?.trim()) return res.status(400).json({ message: "Code and name are required" });
 
       // Duplicate check
       const existing = await pool.query(
@@ -841,17 +920,20 @@ export function registerSupplierProfitCheckRoutes(app: Express, requireAuth: any
         return res.status(409).json({ message: `Item with code "${code.trim()}" already exists` });
 
       // Insert the stock item (default uom = Bale, as used throughout this ERP)
-      const result = await pool.query(`
+      const result = await pool.query(
+        `
         INSERT INTO stock_items (company_id, code, name, stock_group_id, uom, active, created_at)
         VALUES ($1, $2, $3, $4, 'Bale', true, now())
         RETURNING id, code, name, stock_group_id
-      `, [companyId, code.trim().toUpperCase(), name.trim(), stockGroupId || null]);
+      `,
+        [companyId, code.trim().toUpperCase(), name.trim(), stockGroupId || null]
+      );
 
       const item = result.rows[0];
 
       // Persist Dubai / avg sell price overrides if provided
       const hasDubai = dubaiPrice && Number(dubaiPrice) > 0;
-      const hasAvg   = avgSellPrice && Number(avgSellPrice) > 0;
+      const hasAvg = avgSellPrice && Number(avgSellPrice) > 0;
       if ((hasDubai || hasAvg) && supplierId) {
         await pool.query(
           `INSERT INTO supplier_profit_po_overrides (supplier_id, stock_item_id, po_price, avg_price, updated_at)

@@ -1,18 +1,16 @@
 import { AlertTriangle, AlertCircle, CheckCircle2 } from "lucide-react";
 
-export type Status =
-  | "OTW" | "Sea" | "At Port" | "Left Dar"
-  | "At Border" | "In Transit" | "Arrived" | "Offloaded";
+export type Status = "OTW" | "Sea" | "At Port" | "Left Dar" | "At Border" | "In Transit" | "Arrived" | "Offloaded";
 
 export const STATUS_BADGE: Record<Status, string> = {
-  OTW:         "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
-  Sea:         "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  "At Port":   "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
-  "Left Dar":  "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
+  OTW: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+  Sea: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  "At Port": "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  "Left Dar": "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
   "At Border": "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
-  "In Transit":"bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
-  Arrived:     "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  Offloaded:   "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  "In Transit": "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300",
+  Arrived: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
+  Offloaded: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
 };
 
 export type CompanyViewMode = "session" | "all";
@@ -78,11 +76,23 @@ export type PortBucket = {
 };
 
 export const PORT_BUCKETS: PortBucket[] = [
-  { key: "otw-sea",    label: "OTW / AT SEA",          statuses: ["OTW", "Sea"],              headerBg: "bg-blue-600",    headerText: "text-white" },
-  { key: "at-port",    label: "AT PORT",                statuses: ["At Port"],                 headerBg: "bg-amber-500",   headerText: "text-white" },
-  { key: "left-dar",   label: "LEFT DAR",               statuses: ["Left Dar"],                headerBg: "bg-violet-600",  headerText: "text-white" },
-  { key: "in-transit", label: "AT BORDER / IN TRANSIT", statuses: ["At Border", "In Transit"], headerBg: "bg-emerald-600", headerText: "text-white" },
-  { key: "arrived",    label: "ARRIVED",                statuses: ["Arrived"],                 headerBg: "bg-slate-500",   headerText: "text-white" },
+  {
+    key: "otw-sea",
+    label: "OTW / AT SEA",
+    statuses: ["OTW", "Sea"],
+    headerBg: "bg-blue-600",
+    headerText: "text-white",
+  },
+  { key: "at-port", label: "AT PORT", statuses: ["At Port"], headerBg: "bg-amber-500", headerText: "text-white" },
+  { key: "left-dar", label: "LEFT DAR", statuses: ["Left Dar"], headerBg: "bg-violet-600", headerText: "text-white" },
+  {
+    key: "in-transit",
+    label: "AT BORDER / IN TRANSIT",
+    statuses: ["At Border", "In Transit"],
+    headerBg: "bg-emerald-600",
+    headerText: "text-white",
+  },
+  { key: "arrived", label: "ARRIVED", statuses: ["Arrived"], headerBg: "bg-slate-500", headerText: "text-white" },
 ];
 
 export type WarningCode =
@@ -166,39 +176,49 @@ export interface AgentDutyResponseAll {
 export type AgentDutyResponse = AgentDutyResponseSingle | AgentDutyResponseAll;
 
 export interface AgentDutyWaSettings {
-  groups:         Record<string, string>;
+  groups: Record<string, string>;
   hasCredentials: boolean;
-  waEnabled:      boolean;
+  waEnabled: boolean;
 }
 
-export const WARNING_META: Record<WarningCode, {
-  icon: typeof AlertTriangle;
-  className: string;
-  message: string;
-}> = {
+export const WARNING_META: Record<
+  WarningCode,
+  {
+    icon: typeof AlertTriangle;
+    className: string;
+    message: string;
+  }
+> = {
   fuzzy_match: {
     icon: AlertTriangle,
-    className: "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300",
-    message: "Account linked by fuzzy name match — verify the ledger account is correct. Add an exact mapping in Agent Mappings to suppress this warning.",
+    className:
+      "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300",
+    message:
+      "Account linked by fuzzy name match — verify the ledger account is correct. Add an exact mapping in Agent Mappings to suppress this warning.",
   },
   no_account_linked: {
     icon: AlertCircle,
     className: "bg-muted/50 border-border text-muted-foreground",
-    message: "No ledger account linked to this agent. Balance shown as unavailable. Add a mapping in Agent Mappings to enable balance tracking.",
+    message:
+      "No ledger account linked to this agent. Balance shown as unavailable. Add a mapping in Agent Mappings to enable balance tracking.",
   },
   ledger_exceeds_containers: {
     icon: AlertTriangle,
-    className: "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300",
-    message: "Ledger balance exceeds total offloaded duty — there may be payments not matched to any container in this list.",
+    className:
+      "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300",
+    message:
+      "Ledger balance exceeds total offloaded duty — there may be payments not matched to any container in this list.",
   },
   allocation_gap: {
     icon: AlertTriangle,
     className: "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-300",
-    message: "Allocation gap detected — the sum of open remaining amounts does not match the account balance. Check for missing or duplicate container rows.",
+    message:
+      "Allocation gap detected — the sum of open remaining amounts does not match the account balance. Check for missing or duplicate container rows.",
   },
   no_open_balance: {
     icon: CheckCircle2,
-    className: "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300",
+    className:
+      "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300",
     message: "Account balance is zero — all offloaded containers are fully cleared by payments.",
   },
 };

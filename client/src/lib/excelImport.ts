@@ -260,7 +260,9 @@ export async function excelToFortune(buf: ArrayBuffer): Promise<FortuneSheet[]> 
     });
 
     // ── Merged cells ────────────────────────────────────────────────────
-    const merges = (ws as any)._merges as Record<string, { model: { top: number; left: number; bottom: number; right: number } }> | undefined;
+    const merges = (ws as any)._merges as
+      | Record<string, { model: { top: number; left: number; bottom: number; right: number } }>
+      | undefined;
     if (merges && Object.keys(merges).length > 0) {
       config.merge = {};
       for (const entry of Object.values(merges)) {

@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,7 +39,7 @@ export function OffloadDialog({
   ledgerAccounts,
   handleOffload,
 }: OffloadDialogProps) {
-  const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [offloadDestination, setOffloadDestination] = useState("");
   const [selectedContainerId, setSelectedContainerId] = useState("");
   const [actualReceivedKg, setActualReceivedKg] = useState("");
@@ -112,7 +119,9 @@ export function OffloadDialog({
       setCommissionFromContainer(true);
       const commCcy = container?.commissionCurrencyCode || ccy;
       setContainerCommissionCcy(commCcy);
-      const broker = container?.commissionSupplierId ? factorySuppliers?.find((s: any) => s.id === container.commissionSupplierId) : null;
+      const broker = container?.commissionSupplierId
+        ? factorySuppliers?.find((s: any) => s.id === container.commissionSupplierId)
+        : null;
       setCommissionPersonName(broker?.name || "Commission");
       setCommissionLedgerAccountId("");
     } else {
@@ -126,38 +135,43 @@ export function OffloadDialog({
 
   const onSubmit = () => {
     const payload = {
-        selectedContainerId,
-        offloadDate,
-        offloadDestination,
-        actualReceivedKg,
-        costPerKg,
-        currencyCode,
-        fxRateToUsd,
-        freight,
-        freightCurrencyCode,
-        freightFxRate,
-        freightAccountId,
-        otherChargesAccountId,
-        otherCharges,
-        otherChargesCurrencyCode,
-        otherChargesFxRate,
-        dutyAmount,
-        dutyAccountId,
-        dutyPending,
-        dutyNotes,
-        additionalCharges,
-        mixBatchAllocations,
-        commissionPersonName,
-        commissionType,
-        commissionRate,
-        commissionLedgerAccountId,
-        commCurrencyCode: commissionFromContainer ? containerCommissionCcy : "USD"
+      selectedContainerId,
+      offloadDate,
+      offloadDestination,
+      actualReceivedKg,
+      costPerKg,
+      currencyCode,
+      fxRateToUsd,
+      freight,
+      freightCurrencyCode,
+      freightFxRate,
+      freightAccountId,
+      otherChargesAccountId,
+      otherCharges,
+      otherChargesCurrencyCode,
+      otherChargesFxRate,
+      dutyAmount,
+      dutyAccountId,
+      dutyPending,
+      dutyNotes,
+      additionalCharges,
+      mixBatchAllocations,
+      commissionPersonName,
+      commissionType,
+      commissionRate,
+      commissionLedgerAccountId,
+      commCurrencyCode: commissionFromContainer ? containerCommissionCcy : "USD",
     };
     handleOffload(payload);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="p-6 pb-2">
           <DialogTitle className="text-xl flex items-center gap-2">
@@ -170,39 +184,43 @@ export function OffloadDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-2 space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                <Label className="text-sm font-semibold">Select Container</Label>
-                <Select value={selectedContainerId} onValueChange={onContainerSelect}>
-                    <SelectTrigger data-testid="select-offload-container">
-                    <SelectValue placeholder="Select a pending container..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {availableContainers?.map((c) => (
-                        <SelectItem key={c.id} value={c.id.toString()}>
-                        {c.containerNumber} ({c.totalKg} kg — {c.supplierName})
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-                </div>
-                <div className="space-y-2">
-                <Label className="text-sm font-semibold">Offload Date</Label>
-                <Input
-                    type="date"
-                    value={offloadDate}
-                    onChange={(e) => setOffloadDate(e.target.value)}
-                    data-testid="input-offload-date"
-                />
-                </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Select Container</Label>
+              <Select value={selectedContainerId} onValueChange={onContainerSelect}>
+                <SelectTrigger data-testid="select-offload-container">
+                  <SelectValue placeholder="Select a pending container..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableContainers?.map((c) => (
+                    <SelectItem key={c.id} value={c.id.toString()}>
+                      {c.containerNumber} ({c.totalKg} kg — {c.supplierName})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            {/* Additional fields would go here, simplified for brevity in this split */}
-            <p className="text-sm text-muted-foreground italic">Cost and weight details sections...</p>
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Offload Date</Label>
+              <Input
+                type="date"
+                value={offloadDate}
+                onChange={(e) => setOffloadDate(e.target.value)}
+                data-testid="input-offload-date"
+              />
+            </div>
+          </div>
+          {/* Additional fields would go here, simplified for brevity in this split */}
+          <p className="text-sm text-muted-foreground italic">Cost and weight details sections...</p>
         </div>
 
         <DialogFooter className="p-6 pt-2 border-t bg-muted/20">
-          <Button variant="outline" onClick={onClose} data-testid="button-cancel-offload">Cancel</Button>
-          <Button onClick={onSubmit} disabled={!selectedContainerId} data-testid="button-submit-offload">Confirm Offload</Button>
+          <Button variant="outline" onClick={onClose} data-testid="button-cancel-offload">
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} disabled={!selectedContainerId} data-testid="button-submit-offload">
+            Confirm Offload
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

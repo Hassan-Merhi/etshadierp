@@ -7,12 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  getUnresolvedConflicts,
-  resolveConflict,
-  addToSyncQueue,
-  type Conflict,
-} from "@/lib/db";
+import { getUnresolvedConflicts, resolveConflict, addToSyncQueue, type Conflict } from "@/lib/db";
 
 function formatTime(ts: number): string {
   return new Intl.DateTimeFormat("en-PK", {
@@ -64,7 +59,10 @@ function ConflictCard({ conflict, onResolved }: { conflict: Conflict; onResolved
       } catch {}
     }
     await resolveConflict(conflict.id, "local");
-    toast({ title: "Conflict resolved", description: conflict.url ? "Local version queued for sync." : "Marked resolved — please re-enter manually." });
+    toast({
+      title: "Conflict resolved",
+      description: conflict.url ? "Local version queued for sync." : "Marked resolved — please re-enter manually.",
+    });
     onResolved();
   };
 
@@ -87,9 +85,7 @@ function ConflictCard({ conflict, onResolved }: { conflict: Conflict; onResolved
                 {conflict.operation}
               </Badge>
             </CardTitle>
-            <CardDescription className="text-xs">
-              {formatTime(conflict.createdAt)}
-            </CardDescription>
+            <CardDescription className="text-xs">{formatTime(conflict.createdAt)}</CardDescription>
           </div>
           <div className="flex gap-2 flex-wrap">
             <Button
@@ -133,7 +129,7 @@ function ConflictCard({ conflict, onResolved }: { conflict: Conflict; onResolved
           variant="ghost"
           size="sm"
           className="text-xs text-muted-foreground px-0 gap-1"
-          onClick={() => setExpanded(v => !v)}
+          onClick={() => setExpanded((v) => !v)}
           data-testid={`btn-expand-conflict-${conflict.id}`}
         >
           {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -165,7 +161,11 @@ export default function ConflictCenter() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: conflicts = [], isLoading, refetch } = useQuery<Conflict[]>({
+  const {
+    data: conflicts = [],
+    isLoading,
+    refetch,
+  } = useQuery<Conflict[]>({
     queryKey: ["conflicts", "unresolved"],
     queryFn: () => getUnresolvedConflicts(),
     refetchInterval: 15_000,
@@ -174,7 +174,7 @@ export default function ConflictCenter() {
   const clearAllMutation = useMutation({
     mutationFn: async () => {
       const all = await getUnresolvedConflicts();
-      await Promise.all(all.map(c => c.id ? resolveConflict(c.id, "server") : Promise.resolve()));
+      await Promise.all(all.map((c) => (c.id ? resolveConflict(c.id, "server") : Promise.resolve())));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["conflicts"] });
@@ -196,12 +196,7 @@ export default function ConflictCenter() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-            data-testid="btn-refresh-conflicts"
-          >
+          <Button variant="outline" size="sm" onClick={() => refetch()} data-testid="btn-refresh-conflicts">
             <RefreshCw className="h-3 w-3 mr-1" />
             Refresh
           </Button>
@@ -228,21 +223,15 @@ export default function ConflictCenter() {
         <div className="text-center py-16 space-y-3" data-testid="no-conflicts-message">
           <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
           <p className="text-lg font-medium">No conflicts</p>
-          <p className="text-sm text-muted-foreground">
-            All your offline changes synced cleanly with the server.
-          </p>
+          <p className="text-sm text-muted-foreground">All your offline changes synced cleanly with the server.</p>
         </div>
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             {conflicts.length} unresolved {conflicts.length === 1 ? "conflict" : "conflicts"}
           </p>
-          {conflicts.map(conflict => (
-            <ConflictCard
-              key={conflict.id}
-              conflict={conflict}
-              onResolved={handleResolved}
-            />
+          {conflicts.map((conflict) => (
+            <ConflictCard key={conflict.id} conflict={conflict} onResolved={handleResolved} />
           ))}
         </div>
       )}

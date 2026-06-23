@@ -1,17 +1,25 @@
 import { useLocation, Link } from "wouter";
 import {
-  Sidebar, SidebarContent, SidebarHeader, SidebarFooter,
-  SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { Package, ShoppingBag, BarChart3, Settings2, LogOut, Handshake, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const NAV_ITEMS = [
-  { href: "/sp/containers",    label: "Containers",    icon: Package,      testId: "link-sp-containers" },
-  { href: "/sp/sales",         label: "Sales",         icon: ShoppingBag,  testId: "link-sp-sales" },
-  { href: "/sp/reports",       label: "Reports",       icon: BarChart3,    testId: "link-sp-reports" },
-  { href: "/sp/migration",     label: "Migration",     icon: FlaskConical, testId: "link-sp-migration" },
-  { href: "/sp/setup",         label: "Setup",         icon: Settings2,    testId: "link-sp-setup" },
+  { href: "/sp/containers", label: "Containers", icon: Package, testId: "link-sp-containers" },
+  { href: "/sp/sales", label: "Sales", icon: ShoppingBag, testId: "link-sp-sales" },
+  { href: "/sp/reports", label: "Reports", icon: BarChart3, testId: "link-sp-reports" },
+  { href: "/sp/migration", label: "Migration", icon: FlaskConical, testId: "link-sp-migration" },
+  { href: "/sp/setup", label: "Setup", icon: Settings2, testId: "link-sp-setup" },
 ];
 
 export function SpSidebar({ user, onLogout }: { user?: any; onLogout?: () => void }) {
@@ -53,7 +61,13 @@ export function SpSidebar({ user, onLogout }: { user?: any; onLogout?: () => voi
 
       <SidebarFooter className="px-2 py-2 border-t">
         {onLogout && (
-          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={onLogout} data-testid="button-sp-logout">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start"
+            onClick={onLogout}
+            data-testid="button-sp-logout"
+          >
             <LogOut className="h-4 w-4 mr-2" />
             Logout
           </Button>

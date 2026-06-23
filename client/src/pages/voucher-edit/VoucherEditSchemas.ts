@@ -5,7 +5,8 @@ export const voucherEntrySchema = z.object({
   accountType: z.enum(["ledger", "bank", "supplier", "employee", "factorySupplier"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
-  amount: z.string()
+  amount: z
+    .string()
     .min(1, "Amount required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Amount must be a positive number",
@@ -18,7 +19,8 @@ export const journalEntrySchema = z.object({
   accountType: z.enum(["ledger", "bank", "supplier", "employee", "factorySupplier"]),
   accountId: z.number().min(1, "Please select an account"),
   accountName: z.string(),
-  amount: z.string()
+  amount: z
+    .string()
     .min(1, "Amount required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Amount must be a positive number",
@@ -29,12 +31,14 @@ export const salesLineItemSchema = z.object({
   id: z.number().optional(),
   stockItemId: z.number().min(1, "Please select a stock item"),
   stockItemName: z.string(),
-  quantity: z.string()
+  quantity: z
+    .string()
     .min(1, "Quantity required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Quantity must be a positive number",
     }),
-  sellingPrice: z.string()
+  sellingPrice: z
+    .string()
     .min(1, "Selling price required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Selling price must be a positive number",
@@ -45,12 +49,14 @@ export const purchaseLineItemSchema = z.object({
   id: z.number().optional(),
   stockItemId: z.number().min(1, "Please select a stock item"),
   stockItemName: z.string(),
-  quantity: z.string()
+  quantity: z
+    .string()
     .min(1, "Quantity required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Quantity must be a positive number",
     }),
-  rate: z.string()
+  rate: z
+    .string()
     .min(1, "Rate required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Rate must be a positive number",
@@ -61,12 +67,14 @@ export const adjustmentLineItemSchema = z.object({
   id: z.number().optional(),
   stockItemId: z.number().min(1, "Please select a stock item"),
   stockItemName: z.string(),
-  quantity: z.string()
+  quantity: z
+    .string()
     .min(1, "Quantity required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Quantity must be a positive number",
     }),
-  rate: z.string()
+  rate: z
+    .string()
     .min(1, "Rate required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Rate must be a positive number",
@@ -77,12 +85,14 @@ export const transferLineItemSchema = z.object({
   id: z.number().optional(),
   stockItemId: z.number().min(1, "Please select a stock item"),
   stockItemName: z.string(),
-  quantity: z.string()
+  quantity: z
+    .string()
     .min(1, "Quantity required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Quantity must be a positive number",
     }),
-  rate: z.string()
+  rate: z
+    .string()
     .min(1, "Rate required")
     .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
       message: "Rate must be a positive number",

@@ -35,8 +35,7 @@ export function useSidebarSync({
         }
         if (acc.type === "employee" && !searchLower) return false;
         return (
-          (acc.name || "").toLowerCase().includes(searchLower) ||
-          (acc.code || "").toLowerCase().includes(searchLower)
+          (acc.name || "").toLowerCase().includes(searchLower) || (acc.code || "").toLowerCase().includes(searchLower)
         );
       })
       .sort((a, b) => (a.name || "").localeCompare(b.name || ""));

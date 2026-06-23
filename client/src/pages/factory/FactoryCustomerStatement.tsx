@@ -171,7 +171,11 @@ export default function FactoryCustomerStatement() {
 
   const deletePriceMutation = useMutation({
     mutationFn: async (articleCode: string) => {
-      return await factoryApiRequest("DELETE", `/api/factory/customer-price-lists/${customerId}/${encodeURIComponent(articleCode)}`, {});
+      return await factoryApiRequest(
+        "DELETE",
+        `/api/factory/customer-price-lists/${customerId}/${encodeURIComponent(articleCode)}`,
+        {}
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-price-lists", customerId] });
@@ -241,15 +245,22 @@ export default function FactoryCustomerStatement() {
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: "" });
         const lines: { articleCode: string; pricePerBale: string | number }[] = [];
         for (const row of rows) {
-          const code = String(row["article_code"] ?? row["Article Code"] ?? row["ARTICLE_CODE"] ?? row["code"] ?? "").trim();
-          const price = row["price"] ?? row["price_per_bale"] ?? row["Price"] ?? row["Price Per Bale"] ?? row["PRICE"] ?? "";
+          const code = String(
+            row["article_code"] ?? row["Article Code"] ?? row["ARTICLE_CODE"] ?? row["code"] ?? ""
+          ).trim();
+          const price =
+            row["price"] ?? row["price_per_bale"] ?? row["Price"] ?? row["Price Per Bale"] ?? row["PRICE"] ?? "";
           if (code && price !== "") {
             const p = parseFloat(String(price));
             if (!isNaN(p) && p > 0) lines.push({ articleCode: code, pricePerBale: p });
           }
         }
         if (lines.length === 0) {
-          toast({ title: "No valid rows found", description: 'Excel must have columns: article_code, price', variant: "destructive" });
+          toast({
+            title: "No valid rows found",
+            description: "Excel must have columns: article_code, price",
+            variant: "destructive",
+          });
           return;
         }
         savePricesMutation.mutate(lines);
@@ -295,8 +306,15 @@ export default function FactoryCustomerStatement() {
   if (!statement) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
-        <p className="text-muted-foreground" data-testid="text-not-found">Customer not found</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate("/factory/customers")} data-testid="button-back">
+        <p className="text-muted-foreground" data-testid="text-not-found">
+          Customer not found
+        </p>
+        <Button
+          variant="outline"
+          className="mt-4"
+          onClick={() => navigate("/factory/customers")}
+          data-testid="button-back"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Customers
         </Button>
@@ -338,7 +356,10 @@ export default function FactoryCustomerStatement() {
               if (filterDestination) params.set("destination", filterDestination);
               const qs = params.toString();
               const url = `/api/factory/customers/${customerId}/statement/export-pdf${qs ? `?${qs}` : ""}`;
-              if (!navigator.onLine) { window.print(); return; }
+              if (!navigator.onLine) {
+                window.print();
+                return;
+              }
               window.open(url, "_blank");
             }}
             data-testid="button-export-pdf"
@@ -372,7 +393,9 @@ export default function FactoryCustomerStatement() {
           <p className="text-2xl font-bold font-mono" data-testid="text-current-balance">
             {fmtMoney(currentBalance)}
           </p>
-          <Badge variant="outline" className="mt-1 text-xs" data-testid="badge-balance-side">{currentBalanceSide}</Badge>
+          <Badge variant="outline" className="mt-1 text-xs" data-testid="badge-balance-side">
+            {currentBalanceSide}
+          </Badge>
         </div>
         {hasOpeningBalance && (
           <div className="rounded-xl border p-4">
@@ -380,23 +403,32 @@ export default function FactoryCustomerStatement() {
             <p className="text-xl font-semibold font-mono" data-testid="text-opening-balance">
               {fmtMoney(Number(openingBalance || 0))}
             </p>
-            <Badge variant="outline" className="mt-1 text-xs">{openingBalanceSide}</Badge>
+            <Badge variant="outline" className="mt-1 text-xs">
+              {openingBalanceSide}
+            </Badge>
           </div>
         )}
         <div className="rounded-xl border p-4">
           <p className="text-xs text-muted-foreground mb-1">Total Invoices</p>
-          <p className="text-2xl font-bold" data-testid="text-total-invoices">{statement.invoices.length}</p>
+          <p className="text-2xl font-bold" data-testid="text-total-invoices">
+            {statement.invoices.length}
+          </p>
         </div>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="statement" className="flex-1">
         <TabsList className="mb-4">
-          <TabsTrigger value="statement" data-testid="tab-statement">Statement</TabsTrigger>
+          <TabsTrigger value="statement" data-testid="tab-statement">
+            Statement
+          </TabsTrigger>
           <TabsTrigger value="pricelist" data-testid="tab-pricelist">
             Price List
             {(priceListQuery.data?.length ?? 0) > 0 && (
-              <Badge variant="secondary" className="ml-2 text-[10px] no-default-hover-elevate no-default-active-elevate">
+              <Badge
+                variant="secondary"
+                className="ml-2 text-[10px] no-default-hover-elevate no-default-active-elevate"
+              >
                 {priceListQuery.data!.length}
               </Badge>
             )}
@@ -441,7 +473,11 @@ export default function FactoryCustomerStatement() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setFilterDestination(""); setFilterDateFrom(""); setFilterDateTo(""); }}
+                onClick={() => {
+                  setFilterDestination("");
+                  setFilterDateFrom("");
+                  setFilterDateTo("");
+                }}
                 data-testid="button-clear-filters"
               >
                 <X className="h-4 w-4 mr-1" />
@@ -480,23 +516,49 @@ export default function FactoryCustomerStatement() {
             <Table>
               <TableHeader className="sticky top-0 z-30">
                 <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Date</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Type</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Container</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Destination</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Bales</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Kg</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Debit</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Credit</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Balance</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Side</TableHead>
-                  <TableHead className="min-w-[160px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Note</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Date
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Type
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Container
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Destination
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Bales
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Kg
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Debit
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Credit
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Balance
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Side
+                  </TableHead>
+                  <TableHead className="min-w-[160px] text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Note
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredHistory.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-muted-foreground py-8" data-testid="text-no-transactions">
+                    <TableCell
+                      colSpan={11}
+                      className="text-center text-muted-foreground py-8"
+                      data-testid="text-no-transactions"
+                    >
                       {hasFilters ? "No rows match the current filters" : "No transactions yet"}
                     </TableCell>
                   </TableRow>
@@ -504,58 +566,86 @@ export default function FactoryCustomerStatement() {
                   filteredHistory.map((entry) => {
                     const isInvoice = entry.referenceType === "INVOICE" && entry.referenceId;
                     return (
-                    <TableRow
-                      key={entry.id}
-                      data-testid={`row-balance-${entry.id}`}
-                      className={isInvoice ? "cursor-pointer hover-elevate" : undefined}
-                      onClick={isInvoice ? () => navigate(`/factory/sales/invoices/${entry.referenceId}`) : undefined}
-                    >
-                      <TableCell className="text-sm font-mono whitespace-nowrap" data-testid={`text-balance-date-${entry.id}`}>
-                        {entry.transactionDate ? formatDisplayDate(entry.transactionDate) : "-"}
-                      </TableCell>
-                      <TableCell data-testid={`text-balance-type-${entry.id}`}>
-                        <div className="flex items-center gap-1.5">
-                          <Badge variant="outline" className="text-xs">{entry.transactionType}</Badge>
-                          {isInvoice && <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm font-mono text-muted-foreground whitespace-nowrap" data-testid={`text-balance-container-${entry.id}`}>
-                        {entry.containerNumber || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-balance-destination-${entry.id}`}>
-                        {entry.destination || "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-bales-${entry.id}`}>
-                        {entry.totalQtyBales != null ? fmtNum(entry.totalQtyBales) : "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-kg-${entry.id}`}>
-                        {entry.totalWeightKg != null ? fmtNum(entry.totalWeightKg) : "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-debit-${entry.id}`}>
-                        {Number(entry.debitAmount || 0) > 0 ? fmtMoney(Number(entry.debitAmount)) : "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-credit-${entry.id}`}>
-                        {Number(entry.creditAmount || 0) > 0 ? fmtMoney(Number(entry.creditAmount)) : "-"}
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-semibold" data-testid={`text-balance-running-${entry.id}`}>
-                        {fmtMoney(Math.abs(entry.runningBalance))}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`text-xs font-semibold ${drCrClass(entry.runningBalanceSide)}`}>{entry.runningBalanceSide}</Badge>
-                      </TableCell>
-                      <TableCell className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="text"
-                          value={rowNotes[entry.id] ?? ""}
-                          onChange={(e) => setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
-                          onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
-                          placeholder="Add note…"
-                          disabled={savingRowNote === entry.id}
-                          className="w-full text-xs bg-transparent border border-border rounded px-2 py-1 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-                          data-testid={`input-row-note-${entry.id}`}
-                        />
-                      </TableCell>
-                    </TableRow>
+                      <TableRow
+                        key={entry.id}
+                        data-testid={`row-balance-${entry.id}`}
+                        className={isInvoice ? "cursor-pointer hover-elevate" : undefined}
+                        onClick={isInvoice ? () => navigate(`/factory/sales/invoices/${entry.referenceId}`) : undefined}
+                      >
+                        <TableCell
+                          className="text-sm font-mono whitespace-nowrap"
+                          data-testid={`text-balance-date-${entry.id}`}
+                        >
+                          {entry.transactionDate ? formatDisplayDate(entry.transactionDate) : "-"}
+                        </TableCell>
+                        <TableCell data-testid={`text-balance-type-${entry.id}`}>
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="outline" className="text-xs">
+                              {entry.transactionType}
+                            </Badge>
+                            {isInvoice && <ExternalLink className="h-3 w-3 text-muted-foreground shrink-0" />}
+                          </div>
+                        </TableCell>
+                        <TableCell
+                          className="text-sm font-mono text-muted-foreground whitespace-nowrap"
+                          data-testid={`text-balance-container-${entry.id}`}
+                        >
+                          {entry.containerNumber || "-"}
+                        </TableCell>
+                        <TableCell
+                          className="text-sm text-muted-foreground"
+                          data-testid={`text-balance-destination-${entry.id}`}
+                        >
+                          {entry.destination || "-"}
+                        </TableCell>
+                        <TableCell
+                          className="text-right font-mono text-sm"
+                          data-testid={`text-balance-bales-${entry.id}`}
+                        >
+                          {entry.totalQtyBales != null ? fmtNum(entry.totalQtyBales) : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm" data-testid={`text-balance-kg-${entry.id}`}>
+                          {entry.totalWeightKg != null ? fmtNum(entry.totalWeightKg) : "-"}
+                        </TableCell>
+                        <TableCell
+                          className="text-right font-mono text-sm"
+                          data-testid={`text-balance-debit-${entry.id}`}
+                        >
+                          {Number(entry.debitAmount || 0) > 0 ? fmtMoney(Number(entry.debitAmount)) : "-"}
+                        </TableCell>
+                        <TableCell
+                          className="text-right font-mono text-sm"
+                          data-testid={`text-balance-credit-${entry.id}`}
+                        >
+                          {Number(entry.creditAmount || 0) > 0 ? fmtMoney(Number(entry.creditAmount)) : "-"}
+                        </TableCell>
+                        <TableCell
+                          className="text-right font-mono font-semibold"
+                          data-testid={`text-balance-running-${entry.id}`}
+                        >
+                          {fmtMoney(Math.abs(entry.runningBalance))}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={`text-xs font-semibold ${drCrClass(entry.runningBalanceSide)}`}
+                          >
+                            {entry.runningBalanceSide}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="min-w-[160px]" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={rowNotes[entry.id] ?? ""}
+                            onChange={(e) => setRowNotes((prev) => ({ ...prev, [entry.id]: e.target.value }))}
+                            onBlur={() => saveRowNote(entry.id, rowNotes[entry.id] ?? "")}
+                            placeholder="Add note…"
+                            disabled={savingRowNote === entry.id}
+                            className="w-full text-xs bg-transparent border border-border rounded px-2 py-1 placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                            data-testid={`input-row-note-${entry.id}`}
+                          />
+                        </TableCell>
+                      </TableRow>
                     );
                   })
                 )}
@@ -631,10 +721,18 @@ export default function FactoryCustomerStatement() {
             <Table>
               <TableHeader className="sticky top-0 z-30">
                 <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Article Code</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Name</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Price per Bale ($)</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Last Updated</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Article Code
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Name
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Price per Bale ($)
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                    Last Updated
+                  </TableHead>
                   <TableHead className="w-[50px] py-2"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -647,26 +745,35 @@ export default function FactoryCustomerStatement() {
                   </TableRow>
                 ) : (priceListQuery.data ?? []).length === 0 && !newCode ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8" data-testid="text-no-prices">
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-muted-foreground py-8"
+                      data-testid="text-no-prices"
+                    >
                       No prices set yet. Upload an Excel file or add manually below.
                     </TableCell>
                   </TableRow>
                 ) : (
                   (priceListQuery.data ?? []).map((entry) => (
                     <TableRow key={entry.article_code} data-testid={`row-price-${entry.article_code}`}>
-                      <TableCell className="font-mono text-sm font-medium" data-testid={`text-price-code-${entry.article_code}`}>
+                      <TableCell
+                        className="font-mono text-sm font-medium"
+                        data-testid={`text-price-code-${entry.article_code}`}
+                      >
                         {entry.article_code}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {entry.item_name || "-"}
-                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{entry.item_name || "-"}</TableCell>
                       <TableCell className="text-right">
                         <Input
                           type="number"
                           step="0.01"
                           min="0"
-                          value={priceEdits[entry.article_code] !== undefined ? priceEdits[entry.article_code] : entry.price_per_bale}
-                          onChange={(e) => setPriceEdits(prev => ({ ...prev, [entry.article_code]: e.target.value }))}
+                          value={
+                            priceEdits[entry.article_code] !== undefined
+                              ? priceEdits[entry.article_code]
+                              : entry.price_per_bale
+                          }
+                          onChange={(e) => setPriceEdits((prev) => ({ ...prev, [entry.article_code]: e.target.value }))}
                           onBlur={() => {
                             if (priceEdits[entry.article_code] !== undefined) {
                               handleSavePrices();
@@ -736,8 +843,9 @@ export default function FactoryCustomerStatement() {
           </div>
 
           <p className="text-xs text-muted-foreground mt-3">
-            Excel format: columns named <span className="font-mono">article_code</span> and <span className="font-mono">price</span> (or <span className="font-mono">price_per_bale</span>).
-            Prices are also auto-saved when you create a proforma with prices set.
+            Excel format: columns named <span className="font-mono">article_code</span> and{" "}
+            <span className="font-mono">price</span> (or <span className="font-mono">price_per_bale</span>). Prices are
+            also auto-saved when you create a proforma with prices set.
           </p>
         </TabsContent>
       </Tabs>

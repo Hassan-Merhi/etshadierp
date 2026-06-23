@@ -2,32 +2,13 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
 import { Plus, Trash2, Layers, Package } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -87,7 +68,8 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
   // Fetch current sources for this batch
   const { data: currentSources, isLoading: sourcesLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/mix-batches", batch?.id, "sources"],
-    queryFn: () => fetch(`/api/factory/mix-batches/${batch!.id}/sources`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () =>
+      fetch(`/api/factory/mix-batches/${batch!.id}/sources`, { credentials: "include" }).then((r) => r.json()),
     enabled: open && !!batch,
   });
 
@@ -97,7 +79,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
 
     setBatchName(batch.name || "");
     setNotes((batch as any).notes || "");
-    setBatchDate((batch as any).batchDate || new Date().toLocaleDateString('en-CA'));
+    setBatchDate((batch as any).batchDate || new Date().toLocaleDateString("en-CA"));
 
     // Aggregate supplier sources by supplierId
     const supplierMap = new Map<number, { weightKg: number; costPerKg: number; label: string; availableKg: number }>();
@@ -106,10 +88,8 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
     for (const src of currentSources) {
       if (src.sourceBatchId) {
         // Batch source
-        const srcBatch = existingBatches?.find(b => b.id === src.sourceBatchId);
-        const existingRemaining = srcBatch
-          ? parseFloat(srcBatch.totalWeightKg) - parseFloat(srcBatch.usedKg)
-          : 0;
+        const srcBatch = existingBatches?.find((b) => b.id === src.sourceBatchId);
+        const existingRemaining = srcBatch ? parseFloat(srcBatch.totalWeightKg) - parseFloat(srcBatch.usedKg) : 0;
         batchSourceList.push({
           type: "batch",
           sourceId: src.sourceBatchId,
@@ -123,7 +103,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
       } else if (src.supplierId) {
         // Supplier source (may span multiple containers — aggregate by supplierId)
         const existing = supplierMap.get(src.supplierId);
-        const stockRow = supplierStock.find(s => s.supplierId === src.supplierId);
+        const stockRow = supplierStock.find((s) => s.supplierId === src.supplierId);
         // Available = current remaining + what was consumed (returns on edit)
         const currentRemaining = stockRow ? parseFloat(stockRow.remainingKg) : 0;
         const srcWeight = parseFloat(src.weightKg);
@@ -170,30 +150,30 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
     }
   }, [open]);
 
-  const availableSuppliers = supplierStock?.filter(s =>
-    s.supplierId !== null &&
-    !selectedSources.some(sel => sel.type === "supplier" && sel.sourceId === s.supplierId!)
+  const availableSuppliers = supplierStock?.filter(
+    (s) =>
+      s.supplierId !== null && !selectedSources.some((sel) => sel.type === "supplier" && sel.sourceId === s.supplierId!)
   );
 
-  const availableBatchesForSource = existingBatches?.filter(b => {
+  const availableBatchesForSource = existingBatches?.filter((b) => {
     if (b.id === batch?.id) return false; // can't use self as source
     const remaining = parseFloat(b.totalWeightKg) - parseFloat(b.usedKg);
     return (
       remaining > 0.001 &&
       (b.status === "ACTIVE" || b.status === "OPEN" || b.status === "CARRY_FORWARD") &&
-      !selectedSources.some(sel => sel.type === "batch" && sel.sourceId === b.id)
+      !selectedSources.some((sel) => sel.type === "batch" && sel.sourceId === b.id)
     );
   });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       const supplierSourcesPayload = selectedSources
-        .filter(s => s.type === "supplier")
-        .map(s => ({ supplierId: s.sourceId, weightKg: s.weightKg.toString(), costPerKg: s.costPerKg.toString() }));
+        .filter((s) => s.type === "supplier")
+        .map((s) => ({ supplierId: s.sourceId, weightKg: s.weightKg.toString(), costPerKg: s.costPerKg.toString() }));
 
       const batchSourcesPayload = selectedSources
-        .filter(s => s.type === "batch")
-        .map(s => ({ sourceBatchId: s.sourceId, weightKg: s.weightKg.toString() }));
+        .filter((s) => s.type === "batch")
+        .map((s) => ({ sourceBatchId: s.sourceId, weightKg: s.weightKg.toString() }));
 
       const res = await fetch(`/api/factory/mix-batches/${batch!.id}`, {
         method: "PATCH",
@@ -228,14 +208,14 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
   const handleSourceIdChange = (id: string) => {
     setSelectedSourceId(id);
     if (addSourceType === "supplier") {
-      const stock = supplierStock?.find(s => s.supplierId?.toString() === id);
+      const stock = supplierStock?.find((s) => s.supplierId?.toString() === id);
       if (stock) {
         // Only prefill if remaining is positive; leave blank for over-use scenarios
         const rem = parseFloat(stock.remainingKg);
         setWeightInput(rem > 0 ? stock.remainingKg : "");
       }
     } else {
-      const b = existingBatches?.find(b => b.id.toString() === id);
+      const b = existingBatches?.find((b) => b.id.toString() === id);
       if (b) {
         const remaining = parseFloat(b.totalWeightKg) - parseFloat(b.usedKg);
         setWeightInput(remaining > 0 ? remaining.toFixed(3) : "");
@@ -245,38 +225,66 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
 
   const handleAddSource = () => {
     if (!selectedSourceId || !weightInput) {
-      toast({ title: "Missing information", description: "Please select a source and enter weight", variant: "destructive" });
+      toast({
+        title: "Missing information",
+        description: "Please select a source and enter weight",
+        variant: "destructive",
+      });
       return;
     }
     const weight = parseFloat(weightInput);
     if (isNaN(weight) || weight <= 0) {
-      toast({ title: "Invalid weight", description: "Please enter a valid weight greater than 0", variant: "destructive" });
+      toast({
+        title: "Invalid weight",
+        description: "Please enter a valid weight greater than 0",
+        variant: "destructive",
+      });
       return;
     }
 
     if (addSourceType === "supplier") {
-      const stock = supplierStock?.find(s => s.supplierId?.toString() === selectedSourceId);
+      const stock = supplierStock?.find((s) => s.supplierId?.toString() === selectedSourceId);
       if (!stock || !stock.supplierId) return;
       const available = parseFloat(stock.remainingKg);
       // Over-use allowed: no guard on weight > available
       const costPerKg = parseFloat(stock.costPerKg);
-      setSelectedSources(prev => [...prev, {
-        type: "supplier", sourceId: stock.supplierId!, label: stock.supplierName,
-        weightKg: weight, costPerKg, totalCost: weight * costPerKg, availableKg: available,
-      }]);
+      setSelectedSources((prev) => [
+        ...prev,
+        {
+          type: "supplier",
+          sourceId: stock.supplierId!,
+          label: stock.supplierName,
+          weightKg: weight,
+          costPerKg,
+          totalCost: weight * costPerKg,
+          availableKg: available,
+        },
+      ]);
     } else {
-      const b = existingBatches?.find(b => b.id.toString() === selectedSourceId);
+      const b = existingBatches?.find((b) => b.id.toString() === selectedSourceId);
       if (!b) return;
       const available = parseFloat(b.totalWeightKg) - parseFloat(b.usedKg);
       if (weight > available + 0.001) {
-        toast({ title: "Exceeds available", description: `Only ${formatNumber(available)} kg available in this batch`, variant: "destructive" });
+        toast({
+          title: "Exceeds available",
+          description: `Only ${formatNumber(available)} kg available in this batch`,
+          variant: "destructive",
+        });
         return;
       }
       const costPerKg = parseFloat(b.costPerKg);
-      setSelectedSources(prev => [...prev, {
-        type: "batch", sourceId: b.id, label: b.name || b.batchCode,
-        weightKg: weight, costPerKg, totalCost: weight * costPerKg, availableKg: available,
-      }]);
+      setSelectedSources((prev) => [
+        ...prev,
+        {
+          type: "batch",
+          sourceId: b.id,
+          label: b.name || b.batchCode,
+          weightKg: weight,
+          costPerKg,
+          totalCost: weight * costPerKg,
+          availableKg: available,
+        },
+      ]);
     }
     setSelectedSourceId("");
     setWeightInput("");
@@ -285,16 +293,18 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
   const handleUpdateSourceWeight = (type: string, sourceId: number, newWeight: string) => {
     const weight = parseFloat(newWeight);
     if (isNaN(weight) || weight <= 0) return;
-    setSelectedSources(prev => prev.map(s => {
-      if (s.type === type && s.sourceId === sourceId) {
-        return { ...s, weightKg: weight, totalCost: weight * s.costPerKg };
-      }
-      return s;
-    }));
+    setSelectedSources((prev) =>
+      prev.map((s) => {
+        if (s.type === type && s.sourceId === sourceId) {
+          return { ...s, weightKg: weight, totalCost: weight * s.costPerKg };
+        }
+        return s;
+      })
+    );
   };
 
   const handleRemoveSource = (type: string, sourceId: number) => {
-    setSelectedSources(prev => prev.filter(s => !(s.type === type && s.sourceId === sourceId)));
+    setSelectedSources((prev) => prev.filter((s) => !(s.type === type && s.sourceId === sourceId)));
   };
 
   const totalWeight = selectedSources.reduce((s, x) => s + x.weightKg, 0);
@@ -310,7 +320,8 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
         <DialogHeader>
           <DialogTitle>Edit Mix Batch — {batch?.batchCode}</DialogTitle>
           <DialogDescription>
-            Change the raw material sources. Old consumption will be reversed and new amounts will be consumed. Already-produced bales ({formatNumber(currentUsedKg)} kg used) must remain covered.
+            Change the raw material sources. Old consumption will be reversed and new amounts will be consumed.
+            Already-produced bales ({formatNumber(currentUsedKg)} kg used) must remain covered.
           </DialogDescription>
         </DialogHeader>
 
@@ -328,7 +339,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                 <Label>Batch Name</Label>
                 <Input
                   value={batchName}
-                  onChange={e => setBatchName(e.target.value)}
+                  onChange={(e) => setBatchName(e.target.value)}
                   placeholder={batch?.batchCode || ""}
                   data-testid="input-edit-batch-name"
                 />
@@ -338,7 +349,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                 <Input
                   type="date"
                   value={batchDate}
-                  onChange={e => setBatchDate(e.target.value)}
+                  onChange={(e) => setBatchDate(e.target.value)}
                   data-testid="input-edit-batch-date"
                 />
               </div>
@@ -352,7 +363,11 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                   type="button"
                   variant={addSourceType === "supplier" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => { setAddSourceType("supplier"); setSelectedSourceId(""); setWeightInput(""); }}
+                  onClick={() => {
+                    setAddSourceType("supplier");
+                    setSelectedSourceId("");
+                    setWeightInput("");
+                  }}
                   data-testid="button-source-type-supplier"
                 >
                   <Package className="h-3 w-3 mr-1" /> Supplier Stock
@@ -361,7 +376,11 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                   type="button"
                   variant={addSourceType === "batch" ? "default" : "outline"}
                   size="sm"
-                  onClick={() => { setAddSourceType("batch"); setSelectedSourceId(""); setWeightInput(""); }}
+                  onClick={() => {
+                    setAddSourceType("batch");
+                    setSelectedSourceId("");
+                    setWeightInput("");
+                  }}
                   data-testid="button-source-type-batch"
                 >
                   <Layers className="h-3 w-3 mr-1" /> Existing Batch
@@ -375,13 +394,16 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                       <SelectValue placeholder="Select supplier" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableSuppliers?.map(stock => (
+                      {availableSuppliers?.map((stock) => (
                         <SelectItem key={stock.supplierId!} value={stock.supplierId!.toString()}>
-                          {stock.supplierName} ({formatNumber(parseFloat(stock.remainingKg))} kg @ ${parseFloat(stock.costPerKg).toFixed(4)}/kg)
+                          {stock.supplierName} ({formatNumber(parseFloat(stock.remainingKg))} kg @ $
+                          {parseFloat(stock.costPerKg).toFixed(4)}/kg)
                         </SelectItem>
                       ))}
                       {(!availableSuppliers || availableSuppliers.length === 0) && (
-                        <SelectItem value="__none__" disabled>No supplier stock available</SelectItem>
+                        <SelectItem value="__none__" disabled>
+                          No supplier stock available
+                        </SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -391,16 +413,19 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                       <SelectValue placeholder="Select batch" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableBatchesForSource?.map(b => {
+                      {availableBatchesForSource?.map((b) => {
                         const remaining = parseFloat(b.totalWeightKg) - parseFloat(b.usedKg);
                         return (
                           <SelectItem key={b.id} value={b.id.toString()}>
-                            {b.name || b.batchCode} ({formatNumber(remaining)} kg @ ${parseFloat(b.costPerKg).toFixed(4)}/kg)
+                            {b.name || b.batchCode} ({formatNumber(remaining)} kg @ $
+                            {parseFloat(b.costPerKg).toFixed(4)}/kg)
                           </SelectItem>
                         );
                       })}
                       {(!availableBatchesForSource || availableBatchesForSource.length === 0) && (
-                        <SelectItem value="__none__" disabled>No active batches available</SelectItem>
+                        <SelectItem value="__none__" disabled>
+                          No active batches available
+                        </SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -410,7 +435,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                   type="number"
                   placeholder="Weight (kg)"
                   value={weightInput}
-                  onChange={e => setWeightInput(e.target.value)}
+                  onChange={(e) => setWeightInput(e.target.value)}
                   step="0.001"
                   data-testid="input-source-weight"
                 />
@@ -441,7 +466,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedSources.map(sel => (
+                    {selectedSources.map((sel) => (
                       <TableRow key={`${sel.type}-${sel.sourceId}`}>
                         <TableCell>
                           <Badge variant={sel.type === "batch" ? "secondary" : "outline"}>
@@ -456,7 +481,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
                             value={sel.weightKg}
                             step="0.001"
                             min="0.001"
-                            onChange={e => handleUpdateSourceWeight(sel.type, sel.sourceId, e.target.value)}
+                            onChange={(e) => handleUpdateSourceWeight(sel.type, sel.sourceId, e.target.value)}
                             data-testid={`input-weight-${sel.type}-${sel.sourceId}`}
                           />
                         </TableCell>
@@ -506,7 +531,7 @@ export function EditMixBatchDialog({ batch, open, onOpenChange }: EditMixBatchDi
               <Label>Notes</Label>
               <Textarea
                 value={notes}
-                onChange={e => setNotes(e.target.value)}
+                onChange={(e) => setNotes(e.target.value)}
                 placeholder="Optional notes..."
                 rows={2}
                 data-testid="input-edit-batch-notes"

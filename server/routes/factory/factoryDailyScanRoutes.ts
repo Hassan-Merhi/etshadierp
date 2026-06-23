@@ -3,7 +3,6 @@ import { pool } from "../../db";
 import { requireAuth } from "../../auth";
 
 export function registerFactoryDailyScanRoutes(app: Express) {
-
   // All bales produced on a given date (for verification UI)
   app.get("/api/factory/daily-bale-scans/produced", requireAuth, async (req: any, res: any) => {
     try {
@@ -25,7 +24,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
          FROM factory_bales fb
          WHERE fb.company_id = $1 AND fb.stock_entry_date = $2
          ORDER BY fb.id ASC`,
-        [companyId, date],
+        [companyId, date]
       );
       return res.json(result.rows);
     } catch (e: any) {
@@ -44,7 +43,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
          WHERE company_id = $1
          GROUP BY scan_date
          ORDER BY scan_date DESC`,
-        [companyId],
+        [companyId]
       );
       return res.json(result.rows);
     } catch (e: any) {
@@ -65,7 +64,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
          FROM factory_daily_bale_scans
          WHERE company_id = $1 AND scan_date = $2
          ORDER BY scanned_at ASC`,
-        [companyId, date],
+        [companyId, date]
       );
       return res.json(result.rows);
     } catch (e: any) {
@@ -89,7 +88,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       const baleCheck = await pool.query(
         `SELECT id FROM factory_bales
          WHERE company_id = $1 AND stock_entry_date = $2 AND reference_number = $3 AND deleted_at IS NULL`,
-        [companyId, scanDate, ref],
+        [companyId, scanDate, ref]
       );
       if (!baleCheck.rowCount || baleCheck.rowCount === 0) {
         return res.status(422).json({ message: `Bale ${ref} was not produced on ${scanDate}` });
@@ -98,7 +97,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       // Check for duplicate scan
       const existing = await pool.query(
         `SELECT id FROM factory_daily_bale_scans WHERE company_id = $1 AND scan_date = $2 AND reference_number = $3`,
-        [companyId, scanDate, ref],
+        [companyId, scanDate, ref]
       );
       if (existing.rowCount && existing.rowCount > 0) {
         return res.status(409).json({ message: "This bale has already been scanned for this day" });
@@ -110,7 +109,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id, company_id, scan_date::text AS scan_date, reference_number, article_code,
                    product_name, weight_kg, scanned_at, scanned_by_user_id`,
-        [companyId, scanDate, ref, articleCode || null, productName || null, weightKg || null, userId],
+        [companyId, scanDate, ref, articleCode || null, productName || null, weightKg || null, userId]
       );
       return res.status(201).json(result.rows[0]);
     } catch (e: any) {
@@ -125,10 +124,7 @@ export function registerFactoryDailyScanRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id, 10);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
-      await pool.query(
-        `DELETE FROM factory_daily_bale_scans WHERE id = $1 AND company_id = $2`,
-        [id, companyId],
-      );
+      await pool.query(`DELETE FROM factory_daily_bale_scans WHERE id = $1 AND company_id = $2`, [id, companyId]);
       return res.json({ success: true });
     } catch (e: any) {
       return res.status(500).json({ message: e.message });

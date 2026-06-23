@@ -1,5 +1,5 @@
 export async function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export interface RetryResult<T> {
@@ -46,7 +46,9 @@ export async function retryAsync<T>(options: {
       }
     } catch (err: any) {
       lastError = err;
-      console.log(`[${options.label}] Attempt ${attempt} threw: ${err?.message}. ${attempt < options.attempts ? `Waiting ${options.delayMs / 1000}s...` : "No more retries."}`);
+      console.log(
+        `[${options.label}] Attempt ${attempt} threw: ${err?.message}. ${attempt < options.attempts ? `Waiting ${options.delayMs / 1000}s...` : "No more retries."}`
+      );
       if (attempt < options.attempts) {
         await delay(options.delayMs);
       }

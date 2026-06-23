@@ -3,14 +3,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -115,9 +108,10 @@ export default function InventoryRepair() {
       setValueRepairState("previewed");
       toast({
         title: "Preview Complete",
-        description: data.rows.length > 0
-          ? `Found ${data.rows.length} corrupted inventory value row(s).`
-          : "No corrupted inventory rows found.",
+        description:
+          data.rows.length > 0
+            ? `Found ${data.rows.length} corrupted inventory value row(s).`
+            : "No corrupted inventory rows found.",
       });
     } catch (error: any) {
       toast({
@@ -153,14 +147,17 @@ export default function InventoryRepair() {
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-6">
       <div>
-        <PageHeader title="Inventory Repair Tool" subtitle="Recalculates expected inventory by replaying all voucher-backed operations and compares with current stock levels." />
+        <PageHeader
+          title="Inventory Repair Tool"
+          subtitle="Recalculates expected inventory by replaying all voucher-backed operations and compares with current stock levels."
+        />
       </div>
 
       <Alert>
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription>
-          Quick adjustments (manual add/subtract) are not backed by vouchers and cannot be replayed.
-          If you have used quick adjustments, those quantities may appear as discrepancies — review carefully before applying fixes.
+          Quick adjustments (manual add/subtract) are not backed by vouchers and cannot be replayed. If you have used
+          quick adjustments, those quantities may appear as discrepancies — review carefully before applying fixes.
         </AlertDescription>
       </Alert>
 
@@ -168,7 +165,8 @@ export default function InventoryRepair() {
         <CardHeader>
           <CardTitle>Run Inventory Audit</CardTitle>
           <CardDescription>
-            Preview discrepancies first, then apply fixes if needed. The tool also detects and corrects stale transfer flags that could cause future issues.
+            Preview discrepancies first, then apply fixes if needed. The tool also detects and corrects stale transfer
+            flags that could cause future issues.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
@@ -205,17 +203,15 @@ export default function InventoryRepair() {
                   calculated from all voucher-backed operations. This action cannot be automatically undone.
                   {result && result.staleFlagsFound > 0 && (
                     <span className="block mt-2 font-medium">
-                      Additionally, {result.staleFlagsFound} stale transfer flags will be corrected to prevent future issues.
+                      Additionally, {result.staleFlagsFound} stale transfer flags will be corrected to prevent future
+                      issues.
                     </span>
                   )}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel data-testid="button-cancel-fix">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => runRebuild(false)}
-                  data-testid="button-confirm-fix"
-                >
+                <AlertDialogAction onClick={() => runRebuild(false)} data-testid="button-confirm-fix">
                   Yes, Apply Fixes
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -233,22 +229,36 @@ export default function InventoryRepair() {
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground" data-testid="text-label-total-records">Total Records Checked</p>
-                  <p className="text-2xl font-bold" data-testid="text-total-records">{result.totalInventoryRecords}</p>
+                  <p className="text-sm text-muted-foreground" data-testid="text-label-total-records">
+                    Total Records Checked
+                  </p>
+                  <p className="text-2xl font-bold" data-testid="text-total-records">
+                    {result.totalInventoryRecords}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground" data-testid="text-label-discrepancies">Discrepancies Found</p>
+                  <p className="text-sm text-muted-foreground" data-testid="text-label-discrepancies">
+                    Discrepancies Found
+                  </p>
                   <p className="text-2xl font-bold" data-testid="text-discrepancies-count">
                     {result.discrepanciesFound}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground" data-testid="text-label-stale-flags">Stale Transfer Flags</p>
-                  <p className="text-2xl font-bold" data-testid="text-stale-flags">{result.staleFlagsFound}</p>
+                  <p className="text-sm text-muted-foreground" data-testid="text-label-stale-flags">
+                    Stale Transfer Flags
+                  </p>
+                  <p className="text-2xl font-bold" data-testid="text-stale-flags">
+                    {result.staleFlagsFound}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground" data-testid="text-label-fixes">Fixes Applied</p>
-                  <p className="text-2xl font-bold" data-testid="text-fixes-applied">{result.fixesApplied}</p>
+                  <p className="text-sm text-muted-foreground" data-testid="text-label-fixes">
+                    Fixes Applied
+                  </p>
+                  <p className="text-2xl font-bold" data-testid="text-fixes-applied">
+                    {result.fixesApplied}
+                  </p>
                 </div>
               </div>
 
@@ -256,7 +266,8 @@ export default function InventoryRepair() {
                 <Alert className="mt-4">
                   <CheckCircle className="h-4 w-4" />
                   <AlertDescription>
-                    Successfully applied {result.fixesApplied} inventory corrections and fixed {result.staleFlagsFixed} stale transfer flags.
+                    Successfully applied {result.fixesApplied} inventory corrections and fixed {result.staleFlagsFixed}{" "}
+                    stale transfer flags.
                   </AlertDescription>
                 </Alert>
               )}
@@ -268,7 +279,9 @@ export default function InventoryRepair() {
               <CardHeader>
                 <CardTitle>
                   {mode === "applied" ? "Corrections Made" : "Discrepancies"}
-                  <Badge variant="secondary" className="ml-2">{result.discrepancies.length}</Badge>
+                  <Badge variant="secondary" className="ml-2">
+                    {result.discrepancies.length}
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -299,8 +312,15 @@ export default function InventoryRepair() {
                             {d.expectedQty.toFixed(3)}
                           </TableCell>
                           <TableCell className="text-right" data-testid={`text-difference-${i}`}>
-                            <span className={d.difference > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                              {d.difference > 0 ? "+" : ""}{d.difference.toFixed(3)}
+                            <span
+                              className={
+                                d.difference > 0
+                                  ? "text-green-600 dark:text-green-400"
+                                  : "text-red-600 dark:text-red-400"
+                              }
+                            >
+                              {d.difference > 0 ? "+" : ""}
+                              {d.difference.toFixed(3)}
                             </span>
                           </TableCell>
                           <TableCell className="text-right" data-testid={`text-current-value-${i}`}>
@@ -322,8 +342,12 @@ export default function InventoryRepair() {
             <Card>
               <CardContent className="py-8 text-center">
                 <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
-                <p className="text-lg font-medium" data-testid="text-no-discrepancies">No discrepancies found</p>
-                <p className="text-muted-foreground mt-1">Inventory quantities match expected values from all voucher-backed operations.</p>
+                <p className="text-lg font-medium" data-testid="text-no-discrepancies">
+                  No discrepancies found
+                </p>
+                <p className="text-muted-foreground mt-1">
+                  Inventory quantities match expected values from all voucher-backed operations.
+                </p>
               </CardContent>
             </Card>
           )}
@@ -337,7 +361,8 @@ export default function InventoryRepair() {
             Inventory Value Repair
           </CardTitle>
           <CardDescription>
-            Detects inventory rows with corrupted valuation (negative rates, value on zero-quantity rows, etc.) and lets you repair them safely.
+            Detects inventory rows with corrupted valuation (negative rates, value on zero-quantity rows, etc.) and lets
+            you repair them safely.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
@@ -374,16 +399,13 @@ export default function InventoryRepair() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Confirm Value Repair</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will update {valueRepairRows.length} inventory row(s) to correct their average rate and total value.
-                  Quantities will not be changed. This action cannot be automatically undone.
+                  This will update {valueRepairRows.length} inventory row(s) to correct their average rate and total
+                  value. Quantities will not be changed. This action cannot be automatically undone.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel data-testid="button-cancel-value-repair">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={finalizeValueRepair}
-                  data-testid="button-confirm-value-repair"
-                >
+                <AlertDialogAction onClick={finalizeValueRepair} data-testid="button-confirm-value-repair">
                   Yes, Finalize Repair
                 </AlertDialogAction>
               </AlertDialogFooter>
@@ -397,15 +419,17 @@ export default function InventoryRepair() {
           <CardHeader>
             <CardTitle>
               Corrupted Value Rows
-              <Badge variant="secondary" className="ml-2">{valueRepairRows.length}</Badge>
+              <Badge variant="secondary" className="ml-2">
+                {valueRepairRows.length}
+              </Badge>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <Alert className="mb-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
-                The following rows have invalid valuation and will be corrected if you finalize.
-                Quantities will remain unchanged — only rate and value will be updated.
+                The following rows have invalid valuation and will be corrected if you finalize. Quantities will remain
+                unchanged — only rate and value will be updated.
               </AlertDescription>
             </Alert>
             <div className="overflow-auto">
@@ -436,10 +460,16 @@ export default function InventoryRepair() {
                       <TableCell className="text-right" data-testid={`text-vr-old-value-${i}`}>
                         {r.oldValue.toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-right text-green-600 dark:text-green-400" data-testid={`text-vr-new-rate-${i}`}>
+                      <TableCell
+                        className="text-right text-green-600 dark:text-green-400"
+                        data-testid={`text-vr-new-rate-${i}`}
+                      >
                         {r.newRate.toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-right text-green-600 dark:text-green-400" data-testid={`text-vr-new-value-${i}`}>
+                      <TableCell
+                        className="text-right text-green-600 dark:text-green-400"
+                        data-testid={`text-vr-new-value-${i}`}
+                      >
                         {r.newValue.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground" data-testid={`text-vr-reason-${i}`}>
@@ -458,7 +488,9 @@ export default function InventoryRepair() {
         <Card>
           <CardContent className="py-8 text-center">
             <CheckCircle className="mx-auto h-12 w-12 text-green-500 mb-3" />
-            <p className="text-lg font-medium" data-testid="text-no-corrupted-rows">No corrupted inventory rows found</p>
+            <p className="text-lg font-medium" data-testid="text-no-corrupted-rows">
+              No corrupted inventory rows found
+            </p>
             <p className="text-muted-foreground mt-1">All inventory value and rate fields are within valid ranges.</p>
           </CardContent>
         </Card>

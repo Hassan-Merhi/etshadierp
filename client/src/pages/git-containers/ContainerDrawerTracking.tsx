@@ -6,16 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Satellite,
-  AlertTriangle,
-  RefreshCw,
-  History,
-  Loader2,
-  ExternalLink,
-  Clock,
-  ChevronDown,
-} from "lucide-react";
+import { Satellite, AlertTriangle, RefreshCw, History, Loader2, ExternalLink, Clock, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { EnrichedContainerRow, fmtSkipReason, UIPriority, getContainerPriority } from "./gitContainerTypes";
 
@@ -70,7 +61,12 @@ export function ContainerDrawerTracking({
   };
 
   const Row = ({
-    label, badge, badgeColor, detail, detailNode, testId,
+    label,
+    badge,
+    badgeColor,
+    detail,
+    detailNode,
+    testId,
   }: {
     label: string;
     badge: string;
@@ -85,9 +81,7 @@ export function ContainerDrawerTracking({
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 \${badgeColor}`}>{badge}</span>
       </div>
       {(detail || detailNode) && (
-        <p className="text-[11px] text-muted-foreground/70 text-right leading-snug">
-          {detailNode ?? detail}
-        </p>
+        <p className="text-[11px] text-muted-foreground/70 text-right leading-snug">{detailNode ?? detail}</p>
       )}
     </div>
   );
@@ -100,14 +94,15 @@ export function ContainerDrawerTracking({
       <div className="space-y-3">
         <div className="flex items-center gap-2">
           <Satellite className="h-3.5 w-3.5 text-muted-foreground" />
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-            Auto Tracking
-          </p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Auto Tracking</p>
         </div>
 
         {/* Inactive container warning */}
         {isContainerInactive && (
-          <div className="flex items-start gap-1.5 rounded-md bg-muted/50 border px-2 py-1.5" data-testid="banner-tracking-inactive">
+          <div
+            className="flex items-start gap-1.5 rounded-md bg-muted/50 border px-2 py-1.5"
+            data-testid="banner-tracking-inactive"
+          >
             <AlertTriangle className="h-3 w-3 text-muted-foreground shrink-0 mt-px" />
             <p className="text-xs text-muted-foreground">
               Tracking is disabled — container is {container?.status?.toLowerCase()}.
@@ -141,12 +136,16 @@ export function ContainerDrawerTracking({
                 testId="row-scraper"
                 label="3. Puppeteer web scraper (no quota)"
                 badge={trackingStatus.scraperAvailable ? "Ready" : "Unavailable"}
-                badgeColor={trackingStatus.scraperAvailable
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
-                  : "bg-muted text-muted-foreground"}
-                detail={trackingStatus.scraperAvailable
-                  ? "Stealth Chrome — handles Maersk & CMA anti-bot protection"
-                  : "Chrome not available in this environment"}
+                badgeColor={
+                  trackingStatus.scraperAvailable
+                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                    : "bg-muted text-muted-foreground"
+                }
+                detail={
+                  trackingStatus.scraperAvailable
+                    ? "Stealth Chrome — handles Maersk & CMA anti-bot protection"
+                    : "Chrome not available in this environment"
+                }
               />
 
               <Row
@@ -169,7 +168,8 @@ export function ContainerDrawerTracking({
                 detailNode={
                   trackingStatus.seventeenTrackConfigured && (
                     <span>
-                      Quota: {trackingStatus.seventeenTrackRemaining} / {trackingStatus.seventeenTrackMonthlyLimit} remaining
+                      Quota: {trackingStatus.seventeenTrackRemaining} / {trackingStatus.seventeenTrackMonthlyLimit}{" "}
+                      remaining
                     </span>
                   )
                 }
@@ -208,11 +208,16 @@ export function ContainerDrawerTracking({
         <div className="rounded-md border bg-muted/20 px-3 py-2 space-y-1.5" data-testid="panel-priority">
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-muted-foreground">Auto-update scheduler</p>
-            <div className={cn("text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase",
-              priority.tier === "high" ? "bg-red-100 text-red-700" :
-              priority.tier === "medium" ? "bg-amber-100 text-amber-700" :
-              "bg-slate-100 text-slate-700"
-            )}>
+            <div
+              className={cn(
+                "text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase",
+                priority.tier === "high"
+                  ? "bg-red-100 text-red-700"
+                  : priority.tier === "medium"
+                    ? "bg-amber-100 text-amber-700"
+                    : "bg-slate-100 text-slate-700"
+              )}
+            >
               {priority.label} Priority
             </div>
           </div>
@@ -227,7 +232,9 @@ export function ContainerDrawerTracking({
             </div>
             <div className="flex justify-between text-[11px]">
               <span className="text-muted-foreground">Next Check:</span>
-              <span className="font-medium">{container.trackingNextCheckAt ? new Date(container.trackingNextCheckAt).toLocaleString() : "—"}</span>
+              <span className="font-medium">
+                {container.trackingNextCheckAt ? new Date(container.trackingNextCheckAt).toLocaleString() : "—"}
+              </span>
             </div>
             {container.trackingLastSkipReason && (
               <div className="flex justify-between text-[11px]">
@@ -298,7 +305,9 @@ export function ContainerDrawerTracking({
         {/* ── Track Now ── */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">On-demand Tracking</p>
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              On-demand Tracking
+            </p>
             {container.trackingLastCheckedAt && (
               <span className="text-[10px] text-muted-foreground">
                 Checked {new Date(container.trackingLastCheckedAt).toLocaleString()}
@@ -307,7 +316,10 @@ export function ContainerDrawerTracking({
           </div>
 
           {trackNowMutation.isPending ? (
-            <div className="space-y-3 rounded-md border bg-sky-50/30 dark:bg-sky-900/10 p-3" data-testid="panel-tracking-progress">
+            <div
+              className="space-y-3 rounded-md border bg-sky-50/30 dark:bg-sky-900/10 p-3"
+              data-testid="panel-tracking-progress"
+            >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-sky-600" />
@@ -320,7 +332,9 @@ export function ContainerDrawerTracking({
 
               <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1 custom-scrollbar">
                 {trackProgress.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground animate-pulse italic">Connecting to carrier systems...</p>
+                  <p className="text-[11px] text-muted-foreground animate-pulse italic">
+                    Connecting to carrier systems...
+                  </p>
                 ) : (
                   trackProgress.map((step, i) => (
                     <div key={i} className="flex items-start gap-2 animate-in slide-in-from-bottom-1 duration-300">
@@ -329,10 +343,16 @@ export function ContainerDrawerTracking({
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-[11px] font-medium leading-none">{step.label}</p>
                           <span className="text-[9px] text-muted-foreground font-mono">
-                            {new Date(step.ts).toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' })}
+                            {new Date(step.ts).toLocaleTimeString([], {
+                              hour12: false,
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
                           </span>
                         </div>
-                        {step.detail && <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{step.detail}</p>}
+                        {step.detail && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{step.detail}</p>
+                        )}
                       </div>
                     </div>
                   ))
@@ -357,7 +377,9 @@ export function ContainerDrawerTracking({
             <div className="rounded-md border p-2.5 space-y-2" data-testid="panel-last-tracking">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-medium text-muted-foreground">Last Status</span>
-                <span className="text-[10px] text-muted-foreground uppercase font-mono">{container.trackingProvider}</span>
+                <span className="text-[10px] text-muted-foreground uppercase font-mono">
+                  {container.trackingProvider}
+                </span>
               </div>
               <p className="text-sm font-semibold leading-snug">{container.trackingLastStatus}</p>
               {container.trackingLastLocation && (
@@ -414,15 +436,26 @@ export function ContainerDrawerTracking({
                   <div className="absolute left-[11px] top-2 bottom-2 w-px bg-muted-foreground/20" />
                   {events.map((ev, i) => (
                     <div key={i} className="relative pl-7 pb-4 last:pb-0">
-                      <div className={cn(
-                        "absolute left-0 top-1 h-[22px] w-[22px] rounded-full border bg-background flex items-center justify-center z-10",
-                        i === 0 ? "border-sky-500 ring-2 ring-sky-500/20" : "border-muted-foreground/30"
-                      )}>
-                        {i === 0 ? <RefreshCw className="h-2.5 w-2.5 text-sky-600" /> : <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />}
+                      <div
+                        className={cn(
+                          "absolute left-0 top-1 h-[22px] w-[22px] rounded-full border bg-background flex items-center justify-center z-10",
+                          i === 0 ? "border-sky-500 ring-2 ring-sky-500/20" : "border-muted-foreground/30"
+                        )}
+                      >
+                        {i === 0 ? (
+                          <RefreshCw className="h-2.5 w-2.5 text-sky-600" />
+                        ) : (
+                          <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                        )}
                       </div>
                       <div className="space-y-1">
                         <div className="flex items-center justify-between gap-2">
-                          <p className={cn("text-xs font-bold leading-none", i === 0 ? "text-sky-700 dark:text-sky-400" : "")}>
+                          <p
+                            className={cn(
+                              "text-xs font-bold leading-none",
+                              i === 0 ? "text-sky-700 dark:text-sky-400" : ""
+                            )}
+                          >
                             {ev.status}
                           </p>
                           <p className="text-[10px] text-muted-foreground whitespace-nowrap">
@@ -444,12 +477,7 @@ export function ContainerDrawerTracking({
               )}
 
               {container.trackingLink && (
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="w-full text-[10px] h-auto py-0 text-sky-600"
-                  asChild
-                >
+                <Button variant="link" size="sm" className="w-full text-[10px] h-auto py-0 text-sky-600" asChild>
                   <a href={container.trackingLink} target="_blank" rel="noopener noreferrer">
                     View on carrier website <ExternalLink className="ml-1 h-2.5 w-2.5" />
                   </a>

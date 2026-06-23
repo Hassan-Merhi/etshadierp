@@ -8,13 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -125,7 +119,11 @@ function SheetFormDialog({
                 <FormItem>
                   <FormLabel>Google Sheet URL</FormLabel>
                   <FormControl>
-                    <Input placeholder="https://docs.google.com/spreadsheets/..." {...field} data-testid="input-sheet-url" />
+                    <Input
+                      placeholder="https://docs.google.com/spreadsheets/..."
+                      {...field}
+                      data-testid="input-sheet-url"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -136,9 +134,16 @@ function SheetFormDialog({
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description <span className="text-muted-foreground text-xs">(optional)</span></FormLabel>
+                  <FormLabel>
+                    Description <span className="text-muted-foreground text-xs">(optional)</span>
+                  </FormLabel>
                   <FormControl>
-                    <Textarea placeholder="What is this sheet used for?" rows={2} {...field} data-testid="input-sheet-description" />
+                    <Textarea
+                      placeholder="What is this sheet used for?"
+                      rows={2}
+                      {...field}
+                      data-testid="input-sheet-description"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -151,7 +156,11 @@ function SheetFormDialog({
                 render={({ field }) => (
                   <FormItem className="flex items-center gap-3">
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-sheet-active" />
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-sheet-active"
+                      />
                     </FormControl>
                     <Label>Active (visible to all users)</Label>
                   </FormItem>
@@ -159,7 +168,9 @@ function SheetFormDialog({
               />
             )}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
               <Button type="submit" disabled={mutation.isPending} data-testid="button-save-sheet">
                 {mutation.isPending ? "Saving..." : "Save"}
               </Button>
@@ -197,9 +208,18 @@ export default function LiveSheets() {
     },
   });
 
-  const openAdd = () => { setEditTarget(null); setDialogOpen(true); };
-  const openEdit = (s: LiveSpreadsheet) => { setEditTarget(s); setDialogOpen(true); };
-  const closeDialog = () => { setDialogOpen(false); setEditTarget(null); };
+  const openAdd = () => {
+    setEditTarget(null);
+    setDialogOpen(true);
+  };
+  const openEdit = (s: LiveSpreadsheet) => {
+    setEditTarget(s);
+    setDialogOpen(true);
+  };
+  const closeDialog = () => {
+    setDialogOpen(false);
+    setEditTarget(null);
+  };
 
   return (
     <div className="space-y-6">
@@ -217,7 +237,9 @@ export default function LiveSheets() {
 
       {isLoading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
         </div>
       ) : sheets.length === 0 ? (
         <Card>
@@ -225,7 +247,9 @@ export default function LiveSheets() {
             <Sheet className="w-8 h-8 mx-auto mb-3 opacity-40" />
             <p className="font-medium">No live sheets yet</p>
             {isAdmin && (
-              <p className="text-sm mt-1">Click <strong>Add Sheet</strong> to add a Google Sheet link</p>
+              <p className="text-sm mt-1">
+                Click <strong>Add Sheet</strong> to add a Google Sheet link
+              </p>
             )}
           </CardContent>
         </Card>
@@ -237,13 +261,19 @@ export default function LiveSheets() {
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold truncate" data-testid={`text-sheet-name-${sheet.id}`}>{sheet.name}</span>
+                      <span className="font-semibold truncate" data-testid={`text-sheet-name-${sheet.id}`}>
+                        {sheet.name}
+                      </span>
                       {isAdmin && !sheet.isActive && (
-                        <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          Inactive
+                        </Badge>
                       )}
                     </div>
                     {sheet.description && (
-                      <p className="text-sm text-muted-foreground" data-testid={`text-sheet-desc-${sheet.id}`}>{sheet.description}</p>
+                      <p className="text-sm text-muted-foreground" data-testid={`text-sheet-desc-${sheet.id}`}>
+                        {sheet.description}
+                      </p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -286,19 +316,15 @@ export default function LiveSheets() {
         </div>
       )}
 
-      <SheetFormDialog
-        open={dialogOpen}
-        onClose={closeDialog}
-        existing={editTarget}
-        isAdmin={isAdmin}
-      />
+      <SheetFormDialog open={dialogOpen} onClose={closeDialog} existing={editTarget} isAdmin={isAdmin} />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove sheet link?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove <strong>{deleteTarget?.name}</strong> from the system. The actual Google Sheet will not be affected.
+              This will remove <strong>{deleteTarget?.name}</strong> from the system. The actual Google Sheet will not
+              be affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

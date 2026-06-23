@@ -40,7 +40,8 @@ function getPreviewType(file: StoredFile): PreviewType {
   const name = file.fileName.toLowerCase();
   if (mt === "application/pdf") return "pdf";
   if (mt.startsWith("image/")) return "image";
-  if (mt.includes("spreadsheet") || mt.includes("excel") || name.endsWith(".xlsx") || name.endsWith(".xls")) return "excel";
+  if (mt.includes("spreadsheet") || mt.includes("excel") || name.endsWith(".xlsx") || name.endsWith(".xls"))
+    return "excel";
   if (name.endsWith(".csv")) return "csv";
   if (mt.startsWith("text/") || name.endsWith(".txt")) return "text";
   return "unsupported";
@@ -51,7 +52,13 @@ function FileIcon({ fileType, fileName, className }: { fileType: string; fileNam
   const name = fileName.toLowerCase();
   if (mt === "application/pdf") return <FileText className={`text-red-500 ${className}`} />;
   if (mt.startsWith("image/")) return <FileImage className={`text-blue-400 ${className}`} />;
-  if (mt.includes("spreadsheet") || mt.includes("excel") || name.endsWith(".xlsx") || name.endsWith(".xls") || name.endsWith(".csv"))
+  if (
+    mt.includes("spreadsheet") ||
+    mt.includes("excel") ||
+    name.endsWith(".xlsx") ||
+    name.endsWith(".xls") ||
+    name.endsWith(".csv")
+  )
     return <FileSpreadsheet className={`text-green-500 ${className}`} />;
   if (mt.includes("word") || name.endsWith(".doc") || name.endsWith(".docx"))
     return <FileText className={`text-blue-500 ${className}`} />;
@@ -59,7 +66,9 @@ function FileIcon({ fileType, fileName, className }: { fileType: string; fileNam
 }
 
 export function PreviewModal({
-  preview, onClose, onDownload,
+  preview,
+  onClose,
+  onDownload,
 }: {
   preview: PreviewState | null;
   onClose: () => void;
@@ -69,12 +78,15 @@ export function PreviewModal({
   const { file, type, blobUrl, text, rows, loading, error } = preview;
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="max-w-4xl w-full max-h-[90vh] flex flex-col gap-0 p-0">
         <DialogHeader className="px-6 pt-5 pb-3 border-b flex-row items-center justify-between">
-          <DialogTitle className="truncate max-w-[80%] text-base">
-            {visibleName(file)}
-          </DialogTitle>
+          <DialogTitle className="truncate max-w-[80%] text-base">{visibleName(file)}</DialogTitle>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => onDownload(file)} data-testid="button-preview-download">
               <Download className="h-4 w-4 mr-1" />
@@ -109,7 +121,12 @@ export function PreviewModal({
           )}
           {!loading && !error && type === "image" && blobUrl && (
             <div className="flex items-center justify-center">
-              <img src={blobUrl} alt={visibleName(file)} className="max-w-full max-h-[65vh] rounded object-contain" data-testid="preview-image" />
+              <img
+                src={blobUrl}
+                alt={visibleName(file)}
+                className="max-w-full max-h-[65vh] rounded object-contain"
+                data-testid="preview-image"
+              />
             </div>
           )}
           {!loading && !error && (type === "csv" || type === "excel") && rows && rows.length > 0 && (
@@ -117,9 +134,15 @@ export function PreviewModal({
               <table className="text-xs w-full border-collapse" data-testid="preview-table">
                 <tbody>
                   {rows.map((row, ri) => (
-                    <tr key={ri} className={ri === 0 ? "bg-muted font-semibold" : "border-b border-border/40 hover:bg-muted/30"}>
+                    <tr
+                      key={ri}
+                      className={ri === 0 ? "bg-muted font-semibold" : "border-b border-border/40 hover:bg-muted/30"}
+                    >
                       {row.map((cell: any, ci: number) => (
-                        <td key={ci} className="px-2 py-1 border-r border-border/40 whitespace-nowrap max-w-[200px] truncate">
+                        <td
+                          key={ci}
+                          className="px-2 py-1 border-r border-border/40 whitespace-nowrap max-w-[200px] truncate"
+                        >
                           {cell == null ? "" : String(cell)}
                         </td>
                       ))}
@@ -133,7 +156,10 @@ export function PreviewModal({
             <p className="text-muted-foreground text-sm">No data to preview.</p>
           )}
           {!loading && !error && type === "text" && text !== undefined && (
-            <pre className="text-xs whitespace-pre-wrap font-mono bg-muted/30 p-4 rounded max-h-[65vh] overflow-auto" data-testid="preview-text">
+            <pre
+              className="text-xs whitespace-pre-wrap font-mono bg-muted/30 p-4 rounded max-h-[65vh] overflow-auto"
+              data-testid="preview-text"
+            >
               {text}
             </pre>
           )}
@@ -141,7 +167,9 @@ export function PreviewModal({
             <div className="flex flex-col items-center justify-center h-40 gap-3 text-muted-foreground">
               <FileIcon fileType={file.fileType} fileName={file.fileName} className="h-12 w-12" />
               <p className="font-medium">{visibleName(file)}</p>
-              <p className="text-sm">{file.fileType} &bull; {formatSize(file.fileSize)}</p>
+              <p className="text-sm">
+                {file.fileType} &bull; {formatSize(file.fileSize)}
+              </p>
               <p className="text-sm">Preview not available for this file type.</p>
             </div>
           )}

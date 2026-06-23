@@ -10,20 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Search,
   Plus,
@@ -96,11 +84,11 @@ function parseBalance(value: any): number {
 }
 
 const VOUCHER_TYPE_COLORS: Record<string, string> = {
-  "Payment":   "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-  "Receipt":   "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
-  "Journal":   "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  "Invoice":   "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
-  "Purchase":  "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  Payment: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  Receipt: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  Journal: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
+  Invoice: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300",
+  Purchase: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
 };
 
 function voucherBadgeClass(type: string) {
@@ -139,7 +127,8 @@ export default function Agents() {
     const searchLower = agentSearch.trim().toLowerCase();
     return allAccounts.filter((a) => {
       if (!agentIds.has(a.id)) return false;
-      if (searchLower && !a.name.toLowerCase().includes(searchLower) && !a.code.toLowerCase().includes(searchLower)) return false;
+      if (searchLower && !a.name.toLowerCase().includes(searchLower) && !a.code.toLowerCase().includes(searchLower))
+        return false;
       return true;
     });
   }, [allAccounts, agentIds, agentSearch]);
@@ -148,7 +137,13 @@ export default function Agents() {
     const searchLower = addSearch.trim().toLowerCase();
     return allAccounts.filter((a) => {
       if (agentIds.has(a.id)) return false;
-      if (searchLower && !a.name.toLowerCase().includes(searchLower) && !a.code.toLowerCase().includes(searchLower) && !a.type.toLowerCase().includes(searchLower)) return false;
+      if (
+        searchLower &&
+        !a.name.toLowerCase().includes(searchLower) &&
+        !a.code.toLowerCase().includes(searchLower) &&
+        !a.type.toLowerCase().includes(searchLower)
+      )
+        return false;
       return true;
     });
   }, [allAccounts, agentIds, addSearch]);
@@ -156,7 +151,10 @@ export default function Agents() {
   const accountTypeUrl = selectedAccount ? (selectedAccount.type || "").toLowerCase().replace(" ", "-") : null;
   const { data: transactions = [], isLoading: transactionsLoading } = useQuery<Transaction[]>({
     queryKey: selectedAccount
-      ? [`/api/accounts/${accountTypeUrl}/${selectedAccount.accountId}/transactions`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }]
+      ? [
+          `/api/accounts/${accountTypeUrl}/${selectedAccount.accountId}/transactions`,
+          { startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
+        ]
       : [],
     queryFn: async () => {
       if (!selectedAccount) return [];
@@ -172,9 +170,13 @@ export default function Agents() {
   });
 
   const { data: prePeriodData } = useQuery<{ balance: number }>({
-    queryKey: selectedAccount && periodFilter.fromDate
-      ? [`/api/accounts/${accountTypeUrl}/${selectedAccount.accountId}/pre-period-balance`, { endDate: periodFilter.fromDate }]
-      : [],
+    queryKey:
+      selectedAccount && periodFilter.fromDate
+        ? [
+            `/api/accounts/${accountTypeUrl}/${selectedAccount.accountId}/pre-period-balance`,
+            { endDate: periodFilter.fromDate },
+          ]
+        : [],
     queryFn: async () => {
       if (!selectedAccount || !periodFilter.fromDate) return { balance: 0 };
       const res = await fetch(
@@ -273,17 +275,19 @@ export default function Agents() {
     });
   }, [groupedVouchers, openingBalance, selectedAccount]);
 
-  const closingBalance = vouchersWithBalance.length > 0
-    ? (vouchersWithBalance[vouchersWithBalance.length - 1].runningBalance ?? openingBalance)
-    : openingBalance;
+  const closingBalance =
+    vouchersWithBalance.length > 0
+      ? (vouchersWithBalance[vouchersWithBalance.length - 1].runningBalance ?? openingBalance)
+      : openingBalance;
 
-  const periodDebit  = vouchersWithBalance.reduce((s, v) => s + v.totalDebit,  0);
+  const periodDebit = vouchersWithBalance.reduce((s, v) => s + v.totalDebit, 0);
   const periodCredit = vouchersWithBalance.reduce((s, v) => s + v.totalCredit, 0);
 
   const periodLabel = useMemo(() => {
     const hasStart = !!periodFilter.fromDate;
     const hasEnd = !!periodFilter.toDate;
-    if (hasStart && hasEnd) return `${formatDisplayDate(periodFilter.fromDate)} → ${formatDisplayDate(periodFilter.toDate)}`;
+    if (hasStart && hasEnd)
+      return `${formatDisplayDate(periodFilter.fromDate)} → ${formatDisplayDate(periodFilter.toDate)}`;
     if (hasStart) return `From ${formatDisplayDate(periodFilter.fromDate)}`;
     if (hasEnd) return `Up to ${formatDisplayDate(periodFilter.toDate)}`;
     return "All dates";
@@ -305,11 +309,26 @@ export default function Agents() {
     rows.push([selectedAccount.name, "Opening Balance", "", "", formatAmount(openingBalance), openingDateFmt, ""]);
     for (const v of vouchersWithBalance) {
       const dateFmt = format(new Date(v.voucherDate.split("T")[0] + "T00:00:00"), "dd MMM yyyy");
-      const note = (v.voucherDescription?.trim()) || (v.narration?.trim()) || "";
-      rows.push([selectedAccount.name, v.voucherType, v.totalDebit > 0 ? formatAmount(v.totalDebit) : "", v.totalCredit > 0 ? formatAmount(v.totalCredit) : "", formatAmount(v.runningBalance ?? 0), dateFmt, note]);
+      const note = v.voucherDescription?.trim() || v.narration?.trim() || "";
+      rows.push([
+        selectedAccount.name,
+        v.voucherType,
+        v.totalDebit > 0 ? formatAmount(v.totalDebit) : "",
+        v.totalCredit > 0 ? formatAmount(v.totalCredit) : "",
+        formatAmount(v.runningBalance ?? 0),
+        dateFmt,
+        note,
+      ]);
     }
     const wb = utils.book_new();
-    utils.book_append_sheet(wb, { ...utils.aoa_to_sheet(rows), "!cols": [{ wch: 25 }, { wch: 14 }, { wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 14 }, { wch: 30 }] }, selectedAccount.name.substring(0, 31).replace(/[\\/*?[\]:]/g, "_"));
+    utils.book_append_sheet(
+      wb,
+      {
+        ...utils.aoa_to_sheet(rows),
+        "!cols": [{ wch: 25 }, { wch: 14 }, { wch: 15 }, { wch: 15 }, { wch: 18 }, { wch: 14 }, { wch: 30 }],
+      },
+      selectedAccount.name.substring(0, 31).replace(/[\\/*?[\]:]/g, "_")
+    );
     await writeFile(wb, `Agent_Statement_${selectedAccount.name.replace(/[\\/*?[\]:]/g, "_").substring(0, 40)}.xlsx`);
     toast({ title: "Exported successfully" });
   };
@@ -327,7 +346,10 @@ export default function Agents() {
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => { setAddSearch(""); setAddDialogOpen(true); }}
+              onClick={() => {
+                setAddSearch("");
+                setAddDialogOpen(true);
+              }}
               data-testid="button-add-agent"
             >
               <Plus className="h-4 w-4" />
@@ -349,16 +371,16 @@ export default function Agents() {
         <div className="flex-1 overflow-y-auto">
           {agentsLoading || accountsLoading ? (
             <div className="p-3 space-y-1.5">
-              {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+              ))}
             </div>
           ) : agentAccounts.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-12 px-4 text-center">
               <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
                 <Users className="h-5 w-5 text-muted-foreground" />
               </div>
-              <p className="text-sm font-medium">
-                {agentIds.size === 0 ? "No agents yet" : "No results"}
-              </p>
+              <p className="text-sm font-medium">{agentIds.size === 0 ? "No agents yet" : "No results"}</p>
               <p className="text-xs text-muted-foreground">
                 {agentIds.size === 0 ? "Click + to pin an account as an agent" : "Try a different search"}
               </p>
@@ -382,9 +404,7 @@ export default function Agents() {
                       {account.balance !== 0 && (
                         <p className="text-xs tabular-nums text-muted-foreground mt-0.5">
                           {formatAmount(Math.abs(account.balance))}{" "}
-                          <span className={drCrClass(account.balanceSide)}>
-                            {account.balanceSide ?? ""}
-                          </span>
+                          <span className={drCrClass(account.balanceSide)}>{account.balanceSide ?? ""}</span>
                         </p>
                       )}
                     </button>
@@ -413,12 +433,13 @@ export default function Agents() {
                 <BookOpen className="h-6 w-6 text-muted-foreground" />
               </div>
               <p className="text-sm font-medium">No agent selected</p>
-              <p className="text-xs text-muted-foreground">Pick an agent from the list to view their ledger statement</p>
+              <p className="text-xs text-muted-foreground">
+                Pick an agent from the list to view their ledger statement
+              </p>
             </div>
           </div>
         ) : (
           <div className="p-6 space-y-5">
-
             {/* Header row */}
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -434,9 +455,11 @@ export default function Agents() {
                   </Badge>
                 </div>
                 <div className="flex items-center gap-1.5 mt-1">
-                  {selectedAccount.balanceSide?.toLowerCase() === "cr"
-                    ? <TrendingDown className="w-3.5 h-3.5 text-red-500" />
-                    : <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />}
+                  {selectedAccount.balanceSide?.toLowerCase() === "cr" ? (
+                    <TrendingDown className="w-3.5 h-3.5 text-red-500" />
+                  ) : (
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+                  )}
                   <span className="text-sm font-mono font-semibold" data-testid="text-agent-balance">
                     {formatAmount(Math.abs(selectedAccount.balance))}
                   </span>
@@ -493,8 +516,12 @@ export default function Agents() {
                     {formatAmount(Math.abs(openingBalance))}{" "}
                     <span className="text-xs font-normal text-muted-foreground">
                       {openingBalance >= 0
-                        ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
-                        : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                        ? selectedAccount.type === "supplier"
+                          ? "Cr"
+                          : "Dr"
+                        : selectedAccount.type === "supplier"
+                          ? "Dr"
+                          : "Cr"}
                     </span>
                   </p>
                 </div>
@@ -517,12 +544,18 @@ export default function Agents() {
                 <ArrowRightLeft className="h-4 w-4 text-muted-foreground shrink-0" />
                 <div>
                   <p className="text-xs text-muted-foreground leading-none mb-1">Closing Balance</p>
-                  <p className={`text-sm font-semibold font-mono leading-none ${closingBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  <p
+                    className={`text-sm font-semibold font-mono leading-none ${closingBalance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                  >
                     {formatAmount(Math.abs(closingBalance))}{" "}
                     <span className="text-xs font-normal text-muted-foreground">
                       {closingBalance >= 0
-                        ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
-                        : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                        ? selectedAccount.type === "supplier"
+                          ? "Cr"
+                          : "Dr"
+                        : selectedAccount.type === "supplier"
+                          ? "Dr"
+                          : "Cr"}
                     </span>
                   </p>
                 </div>
@@ -535,9 +568,19 @@ export default function Agents() {
               <div className="hidden print:block mb-4">
                 <div className="text-center">
                   <h1 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>{selectedCompany?.name}</h1>
-                  <h2 style={{ fontSize: 14, fontWeight: 600, margin: "4px 0 0" }}>Agent Ledger: {selectedAccount.name}</h2>
+                  <h2 style={{ fontSize: 14, fontWeight: 600, margin: "4px 0 0" }}>
+                    Agent Ledger: {selectedAccount.name}
+                  </h2>
                 </div>
-                <div style={{ borderTop: "1px solid #ccc", borderBottom: "1px solid #ccc", padding: "6px 0", fontSize: 11, marginTop: 8 }}>
+                <div
+                  style={{
+                    borderTop: "1px solid #ccc",
+                    borderBottom: "1px solid #ccc",
+                    padding: "6px 0",
+                    fontSize: 11,
+                    marginTop: 8,
+                  }}
+                >
                   <div>Period: {periodLabel}</div>
                   <div>Generated: {formatDisplayDate(new Date())}</div>
                 </div>
@@ -559,35 +602,67 @@ export default function Agents() {
                     {transactionsLoading ? (
                       [...Array(5)].map((_, i) => (
                         <TableRow key={i}>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-24 ml-auto" /></TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-24" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-16" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-40" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-20 ml-auto" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-20 ml-auto" />
+                          </TableCell>
+                          <TableCell>
+                            <Skeleton className="h-4 w-24 ml-auto" />
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <>
                         {/* Opening Balance row */}
-                        <TableRow className="bg-muted/40 hover:bg-muted/40 font-semibold" data-testid="row-opening-balance">
-                          <TableCell className="py-2.5 text-xs text-muted-foreground uppercase tracking-wide" colSpan={3}>
+                        <TableRow
+                          className="bg-muted/40 hover:bg-muted/40 font-semibold"
+                          data-testid="row-opening-balance"
+                        >
+                          <TableCell
+                            className="py-2.5 text-xs text-muted-foreground uppercase tracking-wide"
+                            colSpan={3}
+                          >
                             Opening Balance
                           </TableCell>
                           <TableCell className="py-2.5 text-right font-mono text-sm">
                             {selectedAccount.type === "supplier"
-                              ? openingBalance < 0 ? formatAmount(Math.abs(openingBalance)) : "-"
-                              : openingBalance > 0 ? formatAmount(openingBalance) : "-"}
+                              ? openingBalance < 0
+                                ? formatAmount(Math.abs(openingBalance))
+                                : "-"
+                              : openingBalance > 0
+                                ? formatAmount(openingBalance)
+                                : "-"}
                           </TableCell>
                           <TableCell className="py-2.5 text-right font-mono text-sm">
                             {selectedAccount.type === "supplier"
-                              ? openingBalance > 0 ? formatAmount(openingBalance) : "-"
-                              : openingBalance < 0 ? formatAmount(Math.abs(openingBalance)) : "-"}
+                              ? openingBalance > 0
+                                ? formatAmount(openingBalance)
+                                : "-"
+                              : openingBalance < 0
+                                ? formatAmount(Math.abs(openingBalance))
+                                : "-"}
                           </TableCell>
                           <TableCell className="py-2.5 text-right font-mono text-sm">
                             {formatAmount(Math.abs(openingBalance))}{" "}
                             <span className="text-xs text-muted-foreground font-normal">
-                              {openingBalance >= 0 ? (selectedAccount.type === "supplier" ? "Cr" : "Dr") : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                              {openingBalance >= 0
+                                ? selectedAccount.type === "supplier"
+                                  ? "Cr"
+                                  : "Dr"
+                                : selectedAccount.type === "supplier"
+                                  ? "Dr"
+                                  : "Cr"}
                             </span>
                           </TableCell>
                         </TableRow>
@@ -609,9 +684,13 @@ export default function Agents() {
                             const bal = v.runningBalance ?? 0;
                             const dateKey = v.voucherDate.split("T")[0];
                             const dateFmt = format(new Date(dateKey + "T00:00:00"), "dd MMM yyyy");
-                            const note = (v.narration?.trim()) || (v.voucherDescription?.trim()) || "";
+                            const note = v.narration?.trim() || v.voucherDescription?.trim() || "";
                             return (
-                              <TableRow key={v.voucherId} className="hover:bg-muted/30" data-testid={`row-voucher-${v.voucherId}`}>
+                              <TableRow
+                                key={v.voucherId}
+                                className="hover:bg-muted/30"
+                                data-testid={`row-voucher-${v.voucherId}`}
+                              >
                                 <TableCell className="py-2.5 font-mono text-sm whitespace-nowrap">{dateFmt}</TableCell>
                                 <TableCell className="py-2.5">
                                   <Badge
@@ -623,20 +702,36 @@ export default function Agents() {
                                 </TableCell>
                                 <TableCell className="py-2.5">
                                   <p className="text-xs text-muted-foreground font-mono">{v.voucherNumber}</p>
-                                  {note && <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{note}</p>}
+                                  {note && (
+                                    <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xs">{note}</p>
+                                  )}
                                 </TableCell>
                                 <TableCell className="py-2.5 text-right font-mono text-sm">
-                                  {v.totalDebit > 0 ? formatAmount(v.totalDebit) : <span className="text-muted-foreground">—</span>}
+                                  {v.totalDebit > 0 ? (
+                                    formatAmount(v.totalDebit)
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="py-2.5 text-right font-mono text-sm">
-                                  {v.totalCredit > 0 ? formatAmount(v.totalCredit) : <span className="text-muted-foreground">—</span>}
+                                  {v.totalCredit > 0 ? (
+                                    formatAmount(v.totalCredit)
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="py-2.5 text-right font-mono text-sm font-medium">
                                   {formatAmount(Math.abs(bal))}{" "}
-                                  <span className={`text-xs font-normal ${bal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
+                                  <span
+                                    className={`text-xs font-normal ${bal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}
+                                  >
                                     {bal >= 0
-                                      ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
-                                      : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                                      ? selectedAccount.type === "supplier"
+                                        ? "Cr"
+                                        : "Dr"
+                                      : selectedAccount.type === "supplier"
+                                        ? "Dr"
+                                        : "Cr"}
                                   </span>
                                 </TableCell>
                               </TableRow>
@@ -646,8 +741,14 @@ export default function Agents() {
 
                         {/* Closing Balance row */}
                         {vouchersWithBalance.length > 0 && (
-                          <TableRow className="bg-muted/40 hover:bg-muted/40 font-semibold" data-testid="row-closing-balance">
-                            <TableCell colSpan={3} className="py-2.5 text-xs text-muted-foreground uppercase tracking-wide">
+                          <TableRow
+                            className="bg-muted/40 hover:bg-muted/40 font-semibold"
+                            data-testid="row-closing-balance"
+                          >
+                            <TableCell
+                              colSpan={3}
+                              className="py-2.5 text-xs text-muted-foreground uppercase tracking-wide"
+                            >
                               Closing Balance
                             </TableCell>
                             <TableCell className="py-2.5 text-right font-mono text-sm">
@@ -660,8 +761,12 @@ export default function Agents() {
                               {formatAmount(Math.abs(closingBalance))}{" "}
                               <span className="text-xs text-muted-foreground font-normal">
                                 {closingBalance >= 0
-                                  ? (selectedAccount.type === "supplier" ? "Cr" : "Dr")
-                                  : (selectedAccount.type === "supplier" ? "Dr" : "Cr")}
+                                  ? selectedAccount.type === "supplier"
+                                    ? "Cr"
+                                    : "Dr"
+                                  : selectedAccount.type === "supplier"
+                                    ? "Dr"
+                                    : "Cr"}
                               </span>
                             </TableCell>
                           </TableRow>
@@ -697,7 +802,9 @@ export default function Agents() {
             <div className="max-h-80 overflow-y-auto border rounded-xl divide-y">
               {accountsLoading ? (
                 <div className="p-4 space-y-2">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-8 w-full" />
+                  ))}
                 </div>
               ) : availableAccounts.length === 0 ? (
                 <div className="p-6 text-center text-sm text-muted-foreground">No accounts found</div>

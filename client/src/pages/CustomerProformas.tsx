@@ -13,7 +13,19 @@ import { useLocation } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Trash2, Star, Pencil, FileText, Check, LayoutGrid, Download, RefreshCw, Lock, LockOpen } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Star,
+  Pencil,
+  FileText,
+  Check,
+  LayoutGrid,
+  Download,
+  RefreshCw,
+  Lock,
+  LockOpen,
+} from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { PageHeader } from "@/components/PageHeader";
@@ -81,7 +93,9 @@ export default function CustomerProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma created successfully" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       setIsCreateOpen(false);
       setNewProformaName("");
     },
@@ -97,7 +111,9 @@ export default function CustomerProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma set as active" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -111,7 +127,9 @@ export default function CustomerProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma deleted" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -125,7 +143,9 @@ export default function CustomerProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Proforma renamed successfully" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       setRenamingProforma(null);
       setRenameValue("");
     },
@@ -136,12 +156,20 @@ export default function CustomerProformas() {
   });
 
   const addLineMutation = useMutation({
-    mutationFn: async (data: { proformaId: number; articleCode: string; productName: string; quantity: number; pricePerBale: string }) => {
+    mutationFn: async (data: {
+      proformaId: number;
+      articleCode: string;
+      productName: string;
+      quantity: number;
+      pricePerBale: string;
+    }) => {
       return await modeApiRequest("POST", "/api/factory/customer-proforma-lines", data);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line added" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       setIsAddLineOpen(false);
       setAddLineProformaId(null);
       setNewLine({ articleCode: "", productName: "", quantity: "", pricePerBale: "" });
@@ -162,7 +190,9 @@ export default function CustomerProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line updated" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       setEditingLine(null);
     },
     onError: (error: Error) => {
@@ -177,7 +207,9 @@ export default function CustomerProformas() {
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Line deleted" });
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -187,11 +219,17 @@ export default function CustomerProformas() {
 
   const applyCatalogPricesMutation = useMutation({
     mutationFn: async (proformaId: number) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-proformas/${proformaId}/apply-catalog-prices`, {});
+      const res = await modeApiRequest(
+        "POST",
+        `/api/factory/customer-proformas/${proformaId}/apply-catalog-prices`,
+        {}
+      );
       return res.json();
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       const parts: string[] = [];
       if (result.updated) parts.push(`${result.updated} line(s) updated`);
       if (result.skipped) parts.push(`${result.skipped} skipped (no catalog price)`);
@@ -207,11 +245,16 @@ export default function CustomerProformas() {
   const toggleFixedMutation = useMutation({
     mutationFn: async (lineId: number) => {
       const res = await modeApiRequest("PATCH", `/api/factory/customer-proforma-lines/${lineId}/toggle-fixed`, {});
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -229,7 +272,14 @@ export default function CustomerProformas() {
   };
 
   const handleAddLine = () => {
-    if (!addLineProformaId || !newLine.articleCode.trim() || !newLine.productName.trim() || !newLine.quantity || !newLine.pricePerBale) return;
+    if (
+      !addLineProformaId ||
+      !newLine.articleCode.trim() ||
+      !newLine.productName.trim() ||
+      !newLine.quantity ||
+      !newLine.pricePerBale
+    )
+      return;
     addLineMutation.mutate({
       proformaId: addLineProformaId,
       articleCode: newLine.articleCode.trim(),
@@ -256,10 +306,7 @@ export default function CustomerProformas() {
           <PageHeader title="Customer Proformas" subtitle="Manage customer-specific price lists for bale sales" />
         </div>
         {customerId && (
-          <Button
-            data-testid="button-create-proforma"
-            onClick={() => setIsCreateOpen(true)}
-          >
+          <Button data-testid="button-create-proforma" onClick={() => setIsCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             New Proforma
           </Button>
@@ -271,10 +318,13 @@ export default function CustomerProformas() {
         {customersLoading ? (
           <Skeleton className="h-9 w-full" />
         ) : (
-          <Select value={selectedCustomerId} onValueChange={(val) => {
-            setSelectedCustomerId(val);
-            setExpandedProformaId(null);
-          }}>
+          <Select
+            value={selectedCustomerId}
+            onValueChange={(val) => {
+              setSelectedCustomerId(val);
+              setExpandedProformaId(null);
+            }}
+          >
             <SelectTrigger data-testid="select-customer">
               <SelectValue placeholder="Choose a customer..." />
             </SelectTrigger>
@@ -328,7 +378,11 @@ export default function CustomerProformas() {
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <span className="font-semibold">{proforma.name}</span>
                       {proforma.isActive && (
-                        <Badge variant="default" className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate" data-testid={`badge-active-${proforma.id}`}>
+                        <Badge
+                          variant="default"
+                          className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
+                          data-testid={`badge-active-${proforma.id}`}
+                        >
                           Active
                         </Badge>
                       )}
@@ -385,7 +439,9 @@ export default function CustomerProformas() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              navigate(`/factory/location-inventory?editProformaId=${proforma.id}&editProformaName=${encodeURIComponent(proforma.name)}&editCustomerId=${proforma.customerId}`);
+                              navigate(
+                                `/factory/location-inventory?editProformaId=${proforma.id}&editProformaName=${encodeURIComponent(proforma.name)}&editCustomerId=${proforma.customerId}`
+                              );
                             }}
                             data-testid={`button-edit-in-inventory-${proforma.id}`}
                           >
@@ -395,7 +451,9 @@ export default function CustomerProformas() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => window.open(`/api/factory/customer-proformas/${proforma.id}/export/excel`, "_blank")}
+                            onClick={() =>
+                              window.open(`/api/factory/customer-proformas/${proforma.id}/export/excel`, "_blank")
+                            }
                             data-testid={`button-export-excel-${proforma.id}`}
                           >
                             <Download className="mr-1 h-3 w-3" />
@@ -405,7 +463,10 @@ export default function CustomerProformas() {
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              if (!navigator.onLine) { window.print(); return; }
+                              if (!navigator.onLine) {
+                                window.print();
+                                return;
+                              }
                               window.open(`/api/factory/customer-proformas/${proforma.id}/export/pdf`, "_blank");
                             }}
                             data-testid={`button-export-pdf-${proforma.id}`}
@@ -458,20 +519,22 @@ export default function CustomerProformas() {
                                   <TableCell className="font-mono text-sm" data-testid={`text-article-code-${line.id}`}>
                                     {line.articleCode}
                                   </TableCell>
-                                  <TableCell data-testid={`text-product-name-${line.id}`}>
-                                    {line.productName}
-                                  </TableCell>
+                                  <TableCell data-testid={`text-product-name-${line.id}`}>{line.productName}</TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-quantity-${line.id}`}>
                                     {line.quantity}
                                   </TableCell>
-                                  <TableCell className="text-right font-mono text-sm" data-testid={`text-kg-bale-${line.id}`}>
-                                    {(() => { const w = parseFloat(line.weightPerBaleKg || "0"); return w % 1 === 0 ? w.toLocaleString() : w.toFixed(2); })()}
+                                  <TableCell
+                                    className="text-right font-mono text-sm"
+                                    data-testid={`text-kg-bale-${line.id}`}
+                                  >
+                                    {(() => {
+                                      const w = parseFloat(line.weightPerBaleKg || "0");
+                                      return w % 1 === 0 ? w.toLocaleString() : w.toFixed(2);
+                                    })()}
                                   </TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-price-${line.id}`}>
                                     <div className="flex items-center justify-end gap-1.5">
-                                      {line.priceFixed && (
-                                        <Lock className="h-3 w-3 text-amber-500 shrink-0" />
-                                      )}
+                                      {line.priceFixed && <Lock className="h-3 w-3 text-amber-500 shrink-0" />}
                                       <span>{formatAmount(parseFloat(line.pricePerBale))}</span>
                                     </div>
                                   </TableCell>
@@ -480,15 +543,20 @@ export default function CustomerProformas() {
                                       <Button
                                         variant="ghost"
                                         size="icon"
-                                        title={line.priceFixed ? "Price is locked — click to unlock" : "Lock this price (won't change on Apply Catalog Prices)"}
+                                        title={
+                                          line.priceFixed
+                                            ? "Price is locked — click to unlock"
+                                            : "Lock this price (won't change on Apply Catalog Prices)"
+                                        }
                                         onClick={() => toggleFixedMutation.mutate(line.id)}
                                         disabled={toggleFixedMutation.isPending}
                                         data-testid={`button-toggle-fixed-${line.id}`}
                                       >
-                                        {line.priceFixed
-                                          ? <Lock className="h-3 w-3 text-amber-500" />
-                                          : <LockOpen className="h-3 w-3 text-muted-foreground" />
-                                        }
+                                        {line.priceFixed ? (
+                                          <Lock className="h-3 w-3 text-amber-500" />
+                                        ) : (
+                                          <LockOpen className="h-3 w-3 text-muted-foreground" />
+                                        )}
                                       </Button>
                                       <Button
                                         variant="ghost"
@@ -524,28 +592,53 @@ export default function CustomerProformas() {
                           </Table>
                           {(() => {
                             const totalQty = proforma.lines.reduce((s, l) => s + l.quantity, 0);
-                            const totalWeight = proforma.lines.reduce((s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"), 0);
-                            const totalAmount = proforma.lines.reduce((s, l) => s + l.quantity * parseFloat(l.pricePerBale), 0);
+                            const totalWeight = proforma.lines.reduce(
+                              (s, l) => s + l.quantity * parseFloat(l.weightPerBaleKg || "0"),
+                              0
+                            );
+                            const totalAmount = proforma.lines.reduce(
+                              (s, l) => s + l.quantity * parseFloat(l.pricePerBale),
+                              0
+                            );
                             return (
                               <div className="flex items-center gap-4 mt-3 pt-3 border-t flex-wrap">
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-xs text-muted-foreground">Total Bales:</span>
-                                  <span className="text-sm font-semibold" data-testid={`text-total-qty-${proforma.id}`}>{totalQty.toLocaleString()}</span>
+                                  <span className="text-sm font-semibold" data-testid={`text-total-qty-${proforma.id}`}>
+                                    {totalQty.toLocaleString()}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-xs text-muted-foreground">Total Weight:</span>
-                                  <span className="text-sm font-semibold" data-testid={`text-total-weight-${proforma.id}`}>{totalWeight.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg</span>
+                                  <span
+                                    className="text-sm font-semibold"
+                                    data-testid={`text-total-weight-${proforma.id}`}
+                                  >
+                                    {totalWeight.toLocaleString(undefined, {
+                                      minimumFractionDigits: 1,
+                                      maximumFractionDigits: 1,
+                                    })}{" "}
+                                    kg
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <span className="text-xs text-muted-foreground">Total Amount:</span>
-                                  <span className="text-sm font-semibold" data-testid={`text-total-amount-${proforma.id}`}>{formatAmount(totalAmount)}</span>
+                                  <span
+                                    className="text-sm font-semibold"
+                                    data-testid={`text-total-amount-${proforma.id}`}
+                                  >
+                                    {formatAmount(totalAmount)}
+                                  </span>
                                 </div>
                               </div>
                             );
                           })()}
                         </div>
                       ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4" data-testid={`text-no-lines-${proforma.id}`}>
+                        <p
+                          className="text-sm text-muted-foreground text-center py-4"
+                          data-testid={`text-no-lines-${proforma.id}`}
+                        >
                           No price lines yet
                         </p>
                       )}
@@ -589,7 +682,15 @@ export default function CustomerProformas() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!renamingProforma} onOpenChange={(open) => { if (!open) { setRenamingProforma(null); setRenameValue(""); } }}>
+      <Dialog
+        open={!!renamingProforma}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRenamingProforma(null);
+            setRenameValue("");
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Rename Proforma</DialogTitle>
@@ -610,12 +711,23 @@ export default function CustomerProformas() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setRenamingProforma(null); setRenameValue(""); }} data-testid="button-cancel-rename">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRenamingProforma(null);
+                  setRenameValue("");
+                }}
+                data-testid="button-cancel-rename"
+              >
                 Cancel
               </Button>
               <Button
                 onClick={() => renameProformaMutation.mutate({ id: renamingProforma!.id, name: renameValue.trim() })}
-                disabled={renameProformaMutation.isPending || !renameValue.trim() || renameValue.trim() === renamingProforma?.name}
+                disabled={
+                  renameProformaMutation.isPending ||
+                  !renameValue.trim() ||
+                  renameValue.trim() === renamingProforma?.name
+                }
                 data-testid="button-submit-rename"
               >
                 {renameProformaMutation.isPending ? "Saving..." : "Save"}
@@ -625,10 +737,13 @@ export default function CustomerProformas() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isAddLineOpen} onOpenChange={(open) => {
-        setIsAddLineOpen(open);
-        if (!open) setAddLineProformaId(null);
-      }}>
+      <Dialog
+        open={isAddLineOpen}
+        onOpenChange={(open) => {
+          setIsAddLineOpen(open);
+          if (!open) setAddLineProformaId(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Add Price Line</DialogTitle>
@@ -681,7 +796,13 @@ export default function CustomerProformas() {
               </Button>
               <Button
                 onClick={handleAddLine}
-                disabled={addLineMutation.isPending || !newLine.articleCode.trim() || !newLine.productName.trim() || !newLine.quantity || !newLine.pricePerBale}
+                disabled={
+                  addLineMutation.isPending ||
+                  !newLine.articleCode.trim() ||
+                  !newLine.productName.trim() ||
+                  !newLine.quantity ||
+                  !newLine.pricePerBale
+                }
                 data-testid="button-submit-line"
               >
                 {addLineMutation.isPending ? "Adding..." : "Add Line"}
@@ -691,7 +812,12 @@ export default function CustomerProformas() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingLine} onOpenChange={(open) => { if (!open) setEditingLine(null); }}>
+      <Dialog
+        open={!!editingLine}
+        onOpenChange={(open) => {
+          if (!open) setEditingLine(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Price Line</DialogTitle>
@@ -748,8 +874,13 @@ export default function CustomerProformas() {
       </Dialog>
       <DeleteConfirmDialog
         open={!!pendingDelete}
-        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
-        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          pendingDelete?.();
+          setPendingDelete(null);
+        }}
       />
     </div>
   );

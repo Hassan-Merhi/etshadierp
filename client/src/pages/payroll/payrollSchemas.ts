@@ -28,26 +28,40 @@ export const bulkPaymentSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const salaryAdvanceSchema = z.object({
-  employeeId: z.string().min(1, "Employee is required"),
-  amount: z.string().min(1, "Amount is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Amount must be positive"),
-  advanceDate: z.date({
-    required_error: "Advance date is required",
-  }),
-  cashAccountId: z.string().optional(),
-  notes: z.string().optional(),
-  isOpeningBalance: z.boolean().default(false),
-}).refine((data) => {
-  // Cash account is required only if NOT an opening balance
-  if (!data.isOpeningBalance && !data.cashAccountId) {
-    return false;
-  }
-  return true;
-}, { message: "Cash account is required", path: ["cashAccountId"] });
+export const salaryAdvanceSchema = z
+  .object({
+    employeeId: z.string().min(1, "Employee is required"),
+    amount: z
+      .string()
+      .min(1, "Amount is required")
+      .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Amount must be positive"),
+    advanceDate: z.date({
+      required_error: "Advance date is required",
+    }),
+    cashAccountId: z.string().optional(),
+    notes: z.string().optional(),
+    isOpeningBalance: z.boolean().default(false),
+  })
+  .refine(
+    (data) => {
+      // Cash account is required only if NOT an opening balance
+      if (!data.isOpeningBalance && !data.cashAccountId) {
+        return false;
+      }
+      return true;
+    },
+    { message: "Cash account is required", path: ["cashAccountId"] }
+  );
 
 export const deductionSchema = z.object({
-  deductionAmount: z.string().min(1, "Deduction amount is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Deduction amount must be positive"),
-  payrollMonth: z.string().min(1, "Payroll month is required").regex(/^\d{4}-\d{2}$/, "Payroll month must be in format YYYY-MM (e.g., 2024-01)"),
+  deductionAmount: z
+    .string()
+    .min(1, "Deduction amount is required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Deduction amount must be positive"),
+  payrollMonth: z
+    .string()
+    .min(1, "Payroll month is required")
+    .regex(/^\d{4}-\d{2}$/, "Payroll month must be in format YYYY-MM (e.g., 2024-01)"),
 });
 
 export type DepositFormData = z.infer<typeof depositSchema>;
@@ -61,7 +75,9 @@ export const workerFormSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().optional().default(""),
   code: z.string().optional(),
-  monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
+  monthlySalary: z
+    .string()
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
   department: z.string().optional(),
   active: z.boolean().default(true),
 });
@@ -70,7 +86,9 @@ export type WorkerFormData = z.infer<typeof workerFormSchema>;
 
 // Employee form schema - omit companyId and employeeType since they're set in the mutation
 export const employeeFormSchema = insertEmployeeSchema.omit({ companyId: true, employeeType: true }).extend({
-  monthlySalary: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
+  monthlySalary: z
+    .string()
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Monthly salary must be >= 0"),
   openingBalance: z.string().optional(),
   employeeGroupId: z.string().optional(),
   salesBonusPct: z.string().optional(),
@@ -105,8 +123,8 @@ export interface SalaryAdvance {
 
 export function getThisMonthRange() {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString('en-CA');
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString('en-CA');
+  const start = new Date(now.getFullYear(), now.getMonth(), 1).toLocaleDateString("en-CA");
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0).toLocaleDateString("en-CA");
   return { start, end };
 }
 
@@ -126,4 +144,3 @@ export function getEmpAvatarColor(name: string) {
 export function getEmpInitials(firstName: string, lastName: string) {
   return `${firstName?.[0] || ""}${lastName?.[0] || ""}`.toUpperCase();
 }
-

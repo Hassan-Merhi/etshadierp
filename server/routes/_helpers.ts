@@ -119,83 +119,106 @@ export async function snapshotVoucherEntries(
   }>
 ): Promise<EntrySnap[]> {
   // Resolve ledger account names
-  const ledgerIds = [...new Set(entries.map(e => e.ledgerAccountId).filter((id): id is number => id != null))];
+  const ledgerIds = [...new Set(entries.map((e) => e.ledgerAccountId).filter((id): id is number => id != null))];
   const ledgerNames: Record<number, string> = {};
   if (ledgerIds.length > 0) {
-    const accts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
-      .from(ledgerAccounts).where(inArray(ledgerAccounts.id, ledgerIds));
-    accts.forEach(a => { ledgerNames[a.id] = a.name; });
+    const accts = await db
+      .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+      .from(ledgerAccounts)
+      .where(inArray(ledgerAccounts.id, ledgerIds));
+    accts.forEach((a) => {
+      ledgerNames[a.id] = a.name;
+    });
   }
 
   // Resolve bank account names
-  const bankIds = [...new Set(entries.map(e => e.bankAccountId).filter((id): id is number => id != null))];
+  const bankIds = [...new Set(entries.map((e) => e.bankAccountId).filter((id): id is number => id != null))];
   const bankNames: Record<number, string> = {};
   if (bankIds.length > 0) {
-    const bnks = await db.select({ id: bankAccounts.id, name: bankAccounts.name })
-      .from(bankAccounts).where(inArray(bankAccounts.id, bankIds));
-    bnks.forEach(b => { bankNames[b.id] = b.name; });
+    const bnks = await db
+      .select({ id: bankAccounts.id, name: bankAccounts.name })
+      .from(bankAccounts)
+      .where(inArray(bankAccounts.id, bankIds));
+    bnks.forEach((b) => {
+      bankNames[b.id] = b.name;
+    });
   }
 
   // Resolve supplier names
-  const supplierIds = [...new Set(entries.map(e => e.supplierId).filter((id): id is number => id != null))];
+  const supplierIds = [...new Set(entries.map((e) => e.supplierId).filter((id): id is number => id != null))];
   const supplierNames: Record<number, string> = {};
   if (supplierIds.length > 0) {
-    const supps = await db.select({ id: suppliers.id, name: suppliers.legalName })
-      .from(suppliers).where(inArray(suppliers.id, supplierIds));
-    supps.forEach(s => { supplierNames[s.id] = s.name; });
+    const supps = await db
+      .select({ id: suppliers.id, name: suppliers.legalName })
+      .from(suppliers)
+      .where(inArray(suppliers.id, supplierIds));
+    supps.forEach((s) => {
+      supplierNames[s.id] = s.name;
+    });
   }
 
   // Resolve employee names (firstName + lastName)
-  const employeeIds = [...new Set(entries.map(e => e.employeeId).filter((id): id is number => id != null))];
+  const employeeIds = [...new Set(entries.map((e) => e.employeeId).filter((id): id is number => id != null))];
   const employeeNames: Record<number, string> = {};
   if (employeeIds.length > 0) {
-    const emps = await db.select({ id: employees.id, firstName: employees.firstName, lastName: employees.lastName })
-      .from(employees).where(inArray(employees.id, employeeIds));
-    emps.forEach(emp => { employeeNames[emp.id] = `${emp.firstName} ${emp.lastName}`.trim(); });
+    const emps = await db
+      .select({ id: employees.id, firstName: employees.firstName, lastName: employees.lastName })
+      .from(employees)
+      .where(inArray(employees.id, employeeIds));
+    emps.forEach((emp) => {
+      employeeNames[emp.id] = `${emp.firstName} ${emp.lastName}`.trim();
+    });
   }
 
   // Resolve customer names
-  const customerIds = [...new Set(entries.map(e => e.customerId).filter((id): id is number => id != null))];
+  const customerIds = [...new Set(entries.map((e) => e.customerId).filter((id): id is number => id != null))];
   const customerNames: Record<number, string> = {};
   if (customerIds.length > 0) {
-    const custs = await db.select({ id: customers.id, name: customers.legalName })
-      .from(customers).where(inArray(customers.id, customerIds));
-    custs.forEach(c => { customerNames[c.id] = c.name; });
+    const custs = await db
+      .select({ id: customers.id, name: customers.legalName })
+      .from(customers)
+      .where(inArray(customers.id, customerIds));
+    custs.forEach((c) => {
+      customerNames[c.id] = c.name;
+    });
   }
 
   // Resolve factory supplier names
-  const factorySupplierIds = [...new Set(entries.map(e => e.factorySupplierId).filter((id): id is number => id != null))];
+  const factorySupplierIds = [
+    ...new Set(entries.map((e) => e.factorySupplierId).filter((id): id is number => id != null)),
+  ];
   const factorySupplierNames: Record<number, string> = {};
   if (factorySupplierIds.length > 0) {
-    const fsupps = await db.select({ id: factorySuppliers.id, name: factorySuppliers.name })
-      .from(factorySuppliers).where(inArray(factorySuppliers.id, factorySupplierIds));
-    fsupps.forEach(s => { factorySupplierNames[s.id] = s.name; });
+    const fsupps = await db
+      .select({ id: factorySuppliers.id, name: factorySuppliers.name })
+      .from(factorySuppliers)
+      .where(inArray(factorySuppliers.id, factorySupplierIds));
+    fsupps.forEach((s) => {
+      factorySupplierNames[s.id] = s.name;
+    });
   }
 
-  return entries.map(e => {
+  return entries.map((e) => {
     const account = e.ledgerAccountId
       ? (ledgerNames[e.ledgerAccountId] ?? `Account #${e.ledgerAccountId}`)
       : e.bankAccountId
-      ? (bankNames[e.bankAccountId] ?? `Bank #${e.bankAccountId}`)
-      : e.supplierId
-      ? (supplierNames[e.supplierId] ?? `Supplier #${e.supplierId}`)
-      : e.employeeId
-      ? (employeeNames[e.employeeId] ?? `Employee #${e.employeeId}`)
-      : e.customerId
-      ? (customerNames[e.customerId] ?? `Customer #${e.customerId}`)
-      : e.factorySupplierId
-      ? (factorySupplierNames[e.factorySupplierId] ?? `Supplier #${e.factorySupplierId}`)
-      : "—";
+        ? (bankNames[e.bankAccountId] ?? `Bank #${e.bankAccountId}`)
+        : e.supplierId
+          ? (supplierNames[e.supplierId] ?? `Supplier #${e.supplierId}`)
+          : e.employeeId
+            ? (employeeNames[e.employeeId] ?? `Employee #${e.employeeId}`)
+            : e.customerId
+              ? (customerNames[e.customerId] ?? `Customer #${e.customerId}`)
+              : e.factorySupplierId
+                ? (factorySupplierNames[e.factorySupplierId] ?? `Supplier #${e.factorySupplierId}`)
+                : "—";
     const snap: EntrySnap = { account, debit: e.debitAmount || "0", credit: e.creditAmount || "0" };
     if (e.narration) snap.narration = e.narration;
     return snap;
   });
 }
 
-export function buildVoucherChangesForCreate(
-  v: VoucherSnap,
-  entries: EntrySnap[]
-): Record<string, { new: any }> {
+export function buildVoucherChangesForCreate(v: VoucherSnap, entries: EntrySnap[]): Record<string, { new: any }> {
   const c: Record<string, { new: any }> = {};
   if (v.voucherType) c.voucherType = { new: v.voucherType };
   if (v.voucherDate) c.date = { new: v.voucherDate };
@@ -206,10 +229,7 @@ export function buildVoucherChangesForCreate(
   return c;
 }
 
-export function buildVoucherChangesForDelete(
-  v: VoucherSnap,
-  entries: EntrySnap[]
-): Record<string, { old: any }> {
+export function buildVoucherChangesForDelete(v: VoucherSnap, entries: EntrySnap[]): Record<string, { old: any }> {
   const c: Record<string, { old: any }> = {};
   if (v.voucherType) c.voucherType = { old: v.voucherType };
   if (v.voucherDate) c.date = { old: v.voucherDate };
@@ -227,10 +247,8 @@ export function buildVoucherChangesForUpdate(
   newEntries: EntrySnap[]
 ): Record<string, { old: any; new: any }> {
   const c: Record<string, { old: any; new: any }> = {};
-  if (oldV.voucherType !== newV.voucherType)
-    c.voucherType = { old: oldV.voucherType, new: newV.voucherType };
-  if (oldV.voucherDate !== newV.voucherDate)
-    c.date = { old: oldV.voucherDate, new: newV.voucherDate };
+  if (oldV.voucherType !== newV.voucherType) c.voucherType = { old: oldV.voucherType, new: newV.voucherType };
+  if (oldV.voucherDate !== newV.voucherDate) c.date = { old: oldV.voucherDate, new: newV.voucherDate };
   if (parseFloat(oldV.totalAmount || "0") !== parseFloat(newV.totalAmount || "0"))
     c.amount = { old: oldV.totalAmount, new: newV.totalAmount };
   if ((oldV.description ?? "") !== (newV.description ?? ""))
@@ -240,27 +258,19 @@ export function buildVoucherChangesForUpdate(
       old: oldV.locationName ?? (oldV.locationId ? `Location #${oldV.locationId}` : null),
       new: newV.locationName ?? (newV.locationId ? `Location #${newV.locationId}` : null),
     };
-  if (oldV.optional !== newV.optional)
-    c.optional = { old: oldV.optional, new: newV.optional };
-  if (JSON.stringify(oldEntries) !== JSON.stringify(newEntries))
-    c.entries = { old: oldEntries, new: newEntries };
+  if (oldV.optional !== newV.optional) c.optional = { old: oldV.optional, new: newV.optional };
+  if (JSON.stringify(oldEntries) !== JSON.stringify(newEntries)) c.entries = { old: oldEntries, new: newEntries };
   return c;
 }
 
 // ─── Exchange rate ────────────────────────────────────────────────────────────
-export async function getCurrentExchangeRate(
-  companyId: number
-): Promise<string | null> {
+export async function getCurrentExchangeRate(companyId: number): Promise<string | null> {
   try {
     const company = await storage.getCompanyById(companyId);
     if (!company || !company.displayCurrency || !company.baseCurrency) {
       return null;
     }
-    const rate = await storage.getLatestExchangeRate(
-      companyId,
-      company.baseCurrency,
-      company.displayCurrency
-    );
+    const rate = await storage.getLatestExchangeRate(companyId, company.baseCurrency, company.displayCurrency);
     return rate?.rate || null;
   } catch (error) {
     console.error("Error fetching exchange rate:", error);
@@ -291,8 +301,7 @@ export async function runIntercompanyPosTransfer(
       .from(companies)
       .where(eq(companies.id, config.destCompanyId));
     const srcCompanyName = srcCompanyRow?.name ?? `Company ${sourceCompanyId}`;
-    const dstCompanyName =
-      dstCompanyRow?.name ?? `Company ${config.destCompanyId}`;
+    const dstCompanyName = dstCompanyRow?.name ?? `Company ${config.destCompanyId}`;
 
     const [cashAccount] = await db
       .select({ name: ledgerAccounts.name })
@@ -304,22 +313,12 @@ export async function runIntercompanyPosTransfer(
     let destCashAccounts = await db
       .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
       .from(ledgerAccounts)
-      .where(
-        and(
-          eq(ledgerAccounts.companyId, config.destCompanyId),
-          eq(ledgerAccounts.name, cashName)
-        )
-      );
+      .where(and(eq(ledgerAccounts.companyId, config.destCompanyId), eq(ledgerAccounts.name, cashName)));
     if (destCashAccounts.length === 0) {
       destCashAccounts = await db
         .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
         .from(ledgerAccounts)
-        .where(
-          and(
-            eq(ledgerAccounts.companyId, config.destCompanyId),
-            ilike(ledgerAccounts.name, cashName)
-          )
-        );
+        .where(and(eq(ledgerAccounts.companyId, config.destCompanyId), ilike(ledgerAccounts.name, cashName)));
     }
     const destCashAccount = destCashAccounts[0] ?? null;
 
@@ -358,20 +357,14 @@ export async function runIntercompanyPosTransfer(
       );
     }
   } catch (err: any) {
-    console.error(
-      "[IntercompanyPOS] Auto-transfer failed:",
-      err?.message ?? err
-    );
+    console.error("[IntercompanyPOS] Auto-transfer failed:", err?.message ?? err);
   }
 }
 
 // ─── Recalculate Intercompany POS for a specific date ─────────────────────────
 // Deletes the existing INTERCO-SRC/DST vouchers for the date and rebuilds them
 // from all non-deleted cash Sales vouchers for that company+date.
-export async function recalculateIntercompanyForDate(
-  companyId: number,
-  date: string
-) {
+export async function recalculateIntercompanyForDate(companyId: number, date: string) {
   try {
     const [config] = await db
       .select()
@@ -390,13 +383,9 @@ export async function recalculateIntercompanyForDate(
       const [existing] = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(
-          and(eq(vouchers.companyId, cId), eq(vouchers.voucherNumber, vNum))
-        );
+        .where(and(eq(vouchers.companyId, cId), eq(vouchers.voucherNumber, vNum)));
       if (existing) {
-        await db
-          .delete(voucherEntries)
-          .where(eq(voucherEntries.voucherId, existing.id));
+        await db.delete(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
         await db.delete(vouchers).where(eq(vouchers.id, existing.id));
       }
     }
@@ -422,12 +411,7 @@ export async function recalculateIntercompanyForDate(
           debitAmount: voucherEntries.debitAmount,
         })
         .from(voucherEntries)
-        .where(
-          and(
-            eq(voucherEntries.voucherId, sv.id),
-            sql`${voucherEntries.debitAmount}::numeric > 0`
-          )
-        );
+        .where(and(eq(voucherEntries.voucherId, sv.id), sql`${voucherEntries.debitAmount}::numeric > 0`));
 
       for (const entry of debitEntries) {
         if (!entry.ledgerAccountId) continue;
@@ -462,52 +446,26 @@ async function upsertIntercompanyVoucher(opts: {
   amount: number;
   debitIsRunningTotal?: boolean;
 }) {
-  const {
-    companyId,
-    voucherNumber,
-    date,
-    narration,
-    debitAccountId,
-    creditAccountId,
-    amount,
-  } = opts;
+  const { companyId, voucherNumber, date, narration, debitAccountId, creditAccountId, amount } = opts;
   const debitIsRunningTotal = opts.debitIsRunningTotal ?? true;
 
   const [existing] = await db
     .select()
     .from(vouchers)
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.voucherNumber, voucherNumber)
-      )
-    );
+    .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, voucherNumber)));
 
   if (existing) {
-    await db
-      .update(vouchers)
-      .set({ description: narration })
-      .where(eq(vouchers.id, existing.id));
+    await db.update(vouchers).set({ description: narration }).where(eq(vouchers.id, existing.id));
 
-    const entries = await db
-      .select()
-      .from(voucherEntries)
-      .where(eq(voucherEntries.voucherId, existing.id));
+    const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
 
     if (debitIsRunningTotal) {
       const existingCrEntry = entries.find(
-        (e) =>
-          e.ledgerAccountId === creditAccountId &&
-          parseFloat(e.creditAmount ?? "0") > 0
+        (e) => e.ledgerAccountId === creditAccountId && parseFloat(e.creditAmount ?? "0") > 0
       );
       if (existingCrEntry) {
-        const newCr = (
-          parseFloat(existingCrEntry.creditAmount ?? "0") + amount
-        ).toFixed(2);
-        await db
-          .update(voucherEntries)
-          .set({ creditAmount: newCr })
-          .where(eq(voucherEntries.id, existingCrEntry.id));
+        const newCr = (parseFloat(existingCrEntry.creditAmount ?? "0") + amount).toFixed(2);
+        await db.update(voucherEntries).set({ creditAmount: newCr }).where(eq(voucherEntries.id, existingCrEntry.id));
       } else {
         await db.insert(voucherEntries).values({
           voucherId: existing.id,
@@ -518,18 +476,13 @@ async function upsertIntercompanyVoucher(opts: {
         });
       }
 
-      const refreshed = await db
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, existing.id));
+      const refreshed = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
       const totalCr = refreshed
         .filter((e) => e.ledgerAccountId !== debitAccountId)
         .reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
 
       const existingDrEntry = refreshed.find(
-        (e) =>
-          e.ledgerAccountId === debitAccountId &&
-          parseFloat(e.debitAmount ?? "0") > 0
+        (e) => e.ledgerAccountId === debitAccountId && parseFloat(e.debitAmount ?? "0") > 0
       );
       if (existingDrEntry) {
         await db
@@ -551,18 +504,11 @@ async function upsertIntercompanyVoucher(opts: {
         .where(eq(vouchers.id, existing.id));
     } else {
       const existingDrEntry = entries.find(
-        (e) =>
-          e.ledgerAccountId === debitAccountId &&
-          parseFloat(e.debitAmount ?? "0") > 0
+        (e) => e.ledgerAccountId === debitAccountId && parseFloat(e.debitAmount ?? "0") > 0
       );
       if (existingDrEntry) {
-        const newDr = (
-          parseFloat(existingDrEntry.debitAmount ?? "0") + amount
-        ).toFixed(2);
-        await db
-          .update(voucherEntries)
-          .set({ debitAmount: newDr })
-          .where(eq(voucherEntries.id, existingDrEntry.id));
+        const newDr = (parseFloat(existingDrEntry.debitAmount ?? "0") + amount).toFixed(2);
+        await db.update(voucherEntries).set({ debitAmount: newDr }).where(eq(voucherEntries.id, existingDrEntry.id));
       } else {
         await db.insert(voucherEntries).values({
           voucherId: existing.id,
@@ -573,18 +519,13 @@ async function upsertIntercompanyVoucher(opts: {
         });
       }
 
-      const refreshed = await db
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, existing.id));
+      const refreshed = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
       const totalDr = refreshed
         .filter((e) => e.ledgerAccountId !== creditAccountId)
         .reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
 
       const existingCrEntry = refreshed.find(
-        (e) =>
-          e.ledgerAccountId === creditAccountId &&
-          parseFloat(e.creditAmount ?? "0") > 0
+        (e) => e.ledgerAccountId === creditAccountId && parseFloat(e.creditAmount ?? "0") > 0
       );
       if (existingCrEntry) {
         await db
@@ -654,12 +595,7 @@ export async function calculateHistoricalLocationInventory(
       averageRate: inventory.averageRate,
     })
     .from(inventory)
-    .where(
-      and(
-        eq(inventory.locationId, locationId),
-        eq(inventory.companyId, companyId)
-      )
-    )
+    .where(and(eq(inventory.locationId, locationId), eq(inventory.companyId, companyId)))
     .execute();
 
   for (const inv of currentInventory) seedStockItemIds.add(inv.stockItemId);
@@ -668,92 +604,49 @@ export async function calculateHistoricalLocationInventory(
     .selectDistinct({ stockItemId: salesItems.stockItemId })
     .from(salesItems)
     .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.locationId, locationId)
-      )
-    )
+    .where(and(eq(vouchers.companyId, companyId), eq(vouchers.locationId, locationId)))
     .execute();
   for (const item of salesStockItems) seedStockItemIds.add(item.stockItemId);
 
   const offloadStockItems = await db
     .selectDistinct({ stockItemId: containerOffloadItems.stockItemId })
     .from(containerOffloadItems)
-    .innerJoin(
-      containerOffloads,
-      eq(containerOffloadItems.offloadId, containerOffloads.id)
-    )
+    .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
     .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
-    .where(
-      and(
-        eq(containers.companyId, companyId),
-        eq(containerOffloads.locationId, locationId)
-      )
-    )
+    .where(and(eq(containers.companyId, companyId), eq(containerOffloads.locationId, locationId)))
     .execute();
   for (const item of offloadStockItems) seedStockItemIds.add(item.stockItemId);
 
   const adjustmentStockItems = await db
     .selectDistinct({ stockItemId: stockAdjustmentItems.stockItemId })
     .from(stockAdjustmentItems)
-    .innerJoin(
-      stockAdjustmentVouchers,
-      eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id)
-    )
+    .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
     .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(stockAdjustmentVouchers.locationId, locationId)
-      )
-    )
+    .where(and(eq(vouchers.companyId, companyId), eq(stockAdjustmentVouchers.locationId, locationId)))
     .execute();
-  for (const item of adjustmentStockItems)
-    seedStockItemIds.add(item.stockItemId);
+  for (const item of adjustmentStockItems) seedStockItemIds.add(item.stockItemId);
 
   const transfersInStockItems = await db
     .selectDistinct({ stockItemId: stockTransferItems.stockItemId })
     .from(stockTransferItems)
-    .innerJoin(
-      stockTransferVouchers,
-      eq(stockTransferItems.transferId, stockTransferVouchers.id)
-    )
+    .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
     .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(stockTransferVouchers.destinationLocationId, locationId)
-      )
-    )
+    .where(and(eq(vouchers.companyId, companyId), eq(stockTransferVouchers.destinationLocationId, locationId)))
     .execute();
-  for (const item of transfersInStockItems)
-    seedStockItemIds.add(item.stockItemId);
+  for (const item of transfersInStockItems) seedStockItemIds.add(item.stockItemId);
 
   const transfersOutStockItems = await db
     .selectDistinct({ stockItemId: stockTransferItems.stockItemId })
     .from(stockTransferItems)
-    .innerJoin(
-      stockTransferVouchers,
-      eq(stockTransferItems.transferId, stockTransferVouchers.id)
-    )
+    .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
     .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(stockTransferItems.sourceLocationId, locationId)
-      )
-    )
+    .where(and(eq(vouchers.companyId, companyId), eq(stockTransferItems.sourceLocationId, locationId)))
     .execute();
-  for (const item of transfersOutStockItems)
-    seedStockItemIds.add(item.stockItemId);
+  for (const item of transfersOutStockItems) seedStockItemIds.add(item.stockItemId);
 
   if (seedStockItemIds.size === 0) return [];
 
-  const inventoryMap = new Map<
-    number,
-    { quantity: number; totalValue: number; rate: number }
-  >();
+  const inventoryMap = new Map<number, { quantity: number; totalValue: number; rate: number }>();
   for (const stockItemId of Array.from(seedStockItemIds)) {
     inventoryMap.set(stockItemId, { quantity: 0, totalValue: 0, rate: 0 });
   }
@@ -796,8 +689,7 @@ export async function calculateHistoricalLocationInventory(
     };
     existing.quantity += qty;
     existing.totalValue += qty * cost;
-    if (existing.quantity > 0)
-      existing.rate = existing.totalValue / existing.quantity;
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(sale.stockItemId, existing);
   }
 
@@ -809,10 +701,7 @@ export async function calculateHistoricalLocationInventory(
       adjustmentType: stockAdjustmentVouchers.adjustmentType,
     })
     .from(stockAdjustmentItems)
-    .innerJoin(
-      stockAdjustmentVouchers,
-      eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id)
-    )
+    .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
     .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
     .where(
       and(
@@ -840,8 +729,7 @@ export async function calculateHistoricalLocationInventory(
       existing.quantity += qty;
       existing.totalValue += qty * rate;
     }
-    if (existing.quantity > 0)
-      existing.rate = existing.totalValue / existing.quantity;
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(adj.stockItemId, existing);
   }
 
@@ -852,10 +740,7 @@ export async function calculateHistoricalLocationInventory(
       rate: stockTransferItems.rate,
     })
     .from(stockTransferItems)
-    .innerJoin(
-      stockTransferVouchers,
-      eq(stockTransferItems.transferId, stockTransferVouchers.id)
-    )
+    .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
     .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
     .where(
       and(
@@ -877,8 +762,7 @@ export async function calculateHistoricalLocationInventory(
     };
     existing.quantity -= qty;
     existing.totalValue -= qty * rate;
-    if (existing.quantity > 0)
-      existing.rate = existing.totalValue / existing.quantity;
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(transfer.stockItemId, existing);
   }
 
@@ -889,10 +773,7 @@ export async function calculateHistoricalLocationInventory(
       rate: stockTransferItems.rate,
     })
     .from(stockTransferItems)
-    .innerJoin(
-      stockTransferVouchers,
-      eq(stockTransferItems.transferId, stockTransferVouchers.id)
-    )
+    .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
     .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
     .where(
       and(
@@ -914,8 +795,7 @@ export async function calculateHistoricalLocationInventory(
     };
     existing.quantity += qty;
     existing.totalValue += qty * rate;
-    if (existing.quantity > 0)
-      existing.rate = existing.totalValue / existing.quantity;
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(transfer.stockItemId, existing);
   }
 
@@ -926,10 +806,7 @@ export async function calculateHistoricalLocationInventory(
       rate: containerOffloadItems.rate,
     })
     .from(containerOffloadItems)
-    .innerJoin(
-      containerOffloads,
-      eq(containerOffloadItems.offloadId, containerOffloads.id)
-    )
+    .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
     .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
     .where(
       and(
@@ -950,8 +827,7 @@ export async function calculateHistoricalLocationInventory(
     };
     existing.quantity -= qty;
     existing.totalValue -= qty * cost;
-    if (existing.quantity > 0)
-      existing.rate = existing.totalValue / existing.quantity;
+    if (existing.quantity > 0) existing.rate = existing.totalValue / existing.quantity;
     inventoryMap.set(offload.stockItemId, existing);
   }
 
@@ -1013,10 +889,7 @@ export async function syncEmployeeBalancesFromEntries(
 ): Promise<void> {
   const allAccounts = await storage.getAllLedgerAccounts(companyId);
 
-  const employeeAccountMap = new Map<
-    number,
-    { code: string; employeeCode: string }
-  >();
+  const employeeAccountMap = new Map<number, { code: string; employeeCode: string }>();
   for (const account of allAccounts) {
     if (account.code && account.code.startsWith("EMP-")) {
       const employeeCode = account.code.replace("EMP-", "");
@@ -1024,14 +897,8 @@ export async function syncEmployeeBalancesFromEntries(
     }
   }
 
-  const employeeChangesById = new Map<
-    number,
-    { balanceChange: number; deposits: number; withdrawals: number }
-  >();
-  const employeeChangesByCode = new Map<
-    string,
-    { balanceChange: number; deposits: number; withdrawals: number }
-  >();
+  const employeeChangesById = new Map<number, { balanceChange: number; deposits: number; withdrawals: number }>();
+  const employeeChangesByCode = new Map<string, { balanceChange: number; deposits: number; withdrawals: number }>();
 
   for (const entry of entries) {
     const debit = parseFloat(entry.debitAmount || "0");
@@ -1058,9 +925,11 @@ export async function syncEmployeeBalancesFromEntries(
     if (entry.ledgerAccountId) {
       const employeeAccount = employeeAccountMap.get(entry.ledgerAccountId);
       if (employeeAccount) {
-        const current = employeeChangesByCode.get(
-          employeeAccount.employeeCode
-        ) || { balanceChange: 0, deposits: 0, withdrawals: 0 };
+        const current = employeeChangesByCode.get(employeeAccount.employeeCode) || {
+          balanceChange: 0,
+          deposits: 0,
+          withdrawals: 0,
+        };
         employeeChangesByCode.set(employeeAccount.employeeCode, {
           balanceChange: current.balanceChange + balanceChange,
           deposits: current.deposits + depositChange,
@@ -1070,27 +939,13 @@ export async function syncEmployeeBalancesFromEntries(
     }
   }
 
-  for (const [employeeId, changes] of Array.from(
-    employeeChangesById.entries()
-  )) {
-    if (
-      changes.balanceChange === 0 &&
-      changes.deposits === 0 &&
-      changes.withdrawals === 0
-    )
-      continue;
+  for (const [employeeId, changes] of Array.from(employeeChangesById.entries())) {
+    if (changes.balanceChange === 0 && changes.deposits === 0 && changes.withdrawals === 0) continue;
     const employee = await storage.getEmployeeById(employeeId);
     if (!employee) continue;
-    const newBalance =
-      parseFloat(employee.currentBalance || "0") + changes.balanceChange;
-    const newDeposits = Math.max(
-      0,
-      parseFloat(employee.totalDeposits || "0") + changes.deposits
-    );
-    const newWithdrawals = Math.max(
-      0,
-      parseFloat(employee.totalWithdrawals || "0") + changes.withdrawals
-    );
+    const newBalance = parseFloat(employee.currentBalance || "0") + changes.balanceChange;
+    const newDeposits = Math.max(0, parseFloat(employee.totalDeposits || "0") + changes.deposits);
+    const newWithdrawals = Math.max(0, parseFloat(employee.totalWithdrawals || "0") + changes.withdrawals);
     await db
       .update(employees)
       .set({
@@ -1101,27 +956,13 @@ export async function syncEmployeeBalancesFromEntries(
       .where(eq(employees.id, employee.id));
   }
 
-  for (const [employeeCode, changes] of Array.from(
-    employeeChangesByCode.entries()
-  )) {
-    if (
-      changes.balanceChange === 0 &&
-      changes.deposits === 0 &&
-      changes.withdrawals === 0
-    )
-      continue;
+  for (const [employeeCode, changes] of Array.from(employeeChangesByCode.entries())) {
+    if (changes.balanceChange === 0 && changes.deposits === 0 && changes.withdrawals === 0) continue;
     const employee = await storage.getEmployeeByCode(employeeCode);
     if (!employee) continue;
-    const newBalance =
-      parseFloat(employee.currentBalance || "0") + changes.balanceChange;
-    const newDeposits = Math.max(
-      0,
-      parseFloat(employee.totalDeposits || "0") + changes.deposits
-    );
-    const newWithdrawals = Math.max(
-      0,
-      parseFloat(employee.totalWithdrawals || "0") + changes.withdrawals
-    );
+    const newBalance = parseFloat(employee.currentBalance || "0") + changes.balanceChange;
+    const newDeposits = Math.max(0, parseFloat(employee.totalDeposits || "0") + changes.deposits);
+    const newWithdrawals = Math.max(0, parseFloat(employee.totalWithdrawals || "0") + changes.withdrawals);
     await db
       .update(employees)
       .set({
@@ -1156,10 +997,7 @@ export async function buildItemLevelChanges(
   resolveNameFn?: (id: number) => Promise<string>
 ): Promise<Record<string, { old?: string; new?: string }>> {
   const nameCache = new Map<number, string>();
-  async function getName(
-    id: number | null | undefined,
-    hint?: string | null
-  ): Promise<string> {
+  async function getName(id: number | null | undefined, hint?: string | null): Promise<string> {
     if (hint) return hint;
     if (!id) return "Unknown Item";
     if (nameCache.has(id)) return nameCache.get(id)!;
@@ -1185,9 +1023,7 @@ export async function buildItemLevelChanges(
       const name = await getName(id, item.itemName);
       const qty = String(item.quantity ?? "");
       const rate = String(item.rate ?? "");
-      const total = String(
-        item.totalAmount ?? item.lineTotal ?? item.totalValue ?? ""
-      );
+      const total = String(item.totalAmount ?? item.lineTotal ?? item.totalValue ?? "");
       changes[`item_added_${++idx}`] = {
         new: `Added ${name}, quantity ${qty}, unit price ${rate}, total ${total}`,
       };
@@ -1199,9 +1035,7 @@ export async function buildItemLevelChanges(
       const name = await getName(id, item.itemName);
       const qty = String(item.quantity ?? "");
       const rate = String(item.rate ?? "");
-      const total = String(
-        item.totalAmount ?? item.lineTotal ?? item.totalValue ?? ""
-      );
+      const total = String(item.totalAmount ?? item.lineTotal ?? item.totalValue ?? "");
       changes[`item_removed_${++idx}`] = {
         old: `Removed ${name}, quantity ${qty}, rate ${rate}, total ${total}`,
       };

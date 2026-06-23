@@ -12,13 +12,49 @@ import FactoryWorkerAttendanceReport from "@/pages/factory/FactoryWorkerAttendan
 
 type TabValue = "workers" | "payroll" | "attendance" | "report" | "advances" | "bonuses";
 
-const ALL_TAB_OPTIONS: { value: TabValue; label: string; icon: React.ElementType; settingKey?: string; hiddenKey?: string }[] = [
-  { value: "workers",    label: "Workers",    icon: HardHat },
-  { value: "payroll",    label: "Payroll",    icon: DollarSign,  settingKey: "workersTabPayrollEnabled",    hiddenKey: "hide_tab_workers_payroll" },
-  { value: "attendance", label: "Attendance", icon: CalendarDays, settingKey: "workersTabAttendanceEnabled", hiddenKey: "hide_tab_workers_attendance" },
-  { value: "report",     label: "Report",     icon: BarChart3,   settingKey: "workersTabReportEnabled",     hiddenKey: "hide_tab_workers_report" },
-  { value: "advances",   label: "Advances",   icon: Banknote,    settingKey: "workersTabAdvancesEnabled",   hiddenKey: "hide_tab_workers_advances" },
-  { value: "bonuses",    label: "Bonuses",    icon: Gift,        settingKey: "workersTabBonusesEnabled",    hiddenKey: "hide_tab_workers_bonuses" },
+const ALL_TAB_OPTIONS: {
+  value: TabValue;
+  label: string;
+  icon: React.ElementType;
+  settingKey?: string;
+  hiddenKey?: string;
+}[] = [
+  { value: "workers", label: "Workers", icon: HardHat },
+  {
+    value: "payroll",
+    label: "Payroll",
+    icon: DollarSign,
+    settingKey: "workersTabPayrollEnabled",
+    hiddenKey: "hide_tab_workers_payroll",
+  },
+  {
+    value: "attendance",
+    label: "Attendance",
+    icon: CalendarDays,
+    settingKey: "workersTabAttendanceEnabled",
+    hiddenKey: "hide_tab_workers_attendance",
+  },
+  {
+    value: "report",
+    label: "Report",
+    icon: BarChart3,
+    settingKey: "workersTabReportEnabled",
+    hiddenKey: "hide_tab_workers_report",
+  },
+  {
+    value: "advances",
+    label: "Advances",
+    icon: Banknote,
+    settingKey: "workersTabAdvancesEnabled",
+    hiddenKey: "hide_tab_workers_advances",
+  },
+  {
+    value: "bonuses",
+    label: "Bonuses",
+    icon: Gift,
+    settingKey: "workersTabBonusesEnabled",
+    hiddenKey: "hide_tab_workers_bonuses",
+  },
 ];
 
 function getInitialTab(): TabValue {
@@ -50,7 +86,10 @@ export default function FactoryWorkersHub() {
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
-    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    queryFn: async () => {
+      const r = await fetch("/api/factory/settings");
+      return r.ok ? r.json() : {};
+    },
     staleTime: 60000,
   });
 

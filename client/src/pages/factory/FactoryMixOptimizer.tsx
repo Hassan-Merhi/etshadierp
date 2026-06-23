@@ -36,9 +36,7 @@ interface Supplier {
 export default function FactoryMixOptimizer() {
   const [targetProduct, setTargetProduct] = useState("");
   const [desiredMargin, setDesiredMargin] = useState(20);
-  const [materials, setMaterials] = useState<MaterialRow[]>([
-    { supplierId: "", kgAvailable: 0, costPerKg: 0 },
-  ]);
+  const [materials, setMaterials] = useState<MaterialRow[]>([{ supplierId: "", kgAvailable: 0, costPerKg: 0 }]);
 
   const productsQuery = useQuery<BaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
@@ -69,9 +67,7 @@ export default function FactoryMixOptimizer() {
   }
 
   function updateMaterial(index: number, field: keyof MaterialRow, value: string | number) {
-    setMaterials((prev) =>
-      prev.map((m, i) => (i === index ? { ...m, [field]: value } : m))
-    );
+    setMaterials((prev) => prev.map((m, i) => (i === index ? { ...m, [field]: value } : m)));
   }
 
   function handleOptimize() {
@@ -98,11 +94,7 @@ export default function FactoryMixOptimizer() {
                   <span className="text-sm text-muted-foreground">Loading products...</span>
                 </div>
               ) : (
-                <Select
-                  value={targetProduct}
-                  onValueChange={setTargetProduct}
-                  data-testid="select-target-product"
-                >
+                <Select value={targetProduct} onValueChange={setTargetProduct} data-testid="select-target-product">
                   <SelectTrigger data-testid="select-trigger-target-product">
                     <SelectValue placeholder="Select a product" />
                   </SelectTrigger>
@@ -157,10 +149,7 @@ export default function FactoryMixOptimizer() {
                   >
                     <div className="space-y-1">
                       <Label className="text-xs text-muted-foreground">Supplier</Label>
-                      <Select
-                        value={mat.supplierId}
-                        onValueChange={(val) => updateMaterial(idx, "supplierId", val)}
-                      >
+                      <Select value={mat.supplierId} onValueChange={(val) => updateMaterial(idx, "supplierId", val)}>
                         <SelectTrigger data-testid={`select-trigger-supplier-${idx}`}>
                           <SelectValue placeholder="Select supplier" />
                         </SelectTrigger>
@@ -283,7 +272,10 @@ export default function FactoryMixOptimizer() {
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Expected Profit</p>
-                        <p className="font-mono font-medium text-green-600 dark:text-green-400" data-testid={`text-profit-${idx}`}>
+                        <p
+                          className="font-mono font-medium text-green-600 dark:text-green-400"
+                          data-testid={`text-profit-${idx}`}
+                        >
                           ${suggestion.expectedProfit.toFixed(2)}
                         </p>
                       </div>

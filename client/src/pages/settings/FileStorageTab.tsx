@@ -7,12 +7,18 @@ import { readFromBuffer } from "@/lib/excelHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Upload, Download, Trash2, Eye, Pencil,
-  ArrowRightLeft, Search, Loader2, Database, ChevronRight,
+  Upload,
+  Download,
+  Trash2,
+  Eye,
+  Pencil,
+  ArrowRightLeft,
+  Search,
+  Loader2,
+  Database,
+  ChevronRight,
 } from "lucide-react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -93,10 +99,7 @@ export function FileStorageTab() {
   });
 
   const folderFiles = allFiles.filter((f) => {
-    const match =
-      selectedFolderId === "unfiled"
-        ? f.folderId == null
-        : f.folderId === selectedFolderId;
+    const match = selectedFolderId === "unfiled" ? f.folderId == null : f.folderId === selectedFolderId;
     if (!match) return false;
     if (!search.trim()) return true;
     return visibleName(f).toLowerCase().includes(search.toLowerCase());
@@ -127,7 +130,9 @@ export function FileStorageTab() {
       setNewFolderOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/file-folders"] });
     },
-    onError: (e: any) => { if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const renameFolderMutation = useMutation({
@@ -138,7 +143,9 @@ export function FileStorageTab() {
       setRenameFolderOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/file-folders"] });
     },
-    onError: (e: any) => { if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const deleteFolderMutation = useMutation({
@@ -163,7 +170,10 @@ export function FileStorageTab() {
         formData.append("folderId", String(selectedFolderId));
       }
       const res = await fetch("/api/files/upload", { method: "POST", body: formData, credentials: "include" });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Upload failed"); }
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -171,7 +181,9 @@ export function FileStorageTab() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
-    onError: (e: any) => { if (!e?._handledGlobally) toast({ title: "Upload failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (!e?._handledGlobally) toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const renameFileMutation = useMutation({
@@ -182,7 +194,9 @@ export function FileStorageTab() {
       setRenameFileOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
-    onError: (e: any) => { if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const moveFileMutation = useMutation({
@@ -193,7 +207,9 @@ export function FileStorageTab() {
       setMoveFileOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
-    onError: (e: any) => { if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const deleteFileMutation = useMutation({
@@ -203,7 +219,9 @@ export function FileStorageTab() {
       setDeleteFileId(null);
       queryClient.invalidateQueries({ queryKey: ["/api/files"] });
     },
-    onError: (e: any) => { if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (!e?._handledGlobally) toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const handleDownload = async (file: StoredFile) => {
@@ -252,18 +270,26 @@ export function FileStorageTab() {
         setPreview({ file, type, blobUrl: url, loading: false });
       } else if (type === "csv") {
         const text = await res.text();
-        const rows = text.split("\n").filter(Boolean).map((line) => {
-          const result: string[] = [];
-          let cur = "";
-          let inQ = false;
-          for (const ch of line) {
-            if (ch === '"') { inQ = !inQ; }
-            else if (ch === "," && !inQ) { result.push(cur); cur = ""; }
-            else { cur += ch; }
-          }
-          result.push(cur);
-          return result;
-        });
+        const rows = text
+          .split("\n")
+          .filter(Boolean)
+          .map((line) => {
+            const result: string[] = [];
+            let cur = "";
+            let inQ = false;
+            for (const ch of line) {
+              if (ch === '"') {
+                inQ = !inQ;
+              } else if (ch === "," && !inQ) {
+                result.push(cur);
+                cur = "";
+              } else {
+                cur += ch;
+              }
+            }
+            result.push(cur);
+            return result;
+          });
         setPreview({ file, type, rows, loading: false });
       } else if (type === "text") {
         const text = await res.text();
@@ -285,14 +311,12 @@ export function FileStorageTab() {
         setPreview({ file, type: "unsupported", loading: false });
       }
     } catch {
-      setPreview((p) => p ? { ...p, loading: false, error: true } : null);
+      setPreview((p) => (p ? { ...p, loading: false, error: true } : null));
     }
   };
 
   const currentFolderName =
-    selectedFolderId === "unfiled"
-      ? "Unfiled"
-      : folders.find((f) => f.id === selectedFolderId)?.name ?? "Files";
+    selectedFolderId === "unfiled" ? "Unfiled" : (folders.find((f) => f.id === selectedFolderId)?.name ?? "Files");
 
   return (
     <div className="space-y-4">
@@ -340,9 +364,15 @@ export function FileStorageTab() {
               data-testid="button-upload-file"
             >
               {uploadMutation.isPending ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading...</>
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Uploading...
+                </>
               ) : (
-                <><Upload className="h-4 w-4 mr-2" />Upload</>
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload
+                </>
               )}
             </Button>
             <input
@@ -350,7 +380,10 @@ export function FileStorageTab() {
               type="file"
               className="hidden"
               accept=".pdf,.jpg,.jpeg,.png,.webp,.xls,.xlsx,.csv,.doc,.docx,.txt,.gif,.bmp,.svg"
-              onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadMutation.mutate({ file }); }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) uploadMutation.mutate({ file });
+              }}
               data-testid="input-file-picker"
             />
           </div>
@@ -359,12 +392,16 @@ export function FileStorageTab() {
           <div className="border rounded-md overflow-hidden">
             {filesLoading ? (
               <div className="p-4 space-y-2">
-                {[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
               </div>
             ) : folderFiles.length === 0 ? (
               <div className="p-10 text-center text-muted-foreground">
                 <Database className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">{search ? "No files match your search." : "No files in this folder. Upload a file above."}</p>
+                <p className="text-sm">
+                  {search ? "No files match your search." : "No files in this folder. Upload a file above."}
+                </p>
               </div>
             ) : (
               <Table>
@@ -387,12 +424,18 @@ export function FileStorageTab() {
                         <div className="flex flex-col">
                           <span className="font-medium text-sm truncate max-w-[260px]">{visibleName(file)}</span>
                           {file.displayName && (
-                            <span className="text-xs text-muted-foreground truncate max-w-[260px]">{file.fileName}</span>
+                            <span className="text-xs text-muted-foreground truncate max-w-[260px]">
+                              {file.fileName}
+                            </span>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground font-mono text-xs">{formatSize(file.fileSize)}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">{formatDisplayDate(file.uploadedAt)}</TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-xs">
+                        {formatSize(file.fileSize)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {formatDisplayDate(file.uploadedAt)}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-0.5">
                           <Button
@@ -409,7 +452,11 @@ export function FileStorageTab() {
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={() => { setRenameFileId(file.id); setRenameFileName(visibleName(file)); setRenameFileOpen(true); }}
+                            onClick={() => {
+                              setRenameFileId(file.id);
+                              setRenameFileName(visibleName(file));
+                              setRenameFileOpen(true);
+                            }}
                             title="Rename"
                             data-testid={`button-rename-file-${file.id}`}
                           >
@@ -419,7 +466,11 @@ export function FileStorageTab() {
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={() => { setMoveFileId(file.id); setMoveFolderTarget(file.folderId ? String(file.folderId) : "unfiled"); setMoveFileOpen(true); }}
+                            onClick={() => {
+                              setMoveFileId(file.id);
+                              setMoveFolderTarget(file.folderId ? String(file.folderId) : "unfiled");
+                              setMoveFileOpen(true);
+                            }}
                             title="Move"
                             data-testid={`button-move-file-${file.id}`}
                           >
@@ -439,7 +490,10 @@ export function FileStorageTab() {
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={() => { setDeleteFileId(file.id); setDeleteFileName(visibleName(file)); }}
+                            onClick={() => {
+                              setDeleteFileId(file.id);
+                              setDeleteFileName(visibleName(file));
+                            }}
                             title="Delete"
                             data-testid={`button-delete-file-${file.id}`}
                           >

@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
-import {
-  Loader2, CheckCircle, XCircle, Minus, AlertCircle, Activity, MapPin,
-  Settings2,
-} from "lucide-react";
+import { Loader2, CheckCircle, XCircle, Minus, AlertCircle, Activity, MapPin, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,18 +30,33 @@ export interface ProgressStep {
 }
 
 export function trackingStatusBadge(status: string | null | undefined) {
-  if (!status) return <Badge variant="secondary" className="text-xs">No data</Badge>;
+  if (!status)
+    return (
+      <Badge variant="secondary" className="text-xs">
+        No data
+      </Badge>
+    );
   const s = status.toLowerCase();
   if (s.includes("transit") || s.includes("depart") || s.includes("vessel") || s.includes("at sea")) {
-    return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{status}</Badge>;
+    return (
+      <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{status}</Badge>
+    );
   }
   if (s.includes("discharg") || s.includes("arrival") || s.includes("arrived") || s.includes("port")) {
-    return <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{status}</Badge>;
+    return (
+      <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{status}</Badge>
+    );
   }
   if (s.includes("deliver") || s.includes("final") || s.includes("complete")) {
-    return <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{status}</Badge>;
+    return (
+      <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{status}</Badge>
+    );
   }
-  return <Badge variant="outline" className="text-xs">{status}</Badge>;
+  return (
+    <Badge variant="outline" className="text-xs">
+      {status}
+    </Badge>
+  );
 }
 
 function ProgressStepIcon({ status }: { status: ProgressStep["status"] }) {
@@ -77,7 +89,12 @@ export function EventTimelineSheet({
   });
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <SheetContent className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
         <SheetHeader className="px-6 py-4 border-b shrink-0">
           <SheetTitle className="flex items-center gap-2 text-base">
@@ -113,7 +130,9 @@ export function EventTimelineSheet({
                   return (
                     <li key={ev.id} className="ml-4 pb-6 last:pb-0">
                       <span className="absolute -left-1.5 flex h-3 w-3 items-center justify-center rounded-full border bg-background ring-2 ring-background">
-                        <span className={`h-1.5 w-1.5 rounded-full ${idx === 0 ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${idx === 0 ? "bg-blue-500" : "bg-muted-foreground/40"}`}
+                        />
                       </span>
                       <div className="flex flex-col gap-0.5">
                         <p className="text-sm font-medium leading-snug">{ev.description ?? ev.status ?? "—"}</p>
@@ -124,7 +143,9 @@ export function EventTimelineSheet({
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground/70 mt-0.5">
-                          {dt ? `${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "—"}
+                          {dt
+                            ? `${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                            : "—"}
                           {ev.provider && <span className="ml-2 opacity-60">via {ev.provider}</span>}
                         </p>
                       </div>
@@ -184,7 +205,12 @@ export function TrackingSettingsSheet({
   });
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <SheetContent className="w-full sm:max-w-sm flex flex-col gap-0 p-0">
         <SheetHeader className="px-6 py-4 border-b shrink-0">
           <SheetTitle className="flex items-center gap-2 text-base">
@@ -199,7 +225,9 @@ export function TrackingSettingsSheet({
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Enable Tracking</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Allow this container to be tracked via carrier APIs</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Allow this container to be tracked via carrier APIs
+              </p>
             </div>
             <Switch checked={enabled} onCheckedChange={setEnabled} data-testid="switch-tracking-enabled" />
           </div>
@@ -207,14 +235,25 @@ export function TrackingSettingsSheet({
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Auto Update</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Let the scheduler check this container automatically</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Let the scheduler check this container automatically
+              </p>
             </div>
-            <Switch checked={autoUpdate} onCheckedChange={setAutoUpdate} disabled={!enabled} data-testid="switch-auto-update" />
+            <Switch
+              checked={autoUpdate}
+              onCheckedChange={setAutoUpdate}
+              disabled={!enabled}
+              data-testid="switch-auto-update"
+            />
           </div>
           <Separator />
           <div className="space-y-2">
-            <Label htmlFor="carrier-hint" className="text-sm font-medium">Carrier Hint</Label>
-            <p className="text-xs text-muted-foreground">Optional — helps the system find the right carrier faster (e.g. MAERSK, CMA)</p>
+            <Label htmlFor="carrier-hint" className="text-sm font-medium">
+              Carrier Hint
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Optional — helps the system find the right carrier faster (e.g. MAERSK, CMA)
+            </p>
             <Input
               id="carrier-hint"
               value={carrierHint}
@@ -259,7 +298,9 @@ export function TrackNowProgressLog({ containerId }: { containerId: number }) {
       }
     };
     poll();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [containerId]);
 
   if (steps.length === 0) {

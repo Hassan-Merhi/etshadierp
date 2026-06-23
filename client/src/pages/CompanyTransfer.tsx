@@ -10,21 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -103,10 +90,7 @@ export default function CompanyTransfer() {
 
   const fromCompanyId = currentCompany?.id;
 
-  const otherCompanies = useMemo(
-    () => companies.filter(c => c.id !== fromCompanyId),
-    [companies, fromCompanyId],
-  );
+  const otherCompanies = useMemo(() => companies.filter((c) => c.id !== fromCompanyId), [companies, fromCompanyId]);
 
   // Accounts for current (from) company
   const { data: fromAccounts = [] } = useQuery<LedgerAccount[]>({
@@ -141,8 +125,7 @@ export default function CompanyTransfer() {
   const autoConfigQueries = [cfgProperties, cfgErp, cfgFactory];
 
   const undoMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest("DELETE", `/api/simple-company-transfer/${id}`),
+    mutationFn: (id: number) => apiRequest("DELETE", `/api/simple-company-transfer/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/simple-company-transfers"] });
       toast({ title: "Transfer reversed", description: "Both entries removed." });
@@ -200,14 +183,16 @@ export default function CompanyTransfer() {
   };
 
   const toggleCashAccount = (id: number) => {
-    setRuleCashAccountIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
+    setRuleCashAccountIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
   const handleSaveRule = () => {
     if (!addingModule || !ruleDestCompanyId || !ruleDestAccountId) {
-      toast({ title: "Missing fields", description: "Select destination company and account.", variant: "destructive" });
+      toast({
+        title: "Missing fields",
+        description: "Select destination company and account.",
+        variant: "destructive",
+      });
       return;
     }
     saveRuleMutation.mutate({
@@ -221,13 +206,15 @@ export default function CompanyTransfer() {
     });
   };
 
-  const accountOptions = (list: LedgerAccount[]) =>
-    list.filter(a => a.code !== "TRANSFER-CLEARING");
+  const accountOptions = (list: LedgerAccount[]) => list.filter((a) => a.code !== "TRANSFER-CLEARING");
 
   return (
     <div className="flex flex-col h-full overflow-auto">
       <div className="border-b px-6 py-4 shrink-0">
-        <PageHeader title="Company Transfer" subtitle="Move a balance from one company to another. The amount is removed from the source and added to the destination." />
+        <PageHeader
+          title="Company Transfer"
+          subtitle="Move a balance from one company to another. The amount is removed from the source and added to the destination."
+        />
       </div>
 
       <div className="p-6 space-y-6">
@@ -239,7 +226,8 @@ export default function CompanyTransfer() {
               Automatic Transfer Rules
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              When a rental payment is recorded, all matching rules fire automatically. Add multiple rules per module to route different cash accounts to different destinations.
+              When a rental payment is recorded, all matching rules fire automatically. Add multiple rules per module to
+              route different cash accounts to different destinations.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -264,7 +252,8 @@ export default function CompanyTransfer() {
                         onClick={() => openAddRule(mod)}
                         data-testid={`button-add-rule-${mod}`}
                       >
-                        <Plus className="h-3.5 w-3.5 mr-1" />Add Rule
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Add Rule
                       </Button>
                     )}
                     {isAdding && (
@@ -277,7 +266,7 @@ export default function CompanyTransfer() {
                   {/* Existing rules list */}
                   {rules.length > 0 && (
                     <div className="space-y-1.5">
-                      {rules.map(rule => (
+                      {rules.map((rule) => (
                         <div
                           key={rule.id}
                           className="flex flex-wrap items-start justify-between gap-2 rounded-md bg-muted/40 px-3 py-2"
@@ -289,16 +278,21 @@ export default function CompanyTransfer() {
                                 {rule.enabled ? "Active" : "Paused"}
                               </Badge>
                               <span className="text-muted-foreground">→</span>
-                              <span className="font-medium">{rule.destCompanyName ?? `Company #${rule.destCompanyId}`}</span>
+                              <span className="font-medium">
+                                {rule.destCompanyName ?? `Company #${rule.destCompanyId}`}
+                              </span>
                               {rule.destAccountName && (
                                 <span className="text-muted-foreground">/ {rule.destAccountName}</span>
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground">
                               Triggers on:{" "}
-                              {(rule.sourceCashAccountIds ?? []).length > 0
-                                ? (rule.sourceAccountNames ?? []).map(a => a.name).join(", ") || `${rule.sourceCashAccountIds.length} account(s)`
-                                : <em>all cash accounts</em>}
+                              {(rule.sourceCashAccountIds ?? []).length > 0 ? (
+                                (rule.sourceAccountNames ?? []).map((a) => a.name).join(", ") ||
+                                `${rule.sourceCashAccountIds.length} account(s)`
+                              ) : (
+                                <em>all cash accounts</em>
+                              )}
                             </p>
                           </div>
                           <Button
@@ -323,15 +317,20 @@ export default function CompanyTransfer() {
                           <Label className="text-xs">Destination Company</Label>
                           <Select
                             value={ruleDestCompanyId}
-                            onValueChange={v => { setRuleDestCompanyId(v); setRuleDestAccountId(""); }}
+                            onValueChange={(v) => {
+                              setRuleDestCompanyId(v);
+                              setRuleDestAccountId("");
+                            }}
                             data-testid={`select-rule-dest-company-${mod}`}
                           >
                             <SelectTrigger>
                               <SelectValue placeholder="Select company" />
                             </SelectTrigger>
                             <SelectContent>
-                              {otherCompanies.map(c => (
-                                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                              {otherCompanies.map((c) => (
+                                <SelectItem key={c.id} value={String(c.id)}>
+                                  {c.name}
+                                </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -345,10 +344,12 @@ export default function CompanyTransfer() {
                             data-testid={`select-rule-dest-account-${mod}`}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder={ruleDestCompanyId ? "Select account" : "Select company first"} />
+                              <SelectValue
+                                placeholder={ruleDestCompanyId ? "Select account" : "Select company first"}
+                              />
                             </SelectTrigger>
                             <SelectContent>
-                              {accountOptions(ruleDestAccounts).map(a => (
+                              {accountOptions(ruleDestAccounts).map((a) => (
                                 <SelectItem key={a.id} value={String(a.id)}>
                                   {a.name}
                                   <span className="text-muted-foreground text-xs ml-1">({a.accountType})</span>
@@ -363,10 +364,12 @@ export default function CompanyTransfer() {
                       <div className="space-y-1.5">
                         <Label className="text-xs">
                           Trigger on cash accounts
-                          <span className="text-muted-foreground font-normal ml-1">(leave all unchecked = every cash account)</span>
+                          <span className="text-muted-foreground font-normal ml-1">
+                            (leave all unchecked = every cash account)
+                          </span>
                         </Label>
                         <div className="rounded-md border p-2 flex flex-wrap gap-x-4 gap-y-1.5">
-                          {accountOptions(fromAccounts).map(a => (
+                          {accountOptions(fromAccounts).map((a) => (
                             <label
                               key={a.id}
                               className="flex items-center gap-1.5 cursor-pointer text-sm select-none"
@@ -391,7 +394,12 @@ export default function CompanyTransfer() {
                         {ruleCashAccountIds.length > 0 && (
                           <p className="text-xs text-muted-foreground">
                             Only when payment uses:{" "}
-                            <strong>{accountOptions(fromAccounts).filter(a => ruleCashAccountIds.includes(a.id)).map(a => a.name).join(", ")}</strong>
+                            <strong>
+                              {accountOptions(fromAccounts)
+                                .filter((a) => ruleCashAccountIds.includes(a.id))
+                                .map((a) => a.name)
+                                .join(", ")}
+                            </strong>
                           </p>
                         )}
                       </div>
@@ -445,7 +453,7 @@ export default function CompanyTransfer() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transfers.map(t => (
+                  {transfers.map((t) => (
                     <TableRow key={t.id} data-testid={`row-transfer-${t.id}`}>
                       <TableCell className="text-sm">{t.transferDate}</TableCell>
                       <TableCell className="font-medium text-sm">{t.fromCompanyName}</TableCell>
@@ -476,16 +484,22 @@ export default function CompanyTransfer() {
       </div>
 
       {/* Undo transfer dialog */}
-      <AlertDialog open={!!undoTarget} onOpenChange={open => { if (!open) setUndoTarget(null); }}>
+      <AlertDialog
+        open={!!undoTarget}
+        onOpenChange={(open) => {
+          if (!open) setUndoTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Reverse this transfer?</AlertDialogTitle>
             <AlertDialogDescription>
               {undoTarget && (
                 <>
-                  This will remove the <strong>{formatAmount(parseFloat(undoTarget.amount))}</strong> transfer
-                  from <strong>{undoTarget.fromCompanyName}</strong> to <strong>{undoTarget.toCompanyName}</strong>{" "}
-                  on <strong>{undoTarget.transferDate}</strong>.<br /><br />
+                  This will remove the <strong>{formatAmount(parseFloat(undoTarget.amount))}</strong> transfer from{" "}
+                  <strong>{undoTarget.fromCompanyName}</strong> to <strong>{undoTarget.toCompanyName}</strong> on{" "}
+                  <strong>{undoTarget.transferDate}</strong>.<br />
+                  <br />
                   Both entries will be deleted and the balances will return to what they were before.
                 </>
               )}
@@ -505,7 +519,12 @@ export default function CompanyTransfer() {
       </AlertDialog>
 
       {/* Delete rule confirmation */}
-      <AlertDialog open={!!deleteConfirmRuleId} onOpenChange={open => { if (!open) setDeleteConfirmRuleId(null); }}>
+      <AlertDialog
+        open={!!deleteConfirmRuleId}
+        onOpenChange={(open) => {
+          if (!open) setDeleteConfirmRuleId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove this auto-transfer rule?</AlertDialogTitle>

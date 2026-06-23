@@ -3,22 +3,66 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { requireActionAccess } from "../lib/permissionMiddleware";
+import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries } from "./_helpers";
 import {
-  upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries,
-} from "./_helpers";
-import {
-  locations, inventory, stockItems, stockGroups, ledgerAccounts, employees,
-  employeeGroups, employeeGroupMembers, 
-  suppliers, customers, customerBalances, customerOrders,
-  stockTransferVouchers, stockTransferItems, stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, vouchers, voucherEntries, salesItems,
-  insertLocationSchema, insertLedgerAccountSchema, updateLedgerAccountSchema,
-  insertEmployeeSchema, insertEmployeeGroupSchema, insertSupplierSchema, insertCustomerSchema,
-  userLocations, userCompanyRoles, companies, bankAccounts, fixedAssets,
-  agentAccounts, auditLog, users, FEATURE_KEYS, stockItemCodeAliases,
+  locations,
+  inventory,
+  stockItems,
+  stockGroups,
+  ledgerAccounts,
+  employees,
+  employeeGroups,
+  employeeGroupMembers,
+  suppliers,
+  customers,
+  customerBalances,
+  customerOrders,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  insertLocationSchema,
+  insertLedgerAccountSchema,
+  updateLedgerAccountSchema,
+  insertEmployeeSchema,
+  insertEmployeeGroupSchema,
+  insertSupplierSchema,
+  insertCustomerSchema,
+  userLocations,
+  userCompanyRoles,
+  companies,
+  bankAccounts,
+  fixedAssets,
+  agentAccounts,
+  auditLog,
+  users,
+  FEATURE_KEYS,
+  stockItemCodeAliases,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -95,7 +139,13 @@ export function registerInventoryRoutes(app: Express) {
         .limit(pageSizeNum)
         .offset(offset);
 
-      return res.json({ data, page: pageNum, pageSize: pageSizeNum, total, totalPages: Math.ceil(total / pageSizeNum) });
+      return res.json({
+        data,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        total,
+        totalPages: Math.ceil(total / pageSizeNum),
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -105,11 +155,11 @@ export function registerInventoryRoutes(app: Express) {
   app.post("/api/inventory/quick-adjust", requireAuth, async (req, res) => {
     try {
       const { stockItemId, locationId, quantity, type } = req.body;
-      
+
       if (!stockItemId || !locationId || !quantity || !type) {
         return res.status(400).json({ message: "Missing required fields: stockItemId, locationId, quantity, type" });
       }
-      
+
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -117,18 +167,23 @@ export function registerInventoryRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       // Block quick-adjust for supplier_partner companies (bypasses sp_stock_movements)
       {
-        const [spCo] = await db.select({ companyType: companies.companyType })
-          .from(companies).where(eq(companies.id, companyId)).limit(1);
+        const [spCo] = await db
+          .select({ companyType: companies.companyType })
+          .from(companies)
+          .where(eq(companies.id, companyId))
+          .limit(1);
         if (spCo?.companyType === "supplier_partner") {
-          return res.status(403).json({ message: "Supplier Partner companies must use SP Sales / SP Containers for this action." });
+          return res
+            .status(403)
+            .json({ message: "Supplier Partner companies must use SP Sales / SP Containers for this action." });
         }
       }
       const qty = parseFloat(quantity);
-      
+
       if (isNaN(qty) || qty <= 0) {
         return res.status(400).json({ message: "Quantity must be a positive number" });
       }
-      
+
       if (type !== "add" && type !== "subtract") {
         return res.status(400).json({ message: "Type must be 'add' or 'subtract'" });
       }
@@ -157,12 +212,7 @@ export function registerInventoryRoutes(app: Express) {
         const [existingInv] = await tx
           .select()
           .from(inventory)
-          .where(
-            and(
-              eq(inventory.stockItemId, stockItemId),
-              eq(inventory.locationId, locationId)
-            )
-          )
+          .where(and(eq(inventory.stockItemId, stockItemId), eq(inventory.locationId, locationId)))
           .limit(1);
 
         const currentQty = existingInv ? parseFloat(existingInv.quantity || "0") : 0;
@@ -175,13 +225,7 @@ export function registerInventoryRoutes(app: Express) {
         }
 
         // Use adjustInventory helper to handle both insert and update
-        const adjustResult = await adjustInventory(
-          tx,
-          locationId,
-          stockItemId,
-          adjustedQty,
-          companyId
-        );
+        const adjustResult = await adjustInventory(tx, locationId, stockItemId, adjustedQty, companyId);
 
         return {
           currentQty: adjustResult.previousQuantity,
@@ -206,7 +250,9 @@ export function registerInventoryRoutes(app: Express) {
             adjustment: { new: `${type === "add" ? "+" : "-"}${qty}` },
           },
         });
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
       res.json({
         message: `Successfully ${type === "add" ? "added" : "subtracted"} ${qty} units. New quantity: ${result.newQty}`,
         previousQuantity: result.currentQty,
@@ -215,7 +261,8 @@ export function registerInventoryRoutes(app: Express) {
       });
     } catch (error: any) {
       console.error("Quick adjust error:", error);
-      const isBusinessError = error.message?.includes("Cannot subtract") || error.message?.includes("non-existent inventory");
+      const isBusinessError =
+        error.message?.includes("Cannot subtract") || error.message?.includes("non-existent inventory");
       res.status(isBusinessError ? 400 : 500).json({ message: error.message });
     }
   });
@@ -225,10 +272,7 @@ export function registerInventoryRoutes(app: Express) {
       const companyId = req.session.currentCompanyId!;
       const issues: any[] = [];
 
-      const allInventory = await db
-        .select()
-        .from(inventory)
-        .where(eq(inventory.companyId, companyId));
+      const allInventory = await db.select().from(inventory).where(eq(inventory.companyId, companyId));
 
       for (const inv of allInventory) {
         const qty = parseFloat(inv.quantity || "0");
@@ -286,8 +330,8 @@ export function registerInventoryRoutes(app: Express) {
         }
       }
 
-      const locationIds = Array.from(new Set(allInventory.map(i => i.locationId)));
-      const stockItemIds = Array.from(new Set(allInventory.map(i => i.stockItemId)));
+      const locationIds = Array.from(new Set(allInventory.map((i) => i.locationId)));
+      const stockItemIds = Array.from(new Set(allInventory.map((i) => i.stockItemId)));
 
       const duplicateCheck = new Map<string, number>();
       for (const inv of allInventory) {
@@ -313,10 +357,10 @@ export function registerInventoryRoutes(app: Express) {
         totalLocations: locationIds.length,
         totalStockItems: stockItemIds.length,
         issueCount: issues.length,
-        criticalIssues: issues.filter(i => i.severity === "critical").length,
-        errorIssues: issues.filter(i => i.severity === "error").length,
-        warningIssues: issues.filter(i => i.severity === "warning").length,
-        infoIssues: issues.filter(i => i.severity === "info").length,
+        criticalIssues: issues.filter((i) => i.severity === "critical").length,
+        errorIssues: issues.filter((i) => i.severity === "error").length,
+        warningIssues: issues.filter((i) => i.severity === "warning").length,
+        infoIssues: issues.filter((i) => i.severity === "info").length,
         totalInventoryValue: allInventory.reduce((sum, inv) => sum + parseFloat(inv.totalValue || "0"), 0).toFixed(2),
       };
 
@@ -371,142 +415,126 @@ export function registerInventoryRoutes(app: Express) {
   });
 
   // Update cost prices by barcode for a location
-  app.post(
-    "/api/locations/:locationId/import-cost-prices",
-    requireAuth,
-    checkPOSLocation,
-    async (req, res) => {
-      try {
-        const locationId = parseInt(req.params.locationId);
-        if (isNaN(locationId)) {
-          return res.status(400).json({ message: "Invalid location ID" });
-        }
-
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-
-        const location = await storage.getLocationById(locationId);
-        if (!location) {
-          return res.status(404).json({ message: "Location not found" });
-        }
-
-        if (location.companyId !== req.session.currentCompanyId) {
-          return res.status(403).json({
-            message: "Access denied: Location belongs to a different company",
-          });
-        }
-
-        const { updates } = req.body;
-        if (!Array.isArray(updates)) {
-          return res.status(400).json({ message: "Updates must be an array" });
-        }
-
-        const result = await storage.updateCostPricesByBarcode(locationId, req.session.currentCompanyId, updates);
-        res.json(result);
-      } catch (error: any) {
-        console.error("Error updating cost prices:", error);
-        res.status(500).json({ message: error.message });
+  app.post("/api/locations/:locationId/import-cost-prices", requireAuth, checkPOSLocation, async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "Invalid location ID" });
       }
-    },
-  );
+
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({
+          message: "Access denied: Location belongs to a different company",
+        });
+      }
+
+      const { updates } = req.body;
+      if (!Array.isArray(updates)) {
+        return res.status(400).json({ message: "Updates must be an array" });
+      }
+
+      const result = await storage.updateCostPricesByBarcode(locationId, req.session.currentCompanyId, updates);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error updating cost prices:", error);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Bulk import inventory for a location
-  app.post(
-    "/api/locations/:locationId/import-inventory",
-    requireAuth,
-    checkPOSLocation,
-    async (req, res) => {
-      try {
-        const locationId = parseInt(req.params.locationId);
-        if (isNaN(locationId)) {
-          return res.status(400).json({ message: "Invalid location ID" });
-        }
+  app.post("/api/locations/:locationId/import-inventory", requireAuth, checkPOSLocation, async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "Invalid location ID" });
+      }
 
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
 
-        // Validate location exists and belongs to current company
-        const location = await storage.getLocationById(locationId);
-        if (!location) {
-          return res.status(404).json({ message: "Location not found" });
-        }
+      // Validate location exists and belongs to current company
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
 
-        if (location.companyId !== req.session.currentCompanyId) {
-          return res
-            .status(403)
-            .json({
-              message: "Access denied: Location belongs to a different company",
-            });
-        }
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({
+          message: "Access denied: Location belongs to a different company",
+        });
+      }
 
-        const { items } = req.body;
-        if (!Array.isArray(items)) {
-          return res.status(400).json({ message: "Items must be an array" });
-        }
+      const { items } = req.body;
+      if (!Array.isArray(items)) {
+        return res.status(400).json({ message: "Items must be an array" });
+      }
 
-        // Get all stock items and stock groups for code matching
-        const allStockItems = await storage.getAllStockItems(
-          req.session.currentCompanyId,
-        );
-        const allStockGroups = await storage.getAllStockGroups(
-          req.session.currentCompanyId,
-        );
+      // Get all stock items and stock groups for code matching
+      const allStockItems = await storage.getAllStockItems(req.session.currentCompanyId);
+      const allStockGroups = await storage.getAllStockGroups(req.session.currentCompanyId);
 
-        const results = {
-          created: [] as any[],
-          updated: [] as any[],
-          skipped: [] as any[],
-          errors: [] as any[],
-        };
+      const results = {
+        created: [] as any[],
+        updated: [] as any[],
+        skipped: [] as any[],
+        errors: [] as any[],
+      };
 
-        // Per-session barcode registry: once a barcode resolves to an item it
-        // ALWAYS resolves to that same item for the rest of this import run.
-        // This prevents the same barcode from ever mapping to more than one product.
-        const barcodeItemMap = new Map<string, any>();
+      // Per-session barcode registry: once a barcode resolves to an item it
+      // ALWAYS resolves to that same item for the rest of this import run.
+      // This prevents the same barcode from ever mapping to more than one product.
+      const barcodeItemMap = new Map<string, any>();
 
-        for (const item of items) {
-          try {
-            const barcodeKey = item.Item_barcode.trim().toLowerCase();
+      for (const item of items) {
+        try {
+          const barcodeKey = item.Item_barcode.trim().toLowerCase();
 
-            // 1. Check session-local registry first (fastest, no DB hit)
-            let stockItem: any = barcodeItemMap.get(barcodeKey) ?? null;
+          // 1. Check session-local registry first (fastest, no DB hit)
+          let stockItem: any = barcodeItemMap.get(barcodeKey) ?? null;
 
-            // 2. If not seen this session, look up in DB (code field OR alias)
-            if (!stockItem) {
-              stockItem = await storage.getStockItemByCodeOrAlias(
-                item.Item_barcode,
-                req.session.currentCompanyId,
-              ) ?? null;
-              if (stockItem) barcodeItemMap.set(barcodeKey, stockItem);
-            }
+          // 2. If not seen this session, look up in DB (code field OR alias)
+          if (!stockItem) {
+            stockItem =
+              (await storage.getStockItemByCodeOrAlias(item.Item_barcode, req.session.currentCompanyId)) ?? null;
+            if (stockItem) barcodeItemMap.set(barcodeKey, stockItem);
+          }
 
-            // If stock item doesn't exist, create it
-            if (!stockItem) {
-              // ── Name-match check: if an existing item's NAME equals the
-              //    uploaded barcode string, register the barcode as an alias
-              //    and reuse that item instead of creating a duplicate. ─────
-              const nameMatch = allStockItems.find(
-                (si) => si.name.trim().toLowerCase() === barcodeKey,
+          // If stock item doesn't exist, create it
+          if (!stockItem) {
+            // ── Name-match check: if an existing item's NAME equals the
+            //    uploaded barcode string, register the barcode as an alias
+            //    and reuse that item instead of creating a duplicate. ─────
+            const nameMatch = allStockItems.find((si) => si.name.trim().toLowerCase() === barcodeKey);
+
+            if (nameMatch) {
+              // Guard: only register alias if the barcode isn't already the
+              // primary code of a *different* item (belt-and-suspenders check)
+              const alreadyACode = allStockItems.find(
+                (si) => si.id !== nameMatch.id && si.code.trim().toLowerCase() === barcodeKey
               );
-
-              if (nameMatch) {
-                // Guard: only register alias if the barcode isn't already the
-                // primary code of a *different* item (belt-and-suspenders check)
-                const alreadyACode = allStockItems.find(
-                  (si) => si.id !== nameMatch.id && si.code.trim().toLowerCase() === barcodeKey,
-                );
-                if (!alreadyACode) {
-                  await db.insert(stockItemCodeAliases).values({
+              if (!alreadyACode) {
+                await db
+                  .insert(stockItemCodeAliases)
+                  .values({
                     stockItemId: nameMatch.id,
                     aliasCode: item.Item_barcode.trim(),
                     companyId: req.session.currentCompanyId!,
-                  }).onConflictDoNothing();
-                }
-                stockItem = alreadyACode ?? nameMatch;
-                barcodeItemMap.set(barcodeKey, stockItem);
-              } else {
+                  })
+                  .onConflictDoNothing();
+              }
+              stockItem = alreadyACode ?? nameMatch;
+              barcodeItemMap.set(barcodeKey, stockItem);
+            } else {
               // Auto-detect stock group from item code prefix (first 2-3 uppercase letters)
               let stockGroupId: number | null = null;
 
@@ -515,15 +543,11 @@ export function registerInventoryRoutes(app: Express) {
 
               // Try 3-letter prefix first, then 2-letter (e.g., "UN259" -> "UN", "GCC123" -> "GCC")
               const prefixes = [];
-              if (normalizedCode.length >= 3)
-                prefixes.push(normalizedCode.substring(0, 3));
-              if (normalizedCode.length >= 2)
-                prefixes.push(normalizedCode.substring(0, 2));
+              if (normalizedCode.length >= 3) prefixes.push(normalizedCode.substring(0, 3));
+              if (normalizedCode.length >= 2) prefixes.push(normalizedCode.substring(0, 2));
 
               for (const prefix of prefixes) {
-                const stockGroup = allStockGroups.find(
-                  (sg) => sg.code.toUpperCase() === prefix,
-                );
+                const stockGroup = allStockGroups.find((sg) => sg.code.toUpperCase() === prefix);
                 if (stockGroup) {
                   stockGroupId = stockGroup.id;
                   break; // Found a match, stop searching
@@ -531,13 +555,9 @@ export function registerInventoryRoutes(app: Express) {
               }
 
               // Fall back to stockGroupCode column if provided and prefix didn't match
-              if (
-                !stockGroupId &&
-                item.stockGroupCode
-              ) {
+              if (!stockGroupId && item.stockGroupCode) {
                 const stockGroup = allStockGroups.find(
-                  (sg) =>
-                    (sg.code || "").toLowerCase() === (item.stockGroupCode || "").toLowerCase(),
+                  (sg) => (sg.code || "").toLowerCase() === (item.stockGroupCode || "").toLowerCase()
                 );
                 if (stockGroup) {
                   stockGroupId = stockGroup.id;
@@ -566,76 +586,69 @@ export function registerInventoryRoutes(app: Express) {
               stockItem = newStockItem;
               allStockItems.push(newStockItem); // Add to cache for subsequent rows
               barcodeItemMap.set(barcodeKey, newStockItem); // lock barcode in session registry
-              } // end else (no name match → create new)
-            }
+            } // end else (no name match → create new)
+          }
 
-            const quantity = parseFloat(item.quantity || "0");
-            const rate = parseFloat(item.rate || "0");
-            const value = parseFloat(
-              item.value || (quantity * rate).toString(),
+          const quantity = parseFloat(item.quantity || "0");
+          const rate = parseFloat(item.rate || "0");
+          const value = parseFloat(item.value || (quantity * rate).toString());
+
+          // Check if inventory already exists for this item at this location
+          const existingInventory = await storage.getLocationInventory(req.session.currentCompanyId!, locationId);
+          const existing = existingInventory.find((inv) => inv.stockItemId === stockItem.id);
+
+          if (existing) {
+            // Update existing inventory - add to existing quantities
+            const newQuantity = parseFloat(existing.quantity) + quantity;
+            const newTotalValue = parseFloat(existing.totalValue) + value;
+            const newAverageRate = newQuantity > 0 ? newTotalValue / newQuantity : 0;
+
+            await storage.updateInventory(
+              locationId,
+              stockItem.id,
+              newQuantity.toString(),
+              newAverageRate.toString(),
+              newTotalValue.toString()
             );
 
-            // Check if inventory already exists for this item at this location
-            const existingInventory =
-              await storage.getLocationInventory(req.session.currentCompanyId!, locationId);
-            const existing = existingInventory.find(
-              (inv) => inv.stockItemId === stockItem.id,
+            results.updated.push({
+              code: item.Item_barcode,
+              itemName: stockItem.name,
+              addedQuantity: quantity,
+              newQuantity: newQuantity,
+            });
+          } else {
+            // Create new inventory record
+            await storage.updateInventory(
+              locationId,
+              stockItem.id,
+              quantity.toString(),
+              rate.toString(),
+              value.toString()
             );
 
-            if (existing) {
-              // Update existing inventory - add to existing quantities
-              const newQuantity = parseFloat(existing.quantity) + quantity;
-              const newTotalValue = parseFloat(existing.totalValue) + value;
-              const newAverageRate =
-                newQuantity > 0 ? newTotalValue / newQuantity : 0;
-
-              await storage.updateInventory(
-                locationId,
-                stockItem.id,
-                newQuantity.toString(),
-                newAverageRate.toString(),
-                newTotalValue.toString(),
-              );
-
-              results.updated.push({
-                code: item.Item_barcode,
-                itemName: stockItem.name,
-                addedQuantity: quantity,
-                newQuantity: newQuantity,
-              });
-            } else {
-              // Create new inventory record
-              await storage.updateInventory(
-                locationId,
-                stockItem.id,
-                quantity.toString(),
-                rate.toString(),
-                value.toString(),
-              );
-
-              results.created.push({
-                code: item.Item_barcode,
-                itemName: stockItem.name,
-                quantity: quantity,
-              });
-            }
-          } catch (error: any) {
-            results.errors.push({
-              code: item.code,
-              error: error.message,
+            results.created.push({
+              code: item.Item_barcode,
+              itemName: stockItem.name,
+              quantity: quantity,
             });
           }
+        } catch (error: any) {
+          results.errors.push({
+            code: item.code,
+            error: error.message,
+          });
         }
-
-        res.json({
-          message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.skipped.length} skipped, ${results.errors.length} errors`,
-          results,
-        });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
       }
-    },
-  );
+
+      res.json({
+        message: `Import completed: ${results.created.length} created, ${results.updated.length} updated, ${results.skipped.length} skipped, ${results.errors.length} errors`,
+        results,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Ledger Accounts
 }

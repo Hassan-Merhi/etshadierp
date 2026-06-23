@@ -42,9 +42,9 @@ function getOpenAIClient() {
 
 function getGrokClient() {
   if (!process.env.XAI_API_KEY) return null;
-  return new OpenAI({ 
+  return new OpenAI({
     apiKey: process.env.XAI_API_KEY,
-    baseURL: "https://api.x.ai/v1"
+    baseURL: "https://api.x.ai/v1",
   });
 }
 
@@ -56,7 +56,7 @@ async function getSelectedAIProvider(): Promise<AIProvider> {
       .from(schema.systemSettings)
       .where(eq(schema.systemSettings.key, "ai_provider"))
       .limit(1);
-    
+
     if (setting.length > 0 && setting[0].value) {
       const provider = setting[0].value.toLowerCase() as AIProvider;
       if (["gemini", "chatgpt", "grok"].includes(provider)) {
@@ -79,40 +79,55 @@ function getAvailableProviders(): AIProvider[] {
 }
 
 // Call Gemini API
-async function callGemini(systemPrompt: string, conversationHistory: { role: string; content: string }[], userMessage: string): Promise<string> {
+async function callGemini(
+  systemPrompt: string,
+  conversationHistory: { role: string; content: string }[],
+  userMessage: string
+): Promise<string> {
   const client = getGeminiClient();
   if (!client) throw new Error("Gemini API key not configured");
-  
+
   const contents = [
     { role: "user", parts: [{ text: systemPrompt }] },
-    { role: "model", parts: [{ text: "I understand. I'm your ERP Assistant, ready to help you understand your business data, provide insights, and answer questions in any language. How can I help you today?" }] },
-    ...conversationHistory.map(msg => ({
+    {
+      role: "model",
+      parts: [
+        {
+          text: "I understand. I'm your ERP Assistant, ready to help you understand your business data, provide insights, and answer questions in any language. How can I help you today?",
+        },
+      ],
+    },
+    ...conversationHistory.map((msg) => ({
       role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.content }]
+      parts: [{ text: msg.content }],
     })),
-    { role: "user", parts: [{ text: userMessage }] }
+    { role: "user", parts: [{ text: userMessage }] },
   ];
 
   const response = await client.models.generateContent({
     model: "gemini-2.0-flash",
     contents: contents,
   });
-  
+
   return response.text || "I couldn't generate a response.";
 }
 
 // Call ChatGPT API
-async function callChatGPT(systemPrompt: string, conversationHistory: { role: string; content: string }[], userMessage: string): Promise<string> {
+async function callChatGPT(
+  systemPrompt: string,
+  conversationHistory: { role: string; content: string }[],
+  userMessage: string
+): Promise<string> {
   const client = getOpenAIClient();
   if (!client) throw new Error("OpenAI API key not configured");
-  
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
-    ...conversationHistory.map(msg => ({
+    ...conversationHistory.map((msg) => ({
       role: msg.role as "user" | "assistant",
-      content: msg.content
+      content: msg.content,
     })),
-    { role: "user", content: userMessage }
+    { role: "user", content: userMessage },
   ];
 
   const response = await client.chat.completions.create({
@@ -120,22 +135,26 @@ async function callChatGPT(systemPrompt: string, conversationHistory: { role: st
     messages: messages,
     max_tokens: 2000,
   });
-  
+
   return response.choices[0]?.message?.content || "I couldn't generate a response.";
 }
 
 // Call Grok API (uses OpenAI-compatible format)
-async function callGrok(systemPrompt: string, conversationHistory: { role: string; content: string }[], userMessage: string): Promise<string> {
+async function callGrok(
+  systemPrompt: string,
+  conversationHistory: { role: string; content: string }[],
+  userMessage: string
+): Promise<string> {
   const client = getGrokClient();
   if (!client) throw new Error("xAI/Grok API key not configured");
-  
+
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemPrompt },
-    ...conversationHistory.map(msg => ({
+    ...conversationHistory.map((msg) => ({
       role: msg.role as "user" | "assistant",
-      content: msg.content
+      content: msg.content,
     })),
-    { role: "user", content: userMessage }
+    { role: "user", content: userMessage },
   ];
 
   const response = await client.chat.completions.create({
@@ -143,31 +162,31 @@ async function callGrok(systemPrompt: string, conversationHistory: { role: strin
     messages: messages,
     max_tokens: 2000,
   });
-  
+
   return response.choices[0]?.message?.content || "I couldn't generate a response.";
 }
 
 // Call AI with fallback to other providers
 async function callAIWithFallback(
   provider: AIProvider,
-  systemPrompt: string, 
-  conversationHistory: { role: string; content: string }[], 
+  systemPrompt: string,
+  conversationHistory: { role: string; content: string }[],
   userMessage: string
 ): Promise<{ response: string; usedProvider: AIProvider }> {
   const available = getAvailableProviders();
-  
+
   // Build fallback order starting with selected provider
-  const fallbackOrder = [provider, ...available.filter(p => p !== provider)];
-  
+  const fallbackOrder = [provider, ...available.filter((p) => p !== provider)];
+
   let lastError: Error | null = null;
-  
+
   for (const currentProvider of fallbackOrder) {
     if (!available.includes(currentProvider)) continue;
-    
+
     try {
       console.log(`[ChatService] Trying ${currentProvider}...`);
       let response: string;
-      
+
       switch (currentProvider) {
         case "gemini":
           response = await callGemini(systemPrompt, conversationHistory, userMessage);
@@ -181,7 +200,7 @@ async function callAIWithFallback(
         default:
           continue;
       }
-      
+
       console.log(`[ChatService] Successfully used ${currentProvider}`);
       return { response, usedProvider: currentProvider };
     } catch (error: any) {
@@ -190,7 +209,7 @@ async function callAIWithFallback(
       // Continue to next provider
     }
   }
-  
+
   throw lastError || new Error("No AI providers available");
 }
 
@@ -215,46 +234,70 @@ type ChatIntent =
   | "general";
 
 // ── Smart provider routing regexes ────────────────────────────────────────────
-const RE_CODE_GEN = /\b(write (a |an |some )?(code|function|class|script|app|program|website|webpage|component|html page)|build (me )?(a |an )?(app|website|script|tool)|create (a |an )?(app|website|html|component|tool)|generate (a |an )?(html|css|script|app)|make (me )?(a |an )?(app|website|tool)|(html|css|javascript|typescript|python|react|nodejs?)\s+(code|snippet|example|template|app)|code (to|that|which)|how (to|do I) (code|program|write code|build))\b/i;
-const RE_NEWS_QUERY = /\b(latest news|current events|what.{0,25}happening (in|today|now|right now)|news (today|about|on)|recent (developments|events|news)|trending (now|today)|breaking news|what.{0,20}new (in|with|about)|today.{0,15}(news|events|headlines))\b/i;
+const RE_CODE_GEN =
+  /\b(write (a |an |some )?(code|function|class|script|app|program|website|webpage|component|html page)|build (me )?(a |an )?(app|website|script|tool)|create (a |an )?(app|website|html|component|tool)|generate (a |an )?(html|css|script|app)|make (me )?(a |an )?(app|website|tool)|(html|css|javascript|typescript|python|react|nodejs?)\s+(code|snippet|example|template|app)|code (to|that|which)|how (to|do I) (code|program|write code|build))\b/i;
+const RE_NEWS_QUERY =
+  /\b(latest news|current events|what.{0,25}happening (in|today|now|right now)|news (today|about|on)|recent (developments|events|news)|trending (now|today)|breaking news|what.{0,20}new (in|with|about)|today.{0,15}(news|events|headlines))\b/i;
 
 // ── Code agent intent regexes ─────────────────────────────────────────────────
 // Matches a reference to a project file (path or bare filename with extension)
-const RE_PROJECT_FILE = /\b((?:server|client|shared|scripts)\/[\w./+-]+\.(?:ts|tsx|js|jsx|css|json|md)|[\w-]+\.(?:ts|tsx|js|jsx|json|css|md))\b/i;
+const RE_PROJECT_FILE =
+  /\b((?:server|client|shared|scripts)\/[\w./+-]+\.(?:ts|tsx|js|jsx|css|json|md)|[\w-]+\.(?:ts|tsx|js|jsx|json|css|md))\b/i;
 // Read-only intent verbs combined with a project file ref OR explicit search/grep request
-const RE_CODE_READ = /\b(?:show me|read|open|explain|what does|how does|how is|describe|view)\b.*\b[\w-]+\.(?:ts|tsx|js|jsx|json|css)|\b(?:find where|search for|where is|grep for|look for|where does)\b/i;
+const RE_CODE_READ =
+  /\b(?:show me|read|open|explain|what does|how does|how is|describe|view)\b.*\b[\w-]+\.(?:ts|tsx|js|jsx|json|css)|\b(?:find where|search for|where is|grep for|look for|where does)\b/i;
 // Write/edit intent verbs combined with a project file ref OR explicit edit phrasing
-const RE_CODE_EDIT = /\b(?:add|create|edit|fix|update|modify|refactor|implement|write)\b.{0,120}\b[\w-]+\.(?:ts|tsx|js|jsx|json|css)|\b(?:create (?:a )?(?:new )?file|add (?:a )?(?:function|route|endpoint|component|field|column|type|interface|class|method|hook|handler)|fix (?:the )?bug|implement (?:the )?)\b.{0,80}\b(?:server|client|shared)\//i;
+const RE_CODE_EDIT =
+  /\b(?:add|create|edit|fix|update|modify|refactor|implement|write)\b.{0,120}\b[\w-]+\.(?:ts|tsx|js|jsx|json|css)|\b(?:create (?:a )?(?:new )?file|add (?:a )?(?:function|route|endpoint|component|field|column|type|interface|class|method|hook|handler)|fix (?:the )?bug|implement (?:the )?)\b.{0,80}\b(?:server|client|shared)\//i;
 // Pathless code-edit intent: covers "add a discount field to the voucher form" style requests
 // that reference UI/code constructs but no explicit file path.
 // "create" is included (create a new component/page/hook) but "voucher/payment/entry" are
 // deliberately excluded from the target-noun list to avoid misclassifying ERP requests.
-const RE_CODE_EDIT_PATHLESS = /\b(?:add|create|edit|fix|update|modify|refactor|implement|rename|remove|delete)\b.{0,140}\b(?:field|button|component|form|page|tab|modal|dialog|dropdown|select|input|textarea|checkbox|radio|label|column|table|card|sidebar|header|footer|nav|menu|link|icon|badge|tooltip|alert|toast|state|hook|function|method|route|endpoint|schema|migration|type|interface|class|handler|prop|event|style|stylesheet|variable|constant|import|export|render|widget|layout|section|panel|filter|feature|validation|permission)\b/i;
+const RE_CODE_EDIT_PATHLESS =
+  /\b(?:add|create|edit|fix|update|modify|refactor|implement|rename|remove|delete)\b.{0,140}\b(?:field|button|component|form|page|tab|modal|dialog|dropdown|select|input|textarea|checkbox|radio|label|column|table|card|sidebar|header|footer|nav|menu|link|icon|badge|tooltip|alert|toast|state|hook|function|method|route|endpoint|schema|migration|type|interface|class|handler|prop|event|style|stylesheet|variable|constant|import|export|render|widget|layout|section|panel|filter|feature|validation|permission)\b/i;
 // Financial-transaction markers — presence means the request is almost certainly ERP, not code
-const RE_FINANCIAL_TX = /(?:\$\s?\d|\d[\d,]*\s*(?:USD|PKR|AED|EUR|GBP|SAR|OMR|KWD|usd|pkr|aed|eur))\b|\b(?:paid|pay\b|received|collect\b|deposit\b|withdraw|remit|invoice\s+\S+\s+\d|receipt\s+\S+\s+\d)\b/i;
-const RE_GENERAL_KNOWLEDGE = /^(hi|hello|hey|yo|sup|hiya|howdy)\b|\b(explain|what (is|are|was|were|does|did)|who (is|are|was|were)|how does|how do|how (can|should) (i|we)|why (is|are|does|do|was|were)|tell me about|write (a |an )?(story|poem|essay|email|letter|blog|article|report)|help me (understand|with|write|create)|translate|summarize|what does .{0,30} mean|give me (a |an )?(example|list|summary|idea)|best (way|practice|approach) to|pros and cons|difference between)\b/i;
+const RE_FINANCIAL_TX =
+  /(?:\$\s?\d|\d[\d,]*\s*(?:USD|PKR|AED|EUR|GBP|SAR|OMR|KWD|usd|pkr|aed|eur))\b|\b(?:paid|pay\b|received|collect\b|deposit\b|withdraw|remit|invoice\s+\S+\s+\d|receipt\s+\S+\s+\d)\b/i;
+const RE_GENERAL_KNOWLEDGE =
+  /^(hi|hello|hey|yo|sup|hiya|howdy)\b|\b(explain|what (is|are|was|were|does|did)|who (is|are|was|were)|how does|how do|how (can|should) (i|we)|why (is|are|does|do|was|were)|tell me about|write (a |an )?(story|poem|essay|email|letter|blog|article|report)|help me (understand|with|write|create)|translate|summarize|what does .{0,30} mean|give me (a |an )?(example|list|summary|idea)|best (way|practice|approach) to|pros and cons|difference between)\b/i;
 
 // Detect best provider for a given message — returns override or null (use admin setting)
 function detectSmartProvider(message: string, available: string[]): "gemini" | "chatgpt" | "grok" | null {
   const has = (p: string) => available.includes(p);
   if (RE_CODE_GEN.test(message) && has("chatgpt")) return "chatgpt";
   if (RE_NEWS_QUERY.test(message) && has("grok")) return "grok";
-  if (/\b(analyz|statistic|math|calculat|formula|equation|data science|machine learning|science|chemistry|biology|physics|research)\b/i.test(message) && has("gemini")) return "gemini";
+  if (
+    /\b(analyz|statistic|math|calculat|formula|equation|data science|machine learning|science|chemistry|biology|physics|research)\b/i.test(
+      message
+    ) &&
+    has("gemini")
+  )
+    return "gemini";
   return null;
 }
 
 // ── Module-level intent regexes (shared between classifyChatIntent + chat) ────
-const RE_VOUCHER = /\b(create|make|record|add|post|enter|book)\b.{0,80}\b(payment|receipt|journal|voucher|entry|invoice|transaction)\b|\b(pay|paid|receive[d]?|collect[ed]?|transfer[red]?|deposit[ed]?)\b.{0,60}\$?\d|\b(journal|receipt|payment)\b.{0,40}\$?\d/i;
-const RE_STOCK_ADJ = /\b(produce|producing|production|consume|consuming|consumption|stock\s+adjust|adjust\s+stock|record\s+production|record\s+consumption|produced|consumed)\b/i;
-const RE_STOCK_TRANSFER = /\b(transfer|move|shift)\b.{0,80}\b(stock|item|inventory)\b|\b(stock|item|inventory)\b.{0,60}\b(transfer|move|shift)\b|\btransfer\b.{0,40}\bfrom\b.{0,40}\bto\b/i;
-const RE_STOCK_ITEM_CREATE = /\b(create\s+(a\s+)?stock\s+item|add\s+(a\s+)?stock\s+item|new\s+stock\s+item|create\s+(a\s+)?new\s+item|add\s+(a\s+)?new\s+item|new\s+item)\b/i;
-const RE_PRICE_UPDATE = /\b(update.*price|change.*price|set.*price|price.*to|price.*for|update.*selling|change.*selling|new price|price list)\b/i;
-const RE_VOUCHER_SEARCH = /\b(when did (i|we) pay|find (the )?(payment|receipt|voucher|transaction)|search (for )?(voucher|payment|receipt)|show (me )?(the )?(voucher|payment|receipt)|paid for|receipt for|voucher for|payment (for|of)|what voucher|which voucher|show.*payment.*for|show.*receipt.*for)\b/i;
-const RE_ACCOUNT_QUERY = /\b(balance of|account.*balance|how much.*account|account.*how much|what.*balance|balance.*account|when did.*account|account.*transactions|transactions.*account|paid.*from account|received.*account|when.*balance.*was|balance.*was.*when|ledger.*balance|account.*paid|account.*received)\b/i;
+const RE_VOUCHER =
+  /\b(create|make|record|add|post|enter|book)\b.{0,80}\b(payment|receipt|journal|voucher|entry|invoice|transaction)\b|\b(pay|paid|receive[d]?|collect[ed]?|transfer[red]?|deposit[ed]?)\b.{0,60}\$?\d|\b(journal|receipt|payment)\b.{0,40}\$?\d/i;
+const RE_STOCK_ADJ =
+  /\b(produce|producing|production|consume|consuming|consumption|stock\s+adjust|adjust\s+stock|record\s+production|record\s+consumption|produced|consumed)\b/i;
+const RE_STOCK_TRANSFER =
+  /\b(transfer|move|shift)\b.{0,80}\b(stock|item|inventory)\b|\b(stock|item|inventory)\b.{0,60}\b(transfer|move|shift)\b|\btransfer\b.{0,40}\bfrom\b.{0,40}\bto\b/i;
+const RE_STOCK_ITEM_CREATE =
+  /\b(create\s+(a\s+)?stock\s+item|add\s+(a\s+)?stock\s+item|new\s+stock\s+item|create\s+(a\s+)?new\s+item|add\s+(a\s+)?new\s+item|new\s+item)\b/i;
+const RE_PRICE_UPDATE =
+  /\b(update.*price|change.*price|set.*price|price.*to|price.*for|update.*selling|change.*selling|new price|price list)\b/i;
+const RE_VOUCHER_SEARCH =
+  /\b(when did (i|we) pay|find (the )?(payment|receipt|voucher|transaction)|search (for )?(voucher|payment|receipt)|show (me )?(the )?(voucher|payment|receipt)|paid for|receipt for|voucher for|payment (for|of)|what voucher|which voucher|show.*payment.*for|show.*receipt.*for)\b/i;
+const RE_ACCOUNT_QUERY =
+  /\b(balance of|account.*balance|how much.*account|account.*how much|what.*balance|balance.*account|when did.*account|account.*transactions|transactions.*account|paid.*from account|received.*account|when.*balance.*was|balance.*was.*when|ledger.*balance|account.*paid|account.*received)\b/i;
 
 // ── ERP context in-memory cache (TTL = 60 s per companyId) ───────────────────
 const ERP_CACHE_TTL_MS = 60_000;
-interface ERPCacheEntry { context: ERPContext; expiresAt: number; }
+interface ERPCacheEntry {
+  context: ERPContext;
+  expiresAt: number;
+}
 const erpContextCache = new Map<string, ERPCacheEntry>();
 
 export function clearERPContextCache(companyId?: number): void {
@@ -337,7 +380,7 @@ interface UserPreferences {
 export async function getERPContext(companyId: number): Promise<ERPContext> {
   // Capture exact timestamp when data fetch begins - this is REAL-TIME data
   const dataFetchedAt = new Date().toISOString();
-  
+
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -353,126 +396,121 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     purchaseOrders,
     containerSales,
   ] = await Promise.all([
-    db.select({
-      stockItemId: schema.inventory.stockItemId,
-      locationId: schema.inventory.locationId,
-      quantity: schema.inventory.quantity,
-      averageRate: schema.inventory.averageRate,
-      totalValue: schema.inventory.totalValue,
-    })
+    db
+      .select({
+        stockItemId: schema.inventory.stockItemId,
+        locationId: schema.inventory.locationId,
+        quantity: schema.inventory.quantity,
+        averageRate: schema.inventory.averageRate,
+        totalValue: schema.inventory.totalValue,
+      })
       .from(schema.inventory)
       .where(eq(schema.inventory.companyId, companyId)),
 
-    db.select({
-      id: schema.stockItems.id,
-      code: schema.stockItems.code,
-      name: schema.stockItems.name,
-      stockGroupId: schema.stockItems.stockGroupId,
-      sellingPrice: schema.stockItems.sellingPrice,
-      reorderLevel: schema.stockItems.reorderLevel,
-    })
+    db
+      .select({
+        id: schema.stockItems.id,
+        code: schema.stockItems.code,
+        name: schema.stockItems.name,
+        stockGroupId: schema.stockItems.stockGroupId,
+        sellingPrice: schema.stockItems.sellingPrice,
+        reorderLevel: schema.stockItems.reorderLevel,
+      })
       .from(schema.stockItems)
-      .where(and(
-        eq(schema.stockItems.companyId, companyId),
-        eq(schema.stockItems.active, true)
-      )),
+      .where(and(eq(schema.stockItems.companyId, companyId), eq(schema.stockItems.active, true))),
 
-    db.select({
-      id: schema.stockGroups.id,
-      code: schema.stockGroups.code,
-      name: schema.stockGroups.name,
-    })
+    db
+      .select({
+        id: schema.stockGroups.id,
+        code: schema.stockGroups.code,
+        name: schema.stockGroups.name,
+      })
       .from(schema.stockGroups)
       .where(eq(schema.stockGroups.companyId, companyId)),
 
-    db.select({
-      id: schema.ledgerAccounts.id,
-      code: schema.ledgerAccounts.code,
-      name: schema.ledgerAccounts.name,
-      accountType: schema.ledgerAccounts.accountType,
-      openingBalance: schema.ledgerAccounts.openingBalance,
-    })
+    db
+      .select({
+        id: schema.ledgerAccounts.id,
+        code: schema.ledgerAccounts.code,
+        name: schema.ledgerAccounts.name,
+        accountType: schema.ledgerAccounts.accountType,
+        openingBalance: schema.ledgerAccounts.openingBalance,
+      })
       .from(schema.ledgerAccounts)
-      .where(and(
-        eq(schema.ledgerAccounts.companyId, companyId),
-        eq(schema.ledgerAccounts.active, true)
-      )),
+      .where(and(eq(schema.ledgerAccounts.companyId, companyId), eq(schema.ledgerAccounts.active, true))),
 
-    db.select({
-      id: schema.suppliers.id,
-      code: schema.suppliers.code,
-      legalName: schema.suppliers.legalName,
-      phone: schema.suppliers.phone,
-      email: schema.suppliers.email,
-    })
+    db
+      .select({
+        id: schema.suppliers.id,
+        code: schema.suppliers.code,
+        legalName: schema.suppliers.legalName,
+        phone: schema.suppliers.phone,
+        email: schema.suppliers.email,
+      })
       .from(schema.suppliers)
       .where(eq(schema.suppliers.active, true)),
 
-    db.select({
-      id: schema.customers.id,
-      code: schema.customers.code,
-      legalName: schema.customers.legalName,
-      phone: schema.customers.phone,
-    })
+    db
+      .select({
+        id: schema.customers.id,
+        code: schema.customers.code,
+        legalName: schema.customers.legalName,
+        phone: schema.customers.phone,
+      })
       .from(schema.customers)
-      .where(and(
-        eq(schema.customers.companyId, companyId),
-        eq(schema.customers.active, true)
-      )),
+      .where(and(eq(schema.customers.companyId, companyId), eq(schema.customers.active, true))),
 
-    db.select({
-      id: schema.locations.id,
-      code: schema.locations.code,
-      name: schema.locations.name,
-      city: schema.locations.city,
-    })
+    db
+      .select({
+        id: schema.locations.id,
+        code: schema.locations.code,
+        name: schema.locations.name,
+        city: schema.locations.city,
+      })
       .from(schema.locations)
-      .where(and(
-        eq(schema.locations.companyId, companyId),
-        eq(schema.locations.active, true)
-      )),
+      .where(and(eq(schema.locations.companyId, companyId), eq(schema.locations.active, true))),
 
-    db.select({
-      id: schema.vouchers.id,
-      voucherNumber: schema.vouchers.voucherNumber,
-      voucherType: schema.vouchers.voucherType,
-      voucherDate: schema.vouchers.voucherDate,
-      totalAmount: schema.vouchers.totalAmount,
-      description: schema.vouchers.description,
-    })
+    db
+      .select({
+        id: schema.vouchers.id,
+        voucherNumber: schema.vouchers.voucherNumber,
+        voucherType: schema.vouchers.voucherType,
+        voucherDate: schema.vouchers.voucherDate,
+        totalAmount: schema.vouchers.totalAmount,
+        description: schema.vouchers.description,
+      })
       .from(schema.vouchers)
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        isNull(schema.vouchers.deletedAt)
-      ))
+      .where(and(eq(schema.vouchers.companyId, companyId), isNull(schema.vouchers.deletedAt)))
       .orderBy(desc(schema.vouchers.createdAt))
       .limit(200),
 
-    db.select({
-      id: schema.purchaseOrders.id,
-      poNumber: schema.purchaseOrders.poNumber,
-      supplierId: schema.purchaseOrders.supplierId,
-      status: schema.purchaseOrders.status,
-      itemsTotal: schema.purchaseOrders.itemsTotal,
-      freight: schema.purchaseOrders.freight,
-      currency: schema.purchaseOrders.currency,
-      createdAt: schema.purchaseOrders.createdAt,
-    })
+    db
+      .select({
+        id: schema.purchaseOrders.id,
+        poNumber: schema.purchaseOrders.poNumber,
+        supplierId: schema.purchaseOrders.supplierId,
+        status: schema.purchaseOrders.status,
+        itemsTotal: schema.purchaseOrders.itemsTotal,
+        freight: schema.purchaseOrders.freight,
+        currency: schema.purchaseOrders.currency,
+        createdAt: schema.purchaseOrders.createdAt,
+      })
       .from(schema.purchaseOrders)
       .where(eq(schema.purchaseOrders.companyId, companyId))
       .orderBy(desc(schema.purchaseOrders.createdAt)),
 
-    db.select({
-      id: schema.containerSales.id,
-      containerId: schema.containerSales.containerId,
-      customerId: schema.containerSales.customerId,
-      containerCost: schema.containerSales.containerCost,
-      commission: schema.containerSales.commission,
-      totalAmount: schema.containerSales.totalAmount,
-      paymentStatus: schema.containerSales.paymentStatus,
-      paidAmount: schema.containerSales.paidAmount,
-      saleDate: schema.containerSales.saleDate,
-    })
+    db
+      .select({
+        id: schema.containerSales.id,
+        containerId: schema.containerSales.containerId,
+        customerId: schema.containerSales.customerId,
+        containerCost: schema.containerSales.containerCost,
+        commission: schema.containerSales.commission,
+        totalAmount: schema.containerSales.totalAmount,
+        paymentStatus: schema.containerSales.paymentStatus,
+        paidAmount: schema.containerSales.paidAmount,
+        saleDate: schema.containerSales.saleDate,
+      })
       .from(schema.containerSales)
       .where(eq(schema.containerSales.companyId, companyId))
       .orderBy(desc(schema.containerSales.saleDate)),
@@ -484,11 +522,13 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       count: sql<number>`COUNT(*)`,
     })
     .from(schema.vouchers)
-    .where(and(
-      eq(schema.vouchers.companyId, companyId),
-      eq(schema.vouchers.voucherType, "Receipt"),
-      isNull(schema.vouchers.deletedAt)
-    ));
+    .where(
+      and(
+        eq(schema.vouchers.companyId, companyId),
+        eq(schema.vouchers.voucherType, "Receipt"),
+        isNull(schema.vouchers.deletedAt)
+      )
+    );
 
   const profitAnalysis = await db
     .select({
@@ -499,10 +539,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     })
     .from(schema.salesItems)
     .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-    .where(and(
-      eq(schema.vouchers.companyId, companyId),
-      isNull(schema.vouchers.deletedAt)
-    ));
+    .where(and(eq(schema.vouchers.companyId, companyId), isNull(schema.vouchers.deletedAt)));
 
   // ── Today's sales ──────────────────────────────────────────────────
   const todayStr = new Date().toISOString().split("T")[0];
@@ -511,220 +548,237 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
   const [todaysSalesRaw, thisMonthSalesRaw, itemProfitabilityRaw] = await Promise.all([
     db
       .select({
-        revenue:          sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC)), 0)`,
-        cost:             sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC)), 0)`,
-        profit:           sql<string>`COALESCE(SUM(CAST(${schema.salesItems.profit} AS NUMERIC)), 0)`,
+        revenue: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC)), 0)`,
+        cost: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC)), 0)`,
+        profit: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.profit} AS NUMERIC)), 0)`,
         transactionCount: sql<number>`COUNT(DISTINCT ${schema.salesItems.voucherId})`,
-        unitsSold:        sql<string>`COALESCE(SUM(CAST(${schema.salesItems.quantity} AS NUMERIC)), 0)`,
+        unitsSold: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.quantity} AS NUMERIC)), 0)`,
       })
       .from(schema.salesItems)
       .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        eq(schema.vouchers.voucherDate, todayStr),
-        isNull(schema.vouchers.deletedAt)
-      )),
+      .where(
+        and(
+          eq(schema.vouchers.companyId, companyId),
+          eq(schema.vouchers.voucherDate, todayStr),
+          isNull(schema.vouchers.deletedAt)
+        )
+      ),
 
     db
       .select({
-        revenue:          sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC)), 0)`,
-        cost:             sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC)), 0)`,
-        profit:           sql<string>`COALESCE(SUM(CAST(${schema.salesItems.profit} AS NUMERIC)), 0)`,
+        revenue: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC)), 0)`,
+        cost: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC)), 0)`,
+        profit: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.profit} AS NUMERIC)), 0)`,
         transactionCount: sql<number>`COUNT(DISTINCT ${schema.salesItems.voucherId})`,
-        unitsSold:        sql<string>`COALESCE(SUM(CAST(${schema.salesItems.quantity} AS NUMERIC)), 0)`,
+        unitsSold: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.quantity} AS NUMERIC)), 0)`,
       })
       .from(schema.salesItems)
       .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        gte(schema.vouchers.voucherDate, monthStartStr),
-        isNull(schema.vouchers.deletedAt)
-      )),
+      .where(
+        and(
+          eq(schema.vouchers.companyId, companyId),
+          gte(schema.vouchers.voucherDate, monthStartStr),
+          isNull(schema.vouchers.deletedAt)
+        )
+      ),
 
     // Per-item profitability: every stock item that has ever been sold
     db
       .select({
-        stockItemId:         schema.salesItems.stockItemId,
-        totalQty:            sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
-        totalRevenue:        sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
-        totalCost:           sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
-        totalProfit:         sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
-        avgSellingPrice:     sql<string>`AVG(CAST(${schema.salesItems.sellingPrice} AS NUMERIC))`,
-        avgConfiguredPrice:  sql<string>`AVG(CAST(COALESCE(${schema.salesItems.configuredPrice}, ${schema.salesItems.sellingPrice}) AS NUMERIC))`,
-        avgCostPrice:        sql<string>`AVG(CAST(${schema.salesItems.costPrice} AS NUMERIC))`,
+        stockItemId: schema.salesItems.stockItemId,
+        totalQty: sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
+        totalRevenue: sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
+        totalCost: sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
+        totalProfit: sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
+        avgSellingPrice: sql<string>`AVG(CAST(${schema.salesItems.sellingPrice} AS NUMERIC))`,
+        avgConfiguredPrice: sql<string>`AVG(CAST(COALESCE(${schema.salesItems.configuredPrice}, ${schema.salesItems.sellingPrice}) AS NUMERIC))`,
+        avgCostPrice: sql<string>`AVG(CAST(${schema.salesItems.costPrice} AS NUMERIC))`,
       })
       .from(schema.salesItems)
       .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        isNull(schema.vouchers.deletedAt)
-      ))
+      .where(and(eq(schema.vouchers.companyId, companyId), isNull(schema.vouchers.deletedAt)))
       .groupBy(schema.salesItems.stockItemId),
   ]);
 
   const todaysSales = {
-    date:             todayStr,
-    revenue:          parseFloat(todaysSalesRaw[0]?.revenue || "0"),
-    cost:             parseFloat(todaysSalesRaw[0]?.cost || "0"),
-    profit:           parseFloat(todaysSalesRaw[0]?.profit || "0"),
+    date: todayStr,
+    revenue: parseFloat(todaysSalesRaw[0]?.revenue || "0"),
+    cost: parseFloat(todaysSalesRaw[0]?.cost || "0"),
+    profit: parseFloat(todaysSalesRaw[0]?.profit || "0"),
     transactionCount: todaysSalesRaw[0]?.transactionCount || 0,
-    unitsSold:        parseFloat(todaysSalesRaw[0]?.unitsSold || "0"),
-    margin:           parseFloat(todaysSalesRaw[0]?.revenue || "0") > 0
-                        ? ((parseFloat(todaysSalesRaw[0]?.profit || "0") / parseFloat(todaysSalesRaw[0]?.revenue || "1")) * 100).toFixed(1)
-                        : "0",
+    unitsSold: parseFloat(todaysSalesRaw[0]?.unitsSold || "0"),
+    margin:
+      parseFloat(todaysSalesRaw[0]?.revenue || "0") > 0
+        ? (
+            (parseFloat(todaysSalesRaw[0]?.profit || "0") / parseFloat(todaysSalesRaw[0]?.revenue || "1")) *
+            100
+          ).toFixed(1)
+        : "0",
   };
 
   const thisMonthSales = {
-    monthStart:       monthStartStr,
-    revenue:          parseFloat(thisMonthSalesRaw[0]?.revenue || "0"),
-    cost:             parseFloat(thisMonthSalesRaw[0]?.cost || "0"),
-    profit:           parseFloat(thisMonthSalesRaw[0]?.profit || "0"),
+    monthStart: monthStartStr,
+    revenue: parseFloat(thisMonthSalesRaw[0]?.revenue || "0"),
+    cost: parseFloat(thisMonthSalesRaw[0]?.cost || "0"),
+    profit: parseFloat(thisMonthSalesRaw[0]?.profit || "0"),
     transactionCount: thisMonthSalesRaw[0]?.transactionCount || 0,
-    unitsSold:        parseFloat(thisMonthSalesRaw[0]?.unitsSold || "0"),
-    margin:           parseFloat(thisMonthSalesRaw[0]?.revenue || "0") > 0
-                        ? ((parseFloat(thisMonthSalesRaw[0]?.profit || "0") / parseFloat(thisMonthSalesRaw[0]?.revenue || "1")) * 100).toFixed(1)
-                        : "0",
+    unitsSold: parseFloat(thisMonthSalesRaw[0]?.unitsSold || "0"),
+    margin:
+      parseFloat(thisMonthSalesRaw[0]?.revenue || "0") > 0
+        ? (
+            (parseFloat(thisMonthSalesRaw[0]?.profit || "0") / parseFloat(thisMonthSalesRaw[0]?.revenue || "1")) *
+            100
+          ).toFixed(1)
+        : "0",
   };
 
   // Enrich per-item data with stock item name and classify as winner/loser
-  const itemProfitabilityReport = itemProfitabilityRaw.map(row => {
-    const si = stockItems.find(s => s.id === row.stockItemId);
-    const qty        = parseFloat(row.totalQty || "0");
-    const revenue    = parseFloat(row.totalRevenue || "0");
-    const cost       = parseFloat(row.totalCost || "0");
-    const profit     = parseFloat(row.totalProfit || "0");
-    const avgCfg     = parseFloat(row.avgConfiguredPrice || "0");
-    const avgCost    = parseFloat(row.avgCostPrice || "0");
-    const margin     = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0";
-    const profitPerUnit = qty > 0 ? (profit / qty).toFixed(2) : "0";
-    return {
-      itemId:            row.stockItemId,
-      itemName:          si?.name || "Unknown",
-      itemCode:          si?.code || "",
-      totalQty:          qty.toFixed(2),
-      totalRevenue:      revenue.toFixed(2),
-      totalCost:         cost.toFixed(2),
-      totalProfit:       profit.toFixed(2),
-      profitPerUnit,
-      profitMargin:      margin + "%",
-      avgConfiguredPrice: avgCfg.toFixed(2),
-      avgCostPrice:      avgCost.toFixed(2),
-      // If configured price < cost price OR total profit < 0 → losing money
-      isLosing:          profit < 0 || avgCfg < avgCost,
-      lossAmount:        profit < 0 ? Math.abs(profit).toFixed(2) : "0",
-    };
-  }).sort((a, b) => parseFloat(a.totalProfit) - parseFloat(b.totalProfit)); // most losing first
+  const itemProfitabilityReport = itemProfitabilityRaw
+    .map((row) => {
+      const si = stockItems.find((s) => s.id === row.stockItemId);
+      const qty = parseFloat(row.totalQty || "0");
+      const revenue = parseFloat(row.totalRevenue || "0");
+      const cost = parseFloat(row.totalCost || "0");
+      const profit = parseFloat(row.totalProfit || "0");
+      const avgCfg = parseFloat(row.avgConfiguredPrice || "0");
+      const avgCost = parseFloat(row.avgCostPrice || "0");
+      const margin = revenue > 0 ? ((profit / revenue) * 100).toFixed(1) : "0";
+      const profitPerUnit = qty > 0 ? (profit / qty).toFixed(2) : "0";
+      return {
+        itemId: row.stockItemId,
+        itemName: si?.name || "Unknown",
+        itemCode: si?.code || "",
+        totalQty: qty.toFixed(2),
+        totalRevenue: revenue.toFixed(2),
+        totalCost: cost.toFixed(2),
+        totalProfit: profit.toFixed(2),
+        profitPerUnit,
+        profitMargin: margin + "%",
+        avgConfiguredPrice: avgCfg.toFixed(2),
+        avgCostPrice: avgCost.toFixed(2),
+        // If configured price < cost price OR total profit < 0 → losing money
+        isLosing: profit < 0 || avgCfg < avgCost,
+        lossAmount: profit < 0 ? Math.abs(profit).toFixed(2) : "0",
+      };
+    })
+    .sort((a, b) => parseFloat(a.totalProfit) - parseFloat(b.totalProfit)); // most losing first
 
   // ── Sales by stock group ────────────────────────────────────────────
   const [salesByGroupRaw, salesByGroupTodayRaw, salesByGroupThisMonthRaw] = await Promise.all([
     // All-time by group
     db
       .select({
-        stockGroupId:  schema.stockItems.stockGroupId,
-        totalQty:      sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
-        totalRevenue:  sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
-        totalCost:     sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
-        totalProfit:   sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
+        stockGroupId: schema.stockItems.stockGroupId,
+        totalQty: sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
+        totalRevenue: sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
+        totalCost: sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
+        totalProfit: sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
       })
       .from(schema.salesItems)
-      .innerJoin(schema.vouchers,    eq(schema.salesItems.voucherId,    schema.vouchers.id))
-      .innerJoin(schema.stockItems,  eq(schema.salesItems.stockItemId,  schema.stockItems.id))
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .innerJoin(schema.stockItems, eq(schema.salesItems.stockItemId, schema.stockItems.id))
       .where(and(eq(schema.vouchers.companyId, companyId), isNull(schema.vouchers.deletedAt)))
       .groupBy(schema.stockItems.stockGroupId),
 
     // Today by group
     db
       .select({
-        stockGroupId:  schema.stockItems.stockGroupId,
-        totalQty:      sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
-        totalRevenue:  sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
-        totalCost:     sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
-        totalProfit:   sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
+        stockGroupId: schema.stockItems.stockGroupId,
+        totalQty: sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
+        totalRevenue: sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
+        totalCost: sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
+        totalProfit: sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
       })
       .from(schema.salesItems)
-      .innerJoin(schema.vouchers,    eq(schema.salesItems.voucherId,    schema.vouchers.id))
-      .innerJoin(schema.stockItems,  eq(schema.salesItems.stockItemId,  schema.stockItems.id))
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        eq(schema.vouchers.voucherDate, todayStr),
-        isNull(schema.vouchers.deletedAt)
-      ))
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .innerJoin(schema.stockItems, eq(schema.salesItems.stockItemId, schema.stockItems.id))
+      .where(
+        and(
+          eq(schema.vouchers.companyId, companyId),
+          eq(schema.vouchers.voucherDate, todayStr),
+          isNull(schema.vouchers.deletedAt)
+        )
+      )
       .groupBy(schema.stockItems.stockGroupId),
 
     // This month by group
     db
       .select({
-        stockGroupId:  schema.stockItems.stockGroupId,
-        totalQty:      sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
-        totalRevenue:  sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
-        totalCost:     sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
-        totalProfit:   sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
+        stockGroupId: schema.stockItems.stockGroupId,
+        totalQty: sql<string>`SUM(CAST(${schema.salesItems.quantity} AS NUMERIC))`,
+        totalRevenue: sql<string>`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`,
+        totalCost: sql<string>`SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC))`,
+        totalProfit: sql<string>`SUM(CAST(${schema.salesItems.profit} AS NUMERIC))`,
       })
       .from(schema.salesItems)
-      .innerJoin(schema.vouchers,    eq(schema.salesItems.voucherId,    schema.vouchers.id))
-      .innerJoin(schema.stockItems,  eq(schema.salesItems.stockItemId,  schema.stockItems.id))
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        gte(schema.vouchers.voucherDate, monthStartStr),
-        isNull(schema.vouchers.deletedAt)
-      ))
+      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+      .innerJoin(schema.stockItems, eq(schema.salesItems.stockItemId, schema.stockItems.id))
+      .where(
+        and(
+          eq(schema.vouchers.companyId, companyId),
+          gte(schema.vouchers.voucherDate, monthStartStr),
+          isNull(schema.vouchers.deletedAt)
+        )
+      )
       .groupBy(schema.stockItems.stockGroupId),
   ]);
 
   // Helper: enrich group row with name
   function enrichGroupRow(row: any) {
     const grp = stockGroups.find((g: any) => g.id === row.stockGroupId);
-    const rev  = parseFloat(row.totalRevenue || "0");
-    const prof = parseFloat(row.totalProfit  || "0");
+    const rev = parseFloat(row.totalRevenue || "0");
+    const prof = parseFloat(row.totalProfit || "0");
     return {
-      groupId:      row.stockGroupId,
-      groupName:    grp?.name || (row.stockGroupId ? "Unknown Group" : "Uncategorized"),
-      groupCode:    grp?.code || "",
-      totalQty:     parseFloat(row.totalQty || "0").toFixed(2),
+      groupId: row.stockGroupId,
+      groupName: grp?.name || (row.stockGroupId ? "Unknown Group" : "Uncategorized"),
+      groupCode: grp?.code || "",
+      totalQty: parseFloat(row.totalQty || "0").toFixed(2),
       totalRevenue: rev.toFixed(2),
-      totalCost:    parseFloat(row.totalCost || "0").toFixed(2),
-      totalProfit:  prof.toFixed(2),
+      totalCost: parseFloat(row.totalCost || "0").toFixed(2),
+      totalProfit: prof.toFixed(2),
       profitMargin: rev > 0 ? ((prof / rev) * 100).toFixed(1) + "%" : "0%",
-      isLosing:     prof < 0,
+      isLosing: prof < 0,
     };
   }
 
-  const salesByGroup          = salesByGroupRaw.map(enrichGroupRow)
-                                   .sort((a, b) => parseFloat(a.totalProfit) - parseFloat(b.totalProfit));
-  const salesByGroupToday     = salesByGroupTodayRaw.map(enrichGroupRow)
-                                   .sort((a, b) => parseFloat(b.totalRevenue) - parseFloat(a.totalRevenue));
-  const salesByGroupThisMonth = salesByGroupThisMonthRaw.map(enrichGroupRow)
-                                   .sort((a, b) => parseFloat(b.totalRevenue) - parseFloat(a.totalRevenue));
+  const salesByGroup = salesByGroupRaw
+    .map(enrichGroupRow)
+    .sort((a, b) => parseFloat(a.totalProfit) - parseFloat(b.totalProfit));
+  const salesByGroupToday = salesByGroupTodayRaw
+    .map(enrichGroupRow)
+    .sort((a, b) => parseFloat(b.totalRevenue) - parseFloat(a.totalRevenue));
+  const salesByGroupThisMonth = salesByGroupThisMonthRaw
+    .map(enrichGroupRow)
+    .sort((a, b) => parseFloat(b.totalRevenue) - parseFloat(a.totalRevenue));
 
   // Pricing health: current stock items where selling price < average cost (selling below cost)
-  const inventoryMap = new Map(inventory.map(i => [i.stockItemId, i]));
+  const inventoryMap = new Map(inventory.map((i) => [i.stockItemId, i]));
   const pricingHealthReport = stockItems
-    .map(item => {
+    .map((item) => {
       const inv = inventoryMap.get(item.id);
-      const avgCost     = parseFloat(inv?.averageRate || "0");
-      const sellPrice   = parseFloat(item.sellingPrice || "0");
-      const qty         = parseFloat(inv?.quantity || "0");
-      const gap         = sellPrice - avgCost;
+      const avgCost = parseFloat(inv?.averageRate || "0");
+      const sellPrice = parseFloat(item.sellingPrice || "0");
+      const qty = parseFloat(inv?.quantity || "0");
+      const gap = sellPrice - avgCost;
       return {
-        itemId:       item.id,
-        itemName:     item.name,
-        itemCode:     item.code || "",
+        itemId: item.id,
+        itemName: item.name,
+        itemCode: item.code || "",
         sellingPrice: sellPrice.toFixed(2),
         avgCostPrice: avgCost.toFixed(2),
-        priceGap:     gap.toFixed(2),
-        stockQty:     qty.toFixed(2),
-        status:       gap < 0 ? "LOSING" : gap === 0 ? "BREAK_EVEN" : "PROFITABLE",
+        priceGap: gap.toFixed(2),
+        stockQty: qty.toFixed(2),
+        status: gap < 0 ? "LOSING" : gap === 0 ? "BREAK_EVEN" : "PROFITABLE",
         potentialLoss: qty > 0 && gap < 0 ? (Math.abs(gap) * qty).toFixed(2) : "0",
       };
     })
-    .filter(item => parseFloat(item.avgCostPrice) > 0) // only items with known cost
+    .filter((item) => parseFloat(item.avgCostPrice) > 0) // only items with known cost
     .sort((a, b) => parseFloat(a.priceGap) - parseFloat(b.priceGap)); // most losing first
 
-  
   const lowStockAlerts: any[] = [];
   for (const item of stockItems) {
     const qty = inventoryMap.get(item.id) || 0;
-    const reorderLevel = parseFloat(item.reorderLevel || '0');
+    const reorderLevel = parseFloat(item.reorderLevel || "0");
     if (reorderLevel > 0 && qty <= reorderLevel) {
       lowStockAlerts.push({
         itemId: item.id,
@@ -732,7 +786,7 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
         itemName: item.name,
         currentQty: qty,
         reorderLevel: reorderLevel,
-        status: qty === 0 ? 'OUT_OF_STOCK' : 'LOW_STOCK',
+        status: qty === 0 ? "OUT_OF_STOCK" : "LOW_STOCK",
       });
     }
   }
@@ -758,12 +812,14 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
         })
         .from(schema.voucherEntries)
         .innerJoin(schema.vouchers, eq(schema.voucherEntries.voucherId, schema.vouchers.id))
-        .where(and(
-          eq(schema.voucherEntries.supplierId, supplier.id),
-          eq(schema.vouchers.companyId, companyId),
-          eq(schema.vouchers.optional, false),
-          isNull(schema.vouchers.deletedAt)
-        ));
+        .where(
+          and(
+            eq(schema.voucherEntries.supplierId, supplier.id),
+            eq(schema.vouchers.companyId, companyId),
+            eq(schema.vouchers.optional, false),
+            isNull(schema.vouchers.deletedAt)
+          )
+        );
 
       // Calculate balance same as supplier page: Opening Balance + Credits - Debits
       const openingBalance = parseFloat(supplier.openingBalance || "0");
@@ -776,16 +832,16 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       return {
         supplierId: supplier.id,
         supplierCode: supplier.code,
-        supplierName: supplier.legalName || 'Unknown',
+        supplierName: supplier.legalName || "Unknown",
         openingBalance: openingBalance,
         balance: balance,
-        status: balance > 0 ? 'PAYABLE' : balance < 0 ? 'OVERPAID' : 'SETTLED',
+        status: balance > 0 ? "PAYABLE" : balance < 0 ? "OVERPAID" : "SETTLED",
       };
     })
   );
 
   // Filter to only show suppliers with non-zero balances
-  const filteredSupplierBalances = supplierBalances.filter(sb => Math.abs(sb.balance) > 0.01);
+  const filteredSupplierBalances = supplierBalances.filter((sb) => Math.abs(sb.balance) > 0.01);
 
   let customerBalancesList: any[] = [];
   try {
@@ -799,24 +855,26 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       .where(eq(schema.customerBalances.companyId, companyId))
       .groupBy(schema.customerBalances.customerId);
 
-    customerBalancesList = customerBalancesRaw.map(cb => {
-      const customer = customers.find(c => c.id === cb.customerId);
-      const balance = parseFloat(cb.totalDebit) - parseFloat(cb.totalCredit);
-      return {
-        customerId: cb.customerId,
-        customerName: customer?.legalName || 'Unknown',
-        balance: balance,
-      };
-    }).filter(cb => Math.abs(cb.balance) > 0.01);
+    customerBalancesList = customerBalancesRaw
+      .map((cb) => {
+        const customer = customers.find((c) => c.id === cb.customerId);
+        const balance = parseFloat(cb.totalDebit) - parseFloat(cb.totalCredit);
+        return {
+          customerId: cb.customerId,
+          customerName: customer?.legalName || "Unknown",
+          balance: balance,
+        };
+      })
+      .filter((cb) => Math.abs(cb.balance) > 0.01);
   } catch (error) {
     console.error("Error fetching customer balances:", error);
   }
 
   const financialSummary = {
-    totalPayables: filteredSupplierBalances.filter(s => s.balance > 0).reduce((sum, s) => sum + s.balance, 0),
-    totalReceivables: customerBalancesList.filter(c => c.balance > 0).reduce((sum, c) => sum + c.balance, 0),
-    openPurchaseOrders: purchaseOrders.filter(po => po.status === 'Open').length,
-    pendingContainerSales: containerSales.filter(cs => cs.paymentStatus !== 'PAID').length,
+    totalPayables: filteredSupplierBalances.filter((s) => s.balance > 0).reduce((sum, s) => sum + s.balance, 0),
+    totalReceivables: customerBalancesList.filter((c) => c.balance > 0).reduce((sum, c) => sum + c.balance, 0),
+    openPurchaseOrders: purchaseOrders.filter((po) => po.status === "Open").length,
+    pendingContainerSales: containerSales.filter((cs) => cs.paymentStatus !== "PAID").length,
   };
 
   const inventoryValueByLocation = await db
@@ -829,11 +887,11 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     .where(eq(schema.inventory.companyId, companyId))
     .groupBy(schema.inventory.locationId);
 
-  const inventoryByLocationWithNames = inventoryValueByLocation.map(inv => {
-    const location = locations.find(l => l.id === inv.locationId);
+  const inventoryByLocationWithNames = inventoryValueByLocation.map((inv) => {
+    const location = locations.find((l) => l.id === inv.locationId);
     return {
       locationId: inv.locationId,
-      locationName: location?.name || 'Unknown',
+      locationName: location?.name || "Unknown",
       totalValue: parseFloat(inv.totalValue),
       itemCount: inv.itemCount,
     };
@@ -848,31 +906,29 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     })
     .from(schema.salesItems)
     .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-    .where(and(
-      eq(schema.vouchers.companyId, companyId),
-      isNull(schema.vouchers.deletedAt)
-    ))
+    .where(and(eq(schema.vouchers.companyId, companyId), isNull(schema.vouchers.deletedAt)))
     .groupBy(schema.salesItems.stockItemId)
     .orderBy(desc(sql`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`))
     .limit(10);
 
-  const topSellingWithNames = topSellingItems.map(item => {
-    const stockItem = stockItems.find(s => s.id === item.stockItemId);
-    const profitMargin = parseFloat(item.totalRevenue) > 0 
-      ? (parseFloat(item.totalProfit) / parseFloat(item.totalRevenue) * 100).toFixed(1)
-      : '0';
+  const topSellingWithNames = topSellingItems.map((item) => {
+    const stockItem = stockItems.find((s) => s.id === item.stockItemId);
+    const profitMargin =
+      parseFloat(item.totalRevenue) > 0
+        ? ((parseFloat(item.totalProfit) / parseFloat(item.totalRevenue)) * 100).toFixed(1)
+        : "0";
     return {
       itemId: item.stockItemId,
-      itemName: stockItem?.name || 'Unknown',
-      itemCode: stockItem?.code || 'N/A',
+      itemName: stockItem?.name || "Unknown",
+      itemCode: stockItem?.code || "N/A",
       totalQuantity: parseFloat(item.totalQuantity).toFixed(2),
       totalRevenue: parseFloat(item.totalRevenue).toFixed(2),
       totalProfit: parseFloat(item.totalProfit).toFixed(2),
-      profitMargin: profitMargin + '%',
+      profitMargin: profitMargin + "%",
     };
   });
 
-  const recentTransactions = recentVouchers.slice(0, 20).map(v => ({
+  const recentTransactions = recentVouchers.slice(0, 20).map((v) => ({
     id: v.id,
     number: v.voucherNumber,
     type: v.voucherType,
@@ -884,79 +940,82 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
   // Slow-moving stock: items that exist in inventory but haven't been sold in 60+ days
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-  
+
   const recentlySoldItemIds = new Set(
-    (await db
-      .select({ stockItemId: schema.salesItems.stockItemId })
-      .from(schema.salesItems)
-      .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        gt(schema.vouchers.voucherDate, sixtyDaysAgo.toISOString().split('T')[0]),
-        isNull(schema.vouchers.deletedAt)
-      ))
-    ).map(r => r.stockItemId)
+    (
+      await db
+        .select({ stockItemId: schema.salesItems.stockItemId })
+        .from(schema.salesItems)
+        .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
+        .where(
+          and(
+            eq(schema.vouchers.companyId, companyId),
+            gt(schema.vouchers.voucherDate, sixtyDaysAgo.toISOString().split("T")[0]),
+            isNull(schema.vouchers.deletedAt)
+          )
+        )
+    ).map((r) => r.stockItemId)
   );
 
   const slowMovingStock = stockItems
-    .filter(item => {
+    .filter((item) => {
       const qty = inventoryMap.get(item.id) || 0;
       return qty > 0 && !recentlySoldItemIds.has(item.id);
     })
-    .map(item => {
+    .map((item) => {
       const qty = inventoryMap.get(item.id) || 0;
-      const invRecord = inventory.find(i => i.stockItemId === item.id);
-      const value = invRecord ? parseFloat(invRecord.totalValue || '0') : 0;
+      const invRecord = inventory.find((i) => i.stockItemId === item.id);
+      const value = invRecord ? parseFloat(invRecord.totalValue || "0") : 0;
       return {
         itemId: item.id,
         itemCode: item.code,
         itemName: item.name,
         quantity: qty,
         value: value,
-        daysSinceLastSale: '60+',
-        recommendation: value > 500 ? 'Consider markdown/promotion' : 'Monitor',
+        daysSinceLastSale: "60+",
+        recommendation: value > 500 ? "Consider markdown/promotion" : "Monitor",
       };
     })
     .slice(0, 20);
 
   // Items to markdown: slow-moving with high value
   const itemsToMarkdown = slowMovingStock
-    .filter(item => item.value > 100)
+    .filter((item) => item.value > 100)
     .sort((a, b) => b.value - a.value)
     .slice(0, 10);
 
   // Overdue containers: OTW status for more than 90 days
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-  
+
   const overdueContainers = purchaseOrders
-    .filter(po => po.status === 'OTW')
-    .filter(po => {
+    .filter((po) => po.status === "OTW")
+    .filter((po) => {
       const createdDate = new Date(po.createdAt);
       return createdDate < ninetyDaysAgo;
     })
-    .map(po => {
-      const supplier = suppliers.find(s => s.id === po.supplierId);
+    .map((po) => {
+      const supplier = suppliers.find((s) => s.id === po.supplierId);
       const daysInTransit = Math.floor((Date.now() - new Date(po.createdAt).getTime()) / (1000 * 60 * 60 * 24));
       return {
         poNumber: po.poNumber,
-        supplierName: supplier?.legalName || 'Unknown',
-        amount: parseFloat(po.itemsTotal || '0') + parseFloat(po.freight || '0'),
+        supplierName: supplier?.legalName || "Unknown",
+        amount: parseFloat(po.itemsTotal || "0") + parseFloat(po.freight || "0"),
         daysInTransit,
-        status: 'OVERDUE',
+        status: "OVERDUE",
       };
     });
 
   // Containers in transit (all OTW)
   const containersInTransit = purchaseOrders
-    .filter(po => po.status === 'OTW')
-    .map(po => {
-      const supplier = suppliers.find(s => s.id === po.supplierId);
+    .filter((po) => po.status === "OTW")
+    .map((po) => {
+      const supplier = suppliers.find((s) => s.id === po.supplierId);
       const daysInTransit = Math.floor((Date.now() - new Date(po.createdAt).getTime()) / (1000 * 60 * 60 * 24));
       return {
         poNumber: po.poNumber,
-        supplierName: supplier?.legalName || 'Unknown',
-        amount: parseFloat(po.itemsTotal || '0') + parseFloat(po.freight || '0'),
+        supplierName: supplier?.legalName || "Unknown",
+        amount: parseFloat(po.itemsTotal || "0") + parseFloat(po.freight || "0"),
         daysInTransit,
         isOverdue: daysInTransit > 90,
       };
@@ -973,47 +1032,44 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
       openingBalance: schema.employees.openingBalance,
     })
     .from(schema.employees)
-    .where(and(
-      eq(schema.employees.companyId, companyId),
-      eq(schema.employees.active, true)
-    ));
+    .where(and(eq(schema.employees.companyId, companyId), eq(schema.employees.active, true)));
 
   const employeeBalancesList = employees
-    .map(emp => ({
+    .map((emp) => ({
       employeeId: emp.id,
       employeeCode: emp.code,
       employeeName: `${emp.firstName} ${emp.lastName}`,
-      balance: parseFloat(emp.currentBalance || '0'),
-      openingBalance: parseFloat(emp.openingBalance || '0'),
+      balance: parseFloat(emp.currentBalance || "0"),
+      openingBalance: parseFloat(emp.openingBalance || "0"),
     }))
-    .filter(e => Math.abs(e.balance) > 0.01);
+    .filter((e) => Math.abs(e.balance) > 0.01);
 
   // Build comprehensive stock items with inventory by location (for full search)
-  const stockItemsWithInventory = stockItems.map(item => {
-    const stockGroup = stockGroups.find(g => g.id === item.stockGroupId);
-    const itemInventory = inventory.filter(inv => inv.stockItemId === item.id);
-    const inventoryByLocation = itemInventory.map(inv => {
-      const location = locations.find(l => l.id === inv.locationId);
+  const stockItemsWithInventory = stockItems.map((item) => {
+    const stockGroup = stockGroups.find((g) => g.id === item.stockGroupId);
+    const itemInventory = inventory.filter((inv) => inv.stockItemId === item.id);
+    const inventoryByLocation = itemInventory.map((inv) => {
+      const location = locations.find((l) => l.id === inv.locationId);
       return {
-        locationName: location?.name || 'Unknown',
-        locationCode: location?.code || '',
-        quantity: parseFloat(inv.quantity || '0'),
-        averageRate: parseFloat(inv.averageRate || '0'),
-        totalValue: parseFloat(inv.totalValue || '0'),
+        locationName: location?.name || "Unknown",
+        locationCode: location?.code || "",
+        quantity: parseFloat(inv.quantity || "0"),
+        averageRate: parseFloat(inv.averageRate || "0"),
+        totalValue: parseFloat(inv.totalValue || "0"),
       };
     });
     const totalQuantity = inventoryByLocation.reduce((sum, l) => sum + l.quantity, 0);
     const totalValue = inventoryByLocation.reduce((sum, l) => sum + l.totalValue, 0);
-    
+
     return {
       code: item.code,
       name: item.name,
-      groupName: stockGroup?.name || '',
-      sellingPrice: parseFloat(item.sellingPrice || '0'),
-      reorderLevel: parseFloat(item.reorderLevel || '0'),
+      groupName: stockGroup?.name || "",
+      sellingPrice: parseFloat(item.sellingPrice || "0"),
+      reorderLevel: parseFloat(item.reorderLevel || "0"),
       totalQuantity,
       totalValue,
-      locations: inventoryByLocation.filter(l => l.quantity > 0),
+      locations: inventoryByLocation.filter((l) => l.quantity > 0),
     };
   });
 
@@ -1032,24 +1088,21 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
     })
     .from(schema.salesItems)
     .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-    .where(and(
-      eq(schema.vouchers.companyId, companyId),
-      isNull(schema.vouchers.deletedAt)
-    ))
+    .where(and(eq(schema.vouchers.companyId, companyId), isNull(schema.vouchers.deletedAt)))
     .orderBy(desc(schema.vouchers.voucherDate))
     .limit(500);
 
-  const recentSalesHistory = allSalesData.map(sale => {
-    const item = stockItems.find(i => i.id === sale.stockItemId);
-    const location = locations.find(l => l.id === sale.locationId);
+  const recentSalesHistory = allSalesData.map((sale) => {
+    const item = stockItems.find((i) => i.id === sale.stockItemId);
+    const location = locations.find((l) => l.id === sale.locationId);
     return {
-      itemCode: item?.code || 'Unknown',
-      itemName: item?.name || 'Unknown',
-      locationName: location?.name || 'Unknown',
-      quantity: parseFloat(sale.quantity || '0'),
-      sellingPrice: parseFloat(sale.sellingPrice || '0'),
-      totalSales: parseFloat(sale.totalSales || '0'),
-      profit: parseFloat(sale.profit || '0'),
+      itemCode: item?.code || "Unknown",
+      itemName: item?.name || "Unknown",
+      locationName: location?.name || "Unknown",
+      quantity: parseFloat(sale.quantity || "0"),
+      sellingPrice: parseFloat(sale.sellingPrice || "0"),
+      totalSales: parseFloat(sale.totalSales || "0"),
+      profit: parseFloat(sale.profit || "0"),
       date: sale.voucherDate,
       voucherNumber: sale.voucherNumber,
     };
@@ -1098,16 +1151,20 @@ export async function getERPContext(companyId: number): Promise<ERPContext> {
 }
 
 function buildSystemPrompt(context: ERPContext, userPreferences?: UserPreferences): string {
-  const currency = userPreferences?.currency || 'USD';
-  const profitMargin = parseFloat(context.profitAnalysis.totalSales) > 0
-    ? ((parseFloat(context.profitAnalysis.totalProfit) / parseFloat(context.profitAnalysis.totalSales)) * 100).toFixed(1)
-    : '0';
+  const currency = userPreferences?.currency || "USD";
+  const profitMargin =
+    parseFloat(context.profitAnalysis.totalSales) > 0
+      ? (
+          (parseFloat(context.profitAnalysis.totalProfit) / parseFloat(context.profitAnalysis.totalSales)) *
+          100
+        ).toFixed(1)
+      : "0";
 
   // Format the timestamp for display
   const fetchTime = new Date(context.dataFetchedAt);
-  const formattedTime = fetchTime.toLocaleString('en-US', { 
-    dateStyle: 'medium', 
-    timeStyle: 'medium' 
+  const formattedTime = fetchTime.toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "medium",
   });
 
   return `You are an intelligent AI assistant for an ERP/POS system called "ERP Assistant". You help business owners and managers understand their data, make decisions, and get insights.
@@ -1165,129 +1222,229 @@ All data below is LIVE from the database - not cached. These numbers reflect the
 - Pending Container Sales: ${context.financialSummary.pendingContainerSales}
 
 ### ⚠️ ALERTS & WARNINGS:
-${context.lowStockAlerts.length > 0 ? `
+${
+  context.lowStockAlerts.length > 0
+    ? `
 LOW STOCK ITEMS (${context.lowStockAlerts.length} items need attention):
-${context.lowStockAlerts.slice(0, 10).map(a => `- ${a.itemName} (${a.itemCode}): ${a.currentQty} units left (reorder at ${a.reorderLevel}) - ${a.status}`).join('\n')}
-` : 'No low stock alerts at this time.'}
+${context.lowStockAlerts
+  .slice(0, 10)
+  .map(
+    (a) => `- ${a.itemName} (${a.itemCode}): ${a.currentQty} units left (reorder at ${a.reorderLevel}) - ${a.status}`
+  )
+  .join("\n")}
+`
+    : "No low stock alerts at this time."
+}
 
-${context.supplierBalances.filter(s => s.balance > 1000).length > 0 ? `
+${
+  context.supplierBalances.filter((s) => s.balance > 1000).length > 0
+    ? `
 SIGNIFICANT SUPPLIER BALANCES:
-${context.supplierBalances.filter(s => s.balance > 1000).slice(0, 5).map(s => `- ${s.supplierName}: $${s.balance.toLocaleString()} ${s.status}`).join('\n')}
-` : ''}
+${context.supplierBalances
+  .filter((s) => s.balance > 1000)
+  .slice(0, 5)
+  .map((s) => `- ${s.supplierName}: $${s.balance.toLocaleString()} ${s.status}`)
+  .join("\n")}
+`
+    : ""
+}
 
-${context.slowMovingStock.length > 0 ? `
+${
+  context.slowMovingStock.length > 0
+    ? `
 🐌 SLOW-MOVING STOCK (Not sold in 60+ days):
-${context.slowMovingStock.slice(0, 10).map(item => `- ${item.itemName} (${item.itemCode}): ${item.quantity} units, Value: $${item.value.toLocaleString()} - ${item.recommendation}`).join('\n')}
-` : ''}
+${context.slowMovingStock
+  .slice(0, 10)
+  .map(
+    (item) =>
+      `- ${item.itemName} (${item.itemCode}): ${item.quantity} units, Value: $${item.value.toLocaleString()} - ${item.recommendation}`
+  )
+  .join("\n")}
+`
+    : ""
+}
 
-${context.itemsToMarkdown.length > 0 ? `
+${
+  context.itemsToMarkdown.length > 0
+    ? `
 💸 ITEMS TO CONSIDER FOR MARKDOWN (High-value slow movers):
-${context.itemsToMarkdown.map(item => `- ${item.itemName}: $${item.value.toLocaleString()} stuck value`).join('\n')}
-` : ''}
+${context.itemsToMarkdown.map((item) => `- ${item.itemName}: $${item.value.toLocaleString()} stuck value`).join("\n")}
+`
+    : ""
+}
 
-${context.overdueContainers.length > 0 ? `
+${
+  context.overdueContainers.length > 0
+    ? `
 🚨 OVERDUE CONTAINERS (In transit 90+ days):
-${context.overdueContainers.map(c => `- ${c.poNumber} from ${c.supplierName}: $${c.amount.toLocaleString()} - ${c.daysInTransit} days in transit`).join('\n')}
-` : ''}
+${context.overdueContainers.map((c) => `- ${c.poNumber} from ${c.supplierName}: $${c.amount.toLocaleString()} - ${c.daysInTransit} days in transit`).join("\n")}
+`
+    : ""
+}
 
-${context.containersInTransit.length > 0 ? `
+${
+  context.containersInTransit.length > 0
+    ? `
 🚢 CONTAINERS IN TRANSIT:
-${context.containersInTransit.map(c => `- ${c.poNumber} from ${c.supplierName}: $${c.amount.toLocaleString()} (${c.daysInTransit} days)${c.isOverdue ? ' ⚠️ OVERDUE' : ''}`).join('\n')}
-` : 'No containers currently in transit.'}
+${context.containersInTransit.map((c) => `- ${c.poNumber} from ${c.supplierName}: $${c.amount.toLocaleString()} (${c.daysInTransit} days)${c.isOverdue ? " ⚠️ OVERDUE" : ""}`).join("\n")}
+`
+    : "No containers currently in transit."
+}
 
-${context.employeeBalances.length > 0 ? `
+${
+  context.employeeBalances.length > 0
+    ? `
 👷 EMPLOYEE BALANCES:
-${context.employeeBalances.map(e => `- ${e.employeeName} (${e.employeeCode}): $${e.balance.toLocaleString()}`).join('\n')}
+${context.employeeBalances.map((e) => `- ${e.employeeName} (${e.employeeCode}): $${e.balance.toLocaleString()}`).join("\n")}
 Total Employee Deposits: $${context.employeeBalances.reduce((sum, e) => sum + e.balance, 0).toLocaleString()}
-` : ''}
+`
+    : ""
+}
 
 ### 📈 TOP SELLING ITEMS (by revenue, all-time):
-${context.topSellingItems.length > 0 ? context.topSellingItems.slice(0, 5).map((item, i) => 
-  `${i+1}. ${item.itemName} - Revenue: $${parseFloat(item.totalRevenue).toLocaleString()}, Profit: $${parseFloat(item.totalProfit).toLocaleString()} (${item.profitMargin} margin)`
-).join('\n') : 'No sales data available yet.'}
+${
+  context.topSellingItems.length > 0
+    ? context.topSellingItems
+        .slice(0, 5)
+        .map(
+          (item, i) =>
+            `${i + 1}. ${item.itemName} - Revenue: $${parseFloat(item.totalRevenue).toLocaleString()}, Profit: $${parseFloat(item.totalProfit).toLocaleString()} (${item.profitMargin} margin)`
+        )
+        .join("\n")
+    : "No sales data available yet."
+}
 
 ### 🗂️ SALES BY STOCK GROUP — TODAY (${context.todaysSales.date}):
-${context.salesByGroupToday.length > 0
-  ? context.salesByGroupToday.map(g =>
-      `${g.groupCode}|${g.groupName}|qty:${g.totalQty}|rev:$${g.totalRevenue}|profit:$${g.totalProfit}|${g.profitMargin}${g.isLosing ? "|LOSING" : ""}`
-    ).join('\n')
-  : 'No sales today yet.'}
+${
+  context.salesByGroupToday.length > 0
+    ? context.salesByGroupToday
+        .map(
+          (g) =>
+            `${g.groupCode}|${g.groupName}|qty:${g.totalQty}|rev:$${g.totalRevenue}|profit:$${g.totalProfit}|${g.profitMargin}${g.isLosing ? "|LOSING" : ""}`
+        )
+        .join("\n")
+    : "No sales today yet."
+}
 
 ### 🗂️ SALES BY STOCK GROUP — THIS MONTH (since ${context.thisMonthSales.monthStart}):
-${context.salesByGroupThisMonth.length > 0
-  ? context.salesByGroupThisMonth.map(g =>
-      `${g.groupCode}|${g.groupName}|qty:${g.totalQty}|rev:$${g.totalRevenue}|profit:$${g.totalProfit}|${g.profitMargin}${g.isLosing ? "|LOSING" : ""}`
-    ).join('\n')
-  : 'No sales this month yet.'}
+${
+  context.salesByGroupThisMonth.length > 0
+    ? context.salesByGroupThisMonth
+        .map(
+          (g) =>
+            `${g.groupCode}|${g.groupName}|qty:${g.totalQty}|rev:$${g.totalRevenue}|profit:$${g.totalProfit}|${g.profitMargin}${g.isLosing ? "|LOSING" : ""}`
+        )
+        .join("\n")
+    : "No sales this month yet."
+}
 
 ### 🗂️ SALES BY STOCK GROUP — ALL TIME (sorted most losing first):
-${context.salesByGroup.length > 0
-  ? context.salesByGroup.map(g =>
-      `${g.groupCode}|${g.groupName}|qty:${g.totalQty}|rev:$${g.totalRevenue}|profit:$${g.totalProfit}|${g.profitMargin}${g.isLosing ? "|LOSING" : ""}`
-    ).join('\n')
-  : 'No group sales data yet.'}
+${
+  context.salesByGroup.length > 0
+    ? context.salesByGroup
+        .map(
+          (g) =>
+            `${g.groupCode}|${g.groupName}|qty:${g.totalQty}|rev:$${g.totalRevenue}|profit:$${g.totalProfit}|${g.profitMargin}${g.isLosing ? "|LOSING" : ""}`
+        )
+        .join("\n")
+    : "No group sales data yet."
+}
 
 ### 📊 ITEM PROFITABILITY REPORT (all items ever sold, sorted MOST LOSING first):
 Format: ITEM | QTY_SOLD | REVENUE | COST | PROFIT | MARGIN | AVG_CONFIG_PRICE | AVG_COST_PRICE | STATUS
-${context.itemProfitabilityReport.length > 0
-  ? context.itemProfitabilityReport.map(item =>
-      `${item.itemCode}|${item.itemName}|${item.totalQty}|$${item.totalRevenue}|$${item.totalCost}|$${item.totalProfit}|${item.profitMargin}|cfg:$${item.avgConfiguredPrice}|cost:$${item.avgCostPrice}|${item.isLosing ? "LOSING" : "PROFITABLE"}`
-    ).join('\n')
-  : 'No sales history yet.'}
+${
+  context.itemProfitabilityReport.length > 0
+    ? context.itemProfitabilityReport
+        .map(
+          (item) =>
+            `${item.itemCode}|${item.itemName}|${item.totalQty}|$${item.totalRevenue}|$${item.totalCost}|$${item.totalProfit}|${item.profitMargin}|cfg:$${item.avgConfiguredPrice}|cost:$${item.avgCostPrice}|${item.isLosing ? "LOSING" : "PROFITABLE"}`
+        )
+        .join("\n")
+    : "No sales history yet."
+}
 
 SUMMARY:
-- Items making profit: ${context.itemProfitabilityReport.filter(i => !i.isLosing).length}
-- Items losing money: ${context.itemProfitabilityReport.filter(i => i.isLosing).length}
-- Biggest loser: ${context.itemProfitabilityReport.find(i => i.isLosing)?.itemName || 'None'} (${context.itemProfitabilityReport.find(i => i.isLosing) ? '$' + context.itemProfitabilityReport.find(i => i.isLosing)!.totalProfit : 'N/A'} profit)
-- Biggest winner: ${[...context.itemProfitabilityReport].reverse().find(i => !i.isLosing)?.itemName || 'None'} (${[...context.itemProfitabilityReport].reverse().find(i => !i.isLosing) ? '$' + [...context.itemProfitabilityReport].reverse().find(i => !i.isLosing)!.totalProfit : 'N/A'} profit)
+- Items making profit: ${context.itemProfitabilityReport.filter((i) => !i.isLosing).length}
+- Items losing money: ${context.itemProfitabilityReport.filter((i) => i.isLosing).length}
+- Biggest loser: ${context.itemProfitabilityReport.find((i) => i.isLosing)?.itemName || "None"} (${context.itemProfitabilityReport.find((i) => i.isLosing) ? "$" + context.itemProfitabilityReport.find((i) => i.isLosing)!.totalProfit : "N/A"} profit)
+- Biggest winner: ${[...context.itemProfitabilityReport].reverse().find((i) => !i.isLosing)?.itemName || "None"} (${[...context.itemProfitabilityReport].reverse().find((i) => !i.isLosing) ? "$" + [...context.itemProfitabilityReport].reverse().find((i) => !i.isLosing)!.totalProfit : "N/A"} profit)
 
 ### 🏷️ PRICING HEALTH — CURRENT SELLING PRICE vs AVG COST (items where cost is known):
 Format: CODE | NAME | SELL_PRICE | AVG_COST | GAP | QTY_IN_STOCK | STATUS | POTENTIAL_LOSS
-${context.pricingHealthReport.slice(0, 100).map(item =>
-  `${item.itemCode}|${item.itemName}|$${item.sellingPrice}|$${item.avgCostPrice}|$${item.priceGap}|${item.stockQty}|${item.status}${item.status === 'LOSING' ? '|loss:$' + item.potentialLoss : ''}`
-).join('\n') || 'No pricing data available.'}
+${
+  context.pricingHealthReport
+    .slice(0, 100)
+    .map(
+      (item) =>
+        `${item.itemCode}|${item.itemName}|$${item.sellingPrice}|$${item.avgCostPrice}|$${item.priceGap}|${item.stockQty}|${item.status}${item.status === "LOSING" ? "|loss:$" + item.potentialLoss : ""}`
+    )
+    .join("\n") || "No pricing data available."
+}
 
 PRICING SUMMARY:
-- Items priced ABOVE cost (profitable): ${context.pricingHealthReport.filter(i => i.status === 'PROFITABLE').length}
-- Items priced BELOW cost (selling at loss): ${context.pricingHealthReport.filter(i => i.status === 'LOSING').length}
-- Items at break-even: ${context.pricingHealthReport.filter(i => i.status === 'BREAK_EVEN').length}
-${context.pricingHealthReport.filter(i => i.status === 'LOSING').length > 0 ? `- Top losing items by current price gap:\n${context.pricingHealthReport.filter(i => i.status === 'LOSING').slice(0, 5).map(i => `  * ${i.itemName}: selling $${i.sellingPrice} vs cost $${i.avgCostPrice} (losing $${Math.abs(parseFloat(i.priceGap)).toFixed(2)}/unit, $${i.potentialLoss} total at current stock)`).join('\n')}` : ''}
+- Items priced ABOVE cost (profitable): ${context.pricingHealthReport.filter((i) => i.status === "PROFITABLE").length}
+- Items priced BELOW cost (selling at loss): ${context.pricingHealthReport.filter((i) => i.status === "LOSING").length}
+- Items at break-even: ${context.pricingHealthReport.filter((i) => i.status === "BREAK_EVEN").length}
+${
+  context.pricingHealthReport.filter((i) => i.status === "LOSING").length > 0
+    ? `- Top losing items by current price gap:\n${context.pricingHealthReport
+        .filter((i) => i.status === "LOSING")
+        .slice(0, 5)
+        .map(
+          (i) =>
+            `  * ${i.itemName}: selling $${i.sellingPrice} vs cost $${i.avgCostPrice} (losing $${Math.abs(parseFloat(i.priceGap)).toFixed(2)}/unit, $${i.potentialLoss} total at current stock)`
+        )
+        .join("\n")}`
+    : ""
+}
 
 ### 📍 INVENTORY BY LOCATION:
-${context.inventoryValueByLocation.map(l => 
-  `- ${l.locationName}: $${l.totalValue.toLocaleString()} (${l.itemCount} items)`
-).join('\n')}
+${context.inventoryValueByLocation
+  .map((l) => `- ${l.locationName}: $${l.totalValue.toLocaleString()} (${l.itemCount} items)`)
+  .join("\n")}
 
 ### 📋 RECENT TRANSACTIONS (Last 20):
-${context.recentTransactions.slice(0, 10).map(t => 
-  `- ${t.type} #${t.number}: $${t.amount} on ${t.date}${t.description ? ` - ${t.description}` : ''}`
-).join('\n')}
+${context.recentTransactions
+  .slice(0, 10)
+  .map((t) => `- ${t.type} #${t.number}: $${t.amount} on ${t.date}${t.description ? ` - ${t.description}` : ""}`)
+  .join("\n")}
 
 ### 📦 PURCHASE ORDERS:
 - Total POs: ${context.purchaseOrders.length}
-- Open POs: ${context.purchaseOrders.filter(po => po.status === 'Open').length}
-- Recent POs: ${context.purchaseOrders.slice(0, 5).map(po => `${po.poNumber} ($${po.itemsTotal})`).join(', ') || 'None'}
+- Open POs: ${context.purchaseOrders.filter((po) => po.status === "Open").length}
+- Recent POs: ${
+    context.purchaseOrders
+      .slice(0, 5)
+      .map((po) => `${po.poNumber} ($${po.itemsTotal})`)
+      .join(", ") || "None"
+  }
 
 ### 🏷️ STOCK ITEMS WITH INVENTORY (${context.stockItemsWithInventory.length} items total, showing up to 300 with stock):
 Format: CODE | NAME | GROUP | QTY | VALUE | LOCATIONS(name:qty:rate)
 ${context.stockItemsWithInventory
-  .filter(i => i.totalQuantity > 0)
+  .filter((i) => i.totalQuantity > 0)
   .slice(0, 300)
-  .map(i => `${i.code}|${i.name}|${i.groupName}|${i.totalQuantity.toFixed(0)}|$${i.totalValue.toFixed(0)}|${i.locations.map((l: any) => `${l.locationName}:${l.quantity.toFixed(0)}:$${l.averageRate.toFixed(2)}`).join(',')}`)
-  .join('\n')}
+  .map(
+    (i) =>
+      `${i.code}|${i.name}|${i.groupName}|${i.totalQuantity.toFixed(0)}|$${i.totalValue.toFixed(0)}|${i.locations.map((l: any) => `${l.locationName}:${l.quantity.toFixed(0)}:$${l.averageRate.toFixed(2)}`).join(",")}`
+  )
+  .join("\n")}
 
 ### 💵 RECENT SALES HISTORY (last ${context.recentSalesHistory.length} transactions, newest first):
 Format: DATE | VOUCHER | CODE | NAME | LOC | QTY | PRICE | PROFIT
 ${context.recentSalesHistory
   .slice(0, 300)
-  .map(s => `${s.date}|${s.voucherNumber}|${s.itemCode}|${s.itemName}|${s.locationName}|${s.quantity}|$${s.sellingPrice}|$${s.profit}`)
-  .join('\n')}
+  .map(
+    (s) =>
+      `${s.date}|${s.voucherNumber}|${s.itemCode}|${s.itemName}|${s.locationName}|${s.quantity}|$${s.sellingPrice}|$${s.profit}`
+  )
+  .join("\n")}
 
 ### 👥 ALL SUPPLIERS (${context.suppliers.length}):
-${context.suppliers.map(s => `${s.code}|${s.legalName}|${s.phone || ''}|${s.email || ''}`).join('\n')}
+${context.suppliers.map((s) => `${s.code}|${s.legalName}|${s.phone || ""}|${s.email || ""}`).join("\n")}
 
 ### 👤 ALL CUSTOMERS (${context.customers.length}):
-${context.customers.map(c => `${c.code}|${c.legalName}|${c.phone || ''}`).join('\n')}
+${context.customers.map((c) => `${c.code}|${c.legalName}|${c.phone || ""}`).join("\n")}
 
 ## RESPONSE GUIDELINES:
 
@@ -1329,44 +1486,44 @@ Beyond this ERP data, you are capable of answering ANY question the user asks �
 
 function generateQuickSuggestions(context: ERPContext): string[] {
   const suggestions: string[] = [];
-  
+
   // Priority: Show alerts first
   if (context.overdueContainers.length > 0) {
     suggestions.push(`⚠️ ${context.overdueContainers.length} containers are overdue - show me details`);
   }
-  
+
   if (context.lowStockAlerts.length > 0) {
     suggestions.push(`Show me the ${context.lowStockAlerts.length} items that are low on stock`);
   }
-  
+
   if (context.slowMovingStock.length > 0) {
     suggestions.push(`What items haven't sold in 60+ days?`);
   }
-  
+
   if (context.itemsToMarkdown.length > 0) {
     suggestions.push(`Which items should I consider marking down?`);
   }
-  
-  if (context.supplierBalances.filter(s => s.balance > 0).length > 0) {
+
+  if (context.supplierBalances.filter((s) => s.balance > 0).length > 0) {
     suggestions.push("What are my outstanding supplier payments?");
   }
-  
+
   if (context.employeeBalances.length > 0) {
     suggestions.push("Show me employee deposit balances");
   }
-  
+
   if (context.containersInTransit.length > 0) {
     suggestions.push(`What containers are currently in transit?`);
   }
-  
+
   if (context.topSellingItems.length > 0) {
     suggestions.push("What are my top selling products?");
   }
-  
+
   suggestions.push("Give me a summary of today's business");
   suggestions.push("Which items have the highest profit margin?");
   suggestions.push("How is my inventory distributed across locations?");
-  
+
   return suggestions.slice(0, 6);
 }
 
@@ -1384,8 +1541,11 @@ function classifyChatIntent(
   if (hasFileRef && RE_CODE_READ.test(userMessage)) return "code_read";
   // Read-only with explicit developer verbs (grep/list-files) — only when the message
   // also has code-specific context so "search for supplier" doesn't route here.
-  const hasCodeContext = hasFileRef ||
-    /\b(?:server|client|shared|scripts)\/|\b[\w-]+\.(?:ts|tsx|js|jsx)\b|\b(?:function|component|hook|middleware|handler|schema|interface|endpoint)\b/i.test(userMessage);
+  const hasCodeContext =
+    hasFileRef ||
+    /\b(?:server|client|shared|scripts)\/|\b[\w-]+\.(?:ts|tsx|js|jsx)\b|\b(?:function|component|hook|middleware|handler|schema|interface|endpoint)\b/i.test(
+      userMessage
+    );
   if (hasCodeContext && /\b(?:find where|grep for|list files|ls\b|where does)\b/i.test(userMessage)) return "code_read";
 
   // ── Code edit without file path — "add a discount field to the voucher form".
@@ -1405,16 +1565,29 @@ function classifyChatIntent(
 
   // Query intents that need broad context
   if (/\b(excel|import|export|template|download.*excel)\b/i.test(userMessage)) return "excel_import";
-  if (/\b(summary|overview|dashboard|today.{0,20}business|how.{0,15}doing|performance|monthly|this month|last month)\b/i.test(userMessage)) return "business_summary";
+  if (
+    /\b(summary|overview|dashboard|today.{0,20}business|how.{0,15}doing|performance|monthly|this month|last month)\b/i.test(
+      userMessage
+    )
+  )
+    return "business_summary";
   if (/\b(sales|revenue|sold|profit|margin|top.{0,10}sell|best.{0,10}sell)\b/i.test(userMessage)) return "sales_query";
-  if (/\b(inventory|stock|item|quantity|qty|warehouse|location.{0,20}stock|in stock|how much stock)\b/i.test(userMessage)) return "inventory_query";
-  if (/\b(supplier|vendor|purchase order|po\b|container.{0,20}(arriv|transit|offload))\b/i.test(userMessage)) return "supplier_query";
+  if (
+    /\b(inventory|stock|item|quantity|qty|warehouse|location.{0,20}stock|in stock|how much stock)\b/i.test(userMessage)
+  )
+    return "inventory_query";
+  if (/\b(supplier|vendor|purchase order|po\b|container.{0,20}(arriv|transit|offload))\b/i.test(userMessage))
+    return "supplier_query";
   if (/\b(customer|client|receivable|owed by|owes|outstanding)\b/i.test(userMessage)) return "customer_query";
 
   // General knowledge — only fire when message has NO ERP-specific context words
-  const hasERPTerms = /\b(our|my company|erp|stock item|supplier|purchase order|warehouse|voucher|ledger|invoice|inventory|selling price|location|container|shipment|bale|factory|payroll|worker|proforma)\b/i.test(userMessage);
+  const hasERPTerms =
+    /\b(our|my company|erp|stock item|supplier|purchase order|warehouse|voucher|ledger|invoice|inventory|selling price|location|container|shipment|bale|factory|payroll|worker|proforma)\b/i.test(
+      userMessage
+    );
   if (!hasERPTerms) {
-    if (/^(hi|hello|hey|yo|sup|hiya|howdy|good (morning|evening|afternoon|night))\b/i.test(userMessage.trim())) return "general_knowledge";
+    if (/^(hi|hello|hey|yo|sup|hiya|howdy|good (morning|evening|afternoon|night))\b/i.test(userMessage.trim()))
+      return "general_knowledge";
     if (RE_CODE_GEN.test(userMessage)) return "general_knowledge";
     if (RE_NEWS_QUERY.test(userMessage)) return "general_knowledge";
     if (RE_GENERAL_KNOWLEDGE.test(userMessage)) return "general_knowledge";
@@ -1467,21 +1640,29 @@ function buildActionSystemPrompt(intent: ChatIntent, pageContext?: { currentRout
   base += `\nThe user has made a specific request. Acknowledge it briefly and naturally (1-2 sentences). `;
   switch (intent) {
     case "create_voucher":
-      base += "Let them know you've prepared a voucher draft for them to review and confirm."; break;
+      base += "Let them know you've prepared a voucher draft for them to review and confirm.";
+      break;
     case "create_stock_adjustment":
-      base += "Let them know you've prepared a stock adjustment draft for them to review."; break;
+      base += "Let them know you've prepared a stock adjustment draft for them to review.";
+      break;
     case "create_stock_transfer":
-      base += "Let them know you've prepared a stock transfer draft for them to review."; break;
+      base += "Let them know you've prepared a stock transfer draft for them to review.";
+      break;
     case "create_stock_item":
-      base += "Let them know you've prepared the new stock item details for them to confirm."; break;
+      base += "Let them know you've prepared the new stock item details for them to confirm.";
+      break;
     case "price_update":
-      base += "Let them know you've prepared a price update for them to confirm."; break;
+      base += "Let them know you've prepared a price update for them to confirm.";
+      break;
     case "search_voucher":
-      base += "Let them know you've searched the voucher records and found the results below."; break;
+      base += "Let them know you've searched the voucher records and found the results below.";
+      break;
     case "account_query":
-      base += "Let them know you've retrieved the account information below."; break;
+      base += "Let them know you've retrieved the account information below.";
+      break;
     case "excel_import":
-      base += "Help the user with their Excel import/export question concisely."; break;
+      base += "Help the user with their Excel import/export question concisely.";
+      break;
     default:
       base += "Answer the user's request as helpfully and concisely as possible.";
   }
@@ -1500,28 +1681,74 @@ const TOOL_INTENTS = new Set<ChatIntent>([
 // Extract meaningful search keywords from a user message, dropping stop words
 function extractSearchTerm(message: string): string {
   const STOP = new Set([
-    "what","how","much","many","is","are","was","were","the","for","about",
-    "do","we","have","show","me","find","get","list","all","any","can","you",
-    "our","in","at","of","and","or","a","an","to","from","with","this","that",
-    "stock","items","item","supply","supplies","customer","customers",
-    "supplier","suppliers","voucher","vouchers","account","accounts",
-    "inventory","balance","please","tell","give","price","prices",
+    "what",
+    "how",
+    "much",
+    "many",
+    "is",
+    "are",
+    "was",
+    "were",
+    "the",
+    "for",
+    "about",
+    "do",
+    "we",
+    "have",
+    "show",
+    "me",
+    "find",
+    "get",
+    "list",
+    "all",
+    "any",
+    "can",
+    "you",
+    "our",
+    "in",
+    "at",
+    "of",
+    "and",
+    "or",
+    "a",
+    "an",
+    "to",
+    "from",
+    "with",
+    "this",
+    "that",
+    "stock",
+    "items",
+    "item",
+    "supply",
+    "supplies",
+    "customer",
+    "customers",
+    "supplier",
+    "suppliers",
+    "voucher",
+    "vouchers",
+    "account",
+    "accounts",
+    "inventory",
+    "balance",
+    "please",
+    "tell",
+    "give",
+    "price",
+    "prices",
   ]);
   return message
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(w => w.length > 2 && !STOP.has(w))
+    .filter((w) => w.length > 2 && !STOP.has(w))
     .slice(0, 4)
     .join(" ");
 }
 
 // Load only the data relevant to the classified intent
-async function loadToolData(
-  intent: ChatIntent,
-  companyId: number,
-  userMessage: string,
-): Promise<Record<string, any>> {
+async function loadToolData(intent: ChatIntent, companyId: number, userMessage: string): Promise<Record<string, any>> {
   const term = extractSearchTerm(userMessage) || userMessage.slice(0, 60);
 
   switch (intent) {
@@ -1574,8 +1801,8 @@ async function loadToolData(
       ]);
       return {
         summary,
-        lowStock:      (lowStockSnap.items as any[]).slice(0, 5),
-        pricingHealth: (pricingSnap.items  as any[]).slice(0, 5),
+        lowStock: (lowStockSnap.items as any[]).slice(0, 5),
+        pricingHealth: (pricingSnap.items as any[]).slice(0, 5),
       };
     }
 
@@ -1588,7 +1815,7 @@ async function loadToolData(
 function buildToolSystemPrompt(
   intent: ChatIntent,
   data: Record<string, any>,
-  pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string },
+  pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string }
 ): string {
   const today = new Date().toISOString().slice(0, 10);
   let prompt = `You are ERP Assistant, an AI for a business ERP/POS system. Today is ${today}.`;
@@ -1602,21 +1829,29 @@ function buildToolSystemPrompt(
       if (items.length === 0) {
         prompt += "No matching stock items found.\n";
       } else {
-        prompt += items.map((i: any) =>
-          `- ${i.name} (${i.code}): qty=${i.totalQty}, sellingPrice=${i.sellingPrice}, avgCost=${i.avgCost}, value=${i.totalValue}, pricing=${i.pricingStatus}`
-        ).join("\n") + "\n";
+        prompt +=
+          items
+            .map(
+              (i: any) =>
+                `- ${i.name} (${i.code}): qty=${i.totalQty}, sellingPrice=${i.sellingPrice}, avgCost=${i.avgCost}, value=${i.totalValue}, pricing=${i.pricingStatus}`
+            )
+            .join("\n") + "\n";
       }
       if (locationBreakdown.length > 0) {
         prompt += `\n## LOCATION BREAKDOWN for ${items[0]?.name}:\n`;
-        prompt += locationBreakdown.map((l: any) =>
-          `- ${l.location}: qty=${l.quantity}, avgCost=${l.avgCost}, value=${l.totalValue}`
-        ).join("\n") + "\n";
+        prompt +=
+          locationBreakdown
+            .map((l: any) => `- ${l.location}: qty=${l.quantity}, avgCost=${l.avgCost}, value=${l.totalValue}`)
+            .join("\n") + "\n";
       }
       if (lowStock.length > 0) {
         prompt += `\n## LOW STOCK ALERTS (${lowStock.length} items):\n`;
-        prompt += lowStock.map((i: any) =>
-          `- ${i.name} (${i.code}): qty=${i.qty}, reorderLevel=${i.reorderLevel}, status=${i.status}`
-        ).join("\n") + "\n";
+        prompt +=
+          lowStock
+            .map(
+              (i: any) => `- ${i.name} (${i.code}): qty=${i.qty}, reorderLevel=${i.reorderLevel}, status=${i.status}`
+            )
+            .join("\n") + "\n";
       }
       break;
     }
@@ -1627,15 +1862,21 @@ function buildToolSystemPrompt(
       if (suppliers.length === 0) {
         prompt += "No matching suppliers found.\n";
       } else {
-        prompt += suppliers.map((s: any) =>
-          `- ${s.name} (${s.code}): phone=${s.phone || "—"}, email=${s.email || "—"}, openingBalance=${s.openingBalance}`
-        ).join("\n") + "\n";
+        prompt +=
+          suppliers
+            .map(
+              (s: any) =>
+                `- ${s.name} (${s.code}): phone=${s.phone || "—"}, email=${s.email || "—"}, openingBalance=${s.openingBalance}`
+            )
+            .join("\n") + "\n";
       }
       if (supplierBalances && supplierBalances.length > 0) {
         prompt += `\n## SUPPLIER BALANCES (${supplierBalances.length} with non-zero balance):\n`;
-        prompt += (supplierBalances as any[]).slice(0, 15).map((s: any) =>
-          `- ${s.supplierName} (${s.supplierCode}): balance=${s.balance} [${s.status}]`
-        ).join("\n") + "\n";
+        prompt +=
+          (supplierBalances as any[])
+            .slice(0, 15)
+            .map((s: any) => `- ${s.supplierName} (${s.supplierCode}): balance=${s.balance} [${s.status}]`)
+            .join("\n") + "\n";
       }
       break;
     }
@@ -1646,9 +1887,7 @@ function buildToolSystemPrompt(
       if (customers.length === 0) {
         prompt += "No matching customers found.\n";
       } else {
-        prompt += customers.map((c: any) =>
-          `- ${c.name} (${c.code}): phone=${c.phone || "—"}`
-        ).join("\n") + "\n";
+        prompt += customers.map((c: any) => `- ${c.name} (${c.code}): phone=${c.phone || "—"}`).join("\n") + "\n";
       }
       break;
     }
@@ -1660,9 +1899,10 @@ function buildToolSystemPrompt(
       prompt += `This Month (since ${summary.thisMonth.monthStart}): revenue=${summary.thisMonth.revenue}, profit=${summary.thisMonth.profit}, margin=${summary.thisMonth.margin}, transactions=${summary.thisMonth.transactions}\n`;
       if (summary.topItemsThisMonth.length > 0) {
         prompt += `\nTop items this month:\n`;
-        prompt += summary.topItemsThisMonth.map((i: any) =>
-          `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`
-        ).join("\n") + "\n";
+        prompt +=
+          summary.topItemsThisMonth
+            .map((i: any) => `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`)
+            .join("\n") + "\n";
       }
       if (matchedItems.length > 0) {
         prompt += `\n## MATCHED ITEM: ${matchedItems[0].name} (${matchedItems[0].code})\n`;
@@ -1670,9 +1910,14 @@ function buildToolSystemPrompt(
       }
       if (salesHistory.length > 0) {
         prompt += `\nRecent sales history for this item:\n`;
-        prompt += salesHistory.slice(0, 10).map((s: any) =>
-          `- ${s.date} | ${s.voucherNumber} | qty=${s.qty} | price=${s.sellingPrice} | cost=${s.costPrice} | profit=${s.profit}`
-        ).join("\n") + "\n";
+        prompt +=
+          salesHistory
+            .slice(0, 10)
+            .map(
+              (s: any) =>
+                `- ${s.date} | ${s.voucherNumber} | qty=${s.qty} | price=${s.sellingPrice} | cost=${s.costPrice} | profit=${s.profit}`
+            )
+            .join("\n") + "\n";
       }
       break;
     }
@@ -1685,9 +1930,10 @@ function buildToolSystemPrompt(
       prompt += `Open Purchase Orders: ${summary.openPurchaseOrders}\n`;
       if (summary.topItemsThisMonth.length > 0) {
         prompt += `\nTop items this month:\n`;
-        prompt += summary.topItemsThisMonth.map((i: any) =>
-          `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`
-        ).join("\n") + "\n";
+        prompt +=
+          summary.topItemsThisMonth
+            .map((i: any) => `- ${i.name}: revenue=${i.revenue}, profit=${i.profit}, qty=${i.qty}`)
+            .join("\n") + "\n";
       }
       if (lowStock.length > 0) {
         prompt += `\nLow stock alerts (${lowStock.length} items): ${lowStock.map((i: any) => `${i.name} (${i.qty} left)`).join(", ")}\n`;
@@ -1710,12 +1956,28 @@ export async function chat(
   userPreferences?: UserPreferences,
   pageContext?: { currentRoute?: string; entityType?: string; entityId?: number; entityName?: string },
   sessionReadFiles?: string[]
-): Promise<{ response: string; suggestions: string[]; provider?: string; voucherDraft?: any; stockAdjustmentDraft?: any; stockTransferDraft?: any; voucherSearchResults?: any[]; stockItemDraft?: any; priceUpdateDraft?: any; accountQueryResult?: any; verifyContainerDraft?: any; dataQueryResult?: any; filePatchDrafts?: any[]; readFiles?: string[] }> {
+): Promise<{
+  response: string;
+  suggestions: string[];
+  provider?: string;
+  voucherDraft?: any;
+  stockAdjustmentDraft?: any;
+  stockTransferDraft?: any;
+  voucherSearchResults?: any[];
+  stockItemDraft?: any;
+  priceUpdateDraft?: any;
+  accountQueryResult?: any;
+  verifyContainerDraft?: any;
+  dataQueryResult?: any;
+  filePatchDrafts?: any[];
+  readFiles?: string[];
+}> {
   const available = getAvailableProviders();
-  
+
   if (available.length === 0) {
     return {
-      response: "AI chatbot is not configured. Please ask an administrator to add at least one AI API key (GEMINI_API_KEY, OPENAI_API_KEY, or XAI_API_KEY).",
+      response:
+        "AI chatbot is not configured. Please ask an administrator to add at least one AI API key (GEMINI_API_KEY, OPENAI_API_KEY, or XAI_API_KEY).",
       suggestions: [],
     };
   }
@@ -1735,7 +1997,7 @@ export async function chat(
 
     // Variables populated inside code_read / code_edit branches; used later in
     // the parsing block and return value.
-    const codeReadFiles: string[] = [];              // files read this request (all code intents)
+    const codeReadFiles: string[] = []; // files read this request (all code intents)
     const codeEditOriginalMap: Record<string, string> = {}; // file → full original content
 
     if (intent === "general_knowledge") {
@@ -1750,7 +2012,6 @@ export async function chat(
         "What are the pros and cons of React vs Vue?",
       ];
       console.log("[ChatService] general_knowledge intent — skipping ERP context");
-
     } else if (intent === "code_read") {
       // ── Code Read: read project files or grep, inject into system prompt ──────
       const filePaths = extractFilePathsFromMessage(userMessage);
@@ -1796,13 +2057,13 @@ export async function chat(
       systemPrompt = `You are a coding assistant with access to this TypeScript ERP/POS project (React + Express + PostgreSQL). Answer the user's question clearly and concisely about the code.${codeContext}\n\nIf you reference specific parts of the code, use code blocks with the language specified.`;
       suggestions = ["Explain how this works", "Find related files", "Show me all usages"];
       console.log("[ChatService] code_read intent — loaded file/grep context");
-
     } else if (intent === "code_edit") {
       // ── Code Edit: load files and build structured output prompt ──────────────
       // Support up to 3 explicitly-named files; fall back to keyword grep for pathless edits.
       const rawPaths = extractFilePathsFromMessage(userMessage);
-      const resolvedPaths = rawPaths.slice(0, 3)
-        .map(p => resolveFilePath(p) ?? p)
+      const resolvedPaths = rawPaths
+        .slice(0, 3)
+        .map((p) => resolveFilePath(p) ?? p)
         .filter(Boolean);
 
       const contentBlocks: string[] = [];
@@ -1816,7 +2077,9 @@ export async function chat(
           codeEditOriginalMap[fp] = raw;
           if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
           const note = alreadyInSession ? " *(also seen earlier this session)*" : "";
-          contentBlocks.push(`Current content of \`${fp}\`${note} (${totalLines} lines${truncated ? ", first 300 shown" : ""}):\n\`\`\`typescript\n${content}\n\`\`\``);
+          contentBlocks.push(
+            `Current content of \`${fp}\`${note} (${totalLines} lines${truncated ? ", first 300 shown" : ""}):\n\`\`\`typescript\n${content}\n\`\`\``
+          );
           console.log(`[ChatService] code_edit — read ${fp} (${totalLines} lines${truncated ? ", truncated" : ""})`);
         } catch {
           contentBlocks.push(`File \`${fp}\` does not exist yet — you will be creating it.`);
@@ -1826,10 +2089,19 @@ export async function chat(
 
       // Pathless edit: infer candidate file by grepping message keywords
       if (resolvedPaths.length === 0) {
-        const keywords = [...new Set(
-          (userMessage.match(/\b[A-Z][a-zA-Z]{3,}\b|\b[a-z]{4,}(?:Form|Page|Component|Hook|Route|Schema|Type|Service|Helper|Utils?)\b/g) ?? [])
-            .concat(userMessage.match(/\b(?:voucher|invoice|payment|receipt|stock|pos|purchase|sale|customer|supplier|company|user|auth|chat)\b/gi) ?? [])
-        )].slice(0, 4);
+        const keywords = [
+          ...new Set(
+            (
+              userMessage.match(
+                /\b[A-Z][a-zA-Z]{3,}\b|\b[a-z]{4,}(?:Form|Page|Component|Hook|Route|Schema|Type|Service|Helper|Utils?)\b/g
+              ) ?? []
+            ).concat(
+              userMessage.match(
+                /\b(?:voucher|invoice|payment|receipt|stock|pos|purchase|sale|customer|supplier|company|user|auth|chat)\b/gi
+              ) ?? []
+            )
+          ),
+        ].slice(0, 4);
 
         let grepResults = "";
         for (const kw of keywords) {
@@ -1839,9 +2111,9 @@ export async function chat(
             break;
           }
         }
-        const candidatePaths = [...new Set(
-          (grepResults.match(/^([\w/.-]+\.(?:tsx?|jsx?)):/gm) ?? []).map(l => l.replace(/:$/, ""))
-        )].slice(0, 1);
+        const candidatePaths = [
+          ...new Set((grepResults.match(/^([\w/.-]+\.(?:tsx?|jsx?)):/gm) ?? []).map((l) => l.replace(/:$/, ""))),
+        ].slice(0, 1);
 
         for (const fp of candidatePaths) {
           const alreadyInSession = sessionReadFiles?.includes(fp);
@@ -1851,13 +2123,21 @@ export async function chat(
             codeEditOriginalMap[fp] = raw;
             if (!codeReadFiles.includes(fp)) codeReadFiles.push(fp);
             const note = alreadyInSession ? " *(also seen earlier this session)*" : "";
-            contentBlocks.push(`Current content of \`${fp}\`${note} (${totalLines} lines${truncated ? ", first 300 shown" : ""}):\n\`\`\`typescript\n${content}\n\`\`\``);
-            console.log(`[ChatService] code_edit (pathless) — inferred ${fp} (${totalLines} lines${truncated ? ", truncated" : ""})`);
-          } catch { /* File might not exist */ }
+            contentBlocks.push(
+              `Current content of \`${fp}\`${note} (${totalLines} lines${truncated ? ", first 300 shown" : ""}):\n\`\`\`typescript\n${content}\n\`\`\``
+            );
+            console.log(
+              `[ChatService] code_edit (pathless) — inferred ${fp} (${totalLines} lines${truncated ? ", truncated" : ""})`
+            );
+          } catch {
+            /* File might not exist */
+          }
         }
 
         if (candidatePaths.length === 0) {
-          contentBlocks.push(`No specific file was found. Infer the best file to create or edit and set filePath accordingly.`);
+          contentBlocks.push(
+            `No specific file was found. Infer the best file to create or edit and set filePath accordingly.`
+          );
         }
       }
 
@@ -1887,7 +2167,6 @@ Rules:
 
       suggestions = ["Apply this change", "Show me the diff", "Explain what changed"];
       console.log(`[ChatService] code_edit intent — targets: ${codeReadFiles.join(", ") || "(inferred)"}`);
-
     } else if (isActionIntent) {
       // Action intents: skip the expensive full-context load, use a light prompt
       systemPrompt = buildActionSystemPrompt(intent, pageContext);
@@ -1915,7 +2194,9 @@ Rules:
         if (pageContext.entityType) pageLines.push(`- Viewing entity type: ${pageContext.entityType}`);
         if (pageContext.entityName) pageLines.push(`- Entity name: ${pageContext.entityName}`);
         if (pageContext.entityId) pageLines.push(`- Entity ID: ${pageContext.entityId}`);
-        pageLines.push(`Use this context to give more relevant and specific answers (e.g. if they are on the vouchers page, answers about vouchers should be especially specific).`);
+        pageLines.push(
+          `Use this context to give more relevant and specific answers (e.g. if they are on the vouchers page, answers about vouchers should be especially specific).`
+        );
         systemPrompt = systemPrompt + pageLines.join("\n");
       }
     }
@@ -1924,7 +2205,9 @@ Rules:
     const adminProvider = await getSelectedAIProvider();
     const smartOverride = detectSmartProvider(userMessage, available);
     const selectedProvider = smartOverride ?? adminProvider;
-    console.log(`[ChatService] Provider: ${selectedProvider} (smart=${smartOverride ?? "none"}, admin=${adminProvider}), Available: ${available.join(", ")}`);
+    console.log(
+      `[ChatService] Provider: ${selectedProvider} (smart=${smartOverride ?? "none"}, admin=${adminProvider}), Available: ${available.join(", ")}`
+    );
 
     const aiStart = Date.now();
     const { response, usedProvider } = await callAIWithFallback(
@@ -1941,7 +2224,11 @@ Rules:
 
     if (intent === "code_edit") {
       try {
-        const raw = response.trim().replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+        const raw = response
+          .trim()
+          .replace(/^```(?:json)?\n?/, "")
+          .replace(/\n?```$/, "")
+          .trim();
         if (raw.startsWith("{")) {
           const parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.patches) && parsed.patches.length > 0) {
@@ -1960,12 +2247,14 @@ Rules:
             }
           } else if (parsed && parsed.filePath && "newContent" in parsed) {
             // Single file patch
-            filePatchDrafts = [{
-              filePath: parsed.filePath,
-              description: parsed.description || "Apply code changes",
-              originalContent: parsed.originalContent ?? codeEditOriginalMap[parsed.filePath] ?? "",
-              newContent: parsed.newContent ?? "",
-            }];
+            filePatchDrafts = [
+              {
+                filePath: parsed.filePath,
+                description: parsed.description || "Apply code changes",
+                originalContent: parsed.originalContent ?? codeEditOriginalMap[parsed.filePath] ?? "",
+                newContent: parsed.newContent ?? "",
+              },
+            ];
             finalResponse = `I've prepared the changes for **\`${parsed.filePath}\`**.\n\n${parsed.description || "Review the diff below and click Apply when you're ready."}\n\nClick **Apply** to write the changes to disk, or **Cancel** to discard.`;
           }
         }
@@ -1982,7 +2271,11 @@ Rules:
     if (RE_VOUCHER.test(userMessage)) {
       try {
         const accts = await db
-          .select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name, accountType: schema.ledgerAccounts.accountType })
+          .select({
+            id: schema.ledgerAccounts.id,
+            name: schema.ledgerAccounts.name,
+            accountType: schema.ledgerAccounts.accountType,
+          })
           .from(schema.ledgerAccounts)
           .where(and(eq(schema.ledgerAccounts.companyId, companyId), isNull(schema.ledgerAccounts.deletedAt)))
           .limit(120);
@@ -1991,7 +2284,7 @@ Rules:
         const extractionPrompt = `You are a voucher extraction assistant for an accounting system.
 User message: "${userMessage}"
 Today's date: ${today}
-Available ledger accounts (id:name:type): ${accts.map(a => `${a.id}:${a.name}:${a.accountType}`).join(" | ")}
+Available ledger accounts (id:name:type): ${accts.map((a) => `${a.id}:${a.name}:${a.accountType}`).join(" | ")}
 
 RULES:
 1. If the user clearly intends to CREATE a payment, receipt, or journal entry, extract the details and respond with ONLY valid JSON (no markdown, no explanation).
@@ -2003,7 +2296,7 @@ RULES:
    - "Journal" = any other adjustment — determine debit/credit from context.
    - NEVER swap these directions. "FROM" is always the credit side for payments, debit side for receipts.
 5. Both sides MUST balance: sum of all debits must equal sum of all credits.
-6. Date resolution — always output a real YYYY-MM-DD date. Today is ${today} (${new Date().toLocaleDateString("en-US", { weekday: "long" })}). Resolve ALL relative references: "Monday" → the most recent or upcoming Monday, "yesterday" → ${new Date(Date.now()-86400000).toISOString().slice(0,10)}, "last week" → approx 7 days ago, "next Friday" → the coming Friday, specific dates like "May 10" → current year. Never leave the date field as a word or relative expression.
+6. Date resolution — always output a real YYYY-MM-DD date. Today is ${today} (${new Date().toLocaleDateString("en-US", { weekday: "long" })}). Resolve ALL relative references: "Monday" → the most recent or upcoming Monday, "yesterday" → ${new Date(Date.now() - 86400000).toISOString().slice(0, 10)}, "last week" → approx 7 days ago, "next Friday" → the coming Friday, specific dates like "May 10" → current year. Never leave the date field as a word or relative expression.
 7. CALCULATE percentages automatically. If the user says "$20,000 with 2.5% transfer charges", compute: main amount = 20000, charges = 20000 * 0.025 = 500. Create separate entries for each — e.g. one line for the 20000 payment and one line for the 500 charges — each going to the account the user specifies. The credit side (source, e.g. bank) should equal the total (20500). Do the math yourself, never ask the user to calculate.
 8. If the user says "optional", "mark as optional", "put as optional", or similar, set "optional": true in the JSON. Otherwise omit it or set false.
 
@@ -2012,8 +2305,16 @@ Respond with ONLY this JSON shape:
 
 If the intent is unclear or amounts/accounts are too ambiguous to resolve, respond with exactly: null`;
 
-        const extractionResult = await callAIWithFallback(selectedProvider, extractionPrompt, [], "Extract voucher or return null");
-        const raw = extractionResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        const extractionResult = await callAIWithFallback(
+          selectedProvider,
+          extractionPrompt,
+          [],
+          "Extract voucher or return null"
+        );
+        const raw = extractionResult.response
+          .trim()
+          .replace(/```json\n?|```/g, "")
+          .trim();
         if (raw !== "null" && raw.startsWith("{")) {
           const parsed = JSON.parse(raw);
           if (parsed && parsed.type && parsed.entries && parsed.entries.length >= 2) {
@@ -2049,11 +2350,13 @@ If the intent is unclear or amounts/accounts are too ambiguous to resolve, respo
     if (RE_STOCK_ADJ.test(userMessage)) {
       try {
         const [items, locs] = await Promise.all([
-          db.select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
+          db
+            .select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
             .from(schema.stockItems)
             .where(and(eq(schema.stockItems.companyId, companyId), eq(schema.stockItems.active, true)))
             .limit(120),
-          db.select({ id: schema.locations.id, name: schema.locations.name })
+          db
+            .select({ id: schema.locations.id, name: schema.locations.name })
             .from(schema.locations)
             .where(eq(schema.locations.companyId, companyId))
             .limit(30),
@@ -2062,8 +2365,8 @@ If the intent is unclear or amounts/accounts are too ambiguous to resolve, respo
         const adjPrompt = `You are a stock adjustment extraction assistant.
 User message: "${userMessage}"
 Today: ${today}
-Stock items (id:name:code): ${items.map(i => `${i.id}:${i.name}:${i.code}`).join(" | ")}
-Locations (id:name): ${locs.map(l => `${l.id}:${l.name}`).join(" | ")}
+Stock items (id:name:code): ${items.map((i) => `${i.id}:${i.name}:${i.code}`).join(" | ")}
+Locations (id:name): ${locs.map((l) => `${l.id}:${l.name}`).join(" | ")}
 
 RULES:
 1. Extract a stock adjustment only if the user clearly intends to produce or consume items.
@@ -2082,8 +2385,16 @@ Respond with ONLY valid JSON (no markdown):
 
 If intent is unclear, respond with exactly: null`;
 
-        const adjResult = await callAIWithFallback(selectedProvider, adjPrompt, [], "Extract stock adjustment or return null");
-        const rawAdj = adjResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        const adjResult = await callAIWithFallback(
+          selectedProvider,
+          adjPrompt,
+          [],
+          "Extract stock adjustment or return null"
+        );
+        const rawAdj = adjResult.response
+          .trim()
+          .replace(/```json\n?|```/g, "")
+          .trim();
         if (rawAdj !== "null" && rawAdj.startsWith("{")) {
           const parsedAdj = JSON.parse(rawAdj);
           if (parsedAdj && parsedAdj.locationId && parsedAdj.items && parsedAdj.items.length > 0) {
@@ -2093,11 +2404,10 @@ If intent is unclear, respond with exactly: null`;
               const invRows = await db
                 .select({ stockItemId: schema.inventory.stockItemId, averageRate: schema.inventory.averageRate })
                 .from(schema.inventory)
-                .where(and(
-                  eq(schema.inventory.locationId, parsedAdj.locationId),
-                  eq(schema.inventory.companyId, companyId),
-                ));
-              const rateMap = new Map(invRows.map(r => [r.stockItemId, parseFloat(r.averageRate ?? "0")]));
+                .where(
+                  and(eq(schema.inventory.locationId, parsedAdj.locationId), eq(schema.inventory.companyId, companyId))
+                );
+              const rateMap = new Map(invRows.map((r) => [r.stockItemId, parseFloat(r.averageRate ?? "0")]));
               parsedAdj.items = parsedAdj.items.map((item: any) => ({
                 ...item,
                 rate: rateMap.get(item.stockItemId) ?? 0,
@@ -2140,7 +2450,10 @@ If intent is unclear, respond with exactly: null`;
 User message: "${userMessage}"
 Return ONLY the search term as plain text (e.g. "rent", "electricity bill", "client ABC"). If no clear term, return null.`;
         const termResult = await callAIWithFallback(selectedProvider, termPrompt, [], "Extract voucher search term");
-        const searchTerm = termResult.response.trim().replace(/^["']|["']$/g, "").toLowerCase();
+        const searchTerm = termResult.response
+          .trim()
+          .replace(/^["']|["']$/g, "")
+          .toLowerCase();
         if (searchTerm && searchTerm !== "null" && searchTerm.length > 0) {
           const results = await db
             .select({
@@ -2153,14 +2466,16 @@ Return ONLY the search term as plain text (e.g. "rent", "electricity bill", "cli
               optional: schema.vouchers.optional,
             })
             .from(schema.vouchers)
-            .where(and(
-              eq(schema.vouchers.companyId, companyId),
-              isNull(schema.vouchers.deletedAt),
-              or(
-                ilike(schema.vouchers.description, `%${searchTerm}%`),
-                ilike(schema.vouchers.voucherNumber, `%${searchTerm}%`),
-              ),
-            ))
+            .where(
+              and(
+                eq(schema.vouchers.companyId, companyId),
+                isNull(schema.vouchers.deletedAt),
+                or(
+                  ilike(schema.vouchers.description, `%${searchTerm}%`),
+                  ilike(schema.vouchers.voucherNumber, `%${searchTerm}%`)
+                )
+              )
+            )
             .orderBy(desc(schema.vouchers.voucherDate))
             .limit(10);
           if (results.length > 0) {
@@ -2186,7 +2501,7 @@ Return ONLY the search term as plain text (e.g. "rent", "electricity bill", "cli
 
         const itemPrompt = `You are a stock item creation assistant.
 User message: "${userMessage}"
-Available stock groups (id:name): ${groups.map(g => `${g.id}:${g.name}`).join(" | ")}
+Available stock groups (id:name): ${groups.map((g) => `${g.id}:${g.name}`).join(" | ")}
 
 Extract the following fields from the user's message:
 - name: full item name
@@ -2206,8 +2521,16 @@ Respond with ONLY valid JSON (no markdown):
 
 If the user is not clearly trying to create a stock item, respond with exactly: null`;
 
-        const itemResult = await callAIWithFallback(selectedProvider, itemPrompt, [], "Extract stock item creation details");
-        const rawItem = itemResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        const itemResult = await callAIWithFallback(
+          selectedProvider,
+          itemPrompt,
+          [],
+          "Extract stock item creation details"
+        );
+        const rawItem = itemResult.response
+          .trim()
+          .replace(/```json\n?|```/g, "")
+          .trim();
         if (rawItem !== "null" && rawItem.startsWith("{")) {
           const parsedItem = JSON.parse(rawItem);
           if (parsedItem && parsedItem.name && parsedItem.code && parsedItem.uom) {
@@ -2217,7 +2540,7 @@ If the user is not clearly trying to create a stock item, respond with exactly: 
               uom: parsedItem.uom.toUpperCase(),
               stockGroupId: parsedItem.stockGroupId ?? null,
               stockGroupName: parsedItem.stockGroupName ?? "",
-              groupCandidates: groups.slice(0, 20).map(g => ({ id: g.id, name: g.name })),
+              groupCandidates: groups.slice(0, 20).map((g) => ({ id: g.id, name: g.name })),
             };
           }
         }
@@ -2232,32 +2555,46 @@ If the user is not clearly trying to create a stock item, respond with exactly: 
     if (RE_PRICE_UPDATE.test(userMessage)) {
       try {
         const [items, masterRows] = await Promise.all([
-          db.select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
+          db
+            .select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
             .from(schema.stockItems)
-            .where(and(eq(schema.stockItems.companyId, companyId), eq(schema.stockItems.active, true), isNull(schema.stockItems.deletedAt)))
+            .where(
+              and(
+                eq(schema.stockItems.companyId, companyId),
+                eq(schema.stockItems.active, true),
+                isNull(schema.stockItems.deletedAt)
+              )
+            )
             .limit(120),
-          db.select({ masterLocationId: schema.locationPriceGroups.masterLocationId })
+          db
+            .select({ masterLocationId: schema.locationPriceGroups.masterLocationId })
             .from(schema.locationPriceGroups)
             .where(eq(schema.locationPriceGroups.companyId, companyId)),
         ]);
 
-        const masterIds = [...new Set(masterRows.map(r => r.masterLocationId))];
-        const masterLocations = masterIds.length > 0
-          ? await db.select({ id: schema.locations.id, name: schema.locations.name })
-              .from(schema.locations)
-              .where(and(eq(schema.locations.companyId, companyId), inArray(schema.locations.id, masterIds)))
-          : await db.select({ id: schema.locations.id, name: schema.locations.name })
-              .from(schema.locations)
-              .where(eq(schema.locations.companyId, companyId))
-              .limit(20);
+        const masterIds = [...new Set(masterRows.map((r) => r.masterLocationId))];
+        const masterLocations =
+          masterIds.length > 0
+            ? await db
+                .select({ id: schema.locations.id, name: schema.locations.name })
+                .from(schema.locations)
+                .where(and(eq(schema.locations.companyId, companyId), inArray(schema.locations.id, masterIds)))
+            : await db
+                .select({ id: schema.locations.id, name: schema.locations.name })
+                .from(schema.locations)
+                .where(eq(schema.locations.companyId, companyId))
+                .limit(20);
 
         // Fetch follower counts per master for display
         const followerCounts = new Map<number, number>();
         if (masterIds.length > 0) {
-          const fRows = await db.select({
-            masterLocationId: schema.locationPriceGroups.masterLocationId,
-            followerLocationId: schema.locationPriceGroups.followerLocationId,
-          }).from(schema.locationPriceGroups).where(eq(schema.locationPriceGroups.companyId, companyId));
+          const fRows = await db
+            .select({
+              masterLocationId: schema.locationPriceGroups.masterLocationId,
+              followerLocationId: schema.locationPriceGroups.followerLocationId,
+            })
+            .from(schema.locationPriceGroups)
+            .where(eq(schema.locationPriceGroups.companyId, companyId));
           for (const r of fRows) {
             followerCounts.set(r.masterLocationId, (followerCounts.get(r.masterLocationId) ?? 0) + 1);
           }
@@ -2265,8 +2602,8 @@ If the user is not clearly trying to create a stock item, respond with exactly: 
 
         const pricePrompt = `You are a price update extraction assistant.
 User message: "${userMessage}"
-Stock items (id:name:code): ${items.map(i => `${i.id}:${i.name}:${i.code}`).join(" | ")}
-Price group / master locations (id:name): ${masterLocations.map(l => `${l.id}:${l.name}`).join(" | ")}
+Stock items (id:name:code): ${items.map((i) => `${i.id}:${i.name}:${i.code}`).join(" | ")}
+Price group / master locations (id:name): ${masterLocations.map((l) => `${l.id}:${l.name}`).join(" | ")}
 
 Extract:
 - stockItemId: best matching stock item id (fuzzy match on name or code)
@@ -2290,14 +2627,17 @@ Respond with ONLY valid JSON (no markdown):
 If intent is not a price update, respond with exactly: null`;
 
         const priceResult = await callAIWithFallback(selectedProvider, pricePrompt, [], "Extract price update details");
-        const rawPrice = priceResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        const rawPrice = priceResult.response
+          .trim()
+          .replace(/```json\n?|```/g, "")
+          .trim();
         if (rawPrice !== "null" && rawPrice.startsWith("{")) {
           const parsedPrice = JSON.parse(rawPrice);
           if (parsedPrice && parsedPrice.stockItemId && parsedPrice.newPrice > 0) {
             priceUpdateDraft = {
               ...parsedPrice,
               followerCount: parsedPrice.locationId ? (followerCounts.get(parsedPrice.locationId) ?? 0) : 0,
-              allLocations: masterLocations.map(l => ({ id: l.id, name: l.name })),
+              allLocations: masterLocations.map((l) => ({ id: l.id, name: l.name })),
             };
           }
         }
@@ -2312,15 +2652,28 @@ If intent is not a price update, respond with exactly: null`;
     if (RE_ACCOUNT_QUERY.test(userMessage)) {
       try {
         const accounts = await db
-          .select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name, code: schema.ledgerAccounts.code, accountType: schema.ledgerAccounts.accountType, openingBalance: schema.ledgerAccounts.openingBalance, openingBalanceSide: schema.ledgerAccounts.openingBalanceSide })
+          .select({
+            id: schema.ledgerAccounts.id,
+            name: schema.ledgerAccounts.name,
+            code: schema.ledgerAccounts.code,
+            accountType: schema.ledgerAccounts.accountType,
+            openingBalance: schema.ledgerAccounts.openingBalance,
+            openingBalanceSide: schema.ledgerAccounts.openingBalanceSide,
+          })
           .from(schema.ledgerAccounts)
-          .where(and(eq(schema.ledgerAccounts.companyId, companyId), eq(schema.ledgerAccounts.active, true), isNull(schema.ledgerAccounts.deletedAt)))
+          .where(
+            and(
+              eq(schema.ledgerAccounts.companyId, companyId),
+              eq(schema.ledgerAccounts.active, true),
+              isNull(schema.ledgerAccounts.deletedAt)
+            )
+          )
           .orderBy(schema.ledgerAccounts.name)
           .limit(150);
 
         const acctPrompt = `You are an accounts query extraction assistant.
 User message: "${userMessage}"
-Ledger accounts (id:name:code:type): ${accounts.map(a => `${a.id}:${a.name}:${a.code}:${a.accountType}`).join(" | ")}
+Ledger accounts (id:name:code:type): ${accounts.map((a) => `${a.id}:${a.name}:${a.code}:${a.accountType}`).join(" | ")}
 
 Determine the query type and extract fields:
 - queryType: "balance" | "transactions" | "balance_history"
@@ -2346,12 +2699,15 @@ Respond with ONLY valid JSON (no markdown):
 If intent is not about an account query, respond with exactly: null`;
 
         const acctResult = await callAIWithFallback(selectedProvider, acctPrompt, [], "Extract account query");
-        const rawAcct = acctResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        const rawAcct = acctResult.response
+          .trim()
+          .replace(/```json\n?|```/g, "")
+          .trim();
 
         if (rawAcct !== "null" && rawAcct.startsWith("{")) {
           const parsed = JSON.parse(rawAcct);
           if (parsed && parsed.accountId && parsed.queryType) {
-            const acct = accounts.find(a => a.id === parsed.accountId);
+            const acct = accounts.find((a) => a.id === parsed.accountId);
             if (!acct) throw new Error("Account not found");
 
             if (parsed.queryType === "balance") {
@@ -2362,7 +2718,14 @@ If intent is not about an account query, respond with exactly: null`;
                   totalCredit: sql<string>`COALESCE(SUM(CAST(${schema.voucherEntries.creditAmount} AS numeric)), 0)`,
                 })
                 .from(schema.voucherEntries)
-                .innerJoin(schema.vouchers, and(eq(schema.voucherEntries.voucherId, schema.vouchers.id), eq(schema.vouchers.optional, false), isNull(schema.vouchers.deletedAt)))
+                .innerJoin(
+                  schema.vouchers,
+                  and(
+                    eq(schema.voucherEntries.voucherId, schema.vouchers.id),
+                    eq(schema.vouchers.optional, false),
+                    isNull(schema.vouchers.deletedAt)
+                  )
+                )
                 .where(eq(schema.voucherEntries.ledgerAccountId, parsed.accountId));
 
               const dr = parseFloat(rows[0]?.totalDebit || "0");
@@ -2370,8 +2733,12 @@ If intent is not about an account query, respond with exactly: null`;
               const ob = parseFloat(acct.openingBalance || "0");
               const obSide = acct.openingBalanceSide || "Dr";
               const balance = (obSide === "Cr" ? -ob : ob) + dr - cr;
-              accountQueryResult = { queryType: "balance", accountId: parsed.accountId, accountName: acct.name, balance: parseFloat(balance.toFixed(2)) };
-
+              accountQueryResult = {
+                queryType: "balance",
+                accountId: parsed.accountId,
+                accountName: acct.name,
+                balance: parseFloat(balance.toFixed(2)),
+              };
             } else if (parsed.queryType === "transactions") {
               // Search transactions by description and/or amount
               const conditions: any[] = [
@@ -2380,19 +2747,23 @@ If intent is not about an account query, respond with exactly: null`;
                 isNull(schema.vouchers.deletedAt),
               ];
               if (parsed.searchTerm) {
-                conditions.push(or(
-                  ilike(schema.vouchers.description, `%${parsed.searchTerm}%`),
-                  ilike(schema.voucherEntries.narration, `%${parsed.searchTerm}%`),
-                  ilike(schema.vouchers.voucherNumber, `%${parsed.searchTerm}%`),
-                ));
+                conditions.push(
+                  or(
+                    ilike(schema.vouchers.description, `%${parsed.searchTerm}%`),
+                    ilike(schema.voucherEntries.narration, `%${parsed.searchTerm}%`),
+                    ilike(schema.vouchers.voucherNumber, `%${parsed.searchTerm}%`)
+                  )
+                );
               }
               if (parsed.searchAmount) {
                 const amt = String(parseFloat(parsed.searchAmount).toFixed(2));
-                conditions.push(or(
-                  sql`CAST(${schema.voucherEntries.debitAmount} AS numeric) = ${parseFloat(amt)}`,
-                  sql`CAST(${schema.voucherEntries.creditAmount} AS numeric) = ${parseFloat(amt)}`,
-                  sql`CAST(${schema.vouchers.totalAmount} AS numeric) = ${parseFloat(amt)}`,
-                ));
+                conditions.push(
+                  or(
+                    sql`CAST(${schema.voucherEntries.debitAmount} AS numeric) = ${parseFloat(amt)}`,
+                    sql`CAST(${schema.voucherEntries.creditAmount} AS numeric) = ${parseFloat(amt)}`,
+                    sql`CAST(${schema.vouchers.totalAmount} AS numeric) = ${parseFloat(amt)}`
+                  )
+                );
               }
               const txRows = await db
                 .select({
@@ -2412,8 +2783,14 @@ If intent is not about an account query, respond with exactly: null`;
                 .orderBy(desc(schema.vouchers.voucherDate))
                 .limit(10);
 
-              accountQueryResult = { queryType: "transactions", accountId: parsed.accountId, accountName: acct.name, searchTerm: parsed.searchTerm, searchAmount: parsed.searchAmount, transactions: txRows };
-
+              accountQueryResult = {
+                queryType: "transactions",
+                accountId: parsed.accountId,
+                accountName: acct.name,
+                searchTerm: parsed.searchTerm,
+                searchAmount: parsed.searchAmount,
+                transactions: txRows,
+              };
             } else if (parsed.queryType === "balance_history") {
               // Get all transactions sorted by date, compute running balance, find when it crossed target
               const allRows = await db
@@ -2427,7 +2804,14 @@ If intent is not about an account query, respond with exactly: null`;
                   creditAmount: schema.voucherEntries.creditAmount,
                 })
                 .from(schema.voucherEntries)
-                .innerJoin(schema.vouchers, and(eq(schema.voucherEntries.voucherId, schema.vouchers.id), eq(schema.vouchers.optional, false), isNull(schema.vouchers.deletedAt)))
+                .innerJoin(
+                  schema.vouchers,
+                  and(
+                    eq(schema.voucherEntries.voucherId, schema.vouchers.id),
+                    eq(schema.vouchers.optional, false),
+                    isNull(schema.vouchers.deletedAt)
+                  )
+                )
                 .where(eq(schema.voucherEntries.ledgerAccountId, parsed.accountId))
                 .orderBy(asc(schema.vouchers.voucherDate));
 
@@ -2445,7 +2829,13 @@ If intent is not about an account query, respond with exactly: null`;
                   if (matches.length >= 5) break;
                 }
               }
-              accountQueryResult = { queryType: "balance_history", accountId: parsed.accountId, accountName: acct.name, targetBalance: target, matches };
+              accountQueryResult = {
+                queryType: "balance_history",
+                accountId: parsed.accountId,
+                accountName: acct.name,
+                targetBalance: target,
+                matches,
+              };
             }
           }
         }
@@ -2460,11 +2850,13 @@ If intent is not about an account query, respond with exactly: null`;
     if (RE_STOCK_TRANSFER.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
       try {
         const [items, locs] = await Promise.all([
-          db.select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
+          db
+            .select({ id: schema.stockItems.id, name: schema.stockItems.name, code: schema.stockItems.code })
             .from(schema.stockItems)
             .where(and(eq(schema.stockItems.companyId, companyId), eq(schema.stockItems.active, true)))
             .limit(120),
-          db.select({ id: schema.locations.id, name: schema.locations.name })
+          db
+            .select({ id: schema.locations.id, name: schema.locations.name })
             .from(schema.locations)
             .where(eq(schema.locations.companyId, companyId))
             .limit(30),
@@ -2474,8 +2866,8 @@ If intent is not about an account query, respond with exactly: null`;
         const transferPrompt = `You are a stock transfer extraction assistant.
 User message: "${userMessage}"
 Today: ${today}
-Stock items (id:name:code): ${items.map(i => `${i.id}:${i.name}:${i.code}`).join(" | ")}
-Locations (id:name): ${locs.map(l => `${l.id}:${l.name}`).join(" | ")}
+Stock items (id:name:code): ${items.map((i) => `${i.id}:${i.name}:${i.code}`).join(" | ")}
+Locations (id:name): ${locs.map((l) => `${l.id}:${l.name}`).join(" | ")}
 
 RULES:
 1. Extract a stock transfer only if the user clearly wants to move/transfer stock between locations.
@@ -2489,8 +2881,16 @@ Respond with ONLY valid JSON (no markdown):
 
 If intent is unclear or this is not a stock transfer request, respond with exactly: null`;
 
-        const tfResult = await callAIWithFallback(selectedProvider, transferPrompt, [], "Extract stock transfer or return null");
-        const rawTf = tfResult.response.trim().replace(/```json\n?|```/g, "").trim();
+        const tfResult = await callAIWithFallback(
+          selectedProvider,
+          transferPrompt,
+          [],
+          "Extract stock transfer or return null"
+        );
+        const rawTf = tfResult.response
+          .trim()
+          .replace(/```json\n?|```/g, "")
+          .trim();
         if (rawTf !== "null" && rawTf.startsWith("{")) {
           const parsedTf = JSON.parse(rawTf);
           if (parsedTf && parsedTf.sourceLocationId && parsedTf.destinationLocationId && parsedTf.items?.length > 0) {
@@ -2516,7 +2916,8 @@ If intent is unclear or this is not a stock transfer request, respond with exact
     }
 
     // ── Verify Container Excel detection ──────────────────────────────
-    const VERIFY_CONTAINER_KEYWORDS = /\b(verif(y|ication)|container\s+verif|verif.*container|verification\s+excel|excel.*verif|download.*verif|container.*excel)\b/i;
+    const VERIFY_CONTAINER_KEYWORDS =
+      /\b(verif(y|ication)|container\s+verif|verif.*container|verification\s+excel|excel.*verif|download.*verif|container.*excel)\b/i;
     let verifyContainerDraft: any = undefined;
 
     if (VERIFY_CONTAINER_KEYWORDS.test(userMessage)) {
@@ -2531,18 +2932,31 @@ If intent is unclear or this is not a stock transfer request, respond with exact
 
         if (containerNumber) {
           const [container] = await db
-            .select({ id: schema.containers.id, containerNumber: schema.containers.containerNumber, supplierId: schema.containers.supplierId })
+            .select({
+              id: schema.containers.id,
+              containerNumber: schema.containers.containerNumber,
+              supplierId: schema.containers.supplierId,
+            })
             .from(schema.containers)
-            .where(and(eq(schema.containers.companyId, companyId), ilike(schema.containers.containerNumber, containerNumber)))
+            .where(
+              and(eq(schema.containers.companyId, companyId), ilike(schema.containers.containerNumber, containerNumber))
+            )
             .limit(1);
 
           if (container) {
             const [proformas, supplierRow] = await Promise.all([
-              db.select({ id: schema.supplierProformas.id, reference: schema.supplierProformas.reference })
+              db
+                .select({ id: schema.supplierProformas.id, reference: schema.supplierProformas.reference })
                 .from(schema.supplierProformas)
-                .where(and(eq(schema.supplierProformas.companyId, companyId), eq(schema.supplierProformas.supplierId, container.supplierId)))
+                .where(
+                  and(
+                    eq(schema.supplierProformas.companyId, companyId),
+                    eq(schema.supplierProformas.supplierId, container.supplierId)
+                  )
+                )
                 .orderBy(desc(schema.supplierProformas.createdAt)),
-              db.select({ name: schema.suppliers.legalName })
+              db
+                .select({ name: schema.suppliers.legalName })
                 .from(schema.suppliers)
                 .where(eq(schema.suppliers.id, container.supplierId))
                 .limit(1),
@@ -2564,7 +2978,8 @@ If intent is unclear or this is not a stock transfer request, respond with exact
 
     // ── Phase 1: Data Query Handler ───────────────────────────────────────────
     // Handles read-only ERP data queries: P&L, cash position, statements, etc.
-    const PHASE1_KEYWORDS = /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency|pos.{0,10}(sale|revenue|summary)|point.{0,10}of.{0,10}sale|shop.{0,10}sale|intercompany|inter.{0,10}company.{0,10}transfer|money.{0,10}(moved|transferred).{0,15}between|offload.{0,10}detail|what.{0,15}(was|were).{0,10}offload|what.{0,10}(arrive|came).{0,15}(in|container)|worker.{0,10}(product|rank|top|best)|top.{0,10}worker|best.{0,10}worker|supplier.{0,10}(spend|history|bought|purchase.{0,10}from)|how much.{0,15}(bought|spend).{0,10}(from|supplier)|upcoming.{0,10}(arrival|container|shipment)|container.{0,10}(arriving|due|expected)|waste.{0,10}(analys|report|trend|summary)|factory.{0,10}waste|customer.{0,10}(payment.{0,10}histor|paid|receipt)|when.{0,10}did.{0,15}pay|voucher.{0,10}(summary|count|by type|breakdown)|how many.{0,10}voucher|stock.{0,10}by.{0,10}location|per.{0,10}location.{0,10}stock|location.{0,10}stock|trial.{0,5}balance|all.{0,10}account.{0,10}balance|balance.{0,10}(of all|per account)|po.{0,10}(detail|line|item)|purchase.{0,10}order.{0,10}(detail|items|break)|what.{0,10}(is|was).{0,10}in.{0,10}(the.{0,5})?po|container.{0,10}(cost|charge|break)|cost.{0,10}break.{0,10}(of|for).{0,10}container|document.{0,10}expir|visa.{0,10}expir|permit.{0,10}expir|worker.{0,10}(doc|expir)|stock.{0,10}transfer|transfer.{0,10}(between|from.{0,10}to).{0,10}(location|warehouse)|move.{0,10}stock|cash.{0,10}flow|money.{0,10}(in|out).{0,10}(this|last|for)|inflow.{0,10}outflow|account.{0,10}(movement|ledger|balance.{0,10}for)|ledger.{0,10}(balance|statement|for)|transaction.{0,10}(of|for).{0,10}account|day.{0,10}(summary|report|sales)|today.{0,10}(sales|voucher)|sale.{0,10}today|profit.{0,10}(by|per).{0,10}location|location.{0,10}profit|which.{0,10}location.{0,10}(most|best)|debit.{0,10}note|supplier.{0,10}debit|customer.{0,10}list|list.{0,10}(of.{0,5})?customer|all.{0,10}customer|supplier.{0,10}list|list.{0,10}(of.{0,5})?supplier|all.{0,10}supplier|stock.{0,10}item.{0,10}(detail|info|profile)|item.{0,10}(detail|info|profile).{0,10}(for|of)|what.{0,10}(is|are).{0,5}(the.{0,5})?details.{0,10}(of|for).{0,10}item|mix.{0,10}batch|batch.{0,10}(list|status|summary)|material.{0,10}batch|customer.{0,10}proforma|price.{0,10}list.{0,10}(for.{0,5})?customer|proforma.{0,10}(for|customer)|supplier.{0,10}proforma|price.{0,10}(list|sheet).{0,10}(from|supplier)|weekly.{0,10}(sale|revenue|breakdown)|sale.{0,10}(by week|per week|week.{0,5}by.{0,5}week)|container.{0,10}(items|content|loaded|what.{0,10}inside)|what.{0,10}(is|are|was).{0,10}(in|inside|loaded).{0,5}container|employee.{0,10}(list|roster|staff)|all.{0,10}(employee|staff)|staff.{0,10}list|journal.{0,10}(entry|entries|voucher)|recent.{0,10}journal|journal.{0,10}posting|audit.{0,10}(log|trail|history)|who.{0,10}(created|deleted|changed|modified|updated)|recent.{0,10}change|bank.{0,10}account.{0,10}(list|balance|all)|all.{0,10}bank|list.{0,10}(of.{0,5})?bank|stock.{0,10}adjust|production.{0,10}(stock|entry|voucher)|consumption.{0,10}(stock|entry)|tracking.{0,10}(event|update|histor)|container.{0,10}tracking|where.{0,10}(is|was).{0,15}container|shipment.{0,10}update|pending.{0,10}(container.{0,10}sale|payment.{0,10}container)|unpaid.{0,10}container|outstanding.{0,10}container|container.{0,10}(unpaid|pending.{0,10}payment)|supplier.{0,10}container|containers.{0,10}(from|by).{0,10}supplier|how many.{0,10}container.{0,10}(from|supplier)|income.{0,10}(break|categ|by type)|revenue.{0,10}(break|by account)|top.{0,10}income.{0,10}account|worker.{0,10}(profile|detail|info)|info.{0,10}(about|for|on).{0,15}worker|who.{0,10}is.{0,10}worker|location.{0,10}(list|all)|all.{0,10}(location|warehouse)|list.{0,10}(of.{0,5})?location|quarterly|quarter.{0,10}(comparison|breakdown|vs)|q[1-4].{0,10}(vs|comparison|revenue)/i;
+    const PHASE1_KEYWORDS =
+      /profit.{0,15}loss|p&l\b|pl\b.{0,10}report|balance.{0,8}sheet|cash.{0,12}(balance|position|account)|who.{0,20}owe[ds]?|overdue|outstanding.{0,15}(balance|amount|supplier)|customer.{0,15}statement|supplier.{0,15}statement|top.{0,10}(customer|buyer)s?|worker.{0,12}attend|how many.{0,20}(absent|present|worker)|bale.{0,12}(produc|today|week|this|last)|produc.{0,12}bale|how many bale|container.{0,12}status|where.{0,12}(is.{0,5})?container|pending.{0,10}offload|not.{0,10}offload|how much.{0,20}(stock|do we have|in stock)|stock.{0,10}(level|balance|position)|inventory.{0,10}(level|check|status)|low.{0,10}stock|below.{0,10}reorder|reorder.{0,10}level|stock.{0,10}movement|stock.{0,10}histor|movement.{0,10}(for|of).{0,20}\w|open.{0,10}(purchase order|po\b|p\.o\.)|pending.{0,10}(po\b|purchase)|aging|age.{0,10}(report|analysis)|receivable|payable.{0,10}(aging|due)|container.{0,10}list|all container|month.{0,10}(comparison|vs|versus|compare)|last month vs|rental.{0,10}(summary|report|occupan)|occupan|tenant|rent.{0,10}(due|overdue|collect)|payroll.{0,10}(summary|total|report)|total.{0,10}payroll|salary.{0,10}(total|summary)|sales.{0,10}(analys|by item|report|revenue)|how much.{0,15}(did we sell|sold)|top.{0,10}(sell|item|product)|best.{0,10}(sell|item)|container.{0,10}profit|profit.{0,10}per container|how much.{0,15}profit.{0,15}container|stock.{0,10}valuat|inventory.{0,10}value|total.{0,10}inventory.{0,10}(value|worth)|expense.{0,10}(break|categ|by type)|top.{0,10}expense|where.{0,20}money.{0,10}(going|spent)|customer.{0,10}order.{0,10}status|order.{0,10}(pending|draft|verified|finalized|loading)|credit.{0,10}note|recent.{0,10}credit|bank.{0,10}(transaction|movement|histor)|cash.{0,10}(transaction|movement|histor)|recent.{0,10}(payment|receipt|bank)|fixed.{0,10}asset|asset.{0,10}(list|register|summar)|kpi|factory.{0,10}(kpi|performance|daily)|daily.{0,10}(production|output)|efficiency|pos.{0,10}(sale|revenue|summary)|point.{0,10}of.{0,10}sale|shop.{0,10}sale|intercompany|inter.{0,10}company.{0,10}transfer|money.{0,10}(moved|transferred).{0,15}between|offload.{0,10}detail|what.{0,15}(was|were).{0,10}offload|what.{0,10}(arrive|came).{0,15}(in|container)|worker.{0,10}(product|rank|top|best)|top.{0,10}worker|best.{0,10}worker|supplier.{0,10}(spend|history|bought|purchase.{0,10}from)|how much.{0,15}(bought|spend).{0,10}(from|supplier)|upcoming.{0,10}(arrival|container|shipment)|container.{0,10}(arriving|due|expected)|waste.{0,10}(analys|report|trend|summary)|factory.{0,10}waste|customer.{0,10}(payment.{0,10}histor|paid|receipt)|when.{0,10}did.{0,15}pay|voucher.{0,10}(summary|count|by type|breakdown)|how many.{0,10}voucher|stock.{0,10}by.{0,10}location|per.{0,10}location.{0,10}stock|location.{0,10}stock|trial.{0,5}balance|all.{0,10}account.{0,10}balance|balance.{0,10}(of all|per account)|po.{0,10}(detail|line|item)|purchase.{0,10}order.{0,10}(detail|items|break)|what.{0,10}(is|was).{0,10}in.{0,10}(the.{0,5})?po|container.{0,10}(cost|charge|break)|cost.{0,10}break.{0,10}(of|for).{0,10}container|document.{0,10}expir|visa.{0,10}expir|permit.{0,10}expir|worker.{0,10}(doc|expir)|stock.{0,10}transfer|transfer.{0,10}(between|from.{0,10}to).{0,10}(location|warehouse)|move.{0,10}stock|cash.{0,10}flow|money.{0,10}(in|out).{0,10}(this|last|for)|inflow.{0,10}outflow|account.{0,10}(movement|ledger|balance.{0,10}for)|ledger.{0,10}(balance|statement|for)|transaction.{0,10}(of|for).{0,10}account|day.{0,10}(summary|report|sales)|today.{0,10}(sales|voucher)|sale.{0,10}today|profit.{0,10}(by|per).{0,10}location|location.{0,10}profit|which.{0,10}location.{0,10}(most|best)|debit.{0,10}note|supplier.{0,10}debit|customer.{0,10}list|list.{0,10}(of.{0,5})?customer|all.{0,10}customer|supplier.{0,10}list|list.{0,10}(of.{0,5})?supplier|all.{0,10}supplier|stock.{0,10}item.{0,10}(detail|info|profile)|item.{0,10}(detail|info|profile).{0,10}(for|of)|what.{0,10}(is|are).{0,5}(the.{0,5})?details.{0,10}(of|for).{0,10}item|mix.{0,10}batch|batch.{0,10}(list|status|summary)|material.{0,10}batch|customer.{0,10}proforma|price.{0,10}list.{0,10}(for.{0,5})?customer|proforma.{0,10}(for|customer)|supplier.{0,10}proforma|price.{0,10}(list|sheet).{0,10}(from|supplier)|weekly.{0,10}(sale|revenue|breakdown)|sale.{0,10}(by week|per week|week.{0,5}by.{0,5}week)|container.{0,10}(items|content|loaded|what.{0,10}inside)|what.{0,10}(is|are|was).{0,10}(in|inside|loaded).{0,5}container|employee.{0,10}(list|roster|staff)|all.{0,10}(employee|staff)|staff.{0,10}list|journal.{0,10}(entry|entries|voucher)|recent.{0,10}journal|journal.{0,10}posting|audit.{0,10}(log|trail|history)|who.{0,10}(created|deleted|changed|modified|updated)|recent.{0,10}change|bank.{0,10}account.{0,10}(list|balance|all)|all.{0,10}bank|list.{0,10}(of.{0,5})?bank|stock.{0,10}adjust|production.{0,10}(stock|entry|voucher)|consumption.{0,10}(stock|entry)|tracking.{0,10}(event|update|histor)|container.{0,10}tracking|where.{0,10}(is|was).{0,15}container|shipment.{0,10}update|pending.{0,10}(container.{0,10}sale|payment.{0,10}container)|unpaid.{0,10}container|outstanding.{0,10}container|container.{0,10}(unpaid|pending.{0,10}payment)|supplier.{0,10}container|containers.{0,10}(from|by).{0,10}supplier|how many.{0,10}container.{0,10}(from|supplier)|income.{0,10}(break|categ|by type)|revenue.{0,10}(break|by account)|top.{0,10}income.{0,10}account|worker.{0,10}(profile|detail|info)|info.{0,10}(about|for|on).{0,15}worker|who.{0,10}is.{0,10}worker|location.{0,10}(list|all)|all.{0,10}(location|warehouse)|list.{0,10}(of.{0,5})?location|quarterly|quarter.{0,10}(comparison|breakdown|vs)|q[1-4].{0,10}(vs|comparison|revenue)/i;
     let dataQueryResult: any = undefined;
 
     if (PHASE1_KEYWORDS.test(userMessage) && !voucherDraft && !stockAdjustmentDraft) {
@@ -2573,7 +2988,9 @@ If intent is unclear or this is not a stock transfer request, respond with exact
         const todayStr = todayDate.toISOString().slice(0, 10);
         const yesterdayStr = new Date(todayDate.getTime() - 86400000).toISOString().slice(0, 10);
         const thisMonthStart = new Date(todayDate.getFullYear(), todayDate.getMonth(), 1).toISOString().slice(0, 10);
-        const lastMonthStart = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1).toISOString().slice(0, 10);
+        const lastMonthStart = new Date(todayDate.getFullYear(), todayDate.getMonth() - 1, 1)
+          .toISOString()
+          .slice(0, 10);
         const lastMonthEnd = new Date(todayDate.getFullYear(), todayDate.getMonth(), 0).toISOString().slice(0, 10);
         const last30Days = new Date(todayDate.getTime() - 30 * 86400000).toISOString().slice(0, 10);
         const dayOfWeek = todayDate.getDay();
@@ -2673,7 +3090,10 @@ Date rules: use provided ranges above. Default to last 30 days for financial, to
 If the intent does not match any type, output: null`;
 
         const phase1Res = await callAIWithFallback(selectedProvider, phase1Prompt, [], "Classify Phase1 query");
-        const rawP1 = phase1Res.response.trim().replace(/```json\n?|```/g, "").trim();
+        const rawP1 = phase1Res.response
+          .trim()
+          .replace(/```json\n?|```/g, "")
+          .trim();
 
         if (rawP1 !== "null" && rawP1.startsWith("{")) {
           const params = JSON.parse(rawP1);
@@ -2681,11 +3101,12 @@ If the intent does not match any type, output: null`;
             const dateFrom: string = params.dateFrom || last30Days;
             const dateTo: string = params.dateTo || todayStr;
             const rowLimit: number = Math.min(params.limit || 10, 50);
-            const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-            const fmtDec = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+            const fmt = (n: number) =>
+              n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            const fmtDec = (n: number) =>
+              n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
             switch (params.queryType) {
-
               case "pl_summary": {
                 const rows = await db.execute(sql`
                   SELECT la.account_type,
@@ -2698,7 +3119,9 @@ If the intent does not match any type, output: null`;
                     AND la.account_type IN ('Income','Expense','Direct Expense','Indirect Expense','Profit')
                   GROUP BY la.account_type
                 `);
-                let revenue = 0, cogs = 0, opex = 0;
+                let revenue = 0,
+                  cogs = 0,
+                  opex = 0;
                 for (const row of rows.rows as any[]) {
                   const dr = parseFloat(row.total_debit || "0");
                   const cr = parseFloat(row.total_credit || "0");
@@ -2736,15 +3159,28 @@ If the intent does not match any type, output: null`;
                   ORDER BY la.account_type, la.name
                 `);
                 let grandTotal = 0;
-                const stats: any[] = (rows.rows as any[]).map(row => {
+                const stats: any[] = (rows.rows as any[]).map((row) => {
                   const ob = parseFloat(row.opening_balance || "0");
                   const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
                   const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
                   grandTotal += bal;
-                  return { label: `${row.name} (${row.account_type})`, value: fmt(bal), highlight: bal >= 0 ? "positive" : "negative" };
+                  return {
+                    label: `${row.name} (${row.account_type})`,
+                    value: fmt(bal),
+                    highlight: bal >= 0 ? "positive" : "negative",
+                  };
                 });
-                stats.push({ label: "TOTAL CASH & BANK", value: fmt(grandTotal), highlight: grandTotal >= 0 ? "positive" : "negative" });
-                dataQueryResult = { queryType: "cash_position", title: "Cash & Bank Positions", subtitle: `As of ${todayStr}`, stats };
+                stats.push({
+                  label: "TOTAL CASH & BANK",
+                  value: fmt(grandTotal),
+                  highlight: grandTotal >= 0 ? "positive" : "negative",
+                });
+                dataQueryResult = {
+                  queryType: "cash_position",
+                  title: "Cash & Bank Positions",
+                  subtitle: `As of ${todayStr}`,
+                  stats,
+                };
                 break;
               }
 
@@ -2772,7 +3208,7 @@ If the intent does not match any type, output: null`;
                   ) DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows = (rows.rows as any[]).map(row => {
+                const tableRows = (rows.rows as any[]).map((row) => {
                   const ob = parseFloat(row.opening_balance || "0");
                   const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
                   const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
@@ -2792,31 +3228,54 @@ If the intent does not match any type, output: null`;
               case "customer_statement": {
                 const name = params.entityName;
                 if (!name) {
-                  dataQueryResult = { queryType: "customer_statement", title: "Customer Statement", summary: "Please specify a customer name." };
+                  dataQueryResult = {
+                    queryType: "customer_statement",
+                    title: "Customer Statement",
+                    summary: "Please specify a customer name.",
+                  };
                   break;
                 }
-                const accts = await db.select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name })
+                const accts = await db
+                  .select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name })
                   .from(schema.ledgerAccounts)
-                  .where(and(eq(schema.ledgerAccounts.companyId, companyId), ilike(schema.ledgerAccounts.name, `%${name}%`), isNull(schema.ledgerAccounts.deletedAt)))
+                  .where(
+                    and(
+                      eq(schema.ledgerAccounts.companyId, companyId),
+                      ilike(schema.ledgerAccounts.name, `%${name}%`),
+                      isNull(schema.ledgerAccounts.deletedAt)
+                    )
+                  )
                   .limit(3);
                 if (!accts.length) {
-                  dataQueryResult = { queryType: "customer_statement", title: `Customer: ${name}`, summary: "No account found matching that name." };
+                  dataQueryResult = {
+                    queryType: "customer_statement",
+                    title: `Customer: ${name}`,
+                    summary: "No account found matching that name.",
+                  };
                   break;
                 }
                 const acct = accts[0];
-                const txRows = await db.select({
-                  voucherDate: schema.vouchers.voucherDate,
-                  voucherType: schema.vouchers.voucherType,
-                  description: schema.vouchers.description,
-                  debitAmount: schema.voucherEntries.debitAmount,
-                  creditAmount: schema.voucherEntries.creditAmount,
-                })
+                const txRows = await db
+                  .select({
+                    voucherDate: schema.vouchers.voucherDate,
+                    voucherType: schema.vouchers.voucherType,
+                    description: schema.vouchers.description,
+                    debitAmount: schema.voucherEntries.debitAmount,
+                    creditAmount: schema.voucherEntries.creditAmount,
+                  })
                   .from(schema.voucherEntries)
-                  .innerJoin(schema.vouchers, and(eq(schema.voucherEntries.voucherId, schema.vouchers.id), eq(schema.vouchers.optional, false), isNull(schema.vouchers.deletedAt)))
+                  .innerJoin(
+                    schema.vouchers,
+                    and(
+                      eq(schema.voucherEntries.voucherId, schema.vouchers.id),
+                      eq(schema.vouchers.optional, false),
+                      isNull(schema.vouchers.deletedAt)
+                    )
+                  )
                   .where(eq(schema.voucherEntries.ledgerAccountId, acct.id))
                   .orderBy(desc(schema.vouchers.voucherDate))
                   .limit(rowLimit);
-                const tableRows = txRows.map(r => [
+                const tableRows = txRows.map((r) => [
                   r.voucherDate || "—",
                   r.voucherType || "—",
                   (r.description || "").slice(0, 40),
@@ -2836,31 +3295,54 @@ If the intent does not match any type, output: null`;
               case "supplier_statement": {
                 const name = params.entityName;
                 if (!name) {
-                  dataQueryResult = { queryType: "supplier_statement", title: "Supplier Statement", summary: "Please specify a supplier name." };
+                  dataQueryResult = {
+                    queryType: "supplier_statement",
+                    title: "Supplier Statement",
+                    summary: "Please specify a supplier name.",
+                  };
                   break;
                 }
-                const accts = await db.select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name })
+                const accts = await db
+                  .select({ id: schema.ledgerAccounts.id, name: schema.ledgerAccounts.name })
                   .from(schema.ledgerAccounts)
-                  .where(and(eq(schema.ledgerAccounts.companyId, companyId), ilike(schema.ledgerAccounts.name, `%${name}%`), isNull(schema.ledgerAccounts.deletedAt)))
+                  .where(
+                    and(
+                      eq(schema.ledgerAccounts.companyId, companyId),
+                      ilike(schema.ledgerAccounts.name, `%${name}%`),
+                      isNull(schema.ledgerAccounts.deletedAt)
+                    )
+                  )
                   .limit(3);
                 if (!accts.length) {
-                  dataQueryResult = { queryType: "supplier_statement", title: `Supplier: ${name}`, summary: "No account found matching that name." };
+                  dataQueryResult = {
+                    queryType: "supplier_statement",
+                    title: `Supplier: ${name}`,
+                    summary: "No account found matching that name.",
+                  };
                   break;
                 }
                 const acct = accts[0];
-                const txRows = await db.select({
-                  voucherDate: schema.vouchers.voucherDate,
-                  voucherType: schema.vouchers.voucherType,
-                  description: schema.vouchers.description,
-                  debitAmount: schema.voucherEntries.debitAmount,
-                  creditAmount: schema.voucherEntries.creditAmount,
-                })
+                const txRows = await db
+                  .select({
+                    voucherDate: schema.vouchers.voucherDate,
+                    voucherType: schema.vouchers.voucherType,
+                    description: schema.vouchers.description,
+                    debitAmount: schema.voucherEntries.debitAmount,
+                    creditAmount: schema.voucherEntries.creditAmount,
+                  })
                   .from(schema.voucherEntries)
-                  .innerJoin(schema.vouchers, and(eq(schema.voucherEntries.voucherId, schema.vouchers.id), eq(schema.vouchers.optional, false), isNull(schema.vouchers.deletedAt)))
+                  .innerJoin(
+                    schema.vouchers,
+                    and(
+                      eq(schema.voucherEntries.voucherId, schema.vouchers.id),
+                      eq(schema.vouchers.optional, false),
+                      isNull(schema.vouchers.deletedAt)
+                    )
+                  )
                   .where(eq(schema.voucherEntries.ledgerAccountId, acct.id))
                   .orderBy(desc(schema.vouchers.voucherDate))
                   .limit(rowLimit);
-                const tableRows = txRows.map(r => [
+                const tableRows = txRows.map((r) => [
                   r.voucherDate || "—",
                   r.voucherType || "—",
                   (r.description || "").slice(0, 40),
@@ -2932,7 +3414,7 @@ If the intent does not match any type, output: null`;
                   ) ASC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows = (rows.rows as any[]).map(row => {
+                const tableRows = (rows.rows as any[]).map((row) => {
                   const ob = parseFloat(row.opening_balance || "0");
                   const obAdj = row.opening_balance_side === "Cr" ? -ob : ob;
                   const bal = obAdj + parseFloat(row.total_debit || "0") - parseFloat(row.total_credit || "0");
@@ -2956,13 +3438,17 @@ If the intent does not match any type, output: null`;
                     AND fa.attendance_date BETWEEN ${dateFrom} AND ${dateTo}
                   GROUP BY fa.status ORDER BY fa.status
                 `);
-                const totalRecords = (rows.rows as any[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
-                const stats: any[] = (rows.rows as any[]).map(r => ({
+                const totalRecords = (rows.rows as any[]).reduce(
+                  (s: number, r: any) => s + parseInt(r.count || "0"),
+                  0
+                );
+                const stats: any[] = (rows.rows as any[]).map((r) => ({
                   label: r.status,
                   value: `${r.count} records · ${r.workers} worker(s)`,
                   highlight: r.status === "Present" ? "positive" : r.status === "Absent" ? "negative" : "muted",
                 }));
-                if (!stats.length) stats.push({ label: "No Data", value: "No attendance records for this period.", highlight: "muted" });
+                if (!stats.length)
+                  stats.push({ label: "No Data", value: "No attendance records for this period.", highlight: "muted" });
                 dataQueryResult = {
                   queryType: "worker_attendance",
                   title: "Worker Attendance",
@@ -2982,8 +3468,11 @@ If the intent does not match any type, output: null`;
                   GROUP BY fb.status ORDER BY count DESC
                 `);
                 const totalBales = (rows.rows as any[]).reduce((s: number, r: any) => s + parseInt(r.count || "0"), 0);
-                const totalWeight = (rows.rows as any[]).reduce((s: number, r: any) => s + parseFloat(r.total_weight || "0"), 0);
-                const tableRows = (rows.rows as any[]).map(r => [
+                const totalWeight = (rows.rows as any[]).reduce(
+                  (s: number, r: any) => s + parseFloat(r.total_weight || "0"),
+                  0
+                );
+                const tableRows = (rows.rows as any[]).map((r) => [
                   String(r.status).replace(/_/g, " "),
                   String(r.count),
                   fmtDec(parseFloat(r.total_weight || "0")) + " kg",
@@ -3003,43 +3492,68 @@ If the intent does not match any type, output: null`;
               }
 
               case "container_status": {
-                const num = params.containerNumber || (userMessage.match(/\b([A-Z]{4}\d{6,7})\b/)?.[1]);
+                const num = params.containerNumber || userMessage.match(/\b([A-Z]{4}\d{6,7})\b/)?.[1];
                 if (!num) {
-                  dataQueryResult = { queryType: "container_status", title: "Container Status", summary: "Please specify a container number (e.g. ABCU1234567)." };
+                  dataQueryResult = {
+                    queryType: "container_status",
+                    title: "Container Status",
+                    summary: "Please specify a container number (e.g. ABCU1234567).",
+                  };
                   break;
                 }
-                const [container] = await db.select({
-                  containerNumber: schema.containers.containerNumber,
-                  status: schema.containers.status,
-                  importDate: schema.containers.importDate,
-                  eta: schema.containers.eta,
-                  offloadDate: schema.containers.offloadDate,
-                  transporter: schema.containers.transporter,
-                  trackingLocation: schema.containers.trackingLocation,
-                  trackingLastStatus: schema.containers.trackingLastStatus,
-                  trackingLastDescription: schema.containers.trackingLastDescription,
-                  trackingLastLocation: schema.containers.trackingLastLocation,
-                  borderDate: schema.containers.borderDate,
-                  grandTotal: schema.containers.grandTotal,
-                })
+                const [container] = await db
+                  .select({
+                    containerNumber: schema.containers.containerNumber,
+                    status: schema.containers.status,
+                    importDate: schema.containers.importDate,
+                    eta: schema.containers.eta,
+                    offloadDate: schema.containers.offloadDate,
+                    transporter: schema.containers.transporter,
+                    trackingLocation: schema.containers.trackingLocation,
+                    trackingLastStatus: schema.containers.trackingLastStatus,
+                    trackingLastDescription: schema.containers.trackingLastDescription,
+                    trackingLastLocation: schema.containers.trackingLastLocation,
+                    borderDate: schema.containers.borderDate,
+                    grandTotal: schema.containers.grandTotal,
+                  })
                   .from(schema.containers)
-                  .where(and(eq(schema.containers.companyId, companyId), ilike(schema.containers.containerNumber, `%${num}%`)))
+                  .where(
+                    and(
+                      eq(schema.containers.companyId, companyId),
+                      ilike(schema.containers.containerNumber, `%${num}%`)
+                    )
+                  )
                   .limit(1);
                 if (!container) {
-                  dataQueryResult = { queryType: "container_status", title: `Container: ${num}`, summary: "Container not found." };
+                  dataQueryResult = {
+                    queryType: "container_status",
+                    title: `Container: ${num}`,
+                    summary: "Container not found.",
+                  };
                   break;
                 }
                 const stats: any[] = [
                   { label: "Container #", value: container.containerNumber, highlight: "neutral" },
-                  { label: "Status", value: container.status, highlight: container.status === "OFFLOADED" ? "positive" : "neutral" },
+                  {
+                    label: "Status",
+                    value: container.status,
+                    highlight: container.status === "OFFLOADED" ? "positive" : "neutral",
+                  },
                   { label: "Import Date", value: container.importDate || "—", highlight: "muted" },
                   { label: "ETA", value: container.eta || "—", highlight: "muted" },
-                  { label: "Offload Date", value: container.offloadDate || "Not yet offloaded", highlight: container.offloadDate ? "positive" : "muted" },
+                  {
+                    label: "Offload Date",
+                    value: container.offloadDate || "Not yet offloaded",
+                    highlight: container.offloadDate ? "positive" : "muted",
+                  },
                   { label: "Transporter", value: container.transporter || "—", highlight: "muted" },
                 ];
-                if (container.trackingLastStatus) stats.push({ label: "Tracking Status", value: container.trackingLastStatus, highlight: "neutral" });
-                if (container.trackingLastLocation) stats.push({ label: "Last Location", value: container.trackingLastLocation, highlight: "neutral" });
-                if (container.trackingLastDescription) stats.push({ label: "Last Update", value: container.trackingLastDescription, highlight: "muted" });
+                if (container.trackingLastStatus)
+                  stats.push({ label: "Tracking Status", value: container.trackingLastStatus, highlight: "neutral" });
+                if (container.trackingLastLocation)
+                  stats.push({ label: "Last Location", value: container.trackingLastLocation, highlight: "neutral" });
+                if (container.trackingLastDescription)
+                  stats.push({ label: "Last Update", value: container.trackingLastDescription, highlight: "muted" });
                 dataQueryResult = {
                   queryType: "container_status",
                   title: `Container: ${container.containerNumber}`,
@@ -3050,25 +3564,18 @@ If the intent does not match any type, output: null`;
               }
 
               case "containers_pending_offload": {
-                const pending = await db.select({
-                  containerNumber: schema.containers.containerNumber,
-                  status: schema.containers.status,
-                  eta: schema.containers.eta,
-                  transporter: schema.containers.transporter,
-                })
+                const pending = await db
+                  .select({
+                    containerNumber: schema.containers.containerNumber,
+                    status: schema.containers.status,
+                    eta: schema.containers.eta,
+                    transporter: schema.containers.transporter,
+                  })
                   .from(schema.containers)
-                  .where(and(
-                    eq(schema.containers.companyId, companyId),
-                    isNull(schema.containers.offloadDate),
-                  ))
+                  .where(and(eq(schema.containers.companyId, companyId), isNull(schema.containers.offloadDate)))
                   .orderBy(asc(schema.containers.eta))
                   .limit(rowLimit);
-                const tableRows = pending.map(c => [
-                  c.containerNumber,
-                  c.status,
-                  c.eta || "—",
-                  c.transporter || "—",
-                ]);
+                const tableRows = pending.map((c) => [c.containerNumber, c.status, c.eta || "—", c.transporter || "—"]);
                 dataQueryResult = {
                   queryType: "containers_pending_offload",
                   title: "Containers Pending Offload",
@@ -3095,12 +3602,12 @@ If the intent does not match any type, output: null`;
                   JOIN locations l ON l.id = inv.location_id
                   WHERE inv.company_id = ${companyId}
                     AND inv.quantity > 0
-                    ${itemName ? sql`AND si.name ILIKE ${'%' + itemName + '%'}` : sql``}
-                    ${locName ? sql`AND l.name ILIKE ${'%' + locName + '%'}` : sql``}
+                    ${itemName ? sql`AND si.name ILIKE ${"%" + itemName + "%"}` : sql``}
+                    ${locName ? sql`AND l.name ILIKE ${"%" + locName + "%"}` : sql``}
                   ORDER BY total_value DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows2 = (rows.rows as any[]).map(r => [
+                const tableRows2 = (rows.rows as any[]).map((r) => [
                   r.item_name,
                   r.code,
                   r.location_name,
@@ -3133,7 +3640,7 @@ If the intent does not match any type, output: null`;
                   ORDER BY (COALESCE(SUM(CAST(inv.quantity AS numeric)), 0) / NULLIF(CAST(si.reorder_level AS numeric), 0)) ASC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows2 = (rows.rows as any[]).map(r => [
+                const tableRows2 = (rows.rows as any[]).map((r) => [
                   r.name,
                   r.code,
                   `${fmtDec(parseFloat(r.total_qty))} ${r.uom}`,
@@ -3153,7 +3660,11 @@ If the intent does not match any type, output: null`;
               case "stock_movement": {
                 const itemName = params.entityName;
                 if (!itemName) {
-                  dataQueryResult = { queryType: "stock_movement", title: "Stock Movement", summary: "Please specify an item name." };
+                  dataQueryResult = {
+                    queryType: "stock_movement",
+                    title: "Stock Movement",
+                    summary: "Please specify an item name.",
+                  };
                   break;
                 }
                 const rows = await db.execute(sql`
@@ -3167,12 +3678,12 @@ If the intent does not match any type, output: null`;
                   JOIN stock_items si ON si.id = sai.stock_item_id
                   JOIN locations l ON l.id = sav.location_id
                   WHERE si.company_id = ${companyId}
-                    AND si.name ILIKE ${'%' + itemName + '%'}
+                    AND si.name ILIKE ${"%" + itemName + "%"}
                     AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
                   ORDER BY v.voucher_date DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows2 = (rows.rows as any[]).map(r => [
+                const tableRows2 = (rows.rows as any[]).map((r) => [
                   String(r.voucher_date).slice(0, 10),
                   r.adjustment_type,
                   r.location,
@@ -3201,11 +3712,11 @@ If the intent does not match any type, output: null`;
                   JOIN containers c ON c.id = po.container_id
                   WHERE po.company_id = ${companyId}
                     AND po.status = 'Open'
-                    ${supplierName ? sql`AND s.legal_name ILIKE ${'%' + supplierName + '%'}` : sql``}
+                    ${supplierName ? sql`AND s.legal_name ILIKE ${"%" + supplierName + "%"}` : sql``}
                   ORDER BY po.created_at DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows2 = (rows.rows as any[]).map(r => [
+                const tableRows2 = (rows.rows as any[]).map((r) => [
                   r.po_number,
                   r.supplier,
                   r.container_number,
@@ -3217,7 +3728,10 @@ If the intent does not match any type, output: null`;
                   queryType: "open_purchase_orders",
                   title: supplierName ? `Open POs — ${supplierName}` : "Open Purchase Orders",
                   subtitle: `${tableRows2.length} open PO(s)`,
-                  table: { headers: ["PO #", "Supplier", "Container", "Currency", "Items Total", "Status"], rows: tableRows2 },
+                  table: {
+                    headers: ["PO #", "Supplier", "Container", "Currency", "Items Total", "Status"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3255,20 +3769,47 @@ If the intent does not match any type, output: null`;
                   ) DESC
                   LIMIT ${rowLimit}
                 `);
-                let grandTotal0_30 = 0, grandTotal31_60 = 0, grandTotal61_90 = 0, grandTotalOver90 = 0, grandTotalAll = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                let grandTotal0_30 = 0,
+                  grandTotal31_60 = 0,
+                  grandTotal61_90 = 0,
+                  grandTotalOver90 = 0,
+                  grandTotalAll = 0;
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const balance = parseFloat(r.ob) + parseFloat(r.total_debit) - parseFloat(r.total_credit);
-                  const b0 = parseFloat(r.bucket_0_30); const b1 = parseFloat(r.bucket_31_60);
-                  const b2 = parseFloat(r.bucket_61_90); const b3 = parseFloat(r.bucket_over_90);
-                  grandTotal0_30 += b0; grandTotal31_60 += b1; grandTotal61_90 += b2; grandTotalOver90 += b3; grandTotalAll += balance;
-                  return [r.name, fmt(balance), fmt(b0 > 0 ? b0 : 0), fmt(b1 > 0 ? b1 : 0), fmt(b2 > 0 ? b2 : 0), fmt(b3 > 0 ? b3 : 0)];
+                  const b0 = parseFloat(r.bucket_0_30);
+                  const b1 = parseFloat(r.bucket_31_60);
+                  const b2 = parseFloat(r.bucket_61_90);
+                  const b3 = parseFloat(r.bucket_over_90);
+                  grandTotal0_30 += b0;
+                  grandTotal31_60 += b1;
+                  grandTotal61_90 += b2;
+                  grandTotalOver90 += b3;
+                  grandTotalAll += balance;
+                  return [
+                    r.name,
+                    fmt(balance),
+                    fmt(b0 > 0 ? b0 : 0),
+                    fmt(b1 > 0 ? b1 : 0),
+                    fmt(b2 > 0 ? b2 : 0),
+                    fmt(b3 > 0 ? b3 : 0),
+                  ];
                 });
-                tableRows2.push(["TOTAL", fmt(grandTotalAll), fmt(grandTotal0_30), fmt(grandTotal31_60), fmt(grandTotal61_90), fmt(grandTotalOver90)]);
+                tableRows2.push([
+                  "TOTAL",
+                  fmt(grandTotalAll),
+                  fmt(grandTotal0_30),
+                  fmt(grandTotal31_60),
+                  fmt(grandTotal61_90),
+                  fmt(grandTotalOver90),
+                ]);
                 dataQueryResult = {
                   queryType: "customer_aging",
                   title: "Customer Receivables Aging",
                   subtitle: `As of ${todayStr}`,
-                  table: { headers: ["Account", "Total", "0-30 days", "31-60 days", "61-90 days", "90+ days"], rows: tableRows2 },
+                  table: {
+                    headers: ["Account", "Total", "0-30 days", "31-60 days", "61-90 days", "90+ days"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length <= 1,
                 };
                 break;
@@ -3306,20 +3847,47 @@ If the intent does not match any type, output: null`;
                   ) DESC
                   LIMIT ${rowLimit}
                 `);
-                let sgTotal0_30 = 0, sgTotal31_60 = 0, sgTotal61_90 = 0, sgTotalOver90 = 0, sgTotalAll = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                let sgTotal0_30 = 0,
+                  sgTotal31_60 = 0,
+                  sgTotal61_90 = 0,
+                  sgTotalOver90 = 0,
+                  sgTotalAll = 0;
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const balance = parseFloat(r.ob) + parseFloat(r.total_credit) - parseFloat(r.total_debit);
-                  const b0 = parseFloat(r.bucket_0_30); const b1 = parseFloat(r.bucket_31_60);
-                  const b2 = parseFloat(r.bucket_61_90); const b3 = parseFloat(r.bucket_over_90);
-                  sgTotal0_30 += b0; sgTotal31_60 += b1; sgTotal61_90 += b2; sgTotalOver90 += b3; sgTotalAll += balance;
-                  return [r.name, fmt(balance), fmt(b0 > 0 ? b0 : 0), fmt(b1 > 0 ? b1 : 0), fmt(b2 > 0 ? b2 : 0), fmt(b3 > 0 ? b3 : 0)];
+                  const b0 = parseFloat(r.bucket_0_30);
+                  const b1 = parseFloat(r.bucket_31_60);
+                  const b2 = parseFloat(r.bucket_61_90);
+                  const b3 = parseFloat(r.bucket_over_90);
+                  sgTotal0_30 += b0;
+                  sgTotal31_60 += b1;
+                  sgTotal61_90 += b2;
+                  sgTotalOver90 += b3;
+                  sgTotalAll += balance;
+                  return [
+                    r.name,
+                    fmt(balance),
+                    fmt(b0 > 0 ? b0 : 0),
+                    fmt(b1 > 0 ? b1 : 0),
+                    fmt(b2 > 0 ? b2 : 0),
+                    fmt(b3 > 0 ? b3 : 0),
+                  ];
                 });
-                tableRows2.push(["TOTAL", fmt(sgTotalAll), fmt(sgTotal0_30), fmt(sgTotal31_60), fmt(sgTotal61_90), fmt(sgTotalOver90)]);
+                tableRows2.push([
+                  "TOTAL",
+                  fmt(sgTotalAll),
+                  fmt(sgTotal0_30),
+                  fmt(sgTotal31_60),
+                  fmt(sgTotal61_90),
+                  fmt(sgTotalOver90),
+                ]);
                 dataQueryResult = {
                   queryType: "supplier_aging",
                   title: "Supplier Payables Aging",
                   subtitle: `As of ${todayStr}`,
-                  table: { headers: ["Supplier", "Total Owed", "0-30 days", "31-60 days", "61-90 days", "90+ days"], rows: tableRows2 },
+                  table: {
+                    headers: ["Supplier", "Total Owed", "0-30 days", "31-60 days", "61-90 days", "90+ days"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length <= 1,
                 };
                 break;
@@ -3335,12 +3903,12 @@ If the intent does not match any type, output: null`;
                   FROM containers c
                   JOIN suppliers s ON s.id = c.supplier_id
                   WHERE c.company_id = ${companyId}
-                    ${statusFilter ? sql`AND c.status ILIKE ${'%' + statusFilter + '%'}` : sql``}
+                    ${statusFilter ? sql`AND c.status ILIKE ${"%" + statusFilter + "%"}` : sql``}
                     AND c.import_date BETWEEN ${dateFrom} AND ${dateTo}
                   ORDER BY c.import_date DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows2 = (rows.rows as any[]).map(r => [
+                const tableRows2 = (rows.rows as any[]).map((r) => [
                   r.container_number,
                   r.status,
                   String(r.import_date).slice(0, 10),
@@ -3353,7 +3921,10 @@ If the intent does not match any type, output: null`;
                   queryType: "container_list",
                   title: statusFilter ? `Containers — ${statusFilter}` : "Container List",
                   subtitle: `${dateFrom} → ${dateTo} · ${tableRows2.length} container(s)`,
-                  table: { headers: ["Container #", "Status", "Import Date", "ETA", "Supplier", "Transporter", "Grand Total"], rows: tableRows2 },
+                  table: {
+                    headers: ["Container #", "Status", "Import Date", "ETA", "Supplier", "Transporter", "Grand Total"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3416,28 +3987,49 @@ If the intent does not match any type, output: null`;
                   ORDER BY pu.unit_type, pu.location_group, pu.unit_number
                   LIMIT ${rowLimit}
                 `);
-                let totalExpected = 0, totalPaid = 0, occupied = 0, vacant = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                let totalExpected = 0,
+                  totalPaid = 0,
+                  occupied = 0,
+                  vacant = 0;
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const exp = parseFloat(r.expected || "0");
                   const paid = parseFloat(r.paid || "0");
-                  totalExpected += exp; totalPaid += paid;
-                  if (r.tenant_name) occupied++; else vacant++;
+                  totalExpected += exp;
+                  totalPaid += paid;
+                  if (r.tenant_name) occupied++;
+                  else vacant++;
                   const balance = exp - paid;
-                  return [r.unit_number, r.unit_type, r.location_group, r.tenant_name || "VACANT", fmt(exp), fmt(paid), fmt(balance), balance > 0 ? "OUTSTANDING" : "OK"];
+                  return [
+                    r.unit_number,
+                    r.unit_type,
+                    r.location_group,
+                    r.tenant_name || "VACANT",
+                    fmt(exp),
+                    fmt(paid),
+                    fmt(balance),
+                    balance > 0 ? "OUTSTANDING" : "OK",
+                  ];
                 });
                 const stats2 = [
                   { label: "Occupied", value: String(occupied) },
                   { label: "Vacant", value: String(vacant) },
                   { label: "Total Expected", value: fmt(totalExpected) },
                   { label: "Total Collected", value: fmt(totalPaid) },
-                  { label: "Outstanding", value: fmt(totalExpected - totalPaid), highlight: (totalExpected - totalPaid) > 0 ? "negative" : "positive" },
+                  {
+                    label: "Outstanding",
+                    value: fmt(totalExpected - totalPaid),
+                    highlight: totalExpected - totalPaid > 0 ? "negative" : "positive",
+                  },
                 ];
                 dataQueryResult = {
                   queryType: "rental_summary",
                   title: "Rental Summary",
                   subtitle: `${currentYear}-${String(currentMonth).padStart(2, "0")} · ${occupied} occupied, ${vacant} vacant`,
                   stats: stats2,
-                  table: { headers: ["Unit", "Type", "Location", "Tenant", "Expected", "Paid", "Balance", "Status"], rows: tableRows2 },
+                  table: {
+                    headers: ["Unit", "Type", "Location", "Tenant", "Expected", "Paid", "Balance", "Status"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3460,12 +4052,26 @@ If the intent does not match any type, output: null`;
                   ORDER BY fp.period_start DESC, fw.name
                   LIMIT ${rowLimit}
                 `);
-                let totalNet = 0, totalBase = 0, totalBale = 0, totalDed = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                let totalNet = 0,
+                  totalBase = 0,
+                  totalBale = 0,
+                  totalDed = 0;
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const net = parseFloat(r.net_salary || "0");
-                  totalNet += net; totalBase += parseFloat(r.base_salary || "0");
-                  totalBale += parseFloat(r.bale_earnings || "0"); totalDed += parseFloat(r.deductions || "0");
-                  return [r.worker_name, String(r.period_start).slice(0, 10), String(r.period_end).slice(0, 10), fmt(parseFloat(r.base_salary || "0")), fmt(parseFloat(r.bale_earnings || "0")), fmt(parseFloat(r.deductions || "0")), fmt(net), r.status];
+                  totalNet += net;
+                  totalBase += parseFloat(r.base_salary || "0");
+                  totalBale += parseFloat(r.bale_earnings || "0");
+                  totalDed += parseFloat(r.deductions || "0");
+                  return [
+                    r.worker_name,
+                    String(r.period_start).slice(0, 10),
+                    String(r.period_end).slice(0, 10),
+                    fmt(parseFloat(r.base_salary || "0")),
+                    fmt(parseFloat(r.bale_earnings || "0")),
+                    fmt(parseFloat(r.deductions || "0")),
+                    fmt(net),
+                    r.status,
+                  ];
                 });
                 const stats2 = [
                   { label: "Total Workers", value: String(tableRows2.length) },
@@ -3479,7 +4085,19 @@ If the intent does not match any type, output: null`;
                   title: "Factory Payroll Summary",
                   subtitle: `${dateFrom} → ${dateTo}`,
                   stats: stats2,
-                  table: { headers: ["Worker", "Period From", "Period To", "Base", "Bale Earn.", "Deductions", "Net", "Status"], rows: tableRows2 },
+                  table: {
+                    headers: [
+                      "Worker",
+                      "Period From",
+                      "Period To",
+                      "Base",
+                      "Bale Earn.",
+                      "Deductions",
+                      "Net",
+                      "Status",
+                    ],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3501,19 +4119,25 @@ If the intent does not match any type, output: null`;
                   JOIN vouchers v ON v.id = sal.voucher_id AND v.deleted_at IS NULL
                   WHERE si.company_id = ${companyId}
                     AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
-                    ${itemNameFilter ? sql`AND si.name ILIKE ${'%' + itemNameFilter + '%'}` : sql``}
+                    ${itemNameFilter ? sql`AND si.name ILIKE ${"%" + itemNameFilter + "%"}` : sql``}
                   GROUP BY si.id, si.name, si.code, si.uom
                   ORDER BY total_revenue DESC
                   LIMIT ${rowLimit}
                 `);
-                let totRev = 0, totCost = 0, totProfit = 0, totQty = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                let totRev = 0,
+                  totCost = 0,
+                  totProfit = 0,
+                  totQty = 0;
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const rev = parseFloat(r.total_revenue || "0");
                   const cost = parseFloat(r.total_cost || "0");
                   const profit3 = parseFloat(r.total_profit || "0");
                   const qty = parseFloat(r.total_qty || "0");
                   const margin = rev > 0 ? ((profit3 / rev) * 100).toFixed(1) + "%" : "—";
-                  totRev += rev; totCost += cost; totProfit += profit3; totQty += qty;
+                  totRev += rev;
+                  totCost += cost;
+                  totProfit += profit3;
+                  totQty += qty;
                   return [r.item_name, `${fmtDec(qty)} ${r.uom}`, fmt(rev), fmt(cost), fmt(profit3), margin];
                 });
                 if (tableRows2.length) {
@@ -3559,7 +4183,10 @@ If the intent does not match any type, output: null`;
                   queryType: "top_selling_items",
                   title: "Top Selling Items",
                   subtitle: `${dateFrom} → ${dateTo} · by revenue`,
-                  table: { headers: ["#", "Item", "Code", "Qty Sold", "Revenue", "Profit", "Transactions"], rows: tableRows2 },
+                  table: {
+                    headers: ["#", "Item", "Code", "Qty Sold", "Revenue", "Profit", "Transactions"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3585,15 +4212,30 @@ If the intent does not match any type, output: null`;
                   ORDER BY cs.sale_date DESC
                   LIMIT ${rowLimit}
                 `);
-                let totCost = 0, totSale = 0, totProfit = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                let totCost = 0,
+                  totSale = 0,
+                  totProfit = 0;
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const cost = parseFloat(r.cost || "0");
                   const sale = parseFloat(r.sale_amount || "0");
                   const comm = parseFloat(r.commission || "0");
                   const profit3 = sale - cost - comm;
                   const margin = sale > 0 ? ((profit3 / sale) * 100).toFixed(1) + "%" : "—";
-                  totCost += cost; totSale += sale; totProfit += profit3;
-                  return [r.container_number, r.supplier, r.customer, r.currency, fmt(cost), fmt(sale), fmt(comm), fmt(profit3), margin, r.payment_status];
+                  totCost += cost;
+                  totSale += sale;
+                  totProfit += profit3;
+                  return [
+                    r.container_number,
+                    r.supplier,
+                    r.customer,
+                    r.currency,
+                    fmt(cost),
+                    fmt(sale),
+                    fmt(comm),
+                    fmt(profit3),
+                    margin,
+                    r.payment_status,
+                  ];
                 });
                 if (tableRows2.length) {
                   const totMargin = totSale > 0 ? ((totProfit / totSale) * 100).toFixed(1) + "%" : "—";
@@ -3603,7 +4245,21 @@ If the intent does not match any type, output: null`;
                   queryType: "container_profitability",
                   title: "Container Profitability",
                   subtitle: `${dateFrom} → ${dateTo}`,
-                  table: { headers: ["Container #", "Supplier", "Customer", "Curr.", "Cost", "Sale", "Comm.", "Profit", "Margin", "Payment"], rows: tableRows2 },
+                  table: {
+                    headers: [
+                      "Container #",
+                      "Supplier",
+                      "Customer",
+                      "Curr.",
+                      "Cost",
+                      "Sale",
+                      "Comm.",
+                      "Profit",
+                      "Margin",
+                      "Payment",
+                    ],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3623,8 +4279,9 @@ If the intent does not match any type, output: null`;
                   ORDER BY total_value DESC
                   LIMIT ${rowLimit}
                 `);
-                let grandTotalValue = 0, grandTotalItems = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                let grandTotalValue = 0,
+                  grandTotalItems = 0;
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const val = parseFloat(r.total_value || "0");
                   grandTotalValue += val;
                   grandTotalItems += parseInt(r.item_count || "0");
@@ -3663,7 +4320,7 @@ If the intent does not match any type, output: null`;
                   LIMIT ${rowLimit}
                 `);
                 let grandSpend = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const spend = parseFloat(r.net_spend || "0");
                   grandSpend += spend;
                   return [r.name, r.account_type, fmt(spend)];
@@ -3695,7 +4352,7 @@ If the intent does not match any type, output: null`;
                   ORDER BY co.order_date DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows2 = (rows.rows as any[]).map(r => [
+                const tableRows2 = (rows.rows as any[]).map((r) => [
                   r.invoice_number || "—",
                   r.customer,
                   String(r.order_date).slice(0, 10),
@@ -3708,7 +4365,10 @@ If the intent does not match any type, output: null`;
                   queryType: "customer_order_status",
                   title: statusFilter ? `Customer Orders — ${statusFilter}` : "Customer Orders",
                   subtitle: `${dateFrom} → ${dateTo} · ${tableRows2.length} order(s)`,
-                  table: { headers: ["Invoice", "Customer", "Date", "Status", "Total", "Bales", "Destination"], rows: tableRows2 },
+                  table: {
+                    headers: ["Invoice", "Customer", "Date", "Status", "Total", "Bales", "Destination"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3732,16 +4392,27 @@ If the intent does not match any type, output: null`;
                   LIMIT ${rowLimit}
                 `);
                 let totValue = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const val = parseFloat(r.total_value || "0");
                   totValue += val;
-                  return [String(r.voucher_date).slice(0, 10), r.item_name, r.location, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(val), (r.description || "").slice(0, 35)];
+                  return [
+                    String(r.voucher_date).slice(0, 10),
+                    r.item_name,
+                    r.location,
+                    `${fmtDec(parseFloat(r.qty))} ${r.uom}`,
+                    fmtDec(parseFloat(r.rate)),
+                    fmt(val),
+                    (r.description || "").slice(0, 35),
+                  ];
                 });
                 dataQueryResult = {
                   queryType: "credit_notes_summary",
                   title: "Credit Notes",
                   subtitle: `${dateFrom} → ${dateTo} · Total returned: ${fmt(totValue)}`,
-                  table: { headers: ["Date", "Item", "Location", "Qty", "Rate", "Value", "Description"], rows: tableRows2 },
+                  table: {
+                    headers: ["Date", "Item", "Location", "Qty", "Rate", "Value", "Description"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3749,16 +4420,22 @@ If the intent does not match any type, output: null`;
 
               case "bank_transactions": {
                 const accountName = params.entityName || params.locationName;
-                const acctTypes = ['Bank', 'Cash'];
+                const acctTypes = ["Bank", "Cash"];
                 const acctRows = await db.execute(sql`
                   SELECT id, name, account_type FROM ledger_accounts
                   WHERE company_id = ${companyId} AND account_type IN ('Bank','Cash') AND deleted_at IS NULL
-                    ${accountName ? sql`AND name ILIKE ${'%' + accountName + '%'}` : sql``}
+                    ${accountName ? sql`AND name ILIKE ${"%" + accountName + "%"}` : sql``}
                   ORDER BY account_type, name
                   LIMIT 1
                 `);
                 if (!acctRows.rows.length) {
-                  dataQueryResult = { queryType: "bank_transactions", title: "Bank/Cash Transactions", summary: accountName ? `No account found matching "${accountName}".` : "Please specify an account name." };
+                  dataQueryResult = {
+                    queryType: "bank_transactions",
+                    title: "Bank/Cash Transactions",
+                    summary: accountName
+                      ? `No account found matching "${accountName}".`
+                      : "Please specify an account name.",
+                  };
                   break;
                 }
                 const acct3 = acctRows.rows[0] as any;
@@ -3773,7 +4450,7 @@ If the intent does not match any type, output: null`;
                   ORDER BY v.voucher_date DESC, v.id DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows2 = (txRows3.rows as any[]).map(r => [
+                const tableRows2 = (txRows3.rows as any[]).map((r) => [
                   String(r.voucher_date).slice(0, 10),
                   r.voucher_type || "—",
                   (r.description || "").slice(0, 40),
@@ -3799,15 +4476,24 @@ If the intent does not match any type, output: null`;
                     fa.depreciation_method, fa.useful_life, fa.active
                   FROM fixed_assets fa
                   WHERE fa.company_id = ${companyId}
-                    ${categoryFilter ? sql`AND fa.category ILIKE ${'%' + categoryFilter + '%'}` : sql``}
+                    ${categoryFilter ? sql`AND fa.category ILIKE ${"%" + categoryFilter + "%"}` : sql``}
                   ORDER BY fa.category, fa.purchase_date DESC
                   LIMIT ${rowLimit}
                 `);
                 let grandTotal = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const amt = parseFloat(r.purchase_amount || "0");
                   grandTotal += amt;
-                  return [r.code, r.name, r.category, String(r.purchase_date).slice(0, 10), fmt(amt), r.depreciation_method, r.useful_life ? `${r.useful_life} yr` : "—", r.active ? "Active" : "Inactive"];
+                  return [
+                    r.code,
+                    r.name,
+                    r.category,
+                    String(r.purchase_date).slice(0, 10),
+                    fmt(amt),
+                    r.depreciation_method,
+                    r.useful_life ? `${r.useful_life} yr` : "—",
+                    r.active ? "Active" : "Inactive",
+                  ];
                 });
                 const stats3 = [
                   { label: "Total Assets", value: String(tableRows2.length) },
@@ -3818,7 +4504,10 @@ If the intent does not match any type, output: null`;
                   title: categoryFilter ? `Fixed Assets — ${categoryFilter}` : "Fixed Assets Register",
                   subtitle: `${tableRows2.length} asset(s)`,
                   stats: stats3,
-                  table: { headers: ["Code", "Name", "Category", "Purchase Date", "Amount", "Depreciation", "Life", "Status"], rows: tableRows2 },
+                  table: {
+                    headers: ["Code", "Name", "Category", "Purchase Date", "Amount", "Depreciation", "Life", "Status"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3837,18 +4526,39 @@ If the intent does not match any type, output: null`;
                   ORDER BY date DESC
                   LIMIT ${rowLimit}
                 `);
-                let totKgIn = 0, totKgPressed = 0, totBales = 0, totWaste = 0;
-                const tableRows2 = (rows.rows as any[]).map(r => {
+                let totKgIn = 0,
+                  totKgPressed = 0,
+                  totBales = 0,
+                  totWaste = 0;
+                const tableRows2 = (rows.rows as any[]).map((r) => {
                   const kgIn = parseFloat(r.kg_in || "0");
                   const kgPressed = parseFloat(r.kg_pressed || "0");
                   const bales = parseInt(r.total_bales_produced || "0");
                   const waste = parseFloat(r.waste_kg || "0");
                   const efficiency = kgIn > 0 ? ((kgPressed / kgIn) * 100).toFixed(1) + "%" : "—";
-                  totKgIn += kgIn; totKgPressed += kgPressed; totBales += bales; totWaste += waste;
-                  return [String(r.date).slice(0, 10), fmtDec(kgIn), fmtDec(kgPressed), String(bales), fmtDec(waste), efficiency];
+                  totKgIn += kgIn;
+                  totKgPressed += kgPressed;
+                  totBales += bales;
+                  totWaste += waste;
+                  return [
+                    String(r.date).slice(0, 10),
+                    fmtDec(kgIn),
+                    fmtDec(kgPressed),
+                    String(bales),
+                    fmtDec(waste),
+                    efficiency,
+                  ];
                 });
                 const avgEff = totKgIn > 0 ? ((totKgPressed / totKgIn) * 100).toFixed(1) + "%" : "—";
-                if (tableRows2.length) tableRows2.push(["TOTAL", fmtDec(totKgIn), fmtDec(totKgPressed), String(totBales), fmtDec(totWaste), avgEff]);
+                if (tableRows2.length)
+                  tableRows2.push([
+                    "TOTAL",
+                    fmtDec(totKgIn),
+                    fmtDec(totKgPressed),
+                    String(totBales),
+                    fmtDec(totWaste),
+                    avgEff,
+                  ]);
                 const stats3 = [
                   { label: "Total Kg In", value: fmtDec(totKgIn) },
                   { label: "Total Kg Pressed", value: fmtDec(totKgPressed) },
@@ -3861,7 +4571,10 @@ If the intent does not match any type, output: null`;
                   title: "Factory Daily KPIs",
                   subtitle: `${dateFrom} → ${dateTo}`,
                   stats: stats3,
-                  table: { headers: ["Date", "Kg In", "Kg Pressed", "Bales", "Waste Kg", "Efficiency"], rows: tableRows2 },
+                  table: {
+                    headers: ["Date", "Kg In", "Kg Pressed", "Bales", "Waste Kg", "Efficiency"],
+                    rows: tableRows2,
+                  },
                   noData: tableRows2.length === 0,
                 };
                 break;
@@ -3881,7 +4594,7 @@ If the intent does not match any type, output: null`;
                   JOIN factory_pos_sales fps ON fps.id = fpsi.sale_id AND fps.status = 'COMPLETED'
                   WHERE fps.company_id = ${companyId}
                     AND CAST(fps.tx_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
-                    ${itemFilter ? sql`AND fpsi.product_name ILIKE ${'%' + itemFilter + '%'}` : sql``}
+                    ${itemFilter ? sql`AND fpsi.product_name ILIKE ${"%" + itemFilter + "%"}` : sql``}
                   GROUP BY fpsi.product_name, fpsi.article_code, fpsi.currency_code
                   ORDER BY total_revenue DESC
                   LIMIT ${rowLimit}
@@ -3895,21 +4608,35 @@ If the intent does not match any type, output: null`;
                 `);
                 const t4 = totalsRow.rows[0] as any;
                 let grandRev = 0;
-                const tableRows4 = (rows.rows as any[]).map(r => {
+                const tableRows4 = (rows.rows as any[]).map((r) => {
                   const rev = parseFloat(r.total_revenue || "0");
                   grandRev += rev;
-                  return [r.product_name, r.article_code || "—", String(r.total_qty), fmt(rev), r.currency_code, String(r.num_sales)];
+                  return [
+                    r.product_name,
+                    r.article_code || "—",
+                    String(r.total_qty),
+                    fmt(rev),
+                    r.currency_code,
+                    String(r.num_sales),
+                  ];
                 });
                 const stats4 = [
                   { label: "Total Transactions", value: String(t4?.num_transactions || 0) },
-                  { label: "Grand Total Revenue", value: fmt(parseFloat(t4?.grand_total || "0")), highlight: "positive" },
+                  {
+                    label: "Grand Total Revenue",
+                    value: fmt(parseFloat(t4?.grand_total || "0")),
+                    highlight: "positive",
+                  },
                 ];
                 dataQueryResult = {
                   queryType: "pos_sales_summary",
                   title: itemFilter ? `POS Sales: ${itemFilter}` : "POS Sales Summary",
                   subtitle: `${dateFrom} → ${dateTo}`,
                   stats: stats4,
-                  table: { headers: ["Product", "Article Code", "Qty", "Revenue", "Currency", "Sales"], rows: tableRows4 },
+                  table: {
+                    headers: ["Product", "Article Code", "Qty", "Revenue", "Currency", "Sales"],
+                    rows: tableRows4,
+                  },
                   noData: tableRows4.length === 0,
                 };
                 break;
@@ -3929,12 +4656,20 @@ If the intent does not match any type, output: null`;
                   ORDER BY ict.transfer_date DESC
                   LIMIT ${rowLimit}
                 `);
-                let totalOut = 0, totalIn = 0;
-                const tableRows4 = (rows.rows as any[]).map(r => {
+                let totalOut = 0,
+                  totalIn = 0;
+                const tableRows4 = (rows.rows as any[]).map((r) => {
                   const amt = parseFloat(r.amount || "0");
                   const isOut = r.from_company === (rows.rows[0] as any)?.from_company;
                   totalOut += amt; // simplified — show all
-                  return [String(r.transfer_date).slice(0, 10), r.transfer_type, r.from_company, r.to_company, fmt(amt), (r.description || "").slice(0, 40)];
+                  return [
+                    String(r.transfer_date).slice(0, 10),
+                    r.transfer_type,
+                    r.from_company,
+                    r.to_company,
+                    fmt(amt),
+                    (r.description || "").slice(0, 40),
+                  ];
                 });
                 dataQueryResult = {
                   queryType: "intercompany_transfers",
@@ -3949,7 +4684,11 @@ If the intent does not match any type, output: null`;
               case "container_offload_details": {
                 const cnFilter = params.containerNumber || params.entityName;
                 if (!cnFilter) {
-                  dataQueryResult = { queryType: "container_offload_details", title: "Container Offload Details", summary: "Please specify a container number." };
+                  dataQueryResult = {
+                    queryType: "container_offload_details",
+                    title: "Container Offload Details",
+                    summary: "Please specify a container number.",
+                  };
                   break;
                 }
                 const rows = await db.execute(sql`
@@ -3964,16 +4703,23 @@ If the intent does not match any type, output: null`;
                   JOIN containers c ON c.id = co.container_id
                   JOIN locations l ON l.id = co.location_id
                   JOIN stock_items si ON si.id = coi.stock_item_id
-                  WHERE c.container_number ILIKE ${'%' + cnFilter + '%'}
+                  WHERE c.container_number ILIKE ${"%" + cnFilter + "%"}
                     AND c.company_id = ${companyId}
                   ORDER BY si.name
                   LIMIT ${rowLimit}
                 `);
                 let totalVal = 0;
-                const tableRows4 = (rows.rows as any[]).map(r => {
+                const tableRows4 = (rows.rows as any[]).map((r) => {
                   const val = parseFloat(r.total_value || "0");
                   totalVal += val;
-                  return [r.item_name, r.code, r.location, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(val)];
+                  return [
+                    r.item_name,
+                    r.code,
+                    r.location,
+                    `${fmtDec(parseFloat(r.qty))} ${r.uom}`,
+                    fmtDec(parseFloat(r.rate)),
+                    fmt(val),
+                  ];
                 });
                 const cn = (rows.rows[0] as any)?.container_number || cnFilter;
                 dataQueryResult = {
@@ -4032,13 +4778,13 @@ If the intent does not match any type, output: null`;
                   JOIN suppliers s ON s.id = po.supplier_id
                   WHERE po.company_id = ${companyId}
                     AND po.created_at >= ${dateFrom}
-                    ${supplierFilter ? sql`AND s.legal_name ILIKE ${'%' + supplierFilter + '%'}` : sql``}
+                    ${supplierFilter ? sql`AND s.legal_name ILIKE ${"%" + supplierFilter + "%"}` : sql``}
                   GROUP BY s.id, s.legal_name, po.currency
                   ORDER BY total_items DESC
                   LIMIT ${rowLimit}
                 `);
                 let grandItems = 0;
-                const tableRows4 = (rows.rows as any[]).map(r => {
+                const tableRows4 = (rows.rows as any[]).map((r) => {
                   const items = parseFloat(r.total_items || "0");
                   const charges = parseFloat(r.total_charges || "0");
                   grandItems += items;
@@ -4048,7 +4794,10 @@ If the intent does not match any type, output: null`;
                   queryType: "supplier_spend",
                   title: supplierFilter ? `Supplier Spend: ${supplierFilter}` : "Supplier Purchase Spend",
                   subtitle: `Since ${dateFrom} · ${tableRows4.length} supplier(s)`,
-                  table: { headers: ["Supplier", "POs", "Items Total", "Charges", "Grand Total", "Currency"], rows: tableRows4 },
+                  table: {
+                    headers: ["Supplier", "POs", "Items Total", "Charges", "Grand Total", "Currency"],
+                    rows: tableRows4,
+                  },
                   noData: tableRows4.length === 0,
                 };
                 break;
@@ -4074,16 +4823,27 @@ If the intent does not match any type, output: null`;
                   ORDER BY c.eta ASC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows4 = (rows.rows as any[]).map(r => {
+                const tableRows4 = (rows.rows as any[]).map((r) => {
                   const days = parseInt(r.days_until_eta || "0");
                   const daysLabel = days <= 0 ? "TODAY/OVERDUE" : `${days}d`;
-                  return [r.container_number, r.status, String(r.eta).slice(0, 10), daysLabel, r.supplier, r.transporter || "—", r.tracking_location || "—"];
+                  return [
+                    r.container_number,
+                    r.status,
+                    String(r.eta).slice(0, 10),
+                    daysLabel,
+                    r.supplier,
+                    r.transporter || "—",
+                    r.tracking_location || "—",
+                  ];
                 });
                 dataQueryResult = {
                   queryType: "upcoming_arrivals",
                   title: "Upcoming Container Arrivals",
                   subtitle: `Next ${daysAhead} days · ${tableRows4.length} container(s) expected`,
-                  table: { headers: ["Container #", "Status", "ETA", "Days Away", "Supplier", "Transporter", "Last Location"], rows: tableRows4 },
+                  table: {
+                    headers: ["Container #", "Status", "ETA", "Days Away", "Supplier", "Transporter", "Last Location"],
+                    rows: tableRows4,
+                  },
                   noData: tableRows4.length === 0,
                 };
                 break;
@@ -4102,14 +4862,17 @@ If the intent does not match any type, output: null`;
                 `);
                 let totalWaste = 0;
                 const typeMap: Record<string, number> = {};
-                const tableRows4 = (rows.rows as any[]).map(r => {
+                const tableRows4 = (rows.rows as any[]).map((r) => {
                   const kg = parseFloat(r.kg_waste || "0");
                   totalWaste += kg;
                   const wt = r.waste_type || "Unknown";
                   typeMap[wt] = (typeMap[wt] || 0) + kg;
                   return [String(r.date).slice(0, 10), wt, fmtDec(kg), (r.reason || "—").slice(0, 40)];
                 });
-                const byType = Object.entries(typeMap).sort((a, b) => b[1] - a[1]).map(([t, kg]) => `${t}: ${fmtDec(kg)} kg`).join(" | ");
+                const byType = Object.entries(typeMap)
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([t, kg]) => `${t}: ${fmtDec(kg)} kg`)
+                  .join(" | ");
                 const stats4 = [
                   { label: "Total Waste Entries", value: String(tableRows4.length) },
                   { label: "Total Waste Kg", value: fmtDec(totalWaste), highlight: "negative" },
@@ -4136,16 +4899,24 @@ If the intent does not match any type, output: null`;
                     AND v.deleted_at IS NULL
                     AND v.voucher_type IN ('Receipt', 'Payment')
                     AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
-                    ${custName ? sql`AND v.description ILIKE ${'%' + custName + '%'}` : sql``}
+                    ${custName ? sql`AND v.description ILIKE ${"%" + custName + "%"}` : sql``}
                   ORDER BY v.voucher_date DESC
                   LIMIT ${rowLimit}
                 `);
-                let totalReceipts = 0, totalPayments = 0;
-                const tableRows4 = (rows.rows as any[]).map(r => {
+                let totalReceipts = 0,
+                  totalPayments = 0;
+                const tableRows4 = (rows.rows as any[]).map((r) => {
                   const amt = parseFloat(r.amount || "0");
                   if (r.voucher_type === "Receipt") totalReceipts += amt;
                   else totalPayments += amt;
-                  return [String(r.voucher_date).slice(0, 10), r.voucher_number, r.voucher_type, (r.description || "").slice(0, 40), fmt(amt), r.currency];
+                  return [
+                    String(r.voucher_date).slice(0, 10),
+                    r.voucher_number,
+                    r.voucher_type,
+                    (r.description || "").slice(0, 40),
+                    fmt(amt),
+                    r.currency,
+                  ];
                 });
                 const stats4 = [
                   { label: "Total Receipts", value: fmt(totalReceipts), highlight: "positive" },
@@ -4156,7 +4927,10 @@ If the intent does not match any type, output: null`;
                   title: custName ? `Payment History: ${custName}` : "Customer Payment History",
                   subtitle: `${dateFrom} → ${dateTo} · ${tableRows4.length} transaction(s)`,
                   stats: stats4,
-                  table: { headers: ["Date", "Voucher #", "Type", "Description", "Amount", "Currency"], rows: tableRows4 },
+                  table: {
+                    headers: ["Date", "Voucher #", "Type", "Description", "Amount", "Currency"],
+                    rows: tableRows4,
+                  },
                   noData: tableRows4.length === 0,
                 };
                 break;
@@ -4177,12 +4951,20 @@ If the intent does not match any type, output: null`;
                   GROUP BY v.voucher_type
                   ORDER BY count DESC
                 `);
-                let grandCount = 0, grandTotal = 0;
-                const tableRows4 = (rows.rows as any[]).map(r => {
+                let grandCount = 0,
+                  grandTotal = 0;
+                const tableRows4 = (rows.rows as any[]).map((r) => {
                   const cnt = parseInt(r.count || "0");
                   const amt = parseFloat(r.total_amount || "0");
-                  grandCount += cnt; grandTotal += amt;
-                  return [r.voucher_type, String(cnt), fmt(amt), r.first_date?.slice(0, 10) || "—", r.last_date?.slice(0, 10) || "—"];
+                  grandCount += cnt;
+                  grandTotal += amt;
+                  return [
+                    r.voucher_type,
+                    String(cnt),
+                    fmt(amt),
+                    r.first_date?.slice(0, 10) || "—",
+                    r.last_date?.slice(0, 10) || "—",
+                  ];
                 });
                 tableRows4.push(["TOTAL", String(grandCount), fmt(grandTotal), "", ""]);
                 dataQueryResult = {
@@ -4206,16 +4988,18 @@ If the intent does not match any type, output: null`;
                   JOIN locations l ON l.id = inv.location_id
                   WHERE inv.company_id = ${companyId}
                     AND inv.quantity > 0
-                    ${locFilter ? sql`AND l.name ILIKE ${'%' + locFilter + '%'}` : sql``}
+                    ${locFilter ? sql`AND l.name ILIKE ${"%" + locFilter + "%"}` : sql``}
                   GROUP BY l.id, l.name
                   ORDER BY total_value DESC
                   LIMIT ${rowLimit}
                 `);
-                let grandItems = 0, grandValue = 0;
-                const tableRows4 = (rows.rows as any[]).map(r => {
+                let grandItems = 0,
+                  grandValue = 0;
+                const tableRows4 = (rows.rows as any[]).map((r) => {
                   const items = parseInt(r.item_count || "0");
                   const val = parseFloat(r.total_value || "0");
-                  grandItems += items; grandValue += val;
+                  grandItems += items;
+                  grandValue += val;
                   return [r.location, String(items), fmtDec(parseFloat(r.total_qty || "0")), fmt(val)];
                 });
                 tableRows4.push(["GRAND TOTAL", String(grandItems), "—", fmt(grandValue)]);
@@ -4255,27 +5039,52 @@ If the intent does not match any type, output: null`;
                     OR COALESCE(SUM(CAST(ve.credit_amount AS numeric)), 0) > 0
                   ORDER BY la.account_type, la.name
                 `);
-                let grandDr = 0, grandCr = 0;
-                const tableRows5 = (rows.rows as any[]).map(r => {
+                let grandDr = 0,
+                  grandCr = 0;
+                const tableRows5 = (rows.rows as any[]).map((r) => {
                   const dr = parseFloat(r.total_dr || "0");
                   const cr = parseFloat(r.total_cr || "0");
                   const net = dr - cr;
-                  grandDr += dr; grandCr += cr;
-                  return [r.code || "—", r.name, r.account_type, fmt(dr), fmt(cr), net >= 0 ? fmt(net) : "—", net < 0 ? fmt(Math.abs(net)) : "—"];
+                  grandDr += dr;
+                  grandCr += cr;
+                  return [
+                    r.code || "—",
+                    r.name,
+                    r.account_type,
+                    fmt(dr),
+                    fmt(cr),
+                    net >= 0 ? fmt(net) : "—",
+                    net < 0 ? fmt(Math.abs(net)) : "—",
+                  ];
                 });
-                tableRows5.push(["", "GRAND TOTAL", "", fmt(grandDr), fmt(grandCr), grandDr >= grandCr ? fmt(grandDr - grandCr) : "—", grandCr > grandDr ? fmt(grandCr - grandDr) : "—"]);
+                tableRows5.push([
+                  "",
+                  "GRAND TOTAL",
+                  "",
+                  fmt(grandDr),
+                  fmt(grandCr),
+                  grandDr >= grandCr ? fmt(grandDr - grandCr) : "—",
+                  grandCr > grandDr ? fmt(grandCr - grandDr) : "—",
+                ]);
                 const stats5 = [
                   { label: "Total Accounts", value: String(tableRows5.length - 1) },
                   { label: "Total Debits", value: fmt(grandDr) },
                   { label: "Total Credits", value: fmt(grandCr) },
-                  { label: "Net", value: fmt(Math.abs(grandDr - grandCr)), highlight: Math.abs(grandDr - grandCr) < 0.01 ? "positive" : "negative" },
+                  {
+                    label: "Net",
+                    value: fmt(Math.abs(grandDr - grandCr)),
+                    highlight: Math.abs(grandDr - grandCr) < 0.01 ? "positive" : "negative",
+                  },
                 ];
                 dataQueryResult = {
                   queryType: "trial_balance",
                   title: "Trial Balance",
                   subtitle: `${dateFrom} → ${dateTo}`,
                   stats: stats5,
-                  table: { headers: ["Code", "Account", "Type", "Debit", "Credit", "Dr Balance", "Cr Balance"], rows: tableRows5 },
+                  table: {
+                    headers: ["Code", "Account", "Type", "Debit", "Credit", "Dr Balance", "Cr Balance"],
+                    rows: tableRows5,
+                  },
                   noData: tableRows5.length <= 1,
                 };
                 break;
@@ -4284,7 +5093,11 @@ If the intent does not match any type, output: null`;
               case "purchase_order_detail": {
                 const poNum = params.containerNumber || params.entityName;
                 if (!poNum) {
-                  dataQueryResult = { queryType: "purchase_order_detail", title: "Purchase Order Detail", summary: "Please specify a PO number." };
+                  dataQueryResult = {
+                    queryType: "purchase_order_detail",
+                    title: "Purchase Order Detail",
+                    summary: "Please specify a PO number.",
+                  };
                   break;
                 }
                 const poRow = await db.execute(sql`
@@ -4301,11 +5114,15 @@ If the intent does not match any type, output: null`;
                   JOIN suppliers s ON s.id = po.supplier_id
                   JOIN containers c ON c.id = po.container_id
                   WHERE po.company_id = ${companyId}
-                    AND po.po_number ILIKE ${'%' + poNum + '%'}
+                    AND po.po_number ILIKE ${"%" + poNum + "%"}
                   ORDER BY po.created_at DESC LIMIT 1
                 `);
                 if (!poRow.rows.length) {
-                  dataQueryResult = { queryType: "purchase_order_detail", title: "Purchase Order Detail", summary: `No PO found matching "${poNum}".` };
+                  dataQueryResult = {
+                    queryType: "purchase_order_detail",
+                    title: "Purchase Order Detail",
+                    summary: `No PO found matching "${poNum}".`,
+                  };
                   break;
                 }
                 const po5 = poRow.rows[0] as any;
@@ -4320,10 +5137,16 @@ If the intent does not match any type, output: null`;
                   ORDER BY pli.id
                 `);
                 let lineTotal = 0;
-                const tableRows5 = (lineRows.rows as any[]).map(r => {
+                const tableRows5 = (lineRows.rows as any[]).map((r) => {
                   const lt = parseFloat(r.line_total || "0");
                   lineTotal += lt;
-                  return [r.item_name, r.code, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(lt)];
+                  return [
+                    r.item_name,
+                    r.code,
+                    `${fmtDec(parseFloat(r.qty))} ${r.uom}`,
+                    fmtDec(parseFloat(r.rate)),
+                    fmt(lt),
+                  ];
                 });
                 const charges = [
                   ["Freight", fmt(parseFloat(po5.freight || "0"))],
@@ -4333,7 +5156,14 @@ If the intent does not match any type, output: null`;
                   ["Other Charges", fmt(parseFloat(po5.other_charges || "0"))],
                   ["Discount", `(${fmt(parseFloat(po5.discount || "0"))})`],
                 ].filter(([, v]) => v !== fmt(0) && v !== `(${fmt(0)})`);
-                const grandPO = parseFloat(po5.items_total || "0") + parseFloat(po5.freight || "0") + parseFloat(po5.surcharge || "0") + parseFloat(po5.fumigation || "0") + parseFloat(po5.doc_charges || "0") + parseFloat(po5.other_charges || "0") - parseFloat(po5.discount || "0");
+                const grandPO =
+                  parseFloat(po5.items_total || "0") +
+                  parseFloat(po5.freight || "0") +
+                  parseFloat(po5.surcharge || "0") +
+                  parseFloat(po5.fumigation || "0") +
+                  parseFloat(po5.doc_charges || "0") +
+                  parseFloat(po5.other_charges || "0") -
+                  parseFloat(po5.discount || "0");
                 const stats5 = [
                   { label: "Supplier", value: po5.supplier },
                   { label: "Container", value: po5.container_number },
@@ -4358,7 +5188,11 @@ If the intent does not match any type, output: null`;
               case "container_cost_breakdown": {
                 const cnFilter5 = params.containerNumber || params.entityName;
                 if (!cnFilter5) {
-                  dataQueryResult = { queryType: "container_cost_breakdown", title: "Container Cost Breakdown", summary: "Please specify a container number." };
+                  dataQueryResult = {
+                    queryType: "container_cost_breakdown",
+                    title: "Container Cost Breakdown",
+                    summary: "Please specify a container number.",
+                  };
                   break;
                 }
                 const cRow = await db.execute(sql`
@@ -4375,11 +5209,15 @@ If the intent does not match any type, output: null`;
                   FROM containers c
                   JOIN suppliers s ON s.id = c.supplier_id
                   WHERE c.company_id = ${companyId}
-                    AND c.container_number ILIKE ${'%' + cnFilter5 + '%'}
+                    AND c.container_number ILIKE ${"%" + cnFilter5 + "%"}
                   ORDER BY c.import_date DESC LIMIT 1
                 `);
                 if (!cRow.rows.length) {
-                  dataQueryResult = { queryType: "container_cost_breakdown", title: "Container Cost Breakdown", summary: `No container found matching "${cnFilter5}".` };
+                  dataQueryResult = {
+                    queryType: "container_cost_breakdown",
+                    title: "Container Cost Breakdown",
+                    summary: `No container found matching "${cnFilter5}".`,
+                  };
                   break;
                 }
                 const cc = cRow.rows[0] as any;
@@ -4394,7 +5232,7 @@ If the intent does not match any type, output: null`;
                     CAST(po.discount AS numeric) AS discount
                   FROM purchase_orders po
                   JOIN containers c ON c.id = po.container_id
-                  WHERE c.container_number ILIKE ${'%' + cnFilter5 + '%'}
+                  WHERE c.container_number ILIKE ${"%" + cnFilter5 + "%"}
                   LIMIT 10
                 `);
                 const stats5 = [
@@ -4409,20 +5247,33 @@ If the intent does not match any type, output: null`;
                   ["Items Total", cc.currency, fmt(parseFloat(cc.items_total || "0"))],
                   ["Charges Total", cc.currency, fmt(parseFloat(cc.charges_total || "0"))],
                 ];
-                if (parseFloat(cc.transport_fee || "0") > 0) breakdownRows.push(["Transport Fee", cc.currency, fmt(parseFloat(cc.transport_fee))]);
-                if (parseFloat(cc.duty_fee || "0") > 0) breakdownRows.push(["Duty Fee", cc.currency, fmt(parseFloat(cc.duty_fee))]);
+                if (parseFloat(cc.transport_fee || "0") > 0)
+                  breakdownRows.push(["Transport Fee", cc.currency, fmt(parseFloat(cc.transport_fee))]);
+                if (parseFloat(cc.duty_fee || "0") > 0)
+                  breakdownRows.push(["Duty Fee", cc.currency, fmt(parseFloat(cc.duty_fee))]);
                 for (const po of poRows5.rows as any[]) {
-                  if (parseFloat(po.freight || "0") > 0) breakdownRows.push([`Freight (${po.po_number})`, po.currency, fmt(parseFloat(po.freight))]);
-                  if (parseFloat(po.fumigation || "0") > 0) breakdownRows.push([`Fumigation (${po.po_number})`, po.currency, fmt(parseFloat(po.fumigation))]);
-                  if (parseFloat(po.surcharge || "0") > 0) breakdownRows.push([`Surcharge (${po.po_number})`, po.currency, fmt(parseFloat(po.surcharge))]);
-                  if (parseFloat(po.doc_charges || "0") > 0) breakdownRows.push([`Doc Charges (${po.po_number})`, po.currency, fmt(parseFloat(po.doc_charges))]);
-                  if (parseFloat(po.discount || "0") > 0) breakdownRows.push([`Discount (${po.po_number})`, po.currency, `(${fmt(parseFloat(po.discount))})`]);
+                  if (parseFloat(po.freight || "0") > 0)
+                    breakdownRows.push([`Freight (${po.po_number})`, po.currency, fmt(parseFloat(po.freight))]);
+                  if (parseFloat(po.fumigation || "0") > 0)
+                    breakdownRows.push([`Fumigation (${po.po_number})`, po.currency, fmt(parseFloat(po.fumigation))]);
+                  if (parseFloat(po.surcharge || "0") > 0)
+                    breakdownRows.push([`Surcharge (${po.po_number})`, po.currency, fmt(parseFloat(po.surcharge))]);
+                  if (parseFloat(po.doc_charges || "0") > 0)
+                    breakdownRows.push([`Doc Charges (${po.po_number})`, po.currency, fmt(parseFloat(po.doc_charges))]);
+                  if (parseFloat(po.discount || "0") > 0)
+                    breakdownRows.push([
+                      `Discount (${po.po_number})`,
+                      po.currency,
+                      `(${fmt(parseFloat(po.discount))})`,
+                    ]);
                 }
                 breakdownRows.push(["GRAND TOTAL", cc.currency, fmt(parseFloat(cc.grand_total || "0"))]);
                 dataQueryResult = {
                   queryType: "container_cost_breakdown",
                   title: `Cost Breakdown: ${cc.container_number}`,
-                  subtitle: cc.transporter ? `Transporter: ${cc.transporter}${cc.agent ? ` · Agent: ${cc.agent}` : ""}` : "",
+                  subtitle: cc.transporter
+                    ? `Transporter: ${cc.transporter}${cc.agent ? ` · Agent: ${cc.agent}` : ""}`
+                    : "",
                   stats: stats5,
                   table: { headers: ["Component", "Currency", "Amount"], rows: breakdownRows },
                   noData: false,
@@ -4451,19 +5302,31 @@ If the intent does not match any type, output: null`;
                   ) ASC
                   LIMIT ${rowLimit}
                 `);
-                const expired: string[] = [], expiringSoon: string[] = [];
-                const tableRows5 = (rows.rows as any[]).map(r => {
+                const expired: string[] = [],
+                  expiringSoon: string[] = [];
+                const tableRows5 = (rows.rows as any[]).map((r) => {
                   const visaExp = r.visa_expiry ? String(r.visa_expiry).slice(0, 10) : "—";
                   const wpExp = r.work_permit_expiry ? String(r.work_permit_expiry).slice(0, 10) : "—";
                   const rpExp = r.residential_permit_expiry ? String(r.residential_permit_expiry).slice(0, 10) : "—";
                   const isExpired = (d: string) => d !== "—" && d < todayStr;
-                  const label = (d: string) => isExpired(d) ? `${d} ⚠ EXPIRED` : d;
+                  const label = (d: string) => (isExpired(d) ? `${d} ⚠ EXPIRED` : d);
                   if (isExpired(visaExp) || isExpired(wpExp) || isExpired(rpExp)) expired.push(r.full_name);
-                  return [r.full_name, r.employee_code || "—", r.nationality || "—", label(visaExp), label(wpExp), label(rpExp)];
+                  return [
+                    r.full_name,
+                    r.employee_code || "—",
+                    r.nationality || "—",
+                    label(visaExp),
+                    label(wpExp),
+                    label(rpExp),
+                  ];
                 });
                 const stats5 = [
                   { label: "Workers With Expiring Docs", value: String(tableRows5.length) },
-                  { label: "Already Expired", value: String(expired.length), highlight: expired.length > 0 ? "negative" : undefined },
+                  {
+                    label: "Already Expired",
+                    value: String(expired.length),
+                    highlight: expired.length > 0 ? "negative" : undefined,
+                  },
                   { label: "Window", value: `Next ${daysWindow} days` },
                 ];
                 dataQueryResult = {
@@ -4471,7 +5334,10 @@ If the intent does not match any type, output: null`;
                   title: "Worker Document Expiry Alert",
                   subtitle: `Expiring within ${daysWindow} days (as of ${todayStr})`,
                   stats: stats5,
-                  table: { headers: ["Worker", "Code", "Nationality", "Visa Expiry", "Work Permit", "Residential Permit"], rows: tableRows5 },
+                  table: {
+                    headers: ["Worker", "Code", "Nationality", "Visa Expiry", "Work Permit", "Residential Permit"],
+                    rows: tableRows5,
+                  },
                   noData: tableRows5.length === 0,
                 };
                 break;
@@ -4495,15 +5361,23 @@ If the intent does not match any type, output: null`;
                   JOIN locations dl ON dl.id = stv.destination_location_id
                   WHERE si.company_id = ${companyId}
                     AND CAST(v.voucher_date AS text) BETWEEN ${dateFrom} AND ${dateTo}
-                    ${locFilter5 ? sql`AND (sl.name ILIKE ${'%' + locFilter5 + '%'} OR dl.name ILIKE ${'%' + locFilter5 + '%'})` : sql``}
+                    ${locFilter5 ? sql`AND (sl.name ILIKE ${"%" + locFilter5 + "%"} OR dl.name ILIKE ${"%" + locFilter5 + "%"})` : sql``}
                   ORDER BY v.voucher_date DESC
                   LIMIT ${rowLimit}
                 `);
                 let totalTransferred = 0;
-                const tableRows5 = (rows.rows as any[]).map(r => {
+                const tableRows5 = (rows.rows as any[]).map((r) => {
                   const amt = parseFloat(r.total_amount || "0");
                   totalTransferred += amt;
-                  return [String(r.voucher_date).slice(0, 10), r.voucher_number, r.item_name, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, r.from_location || "—", r.to_location, fmt(amt)];
+                  return [
+                    String(r.voucher_date).slice(0, 10),
+                    r.voucher_number,
+                    r.item_name,
+                    `${fmtDec(parseFloat(r.qty))} ${r.uom}`,
+                    r.from_location || "—",
+                    r.to_location,
+                    fmt(amt),
+                  ];
                 });
                 dataQueryResult = {
                   queryType: "stock_transfers",
@@ -4531,26 +5405,49 @@ If the intent does not match any type, output: null`;
                   GROUP BY la.id, la.name, la.account_type
                   ORDER BY total_in DESC
                 `);
-                let grandIn = 0, grandOut = 0;
-                const tableRows5 = (rows.rows as any[]).map(r => {
+                let grandIn = 0,
+                  grandOut = 0;
+                const tableRows5 = (rows.rows as any[]).map((r) => {
                   const inflow = parseFloat(r.total_in || "0");
                   const outflow = parseFloat(r.total_out || "0");
                   const net = inflow - outflow;
-                  grandIn += inflow; grandOut += outflow;
-                  return [r.account_name, r.account_type, fmt(inflow), fmt(outflow), net >= 0 ? fmt(net) : `(${fmt(Math.abs(net))})`, String(r.tx_count)];
+                  grandIn += inflow;
+                  grandOut += outflow;
+                  return [
+                    r.account_name,
+                    r.account_type,
+                    fmt(inflow),
+                    fmt(outflow),
+                    net >= 0 ? fmt(net) : `(${fmt(Math.abs(net))})`,
+                    String(r.tx_count),
+                  ];
                 });
-                tableRows5.push(["TOTAL", "", fmt(grandIn), fmt(grandOut), grandIn >= grandOut ? fmt(grandIn - grandOut) : `(${fmt(grandOut - grandIn)})`, ""]);
+                tableRows5.push([
+                  "TOTAL",
+                  "",
+                  fmt(grandIn),
+                  fmt(grandOut),
+                  grandIn >= grandOut ? fmt(grandIn - grandOut) : `(${fmt(grandOut - grandIn)})`,
+                  "",
+                ]);
                 const stats5 = [
                   { label: "Total Cash In", value: fmt(grandIn), highlight: "positive" },
                   { label: "Total Cash Out", value: fmt(grandOut) },
-                  { label: "Net Position", value: grandIn >= grandOut ? fmt(grandIn - grandOut) : `(${fmt(grandOut - grandIn)})`, highlight: grandIn >= grandOut ? "positive" : "negative" },
+                  {
+                    label: "Net Position",
+                    value: grandIn >= grandOut ? fmt(grandIn - grandOut) : `(${fmt(grandOut - grandIn)})`,
+                    highlight: grandIn >= grandOut ? "positive" : "negative",
+                  },
                 ];
                 dataQueryResult = {
                   queryType: "cash_flow_summary",
                   title: "Cash Flow Summary",
                   subtitle: `${dateFrom} → ${dateTo} · Bank & Cash accounts`,
                   stats: stats5,
-                  table: { headers: ["Account", "Type", "Inflow (Dr)", "Outflow (Cr)", "Net", "Transactions"], rows: tableRows5 },
+                  table: {
+                    headers: ["Account", "Type", "Inflow (Dr)", "Outflow (Cr)", "Net", "Transactions"],
+                    rows: tableRows5,
+                  },
                   noData: tableRows5.length <= 1,
                 };
                 break;
@@ -4559,7 +5456,11 @@ If the intent does not match any type, output: null`;
               case "ledger_account_balance": {
                 const acctName5 = params.entityName || params.locationName;
                 if (!acctName5) {
-                  dataQueryResult = { queryType: "ledger_account_balance", title: "Ledger Account Balance", summary: "Please specify an account name." };
+                  dataQueryResult = {
+                    queryType: "ledger_account_balance",
+                    title: "Ledger Account Balance",
+                    summary: "Please specify an account name.",
+                  };
                   break;
                 }
                 const acctRow5 = await db.execute(sql`
@@ -4567,11 +5468,15 @@ If the intent does not match any type, output: null`;
                     CAST(opening_balance AS numeric) AS opening_balance, opening_balance_side
                   FROM ledger_accounts
                   WHERE company_id = ${companyId} AND deleted_at IS NULL
-                    AND name ILIKE ${'%' + acctName5 + '%'}
+                    AND name ILIKE ${"%" + acctName5 + "%"}
                   ORDER BY name LIMIT 1
                 `);
                 if (!acctRow5.rows.length) {
-                  dataQueryResult = { queryType: "ledger_account_balance", title: "Ledger Account Balance", summary: `No account found matching "${acctName5}".` };
+                  dataQueryResult = {
+                    queryType: "ledger_account_balance",
+                    title: "Ledger Account Balance",
+                    summary: `No account found matching "${acctName5}".`,
+                  };
                   break;
                 }
                 const la5 = acctRow5.rows[0] as any;
@@ -4589,27 +5494,44 @@ If the intent does not match any type, output: null`;
                 `);
                 const ob = parseFloat(la5.opening_balance || "0") * (la5.opening_balance_side === "Cr" ? -1 : 1);
                 let runningBal = ob;
-                let totalDr = 0, totalCr = 0;
-                const tableRows5 = (txRows5.rows as any[]).map(r => {
+                let totalDr = 0,
+                  totalCr = 0;
+                const tableRows5 = (txRows5.rows as any[]).map((r) => {
                   const dr = parseFloat(r.dr || "0");
                   const cr = parseFloat(r.cr || "0");
                   runningBal += dr - cr;
-                  totalDr += dr; totalCr += cr;
-                  return [String(r.voucher_date).slice(0, 10), r.voucher_number, r.voucher_type, (r.description || "").slice(0, 35), dr > 0 ? fmt(dr) : "—", cr > 0 ? fmt(cr) : "—", fmt(Math.abs(runningBal)) + (runningBal >= 0 ? " Dr" : " Cr")];
+                  totalDr += dr;
+                  totalCr += cr;
+                  return [
+                    String(r.voucher_date).slice(0, 10),
+                    r.voucher_number,
+                    r.voucher_type,
+                    (r.description || "").slice(0, 35),
+                    dr > 0 ? fmt(dr) : "—",
+                    cr > 0 ? fmt(cr) : "—",
+                    fmt(Math.abs(runningBal)) + (runningBal >= 0 ? " Dr" : " Cr"),
+                  ];
                 });
                 const stats5 = [
                   { label: "Account", value: `${la5.code ? la5.code + " — " : ""}${la5.name}` },
                   { label: "Type", value: la5.account_type },
                   { label: "Total Debit", value: fmt(totalDr) },
                   { label: "Total Credit", value: fmt(totalCr) },
-                  { label: "Closing Balance", value: fmt(Math.abs(runningBal)) + (runningBal >= 0 ? " Dr" : " Cr"), highlight: "positive" },
+                  {
+                    label: "Closing Balance",
+                    value: fmt(Math.abs(runningBal)) + (runningBal >= 0 ? " Dr" : " Cr"),
+                    highlight: "positive",
+                  },
                 ];
                 dataQueryResult = {
                   queryType: "ledger_account_balance",
                   title: `Ledger: ${la5.name}`,
                   subtitle: `${dateFrom} → ${dateTo}`,
                   stats: stats5,
-                  table: { headers: ["Date", "Voucher #", "Type", "Description", "Dr", "Cr", "Balance"], rows: tableRows5 },
+                  table: {
+                    headers: ["Date", "Voucher #", "Type", "Description", "Dr", "Cr", "Balance"],
+                    rows: tableRows5,
+                  },
                   noData: tableRows5.length === 0,
                 };
                 break;
@@ -4632,11 +5554,18 @@ If the intent does not match any type, output: null`;
                 `);
                 const typeMap5: Record<string, number> = {};
                 let grandAmt = 0;
-                const tableRows5 = (rows.rows as any[]).map(r => {
+                const tableRows5 = (rows.rows as any[]).map((r) => {
                   const amt = parseFloat(r.amount || "0");
                   typeMap5[r.voucher_type] = (typeMap5[r.voucher_type] || 0) + amt;
                   grandAmt += amt;
-                  return [r.voucher_number, r.voucher_type, (r.description || "").slice(0, 40), r.location || "—", fmt(amt), r.currency];
+                  return [
+                    r.voucher_number,
+                    r.voucher_type,
+                    (r.description || "").slice(0, 40),
+                    r.location || "—",
+                    fmt(amt),
+                    r.currency,
+                  ];
                 });
                 const stats5 = [
                   { label: "Date", value: reportDate },
@@ -4649,7 +5578,10 @@ If the intent does not match any type, output: null`;
                   title: `Daily Report: ${reportDate}`,
                   subtitle: `${tableRows5.length} voucher(s) · Total: ${fmt(grandAmt)}`,
                   stats: stats5,
-                  table: { headers: ["Voucher #", "Type", "Description", "Location", "Amount", "Currency"], rows: tableRows5 },
+                  table: {
+                    headers: ["Voucher #", "Type", "Description", "Location", "Amount", "Currency"],
+                    rows: tableRows5,
+                  },
                   noData: tableRows5.length === 0,
                 };
                 break;
@@ -4671,13 +5603,17 @@ If the intent does not match any type, output: null`;
                   ORDER BY total_profit DESC
                   LIMIT ${rowLimit}
                 `);
-                let grandRev = 0, grandCost = 0, grandProfit = 0;
-                const tableRows5 = (rows.rows as any[]).map(r => {
+                let grandRev = 0,
+                  grandCost = 0,
+                  grandProfit = 0;
+                const tableRows5 = (rows.rows as any[]).map((r) => {
                   const rev = parseFloat(r.total_revenue || "0");
                   const cost = parseFloat(r.total_cost || "0");
                   const profit5 = parseFloat(r.total_profit || "0");
                   const margin = rev > 0 ? ((profit5 / rev) * 100).toFixed(1) + "%" : "—";
-                  grandRev += rev; grandCost += cost; grandProfit += profit5;
+                  grandRev += rev;
+                  grandCost += cost;
+                  grandProfit += profit5;
                   return [r.location, String(r.sales_count), fmt(rev), fmt(cost), fmt(profit5), margin];
                 });
                 if (tableRows5.length) {
@@ -4715,10 +5651,16 @@ If the intent does not match any type, output: null`;
                   LIMIT ${rowLimit}
                 `);
                 let totalDN = 0;
-                const tableRows5 = (rows.rows as any[]).map(r => {
+                const tableRows5 = (rows.rows as any[]).map((r) => {
                   const amt = parseFloat(r.amount || "0");
                   totalDN += amt;
-                  return [String(r.voucher_date).slice(0, 10), r.voucher_number, (r.description || "").slice(0, 50), fmt(amt), r.currency];
+                  return [
+                    String(r.voucher_date).slice(0, 10),
+                    r.voucher_number,
+                    (r.description || "").slice(0, 50),
+                    fmt(amt),
+                    r.currency,
+                  ];
                 });
                 const stats5 = [
                   { label: "Debit Notes Issued", value: String(tableRows5.length) },
@@ -4752,17 +5694,24 @@ If the intent does not match any type, output: null`;
                   LEFT JOIN vouchers v ON v.id = ve.voucher_id AND v.deleted_at IS NULL AND v.optional = false
                   WHERE c.company_id = ${companyId}
                     AND c.deleted_at IS NULL
-                    ${nameFilter6 ? sql`AND c.legal_name ILIKE ${'%' + nameFilter6 + '%'}` : sql``}
+                    ${nameFilter6 ? sql`AND c.legal_name ILIKE ${"%" + nameFilter6 + "%"}` : sql``}
                   GROUP BY c.id, c.code, c.legal_name, c.phone, c.payment_terms_days, c.active, c.opening_balance, c.opening_balance_side
                   ORDER BY c.legal_name
                   LIMIT ${rowLimit}
                 `);
                 let totalBalance = 0;
-                const tableRows6 = (rows.rows as any[]).map(r => {
+                const tableRows6 = (rows.rows as any[]).map((r) => {
                   const bal = parseFloat(r.net_balance || "0");
                   totalBalance += Math.max(bal, 0);
                   const balLabel = bal >= 0 ? fmt(bal) + " Dr" : fmt(Math.abs(bal)) + " Cr";
-                  return [r.code, r.legal_name, r.phone || "—", r.payment_terms_days ? `${r.payment_terms_days}d` : "—", balLabel, r.active ? "Active" : "Inactive"];
+                  return [
+                    r.code,
+                    r.legal_name,
+                    r.phone || "—",
+                    r.payment_terms_days ? `${r.payment_terms_days}d` : "—",
+                    balLabel,
+                    r.active ? "Active" : "Inactive",
+                  ];
                 });
                 const stats6 = [
                   { label: "Total Customers", value: String(tableRows6.length) },
@@ -4788,12 +5737,12 @@ If the intent does not match any type, output: null`;
                   FROM suppliers s
                   JOIN purchase_orders po ON po.supplier_id = s.id AND po.company_id = ${companyId}
                   WHERE s.deleted_at IS NULL
-                    ${nameFilter6 ? sql`AND s.legal_name ILIKE ${'%' + nameFilter6 + '%'}` : sql``}
+                    ${nameFilter6 ? sql`AND s.legal_name ILIKE ${"%" + nameFilter6 + "%"}` : sql``}
                   GROUP BY s.id, s.code, s.legal_name, s.email, s.phone, s.payment_terms, s.active
                   ORDER BY total_ordered DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows6 = (rows.rows as any[]).map(r => [
+                const tableRows6 = (rows.rows as any[]).map((r) => [
                   r.code || "—",
                   r.legal_name,
                   r.email || "—",
@@ -4812,7 +5761,10 @@ If the intent does not match any type, output: null`;
                   title: nameFilter6 ? `Suppliers: ${nameFilter6}` : "Supplier List",
                   subtitle: `${tableRows6.length} supplier(s) · ranked by total ordered`,
                   stats: stats6,
-                  table: { headers: ["Code", "Name", "Email", "Phone", "Terms", "POs", "Total Ordered", "Status"], rows: tableRows6 },
+                  table: {
+                    headers: ["Code", "Name", "Email", "Phone", "Terms", "POs", "Total Ordered", "Status"],
+                    rows: tableRows6,
+                  },
                   noData: tableRows6.length === 0,
                 };
                 break;
@@ -4821,7 +5773,11 @@ If the intent does not match any type, output: null`;
               case "stock_item_detail": {
                 const itemName6 = params.entityName;
                 if (!itemName6) {
-                  dataQueryResult = { queryType: "stock_item_detail", title: "Stock Item Detail", summary: "Please specify an item name." };
+                  dataQueryResult = {
+                    queryType: "stock_item_detail",
+                    title: "Stock Item Detail",
+                    summary: "Please specify an item name.",
+                  };
                   break;
                 }
                 const itemRow = await db.execute(sql`
@@ -4832,11 +5788,15 @@ If the intent does not match any type, output: null`;
                   LEFT JOIN stock_groups sg ON sg.id = si.stock_group_id
                   WHERE si.company_id = ${companyId}
                     AND si.deleted_at IS NULL
-                    AND si.name ILIKE ${'%' + itemName6 + '%'}
+                    AND si.name ILIKE ${"%" + itemName6 + "%"}
                   ORDER BY si.name LIMIT 1
                 `);
                 if (!itemRow.rows.length) {
-                  dataQueryResult = { queryType: "stock_item_detail", title: "Stock Item Detail", summary: `No item found matching "${itemName6}".` };
+                  dataQueryResult = {
+                    queryType: "stock_item_detail",
+                    title: "Stock Item Detail",
+                    summary: `No item found matching "${itemName6}".`,
+                  };
                   break;
                 }
                 const si6 = itemRow.rows[0] as any;
@@ -4852,11 +5812,13 @@ If the intent does not match any type, output: null`;
                     AND inv.quantity > 0
                   ORDER BY inv.quantity DESC
                 `);
-                let totalQty = 0, totalVal = 0;
-                const tableRows6 = (invRows.rows as any[]).map(r => {
+                let totalQty = 0,
+                  totalVal = 0;
+                const tableRows6 = (invRows.rows as any[]).map((r) => {
                   const qty = parseFloat(r.qty || "0");
                   const val = parseFloat(r.total_value || "0");
-                  totalQty += qty; totalVal += val;
+                  totalQty += qty;
+                  totalVal += val;
                   return [r.location, fmtDec(qty), fmtDec(parseFloat(r.avg_rate || "0")), fmt(val)];
                 });
                 const stats6 = [
@@ -4865,7 +5827,11 @@ If the intent does not match any type, output: null`;
                   { label: "UOM", value: si6.uom },
                   { label: "Selling Price", value: fmtDec(parseFloat(si6.selling_price || "0")) },
                   { label: "Reorder Level", value: `${fmtDec(parseFloat(si6.reorder_level || "0"))} ${si6.uom}` },
-                  { label: "Total Stock", value: `${fmtDec(totalQty)} ${si6.uom}`, highlight: totalQty > 0 ? "positive" : "negative" },
+                  {
+                    label: "Total Stock",
+                    value: `${fmtDec(totalQty)} ${si6.uom}`,
+                    highlight: totalQty > 0 ? "positive" : "negative",
+                  },
                   { label: "Total Value", value: fmt(totalVal), highlight: "positive" },
                 ];
                 dataQueryResult = {
@@ -4896,14 +5862,29 @@ If the intent does not match any type, output: null`;
                   ORDER BY fmb.batch_date DESC, fmb.id DESC
                   LIMIT ${rowLimit}
                 `);
-                let totWeight = 0, totUsed = 0, totCost = 0;
-                const tableRows6 = (rows.rows as any[]).map(r => {
+                let totWeight = 0,
+                  totUsed = 0,
+                  totCost = 0;
+                const tableRows6 = (rows.rows as any[]).map((r) => {
                   const totalKg = parseFloat(r.total_kg || "0");
                   const usedKg = parseFloat(r.used_kg || "0");
                   const remainKg = totalKg - usedKg;
                   const pct = totalKg > 0 ? ((usedKg / totalKg) * 100).toFixed(1) + "%" : "—";
-                  totWeight += totalKg; totUsed += usedKg; totCost += parseFloat(r.total_cost || "0");
-                  return [r.batch_code, r.name || "—", r.batch_date ? String(r.batch_date).slice(0, 10) : "—", r.status, fmtDec(totalKg), fmtDec(usedKg), fmtDec(remainKg), pct, fmtDec(parseFloat(r.cost_per_kg || "0")), r.operator_user || "—"];
+                  totWeight += totalKg;
+                  totUsed += usedKg;
+                  totCost += parseFloat(r.total_cost || "0");
+                  return [
+                    r.batch_code,
+                    r.name || "—",
+                    r.batch_date ? String(r.batch_date).slice(0, 10) : "—",
+                    r.status,
+                    fmtDec(totalKg),
+                    fmtDec(usedKg),
+                    fmtDec(remainKg),
+                    pct,
+                    fmtDec(parseFloat(r.cost_per_kg || "0")),
+                    r.operator_user || "—",
+                  ];
                 });
                 const stats6 = [
                   { label: "Batches", value: String(tableRows6.length) },
@@ -4917,7 +5898,21 @@ If the intent does not match any type, output: null`;
                   title: statusFilter6 ? `Mix Batches — ${statusFilter6}` : "Factory Mix Batches",
                   subtitle: `${tableRows6.length} batch(es)`,
                   stats: stats6,
-                  table: { headers: ["Code", "Name", "Date", "Status", "Total Kg", "Used Kg", "Remaining", "Usage%", "Cost/Kg", "Operator"], rows: tableRows6 },
+                  table: {
+                    headers: [
+                      "Code",
+                      "Name",
+                      "Date",
+                      "Status",
+                      "Total Kg",
+                      "Used Kg",
+                      "Remaining",
+                      "Usage%",
+                      "Cost/Kg",
+                      "Operator",
+                    ],
+                    rows: tableRows6,
+                  },
                   noData: tableRows6.length === 0,
                 };
                 break;
@@ -4936,12 +5931,12 @@ If the intent does not match any type, output: null`;
                   LEFT JOIN customer_proforma_lines cpl ON cpl.proforma_id = cp.id
                   WHERE cp.company_id = ${companyId}
                     AND cp.deleted_at IS NULL
-                    ${custFilter6 ? sql`AND cu.legal_name ILIKE ${'%' + custFilter6 + '%'}` : sql``}
+                    ${custFilter6 ? sql`AND cu.legal_name ILIKE ${"%" + custFilter6 + "%"}` : sql``}
                   GROUP BY cp.id, cp.name, cu.legal_name, cp.is_active, cp.created_at
                   ORDER BY cp.is_active DESC, cu.legal_name
                   LIMIT ${rowLimit}
                 `);
-                const tableRows6 = (rows.rows as any[]).map(r => [
+                const tableRows6 = (rows.rows as any[]).map((r) => [
                   r.proforma_name,
                   r.customer,
                   String(r.line_count),
@@ -4954,7 +5949,10 @@ If the intent does not match any type, output: null`;
                   queryType: "customer_proformas",
                   title: custFilter6 ? `Customer Proformas: ${custFilter6}` : "Customer Proformas",
                   subtitle: `${tableRows6.length} proforma(s)`,
-                  table: { headers: ["Proforma", "Customer", "Items", "Total Qty", "Total Value", "Status", "Created"], rows: tableRows6 },
+                  table: {
+                    headers: ["Proforma", "Customer", "Items", "Total Qty", "Total Value", "Status", "Created"],
+                    rows: tableRows6,
+                  },
                   noData: tableRows6.length === 0,
                 };
                 break;
@@ -4971,12 +5969,12 @@ If the intent does not match any type, output: null`;
                   JOIN suppliers s ON s.id = sp.supplier_id
                   LEFT JOIN supplier_proforma_lines spl ON spl.proforma_id = sp.id
                   WHERE sp.company_id = ${companyId}
-                    ${suppFilter6 ? sql`AND s.legal_name ILIKE ${'%' + suppFilter6 + '%'}` : sql``}
+                    ${suppFilter6 ? sql`AND s.legal_name ILIKE ${"%" + suppFilter6 + "%"}` : sql``}
                   GROUP BY sp.id, sp.reference, s.legal_name, sp.notes, sp.created_at
                   ORDER BY sp.created_at DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows6 = (rows.rows as any[]).map(r => [
+                const tableRows6 = (rows.rows as any[]).map((r) => [
                   r.reference,
                   r.supplier,
                   String(r.line_count),
@@ -4989,7 +5987,10 @@ If the intent does not match any type, output: null`;
                   queryType: "supplier_proformas",
                   title: suppFilter6 ? `Supplier Proformas: ${suppFilter6}` : "Supplier Proformas",
                   subtitle: `${tableRows6.length} proforma(s)`,
-                  table: { headers: ["Reference", "Supplier", "Items", "Total Qty", "Total Value", "Date", "Notes"], rows: tableRows6 },
+                  table: {
+                    headers: ["Reference", "Supplier", "Items", "Total Qty", "Total Value", "Date", "Notes"],
+                    rows: tableRows6,
+                  },
                   noData: tableRows6.length === 0,
                 };
                 break;
@@ -5010,13 +6011,17 @@ If the intent does not match any type, output: null`;
                   ORDER BY week_start DESC
                   LIMIT ${rowLimit}
                 `);
-                let totRev = 0, totCost = 0, totProfit = 0;
-                const tableRows6 = (rows.rows as any[]).map(r => {
+                let totRev = 0,
+                  totCost = 0,
+                  totProfit = 0;
+                const tableRows6 = (rows.rows as any[]).map((r) => {
                   const rev = parseFloat(r.revenue || "0");
                   const cost = parseFloat(r.cost || "0");
                   const profit6 = parseFloat(r.profit || "0");
                   const margin = rev > 0 ? ((profit6 / rev) * 100).toFixed(1) + "%" : "—";
-                  totRev += rev; totCost += cost; totProfit += profit6;
+                  totRev += rev;
+                  totCost += cost;
+                  totProfit += profit6;
                   const ws = String(r.week_start).slice(0, 10);
                   return [ws, String(r.sales_count), fmt(rev), fmt(cost), fmt(profit6), margin];
                 });
@@ -5028,7 +6033,10 @@ If the intent does not match any type, output: null`;
                   queryType: "weekly_sales",
                   title: "Weekly Sales Breakdown",
                   subtitle: `${dateFrom} → ${dateTo}`,
-                  table: { headers: ["Week Starting", "Invoices", "Revenue", "Cost", "Profit", "Margin"], rows: tableRows6 },
+                  table: {
+                    headers: ["Week Starting", "Invoices", "Revenue", "Cost", "Profit", "Margin"],
+                    rows: tableRows6,
+                  },
                   noData: tableRows6.length === 0,
                 };
                 break;
@@ -5037,7 +6045,11 @@ If the intent does not match any type, output: null`;
               case "container_items_list": {
                 const cn6 = params.containerNumber || params.entityName;
                 if (!cn6) {
-                  dataQueryResult = { queryType: "container_items_list", title: "Container Items", summary: "Please specify a container number." };
+                  dataQueryResult = {
+                    queryType: "container_items_list",
+                    title: "Container Items",
+                    summary: "Please specify a container number.",
+                  };
                   break;
                 }
                 const rows = await db.execute(sql`
@@ -5052,16 +6064,24 @@ If the intent does not match any type, output: null`;
                   JOIN containers c ON c.id = po.container_id
                   JOIN suppliers s ON s.id = c.supplier_id
                   JOIN stock_items si ON si.id = pli.stock_item_id
-                  WHERE c.container_number ILIKE ${'%' + cn6 + '%'}
+                  WHERE c.container_number ILIKE ${"%" + cn6 + "%"}
                     AND po.company_id = ${companyId}
                   ORDER BY pli.item_name
                   LIMIT ${rowLimit}
                 `);
                 let grandItems = 0;
-                const tableRows6 = (rows.rows as any[]).map(r => {
+                const tableRows6 = (rows.rows as any[]).map((r) => {
                   const lt = parseFloat(r.line_total || "0");
                   grandItems += lt;
-                  return [r.item_name, r.code, `${fmtDec(parseFloat(r.qty))} ${r.uom}`, fmtDec(parseFloat(r.rate)), fmt(lt), r.po_number, r.currency];
+                  return [
+                    r.item_name,
+                    r.code,
+                    `${fmtDec(parseFloat(r.qty))} ${r.uom}`,
+                    fmtDec(parseFloat(r.rate)),
+                    fmt(lt),
+                    r.po_number,
+                    r.currency,
+                  ];
                 });
                 const hdr = rows.rows[0] as any;
                 tableRows6.push(["TOTAL", "", "", "", fmt(grandItems), "", ""]);
@@ -5086,16 +6106,26 @@ If the intent does not match any type, output: null`;
                   WHERE e.company_id = ${companyId}
                     AND e.active = true
                     AND e.deleted_at IS NULL
-                    ${deptFilter6 ? sql`AND e.department ILIKE ${'%' + deptFilter6 + '%'}` : sql``}
+                    ${deptFilter6 ? sql`AND e.department ILIKE ${"%" + deptFilter6 + "%"}` : sql``}
                   ORDER BY e.department, e.first_name, e.last_name
                   LIMIT ${rowLimit}
                 `);
-                let totalSalary = 0, totalBalance = 0;
-                const tableRows6 = (rows.rows as any[]).map(r => {
+                let totalSalary = 0,
+                  totalBalance = 0;
+                const tableRows6 = (rows.rows as any[]).map((r) => {
                   const sal = parseFloat(r.monthly_salary || "0");
                   const bal = parseFloat(r.current_balance || "0");
-                  totalSalary += sal; totalBalance += bal;
-                  return [r.code || "—", `${r.first_name} ${r.last_name}`, r.department || "—", r.employee_type, fmt(sal), fmt(bal), r.join_date ? String(r.join_date).slice(0, 10) : "—"];
+                  totalSalary += sal;
+                  totalBalance += bal;
+                  return [
+                    r.code || "—",
+                    `${r.first_name} ${r.last_name}`,
+                    r.department || "—",
+                    r.employee_type,
+                    fmt(sal),
+                    fmt(bal),
+                    r.join_date ? String(r.join_date).slice(0, 10) : "—",
+                  ];
                 });
                 const stats6 = [
                   { label: "Total Employees", value: String(tableRows6.length) },
@@ -5107,7 +6137,10 @@ If the intent does not match any type, output: null`;
                   title: deptFilter6 ? `Employees — ${deptFilter6}` : "Employee Roster",
                   subtitle: `${tableRows6.length} active employee(s)`,
                   stats: stats6,
-                  table: { headers: ["Code", "Name", "Dept", "Type", "Monthly Salary", "Balance", "Join Date"], rows: tableRows6 },
+                  table: {
+                    headers: ["Code", "Name", "Dept", "Type", "Monthly Salary", "Balance", "Join Date"],
+                    rows: tableRows6,
+                  },
                   noData: tableRows6.length === 0,
                 };
                 break;
@@ -5139,17 +6172,36 @@ If the intent does not match any type, output: null`;
                 for (const r of rows.rows as any[]) {
                   const entries = typeof r.entries === "string" ? JSON.parse(r.entries) : r.entries;
                   const firstEntry = entries?.[0];
-                  tableRows6.push([String(r.voucher_date).slice(0, 10), r.voucher_number, (r.description || "").slice(0, 35), firstEntry?.account || "—", firstEntry?.dr > 0 ? fmt(firstEntry.dr) : "—", firstEntry?.cr > 0 ? fmt(firstEntry.cr) : "—", r.currency]);
+                  tableRows6.push([
+                    String(r.voucher_date).slice(0, 10),
+                    r.voucher_number,
+                    (r.description || "").slice(0, 35),
+                    firstEntry?.account || "—",
+                    firstEntry?.dr > 0 ? fmt(firstEntry.dr) : "—",
+                    firstEntry?.cr > 0 ? fmt(firstEntry.cr) : "—",
+                    r.currency,
+                  ]);
                   for (let i = 1; i < (entries || []).length && i < 4; i++) {
                     const e = entries[i];
-                    tableRows6.push(["", "", "", e.account, e.dr > 0 ? fmt(e.dr) : "—", e.cr > 0 ? fmt(e.cr) : "—", ""]);
+                    tableRows6.push([
+                      "",
+                      "",
+                      "",
+                      e.account,
+                      e.dr > 0 ? fmt(e.dr) : "—",
+                      e.cr > 0 ? fmt(e.cr) : "—",
+                      "",
+                    ]);
                   }
                 }
                 dataQueryResult = {
                   queryType: "journal_entries",
                   title: "Journal Entries",
                   subtitle: `${dateFrom} → ${dateTo} · ${rows.rows.length} journal(s)`,
-                  table: { headers: ["Date", "Voucher #", "Description", "Account", "Dr", "Cr", "Currency"], rows: tableRows6 },
+                  table: {
+                    headers: ["Date", "Voucher #", "Description", "Account", "Dr", "Cr", "Currency"],
+                    rows: tableRows6,
+                  },
                   noData: tableRows6.length === 0,
                 };
                 break;
@@ -5165,18 +6217,27 @@ If the intent does not match any type, output: null`;
                   FROM audit_log al
                   WHERE al.company_id = ${companyId}
                     AND al.created_at >= ${dateFrom}
-                    ${tableFilter7 ? sql`AND (al.table_name ILIKE ${'%' + tableFilter7 + '%'} OR al.record_identifier ILIKE ${'%' + tableFilter7 + '%'})` : sql``}
+                    ${tableFilter7 ? sql`AND (al.table_name ILIKE ${"%" + tableFilter7 + "%"} OR al.record_identifier ILIKE ${"%" + tableFilter7 + "%"})` : sql``}
                   ORDER BY al.created_at DESC
                   LIMIT ${rowLimit}
                 `);
                 const actionMap: Record<string, number> = {};
-                const tableRows7 = (rows.rows as any[]).map(r => {
+                const tableRows7 = (rows.rows as any[]).map((r) => {
                   actionMap[r.action] = (actionMap[r.action] || 0) + 1;
-                  return [String(r.created_at).slice(0, 16), r.username, r.action, r.table_name, r.record_identifier || "—"];
+                  return [
+                    String(r.created_at).slice(0, 16),
+                    r.username,
+                    r.action,
+                    r.table_name,
+                    r.record_identifier || "—",
+                  ];
                 });
                 const stats7 = [
                   { label: "Total Events", value: String(tableRows7.length) },
-                  ...Object.entries(actionMap).map(([a, c]) => ({ label: a.charAt(0).toUpperCase() + a.slice(1) + "s", value: String(c) })),
+                  ...Object.entries(actionMap).map(([a, c]) => ({
+                    label: a.charAt(0).toUpperCase() + a.slice(1) + "s",
+                    value: String(c),
+                  })),
                 ];
                 dataQueryResult = {
                   queryType: "audit_trail",
@@ -5207,7 +6268,7 @@ If the intent does not match any type, output: null`;
                   ORDER BY ba.name
                 `);
                 let grandBalance = 0;
-                const tableRows7 = (rows.rows as any[]).map(r => {
+                const tableRows7 = (rows.rows as any[]).map((r) => {
                   const ob = parseFloat(r.opening_balance || "0") * (r.opening_balance_side === "Cr" ? -1 : 1);
                   const dr = parseFloat(r.total_dr || "0");
                   const cr = parseFloat(r.total_cr || "0");
@@ -5216,10 +6277,20 @@ If the intent does not match any type, output: null`;
                   const balLabel = balance >= 0 ? fmt(balance) + " Dr" : fmt(Math.abs(balance)) + " Cr";
                   return [r.code, r.name, r.bank_name, r.account_number, balLabel];
                 });
-                tableRows7.push(["", "TOTAL BALANCE", "", "", grandBalance >= 0 ? fmt(grandBalance) + " Dr" : fmt(Math.abs(grandBalance)) + " Cr"]);
+                tableRows7.push([
+                  "",
+                  "TOTAL BALANCE",
+                  "",
+                  "",
+                  grandBalance >= 0 ? fmt(grandBalance) + " Dr" : fmt(Math.abs(grandBalance)) + " Cr",
+                ]);
                 const stats7 = [
                   { label: "Bank Accounts", value: String(tableRows7.length - 1) },
-                  { label: "Net Balance", value: grandBalance >= 0 ? fmt(grandBalance) + " Dr" : fmt(Math.abs(grandBalance)) + " Cr", highlight: grandBalance >= 0 ? "positive" : "negative" },
+                  {
+                    label: "Net Balance",
+                    value: grandBalance >= 0 ? fmt(grandBalance) + " Dr" : fmt(Math.abs(grandBalance)) + " Cr",
+                    highlight: grandBalance >= 0 ? "positive" : "negative",
+                  },
                 ];
                 dataQueryResult = {
                   queryType: "bank_account_list",
@@ -5233,7 +6304,11 @@ If the intent does not match any type, output: null`;
               }
 
               case "stock_adjustments": {
-                const adjTypeFilter = params.entityName?.toLowerCase().includes("consum") ? "Consumption" : params.entityName?.toLowerCase().includes("prod") ? "Production" : null;
+                const adjTypeFilter = params.entityName?.toLowerCase().includes("consum")
+                  ? "Consumption"
+                  : params.entityName?.toLowerCase().includes("prod")
+                    ? "Production"
+                    : null;
                 const rows = await db.execute(sql`
                   SELECT v.voucher_date, v.voucher_number, sav.adjustment_type,
                     l.name AS location, si.name AS item_name, si.code, si.uom,
@@ -5251,13 +6326,22 @@ If the intent does not match any type, output: null`;
                   ORDER BY v.voucher_date DESC
                   LIMIT ${rowLimit}
                 `);
-                let totalProd = 0, totalCons = 0;
-                const tableRows7 = (rows.rows as any[]).map(r => {
+                let totalProd = 0,
+                  totalCons = 0;
+                const tableRows7 = (rows.rows as any[]).map((r) => {
                   const qty = parseFloat(r.qty || "0");
                   const amt = parseFloat(r.total_amount || "0");
                   if (r.adjustment_type === "Production") totalProd += amt;
                   else totalCons += amt;
-                  return [String(r.voucher_date).slice(0, 10), r.voucher_number, r.adjustment_type, r.location, r.item_name, `${fmtDec(Math.abs(qty))} ${r.uom}`, fmt(Math.abs(amt))];
+                  return [
+                    String(r.voucher_date).slice(0, 10),
+                    r.voucher_number,
+                    r.adjustment_type,
+                    r.location,
+                    r.item_name,
+                    `${fmtDec(Math.abs(qty))} ${r.uom}`,
+                    fmt(Math.abs(amt)),
+                  ];
                 });
                 const stats7 = [
                   { label: "Total Entries", value: String(tableRows7.length) },
@@ -5269,7 +6353,10 @@ If the intent does not match any type, output: null`;
                   title: adjTypeFilter ? `Stock Adjustments — ${adjTypeFilter}` : "Stock Adjustments",
                   subtitle: `${dateFrom} → ${dateTo}`,
                   stats: stats7,
-                  table: { headers: ["Date", "Voucher #", "Type", "Location", "Item", "Qty", "Amount"], rows: tableRows7 },
+                  table: {
+                    headers: ["Date", "Voucher #", "Type", "Location", "Item", "Qty", "Amount"],
+                    rows: tableRows7,
+                  },
                   noData: tableRows7.length === 0,
                 };
                 break;
@@ -5278,7 +6365,11 @@ If the intent does not match any type, output: null`;
               case "container_tracking": {
                 const cn7 = params.containerNumber || params.entityName;
                 if (!cn7) {
-                  dataQueryResult = { queryType: "container_tracking", title: "Container Tracking", summary: "Please specify a container number." };
+                  dataQueryResult = {
+                    queryType: "container_tracking",
+                    title: "Container Tracking",
+                    summary: "Please specify a container number.",
+                  };
                   break;
                 }
                 const containerRow7 = await db.execute(sql`
@@ -5286,11 +6377,15 @@ If the intent does not match any type, output: null`;
                     c.tracking_last_location, c.tracking_last_description, c.tracking_changed_at
                   FROM containers c
                   WHERE c.company_id = ${companyId}
-                    AND c.container_number ILIKE ${'%' + cn7 + '%'}
+                    AND c.container_number ILIKE ${"%" + cn7 + "%"}
                   LIMIT 1
                 `);
                 if (!containerRow7.rows.length) {
-                  dataQueryResult = { queryType: "container_tracking", title: "Container Tracking", summary: `No container found matching "${cn7}".` };
+                  dataQueryResult = {
+                    queryType: "container_tracking",
+                    title: "Container Tracking",
+                    summary: `No container found matching "${cn7}".`,
+                  };
                   break;
                 }
                 const ctr7 = containerRow7.rows[0] as any;
@@ -5301,7 +6396,7 @@ If the intent does not match any type, output: null`;
                   ORDER BY cte.event_time DESC
                   LIMIT ${rowLimit}
                 `);
-                const tableRows7 = (evtRows.rows as any[]).map(r => [
+                const tableRows7 = (evtRows.rows as any[]).map((r) => [
                   r.event_time ? String(r.event_time).slice(0, 16) : "—",
                   r.event_status || "—",
                   r.event_location || "—",
@@ -5318,7 +6413,9 @@ If the intent does not match any type, output: null`;
                 dataQueryResult = {
                   queryType: "container_tracking",
                   title: `Tracking: ${ctr7.container_number}`,
-                  subtitle: ctr7.tracking_last_description ? `Latest: ${(ctr7.tracking_last_description as string).slice(0, 60)}` : `${tableRows7.length} event(s)`,
+                  subtitle: ctr7.tracking_last_description
+                    ? `Latest: ${(ctr7.tracking_last_description as string).slice(0, 60)}`
+                    : `${tableRows7.length} event(s)`,
                   stats: stats7,
                   table: { headers: ["Time", "Status", "Location", "Description", "Provider"], rows: tableRows7 },
                   noData: tableRows7.length === 0,
@@ -5343,10 +6440,20 @@ If the intent does not match any type, output: null`;
                   LIMIT ${rowLimit}
                 `);
                 let totalOutstanding = 0;
-                const tableRows7 = (rows.rows as any[]).map(r => {
+                const tableRows7 = (rows.rows as any[]).map((r) => {
                   const outstanding = parseFloat(r.outstanding || "0");
                   totalOutstanding += outstanding;
-                  return [String(r.sale_date).slice(0, 10), r.invoice_number || "—", r.container_number, r.customer, fmt(parseFloat(r.total_amount)), fmt(parseFloat(r.paid_amount)), fmt(outstanding), r.payment_status, r.currency];
+                  return [
+                    String(r.sale_date).slice(0, 10),
+                    r.invoice_number || "—",
+                    r.container_number,
+                    r.customer,
+                    fmt(parseFloat(r.total_amount)),
+                    fmt(parseFloat(r.paid_amount)),
+                    fmt(outstanding),
+                    r.payment_status,
+                    r.currency,
+                  ];
                 });
                 const stats7 = [
                   { label: "Pending Sales", value: String(tableRows7.length) },
@@ -5357,7 +6464,20 @@ If the intent does not match any type, output: null`;
                   title: "Pending Container Sales",
                   subtitle: `${tableRows7.length} unpaid/partial container sale(s)`,
                   stats: stats7,
-                  table: { headers: ["Sale Date", "Invoice #", "Container", "Customer", "Total", "Paid", "Outstanding", "Status", "Currency"], rows: tableRows7 },
+                  table: {
+                    headers: [
+                      "Sale Date",
+                      "Invoice #",
+                      "Container",
+                      "Customer",
+                      "Total",
+                      "Paid",
+                      "Outstanding",
+                      "Status",
+                      "Currency",
+                    ],
+                    rows: tableRows7,
+                  },
                   noData: tableRows7.length === 0,
                 };
                 break;
@@ -5366,7 +6486,11 @@ If the intent does not match any type, output: null`;
               case "supplier_container_history": {
                 const suppName7 = params.entityName;
                 if (!suppName7) {
-                  dataQueryResult = { queryType: "supplier_container_history", title: "Supplier Container History", summary: "Please specify a supplier name." };
+                  dataQueryResult = {
+                    queryType: "supplier_container_history",
+                    title: "Supplier Container History",
+                    summary: "Please specify a supplier name.",
+                  };
                   break;
                 }
                 const rows = await db.execute(sql`
@@ -5376,18 +6500,29 @@ If the intent does not match any type, output: null`;
                   FROM containers c
                   JOIN suppliers s ON s.id = c.supplier_id
                   WHERE c.company_id = ${companyId}
-                    AND s.legal_name ILIKE ${'%' + suppName7 + '%'}
+                    AND s.legal_name ILIKE ${"%" + suppName7 + "%"}
                   ORDER BY c.import_date DESC
                   LIMIT ${rowLimit}
                 `);
-                let totalValue = 0, totalKg = 0;
+                let totalValue = 0,
+                  totalKg = 0;
                 const statusCounts: Record<string, number> = {};
-                const tableRows7 = (rows.rows as any[]).map(r => {
+                const tableRows7 = (rows.rows as any[]).map((r) => {
                   const val = parseFloat(r.grand_total || "0");
                   const kg = parseFloat(r.total_kg || "0");
-                  totalValue += val; totalKg += kg;
+                  totalValue += val;
+                  totalKg += kg;
                   statusCounts[r.status] = (statusCounts[r.status] || 0) + 1;
-                  return [r.container_number, r.status, String(r.import_date).slice(0, 10), r.eta ? String(r.eta).slice(0, 10) : "—", fmtDec(kg), fmt(val), r.currency, (r.item_name || "—").slice(0, 25)];
+                  return [
+                    r.container_number,
+                    r.status,
+                    String(r.import_date).slice(0, 10),
+                    r.eta ? String(r.eta).slice(0, 10) : "—",
+                    fmtDec(kg),
+                    fmt(val),
+                    r.currency,
+                    (r.item_name || "—").slice(0, 25),
+                  ];
                 });
                 const supplier7 = (rows.rows[0] as any)?.supplier || suppName7;
                 const stats7 = [
@@ -5402,7 +6537,10 @@ If the intent does not match any type, output: null`;
                   title: `Containers from: ${supplier7}`,
                   subtitle: `${tableRows7.length} container(s) · most recent first`,
                   stats: stats7,
-                  table: { headers: ["Container #", "Status", "Import Date", "ETA", "Total Kg", "Value", "Currency", "Item"], rows: tableRows7 },
+                  table: {
+                    headers: ["Container #", "Status", "Import Date", "ETA", "Total Kg", "Value", "Currency", "Item"],
+                    rows: tableRows7,
+                  },
                   noData: tableRows7.length === 0,
                 };
                 break;
@@ -5426,7 +6564,7 @@ If the intent does not match any type, output: null`;
                   LIMIT ${rowLimit}
                 `);
                 let grandIncome = 0;
-                const tableRows7 = (rows.rows as any[]).map(r => {
+                const tableRows7 = (rows.rows as any[]).map((r) => {
                   const income = parseFloat(r.net_income || "0");
                   grandIncome += income;
                   return [r.name, r.account_type, fmt(income)];
@@ -5445,7 +6583,11 @@ If the intent does not match any type, output: null`;
               case "factory_worker_profile": {
                 const workerName7 = params.entityName;
                 if (!workerName7) {
-                  dataQueryResult = { queryType: "factory_worker_profile", title: "Factory Worker Profile", summary: "Please specify a worker name." };
+                  dataQueryResult = {
+                    queryType: "factory_worker_profile",
+                    title: "Factory Worker Profile",
+                    summary: "Please specify a worker name.",
+                  };
                   break;
                 }
                 const wRow = await db.execute(sql`
@@ -5457,11 +6599,15 @@ If the intent does not match any type, output: null`;
                     fw.transport_allowance
                   FROM factory_workers fw
                   WHERE fw.company_id = ${companyId}
-                    AND fw.full_name ILIKE ${'%' + workerName7 + '%'}
+                    AND fw.full_name ILIKE ${"%" + workerName7 + "%"}
                   ORDER BY fw.full_name LIMIT 1
                 `);
                 if (!wRow.rows.length) {
-                  dataQueryResult = { queryType: "factory_worker_profile", title: "Factory Worker Profile", summary: `No worker found matching "${workerName7}".` };
+                  dataQueryResult = {
+                    queryType: "factory_worker_profile",
+                    title: "Factory Worker Profile",
+                    summary: `No worker found matching "${workerName7}".`,
+                  };
                   break;
                 }
                 const w7 = wRow.rows[0] as any;
@@ -5472,7 +6618,7 @@ If the intent does not match any type, output: null`;
                   WHERE company_id = ${companyId}
                     AND pressed_at IS NOT NULL
                     AND CAST(pressed_at AS text) BETWEEN ${dateFrom} AND ${dateTo}
-                    AND worker_name ILIKE ${'%' + workerName7 + '%'}
+                    AND worker_name ILIKE ${"%" + workerName7 + "%"}
                 `);
                 const bs7 = baleStats7.rows[0] as any;
                 const stats7 = [
@@ -5523,12 +6669,22 @@ If the intent does not match any type, output: null`;
                   GROUP BY l.id, l.code, l.name, l.city, l.country, l.active
                   ORDER BY l.name
                 `);
-                let grandValue = 0, grandItems = 0;
-                const tableRows7 = (rows.rows as any[]).map(r => {
+                let grandValue = 0,
+                  grandItems = 0;
+                const tableRows7 = (rows.rows as any[]).map((r) => {
                   const val = parseFloat(r.total_value || "0");
                   const items = parseInt(r.item_count || "0");
-                  grandValue += val; grandItems += items;
-                  return [r.code || "—", r.name, r.city || "—", r.country || "—", String(items), fmt(val), r.active ? "Active" : "Inactive"];
+                  grandValue += val;
+                  grandItems += items;
+                  return [
+                    r.code || "—",
+                    r.name,
+                    r.city || "—",
+                    r.country || "—",
+                    String(items),
+                    fmt(val),
+                    r.active ? "Active" : "Inactive",
+                  ];
                 });
                 const stats7 = [
                   { label: "Total Locations", value: String(tableRows7.length) },
@@ -5540,7 +6696,10 @@ If the intent does not match any type, output: null`;
                   title: "Warehouse / Location List",
                   subtitle: `${tableRows7.length} location(s)`,
                   stats: stats7,
-                  table: { headers: ["Code", "Name", "City", "Country", "Items", "Inv. Value", "Status"], rows: tableRows7 },
+                  table: {
+                    headers: ["Code", "Name", "City", "Country", "Items", "Inv. Value", "Status"],
+                    rows: tableRows7,
+                  },
                   noData: tableRows7.length === 0,
                 };
                 break;
@@ -5561,15 +6720,19 @@ If the intent does not match any type, output: null`;
                   GROUP BY quarter
                   ORDER BY quarter
                 `);
-                let totRev = 0, totCost = 0, totProfit = 0;
+                let totRev = 0,
+                  totCost = 0,
+                  totProfit = 0;
                 const qLabels = ["Q1 (Jan-Mar)", "Q2 (Apr-Jun)", "Q3 (Jul-Sep)", "Q4 (Oct-Dec)"];
-                const tableRows7 = (rows.rows as any[]).map(r => {
+                const tableRows7 = (rows.rows as any[]).map((r) => {
                   const q = parseInt(r.quarter || "1");
                   const rev = parseFloat(r.revenue || "0");
                   const cost = parseFloat(r.cost || "0");
                   const profit7 = parseFloat(r.profit || "0");
                   const margin = rev > 0 ? ((profit7 / rev) * 100).toFixed(1) + "%" : "—";
-                  totRev += rev; totCost += cost; totProfit += profit7;
+                  totRev += rev;
+                  totCost += cost;
+                  totProfit += profit7;
                   return [qLabels[q - 1] || `Q${q}`, String(r.sales_count), fmt(rev), fmt(cost), fmt(profit7), margin];
                 });
                 if (tableRows7.length) {
@@ -5593,7 +6756,6 @@ If the intent does not match any type, output: null`;
                 };
                 break;
               }
-
             }
           }
         }
@@ -5622,7 +6784,11 @@ If the intent does not match any type, output: null`;
   } catch (error: any) {
     console.error("[ChatService] ERROR:", error.message);
     console.error("[ChatService] Stack:", error.stack);
-    if (error.message?.includes("API_KEY") || error.message?.includes("API key") || error.message?.includes("not configured")) {
+    if (
+      error.message?.includes("API_KEY") ||
+      error.message?.includes("API key") ||
+      error.message?.includes("not configured")
+    ) {
       return {
         response: "Invalid or missing API key. Please check your AI provider configuration in Settings.",
         suggestions: [],
@@ -5674,10 +6840,10 @@ export async function getConversationHistory(
   limit: number = 10
 ): Promise<{ id: number; role: string; message: string; createdAt: Date }[]> {
   // Filter by sessionId AND userId for security (if userId provided)
-  const whereClause = userId 
+  const whereClause = userId
     ? and(eq(schema.chatMessages.sessionId, sessionId), eq(schema.chatMessages.userId, userId))
     : eq(schema.chatMessages.sessionId, sessionId);
-    
+
   const messages = await db
     .select({
       id: schema.chatMessages.id,
@@ -5712,10 +6878,7 @@ export async function getConversationHistoryForAI(
   return messages.reverse();
 }
 
-export async function getAllChatHistory(
-  companyId: number,
-  limit: number = 100
-): Promise<any[]> {
+export async function getAllChatHistory(companyId: number, limit: number = 100): Promise<any[]> {
   const messages = await db
     .select({
       id: schema.chatMessages.id,
@@ -5735,7 +6898,7 @@ export async function getAllChatHistory(
 
 export async function saveFeedback(
   messageId: number,
-  feedback: 'positive' | 'negative',
+  feedback: "positive" | "negative",
   userId: string
 ): Promise<void> {
   console.log(`Feedback saved: Message ${messageId} - ${feedback} by user ${userId}`);
@@ -5797,7 +6960,10 @@ Rules:
       [],
       `Extract PO data from this text:\n\n${rawText.slice(0, 8000)}`
     );
-    const cleaned = response.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const cleaned = response
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
     const parsed = JSON.parse(cleaned);
     if (!Array.isArray(parsed.items)) return null;
     return parsed;

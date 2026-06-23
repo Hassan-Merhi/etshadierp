@@ -1,13 +1,13 @@
-import { 
-  CheckCircle2, 
-  Loader2, 
-  MessageCircle, 
-  Upload, 
-  Download, 
-  ChevronDown, 
-  X, 
-  Undo2, 
-  FileSpreadsheet 
+import {
+  CheckCircle2,
+  Loader2,
+  MessageCircle,
+  Upload,
+  Download,
+  ChevronDown,
+  X,
+  Undo2,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,9 +51,14 @@ export function ContainerBulkActions({
           disabled={isBulkPending || allContainersCount === 0}
           data-testid="button-track-all-now"
         >
-          {isBulkPending
-            ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            : <div className="flex items-center"><CheckCircle2 className="h-4 w-4 mr-1.5" />Track All</div>}
+          {isBulkPending ? (
+            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+          ) : (
+            <div className="flex items-center">
+              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+              Track All
+            </div>
+          )}
         </Button>
       )}
 

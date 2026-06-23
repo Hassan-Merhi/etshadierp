@@ -2,8 +2,17 @@ import { apiRequest } from "@/lib/queryClient";
 import { fmt, fmtD, clientReallocate } from "./helpers";
 import type { AgentDutySummary, ApiAllocatedRow, ApiAllocStatus } from "./types";
 
-interface AdjEntry { id: number; description: string; amount: number; type: string; }
-interface ReplaceTarget { id: number; containerNumber: string; dutyFee: number; }
+interface AdjEntry {
+  id: number;
+  description: string;
+  amount: number;
+  type: string;
+}
+interface ReplaceTarget {
+  id: number;
+  containerNumber: string;
+  dutyFee: number;
+}
 
 export interface SendAgentDutyWaParams {
   agent: AgentDutySummary;
@@ -21,24 +30,34 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
   try {
     const html2canvas = (await import("html2canvas")).default;
     const esc = (s: unknown) =>
-      String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
     const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
-    const agentName       = agent.agentName;
-    const ledgerBalance   = agent.ledgerBalance;
-    const openBalance     = agent.openBalance;
-    const hasBalance      = ledgerBalance !== null;
+    const agentName = agent.agentName;
+    const ledgerBalance = agent.ledgerBalance;
+    const openBalance = agent.openBalance;
+    const hasBalance = ledgerBalance !== null;
     const activePreviewRows = agent.activePreviewRows.filter((r: any) => !!(r.numberPlate ?? "").trim());
-    const cbClearedRows   = agent.clearedRows as ApiAllocatedRow[];
-    const cbAllOpenPartial: ApiAllocatedRow[] = [...(agent.partialRows as ApiAllocatedRow[]), ...(agent.openRows as ApiAllocatedRow[])];
-    const cbClearedTotal  = cbClearedRows.reduce((s, r) => s + r.dutyFee, 0);
-    const cbRemainder     = Math.max(agent.clearedByPayments - cbClearedTotal, 0);
+    const cbClearedRows = agent.clearedRows as ApiAllocatedRow[];
+    const cbAllOpenPartial: ApiAllocatedRow[] = [
+      ...(agent.partialRows as ApiAllocatedRow[]),
+      ...(agent.openRows as ApiAllocatedRow[]),
+    ];
+    const cbClearedTotal = cbClearedRows.reduce((s, r) => s + r.dutyFee, 0);
+    const cbRemainder = Math.max(agent.clearedByPayments - cbClearedTotal, 0);
     let openAndPartial: ApiAllocatedRow[];
     if (customOrder && customOrder.length > 0) {
       const orderMap = new Map(customOrder.map((id, i) => [id, i]));
       const sorted = [...cbAllOpenPartial].sort((a, b) => {
-        const ai = orderMap.has(a.id) ? orderMap.get(a.id)! : customOrder.length + cbAllOpenPartial.findIndex(r => r.id === a.id);
-        const bi = orderMap.has(b.id) ? orderMap.get(b.id)! : customOrder.length + cbAllOpenPartial.findIndex(r => r.id === b.id);
+        const ai = orderMap.has(a.id)
+          ? orderMap.get(a.id)!
+          : customOrder.length + cbAllOpenPartial.findIndex((r) => r.id === a.id);
+        const bi = orderMap.has(b.id)
+          ? orderMap.get(b.id)!
+          : customOrder.length + cbAllOpenPartial.findIndex((r) => r.id === b.id);
         return ai - bi;
       });
       openAndPartial = clientReallocate(sorted, cbRemainder);
@@ -59,29 +78,30 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
       `font-size:11px;padding:6px 10px;text-align:${align};color:${color};` +
       `font-weight:${bold ? "700" : "400"};border:1px solid #e2e8f0;white-space:nowrap;`;
 
-    const netAdj      = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
-    const hasAdj      = adjustments.length > 0;
-    const waOpenSum   = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
-    const displayBal  = ledgerBalance ?? waOpenSum;
+    const netAdj = adjustments.reduce((s, a) => s + (a.type === "debit" ? a.amount : -a.amount), 0);
+    const hasAdj = adjustments.length > 0;
+    const waOpenSum = openAndPartial.reduce((s, r) => s + r.remainingAmount, 0);
+    const displayBal = ledgerBalance ?? waOpenSum;
     const adjustedBal = displayBal;
-    const adjIsDebit  = adjustedBal >= 0;
-    const waMismatch  = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
+    const adjIsDebit = adjustedBal >= 0;
+    const waMismatch = hasAdj && Math.abs(adjustedBal - waOpenSum) > 0.01;
     const isReconciledWa = hasAdj && hasBalance && Math.abs(adjustedBal) <= 0.01;
 
-    const waPrepaidSet    = new Set<number>(dbPrepaidIds);
-    const waPrepaidRows   = activePreviewRows.filter((r: any) => waPrepaidSet.has(r.id));
+    const waPrepaidSet = new Set<number>(dbPrepaidIds);
+    const waPrepaidRows = activePreviewRows.filter((r: any) => waPrepaidSet.has(r.id));
     const waRemainingRows = activePreviewRows.filter((r: any) => !waPrepaidSet.has(r.id));
     const designatedPrepaidSum = waPrepaidRows.reduce((s: number, r: any) => s + Number(r.dutyFee ?? 0), 0);
-    const waPrepaidBudget  = Math.max(0, ledgerBalance ?? 0);
-    const minOpenRem = cbAllOpenPartial.length > 0
-      ? Math.min(...cbAllOpenPartial.map(r => r.remainingAmount).filter(a => a > 0.01))
-      : Infinity;
+    const waPrepaidBudget = Math.max(0, ledgerBalance ?? 0);
+    const minOpenRem =
+      cbAllOpenPartial.length > 0
+        ? Math.min(...cbAllOpenPartial.map((r) => r.remainingAmount).filter((a) => a > 0.01))
+        : Infinity;
     const allBudgetDesignated =
       designatedPrepaidSum > 0 &&
       waPrepaidBudget > 0 &&
       (designatedPrepaidSum >= waPrepaidBudget - 0.01 ||
-       (waPrepaidBudget - designatedPrepaidSum) <= (isFinite(minOpenRem) ? minOpenRem : 0) ||
-       Math.abs((designatedPrepaidSum + netAdj) - waPrepaidBudget) <= 1.0);
+        waPrepaidBudget - designatedPrepaidSum <= (isFinite(minOpenRem) ? minOpenRem : 0) ||
+        Math.abs(designatedPrepaidSum + netAdj - waPrepaidBudget) <= 1.0);
     const enhancedRem = allBudgetDesignated
       ? (agent.offloadedDutyTotal ?? 0) * 2 + 1
       : cbRemainder + designatedPrepaidSum;
@@ -89,11 +109,29 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
     const enhancedAllocated = openAndPartial.map((row: ApiAllocatedRow) => {
       const needed = row.remainingAmount;
       if (needed <= 0) return { ...row, allocationStatus: "Cleared" as ApiAllocStatus };
-      if (_waEnhRem >= needed) { _waEnhRem -= needed; return { ...row, clearedAmount: row.dutyFee, remainingAmount: 0, allocationStatus: "Cleared" as ApiAllocStatus }; }
-      else if (_waEnhRem > 0) { const extra = _waEnhRem; _waEnhRem = 0; return { ...row, clearedAmount: row.clearedAmount + extra, remainingAmount: row.remainingAmount - extra, allocationStatus: "Partially Cleared" as ApiAllocStatus }; }
+      if (_waEnhRem >= needed) {
+        _waEnhRem -= needed;
+        return {
+          ...row,
+          clearedAmount: row.dutyFee,
+          remainingAmount: 0,
+          allocationStatus: "Cleared" as ApiAllocStatus,
+        };
+      } else if (_waEnhRem > 0) {
+        const extra = _waEnhRem;
+        _waEnhRem = 0;
+        return {
+          ...row,
+          clearedAmount: row.clearedAmount + extra,
+          remainingAmount: row.remainingAmount - extra,
+          allocationStatus: "Partially Cleared" as ApiAllocStatus,
+        };
+      }
       return row;
     });
-    const enhancedCoveredIds = new Set(enhancedAllocated.filter((r: ApiAllocatedRow) => r.clearedAmount >= r.dutyFee).map((r: ApiAllocatedRow) => r.id));
+    const enhancedCoveredIds = new Set(
+      enhancedAllocated.filter((r: ApiAllocatedRow) => r.clearedAmount >= r.dutyFee).map((r: ApiAllocatedRow) => r.id)
+    );
     const waVisibleOpenPartial = openAndPartial.filter((r: ApiAllocatedRow) => !enhancedCoveredIds.has(r.id));
 
     let openRowsHtml = "";
@@ -119,8 +157,8 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
         </tr>`;
       });
       waVisibleOpenPartial.forEach((r, i) => {
-        const isPartial  = r.allocationStatus === "Partially Cleared";
-        const bg         = isPartial ? "#fffbeb" : (i % 2 === 0 ? "#ffffff" : "#f9fafb");
+        const isPartial = r.allocationStatus === "Partially Cleared";
+        const bg = isPartial ? "#fffbeb" : i % 2 === 0 ? "#ffffff" : "#f9fafb";
         const statusColor = isPartial ? "#b45309" : "#374151";
         const statusLabel = isPartial ? "Partial" : "Open";
         openRowsHtml += `<tr style="background:${bg}">
@@ -139,11 +177,14 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
       });
     }
 
-    const adjustmentsHtml = hasAdj ? `
+    const adjustmentsHtml = hasAdj
+      ? `
       <div style="background:#f9fafb;border-bottom:1px solid #e5e7eb;padding:8px 14px;">
         <div style="font-size:10.5px;font-weight:700;color:#374151;margin-bottom:5px;text-transform:uppercase;letter-spacing:0.05em;">Manual Entries</div>
         <table style="width:100%;border-collapse:collapse;">
-          ${adjustments.map(a => `
+          ${adjustments
+            .map(
+              (a) => `
             <tr>
               <td style="font-size:10.5px;padding:2px 0;color:#374151;">${esc(a.description)}</td>
               <td style="font-size:10.5px;padding:2px 0;text-align:right;font-weight:600;color:${a.type === "debit" ? "#059669" : "#dc2626"};">
@@ -152,14 +193,18 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
               <td style="font-size:10.5px;padding:2px 0 2px 8px;font-weight:600;color:${a.type === "debit" ? "#059669" : "#dc2626"};">
                 ${a.type === "debit" ? "Dr" : "Cr"}
               </td>
-            </tr>`).join("")}
+            </tr>`
+            )
+            .join("")}
         </table>
-      </div>` : "";
+      </div>`
+      : "";
 
-    const finalBal   = hasAdj ? adjustedBal : displayBal;
+    const finalBal = hasAdj ? adjustedBal : displayBal;
     const finalLabel = hasAdj ? (adjIsDebit ? "Dr" : "Cr") : "";
-    const balRowBg   = finalBal > 0 ? "#16a34a" : finalBal < 0 ? "#dc2626" : "#475569";
-    const balanceRowHtml = hasBalance ? `
+    const balRowBg = finalBal > 0 ? "#16a34a" : finalBal < 0 ? "#dc2626" : "#475569";
+    const balanceRowHtml = hasBalance
+      ? `
       <tr style="background:${balRowBg}">
         <td colspan="9" style="padding:9px 10px;font-size:11px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.06em;border:1px solid rgba(0,0,0,0.15);">Account Balance</td>
         <td style="padding:9px 10px;font-size:14px;font-weight:800;color:#ffffff;text-align:right;border:1px solid rgba(0,0,0,0.15);">
@@ -167,7 +212,8 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
           ${finalLabel ? `<span style="font-size:11px;opacity:0.85;margin-left:4px;">(${esc(finalLabel)})</span>` : ""}
         </td>
         <td style="padding:9px 10px;border:1px solid rgba(0,0,0,0.15);"></td>
-      </tr>` : "";
+      </tr>`
+      : "";
 
     let transitHtml = "";
     const waTransitRows = transitTransporterFilter
@@ -177,7 +223,8 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
       const transitTotal = waTransitRows.reduce((s: number, r: any) => s + r.dutyFee, 0);
       let transitRowsHtml = "";
       const sortedWaTransitRows = [...waTransitRows].sort((a: any, b: any) => {
-        const tA = (a.transporter ?? "").toLowerCase(), tB = (b.transporter ?? "").toLowerCase();
+        const tA = (a.transporter ?? "").toLowerCase(),
+          tB = (b.transporter ?? "").toLowerCase();
         if (tA !== tB) return tA < tB ? -1 : 1;
         const sA = (a.supplierCode ?? a.supplierName ?? "").toLowerCase();
         const sB = (b.supplierCode ?? b.supplierName ?? "").toLowerCase();
@@ -204,7 +251,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
           <span style="font-size:12px;font-weight:700;color:#94a3b8;letter-spacing:0.04em;">$${fmt(transitTotal, 0)} Upcoming Duty</span>
         </div>
         <table style="width:100%;border-collapse:collapse;">
-          <thead><tr>${transitCols.map(h => `<th style="${thTransit()}">${h}</th>`).join("")}</tr></thead>
+          <thead><tr>${transitCols.map((h) => `<th style="${thTransit()}">${h}</th>`).join("")}</tr></thead>
           <tbody>${transitRowsHtml}</tbody>
         </table>`;
     }
@@ -215,7 +262,19 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
       `position:fixed;top:-9999px;left:-9999px;width:${W}px;` +
       "background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;" +
       "border:1px solid #d1d5db;border-radius:6px;overflow:hidden;";
-    const openCols = ["CONTAINER", "SUPPLIER", "PLATE", "OFFLOAD DATE", "BORDER DATE", "TRANSPORTER", "LOCATION", "DUTY", "CLEARED", "REMAINING", "STATUS"];
+    const openCols = [
+      "CONTAINER",
+      "SUPPLIER",
+      "PLATE",
+      "OFFLOAD DATE",
+      "BORDER DATE",
+      "TRANSPORTER",
+      "LOCATION",
+      "DUTY",
+      "CLEARED",
+      "REMAINING",
+      "STATUS",
+    ];
 
     capture.innerHTML = `
       <div style="background:#1e293b;padding:18px 16px;display:flex;align-items:center;justify-content:space-between;">
@@ -224,7 +283,7 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
       </div>
       ${adjustmentsHtml}
       <table style="width:100%;border-collapse:collapse;table-layout:auto;">
-        <thead><tr>${openCols.map(h => `<th style="${thOpen()}">${h}</th>`).join("")}</tr></thead>
+        <thead><tr>${openCols.map((h) => `<th style="${thOpen()}">${h}</th>`).join("")}</tr></thead>
         <tbody>${openRowsHtml}${balanceRowHtml}</tbody>
       </table>
       ${transitHtml}
@@ -234,8 +293,15 @@ export async function sendAgentCardToWhatsApp(params: SendAgentDutyWaParams): Pr
 
     document.body.appendChild(capture);
     const canvas = await html2canvas(capture, {
-      scale: 3, useCORS: true, allowTaint: true, backgroundColor: "#ffffff", logging: false,
-      width: W, height: capture.scrollHeight, windowWidth: W, windowHeight: capture.scrollHeight,
+      scale: 3,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+      width: W,
+      height: capture.scrollHeight,
+      windowWidth: W,
+      windowHeight: capture.scrollHeight,
     });
     document.body.removeChild(capture);
 

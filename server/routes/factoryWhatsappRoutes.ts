@@ -16,7 +16,6 @@ import { sendWhatsAppFileByUploadPos } from "../services/whatsappService";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
 export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
-
   // ── GET rule ──────────────────────────────────────────────────────────────
   app.get("/api/factory/accounts/:accountId/whatsapp-rule", requireAuth, async (req: any, res: any) => {
     try {
@@ -29,22 +28,26 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
       const [rule] = await db
         .select()
         .from(factoryAccountWhatsappRules)
-        .where(and(
-          eq(factoryAccountWhatsappRules.companyId, companyId),
-          eq(factoryAccountWhatsappRules.ledgerAccountId, accountId),
-        ));
+        .where(
+          and(
+            eq(factoryAccountWhatsappRules.companyId, companyId),
+            eq(factoryAccountWhatsappRules.ledgerAccountId, accountId)
+          )
+        );
 
       // Return null-ish defaults when rule doesn't exist yet
-      res.json(rule ?? {
-        id: null,
-        companyId,
-        ledgerAccountId: accountId,
-        enabled: false,
-        whatsappChatId: null,
-        sendOnPayment: true,
-        sendOnReceipt: true,
-        sendOnJournal: true,
-      });
+      res.json(
+        rule ?? {
+          id: null,
+          companyId,
+          ledgerAccountId: accountId,
+          enabled: false,
+          whatsappChatId: null,
+          sendOnPayment: true,
+          sendOnReceipt: true,
+          sendOnJournal: true,
+        }
+      );
     } catch (err: any) {
       console.error("[factory-wa] GET rule error", err);
       res.status(500).json({ message: err.message });
@@ -61,7 +64,8 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
 
       // Verify account belongs to this company
-      const [acct] = await db.select({ id: ledgerAccounts.id })
+      const [acct] = await db
+        .select({ id: ledgerAccounts.id })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(404).json({ message: "Account not found" });
@@ -73,22 +77,22 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
         .values({
           companyId,
           ledgerAccountId: accountId,
-          enabled:         Boolean(enabled),
-          whatsappChatId:  whatsappChatId ?? null,
-          sendOnPayment:   sendOnPayment  ?? true,
-          sendOnReceipt:   sendOnReceipt  ?? true,
-          sendOnJournal:   sendOnJournal  ?? true,
-          updatedAt:       new Date(),
+          enabled: Boolean(enabled),
+          whatsappChatId: whatsappChatId ?? null,
+          sendOnPayment: sendOnPayment ?? true,
+          sendOnReceipt: sendOnReceipt ?? true,
+          sendOnJournal: sendOnJournal ?? true,
+          updatedAt: new Date(),
         })
         .onConflictDoUpdate({
           target: [factoryAccountWhatsappRules.companyId, factoryAccountWhatsappRules.ledgerAccountId],
           set: {
-            enabled:       Boolean(enabled),
+            enabled: Boolean(enabled),
             whatsappChatId: whatsappChatId ?? null,
-            sendOnPayment: sendOnPayment  ?? true,
-            sendOnReceipt: sendOnReceipt  ?? true,
-            sendOnJournal: sendOnJournal  ?? true,
-            updatedAt:     new Date(),
+            sendOnPayment: sendOnPayment ?? true,
+            sendOnReceipt: sendOnReceipt ?? true,
+            sendOnJournal: sendOnJournal ?? true,
+            updatedAt: new Date(),
           },
         })
         .returning();
@@ -110,18 +114,22 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
       if (isNaN(accountId)) return res.status(400).json({ message: "Invalid account ID" });
 
       // Verify account belongs to company
-      const [acct] = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+      const [acct] = await db
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.id, accountId), eq(ledgerAccounts.companyId, companyId)));
       if (!acct) return res.status(404).json({ message: "Account not found" });
 
       // Load rule
-      const [rule] = await db.select()
+      const [rule] = await db
+        .select()
         .from(factoryAccountWhatsappRules)
-        .where(and(
-          eq(factoryAccountWhatsappRules.companyId, companyId),
-          eq(factoryAccountWhatsappRules.ledgerAccountId, accountId),
-        ));
+        .where(
+          and(
+            eq(factoryAccountWhatsappRules.companyId, companyId),
+            eq(factoryAccountWhatsappRules.ledgerAccountId, accountId)
+          )
+        );
 
       if (!rule?.whatsappChatId) {
         return res.status(400).json({ message: "No WhatsApp target configured for this account" });
@@ -134,17 +142,17 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
       if (month) {
         const base = new Date(`${month}-01T00:00:00`);
         startDate = format(startOfMonth(base), "yyyy-MM-dd");
-        endDate   = format(endOfMonth(base),   "yyyy-MM-dd");
+        endDate = format(endOfMonth(base), "yyyy-MM-dd");
       } else {
         const now = new Date();
         startDate = format(startOfMonth(now), "yyyy-MM-dd");
-        endDate   = format(endOfMonth(now),   "yyyy-MM-dd");
+        endDate = format(endOfMonth(now), "yyyy-MM-dd");
       }
 
       const safeAccName = acct.name.replace(/[^\w\s.()\-]/g, "_");
-      const monthLabel  = month ?? format(new Date(), "yyyy-MM");
-      const fileName    = `${safeAccName} Statement ${monthLabel}.pdf`;
-      const caption     = `${acct.name} — Statement ${monthLabel}`;
+      const monthLabel = month ?? format(new Date(), "yyyy-MM");
+      const fileName = `${safeAccName} Statement ${monthLabel}.pdf`;
+      const caption = `${acct.name} — Statement ${monthLabel}`;
 
       const pdfBuf = await generateAccountStatementPdf({
         accountType: "ledger",
@@ -155,12 +163,7 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
         lang: "en",
       });
 
-      const result = await sendWhatsAppFileByUploadPos(
-        rule.whatsappChatId,
-        pdfBuf,
-        fileName,
-        caption,
-      );
+      const result = await sendWhatsAppFileByUploadPos(rule.whatsappChatId, pdfBuf, fileName, caption);
 
       if (!result.success) {
         console.error("[factory-wa] manual send failed", result.error);
@@ -185,21 +188,24 @@ export function registerFactoryWhatsappRoutes(app: Express, requireAuth: any) {
  * or { prompt: false } when no rule is configured / applicable.
  */
 export async function checkAccountWhatsAppRule(opts: {
-  companyId:    number;
-  accountId:    number;
-  accountType:  string;
-  voucherType:  "Payment" | "Receipt" | "Journal";
-  voucherDate:  string;
+  companyId: number;
+  accountId: number;
+  accountType: string;
+  voucherType: "Payment" | "Receipt" | "Journal";
+  voucherDate: string;
 }): Promise<{ prompt: boolean; accountId?: number; voucherDate?: string; month?: string }> {
   const { companyId, accountId, accountType, voucherType, voucherDate } = opts;
   if (accountType !== "ledger") return { prompt: false };
   try {
-    const [rule] = await db.select()
+    const [rule] = await db
+      .select()
       .from(factoryAccountWhatsappRules)
-      .where(and(
-        eq(factoryAccountWhatsappRules.companyId, companyId),
-        eq(factoryAccountWhatsappRules.ledgerAccountId, accountId),
-      ));
+      .where(
+        and(
+          eq(factoryAccountWhatsappRules.companyId, companyId),
+          eq(factoryAccountWhatsappRules.ledgerAccountId, accountId)
+        )
+      );
     if (!rule || !rule.enabled || !rule.whatsappChatId) return { prompt: false };
     if (voucherType === "Payment" && !rule.sendOnPayment) return { prompt: false };
     if (voucherType === "Receipt" && !rule.sendOnReceipt) return { prompt: false };
@@ -218,11 +224,11 @@ export async function checkAccountWhatsAppRule(opts: {
  * Returns a result summary for the API response.
  */
 export async function triggerAccountWhatsAppStatement(opts: {
-  companyId:    number;
-  accountId:    number;
-  accountType:  string;    // "ledger" | "bank" | ...
-  voucherType:  "Payment" | "Receipt" | "Journal";
-  voucherDate:  string;    // yyyy-MM-dd
+  companyId: number;
+  accountId: number;
+  accountType: string; // "ledger" | "bank" | ...
+  voucherType: "Payment" | "Receipt" | "Journal";
+  voucherDate: string; // yyyy-MM-dd
 }): Promise<{ sent: boolean; error?: string }> {
   const { companyId, accountId, accountType, voucherType, voucherDate } = opts;
 
@@ -230,12 +236,15 @@ export async function triggerAccountWhatsAppStatement(opts: {
   if (accountType !== "ledger") return { sent: false };
 
   try {
-    const [rule] = await db.select()
+    const [rule] = await db
+      .select()
       .from(factoryAccountWhatsappRules)
-      .where(and(
-        eq(factoryAccountWhatsappRules.companyId, companyId),
-        eq(factoryAccountWhatsappRules.ledgerAccountId, accountId),
-      ));
+      .where(
+        and(
+          eq(factoryAccountWhatsappRules.companyId, companyId),
+          eq(factoryAccountWhatsappRules.ledgerAccountId, accountId)
+        )
+      );
 
     if (!rule || !rule.enabled || !rule.whatsappChatId) return { sent: false };
 
@@ -245,18 +254,19 @@ export async function triggerAccountWhatsAppStatement(opts: {
     if (voucherType === "Journal" && !rule.sendOnJournal) return { sent: false };
 
     // Month boundaries from voucher date
-    const base      = new Date(`${voucherDate}T00:00:00`);
+    const base = new Date(`${voucherDate}T00:00:00`);
     const startDate = format(startOfMonth(base), "yyyy-MM-dd");
-    const endDate   = format(endOfMonth(base),   "yyyy-MM-dd");
+    const endDate = format(endOfMonth(base), "yyyy-MM-dd");
     const monthLabel = format(base, "yyyy-MM");
 
-    const [acct] = await db.select({ name: ledgerAccounts.name })
+    const [acct] = await db
+      .select({ name: ledgerAccounts.name })
       .from(ledgerAccounts)
       .where(eq(ledgerAccounts.id, accountId));
-    const accName  = acct?.name ?? `Account #${accountId}`;
+    const accName = acct?.name ?? `Account #${accountId}`;
     const safeAccName = accName.replace(/[^\w\s.()\-]/g, "_");
     const fileName = `${safeAccName} Statement ${monthLabel}.pdf`;
-    const caption  = `${accName} — Statement ${monthLabel}`;
+    const caption = `${accName} — Statement ${monthLabel}`;
 
     const pdfBuf = await generateAccountStatementPdf({
       accountType: "ledger",
@@ -267,12 +277,7 @@ export async function triggerAccountWhatsAppStatement(opts: {
       lang: "en",
     });
 
-    const result = await sendWhatsAppFileByUploadPos(
-      rule.whatsappChatId,
-      pdfBuf,
-      fileName,
-      caption,
-    );
+    const result = await sendWhatsAppFileByUploadPos(rule.whatsappChatId, pdfBuf, fileName, caption);
 
     if (!result.success) {
       console.error("[factory-wa] auto-send failed", { accountId, voucherType, error: result.error });

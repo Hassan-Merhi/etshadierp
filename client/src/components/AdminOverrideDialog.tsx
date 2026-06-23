@@ -19,12 +19,7 @@ interface AdminOverrideDialogProps {
  * `/api/factory/admin-verify` before invoking `onSuccess`. Built on top of
  * the canonical {@link ConfirmDialog} primitive.
  */
-export function AdminOverrideDialog({
-  open,
-  actionLabel,
-  onSuccess,
-  onCancel,
-}: AdminOverrideDialogProps) {
+export function AdminOverrideDialog({ open, actionLabel, onSuccess, onCancel }: AdminOverrideDialogProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
@@ -113,13 +108,7 @@ export function AdminOverrideDialog({
             disabled={verifyMutation.isPending}
           />
         </div>
-        {errorMsg && (
-          <AlertPanel
-            tone="destructive"
-            description={errorMsg}
-            data-testid="text-admin-override-error"
-          />
-        )}
+        {errorMsg && <AlertPanel tone="destructive" description={errorMsg} data-testid="text-admin-override-error" />}
       </div>
     </ConfirmDialog>
   );

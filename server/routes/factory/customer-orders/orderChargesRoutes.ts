@@ -10,44 +10,112 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, recalculateOrderTotals,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  recalculateOrderTotals,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  customerOrderBaleRemovals, customerOrderExpectedLines,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
+  customerOrderBaleRemovals,
+  customerOrderExpectedLines,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -55,7 +123,6 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
 
 export function registerOrderChargesRoutes(app: Express) {
   app.post("/api/factory/customer-orders/:id/charges", requireAuth, async (req: any, res: any) => {
@@ -69,22 +136,30 @@ export function registerOrderChargesRoutes(app: Express) {
       const { name, amount, chargeType, ledgerAccountId } = req.body;
       if (!name || !amount) return res.status(400).json({ message: "name and amount are required" });
 
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
-      const [newCharge] = await db.insert(customerOrderCharges).values({
-        orderId,
-        name,
-        amount: String(amount),
-        chargeType: chargeType || "OTHER",
-        ledgerAccountId: ledgerAccountId ? parseInt(ledgerAccountId) : null,
-      }).returning();
+      const [newCharge] = await db
+        .insert(customerOrderCharges)
+        .values({
+          orderId,
+          name,
+          amount: String(amount),
+          chargeType: chargeType || "OTHER",
+          ledgerAccountId: ledgerAccountId ? parseInt(ledgerAccountId) : null,
+        })
+        .returning();
 
       await recalculateOrderTotals(db, orderId);
 
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
-      const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+      const updatedCharges = await db
+        .select()
+        .from(customerOrderCharges)
+        .where(eq(customerOrderCharges.orderId, orderId));
 
       const resolvedLedgerAccountId = newCharge?.ledgerAccountId;
       const chargeAmt = parseFloat(String(amount) || "0");
@@ -93,15 +168,19 @@ export function registerOrderChargesRoutes(app: Express) {
       let chargeWarning: string | undefined;
       if (updatedOrder.status === "FINALIZED") {
         const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
-        const [existingLedgerEntry] = await db.select({ id: customerBalances.id })
+        const [existingLedgerEntry] = await db
+          .select({ id: customerBalances.id })
           .from(customerBalances)
-          .where(and(
-            eq(customerBalances.companyId, companyId),
-            eq(customerBalances.referenceType, "INVOICE"),
-            eq(customerBalances.referenceId, orderId)
-          ));
+          .where(
+            and(
+              eq(customerBalances.companyId, companyId),
+              eq(customerBalances.referenceType, "INVOICE"),
+              eq(customerBalances.referenceId, orderId)
+            )
+          );
         if (existingLedgerEntry) {
-          await db.update(customerBalances)
+          await db
+            .update(customerBalances)
             .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
             .where(eq(customerBalances.id, existingLedgerEntry.id));
         }
@@ -110,16 +189,22 @@ export function registerOrderChargesRoutes(app: Express) {
         // Gate: charge must have a ledger account linked + charge amount > 0
         // invoiceNumber is optional — fall back to ORD-{id} so old orders aren't silently skipped
         if (newCharge && resolvedLedgerAccountId && chargeAmt > 0) {
-          const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId, legalName: customers.legalName })
-            .from(customers).where(eq(customers.id, order.customerId));
+          const [customer] = await db
+            .select({ ledgerAccountId: customers.ledgerAccountId, legalName: customers.legalName })
+            .from(customers)
+            .where(eq(customers.id, order.customerId));
           // Auto-create and link a ledger account for the customer if one doesn't exist
           let customerLedgerAccountId = customer?.ledgerAccountId;
           if (!customerLedgerAccountId) {
             const customerName = customer?.legalName || `Customer ${order.customerId}`;
             customerLedgerAccountId = await getOrCreateLedgerAccount(
-              companyId, `CUST-${order.customerId}`, customerName, "Asset"
+              companyId,
+              `CUST-${order.customerId}`,
+              customerName,
+              "Asset"
             );
-            await db.update(customers)
+            await db
+              .update(customers)
               .set({ ledgerAccountId: customerLedgerAccountId })
               .where(eq(customers.id, order.customerId));
           }
@@ -130,15 +215,18 @@ export function registerOrderChargesRoutes(app: Express) {
             : `${name} - ${voucherRef}`;
           // Atomic: voucher + entries + FK stamp must all commit together
           await db.transaction(async (tx: any) => {
-            const [chargeVoucher] = await tx.insert(vouchers).values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: chargeVoucherNumber,
-              voucherDate: updatedOrder.orderDate || getClientDate(req),
-              description: chargeDesc,
-              totalAmount: String(chargeAmt),
-              sourceModule: "FACTORY",
-            }).returning();
+            const [chargeVoucher] = await tx
+              .insert(vouchers)
+              .values({
+                companyId,
+                voucherType: "Journal",
+                voucherNumber: chargeVoucherNumber,
+                voucherDate: updatedOrder.orderDate || getClientDate(req),
+                description: chargeDesc,
+                totalAmount: String(chargeAmt),
+                sourceModule: "FACTORY",
+              })
+              .returning();
             await tx.insert(voucherEntries).values({
               voucherId: chargeVoucher.id,
               ledgerAccountId: customerLedgerAccountId,
@@ -154,7 +242,8 @@ export function registerOrderChargesRoutes(app: Express) {
               creditAmount: String(chargeAmt),
               narration: chargeDesc,
             });
-            await tx.update(customerOrderCharges)
+            await tx
+              .update(customerOrderCharges)
               .set({ voucherId: chargeVoucher.id })
               .where(eq(customerOrderCharges.id, newCharge.id));
           });
@@ -166,15 +255,19 @@ export function registerOrderChargesRoutes(app: Express) {
       // Sync daybook INVOICE row with new grand total (FINALIZED path)
       if (updatedOrder.status === "FINALIZED") {
         const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
-        const [daybookEntry] = await db.select({ id: factoryDaybookEntries.id })
+        const [daybookEntry] = await db
+          .select({ id: factoryDaybookEntries.id })
           .from(factoryDaybookEntries)
-          .where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "INVOICE"),
-            eq(factoryDaybookEntries.referenceId, orderId)
-          ));
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "INVOICE"),
+              eq(factoryDaybookEntries.referenceId, orderId)
+            )
+          );
         if (daybookEntry) {
-          await db.update(factoryDaybookEntries)
+          await db
+            .update(factoryDaybookEntries)
             .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
             .where(eq(factoryDaybookEntries.id, daybookEntry.id));
         }
@@ -183,15 +276,19 @@ export function registerOrderChargesRoutes(app: Express) {
       // Sync daybook ORDER_VERIFIED row with new grand total (VERIFIED path)
       if (updatedOrder.status === "VERIFIED") {
         const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
-        const [verifiedDaybookEntry] = await db.select({ id: factoryDaybookEntries.id })
+        const [verifiedDaybookEntry] = await db
+          .select({ id: factoryDaybookEntries.id })
           .from(factoryDaybookEntries)
-          .where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
-            eq(factoryDaybookEntries.referenceId, orderId)
-          ));
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+              eq(factoryDaybookEntries.referenceId, orderId)
+            )
+          );
         if (verifiedDaybookEntry) {
-          await db.update(factoryDaybookEntries)
+          await db
+            .update(factoryDaybookEntries)
             .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
             .where(eq(factoryDaybookEntries.id, verifiedDaybookEntry.id));
         }
@@ -202,10 +299,14 @@ export function registerOrderChargesRoutes(app: Express) {
       // invoice-based name, so it is never double-counted.
       if (
         ["PENDING_VERIFICATION", "VERIFIED"].includes(updatedOrder.status) &&
-        newCharge && resolvedLedgerAccountId && chargeAmt > 0
+        newCharge &&
+        resolvedLedgerAccountId &&
+        chargeAmt > 0
       ) {
-        const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId })
-          .from(customers).where(eq(customers.id, order.customerId));
+        const [customer] = await db
+          .select({ ledgerAccountId: customers.ledgerAccountId })
+          .from(customers)
+          .where(eq(customers.id, order.customerId));
         if (customer?.ledgerAccountId) {
           const preVoucherNumber = `CHARGE-PRE-${orderId}-${newCharge.id}`;
           const chargeDesc = order.containerNumber
@@ -214,15 +315,18 @@ export function registerOrderChargesRoutes(app: Express) {
           // Phase 6: atomic — voucher + entries + FK stamp must all commit together
           // to avoid orphaned (unlinked) vouchers on mid-flight failure.
           await db.transaction(async (tx: any) => {
-            const [chargeVoucher] = await tx.insert(vouchers).values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: preVoucherNumber,
-              voucherDate: order.orderDate || getClientDate(req),
-              description: chargeDesc,
-              totalAmount: String(chargeAmt),
-              sourceModule: "FACTORY",
-            }).returning();
+            const [chargeVoucher] = await tx
+              .insert(vouchers)
+              .values({
+                companyId,
+                voucherType: "Journal",
+                voucherNumber: preVoucherNumber,
+                voucherDate: order.orderDate || getClientDate(req),
+                description: chargeDesc,
+                totalAmount: String(chargeAmt),
+                sourceModule: "FACTORY",
+              })
+              .returning();
             await tx.insert(voucherEntries).values({
               voucherId: chargeVoucher.id,
               ledgerAccountId: customer.ledgerAccountId,
@@ -238,7 +342,8 @@ export function registerOrderChargesRoutes(app: Express) {
               creditAmount: String(chargeAmt),
               narration: chargeDesc,
             });
-            await tx.update(customerOrderCharges)
+            await tx
+              .update(customerOrderCharges)
               .set({ voucherId: chargeVoucher.id })
               .where(eq(customerOrderCharges.id, newCharge.id));
           });
@@ -261,13 +366,17 @@ export function registerOrderChargesRoutes(app: Express) {
       const orderId = parseId(req.params.id);
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
       if (order.status !== "FINALIZED") return res.status(400).json({ message: "Order is not finalized" });
 
-      const [customer] = await db.select({ ledgerAccountId: customers.ledgerAccountId, legalName: customers.legalName })
-        .from(customers).where(eq(customers.id, order.customerId));
+      const [customer] = await db
+        .select({ ledgerAccountId: customers.ledgerAccountId, legalName: customers.legalName })
+        .from(customers)
+        .where(eq(customers.id, order.customerId));
 
       // Auto-create and link a ledger account for the customer if one doesn't exist yet
       let customerLedgerAccountId = customer?.ledgerAccountId;
@@ -279,42 +388,44 @@ export function registerOrderChargesRoutes(app: Express) {
           customerName,
           "Asset"
         );
-        await db.update(customers)
+        await db
+          .update(customers)
           .set({ ledgerAccountId: customerLedgerAccountId })
           .where(eq(customers.id, order.customerId));
       }
 
       // Find all charges missing a voucher
-      const unlinkedCharges = await db.select().from(customerOrderCharges)
-        .where(and(
-          eq(customerOrderCharges.orderId, orderId),
-          isNull(customerOrderCharges.voucherId),
-        ));
+      const unlinkedCharges = await db
+        .select()
+        .from(customerOrderCharges)
+        .where(and(eq(customerOrderCharges.orderId, orderId), isNull(customerOrderCharges.voucherId)));
 
-      const actionableCharges = unlinkedCharges.filter(c => parseFloat(c.amount || "0") > 0);
+      const actionableCharges = unlinkedCharges.filter((c) => parseFloat(c.amount || "0") > 0);
       if (actionableCharges.length === 0) {
         return res.json({ linked: 0, message: "All charges already have ledger entries — nothing to relink." });
       }
 
       // For charges without a ledgerAccountId, attempt to auto-match by name
       // (e.g. a charge named "Surcharge" matches a ledger account named "Surcharge")
-      const allLedgerAccounts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+      const allLedgerAccounts = await db
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
         .from(ledgerAccounts)
         .where(eq(ledgerAccounts.companyId, companyId));
 
-      const resolvedCharges: Array<typeof actionableCharges[0] & { resolvedLedgerAccountId: number }> = [];
+      const resolvedCharges: Array<(typeof actionableCharges)[0] & { resolvedLedgerAccountId: number }> = [];
       const skipped: string[] = [];
 
       for (const charge of actionableCharges) {
         let resolvedId = charge.ledgerAccountId ?? null;
         if (!resolvedId && charge.name) {
           const match = allLedgerAccounts.find(
-            a => a.name.trim().toLowerCase() === charge.name!.trim().toLowerCase()
+            (a) => a.name.trim().toLowerCase() === charge.name!.trim().toLowerCase()
           );
           if (match) {
             resolvedId = match.id;
             // Persist the resolved account so future relinks don't need to re-match
-            await db.update(customerOrderCharges)
+            await db
+              .update(customerOrderCharges)
               .set({ ledgerAccountId: resolvedId })
               .where(eq(customerOrderCharges.id, charge.id));
           }
@@ -344,15 +455,18 @@ export function registerOrderChargesRoutes(app: Express) {
           : `${charge.name} - ${voucherRef}`;
 
         await db.transaction(async (tx: any) => {
-          const [chargeVoucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherType: "Journal",
-            voucherNumber: chargeVoucherNumber,
-            voucherDate: order.orderDate || getClientDate(req),
-            description: chargeDesc,
-            totalAmount: String(chargeAmt),
-            sourceModule: "FACTORY",
-          }).returning();
+          const [chargeVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: chargeVoucherNumber,
+              voucherDate: order.orderDate || getClientDate(req),
+              description: chargeDesc,
+              totalAmount: String(chargeAmt),
+              sourceModule: "FACTORY",
+            })
+            .returning();
           await tx.insert(voucherEntries).values({
             voucherId: chargeVoucher.id,
             ledgerAccountId: customerLedgerAccountId,
@@ -368,15 +482,21 @@ export function registerOrderChargesRoutes(app: Express) {
             creditAmount: String(chargeAmt),
             narration: chargeDesc,
           });
-          await tx.update(customerOrderCharges)
+          await tx
+            .update(customerOrderCharges)
             .set({ voucherId: chargeVoucher.id })
             .where(eq(customerOrderCharges.id, charge.id));
         });
         linked++;
       }
 
-      const skippedMsg = skipped.length ? ` ${skipped.length} skipped (no matching account): ${skipped.join(", ")}.` : "";
-      res.json({ linked, message: `${linked} charge${linked !== 1 ? "s" : ""} successfully linked to the ledger.${skippedMsg}` });
+      const skippedMsg = skipped.length
+        ? ` ${skipped.length} skipped (no matching account): ${skipped.join(", ")}.`
+        : "";
+      res.json({
+        linked,
+        message: `${linked} charge${linked !== 1 ? "s" : ""} successfully linked to the ledger.${skippedMsg}`,
+      });
     } catch (error: any) {
       console.error("Error relinking charge vouchers:", error);
       res.status(500).json({ message: error.message });
@@ -394,26 +514,31 @@ export function registerOrderChargesRoutes(app: Express) {
       const chargeId = parseId(req.params.chargeId);
       if (chargeId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
       const { ledgerAccountId, amount, name } = req.body;
       const updateData: Record<string, unknown> = {};
-      if (ledgerAccountId !== undefined) updateData.ledgerAccountId = ledgerAccountId ? parseInt(ledgerAccountId) : null;
+      if (ledgerAccountId !== undefined)
+        updateData.ledgerAccountId = ledgerAccountId ? parseInt(ledgerAccountId) : null;
       if (amount !== undefined) updateData.amount = parseFloat(amount).toFixed(2);
       if (name !== undefined) updateData.name = name;
 
       if (Object.keys(updateData).length === 0) return res.status(400).json({ message: "Nothing to update" });
 
       // Read the charge BEFORE update so we have the voucherId
-      const [chargeBeforeUpdate] = await db.select()
+      const [chargeBeforeUpdate] = await db
+        .select()
         .from(customerOrderCharges)
         .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
       if (!chargeBeforeUpdate) return res.status(404).json({ message: "Charge not found" });
 
       await db.transaction(async (tx: any) => {
-        await tx.update(customerOrderCharges)
+        await tx
+          .update(customerOrderCharges)
           .set(updateData)
           .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
 
@@ -425,46 +550,64 @@ export function registerOrderChargesRoutes(app: Express) {
           const linkedVoucherId = chargeBeforeUpdate.voucherId;
 
           // Update voucher header total
-          await tx.update(vouchers)
+          await tx
+            .update(vouchers)
             .set({ totalAmount: String(newAmt) })
             .where(eq(vouchers.id, linkedVoucherId));
 
           // Update the debit-side entry (customer account)
-          await tx.update(voucherEntries)
+          await tx
+            .update(voucherEntries)
             .set({ debitAmount: String(newAmt) })
-            .where(and(
-              eq(voucherEntries.voucherId, linkedVoucherId),
-              sql`cast(${voucherEntries.debitAmount} as numeric) > 0`
-            ));
+            .where(
+              and(
+                eq(voucherEntries.voucherId, linkedVoucherId),
+                sql`cast(${voucherEntries.debitAmount} as numeric) > 0`
+              )
+            );
 
           // Update the credit-side entry (charge ledger account)
-          await tx.update(voucherEntries)
+          await tx
+            .update(voucherEntries)
             .set({ creditAmount: String(newAmt) })
-            .where(and(
-              eq(voucherEntries.voucherId, linkedVoucherId),
-              sql`cast(${voucherEntries.creditAmount} as numeric) > 0`
-            ));
+            .where(
+              and(
+                eq(voucherEntries.voucherId, linkedVoucherId),
+                sql`cast(${voucherEntries.creditAmount} as numeric) > 0`
+              )
+            );
         }
 
         // PENDING_VERIFICATION / VERIFIED — update existing PRE-voucher amount on edit
-        if (amount !== undefined && ["PENDING_VERIFICATION", "VERIFIED"].includes(order.status) && chargeBeforeUpdate.voucherId) {
+        if (
+          amount !== undefined &&
+          ["PENDING_VERIFICATION", "VERIFIED"].includes(order.status) &&
+          chargeBeforeUpdate.voucherId
+        ) {
           const newAmt = parseFloat(amount);
           const linkedVoucherId = chargeBeforeUpdate.voucherId;
-          await tx.update(vouchers)
+          await tx
+            .update(vouchers)
             .set({ totalAmount: String(newAmt) })
             .where(eq(vouchers.id, linkedVoucherId));
-          await tx.update(voucherEntries)
+          await tx
+            .update(voucherEntries)
             .set({ debitAmount: String(newAmt) })
-            .where(and(
-              eq(voucherEntries.voucherId, linkedVoucherId),
-              sql`cast(${voucherEntries.debitAmount} as numeric) > 0`
-            ));
-          await tx.update(voucherEntries)
+            .where(
+              and(
+                eq(voucherEntries.voucherId, linkedVoucherId),
+                sql`cast(${voucherEntries.debitAmount} as numeric) > 0`
+              )
+            );
+          await tx
+            .update(voucherEntries)
             .set({ creditAmount: String(newAmt) })
-            .where(and(
-              eq(voucherEntries.voucherId, linkedVoucherId),
-              sql`cast(${voucherEntries.creditAmount} as numeric) > 0`
-            ));
+            .where(
+              and(
+                eq(voucherEntries.voucherId, linkedVoucherId),
+                sql`cast(${voucherEntries.creditAmount} as numeric) > 0`
+              )
+            );
         }
 
         // If a ledger account is being assigned to a charge that has NO voucher yet,
@@ -475,30 +618,37 @@ export function registerOrderChargesRoutes(app: Express) {
           !chargeBeforeUpdate.voucherId &&
           ["PENDING_VERIFICATION", "VERIFIED", "FINALIZED"].includes(order.status)
         ) {
-          const [updatedCharge] = await tx.select()
+          const [updatedCharge] = await tx
+            .select()
             .from(customerOrderCharges)
             .where(eq(customerOrderCharges.id, chargeId));
           const chargeAmt = parseFloat(updatedCharge?.amount || String(amount) || "0");
           if (chargeAmt > 0) {
-            const [customer] = await tx.select({ ledgerAccountId: customers.ledgerAccountId })
-              .from(customers).where(eq(customers.id, order.customerId));
+            const [customer] = await tx
+              .select({ ledgerAccountId: customers.ledgerAccountId })
+              .from(customers)
+              .where(eq(customers.id, order.customerId));
             if (customer?.ledgerAccountId) {
               const isFinalized = order.status === "FINALIZED";
-              const voucherNum = isFinalized && order.invoiceNumber
-                ? `CHARGE-${order.invoiceNumber}-${chargeId}-${Date.now()}`
-                : `CHARGE-PRE-${orderId}-${chargeId}`;
+              const voucherNum =
+                isFinalized && order.invoiceNumber
+                  ? `CHARGE-${order.invoiceNumber}-${chargeId}-${Date.now()}`
+                  : `CHARGE-PRE-${orderId}-${chargeId}`;
               const chargeDesc = order.containerNumber
                 ? `${updatedCharge?.name || "Charge"} for container - ${order.containerNumber}`
                 : `${updatedCharge?.name || "Charge"} - Order #${orderId}`;
-              const [chargeVoucher] = await tx.insert(vouchers).values({
-                companyId,
-                voucherType: "Journal",
-                voucherNumber: voucherNum,
-                voucherDate: order.orderDate || getClientDate(req),
-                description: chargeDesc,
-                totalAmount: String(chargeAmt),
-                sourceModule: "FACTORY",
-              }).returning();
+              const [chargeVoucher] = await tx
+                .insert(vouchers)
+                .values({
+                  companyId,
+                  voucherType: "Journal",
+                  voucherNumber: voucherNum,
+                  voucherDate: order.orderDate || getClientDate(req),
+                  description: chargeDesc,
+                  totalAmount: String(chargeAmt),
+                  sourceModule: "FACTORY",
+                })
+                .returning();
               await tx.insert(voucherEntries).values({
                 voucherId: chargeVoucher.id,
                 ledgerAccountId: customer.ledgerAccountId,
@@ -514,7 +664,8 @@ export function registerOrderChargesRoutes(app: Express) {
                 creditAmount: String(chargeAmt),
                 narration: chargeDesc,
               });
-              await tx.update(customerOrderCharges)
+              await tx
+                .update(customerOrderCharges)
                 .set({ voucherId: chargeVoucher.id })
                 .where(eq(customerOrderCharges.id, chargeId));
             }
@@ -523,32 +674,42 @@ export function registerOrderChargesRoutes(app: Express) {
 
         // If order is FINALIZED, sync customerBalances and daybook with new grand total
         if (order.status === "FINALIZED" && amount !== undefined) {
-          const [recalcOrder] = await tx.select({ grandTotal: customerOrders.grandTotal })
-            .from(customerOrders).where(eq(customerOrders.id, orderId));
+          const [recalcOrder] = await tx
+            .select({ grandTotal: customerOrders.grandTotal })
+            .from(customerOrders)
+            .where(eq(customerOrders.id, orderId));
           const newGrandTotal = parseFloat(recalcOrder?.grandTotal || "0");
 
-          const [existingLedgerEntry] = await tx.select({ id: customerBalances.id })
+          const [existingLedgerEntry] = await tx
+            .select({ id: customerBalances.id })
             .from(customerBalances)
-            .where(and(
-              eq(customerBalances.companyId, companyId),
-              eq(customerBalances.referenceType, "INVOICE"),
-              eq(customerBalances.referenceId, orderId)
-            ));
+            .where(
+              and(
+                eq(customerBalances.companyId, companyId),
+                eq(customerBalances.referenceType, "INVOICE"),
+                eq(customerBalances.referenceId, orderId)
+              )
+            );
           if (existingLedgerEntry) {
-            await tx.update(customerBalances)
+            await tx
+              .update(customerBalances)
               .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
               .where(eq(customerBalances.id, existingLedgerEntry.id));
           }
 
-          const [daybookEntry] = await tx.select({ id: factoryDaybookEntries.id })
+          const [daybookEntry] = await tx
+            .select({ id: factoryDaybookEntries.id })
             .from(factoryDaybookEntries)
-            .where(and(
-              eq(factoryDaybookEntries.companyId, companyId),
-              eq(factoryDaybookEntries.txType, "INVOICE"),
-              eq(factoryDaybookEntries.referenceId, orderId)
-            ));
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "INVOICE"),
+                eq(factoryDaybookEntries.referenceId, orderId)
+              )
+            );
           if (daybookEntry) {
-            await tx.update(factoryDaybookEntries)
+            await tx
+              .update(factoryDaybookEntries)
               .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
               .where(eq(factoryDaybookEntries.id, daybookEntry.id));
           }
@@ -556,18 +717,24 @@ export function registerOrderChargesRoutes(app: Express) {
 
         // Sync daybook ORDER_VERIFIED entry when charge amount edited on a VERIFIED order
         if (order.status === "VERIFIED" && amount !== undefined) {
-          const [recalcOrder] = await tx.select({ grandTotal: customerOrders.grandTotal })
-            .from(customerOrders).where(eq(customerOrders.id, orderId));
+          const [recalcOrder] = await tx
+            .select({ grandTotal: customerOrders.grandTotal })
+            .from(customerOrders)
+            .where(eq(customerOrders.id, orderId));
           const newGrandTotal = parseFloat(recalcOrder?.grandTotal || "0");
-          const [verifiedDaybookEntry] = await tx.select({ id: factoryDaybookEntries.id })
+          const [verifiedDaybookEntry] = await tx
+            .select({ id: factoryDaybookEntries.id })
             .from(factoryDaybookEntries)
-            .where(and(
-              eq(factoryDaybookEntries.companyId, companyId),
-              eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
-              eq(factoryDaybookEntries.referenceId, orderId)
-            ));
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+                eq(factoryDaybookEntries.referenceId, orderId)
+              )
+            );
           if (verifiedDaybookEntry) {
-            await tx.update(factoryDaybookEntries)
+            await tx
+              .update(factoryDaybookEntries)
               .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
               .where(eq(factoryDaybookEntries.id, verifiedDaybookEntry.id));
           }
@@ -575,7 +742,10 @@ export function registerOrderChargesRoutes(app: Express) {
       });
 
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
-      const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+      const updatedCharges = await db
+        .select()
+        .from(customerOrderCharges)
+        .where(eq(customerOrderCharges.orderId, orderId));
 
       res.json({ ...updatedOrder, charges: updatedCharges });
     } catch (error: any) {
@@ -595,23 +765,30 @@ export function registerOrderChargesRoutes(app: Express) {
       const chargeId = parseId(req.params.chargeId);
       if (chargeId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
       // Phase 6: read FK linkage BEFORE deleting the charge so we can drop the linked voucher precisely
-      const [chargeRow] = await db.select({ voucherId: customerOrderCharges.voucherId })
+      const [chargeRow] = await db
+        .select({ voucherId: customerOrderCharges.voucherId })
         .from(customerOrderCharges)
         .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
       const linkedVoucherId = chargeRow?.voucherId ?? null;
 
-      await db.delete(customerOrderCharges)
+      await db
+        .delete(customerOrderCharges)
         .where(and(eq(customerOrderCharges.orderId, orderId), eq(customerOrderCharges.id, chargeId)));
 
       await recalculateOrderTotals(db, orderId);
 
       const [updatedOrder] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderId));
-      const updatedCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+      const updatedCharges = await db
+        .select()
+        .from(customerOrderCharges)
+        .where(eq(customerOrderCharges.orderId, orderId));
 
       // Phase 6: prefer FK-based delete; fall back to voucherNumber pattern for legacy unbacked rows
       let chargeVoucherIdsToDelete: number[] = [];
@@ -621,14 +798,17 @@ export function registerOrderChargesRoutes(app: Express) {
         // Legacy fallback: PRE-voucher pattern + invoice-number pattern
         const legacyPatterns: string[] = [`CHARGE-PRE-${orderId}-${chargeId}`];
         if (order.invoiceNumber) legacyPatterns.push(`CHARGE-${order.invoiceNumber}-${chargeId}-%`);
-        const legacyMatches = await db.select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
+        const legacyMatches = await db
+          .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
           .from(vouchers)
-          .where(and(
-            eq(vouchers.companyId, companyId),
-            sql`(${vouchers.voucherNumber} = ${legacyPatterns[0]}${
-              legacyPatterns.length > 1 ? sql` OR ${vouchers.voucherNumber} LIKE ${legacyPatterns[1]}` : sql``
-            })`,
-          ));
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              sql`(${vouchers.voucherNumber} = ${legacyPatterns[0]}${
+                legacyPatterns.length > 1 ? sql` OR ${vouchers.voucherNumber} LIKE ${legacyPatterns[1]}` : sql``
+              })`
+            )
+          );
         chargeVoucherIdsToDelete = legacyMatches.map((v: any) => v.id);
       }
 
@@ -640,15 +820,19 @@ export function registerOrderChargesRoutes(app: Express) {
       // Sync customerBalances ledger entry if the order is already finalized
       if (updatedOrder.status === "FINALIZED") {
         const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
-        const [existingLedgerEntry] = await db.select({ id: customerBalances.id })
+        const [existingLedgerEntry] = await db
+          .select({ id: customerBalances.id })
           .from(customerBalances)
-          .where(and(
-            eq(customerBalances.companyId, companyId),
-            eq(customerBalances.referenceType, "INVOICE"),
-            eq(customerBalances.referenceId, orderId)
-          ));
+          .where(
+            and(
+              eq(customerBalances.companyId, companyId),
+              eq(customerBalances.referenceType, "INVOICE"),
+              eq(customerBalances.referenceId, orderId)
+            )
+          );
         if (existingLedgerEntry) {
-          await db.update(customerBalances)
+          await db
+            .update(customerBalances)
             .set({ debitAmount: String(newGrandTotal), balance: String(newGrandTotal) })
             .where(eq(customerBalances.id, existingLedgerEntry.id));
         }
@@ -657,15 +841,19 @@ export function registerOrderChargesRoutes(app: Express) {
       // Sync daybook ORDER_VERIFIED entry when a charge is deleted from a VERIFIED order
       if (updatedOrder.status === "VERIFIED") {
         const newGrandTotal = parseFloat(updatedOrder.grandTotal || "0");
-        const [verifiedDaybookEntry] = await db.select({ id: factoryDaybookEntries.id })
+        const [verifiedDaybookEntry] = await db
+          .select({ id: factoryDaybookEntries.id })
           .from(factoryDaybookEntries)
-          .where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
-            eq(factoryDaybookEntries.referenceId, orderId)
-          ));
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "ORDER_VERIFIED"),
+              eq(factoryDaybookEntries.referenceId, orderId)
+            )
+          );
         if (verifiedDaybookEntry) {
-          await db.update(factoryDaybookEntries)
+          await db
+            .update(factoryDaybookEntries)
             .set({ amountCurrency: newGrandTotal, amountUsd: newGrandTotal })
             .where(eq(factoryDaybookEntries.id, verifiedDaybookEntry.id));
         }

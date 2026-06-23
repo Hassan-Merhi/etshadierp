@@ -31,10 +31,14 @@ export function LoadingSkeleton({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="p-5"><Skeleton className="h-16 w-full" /></Card>
+            <Card key={i} className="p-5">
+              <Skeleton className="h-16 w-full" />
+            </Card>
           ))}
         </div>
-        <Card className="p-5"><Skeleton className="h-64 w-full" /></Card>
+        <Card className="p-5">
+          <Skeleton className="h-64 w-full" />
+        </Card>
       </div>
     );
   }
@@ -43,7 +47,9 @@ export function LoadingSkeleton({
     return (
       <div className={cn("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3", className)} data-testid={tid}>
         {Array.from({ length: rows }).map((_, i) => (
-          <Card key={i} className="p-5"><Skeleton className="h-16 w-full" /></Card>
+          <Card key={i} className="p-5">
+            <Skeleton className="h-16 w-full" />
+          </Card>
         ))}
       </div>
     );

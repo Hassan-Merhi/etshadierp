@@ -83,9 +83,7 @@ export function UserManagementForm({
                 onChange={(e) => setUsername(e.target.value)}
                 data-testid="input-drawer-username"
               />
-              {username !== user.username && (
-                <p className="text-xs text-muted-foreground">Will change on save</p>
-              )}
+              {username !== user.username && <p className="text-xs text-muted-foreground">Will change on save</p>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Display Name</Label>
@@ -166,12 +164,14 @@ export function UserManagementForm({
         <CardContent className="space-y-3">
           {isPrivileged ? (
             <p className="text-xs text-muted-foreground rounded-md bg-muted/40 px-3 py-2.5">
-              <strong>{user.role}</strong> accounts always have full access to both ERP and Factory — this cannot be restricted.
+              <strong>{user.role}</strong> accounts always have full access to both ERP and Factory — this cannot be
+              restricted.
             </p>
           ) : isViewOnly ? (
             <>
               <p className="text-xs rounded-md bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 px-3 py-2.5 text-sky-700 dark:text-sky-300">
-                This user can only view data — all write actions are blocked. Use the toggles below to choose which sections they can access. If both are on, they can view everything.
+                This user can only view data — all write actions are blocked. Use the toggles below to choose which
+                sections they can access. If both are on, they can view everything.
               </p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center justify-between rounded-md border p-3">

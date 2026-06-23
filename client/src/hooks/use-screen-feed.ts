@@ -4,48 +4,53 @@ import html2canvas from "html2canvas";
 // How often to check if a Developer is watching us (cheap GET, no canvas).
 // Kept at 15 s to avoid saturating the Android WebView JS↔Java bridge with
 // constant background fetches (was 2 s, causing steady main-thread pressure).
-const POLL_INTERVAL_MS    = 15000;
+const POLL_INTERVAL_MS = 15000;
 // How often to capture + upload a frame while being watched
 const CAPTURE_INTERVAL_MS = 3000;
 // Max time to wait for html2canvas before giving up on a frame.
 // Two attempts × 4 s each = 8 s max, inside the 12 s watcher window.
-const CAPTURE_TIMEOUT_MS  = 4000;
-const CLICK_RETAIN_MS     = 8000;
+const CAPTURE_TIMEOUT_MS = 4000;
+const CLICK_RETAIN_MS = 8000;
 // Max dataUrl size we'll bother uploading (~1.2 MB as a base64 string)
-const MAX_DATA_URL_LEN    = 1_300_000;
+const MAX_DATA_URL_LEN = 1_300_000;
 
 const isDev = import.meta.env.DEV;
 
 export interface ClickEvent {
-  x:     number;
-  y:     number;
+  x: number;
+  y: number;
   label: string;
-  ts:    number;
+  ts: number;
 }
 
 const clickBuffer: ClickEvent[] = [];
 
 function trimLabel(el: HTMLElement): string {
-  const txt = el.getAttribute("aria-label")
-    || el.getAttribute("placeholder")
-    || el.getAttribute("title")
-    || el.textContent?.trim()
-    || el.tagName.toLowerCase();
+  const txt =
+    el.getAttribute("aria-label") ||
+    el.getAttribute("placeholder") ||
+    el.getAttribute("title") ||
+    el.textContent?.trim() ||
+    el.tagName.toLowerCase();
   return txt.slice(0, 60);
 }
 
 if (typeof window !== "undefined") {
-  window.addEventListener("click", (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (target.closest("[data-screenfeed-ignore='true']")) return;
-    clickBuffer.push({
-      x:     e.clientX / window.innerWidth,
-      y:     e.clientY / window.innerHeight,
-      label: trimLabel(target),
-      ts:    Date.now(),
-    });
-    if (clickBuffer.length > 50) clickBuffer.shift();
-  }, { capture: true });
+  window.addEventListener(
+    "click",
+    (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest("[data-screenfeed-ignore='true']")) return;
+      clickBuffer.push({
+        x: e.clientX / window.innerWidth,
+        y: e.clientY / window.innerHeight,
+        label: trimLabel(target),
+        ts: Date.now(),
+      });
+      if (clickBuffer.length > 50) clickBuffer.shift();
+    },
+    { capture: true }
+  );
 }
 
 function runWhenIdle(fn: () => void): void {
@@ -69,40 +74,41 @@ function trace(event: string, extra?: string) {
 function sanitizeClone(doc: Document) {
   // Remove <img> tags — they trigger createPattern when the src can't be
   // rendered as a canvas image in Replit's Chromium sandbox.
-  doc.querySelectorAll("img").forEach(el => el.remove());
+  doc.querySelectorAll("img").forEach((el) => el.remove());
   // Remove SVG <image> elements for the same reason.
-  doc.querySelectorAll("image").forEach(el => el.remove());
+  doc.querySelectorAll("image").forEach((el) => el.remove());
   // Strip background-image from every element to avoid pattern fills.
-  doc.querySelectorAll<HTMLElement>("*").forEach(el => {
+  doc.querySelectorAll<HTMLElement>("*").forEach((el) => {
     try {
       const bg = window.getComputedStyle(el).backgroundImage;
       if (bg && bg !== "none") el.style.backgroundImage = "none";
-    } catch { /* cross-origin iframe — skip */ }
+    } catch {
+      /* cross-origin iframe — skip */
+    }
   });
 }
 
 const html2canvasBaseOpts = {
-  scale:                  0.75,
-  useCORS:                true,
-  logging:                false,
+  scale: 0.75,
+  useCORS: true,
+  logging: false,
   foreignObjectRendering: false,
-  imageTimeout:           200,
-  onclone:                (_doc: Document, _el: HTMLElement) => sanitizeClone(_doc),
-  ignoreElements: (el: Element) =>
-    el.getAttribute("data-screenfeed-ignore") === "true",
+  imageTimeout: 200,
+  onclone: (_doc: Document, _el: HTMLElement) => sanitizeClone(_doc),
+  ignoreElements: (el: Element) => el.getAttribute("data-screenfeed-ignore") === "true",
 } as const;
 
 async function tryCapture(opts: Record<string, any>): Promise<HTMLCanvasElement> {
   return Promise.race([
     html2canvas(document.body, {
       ...opts,
-      x:            window.scrollX,
-      y:            window.scrollY,
-      width:        window.innerWidth,
-      height:       window.innerHeight,
-      scrollX:     -window.scrollX,
-      scrollY:     -window.scrollY,
-      windowWidth:  window.innerWidth,
+      x: window.scrollX,
+      y: window.scrollY,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      scrollX: -window.scrollX,
+      scrollY: -window.scrollY,
+      windowWidth: window.innerWidth,
       windowHeight: window.innerHeight,
     }),
     new Promise<never>((_, reject) =>
@@ -113,10 +119,11 @@ async function tryCapture(opts: Record<string, any>): Promise<HTMLCanvasElement>
 
 /** Fallback: draw a simple text frame if html2canvas fails. Always succeeds. */
 function buildFallbackCanvas(): HTMLCanvasElement {
-  const W = 800, H = 480;
-  const c   = document.createElement("canvas");
-  c.width   = W;
-  c.height  = H;
+  const W = 800,
+    H = 480;
+  const c = document.createElement("canvas");
+  c.width = W;
+  c.height = H;
   const ctx = c.getContext("2d")!;
   const dark = document.documentElement.classList.contains("dark");
 
@@ -148,7 +155,7 @@ function buildFallbackCanvas(): HTMLCanvasElement {
 
   // List visible <h1>/<h2> text on page
   let y = 220;
-  document.querySelectorAll("h1, h2, h3").forEach(el => {
+  document.querySelectorAll("h1, h2, h3").forEach((el) => {
     const t = el.textContent?.trim().slice(0, 80);
     if (t && y < H - 20) {
       ctx.fillStyle = dark ? "#ccc" : "#222";
@@ -173,9 +180,13 @@ function withSafeCreatePattern<T>(fn: () => T): T {
   const orig = CanvasRenderingContext2D.prototype.createPattern;
   CanvasRenderingContext2D.prototype.createPattern = function (
     image: CanvasImageSource,
-    repetition: string | null,
+    repetition: string | null
   ): CanvasPattern | null {
-    try { return orig.call(this, image, repetition); } catch { return null; }
+    try {
+      return orig.call(this, image, repetition);
+    } catch {
+      return null;
+    }
   };
   try {
     return fn();
@@ -198,11 +209,13 @@ async function captureAndUpload() {
     trace("capture-fail-p1", String(err).slice(0, 80));
     // Retry once with very conservative settings
     try {
-      canvas = await withSafeCreatePattern(() => tryCapture({
-        ...html2canvasBaseOpts,
-        scale:        0.15,
-        imageTimeout: 200,
-      }));
+      canvas = await withSafeCreatePattern(() =>
+        tryCapture({
+          ...html2canvasBaseOpts,
+          scale: 0.15,
+          imageTimeout: 200,
+        })
+      );
       trace("capture-ok-retry");
     } catch (err2) {
       trace("capture-fail-p2", String(err2).slice(0, 80));
@@ -232,15 +245,15 @@ async function captureAndUpload() {
 
   trace("uploading", String(dataUrl.length));
 
-  const cutoff  = Date.now() - CLICK_RETAIN_MS;
-  const clicks  = clickBuffer.filter(c => c.ts >= cutoff);
+  const cutoff = Date.now() - CLICK_RETAIN_MS;
+  const clicks = clickBuffer.filter((c) => c.ts >= cutoff);
 
   try {
     const res = await fetch("/api/screen-feed", {
-      method:      "POST",
-      headers:     { "Content-Type": "application/json" },
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body:        JSON.stringify({ dataUrl, clicks }),
+      body: JSON.stringify({ dataUrl, clicks }),
     });
     trace("upload-done", String(res.status));
   } catch (err) {
@@ -249,9 +262,9 @@ async function captureAndUpload() {
 }
 
 export function useScreenFeed() {
-  const busyRef      = useRef(false);
-  const watchedRef   = useRef(false);
-  const captureRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const busyRef = useRef(false);
+  const watchedRef = useRef(false);
+  const captureRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     // Reset busyRef in case HMR fired mid-capture and left it stuck at true.
@@ -265,7 +278,9 @@ export function useScreenFeed() {
       if (!busyRef.current) {
         busyRef.current = true;
         runWhenIdle(() => {
-          captureAndUpload().finally(() => { busyRef.current = false; });
+          captureAndUpload().finally(() => {
+            busyRef.current = false;
+          });
         });
       }
 
@@ -273,7 +288,9 @@ export function useScreenFeed() {
         if (busyRef.current) return;
         busyRef.current = true;
         runWhenIdle(() => {
-          captureAndUpload().finally(() => { busyRef.current = false; });
+          captureAndUpload().finally(() => {
+            busyRef.current = false;
+          });
         });
       }, CAPTURE_INTERVAL_MS);
     };
@@ -287,7 +304,7 @@ export function useScreenFeed() {
 
     const pollWatcherStatus = async () => {
       try {
-        const res  = await fetch("/api/screen-feed/being-watched", { credentials: "include" });
+        const res = await fetch("/api/screen-feed/being-watched", { credentials: "include" });
         if (!res.ok) {
           if (watchedRef.current) {
             watchedRef.current = false;

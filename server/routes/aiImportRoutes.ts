@@ -43,31 +43,35 @@ async function upsertCorrection(params: {
   resolvedType: string | null;
   confidence?: number;
 }): Promise<void> {
-  const {
-    companyId, userId, memoryType, rawValue,
-    resolvedId, resolvedValue, resolvedType,
-    confidence = 100,
-  } = params;
+  const { companyId, userId, memoryType, rawValue, resolvedId, resolvedValue, resolvedType, confidence = 100 } = params;
 
   const [existing] = await db
     .select({ id: aiCorrectionMemory.id })
     .from(aiCorrectionMemory)
-    .where(and(
-      eq(aiCorrectionMemory.companyId, companyId),
-      eq(aiCorrectionMemory.memoryType, memoryType),
-      sql`LOWER(${aiCorrectionMemory.rawValue}) = LOWER(${rawValue})`,
-    ))
+    .where(
+      and(
+        eq(aiCorrectionMemory.companyId, companyId),
+        eq(aiCorrectionMemory.memoryType, memoryType),
+        sql`LOWER(${aiCorrectionMemory.rawValue}) = LOWER(${rawValue})`
+      )
+    )
     .limit(1);
 
   if (existing) {
-    await db.update(aiCorrectionMemory)
+    await db
+      .update(aiCorrectionMemory)
       .set({ resolvedId, resolvedValue, resolvedType, confidence, updatedAt: new Date() })
       .where(eq(aiCorrectionMemory.id, existing.id));
   } else {
     await db.insert(aiCorrectionMemory).values({
-      companyId, memoryType, rawValue,
-      resolvedId, resolvedValue, resolvedType,
-      confidence, createdBy: userId,
+      companyId,
+      memoryType,
+      rawValue,
+      resolvedId,
+      resolvedValue,
+      resolvedType,
+      confidence,
+      createdBy: userId,
     });
   }
 }
@@ -77,14 +81,16 @@ async function upsertCorrection(params: {
 async function validateRows(
   companyId: number,
   importType: string,
-  rows: { id: number; rowNumber: number; rawData: any }[],
-): Promise<{
-  id: number;
-  status: "valid" | "warning" | "error";
-  mappedData: any;
-  errors: string[];
-  warnings: string[];
-}[]> {
+  rows: { id: number; rowNumber: number; rawData: any }[]
+): Promise<
+  {
+    id: number;
+    status: "valid" | "warning" | "error";
+    mappedData: any;
+    errors: string[];
+    warnings: string[];
+  }[]
+> {
   switch (importType) {
     case "stock_items":
       return validateStockItemRows(companyId, rows);
@@ -99,37 +105,39 @@ async function validateRows(
   }
 }
 
-async function validateStockItemRows(
-  companyId: number,
-  rows: { id: number; rowNumber: number; rawData: any }[],
-) {
+async function validateStockItemRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
   // Pre-fetch lookup data (including correction memory for stock-group aliases)
   const [existingCodes, groups, itemCorrections] = await Promise.all([
-    db.select({ code: stockItems.code })
+    db
+      .select({ code: stockItems.code })
       .from(stockItems)
       .where(and(eq(stockItems.companyId, companyId), eq(stockItems.active, true), isNull(stockItems.deletedAt))),
-    db.select({ id: stockGroups.id, name: stockGroups.name, code: stockGroups.code })
+    db
+      .select({ id: stockGroups.id, name: stockGroups.name, code: stockGroups.code })
       .from(stockGroups)
       .where(eq(stockGroups.companyId, companyId)),
-    db.select()
+    db
+      .select()
       .from(aiCorrectionMemory)
-      .where(and(
-        eq(aiCorrectionMemory.companyId, companyId),
-        eq(aiCorrectionMemory.memoryType, "item_alias"),
-        sql`${aiCorrectionMemory.confidence} >= 100`,
-      )),
+      .where(
+        and(
+          eq(aiCorrectionMemory.companyId, companyId),
+          eq(aiCorrectionMemory.memoryType, "item_alias"),
+          sql`${aiCorrectionMemory.confidence} >= 100`
+        )
+      ),
   ]);
 
-  const existingCodeSet = new Set(existingCodes.map(r => (r.code || "").toLowerCase()));
-  const groupByCode = new Map(groups.map(g => [g.code?.toLowerCase() ?? "", g]));
-  const groupByName = new Map(groups.map(g => [g.name?.toLowerCase() ?? "", g]));
+  const existingCodeSet = new Set(existingCodes.map((r) => (r.code || "").toLowerCase()));
+  const groupByCode = new Map(groups.map((g) => [g.code?.toLowerCase() ?? "", g]));
+  const groupByName = new Map(groups.map((g) => [g.name?.toLowerCase() ?? "", g]));
   // rawValue.toLowerCase() → correction (exact remembered matches only)
-  const itemCorrMap = new Map(itemCorrections.map(c => [c.rawValue.toLowerCase(), c]));
+  const itemCorrMap = new Map(itemCorrections.map((c) => [c.rawValue.toLowerCase(), c]));
 
   // Track codes introduced within this batch (to catch intra-batch duplicates)
   const batchCodes = new Set<string>();
 
-  return rows.map(row => {
+  return rows.map((row) => {
     const raw = row.rawData as Record<string, any>;
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -184,18 +192,15 @@ async function validateStockItemRows(
   });
 }
 
-async function validateCustomerRows(
-  companyId: number,
-  rows: { id: number; rowNumber: number; rawData: any }[],
-) {
+async function validateCustomerRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
   const existingCodes = await db
     .select({ code: customers.code })
     .from(customers)
     .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt)));
-  const existingCodeSet = new Set(existingCodes.map(r => (r.code || "").toLowerCase()));
+  const existingCodeSet = new Set(existingCodes.map((r) => (r.code || "").toLowerCase()));
   const batchCodes = new Set<string>();
 
-  return rows.map(row => {
+  return rows.map((row) => {
     const raw = row.rawData as Record<string, any>;
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -223,18 +228,15 @@ async function validateCustomerRows(
   });
 }
 
-async function validateSupplierRows(
-  companyId: number,
-  rows: { id: number; rowNumber: number; rawData: any }[],
-) {
+async function validateSupplierRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
   const existingCodes = await db
     .select({ code: suppliers.code })
     .from(suppliers)
     .where(and(eq(suppliers.companyId, companyId), isNull(suppliers.deletedAt)));
-  const existingCodeSet = new Set(existingCodes.map(r => (r.code || "").toLowerCase()));
+  const existingCodeSet = new Set(existingCodes.map((r) => (r.code || "").toLowerCase()));
   const batchCodes = new Set<string>();
 
-  return rows.map(row => {
+  return rows.map((row) => {
     const raw = row.rawData as Record<string, any>;
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -262,29 +264,32 @@ async function validateSupplierRows(
   });
 }
 
-async function validateVoucherRows(
-  companyId: number,
-  rows: { id: number; rowNumber: number; rawData: any }[],
-) {
+async function validateVoucherRows(companyId: number, rows: { id: number; rowNumber: number; rawData: any }[]) {
   const [accounts, ledgerCorrections] = await Promise.all([
-    db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name, code: ledgerAccounts.code })
+    db
+      .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, code: ledgerAccounts.code })
       .from(ledgerAccounts)
-      .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.active, true), isNull(ledgerAccounts.deletedAt))),
-    db.select()
+      .where(
+        and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.active, true), isNull(ledgerAccounts.deletedAt))
+      ),
+    db
+      .select()
       .from(aiCorrectionMemory)
-      .where(and(
-        eq(aiCorrectionMemory.companyId, companyId),
-        eq(aiCorrectionMemory.memoryType, "ledger_alias"),
-        sql`${aiCorrectionMemory.confidence} >= 100`,
-      )),
+      .where(
+        and(
+          eq(aiCorrectionMemory.companyId, companyId),
+          eq(aiCorrectionMemory.memoryType, "ledger_alias"),
+          sql`${aiCorrectionMemory.confidence} >= 100`
+        )
+      ),
   ]);
-  const acctByCode = new Map(accounts.map(a => [a.code?.toLowerCase() ?? "", a]));
-  const acctByName = new Map(accounts.map(a => [a.name?.toLowerCase() ?? "", a]));
-  const acctById   = new Map(accounts.map(a => [a.id, a]));
+  const acctByCode = new Map(accounts.map((a) => [a.code?.toLowerCase() ?? "", a]));
+  const acctByName = new Map(accounts.map((a) => [a.name?.toLowerCase() ?? "", a]));
+  const acctById = new Map(accounts.map((a) => [a.id, a]));
   // rawValue.toLowerCase() → correction (exact remembered ledger-account aliases)
-  const ledgerCorrMap = new Map(ledgerCorrections.map(c => [c.rawValue.toLowerCase(), c]));
+  const ledgerCorrMap = new Map(ledgerCorrections.map((c) => [c.rawValue.toLowerCase(), c]));
 
-  return rows.map(row => {
+  return rows.map((row) => {
     const raw = row.rawData as Record<string, any>;
     const errors: string[] = [];
     const warnings: string[] = [];
@@ -305,10 +310,10 @@ async function validateVoucherRows(
     mapped.description = String(raw.description ?? raw.Description ?? raw.narration ?? "").trim();
 
     // debit/credit accounts
-    const debitRef  = String(raw.debitAccount  ?? raw["Debit Account"]  ?? "").trim();
+    const debitRef = String(raw.debitAccount ?? raw["Debit Account"] ?? "").trim();
     const creditRef = String(raw.creditAccount ?? raw["Credit Account"] ?? "").trim();
 
-    if (!debitRef)  errors.push("debitAccount is required");
+    if (!debitRef) errors.push("debitAccount is required");
     if (!creditRef) errors.push("creditAccount is required");
 
     // Resolve debit account — correction memory wins over name/code lookup
@@ -322,13 +327,13 @@ async function validateVoucherRows(
       return acctByCode.get(lo) ?? acctByName.get(lo) ?? null;
     }
 
-    const debitAcct  = debitRef  ? resolveAccount(debitRef)  : null;
+    const debitAcct = debitRef ? resolveAccount(debitRef) : null;
     const creditAcct = creditRef ? resolveAccount(creditRef) : null;
 
-    if (debitRef  && !debitAcct)  errors.push(`debit account "${debitRef}" not found`);
+    if (debitRef && !debitAcct) errors.push(`debit account "${debitRef}" not found`);
     if (creditRef && !creditAcct) errors.push(`credit account "${creditRef}" not found`);
 
-    mapped.debitAccountId  = debitAcct?.id  ?? null;
+    mapped.debitAccountId = debitAcct?.id ?? null;
     mapped.creditAccountId = creditAcct?.id ?? null;
 
     const amount = parseFloat(raw.amount ?? raw.Amount ?? 0);
@@ -342,7 +347,7 @@ async function validateVoucherRows(
 }
 
 function validateGenericRows(rows: { id: number; rowNumber: number; rawData: any }[]) {
-  return rows.map(row => ({
+  return rows.map((row) => ({
     id: row.id,
     status: "valid" as const,
     mappedData: row.rawData,
@@ -359,12 +364,15 @@ async function postRows(
   username: string,
   importType: string,
   rows: { id: number; mappedData: any }[],
-  tx: typeof db,
+  tx: typeof db
 ): Promise<{ rowId: number; recordType: string; recordId: number }[]> {
   switch (importType) {
-    case "stock_items":   return postStockItemRows(companyId, userId, username, rows, tx);
-    case "customers":     return postCustomerRows(companyId, userId, username, rows, tx);
-    case "suppliers":     return postSupplierRows(companyId, userId, username, rows, tx);
+    case "stock_items":
+      return postStockItemRows(companyId, userId, username, rows, tx);
+    case "customers":
+      return postCustomerRows(companyId, userId, username, rows, tx);
+    case "suppliers":
+      return postSupplierRows(companyId, userId, username, rows, tx);
     default:
       return [];
   }
@@ -375,7 +383,7 @@ async function postStockItemRows(
   userId: string,
   username: string,
   rows: { id: number; mappedData: any }[],
-  tx: typeof db,
+  tx: typeof db
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
   for (const row of rows) {
@@ -414,7 +422,7 @@ async function postCustomerRows(
   userId: string,
   username: string,
   rows: { id: number; mappedData: any }[],
-  tx: typeof db,
+  tx: typeof db
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
   for (const row of rows) {
@@ -453,7 +461,7 @@ async function postSupplierRows(
   userId: string,
   username: string,
   rows: { id: number; mappedData: any }[],
-  tx: typeof db,
+  tx: typeof db
 ) {
   const results: { rowId: number; recordType: string; recordId: number }[] = [];
   for (const row of rows) {
@@ -495,11 +503,11 @@ export function registerAiImportRoutes(app: Express) {
   app.post("/api/ai-import/upload", requireAuth, upload.single("file"), async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      const userId    = req.session.userId;
-      const username  = req.session.username || "Unknown";
+      const userId = req.session.userId;
+      const username = req.session.username || "Unknown";
 
       if (!companyId || !userId) return res.status(400).json({ message: "No company selected" });
-      if (!req.file)             return res.status(400).json({ message: "No file uploaded" });
+      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
       const importType = String(req.body.importType ?? "").trim();
       if (!importType) return res.status(400).json({ message: "importType is required" });
@@ -509,7 +517,7 @@ export function registerAiImportRoutes(app: Express) {
         return res.status(400).json({ message: `importType must be one of: ${SUPPORTED.join(", ")}` });
 
       // Parse the Excel file
-      const workbook  = readExcel(req.file.buffer);
+      const workbook = readExcel(req.file.buffer);
       const sheetName = workbook.SheetNames[0];
       if (!sheetName) return res.status(400).json({ message: "Excel file has no sheets" });
 
@@ -614,8 +622,7 @@ export function registerAiImportRoutes(app: Express) {
 
       const job = await assertJobOwnership(jobId, companyId);
 
-      if (job.status === "posted")
-        return res.status(409).json({ message: "Job is already posted" });
+      if (job.status === "posted") return res.status(409).json({ message: "Job is already posted" });
 
       // Load all rows
       const rows = await db
@@ -634,40 +641,41 @@ export function registerAiImportRoutes(app: Express) {
         await db
           .update(aiImportRows)
           .set({
-            status:     r.status,
+            status: r.status,
             mappedData: r.mappedData,
-            errors:     r.errors,
-            warnings:   r.warnings,
+            errors: r.errors,
+            warnings: r.warnings,
           })
           .where(eq(aiImportRows.id, r.id));
       }
 
-      const validRows   = results.filter(r => r.status === "valid").length;
-      const warningRows = results.filter(r => r.status === "warning").length;
-      const errorRows   = results.filter(r => r.status === "error").length;
+      const validRows = results.filter((r) => r.status === "valid").length;
+      const warningRows = results.filter((r) => r.status === "warning").length;
+      const errorRows = results.filter((r) => r.status === "error").length;
 
       await db
         .update(aiImportJobs)
         .set({
-          status:      errorRows > 0 ? "has_errors" : "validated",
+          status: errorRows > 0 ? "has_errors" : "validated",
           validRows,
           warningRows,
           errorRows,
-          updatedAt:   new Date(),
+          updatedAt: new Date(),
         })
         .where(eq(aiImportJobs.id, jobId));
 
       res.json({
         jobId,
-        totalRows:   rows.length,
+        totalRows: rows.length,
         validRows,
         warningRows,
         errorRows,
-        status:      errorRows > 0 ? "has_errors" : "validated",
-        canConfirm:  errorRows === 0,
-        message:     errorRows > 0
-          ? `${errorRows} row(s) have errors that must be fixed before confirming.`
-          : `All rows valid. Call /confirm to proceed.`,
+        status: errorRows > 0 ? "has_errors" : "validated",
+        canConfirm: errorRows === 0,
+        message:
+          errorRows > 0
+            ? `${errorRows} row(s) have errors that must be fixed before confirming.`
+            : `All rows valid. Call /confirm to proceed.`,
       });
     } catch (error: any) {
       console.error("[AI Import] validate error:", error.message);
@@ -687,10 +695,8 @@ export function registerAiImportRoutes(app: Express) {
 
       const job = await assertJobOwnership(jobId, companyId);
 
-      if (job.status === "posted")
-        return res.status(409).json({ message: "Job is already posted" });
-      if (job.status === "staged")
-        return res.status(409).json({ message: "Job is already confirmed" });
+      if (job.status === "posted") return res.status(409).json({ message: "Job is already posted" });
+      if (job.status === "staged") return res.status(409).json({ message: "Job is already confirmed" });
       if (!["validated"].includes(job.status))
         return res.status(409).json({ message: "Job must be validated before confirming" });
       if ((job.errorRows ?? 0) > 0)
@@ -703,10 +709,10 @@ export function registerAiImportRoutes(app: Express) {
 
       res.json({
         jobId,
-        status:     "staged",
-        validRows:  job.validRows,
+        status: "staged",
+        validRows: job.validRows,
         warningRows: job.warningRows,
-        message:    "Job confirmed. Call /post to create the records.",
+        message: "Job confirmed. Call /post to create the records.",
       });
     } catch (error: any) {
       console.error("[AI Import] confirm error:", error.message);
@@ -730,7 +736,7 @@ export function registerAiImportRoutes(app: Express) {
   app.patch("/api/ai-import/rows/:rowId", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      const userId    = req.session.userId;
+      const userId = req.session.userId;
       if (!companyId || !userId) return res.status(400).json({ message: "No company selected" });
 
       const rowId = parseInt(req.params.rowId);
@@ -739,10 +745,10 @@ export function registerAiImportRoutes(app: Express) {
       // Load row + verify job ownership
       const [row] = await db
         .select({
-          id:        aiImportRows.id,
-          jobId:     aiImportRows.jobId,
+          id: aiImportRows.id,
+          jobId: aiImportRows.jobId,
           rowNumber: aiImportRows.rowNumber,
-          rawData:   aiImportRows.rawData,
+          rawData: aiImportRows.rawData,
         })
         .from(aiImportRows)
         .where(eq(aiImportRows.id, rowId));
@@ -750,8 +756,7 @@ export function registerAiImportRoutes(app: Express) {
       if (!row) return res.status(404).json({ message: "Row not found" });
 
       const job = await assertJobOwnership(row.jobId, companyId);
-      if (job.status === "posted")
-        return res.status(409).json({ message: "Job is already posted" });
+      if (job.status === "posted") return res.status(409).json({ message: "Job is already posted" });
 
       const { corrections = [], mappedData: overrideMappedData } = req.body;
 
@@ -761,47 +766,48 @@ export function registerAiImportRoutes(app: Express) {
         await upsertCorrection({
           companyId,
           userId,
-          memoryType:    String(c.memoryType),
-          rawValue:      String(c.rawValue),
-          resolvedId:    c.resolvedId   ?? null,
+          memoryType: String(c.memoryType),
+          rawValue: String(c.rawValue),
+          resolvedId: c.resolvedId ?? null,
           resolvedValue: c.resolvedValue ?? null,
-          resolvedType:  c.resolvedType  ?? null,
-          confidence:    typeof c.confidence === "number" ? c.confidence : 100,
+          resolvedType: c.resolvedType ?? null,
+          confidence: typeof c.confidence === "number" ? c.confidence : 100,
         });
       }
 
       // Re-validate this row from rawData — correction memory now has the fix applied,
       // so entity references will resolve automatically.
-      const [result] = await validateRows(companyId, job.importType, [{
-        id:        row.id,
-        rowNumber: row.rowNumber,
-        rawData:   row.rawData,
-      }]);
+      const [result] = await validateRows(companyId, job.importType, [
+        {
+          id: row.id,
+          rowNumber: row.rowNumber,
+          rawData: row.rawData,
+        },
+      ]);
 
       // If caller also sent an explicit mappedData override, merge it on top.
       // This lets the frontend override freeform text fields (name, code, etc.)
       // that rawData-based re-validation cannot infer.
-      const finalMappedData = overrideMappedData != null
-        ? { ...(result.mappedData ?? {}), ...overrideMappedData }
-        : result.mappedData;
+      const finalMappedData =
+        overrideMappedData != null ? { ...(result.mappedData ?? {}), ...overrideMappedData } : result.mappedData;
 
       await db
         .update(aiImportRows)
         .set({
-          status:     result.status,
+          status: result.status,
           mappedData: finalMappedData,
-          errors:     result.errors,
-          warnings:   result.warnings,
+          errors: result.errors,
+          warnings: result.warnings,
         })
         .where(eq(aiImportRows.id, rowId));
 
       res.json({
-        id:                  rowId,
-        status:              result.status,
-        mappedData:          finalMappedData,
-        errors:              result.errors,
-        warnings:            result.warnings,
-        correctionsApplied:  corrections.length,
+        id: rowId,
+        status: result.status,
+        mappedData: finalMappedData,
+        errors: result.errors,
+        warnings: result.warnings,
+        correctionsApplied: corrections.length,
       });
     } catch (error: any) {
       res.status((error as any).status ?? 500).json({ message: error.message });
@@ -823,11 +829,8 @@ export function registerAiImportRoutes(app: Express) {
         .from(aiCorrectionMemory)
         .where(
           memoryTypeFilter
-            ? and(
-                eq(aiCorrectionMemory.companyId, companyId),
-                eq(aiCorrectionMemory.memoryType, memoryTypeFilter),
-              )
-            : eq(aiCorrectionMemory.companyId, companyId),
+            ? and(eq(aiCorrectionMemory.companyId, companyId), eq(aiCorrectionMemory.memoryType, memoryTypeFilter))
+            : eq(aiCorrectionMemory.companyId, companyId)
         )
         .orderBy(aiCorrectionMemory.memoryType, aiCorrectionMemory.rawValue);
 
@@ -853,8 +856,7 @@ export function registerAiImportRoutes(app: Express) {
         .where(eq(aiCorrectionMemory.id, corrId));
 
       if (!existing) return res.status(404).json({ message: "Correction not found" });
-      if (existing.companyId !== companyId)
-        return res.status(403).json({ message: "Forbidden" });
+      if (existing.companyId !== companyId) return res.status(403).json({ message: "Forbidden" });
 
       await db.delete(aiCorrectionMemory).where(eq(aiCorrectionMemory.id, corrId));
       res.json({ success: true });
@@ -868,8 +870,8 @@ export function registerAiImportRoutes(app: Express) {
   app.post("/api/ai-import/jobs/:id/post", requireAuth, async (req, res) => {
     try {
       const companyId = req.session.currentCompanyId;
-      const userId    = req.session.userId;
-      const username  = req.session.username || "Unknown";
+      const userId = req.session.userId;
+      const username = req.session.username || "Unknown";
 
       if (!companyId || !userId) return res.status(400).json({ message: "No company selected" });
 
@@ -878,25 +880,19 @@ export function registerAiImportRoutes(app: Express) {
 
       const job = await assertJobOwnership(jobId, companyId);
 
-      if (job.status === "posted")
-        return res.status(409).json({ message: "Job is already posted" });
-      if (job.status !== "staged")
-        return res.status(409).json({ message: "Job must be confirmed before posting" });
+      if (job.status === "posted") return res.status(409).json({ message: "Job is already posted" });
+      if (job.status !== "staged") return res.status(409).json({ message: "Job must be confirmed before posting" });
 
       // Load valid/warning rows only
       const rows = await db
         .select({ id: aiImportRows.id, mappedData: aiImportRows.mappedData, status: aiImportRows.status })
         .from(aiImportRows)
-        .where(and(
-          eq(aiImportRows.jobId, jobId),
-          sql`${aiImportRows.status} IN ('valid', 'warning')`,
-        ))
+        .where(and(eq(aiImportRows.jobId, jobId), sql`${aiImportRows.status} IN ('valid', 'warning')`))
         .orderBy(aiImportRows.rowNumber);
 
-      if (!rows.length)
-        return res.status(400).json({ message: "No valid rows to post" });
+      if (!rows.length) return res.status(400).json({ message: "No valid rows to post" });
 
-      const rowsToPost = rows.map(r => ({ id: r.id, mappedData: r.mappedData as any }));
+      const rowsToPost = rows.map((r) => ({ id: r.id, mappedData: r.mappedData as any }));
 
       // Run everything in a single transaction
       const created = await db.transaction(async (tx) => {
@@ -907,9 +903,9 @@ export function registerAiImportRoutes(app: Express) {
           await tx
             .update(aiImportRows)
             .set({
-              status:            "posted",
+              status: "posted",
               createdRecordType: r.recordType,
-              createdRecordId:   r.recordId,
+              createdRecordId: r.recordId,
             })
             .where(eq(aiImportRows.id, r.rowId));
         }
@@ -925,10 +921,10 @@ export function registerAiImportRoutes(app: Express) {
 
       res.json({
         jobId,
-        status:       "posted",
+        status: "posted",
         recordsCreated: created.length,
-        records:      created,
-        message:      `${created.length} record(s) created successfully.`,
+        records: created,
+        message: `${created.length} record(s) created successfully.`,
       });
     } catch (error: any) {
       console.error("[AI Import] post error:", error.message);

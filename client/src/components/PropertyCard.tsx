@@ -36,10 +36,17 @@ export function PropertyCard({
   className,
   "data-testid": testId,
 }: PropertyCardProps) {
-  const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const slug = name
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
   const inner = (
     <Card
-      className={cn("overflow-hidden flex flex-col h-full", href && "hover-elevate active-elevate-2 cursor-pointer", className)}
+      className={cn(
+        "overflow-hidden flex flex-col h-full",
+        href && "hover-elevate active-elevate-2 cursor-pointer",
+        className
+      )}
       data-testid={testId ?? `card-property-${slug}`}
     >
       {imageUrl ? (

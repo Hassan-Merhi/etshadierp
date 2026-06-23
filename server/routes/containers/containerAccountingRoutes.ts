@@ -6,23 +6,68 @@ import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { upload, logAudit, getCurrentExchangeRate } from "../_helpers";
 import {
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, suppliers, customers,
-  locations, employees, userLocations, auditLog, interCompanyTransfers,
-  insertInterCompanyTransferSchema, FEATURE_KEYS,
-  ledgerAccounts, intercompanyPosConfigs,
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  suppliers,
+  customers,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  FEATURE_KEYS,
+  ledgerAccounts,
+  intercompanyPosConfigs,
   stockItemMergeLogs,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -71,10 +116,10 @@ export function registerContainerAccountingRoutes(app: Express) {
       if (oldNumber && oldNumber !== newNumber) {
         try {
           await db.execute(
-            sql`UPDATE vouchers SET description = REPLACE(description, ${oldNumber}, ${newNumber}) WHERE description LIKE ${'%' + oldNumber + '%'}`
+            sql`UPDATE vouchers SET description = REPLACE(description, ${oldNumber}, ${newNumber}) WHERE description LIKE ${"%" + oldNumber + "%"}`
           );
           await db.execute(
-            sql`UPDATE voucher_entries SET narration = REPLACE(narration, ${oldNumber}, ${newNumber}) WHERE narration LIKE ${'%' + oldNumber + '%'}`
+            sql`UPDATE voucher_entries SET narration = REPLACE(narration, ${oldNumber}, ${newNumber}) WHERE narration LIKE ${"%" + oldNumber + "%"}`
           );
         } catch (syncErr) {
           console.error("[container number sync] Error updating voucher descriptions:", syncErr);
@@ -103,10 +148,7 @@ export function registerContainerAccountingRoutes(app: Express) {
         .limit(1);
       if (!container) return res.status(404).json({ message: "Container not found" });
 
-      const pos = await db
-        .select()
-        .from(purchaseOrders)
-        .where(eq(purchaseOrders.containerId, id));
+      const pos = await db.select().from(purchaseOrders).where(eq(purchaseOrders.containerId, id));
 
       const parentCompanyId = await storage.getParentCompanyId();
       let updatedLocalVouchers = 0;
@@ -116,24 +158,32 @@ export function registerContainerAccountingRoutes(app: Express) {
 
       for (const po of pos) {
         const { grossTotal: poTotal, intercoTotal: poIntercoTotal } = calcPoAmounts({
-          itemsTotal: po.itemsTotal, freight: po.freight, surcharge: po.surcharge,
-          fumigation: po.fumigation, documentCharges: po.documentCharges,
-          discount: po.discount, otherCharges: po.otherCharges,
+          itemsTotal: po.itemsTotal,
+          freight: po.freight,
+          surcharge: po.surcharge,
+          fumigation: po.fumigation,
+          documentCharges: po.documentCharges,
+          discount: po.discount,
+          otherCharges: po.otherCharges,
           freightPaidBy: (po as any).freightPaidBy,
         });
         const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
         const poFreight = parseFloat(po.freight || "0");
         const poFreightParentAccountId: number | null = (po as any).freightParentAccountId
-          ? Number((po as any).freightParentAccountId) : null;
+          ? Number((po as any).freightParentAccountId)
+          : null;
         const poFreightOwnAccountId: number | null = (po as any).freightOwnAccountId
-          ? Number((po as any).freightOwnAccountId) : null;
-        const hasParentFreight = poFreightPaidBy === 'parent' && poFreight > 0 && !!poFreightParentAccountId;
-        const hasOwnFreight    = poFreightPaidBy === 'own'    && poFreight > 0 && !!poFreightOwnAccountId;
+          ? Number((po as any).freightOwnAccountId)
+          : null;
+        const hasParentFreight = poFreightPaidBy === "parent" && poFreight > 0 && !!poFreightParentAccountId;
+        const hasOwnFreight = poFreightPaidBy === "own" && poFreight > 0 && !!poFreightOwnAccountId;
         const hasEmbeddedFreight = hasParentFreight || hasOwnFreight;
         // Which account to credit for freight inside the purchase voucher
-        const freightAccountId = hasParentFreight ? poFreightParentAccountId
-                               : hasOwnFreight    ? poFreightOwnAccountId
-                               : null;
+        const freightAccountId = hasParentFreight
+          ? poFreightParentAccountId
+          : hasOwnFreight
+            ? poFreightOwnAccountId
+            : null;
 
         // Local voucher amount: grossTotal when freight is embedded, intercoTotal otherwise.
         const poLocalTotal = hasEmbeddedFreight ? poTotal : poIntercoTotal;
@@ -164,17 +214,11 @@ export function registerContainerAccountingRoutes(app: Express) {
               .limit(1);
             const expectedDesc = [container.containerNumber, sup?.legalName].filter(Boolean).join(" ");
             if (voucherRow.description && !voucherRow.description.includes(container.containerNumber)) {
-              await db
-                .update(vouchers)
-                .set({ description: expectedDesc })
-                .where(eq(vouchers.id, voucherRow.id));
+              await db.update(vouchers).set({ description: expectedDesc }).where(eq(vouchers.id, voucherRow.id));
             }
           }
 
-          const entries = await db
-            .select()
-            .from(voucherEntries)
-            .where(eq(voucherEntries.voucherId, po.voucherId));
+          const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, po.voucherId));
 
           if (hasParentFreight && poFreightParentAccountId) {
             // Parent-paid freight: child's voucher must NEVER reference the parent's
@@ -195,8 +239,8 @@ export function registerContainerAccountingRoutes(app: Express) {
 
             for (const entry of entries) {
               const acctId = (entry as any).ledgerAccountId as number | null;
-              const isDebit  = parseFloat(entry.debitAmount  || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
-              const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount  || "0") === 0;
+              const isDebit = parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
+              const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
 
               if (isCredit && acctId === parentCreditAcctId && parentCreditEntryId === null) {
                 // Keep this one — we'll update it to grossTotal
@@ -218,14 +262,17 @@ export function registerContainerAccountingRoutes(app: Express) {
 
             // Update or insert the parent credit CR (grossTotal)
             if (parentCreditEntryId !== null) {
-              await db.update(voucherEntries)
+              await db
+                .update(voucherEntries)
                 .set({ creditAmount: poTotal.toFixed(2), debitAmount: "0" })
                 .where(eq(voucherEntries.id, parentCreditEntryId));
             } else if (parentCreditAcctId) {
               await db.insert(voucherEntries).values({
-                voucherId: po.voucherId, companyId: po.companyId,
+                voucherId: po.voucherId,
+                companyId: po.companyId,
                 ledgerAccountId: parentCreditAcctId,
-                debitAmount: "0", creditAmount: poTotal.toFixed(2),
+                debitAmount: "0",
+                creditAmount: poTotal.toFixed(2),
                 narration: `PO ${po.poNumber} - Credit to parent`,
               });
             }
@@ -234,15 +281,19 @@ export function registerContainerAccountingRoutes(app: Express) {
             if (purchasesAcctId) {
               await db.insert(voucherEntries).values([
                 {
-                  voucherId: po.voucherId, companyId: po.companyId,
+                  voucherId: po.voucherId,
+                  companyId: po.companyId,
                   ledgerAccountId: purchasesAcctId,
-                  debitAmount: poIntercoTotal.toFixed(2), creditAmount: "0",
+                  debitAmount: poIntercoTotal.toFixed(2),
+                  creditAmount: "0",
                   narration: `${po.poNumber}`,
                 },
                 {
-                  voucherId: po.voucherId, companyId: po.companyId,
+                  voucherId: po.voucherId,
+                  companyId: po.companyId,
                   ledgerAccountId: purchasesAcctId,
-                  debitAmount: poFreight.toFixed(2), creditAmount: "0",
+                  debitAmount: poFreight.toFixed(2),
+                  creditAmount: "0",
                   narration: `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ""}`,
                 },
               ]);
@@ -260,7 +311,8 @@ export function registerContainerAccountingRoutes(app: Express) {
                 if (!purchasesAcctId) purchasesAcctId = (entry as any).ledgerAccountId ?? null;
                 // Goods DR entry — update to intercoTotal; freight DR will be added/kept separately
                 if ((entry as any).ledgerAccountId !== freightAccountId) {
-                  await db.update(voucherEntries)
+                  await db
+                    .update(voucherEntries)
                     .set({ debitAmount: poIntercoTotal.toFixed(2), creditAmount: "0" })
                     .where(eq(voucherEntries.id, entry.id));
                 }
@@ -268,12 +320,14 @@ export function registerContainerAccountingRoutes(app: Express) {
                 if ((entry as any).ledgerAccountId === freightAccountId) {
                   // Freight CR entry — update to current freight amount
                   freightCrFound = true;
-                  await db.update(voucherEntries)
+                  await db
+                    .update(voucherEntries)
                     .set({ creditAmount: poFreight.toFixed(2) })
                     .where(eq(voucherEntries.id, entry.id));
                 } else {
                   // Goods CR entry (supplier account) — update to intercoTotal
-                  await db.update(voucherEntries)
+                  await db
+                    .update(voucherEntries)
                     .set({ creditAmount: poIntercoTotal.toFixed(2), debitAmount: "0" })
                     .where(eq(voucherEntries.id, entry.id));
                 }
@@ -283,15 +337,19 @@ export function registerContainerAccountingRoutes(app: Express) {
             if (!freightCrFound && purchasesAcctId) {
               await db.insert(voucherEntries).values([
                 {
-                  voucherId: po.voucherId, companyId: po.companyId,
+                  voucherId: po.voucherId,
+                  companyId: po.companyId,
                   ledgerAccountId: purchasesAcctId,
-                  debitAmount: poFreight.toFixed(2), creditAmount: "0",
+                  debitAmount: poFreight.toFixed(2),
+                  creditAmount: "0",
                   narration: `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ""}`,
                 },
                 {
-                  voucherId: po.voucherId, companyId: po.companyId,
+                  voucherId: po.voucherId,
+                  companyId: po.companyId,
                   ledgerAccountId: freightAccountId,
-                  debitAmount: "0", creditAmount: poFreight.toFixed(2),
+                  debitAmount: "0",
+                  creditAmount: poFreight.toFixed(2),
                   narration: `Freight - ${po.poNumber}${poContainerRow?.containerNumber ? ` (${poContainerRow.containerNumber})` : ""}`,
                 },
               ]);
@@ -311,11 +369,13 @@ export function registerContainerAccountingRoutes(app: Express) {
                 isDebitEntry = !entry.supplierId && (nar.includes("purchases") || nar.includes("owes us"));
               }
               if (isDebitEntry) {
-                await db.update(voucherEntries)
+                await db
+                  .update(voucherEntries)
                   .set({ debitAmount: poLocalTotal.toFixed(2), creditAmount: "0" })
                   .where(eq(voucherEntries.id, entry.id));
               } else {
-                await db.update(voucherEntries)
+                await db
+                  .update(voucherEntries)
                   .set({ creditAmount: poLocalTotal.toFixed(2), debitAmount: "0" })
                   .where(eq(voucherEntries.id, entry.id));
               }
@@ -327,8 +387,17 @@ export function registerContainerAccountingRoutes(app: Express) {
         // Fix the INTERCO-PARENT voucher in the parent company
         if (parentCompanyId && po.companyId !== parentCompanyId) {
           const svResult = await syncIntercoParentVoucher(
-            db, po.poNumber, poTotal, container.containerNumber,
-            hasParentFreight ? { freightAmount: poFreight, freightParentAccountId: poFreightParentAccountId!, subsidiaryCompanyId: po.companyId } : undefined,
+            db,
+            po.poNumber,
+            poTotal,
+            container.containerNumber,
+            hasParentFreight
+              ? {
+                  freightAmount: poFreight,
+                  freightParentAccountId: poFreightParentAccountId!,
+                  subsidiaryCompanyId: po.companyId,
+                }
+              : undefined
           );
           if (svResult.updated) {
             updatedParentVouchers++;
@@ -398,9 +467,7 @@ export function registerContainerAccountingRoutes(app: Express) {
         const allContainerRows = await db
           .select({ id: containers.id, containerNumber: containers.containerNumber })
           .from(containers);
-        const containerNumberMap = new Map<number, string>(
-          allContainerRows.map((c) => [c.id, c.containerNumber])
-        );
+        const containerNumberMap = new Map<number, string>(allContainerRows.map((c) => [c.id, c.containerNumber]));
 
         let scannedPOs = 0;
         let updatedLocalVouchers = 0;
@@ -417,9 +484,13 @@ export function registerContainerAccountingRoutes(app: Express) {
           try {
             // Recalculate exact amounts
             const { grossTotal, intercoTotal } = calcPoAmounts({
-              itemsTotal: po.itemsTotal, freight: po.freight, surcharge: po.surcharge,
-              fumigation: po.fumigation, documentCharges: po.documentCharges,
-              discount: po.discount, otherCharges: po.otherCharges,
+              itemsTotal: po.itemsTotal,
+              freight: po.freight,
+              surcharge: po.surcharge,
+              fumigation: po.fumigation,
+              documentCharges: po.documentCharges,
+              discount: po.discount,
+              otherCharges: po.otherCharges,
               freightPaidBy: (po as any).freightPaidBy,
             });
 
@@ -432,15 +503,19 @@ export function registerContainerAccountingRoutes(app: Express) {
             const poFreightPaidBy: string = (po as any).freightPaidBy || "supplier";
             const poFreight = parseFloat(po.freight || "0");
             const poFreightParentAccountId: number | null = (po as any).freightParentAccountId
-              ? Number((po as any).freightParentAccountId) : null;
+              ? Number((po as any).freightParentAccountId)
+              : null;
             const poFreightOwnAccountId: number | null = (po as any).freightOwnAccountId
-              ? Number((po as any).freightOwnAccountId) : null;
-            const hasParentFreight   = poFreightPaidBy === 'parent' && poFreight > 0 && !!poFreightParentAccountId;
-            const hasOwnFreight      = poFreightPaidBy === 'own'    && poFreight > 0 && !!poFreightOwnAccountId;
+              ? Number((po as any).freightOwnAccountId)
+              : null;
+            const hasParentFreight = poFreightPaidBy === "parent" && poFreight > 0 && !!poFreightParentAccountId;
+            const hasOwnFreight = poFreightPaidBy === "own" && poFreight > 0 && !!poFreightOwnAccountId;
             const hasEmbeddedFreight = hasParentFreight || hasOwnFreight;
-            const freightAccountId   = hasParentFreight ? poFreightParentAccountId
-                                     : hasOwnFreight    ? poFreightOwnAccountId
-                                     : null;
+            const freightAccountId = hasParentFreight
+              ? poFreightParentAccountId
+              : hasOwnFreight
+                ? poFreightOwnAccountId
+                : null;
 
             // ── Fix the local purchase voucher ────────────────────────────────
             // Expected total:
@@ -448,9 +523,7 @@ export function registerContainerAccountingRoutes(app: Express) {
             //   own-embedded freight                     → grossTotal
             //   all other cases                          → intercoTotal (goods only)
             const expectedLocalTotal =
-              (hasEmbeddedFreight || (poFreightPaidBy === 'parent' && poFreight > 0))
-                ? grossTotal
-                : intercoTotal;
+              hasEmbeddedFreight || (poFreightPaidBy === "parent" && poFreight > 0) ? grossTotal : intercoTotal;
             if (po.voucherId) {
               const [localVoucher] = await db
                 .select({ id: vouchers.id, totalAmount: vouchers.totalAmount })
@@ -472,24 +545,29 @@ export function registerContainerAccountingRoutes(app: Express) {
                   if (isSameCompanyPo) {
                     // Same-company: freight CR entry must exist at freightParentAccountId
                     const freightCrEntry = entries.find(
-                      (e: any) => Number(e.ledgerAccountId) === poFreightParentAccountId &&
-                                  parseFloat(e.creditAmount || "0") > 0 && parseFloat(e.debitAmount || "0") === 0
+                      (e: any) =>
+                        Number(e.ledgerAccountId) === poFreightParentAccountId &&
+                        parseFloat(e.creditAmount || "0") > 0 &&
+                        parseFloat(e.debitAmount || "0") === 0
                     );
-                    freightEntryMissing = !freightCrEntry ||
+                    freightEntryMissing =
+                      !freightCrEntry ||
                       Math.abs(parseFloat((freightCrEntry as any).creditAmount || "0") - poFreight) > 0.001;
                   } else {
-                  // Interco: detect old single-DR structure or wrong DR sum → needs rebuild
-                  const drEntries = entries.filter((e: any) =>
-                    parseFloat(e.debitAmount || "0") > 0 && parseFloat(e.creditAmount || "0") === 0
-                  );
-                  const drSum = drEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0);
-                  const strayFreightCr = poFreightParentAccountId
-                    ? entries.some(
-                        (e: any) => Number((e as any).ledgerAccountId) === poFreightParentAccountId &&
-                                    parseFloat(e.creditAmount || "0") > 0
-                      )
-                    : false;
-                  freightEntryMissing = drEntries.length !== 2 || Math.abs(drSum - grossTotal) > 0.001 || strayFreightCr;
+                    // Interco: detect old single-DR structure or wrong DR sum → needs rebuild
+                    const drEntries = entries.filter(
+                      (e: any) => parseFloat(e.debitAmount || "0") > 0 && parseFloat(e.creditAmount || "0") === 0
+                    );
+                    const drSum = drEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0);
+                    const strayFreightCr = poFreightParentAccountId
+                      ? entries.some(
+                          (e: any) =>
+                            Number((e as any).ledgerAccountId) === poFreightParentAccountId &&
+                            parseFloat(e.creditAmount || "0") > 0
+                        )
+                      : false;
+                    freightEntryMissing =
+                      drEntries.length !== 2 || Math.abs(drSum - grossTotal) > 0.001 || strayFreightCr;
                   }
                 } else if (hasOwnFreight) {
                   // Own-freight: freight CR to freightAccountId must exist in child's voucher
@@ -501,7 +579,9 @@ export function registerContainerAccountingRoutes(app: Express) {
                 const localMismatch = Math.abs(currentLocalTotal - expectedLocalTotal) > 0.001 || freightEntryMissing;
 
                 if (localMismatch) {
-                  console.log(`[SyncAll] PO ${po.poNumber}: local voucher #${po.voucherId} ${currentLocalTotal} → ${expectedLocalTotal}`);
+                  console.log(
+                    `[SyncAll] PO ${po.poNumber}: local voucher #${po.voucherId} ${currentLocalTotal} → ${expectedLocalTotal}`
+                  );
                   await db
                     .update(vouchers)
                     .set({ totalAmount: expectedLocalTotal.toFixed(2) })
@@ -521,8 +601,10 @@ export function registerContainerAccountingRoutes(app: Express) {
                       const freightCrCandidates3: number[] = [];
                       for (const entry of entries) {
                         const acctId = (entry as any).ledgerAccountId as number | null;
-                        const isDebit  = parseFloat(entry.debitAmount  || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
-                        const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount  || "0") === 0;
+                        const isDebit =
+                          parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
+                        const isCredit =
+                          parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
                         if (isCredit && acctId === poFreightParentAccountId) {
                           freightCrCandidates3.push(entry.id);
                         } else if (isDebit && purchasesEntryId === null) {
@@ -535,76 +617,109 @@ export function registerContainerAccountingRoutes(app: Express) {
                       }
                       freightCrEntryId = freightCrCandidates3[0] ?? null;
                       toDeleteIds.push(...freightCrCandidates3.slice(1));
-                      if (toDeleteIds.length > 0) await db.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
-                      if (purchasesEntryId !== null) await db.update(voucherEntries).set({ debitAmount: grossTotal.toFixed(2), creditAmount: "0" }).where(eq(voucherEntries.id, purchasesEntryId));
-                      if (mainCrEntryId !== null) await db.update(voucherEntries).set({ creditAmount: intercoTotal.toFixed(2), debitAmount: "0" }).where(eq(voucherEntries.id, mainCrEntryId));
-                      const _syncAllFreightNarration = `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ''}`;
+                      if (toDeleteIds.length > 0)
+                        await db.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
+                      if (purchasesEntryId !== null)
+                        await db
+                          .update(voucherEntries)
+                          .set({ debitAmount: grossTotal.toFixed(2), creditAmount: "0" })
+                          .where(eq(voucherEntries.id, purchasesEntryId));
+                      if (mainCrEntryId !== null)
+                        await db
+                          .update(voucherEntries)
+                          .set({ creditAmount: intercoTotal.toFixed(2), debitAmount: "0" })
+                          .where(eq(voucherEntries.id, mainCrEntryId));
+                      const _syncAllFreightNarration = `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ""}`;
                       if (freightCrEntryId !== null) {
-                        await db.update(voucherEntries).set({ creditAmount: poFreight.toFixed(2), debitAmount: "0", ledgerAccountId: poFreightParentAccountId!, narration: _syncAllFreightNarration }).where(eq(voucherEntries.id, freightCrEntryId));
+                        await db
+                          .update(voucherEntries)
+                          .set({
+                            creditAmount: poFreight.toFixed(2),
+                            debitAmount: "0",
+                            ledgerAccountId: poFreightParentAccountId!,
+                            narration: _syncAllFreightNarration,
+                          })
+                          .where(eq(voucherEntries.id, freightCrEntryId));
                       } else {
-                        await db.insert(voucherEntries).values({ voucherId: po.voucherId, companyId: po.companyId, ledgerAccountId: poFreightParentAccountId!, debitAmount: "0", creditAmount: poFreight.toFixed(2), narration: _syncAllFreightNarration });
+                        await db.insert(voucherEntries).values({
+                          voucherId: po.voucherId,
+                          companyId: po.companyId,
+                          ledgerAccountId: poFreightParentAccountId!,
+                          debitAmount: "0",
+                          creditAmount: poFreight.toFixed(2),
+                          narration: _syncAllFreightNarration,
+                        });
                       }
                       updatedFreightVouchers++;
                     } else {
-                    // Interco: delete-and-rebuild approach.
-                    //   DR Purchases (intercoTotal — goods)
-                    //   DR Purchases (freight — same account)
-                    //   CR parentCreditAccount (grossTotal)
-                    const childSettings = await storage.getCompanySettings(po.companyId);
-                    const parentCreditAcctId = childSettings?.parentCreditAccountId ?? null;
+                      // Interco: delete-and-rebuild approach.
+                      //   DR Purchases (intercoTotal — goods)
+                      //   DR Purchases (freight — same account)
+                      //   CR parentCreditAccount (grossTotal)
+                      const childSettings = await storage.getCompanySettings(po.companyId);
+                      const parentCreditAcctId = childSettings?.parentCreditAccountId ?? null;
 
-                    let parentCreditEntryId: number | null = null;
-                    let purchasesAcctId: number | null = null;
-                    const toDeleteIds: number[] = [];
+                      let parentCreditEntryId: number | null = null;
+                      let purchasesAcctId: number | null = null;
+                      const toDeleteIds: number[] = [];
 
-                    for (const entry of entries) {
-                      const acctId = (entry as any).ledgerAccountId as number | null;
-                      const isDebit = parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
-                      const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
+                      for (const entry of entries) {
+                        const acctId = (entry as any).ledgerAccountId as number | null;
+                        const isDebit =
+                          parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
+                        const isCredit =
+                          parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
 
-                      if (isCredit && acctId === parentCreditAcctId && parentCreditEntryId === null) {
-                        parentCreditEntryId = entry.id;
-                      } else {
-                        toDeleteIds.push(entry.id);
-                        if (isDebit && acctId !== poFreightParentAccountId && !purchasesAcctId) {
-                          purchasesAcctId = acctId;
+                        if (isCredit && acctId === parentCreditAcctId && parentCreditEntryId === null) {
+                          parentCreditEntryId = entry.id;
+                        } else {
+                          toDeleteIds.push(entry.id);
+                          if (isDebit && acctId !== poFreightParentAccountId && !purchasesAcctId) {
+                            purchasesAcctId = acctId;
+                          }
                         }
                       }
-                    }
 
-                    if (toDeleteIds.length > 0) {
-                      await db.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
-                    }
+                      if (toDeleteIds.length > 0) {
+                        await db.delete(voucherEntries).where(inArray(voucherEntries.id, toDeleteIds));
+                      }
 
-                    if (parentCreditEntryId !== null) {
-                      await db.update(voucherEntries)
-                        .set({ creditAmount: grossTotal.toFixed(2), debitAmount: "0" })
-                        .where(eq(voucherEntries.id, parentCreditEntryId));
-                    } else if (parentCreditAcctId) {
-                      await db.insert(voucherEntries).values({
-                        voucherId: po.voucherId, companyId: po.companyId,
-                        ledgerAccountId: parentCreditAcctId,
-                        debitAmount: "0", creditAmount: grossTotal.toFixed(2),
-                        narration: `PO ${po.poNumber} - Credit to parent`,
-                      });
-                    }
+                      if (parentCreditEntryId !== null) {
+                        await db
+                          .update(voucherEntries)
+                          .set({ creditAmount: grossTotal.toFixed(2), debitAmount: "0" })
+                          .where(eq(voucherEntries.id, parentCreditEntryId));
+                      } else if (parentCreditAcctId) {
+                        await db.insert(voucherEntries).values({
+                          voucherId: po.voucherId,
+                          companyId: po.companyId,
+                          ledgerAccountId: parentCreditAcctId,
+                          debitAmount: "0",
+                          creditAmount: grossTotal.toFixed(2),
+                          narration: `PO ${po.poNumber} - Credit to parent`,
+                        });
+                      }
 
-                    if (purchasesAcctId) {
-                      await db.insert(voucherEntries).values([
-                        {
-                          voucherId: po.voucherId, companyId: po.companyId,
-                          ledgerAccountId: purchasesAcctId,
-                          debitAmount: intercoTotal.toFixed(2), creditAmount: "0",
-                          narration: `${po.poNumber}`,
-                        },
-                        {
-                          voucherId: po.voucherId, companyId: po.companyId,
-                          ledgerAccountId: purchasesAcctId,
-                          debitAmount: poFreight.toFixed(2), creditAmount: "0",
-                          narration: `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ""}`,
-                        },
-                      ]);
-                    }
+                      if (purchasesAcctId) {
+                        await db.insert(voucherEntries).values([
+                          {
+                            voucherId: po.voucherId,
+                            companyId: po.companyId,
+                            ledgerAccountId: purchasesAcctId,
+                            debitAmount: intercoTotal.toFixed(2),
+                            creditAmount: "0",
+                            narration: `${po.poNumber}`,
+                          },
+                          {
+                            voucherId: po.voucherId,
+                            companyId: po.companyId,
+                            ledgerAccountId: purchasesAcctId,
+                            debitAmount: poFreight.toFixed(2),
+                            creditAmount: "0",
+                            narration: `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ""}`,
+                          },
+                        ]);
+                      }
                     } // end interco branch
                   } else if (hasOwnFreight) {
                     // Own-freight: DR Purchases (goods) + DR FreightOwnAccount (freight)
@@ -612,23 +727,28 @@ export function registerContainerAccountingRoutes(app: Express) {
                     let purchasesAcctId: number | null = null;
                     let freightCrFound = false;
                     for (const entry of entries) {
-                      const isDebit = parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
-                      const isCredit = parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
+                      const isDebit =
+                        parseFloat(entry.debitAmount || "0") > 0 && parseFloat(entry.creditAmount || "0") === 0;
+                      const isCredit =
+                        parseFloat(entry.creditAmount || "0") > 0 && parseFloat(entry.debitAmount || "0") === 0;
                       if (isDebit) {
                         if (!purchasesAcctId) purchasesAcctId = (entry as any).ledgerAccountId ?? null;
                         if ((entry as any).ledgerAccountId !== freightAccountId) {
-                          await db.update(voucherEntries)
+                          await db
+                            .update(voucherEntries)
                             .set({ debitAmount: intercoTotal.toFixed(2), creditAmount: "0" })
                             .where(eq(voucherEntries.id, entry.id));
                         }
                       } else if (isCredit) {
                         if ((entry as any).ledgerAccountId === freightAccountId) {
                           freightCrFound = true;
-                          await db.update(voucherEntries)
+                          await db
+                            .update(voucherEntries)
                             .set({ creditAmount: poFreight.toFixed(2) })
                             .where(eq(voucherEntries.id, entry.id));
                         } else {
-                          await db.update(voucherEntries)
+                          await db
+                            .update(voucherEntries)
                             .set({ creditAmount: intercoTotal.toFixed(2), debitAmount: "0" })
                             .where(eq(voucherEntries.id, entry.id));
                         }
@@ -637,15 +757,19 @@ export function registerContainerAccountingRoutes(app: Express) {
                     if (!freightCrFound && purchasesAcctId) {
                       await db.insert(voucherEntries).values([
                         {
-                          voucherId: po.voucherId, companyId: po.companyId,
+                          voucherId: po.voucherId,
+                          companyId: po.companyId,
                           ledgerAccountId: purchasesAcctId,
-                          debitAmount: poFreight.toFixed(2), creditAmount: "0",
+                          debitAmount: poFreight.toFixed(2),
+                          creditAmount: "0",
                           narration: `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ""}`,
                         },
                         {
-                          voucherId: po.voucherId, companyId: po.companyId,
+                          voucherId: po.voucherId,
+                          companyId: po.companyId,
                           ledgerAccountId: freightAccountId,
-                          debitAmount: "0", creditAmount: poFreight.toFixed(2),
+                          debitAmount: "0",
+                          creditAmount: poFreight.toFixed(2),
                           narration: `Freight - ${po.poNumber}${cNum && cNum !== String(po.id) ? ` (${cNum})` : ""}`,
                         },
                       ]);
@@ -655,15 +779,20 @@ export function registerContainerAccountingRoutes(app: Express) {
                     for (const entry of entries) {
                       const origDebit = parseFloat(entry.debitAmount || "0");
                       const origCredit = parseFloat(entry.creditAmount || "0");
-                      const isDebit = origDebit > 0 && origCredit === 0
-                        ? true : origCredit > 0 && origDebit === 0
-                          ? false : !(entry.supplierId);
+                      const isDebit =
+                        origDebit > 0 && origCredit === 0
+                          ? true
+                          : origCredit > 0 && origDebit === 0
+                            ? false
+                            : !entry.supplierId;
                       if (isDebit) {
-                        await db.update(voucherEntries)
+                        await db
+                          .update(voucherEntries)
                           .set({ debitAmount: expectedLocalTotal.toFixed(2), creditAmount: "0" })
                           .where(eq(voucherEntries.id, entry.id));
                       } else {
-                        await db.update(voucherEntries)
+                        await db
+                          .update(voucherEntries)
                           .set({ creditAmount: expectedLocalTotal.toFixed(2), debitAmount: "0" })
                           .where(eq(voucherEntries.id, entry.id));
                       }
@@ -676,13 +805,24 @@ export function registerContainerAccountingRoutes(app: Express) {
 
             // ── Compute container number for this PO (used by parent sync) ──
             const poContainerId = po.containerId;
-            const cNum = poContainerId ? (containerNumberMap.get(poContainerId) ?? String(poContainerId)) : String(po.id);
+            const cNum = poContainerId
+              ? (containerNumberMap.get(poContainerId) ?? String(poContainerId))
+              : String(po.id);
 
             // ── Fix the parent INTERCO-PARENT voucher ───────────────────────
             if (parentCompanyId && po.companyId !== parentCompanyId) {
               const svResult = await syncIntercoParentVoucher(
-                db, po.poNumber, grossTotal, cNum,
-                hasParentFreight ? { freightAmount: poFreight, freightParentAccountId: poFreightParentAccountId!, subsidiaryCompanyId: po.companyId } : undefined,
+                db,
+                po.poNumber,
+                grossTotal,
+                cNum,
+                hasParentFreight
+                  ? {
+                      freightAmount: poFreight,
+                      freightParentAccountId: poFreightParentAccountId!,
+                      subsidiaryCompanyId: po.companyId,
+                    }
+                  : undefined
               );
               if (svResult.updated) {
                 updatedParentVouchers++;
@@ -692,8 +832,10 @@ export function registerContainerAccountingRoutes(app: Express) {
             }
             // ── Stale FREIGHT- voucher cleanup / missing parent freight account warning ──
             const freightVoucherNum = `FREIGHT-${cNum}-${po.poNumber}`;
-            if (poFreightPaidBy === 'parent' && poFreight > 0 && !((po as any).freightParentAccountId)) {
-              missingParentFreightAccount.push(`PO ${po.poNumber}: freight set to parent-paid but no parent account configured`);
+            if (poFreightPaidBy === "parent" && poFreight > 0 && !(po as any).freightParentAccountId) {
+              missingParentFreightAccount.push(
+                `PO ${po.poNumber}: freight set to parent-paid but no parent account configured`
+              );
             }
 
             // Freight is now embedded inside the purchase voucher — delete any stale FREIGHT- voucher.
@@ -715,7 +857,7 @@ export function registerContainerAccountingRoutes(app: Express) {
             // ── Stale PARENT-FREIGHT- journal cleanup (same-company POs only) ──
             // These journals were wrongly created when a same-company PO had parent freight.
             // Freight is embedded in the PO voucher, so the standalone journal is wrong — delete it.
-            if (isSameCompanyPo && poFreightPaidBy === 'parent') {
+            if (isSameCompanyPo && poFreightPaidBy === "parent") {
               const parentFreightVoucherNum = `PARENT-FREIGHT-${po.poNumber}`;
               const [stalePFV] = await db
                 .select({ id: vouchers.id })
@@ -747,18 +889,25 @@ export function registerContainerAccountingRoutes(app: Express) {
             const containerPos = allPos.filter((p) => p.containerId === cid);
             const containerItemsTotal = containerPos.reduce((sum, p) => sum + parseFloat(p.itemsTotal || "0"), 0);
             const containerChargesTotal = containerPos.reduce((sum, p) => {
-              return sum +
+              return (
+                sum +
                 parseFloat(p.freight || "0") +
                 parseFloat(p.surcharge || "0") +
                 parseFloat(p.fumigation || "0") +
                 parseFloat(p.documentCharges || "0") -
                 parseFloat(p.discount || "0") +
-                parseFloat(p.otherCharges || "0");
+                parseFloat(p.otherCharges || "0")
+              );
             }, 0);
             const containerGrandTotal = containerItemsTotal + containerChargesTotal;
 
             const [existingContainer] = await db
-              .select({ id: containers.id, itemsTotal: containers.itemsTotal, chargesTotal: containers.chargesTotal, grandTotal: containers.grandTotal })
+              .select({
+                id: containers.id,
+                itemsTotal: containers.itemsTotal,
+                chargesTotal: containers.chargesTotal,
+                grandTotal: containers.grandTotal,
+              })
               .from(containers)
               .where(eq(containers.id, cid))
               .limit(1);
@@ -772,7 +921,8 @@ export function registerContainerAccountingRoutes(app: Express) {
                 Math.abs(curCharges - containerChargesTotal) > 0.001 ||
                 Math.abs(curGrand - containerGrandTotal) > 0.001;
               if (mismatch) {
-                await db.update(containers)
+                await db
+                  .update(containers)
                   .set({
                     itemsTotal: containerItemsTotal.toFixed(2),
                     chargesTotal: containerChargesTotal.toFixed(2),
@@ -787,21 +937,33 @@ export function registerContainerAccountingRoutes(app: Express) {
             // Aggregate each charge type across all POs for this container
             if (cid) {
               const summedCharges = [
-                { chargeType: "Freight",          amount: containerPos.reduce((s, p) => s + parseFloat(p.freight || "0"), 0) },
-                { chargeType: "Surcharge",        amount: containerPos.reduce((s, p) => s + parseFloat(p.surcharge || "0"), 0) },
-                { chargeType: "Fumigation",       amount: containerPos.reduce((s, p) => s + parseFloat(p.fumigation || "0"), 0) },
-                { chargeType: "Document Charges", amount: containerPos.reduce((s, p) => s + parseFloat(p.documentCharges || "0"), 0) },
-                { chargeType: "Discount",         amount: -containerPos.reduce((s, p) => s + parseFloat(p.discount || "0"), 0) },
-                { chargeType: "Other Charges",    amount: containerPos.reduce((s, p) => s + parseFloat(p.otherCharges || "0"), 0) },
+                { chargeType: "Freight", amount: containerPos.reduce((s, p) => s + parseFloat(p.freight || "0"), 0) },
+                {
+                  chargeType: "Surcharge",
+                  amount: containerPos.reduce((s, p) => s + parseFloat(p.surcharge || "0"), 0),
+                },
+                {
+                  chargeType: "Fumigation",
+                  amount: containerPos.reduce((s, p) => s + parseFloat(p.fumigation || "0"), 0),
+                },
+                {
+                  chargeType: "Document Charges",
+                  amount: containerPos.reduce((s, p) => s + parseFloat(p.documentCharges || "0"), 0),
+                },
+                {
+                  chargeType: "Discount",
+                  amount: -containerPos.reduce((s, p) => s + parseFloat(p.discount || "0"), 0),
+                },
+                {
+                  chargeType: "Other Charges",
+                  amount: containerPos.reduce((s, p) => s + parseFloat(p.otherCharges || "0"), 0),
+                },
               ];
               for (const { chargeType, amount } of summedCharges) {
                 const [existingCharge] = await db
                   .select({ id: containerCharges.id, amount: containerCharges.amount })
                   .from(containerCharges)
-                  .where(and(
-                    eq(containerCharges.containerId, cid),
-                    eq(containerCharges.chargeType, chargeType),
-                  ))
+                  .where(and(eq(containerCharges.containerId, cid), eq(containerCharges.chargeType, chargeType)))
                   .limit(1);
                 if (amount === 0) {
                   if (existingCharge) {
@@ -812,11 +974,14 @@ export function registerContainerAccountingRoutes(app: Express) {
                   const currentAmt = parseFloat(existingCharge?.amount || "0");
                   if (Math.abs(currentAmt - amount) > 0.001) {
                     if (existingCharge) {
-                      await db.update(containerCharges)
+                      await db
+                        .update(containerCharges)
                         .set({ amount: amount.toFixed(2) })
                         .where(eq(containerCharges.id, existingCharge.id));
                     } else {
-                      await db.insert(containerCharges).values({ containerId: cid, chargeType, amount: amount.toFixed(2) });
+                      await db
+                        .insert(containerCharges)
+                        .values({ containerId: cid, chargeType, amount: amount.toFixed(2) });
                     }
                     updatedContainerCharges++;
                   }
@@ -829,7 +994,9 @@ export function registerContainerAccountingRoutes(app: Express) {
         }
 
         const scannedContainers = containerIds.length;
-        console.log(`[SyncAll] Done. POs=${scannedPOs} Containers=${scannedContainers} LocalVouchers=${updatedLocalVouchers} ParentVouchers=${updatedParentVouchers} FreightVouchers=${updatedFreightVouchers} ContainerCharges=${updatedContainerCharges} ContainerTotals=${updatedContainers} Skipped=${skipped.length} NotFound=${notFoundParentVouchers.length} Errors=${errors.length}`);
+        console.log(
+          `[SyncAll] Done. POs=${scannedPOs} Containers=${scannedContainers} LocalVouchers=${updatedLocalVouchers} ParentVouchers=${updatedParentVouchers} FreightVouchers=${updatedFreightVouchers} ContainerCharges=${updatedContainerCharges} ContainerTotals=${updatedContainers} Skipped=${skipped.length} NotFound=${notFoundParentVouchers.length} Errors=${errors.length}`
+        );
 
         res.json({
           scannedPOs,

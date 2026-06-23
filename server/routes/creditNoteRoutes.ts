@@ -2,42 +2,113 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries, buildItemLevelChanges } from "./_helpers";
 import {
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, insertVoucherSchema, insertVoucherEntrySchema,
+  upload,
+  logAudit,
+  getCurrentExchangeRate,
+  calculateHistoricalLocationInventory,
+  syncEmployeeBalancesFromEntries,
+  buildItemLevelChanges,
+} from "./_helpers";
+import {
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  insertVoucherSchema,
+  insertVoucherEntrySchema,
   insertSalesItemSchema,
-  suppliers, customers, customerBalances, locations, employees, userLocations,
-  auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
-  ledgerAccounts, insertLedgerAccountSchema, 
-  companies, users, userCompanyRoles, companySettings,
-  FEATURE_KEYS, fiscalPeriodClosures,
-  wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
-  bales, baleProducts, baleProductCategories, baleTransfers,
-  insertBaleSchema, insertBaleTransferSchema,
-  
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  suppliers,
+  customers,
+  customerBalances,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  companies,
+  users,
+  userCompanyRoles,
+  companySettings,
+  FEATURE_KEYS,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  insertWasteDispatchSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  baleTransfers,
+  insertBaleSchema,
+  insertBaleTransferSchema,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, 
-  pendingBarcodes, insertPendingBarcodeSchema,
-  storedFiles, spreadsheets, liveSpreadsheets,
-  agentAccounts, insertAgentAccountSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  storedFiles,
+  spreadsheets,
+  liveSpreadsheets,
+  agentAccounts,
+  insertAgentAccountSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
   chatMessages,
-  
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -53,10 +124,7 @@ import fs from "fs";
  * inventory cost on Credit / Debit Notes.
  * Never falls back to a random Indirect Expense account.
  */
-async function getOrCreateSalesReturnsAccount(
-  companyId: number,
-  txOrDb: any = db,
-): Promise<number | null> {
+async function getOrCreateSalesReturnsAccount(companyId: number, txOrDb: any = db): Promise<number | null> {
   // 1. Existing account whose name contains "sales return" (case-insensitive)
   const byName = await txOrDb
     .select({ id: ledgerAccounts.id })
@@ -64,11 +132,8 @@ async function getOrCreateSalesReturnsAccount(
     .where(
       and(
         eq(ledgerAccounts.companyId, companyId),
-        or(
-          ilike(ledgerAccounts.name, "%sales return%"),
-          ilike(ledgerAccounts.name, "%return%allowance%"),
-        ),
-      ),
+        or(ilike(ledgerAccounts.name, "%sales return%"), ilike(ledgerAccounts.name, "%return%allowance%"))
+      )
     )
     .limit(1);
   if (byName.length > 0) return byName[0].id;
@@ -77,12 +142,7 @@ async function getOrCreateSalesReturnsAccount(
   const byCode = await txOrDb
     .select({ id: ledgerAccounts.id })
     .from(ledgerAccounts)
-    .where(
-      and(
-        eq(ledgerAccounts.companyId, companyId),
-        eq(ledgerAccounts.code, "SALES-RETURNS"),
-      ),
-    )
+    .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "SALES-RETURNS")))
     .limit(1);
   if (byCode.length > 0) return byCode[0].id;
 
@@ -140,7 +200,9 @@ export function registerCreditNoteRoutes(app: Express) {
           return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
         }
         if (!item.locationId || isNaN(Number(item.locationId))) {
-          return res.status(400).json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
+          return res
+            .status(400)
+            .json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
         }
         const qty = parseFloat(item.quantity);
         if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
@@ -175,14 +237,14 @@ export function registerCreditNoteRoutes(app: Express) {
         const [createdVoucher] = await tx
           .insert(vouchers)
           .values({
-          companyId,
-          voucherNumber,
-          voucherType: noteType,
-          voucherDate,
-          description: description || `${noteType} for customer return`,
-          totalAmount: totalRefundAmount.toFixed(2),
-        })
-        .returning();
+            companyId,
+            voucherNumber,
+            voucherType: noteType,
+            voucherDate,
+            description: description || `${noteType} for customer return`,
+            totalAmount: totalRefundAmount.toFixed(2),
+          })
+          .returning();
 
         // Create voucher entries for the cash account using the REFUND amount
         if (cashAccountType === "bank") {
@@ -205,20 +267,23 @@ export function registerCreditNoteRoutes(app: Express) {
 
         // For each item, process inventory (using inventoryCost) and track refund amounts
         for (const item of items) {
-          const { stockItemId, locationId, quantity, refundRate: itemRefundRate, inventoryCost: itemInventoryCost } = item;
+          const {
+            stockItemId,
+            locationId,
+            quantity,
+            refundRate: itemRefundRate,
+            inventoryCost: itemInventoryCost,
+          } = item;
           const qty = parseFloat(quantity);
           const refundRateVal = parseFloat(itemRefundRate || "0");
           const inventoryCostVal = parseFloat(itemInventoryCost || "0");
           const inventoryValue = qty * inventoryCostVal;
 
-          const [location] = await tx
-            .select()
-            .from(locations)
-            .where(eq(locations.id, locationId));
+          const [location] = await tx.select().from(locations).where(eq(locations.id, locationId));
 
-        if (!location) {
-          throw new Error(`Location ${locationId} not found`);
-        }
+          if (!location) {
+            throw new Error(`Location ${locationId} not found`);
+          }
 
           if (noteType === "Credit Note") {
             // Do NOT pass a rate — cost price must never change due to POS/credit-note returns.
@@ -325,7 +390,9 @@ export function registerCreditNoteRoutes(app: Express) {
             cashAccount: { new: cashAccountId },
           },
         });
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
       res.json({
         success: true,
         voucherId: voucher.id,
@@ -366,10 +433,7 @@ export function registerCreditNoteRoutes(app: Express) {
       }
 
       // Get voucher entries
-      const entries = await db
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, voucherId));
+      const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
       // Get credit note items
       const noteItems = await db
@@ -400,10 +464,7 @@ export function registerCreditNoteRoutes(app: Express) {
           break;
         } else if (entry.ledgerAccountId) {
           // Check if this is a cash-type account
-          const [ledger] = await db
-            .select()
-            .from(ledgerAccounts)
-            .where(eq(ledgerAccounts.id, entry.ledgerAccountId));
+          const [ledger] = await db.select().from(ledgerAccounts).where(eq(ledgerAccounts.id, entry.ledgerAccountId));
           if (ledger && ["Cash", "Bank"].includes(ledger.accountType || "")) {
             cashAccountId = entry.ledgerAccountId;
             cashAccountType = "ledger";
@@ -416,18 +477,13 @@ export function registerCreditNoteRoutes(app: Express) {
       const itemsWithCosts = await Promise.all(
         noteItems.map(async (item) => {
           let costRate = "0";
-          
+
           // First try to find inventory at the item's location
           const [inv] = await db
             .select()
             .from(inventory)
-            .where(
-              and(
-                eq(inventory.stockItemId, item.stockItemId),
-                eq(inventory.locationId, item.locationId)
-              )
-            );
-          
+            .where(and(eq(inventory.stockItemId, item.stockItemId), eq(inventory.locationId, item.locationId)));
+
           if (inv?.averageRate && parseFloat(inv.averageRate) > 0) {
             costRate = inv.averageRate;
           } else {
@@ -438,7 +494,7 @@ export function registerCreditNoteRoutes(app: Express) {
               .where(eq(inventory.stockItemId, item.stockItemId))
               .orderBy(desc(inventory.quantity))
               .limit(1);
-            
+
             if (anyInv?.averageRate && parseFloat(anyInv.averageRate) > 0) {
               costRate = anyInv.averageRate;
             } else {
@@ -449,13 +505,13 @@ export function registerCreditNoteRoutes(app: Express) {
                 .where(eq(containerOffloadItems.stockItemId, item.stockItemId))
                 .orderBy(desc(containerOffloadItems.id))
                 .limit(1);
-              
+
               if (offloadItem?.rate && parseFloat(offloadItem.rate) > 0) {
                 costRate = offloadItem.rate;
               }
             }
           }
-          
+
           return {
             stockItemId: item.stockItemId,
             stockItemName: item.stockItemName || "",
@@ -526,7 +582,9 @@ export function registerCreditNoteRoutes(app: Express) {
             return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
           }
           if (!item.locationId || isNaN(Number(item.locationId))) {
-            return res.status(400).json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
+            return res
+              .status(400)
+              .json({ message: `Invalid locationId for item ${item.stockItemId}: ${item.locationId}` });
           }
           const qty = parseFloat(item.quantity);
           if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
@@ -536,18 +594,12 @@ export function registerCreditNoteRoutes(app: Express) {
       }
 
       // Snapshot old credit note items BEFORE the transaction (for audit diff)
-      const _oldCNItems = await db
-        .select()
-        .from(creditNoteItems)
-        .where(eq(creditNoteItems.voucherId, voucherId));
+      const _oldCNItems = await db.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
 
       // Wrap all mutations in a transaction
       await db.transaction(async (tx) => {
         // Get existing credit note items to reverse inventory
-        const existingItems = await tx
-          .select()
-          .from(creditNoteItems)
-          .where(eq(creditNoteItems.voucherId, voucherId));
+        const existingItems = await tx.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, voucherId));
 
         // REVERSE: Undo inventory changes from existing items
         for (const item of existingItems) {
@@ -609,16 +661,19 @@ export function registerCreditNoteRoutes(app: Express) {
 
         // Apply new items
         for (const item of items) {
-          const { stockItemId, locationId, quantity, refundRate: itemRefundRate, inventoryCost: itemInventoryCost } = item;
+          const {
+            stockItemId,
+            locationId,
+            quantity,
+            refundRate: itemRefundRate,
+            inventoryCost: itemInventoryCost,
+          } = item;
           const qty = parseFloat(quantity);
           const refundRateVal = parseFloat(itemRefundRate || "0");
           const inventoryCostVal = parseFloat(itemInventoryCost || "0");
           const inventoryValue = qty * inventoryCostVal;
 
-          const [location] = await tx
-            .select()
-            .from(locations)
-            .where(eq(locations.id, locationId));
+          const [location] = await tx.select().from(locations).where(eq(locations.id, locationId));
 
           if (!location) {
             throw new Error(`Location ${locationId} not found`);
@@ -716,23 +771,21 @@ export function registerCreditNoteRoutes(app: Express) {
           _cnChanges.date = { old: voucher.voucherDate, new: voucherDate };
         if (cashAccountId !== undefined)
           _cnChanges.cashAccount = { old: _oldCNItems[0]?.voucherId ?? null, new: cashAccountId };
-        const _resolveCNName = async (id: number) =>
-          (await storage.getStockItemById(id))?.name ?? `Item #${id}`;
+        const _resolveCNName = async (id: number) => (await storage.getStockItemById(id))?.name ?? `Item #${id}`;
         const _cnItemDiff = items?.length
           ? await buildItemLevelChanges(
-              _oldCNItems.map(it => ({
+              _oldCNItems.map((it) => ({
                 stockItemId: it.stockItemId,
                 quantity: it.quantity,
                 rate: it.rate,
                 totalValue: it.totalValue,
               })),
-              (items as any[]).map(it => ({
+              (items as any[]).map((it) => ({
                 stockItemId: Number(it.stockItemId),
                 quantity: String(it.quantity ?? ""),
                 rate: String(it.refundRate ?? it.rate ?? ""),
                 totalValue: String(
-                  parseFloat(String(it.quantity ?? 0)) *
-                    parseFloat(String(it.refundRate ?? it.rate ?? 0))
+                  parseFloat(String(it.quantity ?? 0)) * parseFloat(String(it.refundRate ?? it.rate ?? 0))
                 ),
               })),
               _resolveCNName
@@ -748,7 +801,9 @@ export function registerCreditNoteRoutes(app: Express) {
           recordIdentifier: voucher.voucherNumber,
           changes: { ..._cnChanges, ..._cnItemDiff },
         });
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
       res.json({
         success: true,
         voucherId,
@@ -759,5 +814,4 @@ export function registerCreditNoteRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 }

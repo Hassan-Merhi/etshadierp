@@ -56,10 +56,9 @@ export function AccountCombobox({
   const { data: fetchedSuppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers", selectedCompany?.id, "combobox", debouncedSearch],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/suppliers?search=${encodeURIComponent(debouncedSearch)}`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/suppliers?search=${encodeURIComponent(debouncedSearch)}`, {
+        credentials: "include",
+      });
       if (!res.ok) return [];
       return res.json();
     },
@@ -70,10 +69,9 @@ export function AccountCombobox({
   const { data: fetchedCustomers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers", selectedCompany?.id, "combobox", debouncedSearch],
     queryFn: async () => {
-      const res = await fetch(
-        `/api/customers?search=${encodeURIComponent(debouncedSearch)}`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/customers?search=${encodeURIComponent(debouncedSearch)}`, {
+        credentials: "include",
+      });
       if (!res.ok) return [];
       return res.json();
     },
@@ -155,9 +153,7 @@ export function AccountCombobox({
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value?.type === account.type && value?.id === account.id
-                        ? "opacity-100"
-                        : "opacity-0"
+                      value?.type === account.type && value?.id === account.id ? "opacity-100" : "opacity-0"
                     )}
                   />
                   {account.name}

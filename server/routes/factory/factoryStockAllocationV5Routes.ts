@@ -47,14 +47,22 @@ const TOTAL_LOADED_STATUSES = ["LOADING", "PENDING_VERIFICATION", "VERIFIED", "F
 //     > 0 → surplus available            → green
 
 export function registerFactoryStockAllocationV5Routes(app: Express) {
-
   // ── GET /api/factory/v5/stock-allocation ────────────────────────────────
   app.get("/api/factory/v5/stock-allocation", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const { productFilter, customerFilter, proformaFilter, containerFilter, statusFilter, fromDate, toDate, hideZero } = req.query;
+      const {
+        productFilter,
+        customerFilter,
+        proformaFilter,
+        containerFilter,
+        statusFilter,
+        fromDate,
+        toDate,
+        hideZero,
+      } = req.query;
 
       // 0. Build set of excluded article codes — products whose category is Wiper or Garbage
       const excludedCodesRaw = await db.execute(
@@ -65,12 +73,12 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               AND (
                 LOWER(fc.name) LIKE '%wiper%'
                 OR LOWER(fc.name) LIKE '%garbage%'
-              )`,
+              )`
       );
       const excludedCodes = new Set<string>(
         ((excludedCodesRaw as any).rows ?? (excludedCodesRaw as unknown as any[]))
           .map((r: any) => r.articleCode)
-          .filter(Boolean),
+          .filter(Boolean)
       );
 
       // 1. stockAvailable — IN_STOCK bales
@@ -78,11 +86,10 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         sql`SELECT article_code AS "articleCode", COUNT(*)::int AS count
             FROM factory_bales
             WHERE company_id = ${companyId} AND status = 'IN_STOCK'
-            GROUP BY article_code`,
+            GROUP BY article_code`
       );
       const inStockMap = new Map<string, number>(
-        ((inStockRaw as any).rows ?? (inStockRaw as unknown as any[]))
-          .map((r: any) => [r.articleCode, Number(r.count)]),
+        ((inStockRaw as any).rows ?? (inStockRaw as unknown as any[])).map((r: any) => [r.articleCode, Number(r.count)])
       );
 
       // 2. totalLoaded — bales physically scanned into LOADING orders ONLY.
@@ -97,11 +104,13 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
             WHERE co.company_id = ${companyId}
               AND co.status = 'LOADING'
               AND co.proforma_id_used IS NOT NULL
-            GROUP BY fb.article_code`,
+            GROUP BY fb.article_code`
       );
       const inLoadingMap = new Map<string, number>(
-        ((inLoadingRaw as any).rows ?? (inLoadingRaw as unknown as any[]))
-          .map((r: any) => [r.articleCode, Number(r.count)]),
+        ((inLoadingRaw as any).rows ?? (inLoadingRaw as unknown as any[])).map((r: any) => [
+          r.articleCode,
+          Number(r.count),
+        ])
       );
 
       // 3. Active proformas + lines (with optional date range filter on createdAt)
@@ -135,25 +144,33 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         .from(customerProformas)
         .where(and(...proformaConditions));
 
-      const proformaIds = activeProformasRaw.map(p => p.id);
+      const proformaIds = activeProformasRaw.map((p) => p.id);
 
-      let allLines: { id: number; proformaId: number; articleCode: string; productName: string; quantity: number }[] = [];
+      let allLines: { id: number; proformaId: number; articleCode: string; productName: string; quantity: number }[] =
+        [];
       if (proformaIds.length > 0) {
-        allLines = (await db
-          .select({
-            id: customerProformaLines.id,
-            proformaId: customerProformaLines.proformaId,
-            articleCode: customerProformaLines.articleCode,
-            productName: customerProformaLines.productName,
-            quantity: customerProformaLines.quantity,
-          })
-          .from(customerProformaLines)
-          .where(inArray(customerProformaLines.proformaId, proformaIds))
-        ).map(l => ({ ...l, quantity: Number(l.quantity) }));
+        allLines = (
+          await db
+            .select({
+              id: customerProformaLines.id,
+              proformaId: customerProformaLines.proformaId,
+              articleCode: customerProformaLines.articleCode,
+              productName: customerProformaLines.productName,
+              quantity: customerProformaLines.quantity,
+            })
+            .from(customerProformaLines)
+            .where(inArray(customerProformaLines.proformaId, proformaIds))
+        ).map((l) => ({ ...l, quantity: Number(l.quantity) }));
       }
 
       // 4. Active orders per proforma (ACTIVE_ORDER_STATUSES, excludes CANCELLED)
-      type OrderRow = { id: number; proformaId: number; containerNumber: string | null; status: string; customerId: number };
+      type OrderRow = {
+        id: number;
+        proformaId: number;
+        containerNumber: string | null;
+        status: string;
+        customerId: number;
+      };
       let ordersByProforma: OrderRow[] = [];
       if (proformaIds.length > 0) {
         const ordersRaw = await db.execute(
@@ -163,7 +180,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               WHERE company_id = ${companyId}
                 AND proforma_id_used = ANY(${sqlArray(proformaIds)})
                 AND status = ANY(${sqlArray(ACTIVE_ORDER_STATUSES as unknown as string[])})
-              ORDER BY id`,
+              ORDER BY id`
         );
         ordersByProforma = ((ordersRaw as any).rows ?? (ordersRaw as unknown as any[])).map((r: any) => ({
           id: Number(r.id),
@@ -177,14 +194,14 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       // 5. Loaded bales per order — for expandable container detail
       type BalesByOrder = { orderId: number; articleCode: string; count: number };
       let loadedBalesByOrder: BalesByOrder[] = [];
-      const allOrderIds = ordersByProforma.map(o => o.id);
+      const allOrderIds = ordersByProforma.map((o) => o.id);
       if (allOrderIds.length > 0) {
         const balesRaw = await db.execute(
           sql`SELECT cob.order_id AS "orderId", fb.article_code AS "articleCode", COUNT(*)::int AS count
               FROM customer_order_bales cob
               JOIN factory_bales fb ON fb.id = cob.bale_id
               WHERE cob.order_id = ANY(${sqlArray(allOrderIds)})
-              GROUP BY cob.order_id, fb.article_code`,
+              GROUP BY cob.order_id, fb.article_code`
         );
         loadedBalesByOrder = ((balesRaw as any).rows ?? (balesRaw as unknown as any[])).map((r: any) => ({
           orderId: Number(r.orderId),
@@ -222,7 +239,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                     SELECT 1 FROM customer_order_expected_lines cel
                     WHERE cel.order_id = co.id AND cel.article_code = cpl.article_code
                   )
-                ON CONFLICT (order_id, article_code) DO NOTHING`,
+                ON CONFLICT (order_id, article_code) DO NOTHING`
           );
         } catch (_backfillErr) {
           // Non-fatal: backfill failure must never block the GET response
@@ -240,7 +257,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           sql`SELECT order_id AS "orderId", article_code AS "articleCode",
                      expected_qty AS "expectedQty"
               FROM customer_order_expected_lines
-              WHERE order_id = ANY(${sqlArray(allOrderIds)})`,
+              WHERE order_id = ANY(${sqlArray(allOrderIds)})`
         );
         allExpectedLines = ((expRaw as any).rows ?? (expRaw as unknown as any[])).map((r: any) => ({
           orderId: Number(r.orderId),
@@ -251,15 +268,17 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       // Key: `${orderId}__${articleCode}` → expectedQty for per-container expandable detail
       const perContainerExpectedMap = new Map<string, number>();
-      allExpectedLines.forEach(el => {
+      allExpectedLines.forEach((el) => {
         perContainerExpectedMap.set(`${el.orderId}__${el.articleCode}`, el.expectedQty);
       });
 
       // 6. Customer names
-      const customerIds = [...new Set([
-        ...activeProformasRaw.map(p => p.customerId).filter((id): id is number => id != null),
-        ...ordersByProforma.map(o => o.customerId),
-      ])];
+      const customerIds = [
+        ...new Set([
+          ...activeProformasRaw.map((p) => p.customerId).filter((id): id is number => id != null),
+          ...ordersByProforma.map((o) => o.customerId),
+        ]),
+      ];
       const customerMap = new Map<number, string>();
       if (customerIds.length > 0) {
         const rows = await db
@@ -276,7 +295,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                    weight_per_bale_kg AS "weightKg"
             FROM factory_bale_products
             WHERE company_id = ${companyId} AND active = true
-            ORDER BY name`,
+            ORDER BY name`
       );
       const allProductsMap = new Map<string, string>();
       const weightMap = new Map<string, number>();
@@ -298,7 +317,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       const allCodes = new Set([
         ...inStockMap.keys(),
         ...inLoadingMap.keys(),
-        ...allLines.map(l => l.articleCode),
+        ...allLines.map((l) => l.articleCode),
         ...allProductsMap.keys(),
       ]);
 
@@ -319,7 +338,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                   AND (code = ANY(${codeArr}) OR article_code = ANY(${codeArr}))
               ) sub
               WHERE matched_code IS NOT NULL
-              ORDER BY matched_code`,
+              ORDER BY matched_code`
         );
         ((prodRaw as any).rows ?? (prodRaw as unknown as any[])).forEach((r: any) => {
           if (r.name) productNamesMap[r.articleCode] = r.name;
@@ -327,13 +346,15 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       }
 
       // 9b. Fill remaining codes from proforma line names (last resort)
-      allLines.forEach(l => { if (!productNamesMap[l.articleCode]) productNamesMap[l.articleCode] = l.productName; });
+      allLines.forEach((l) => {
+        if (!productNamesMap[l.articleCode]) productNamesMap[l.articleCode] = l.productName;
+      });
 
       // 9c. Final fallback — look up product_name stored on factory_bales for any codes
       //     that are still unmapped after the products-table and proforma-line lookups.
       //     This catches bales whose article_code has no matching row in factory_bale_products
       //     (e.g. legacy codes, renamed products, or manually-entered codes).
-      const unmappedCodes = Array.from(allCodes).filter(c => !productNamesMap[c]);
+      const unmappedCodes = Array.from(allCodes).filter((c) => !productNamesMap[c]);
       if (unmappedCodes.length > 0) {
         const unmappedArr = sqlArray(unmappedCodes);
         const baleNamesRaw = await db.execute(
@@ -343,7 +364,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                 AND article_code = ANY(${unmappedArr})
                 AND product_name IS NOT NULL
                 AND product_name != ''
-              ORDER BY article_code, created_at DESC`,
+              ORDER BY article_code, created_at DESC`
         );
         ((baleNamesRaw as any).rows ?? (baleNamesRaw as unknown as any[])).forEach((r: any) => {
           if (r.articleCode && r.productName && !productNamesMap[r.articleCode]) {
@@ -371,114 +392,129 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       // This prevents showing free bales that are still needed to complete active containers.
       // V5 guard: proformaIdUsed IS NOT NULL (allExpectedLines already filtered to active V5 orders)
       const activeDraftLoadingIds = new Set(
-        ordersByProforma.filter(o => o.status === "DRAFT" || o.status === "LOADING").map(o => o.id),
+        ordersByProforma.filter((o) => o.status === "DRAFT" || o.status === "LOADING").map((o) => o.id)
       );
       const expectedMap = new Map<string, number>();
-      allExpectedLines.forEach(el => {
+      allExpectedLines.forEach((el) => {
         if (!activeDraftLoadingIds.has(el.orderId)) return;
-        const loaded = loadedBalesByOrder.find(
-          b => b.orderId === el.orderId && b.articleCode === el.articleCode,
-        )?.count ?? 0;
+        const loaded =
+          loadedBalesByOrder.find((b) => b.orderId === el.orderId && b.articleCode === el.articleCode)?.count ?? 0;
         const remaining = Math.max(el.expectedQty - loaded, 0);
         expectedMap.set(el.articleCode, (expectedMap.get(el.articleCode) ?? 0) + remaining);
       });
 
       // 10. Build rows — union of all known codes (including zero-stock active products)
-      const rows = Array.from(allCodes).sort().map(articleCode => {
-        const stockAvailable = inStockMap.get(articleCode) ?? 0;
-        const totalLoaded    = inLoadingMap.get(articleCode) ?? 0;
-        const expectedToLoad = expectedMap.get(articleCode) ?? 0;
-        const freeToPromise  = stockAvailable - expectedToLoad - totalLoaded;
+      const rows = Array.from(allCodes)
+        .sort()
+        .map((articleCode) => {
+          const stockAvailable = inStockMap.get(articleCode) ?? 0;
+          const totalLoaded = inLoadingMap.get(articleCode) ?? 0;
+          const expectedToLoad = expectedMap.get(articleCode) ?? 0;
+          const freeToPromise = stockAvailable - expectedToLoad - totalLoaded;
 
-        // Per-proforma/per-container expandable detail
-        const proformaDetails = activeProformasRaw
-          .filter(p => allLines.some(l => l.proformaId === p.id && l.articleCode === articleCode))
-          .map(p => {
-            const line = allLines.find(l => l.proformaId === p.id && l.articleCode === articleCode);
-            const lineQty = line?.quantity ?? 0;
-            const linkedOrders = ordersByProformaId.get(p.id) ?? [];
-            const containers = linkedOrders.map(o => {
-              const loadedBales = loadedBalesByOrder.find(
-                b => b.orderId === o.id && b.articleCode === articleCode,
-              )?.count ?? 0;
-              // Phase B: use locked-in per-container expected qty from customer_order_expected_lines.
-              // Falls back to lineQty if no expected line exists (e.g. order pre-dates Phase B backfill).
-              const containerExpectedQty = perContainerExpectedMap.get(`${o.id}__${articleCode}`) ?? lineQty;
-              const remainingQty = Math.max(containerExpectedQty - loadedBales, 0);
+          // Per-proforma/per-container expandable detail
+          const proformaDetails = activeProformasRaw
+            .filter((p) => allLines.some((l) => l.proformaId === p.id && l.articleCode === articleCode))
+            .map((p) => {
+              const line = allLines.find((l) => l.proformaId === p.id && l.articleCode === articleCode);
+              const lineQty = line?.quantity ?? 0;
+              const linkedOrders = ordersByProformaId.get(p.id) ?? [];
+              const containers = linkedOrders.map((o) => {
+                const loadedBales =
+                  loadedBalesByOrder.find((b) => b.orderId === o.id && b.articleCode === articleCode)?.count ?? 0;
+                // Phase B: use locked-in per-container expected qty from customer_order_expected_lines.
+                // Falls back to lineQty if no expected line exists (e.g. order pre-dates Phase B backfill).
+                const containerExpectedQty = perContainerExpectedMap.get(`${o.id}__${articleCode}`) ?? lineQty;
+                const remainingQty = Math.max(containerExpectedQty - loadedBales, 0);
+                return {
+                  orderId: o.id,
+                  containerName: o.containerNumber || `Order #${o.id}`,
+                  status: o.status,
+                  expectedQty: containerExpectedQty,
+                  loadedQty: loadedBales,
+                  remainingQty,
+                };
+              });
+              // totalExpected: sum of locked-in per-container expected qty for this article
+              const totalExpected = linkedOrders.reduce(
+                (sum, o) => sum + (perContainerExpectedMap.get(`${o.id}__${articleCode}`) ?? lineQty),
+                0
+              );
               return {
-                orderId: o.id,
-                containerName: o.containerNumber || `Order #${o.id}`,
-                status: o.status,
-                expectedQty: containerExpectedQty,
-                loadedQty: loadedBales,
-                remainingQty,
+                proformaId: p.id,
+                proformaName: p.name,
+                customerId: p.customerId,
+                customerName: customerMap.get(p.customerId!) ?? `Customer #${p.customerId}`,
+                lineQty,
+                containerCount: linkedOrders.length,
+                totalExpected,
+                containers,
               };
             });
-            // totalExpected: sum of locked-in per-container expected qty for this article
-            const totalExpected = linkedOrders.reduce(
-              (sum, o) => sum + (perContainerExpectedMap.get(`${o.id}__${articleCode}`) ?? lineQty),
-              0,
-            );
-            return {
-              proformaId: p.id,
-              proformaName: p.name,
-              customerId: p.customerId,
-              customerName: customerMap.get(p.customerId!) ?? `Customer #${p.customerId}`,
-              lineQty,
-              containerCount: linkedOrders.length,
-              totalExpected,
-              containers,
-            };
-          });
 
-        const productName = productNamesMap[articleCode] || articleCode;
-        const weightKg    = weightMap.get(articleCode) ?? 0;
-        const totalKg     = Math.round(stockAvailable * weightKg);
-        const isGarbageOrWipers = excludedCodes.has(articleCode);
-        return { articleCode, productName, stockAvailable, totalLoaded, expectedToLoad, freeToPromise, totalKg, proformaDetails, isGarbageOrWipers };
-      });
+          const productName = productNamesMap[articleCode] || articleCode;
+          const weightKg = weightMap.get(articleCode) ?? 0;
+          const totalKg = Math.round(stockAvailable * weightKg);
+          const isGarbageOrWipers = excludedCodes.has(articleCode);
+          return {
+            articleCode,
+            productName,
+            stockAvailable,
+            totalLoaded,
+            expectedToLoad,
+            freeToPromise,
+            totalKg,
+            proformaDetails,
+            isGarbageOrWipers,
+          };
+        });
 
       // 11. Apply frontend filters
       let filtered = rows;
       if (productFilter) {
         const q = String(productFilter).toLowerCase();
-        filtered = filtered.filter(r => r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q));
+        filtered = filtered.filter(
+          (r) => r.articleCode.toLowerCase().includes(q) || r.productName.toLowerCase().includes(q)
+        );
       }
       if (customerFilter) {
         const q = String(customerFilter).toLowerCase();
-        filtered = filtered.filter(r => r.proformaDetails.some(d => d.customerName.toLowerCase().includes(q)));
+        filtered = filtered.filter((r) => r.proformaDetails.some((d) => d.customerName.toLowerCase().includes(q)));
       }
       if (proformaFilter) {
         const q = String(proformaFilter).toLowerCase();
-        filtered = filtered.filter(r => r.proformaDetails.some(d => d.proformaName.toLowerCase().includes(q)));
+        filtered = filtered.filter((r) => r.proformaDetails.some((d) => d.proformaName.toLowerCase().includes(q)));
       }
       if (containerFilter) {
         const q = String(containerFilter).toLowerCase();
-        filtered = filtered.filter(r => r.proformaDetails.some(d => d.containers.some(c => c.containerName.toLowerCase().includes(q))));
+        filtered = filtered.filter((r) =>
+          r.proformaDetails.some((d) => d.containers.some((c) => c.containerName.toLowerCase().includes(q)))
+        );
       }
       if (statusFilter) {
         const q = String(statusFilter).toUpperCase();
-        filtered = filtered.filter(r => r.proformaDetails.some(d => d.containers.some(c => c.status === q)));
+        filtered = filtered.filter((r) => r.proformaDetails.some((d) => d.containers.some((c) => c.status === q)));
       }
       if (hideZero === "true") {
         // Keep rows that have non-zero counts OR that still have at least one non-cancelled
         // container in any linked proforma (e.g. a FINALIZED order whose bales are already SOLD
         // and therefore no longer contribute to stockAvailable / totalLoaded / expectedToLoad).
-        filtered = filtered.filter(r =>
-          r.expectedToLoad > 0 ||
-          r.stockAvailable > 0 ||
-          r.totalLoaded > 0 ||
-          r.proformaDetails.some(d => d.containers.some(c => c.status !== "CANCELLED")),
+        filtered = filtered.filter(
+          (r) =>
+            r.expectedToLoad > 0 ||
+            r.stockAvailable > 0 ||
+            r.totalLoaded > 0 ||
+            r.proformaDetails.some((d) => d.containers.some((c) => c.status !== "CANCELLED"))
         );
       }
 
       const totals = {
         stockAvailable: filtered.reduce((s, r) => s + r.stockAvailable, 0),
-        totalLoaded:    filtered.reduce((s, r) => s + r.totalLoaded, 0),
+        totalLoaded: filtered.reduce((s, r) => s + r.totalLoaded, 0),
         expectedToLoad: filtered.reduce((s, r) => s + r.expectedToLoad, 0),
-        freeToPromise:  filtered.reduce((s, r) => s + r.freeToPromise, 0),
-        totalKg:        filtered.reduce((s, r) => s + r.totalKg, 0),
-        shortageCount:  filtered.filter(r => r.freeToPromise < 0).length,
+        freeToPromise: filtered.reduce((s, r) => s + r.freeToPromise, 0),
+        totalKg: filtered.reduce((s, r) => s + r.totalKg, 0),
+        shortageCount: filtered.filter((r) => r.freeToPromise < 0).length,
       };
 
       res.json({ rows: filtered, totals, productNames: productNamesMap });
@@ -502,7 +538,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       }
       const validLines = lines.filter((l: any) => l.articleCode && l.productName && parseInt(l.quantity) > 0);
       if (validLines.length === 0) {
-        return res.status(400).json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
+        return res
+          .status(400)
+          .json({ message: "At least one line must have articleCode, productName, and quantity > 0" });
       }
 
       const names: string[] = Array.isArray(containerNames) ? containerNames.filter(Boolean) : [];
@@ -520,8 +558,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
           quantity: parseInt(l.quantity),
           pricePerBale: String(l.pricePerBale ?? "0"),
           productionPricePerBale: String(l.productionPricePerBale ?? "0"),
-          pricingMode: l.pricingMode ?? 'per_bale',
-          pricePerKg: (l.pricingMode === 'per_kg' && l.pricePerKg != null && l.pricePerKg !== '') ? String(l.pricePerKg) : null,
+          pricingMode: l.pricingMode ?? "per_bale",
+          pricePerKg:
+            l.pricingMode === "per_kg" && l.pricePerKg != null && l.pricePerKg !== "" ? String(l.pricePerKg) : null,
         }));
         const insertedLines = await tx.insert(customerProformaLines).values(lineValues).returning();
 
@@ -606,7 +645,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       if (uniqueInReq.size !== containerNames.length) {
         const seen = new Set<string>();
         const dupes = containerNames.filter((n: string) => seen.size === seen.add(n).size);
-        return res.status(400).json({ message: `Duplicate container names in request: ${Array.from(new Set(dupes)).join(", ")}` });
+        return res
+          .status(400)
+          .json({ message: `Duplicate container names in request: ${Array.from(new Set(dupes)).join(", ")}` });
       }
 
       // Confirm proforma exists for this company and is active
@@ -622,14 +663,16 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       const existingOrdersRaw = await db.execute(
         sql`SELECT container_number FROM customer_orders
             WHERE proforma_id_used = ${proformaId}
-              AND container_number IS NOT NULL`,
+              AND container_number IS NOT NULL`
       );
       const existingNames = new Set(
-        ((existingOrdersRaw as any).rows ?? []).map((r: any) => String(r.container_number ?? "").trim()),
+        ((existingOrdersRaw as any).rows ?? []).map((r: any) => String(r.container_number ?? "").trim())
       );
       const conflicting = containerNames.filter((n: string) => existingNames.has(n));
       if (conflicting.length > 0) {
-        return res.status(400).json({ message: `Container name(s) already exist under this proforma: ${conflicting.join(", ")}` });
+        return res
+          .status(400)
+          .json({ message: `Container name(s) already exist under this proforma: ${conflicting.join(", ")}` });
       }
 
       // Fetch current proforma lines — used to create expected_lines for each new container
@@ -680,7 +723,11 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         return { orders: createdOrders, expectedLinesCreated: expectedLineValues.length };
       });
 
-      res.json({ added: containerNames.length, orders: result.orders, expectedLinesCreated: result.expectedLinesCreated });
+      res.json({
+        added: containerNames.length,
+        orders: result.orders,
+        expectedLinesCreated: result.expectedLinesCreated,
+      });
     } catch (err: any) {
       console.error("[V5] add-containers error:", err);
       res.status(400).json({ message: err.message });
@@ -712,7 +759,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       // Confirm it has linked customer_orders
       const linkedOrdersRaw = await db.execute(
-        sql`SELECT id, status FROM customer_orders WHERE proforma_id_used = ${proformaId}`,
+        sql`SELECT id, status FROM customer_orders WHERE proforma_id_used = ${proformaId}`
       );
       const linkedOrders = ((linkedOrdersRaw as any).rows ?? []) as { id: number; status: string }[];
       if (linkedOrders.length === 0) {
@@ -721,7 +768,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
 
       // Confirm all linked orders are FINALIZED or CANCELLED
       const CLOSEABLE_STATUSES = ["FINALIZED", "CANCELLED"];
-      const openOrders = linkedOrders.filter(o => !CLOSEABLE_STATUSES.includes(o.status));
+      const openOrders = linkedOrders.filter((o) => !CLOSEABLE_STATUSES.includes(o.status));
       if (openOrders.length > 0) {
         return res.status(400).json({ message: "Cannot close proforma while containers are still open." });
       }
@@ -787,7 +834,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               AND status = 'DRAFT'
               AND NOT EXISTS (
                 SELECT 1 FROM customer_order_bales cob WHERE cob.order_id = customer_orders.id
-              )`,
+              )`
       );
       const eligibleOrders = ((eligibleRaw as any).rows ?? []) as { id: number }[];
       if (eligibleOrders.length === 0) {
@@ -810,7 +857,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                   SET expected_qty = ${qty}
                   WHERE order_id = ${orderId}
                     AND article_code = ${update.articleCode}
-                    AND company_id = ${companyId}`,
+                    AND company_id = ${companyId}`
             );
             totalUpdated += (result as any).rowCount ?? 0;
           }
@@ -843,7 +890,8 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const locationId = parseInt(String(req.query.locationId));
-      if (!locationId || isNaN(locationId)) return res.status(400).json({ message: "locationId query param is required" });
+      if (!locationId || isNaN(locationId))
+        return res.status(400).json({ message: "locationId query param is required" });
 
       // 1. inStock — IN_STOCK bales at this location, grouped by article
       const inStockRaw = await db.execute(
@@ -852,10 +900,10 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
             WHERE company_id = ${companyId}
               AND erp_location_id = ${locationId}
               AND status = 'IN_STOCK'
-            GROUP BY article_code`,
+            GROUP BY article_code`
       );
       const inStockMap = new Map<string, number>(
-        ((inStockRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.count)]),
+        ((inStockRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.count)])
       );
 
       // 2. reservedExpected — SUM(expected_qty) for DRAFT V5 orders on active proformas (company-wide)
@@ -870,10 +918,10 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               AND co.status = 'DRAFT'
               AND co.proforma_id_used IS NOT NULL
               AND cp.is_active = true
-            GROUP BY cel.article_code`,
+            GROUP BY cel.article_code`
       );
       const reservedMap = new Map<string, number>(
-        ((reservedRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.total)]),
+        ((reservedRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.total)])
       );
 
       // 3. loading — bales at this location that have been scanned into LOADING V5 containers
@@ -888,10 +936,10 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               AND co.status = 'LOADING'
               AND co.proforma_id_used IS NOT NULL
               AND fb.erp_location_id = ${locationId}
-            GROUP BY fb.article_code`,
+            GROUP BY fb.article_code`
       );
       const loadingMap = new Map<string, number>(
-        ((loadingRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.count)]),
+        ((loadingRaw as any).rows ?? []).map((r: any) => [r.articleCode, Number(r.count)])
       );
 
       // 4. Resolve product names + weight_per_bale_kg (bidirectional code/articleCode lookup)
@@ -912,7 +960,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
                   AND (code = ANY(${codeArr2}) OR article_code = ANY(${codeArr2}))
               ) sub
               WHERE matched_code IS NOT NULL
-              ORDER BY matched_code`,
+              ORDER BY matched_code`
         );
         ((nameRaw as any).rows ?? []).forEach((r: any) => {
           if (r.name) productNameMap.set(r.articleCode, r.name);
@@ -921,26 +969,29 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       }
 
       // 5. Build per-article rows; exclude rows with all zeros
-      const rows = Array.from(allCodes).sort().map(articleCode => {
-        const inStock          = inStockMap.get(articleCode) ?? 0;
-        const reservedExpected = reservedMap.get(articleCode) ?? 0;
-        const loading          = loadingMap.get(articleCode) ?? 0;
-        const availableBalance = inStock - reservedExpected - loading;
-        const weightPerBaleKg  = weightMap.get(articleCode) ?? 0;
-        return {
-          articleCode,
-          productName: productNameMap.get(articleCode) ?? articleCode,
-          inStock,
-          reservedExpected,
-          loading,
-          availableBalance,
-          weightPerBaleKg,
-        };
-      }).filter(r => r.inStock > 0 || r.reservedExpected > 0 || r.loading > 0);
+      const rows = Array.from(allCodes)
+        .sort()
+        .map((articleCode) => {
+          const inStock = inStockMap.get(articleCode) ?? 0;
+          const reservedExpected = reservedMap.get(articleCode) ?? 0;
+          const loading = loadingMap.get(articleCode) ?? 0;
+          const availableBalance = inStock - reservedExpected - loading;
+          const weightPerBaleKg = weightMap.get(articleCode) ?? 0;
+          return {
+            articleCode,
+            productName: productNameMap.get(articleCode) ?? articleCode,
+            inStock,
+            reservedExpected,
+            loading,
+            availableBalance,
+            weightPerBaleKg,
+          };
+        })
+        .filter((r) => r.inStock > 0 || r.reservedExpected > 0 || r.loading > 0);
 
       res.json({
         rows,
-        shortageCount: rows.filter(r => r.availableBalance < 0).length,
+        shortageCount: rows.filter((r) => r.availableBalance < 0).length,
       });
     } catch (err: any) {
       console.error("[V5] location-summary error:", err);
@@ -976,19 +1027,19 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               AND co.proforma_id_used    IS NOT NULL
               AND co.updated_at          >= NOW() - INTERVAL '30 days'
             ORDER BY co.updated_at DESC
-            LIMIT 50`,
+            LIMIT 50`
       );
 
       const orders = ((raw as any).rows ?? (raw as unknown as any[])).map((r: any) => ({
-        id:               Number(r.id),
-        containerNumber:  r.containerNumber ?? `Order #${r.id}`,
-        status:           r.status,
-        customerId:       r.customerId ? Number(r.customerId) : null,
-        customerName:     r.customerName ?? "Unknown",
-        cancelledAt:      r.cancelledAt,
-        wasLoading:       !!r.loadingStartedAt,
-        proformaId:       r.proformaId ? Number(r.proformaId) : null,
-        proformaName:     r.proformaName ?? null,
+        id: Number(r.id),
+        containerNumber: r.containerNumber ?? `Order #${r.id}`,
+        status: r.status,
+        customerId: r.customerId ? Number(r.customerId) : null,
+        customerName: r.customerName ?? "Unknown",
+        cancelledAt: r.cancelledAt,
+        wasLoading: !!r.loadingStartedAt,
+        proformaId: r.proformaId ? Number(r.proformaId) : null,
+        proformaName: r.proformaName ?? null,
       }));
 
       res.json({ orders });
@@ -1012,27 +1063,33 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       const orderId = parseInt(req.params.id);
       if (!orderId || isNaN(orderId)) return res.status(400).json({ message: "Invalid id" });
 
-      const [order] = await db.execute(
-        sql`SELECT id, status, proforma_id_used, loading_started_at
+      const [order] = await db
+        .execute(
+          sql`SELECT id, status, proforma_id_used, loading_started_at
             FROM customer_orders
-            WHERE id = ${orderId} AND company_id = ${companyId}`,
-      ).then((r: any) => (r.rows ?? (r as any[])).map((row: any) => ({
-        id: Number(row.id),
-        status: row.status,
-        proformaIdUsed: row.proforma_id_used,
-        loadingStartedAt: row.loading_started_at,
-      })));
+            WHERE id = ${orderId} AND company_id = ${companyId}`
+        )
+        .then((r: any) =>
+          (r.rows ?? (r as any[])).map((row: any) => ({
+            id: Number(row.id),
+            status: row.status,
+            proformaIdUsed: row.proforma_id_used,
+            loadingStartedAt: row.loading_started_at,
+          }))
+        );
 
       if (!order) return res.status(404).json({ message: "Container not found" });
-      if (order.status !== "CANCELLED") return res.status(400).json({ message: "Only CANCELLED containers can be restored" });
-      if (!order.proformaIdUsed) return res.status(400).json({ message: "Only V5 containers (linked to a proforma) can be restored here" });
+      if (order.status !== "CANCELLED")
+        return res.status(400).json({ message: "Only CANCELLED containers can be restored" });
+      if (!order.proformaIdUsed)
+        return res.status(400).json({ message: "Only V5 containers (linked to a proforma) can be restored here" });
 
       const restoreStatus = order.loadingStartedAt ? "LOADING" : "DRAFT";
 
       await db.execute(
         sql`UPDATE customer_orders
             SET status = ${restoreStatus}, updated_at = NOW()
-            WHERE id = ${orderId} AND company_id = ${companyId}`,
+            WHERE id = ${orderId} AND company_id = ${companyId}`
       );
 
       // Remove the ORDER_CANCELLED daybook entry so financials are clean
@@ -1040,7 +1097,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
         sql`DELETE FROM factory_daybook_entries
             WHERE company_id = ${companyId}
               AND tx_type = 'ORDER_CANCELLED'
-              AND reference_id = ${orderId}`,
+              AND reference_id = ${orderId}`
       );
 
       // Restore the exact bale links that were archived when the order was cancelled.
@@ -1049,7 +1106,7 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
       // For older orders cancelled before this feature, history is empty and the totals
       // are simply reset to 0 — those orders need Auto-Recover or manual recovery.
       const historyResult = await db.execute(
-        sql`SELECT COUNT(*)::int AS cnt FROM customer_order_bales_history WHERE order_id = ${orderId}`,
+        sql`SELECT COUNT(*)::int AS cnt FROM customer_order_bales_history WHERE order_id = ${orderId}`
       );
       const historyCount = Number(((historyResult as any).rows ?? [])[0]?.cnt ?? 0);
 
@@ -1061,11 +1118,9 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               SELECT order_id, bale_id, bale_reference, location_id, weight,
                      article_code, bale_name, price_used, scanned_by
               FROM customer_order_bales_history
-              WHERE order_id = ${orderId}`,
+              WHERE order_id = ${orderId}`
         );
-        await db.execute(
-          sql`DELETE FROM customer_order_bales_history WHERE order_id = ${orderId}`,
-        );
+        await db.execute(sql`DELETE FROM customer_order_bales_history WHERE order_id = ${orderId}`);
       }
 
       // Rebuild order_lines and sync total_qty_bales from the live bale count.
@@ -1103,16 +1158,16 @@ export function registerFactoryStockAllocationV5Routes(app: Express) {
               AND co.status          = 'LOADING'
               AND co.proforma_id_used IS NULL
             GROUP BY co.id, co.container_number, co.status, co.customer_id, co.created_at, c.legal_name
-            ORDER BY co.created_at DESC`,
+            ORDER BY co.created_at DESC`
       );
 
       const orders = ((raw as any).rows ?? (raw as any[])).map((r: any) => ({
-        id:              Number(r.id),
+        id: Number(r.id),
         containerNumber: r.containerNumber ?? `Order #${r.id}`,
-        status:          r.status,
-        customerId:      r.customerId ? Number(r.customerId) : null,
-        customerName:    r.customerName ?? "Unknown",
-        createdAt:       r.createdAt,
+        status: r.status,
+        customerId: r.customerId ? Number(r.customerId) : null,
+        customerName: r.customerName ?? "Unknown",
+        createdAt: r.createdAt,
         loadedBaleCount: Number(r.loadedBaleCount ?? 0),
       }));
 

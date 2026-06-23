@@ -14,7 +14,7 @@ export interface DesignColorOption {
   colorHex?: string;
 }
 
-const STATIC_FALLBACK: DesignColorOption[] = A4_DESIGN_OPTIONS.map(o => ({
+const STATIC_FALLBACK: DesignColorOption[] = A4_DESIGN_OPTIONS.map((o) => ({
   ...o,
   isDefault: true,
   hasCustom: false,
@@ -42,8 +42,8 @@ export function useLabelDesignColors() {
     queryKey: ["/api/factory/label-design-colors"],
     queryFn: () =>
       fetch("/api/factory/label-design-colors", { credentials: "include" })
-        .then(r => r.json())
-        .then(rows => {
+        .then((r) => r.json())
+        .then((rows) => {
           const colors = Array.isArray(rows) ? rows.map(rowToOption) : STATIC_FALLBACK;
           const timestamps: Record<string, number | null> = {};
           for (const c of colors) {

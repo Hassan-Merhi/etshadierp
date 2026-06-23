@@ -19,12 +19,15 @@ export interface ExportJob {
 const jobs = new Map<string, ExportJob>();
 
 // Clean up jobs older than 30 minutes
-setInterval(() => {
-  const cutoff = new Date(Date.now() - 30 * 60 * 1000);
-  for (const [id, job] of jobs.entries()) {
-    if (job.createdAt < cutoff) jobs.delete(id);
-  }
-}, 5 * 60 * 1000);
+setInterval(
+  () => {
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    for (const [id, job] of jobs.entries()) {
+      if (job.createdAt < cutoff) jobs.delete(id);
+    }
+  },
+  5 * 60 * 1000
+);
 
 export function createJob(mode: "download" | "email"): ExportJob {
   const id = `exp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -45,7 +48,12 @@ export function getJob(id: string): ExportJob | undefined {
 
 export function addStep(job: ExportJob, message: string, type: StepType = "info") {
   job.steps.push({
-    time: new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    time: new Date().toLocaleTimeString("en-US", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }),
     message,
     type,
   });

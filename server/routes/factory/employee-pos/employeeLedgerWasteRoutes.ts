@@ -6,44 +6,112 @@ import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { buildBrokerStatement } from "../suppliers/supplierBrokerRoutes";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  propertyContracts, propertyMonthlyLedger, propertyPayments,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
+  propertyContracts,
+  propertyMonthlyLedger,
+  propertyPayments,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -52,7 +120,6 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
 
 export function registerEmployeeLedgerWasteRoutes(app: Express) {
   app.get("/api/factory/bale-ledger", requireAuth, async (req: any, res: any) => {
@@ -77,8 +144,20 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           WHERE fb.company_id = ${companyId}
           AND fb.status IN ('IN_STOCK', 'FINALIZED', 'SOLD', 'DISPATCHED', 'RESERVED_FOR_ORDER')
         `),
-        db.select({ id: factoryBaleProducts.id, name: factoryBaleProducts.name, articleCode: factoryBaleProducts.articleCode, categoryId: factoryBaleProducts.categoryId, productionPrice: factoryBaleProducts.productionPrice }).from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId)),
-        db.select({ id: factoryCategories.id, name: factoryCategories.name }).from(factoryCategories).where(eq(factoryCategories.companyId, companyId)),
+        db
+          .select({
+            id: factoryBaleProducts.id,
+            name: factoryBaleProducts.name,
+            articleCode: factoryBaleProducts.articleCode,
+            categoryId: factoryBaleProducts.categoryId,
+            productionPrice: factoryBaleProducts.productionPrice,
+          })
+          .from(factoryBaleProducts)
+          .where(eq(factoryBaleProducts.companyId, companyId)),
+        db
+          .select({ id: factoryCategories.id, name: factoryCategories.name })
+          .from(factoryCategories)
+          .where(eq(factoryCategories.companyId, companyId)),
         // Bale IDs linked to orders currently in LOADING / PENDING_VERIFICATION / VERIFIED
         db.execute(sql`
           SELECT DISTINCT cob.bale_id AS "baleId"
@@ -91,8 +170,10 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
       const allBales: any[] = Array.isArray(allBalesRaw) ? allBalesRaw : (allBalesRaw as any).rows || [];
       const pendingOrderBaleIds = new Set<number>(
-        (Array.isArray(pendingOrderBaleIdsRaw) ? pendingOrderBaleIdsRaw : (pendingOrderBaleIdsRaw as any).rows || [])
-          .map((r: any) => Number(r.baleId))
+        (Array.isArray(pendingOrderBaleIdsRaw)
+          ? pendingOrderBaleIdsRaw
+          : (pendingOrderBaleIdsRaw as any).rows || []
+        ).map((r: any) => Number(r.baleId))
       );
 
       // Identify waste categories (garbage or wiper)
@@ -116,7 +197,12 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         return p.categoryId ? wasteCategories.has(p.categoryId) : false;
       }
 
-      function getProductLabel(bale: any): { productName: string; articleCode: string; categoryName: string; productId: number | null } {
+      function getProductLabel(bale: any): {
+        productName: string;
+        articleCode: string;
+        categoryName: string;
+        productId: number | null;
+      } {
         const p = bale.productId ? productMap.get(bale.productId) : null;
         const cat = p?.categoryId ? categoryMap.get(p.categoryId) : null;
         return {
@@ -135,8 +221,23 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
 
       // Group bales into buckets
       type BaleDetail = { ref: string; weightKg: number; totalCost: number };
-      type BucketRow = { productId: number | null; productName: string; articleCode: string; categoryName: string; baleCount: number; totalWeightKg: number; totalCost: number; baleDetails: BaleDetail[] };
-      const buckets: { currentStock: Map<string, BucketRow>; wasteStock: Map<string, BucketRow>; sold: Map<string, BucketRow>; wasteDispatched: Map<string, BucketRow>; pendingLoading: Map<string, BucketRow> } = {
+      type BucketRow = {
+        productId: number | null;
+        productName: string;
+        articleCode: string;
+        categoryName: string;
+        baleCount: number;
+        totalWeightKg: number;
+        totalCost: number;
+        baleDetails: BaleDetail[];
+      };
+      const buckets: {
+        currentStock: Map<string, BucketRow>;
+        wasteStock: Map<string, BucketRow>;
+        sold: Map<string, BucketRow>;
+        wasteDispatched: Map<string, BucketRow>;
+        pendingLoading: Map<string, BucketRow>;
+      } = {
         currentStock: new Map(),
         wasteStock: new Map(),
         sold: new Map(),
@@ -144,7 +245,12 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         pendingLoading: new Map(),
       };
 
-      function addToBucket(bucket: Map<string, BucketRow>, key: string, label: ReturnType<typeof getProductLabel>, bale: any) {
+      function addToBucket(
+        bucket: Map<string, BucketRow>,
+        key: string,
+        label: ReturnType<typeof getProductLabel>,
+        bale: any
+      ) {
         const existing = bucket.get(key);
         const w = parseFloat(bale.weightKg) || 0;
         const c = getSellingPrice(bale); // selling price replaces cost
@@ -198,11 +304,14 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       }
 
       function sumBucket(rows: BucketRow[]) {
-        return rows.reduce((acc, r) => ({
-          baleCount: acc.baleCount + r.baleCount,
-          totalWeightKg: acc.totalWeightKg + r.totalWeightKg,
-          totalCost: acc.totalCost + r.totalCost,
-        }), { baleCount: 0, totalWeightKg: 0, totalCost: 0 });
+        return rows.reduce(
+          (acc, r) => ({
+            baleCount: acc.baleCount + r.baleCount,
+            totalWeightKg: acc.totalWeightKg + r.totalWeightKg,
+            totalCost: acc.totalCost + r.totalCost,
+          }),
+          { baleCount: 0, totalWeightKg: 0, totalCost: 0 }
+        );
       }
 
       const currentStock = bucketToArray(buckets.currentStock);
@@ -250,7 +359,10 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       });
       const wasteCategoryIds = new Set(wasteCategories.map((c: any) => c.id));
 
-      const allProducts = await db.select().from(factoryBaleProducts).where(eq(factoryBaleProducts.companyId, companyId));
+      const allProducts = await db
+        .select()
+        .from(factoryBaleProducts)
+        .where(eq(factoryBaleProducts.companyId, companyId));
       const wasteProductIds = new Set(
         allProducts
           .filter((p: any) => {
@@ -281,9 +393,13 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
       const categoryMap = new Map(allCategories.map((c: any) => [c.id, c]));
 
       const locationIds = [...new Set(baleRows.map((b: any) => b.erpLocationId).filter(Boolean))] as number[];
-      const locationRows = locationIds.length > 0
-        ? await db.select({ id: locations.id, name: locations.name }).from(locations).where(inArray(locations.id, locationIds))
-        : [];
+      const locationRows =
+        locationIds.length > 0
+          ? await db
+              .select({ id: locations.id, name: locations.name })
+              .from(locations)
+              .where(inArray(locations.id, locationIds))
+          : [];
       const locationMap = new Map(locationRows.map((l: any) => [l.id, l.name]));
 
       const enriched = baleRows.map((b: any) => {
@@ -299,7 +415,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           costPerKg: parseFloat(b.costPerKg as string) || 0,
           totalCost: parseFloat(b.totalCost as string) || 0,
           status: b.status,
-          locationName: b.erpLocationId ? (locationMap.get(b.erpLocationId) || "Unknown") : "No Location",
+          locationName: b.erpLocationId ? locationMap.get(b.erpLocationId) || "Unknown" : "No Location",
           locationId: b.erpLocationId,
           finalizedAt: b.finalizedAt,
         };
@@ -351,9 +467,7 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           AND waste_dispatch_id IS NOT NULL
         ORDER BY waste_dispatch_id, id
       `);
-      const linkedBales: any[] = Array.isArray(linkedBalesRaw)
-        ? linkedBalesRaw
-        : (linkedBalesRaw as any).rows || [];
+      const linkedBales: any[] = Array.isArray(linkedBalesRaw) ? linkedBalesRaw : (linkedBalesRaw as any).rows || [];
 
       const balesByDispatch = new Map<number, any[]>();
       for (const bale of linkedBales) {
@@ -362,10 +476,12 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
         balesByDispatch.get(did)!.push(bale);
       }
 
-      res.json(dispatches.map((d: any) => ({
-        ...d,
-        bales: balesByDispatch.get(d.id) || [],
-      })));
+      res.json(
+        dispatches.map((d: any) => ({
+          ...d,
+          bales: balesByDispatch.get(d.id) || [],
+        }))
+      );
     } catch (error: any) {
       console.error("Error fetching waste dispatch history:", error);
       res.status(500).json({ message: error.message });
@@ -423,35 +539,43 @@ export function registerEmployeeLedgerWasteRoutes(app: Express) {
           totalCostWrittenOff += parseFloat(bale.totalCost as string) || 0;
         }
 
-        const [dispatch] = await tx.insert(factoryBaleWasteDispatches).values({
-          companyId,
-          dispatchNumber,
-          dispatchDate,
-          notes: notes || null,
-          totalBales: balesToDispose.length,
-          totalWeightKg: totalWeightKg.toFixed(3),
-          totalCostWrittenOff: totalCostWrittenOff.toFixed(2),
-          createdBy: userId,
-        }).returning();
+        const [dispatch] = await tx
+          .insert(factoryBaleWasteDispatches)
+          .values({
+            companyId,
+            dispatchNumber,
+            dispatchDate,
+            notes: notes || null,
+            totalBales: balesToDispose.length,
+            totalWeightKg: totalWeightKg.toFixed(3),
+            totalCostWrittenOff: totalCostWrittenOff.toFixed(2),
+            createdBy: userId,
+          })
+          .returning();
 
         const now = new Date();
 
         const productIds = [...new Set(balesToDispose.map((b: any) => b.productId).filter(Boolean))] as number[];
-        const factoryProducts = productIds.length > 0
-          ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
-          : [];
+        const factoryProducts =
+          productIds.length > 0
+            ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+            : [];
         const productMap = new Map(factoryProducts.map((p: any) => [p.id, p]));
         const stockItemCache = new Map<string, number>();
 
         for (const bale of balesToDispose) {
-          await tx.execute(sql`UPDATE factory_bales SET status = 'DISPATCHED', waste_dispatch_id = ${dispatch.id}, updated_at = ${now} WHERE id = ${bale.id}`);
+          await tx.execute(
+            sql`UPDATE factory_bales SET status = 'DISPATCHED', waste_dispatch_id = ${dispatch.id}, updated_at = ${now} WHERE id = ${bale.id}`
+          );
 
           const product = productMap.get(bale.productId as number);
           const itemCode = product?.articleCode || product?.code || bale.articleCode || bale.baleCode;
           if (itemCode && bale.erpLocationId) {
             let erpStockItemId = stockItemCache.get(itemCode);
             if (!erpStockItemId) {
-              const [existing] = await tx.select({ id: stockItems.id }).from(stockItems)
+              const [existing] = await tx
+                .select({ id: stockItems.id })
+                .from(stockItems)
                 .where(and(eq(stockItems.companyId, companyId), eq(stockItems.code, itemCode)));
               if (existing) {
                 erpStockItemId = existing.id;

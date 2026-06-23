@@ -39,7 +39,10 @@ export function DashboardCard({
   className,
   "data-testid": testId,
 }: DashboardCardProps) {
-  const slug = title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const slug = title
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
   const interactive = !!href || !!onClick;
 
   const inner = (
@@ -47,7 +50,7 @@ export function DashboardCard({
       className={cn(
         "p-5 flex flex-col gap-4 h-full",
         interactive && "hover-elevate active-elevate-2 cursor-pointer",
-        className,
+        className
       )}
       onClick={onClick}
       data-testid={testId ?? `card-dashboard-${slug}`}
@@ -64,14 +67,10 @@ export function DashboardCard({
               <h3 className="text-base font-semibold leading-tight truncate">{title}</h3>
               {badge}
             </div>
-            {description && (
-              <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{description}</p>
-            )}
+            {description && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{description}</p>}
           </div>
         </div>
-        {interactive && (
-          <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" aria-hidden />
-        )}
+        {interactive && <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" aria-hidden />}
       </div>
 
       {(primaryValue !== undefined || loading) && (
@@ -79,13 +78,14 @@ export function DashboardCard({
           {loading ? (
             <Skeleton className="h-7 w-20" />
           ) : (
-            <span className="text-2xl font-semibold tabular-nums tracking-tight" data-testid={`text-dashboard-value-${slug}`}>
+            <span
+              className="text-2xl font-semibold tabular-nums tracking-tight"
+              data-testid={`text-dashboard-value-${slug}`}
+            >
               {primaryValue}
             </span>
           )}
-          {primaryLabel && (
-            <span className="text-xs text-muted-foreground">{primaryLabel}</span>
-          )}
+          {primaryLabel && <span className="text-xs text-muted-foreground">{primaryLabel}</span>}
         </div>
       )}
 

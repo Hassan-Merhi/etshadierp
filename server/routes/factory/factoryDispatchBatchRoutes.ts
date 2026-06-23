@@ -35,7 +35,7 @@ async function isAdmin(req: any, companyId: number): Promise<boolean> {
     const userId = (req.session as any).userId;
     if (!userId) return false;
     const rows = await db.execute(
-      sql`SELECT role FROM user_company_roles WHERE company_id = ${companyId} AND user_id = ${String(userId)} LIMIT 1`,
+      sql`SELECT role FROM user_company_roles WHERE company_id = ${companyId} AND user_id = ${String(userId)} LIMIT 1`
     );
     const row = (rows as any).rows?.[0];
     return row?.role === "Admin";
@@ -46,27 +46,16 @@ async function isAdmin(req: any, companyId: number): Promise<boolean> {
 
 // Recalculate and update the batch totals — not needed for batches themselves
 // but we do need to update batch status to LOADING when first ride is created
-async function ensureBatchStatus(
-  tx: any,
-  batchId: number,
-  companyId: number,
-  status: string,
-) {
+async function ensureBatchStatus(tx: any, batchId: number, companyId: number, status: string) {
   await tx
     .update(customerDispatchBatches)
     .set({ status, updatedAt: new Date() })
-    .where(
-      and(
-        eq(customerDispatchBatches.id, batchId),
-        eq(customerDispatchBatches.companyId, companyId),
-      ),
-    );
+    .where(and(eq(customerDispatchBatches.id, batchId), eq(customerDispatchBatches.companyId, companyId)));
 }
 
 // ── route registration ────────────────────────────────────────────────────────
 
 export function registerDispatchBatchRoutes(app: Express) {
-
   // ── GET /api/factory/dispatch-batches ─────────────────────────────────────
   // List all batches for the company with optional filters
   app.get("/api/factory/dispatch-batches", requireAuth, async (req: any, res: any) => {
@@ -148,28 +137,32 @@ export function registerDispatchBatchRoutes(app: Express) {
             .where(and(eq(customerProformas.id, proformaId), eq(customerProformas.companyId, companyId)));
           if (!pf) throw new Error("Proforma not found");
           if (pf.customerId !== customerId) throw new Error("Proforma belongs to a different customer");
-          if (!["ACTIVE", "PARTIALLY_DISPATCHED"].includes(pf.status)) throw new Error(`Proforma status is ${pf.status} — cannot create dispatch batch`);
+          if (!["ACTIVE", "PARTIALLY_DISPATCHED"].includes(pf.status))
+            throw new Error(`Proforma status is ${pf.status} — cannot create dispatch batch`);
           proforma = pf;
-          proformaLines = await tx.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, proformaId));
+          proformaLines = await tx
+            .select()
+            .from(customerProformaLines)
+            .where(eq(customerProformaLines.proformaId, proformaId));
         }
 
         // Generate batch number
         let seqRows = await tx.execute(
-          sql`SELECT next_number FROM customer_dispatch_batch_sequences WHERE company_id = ${companyId} FOR UPDATE`,
+          sql`SELECT next_number FROM customer_dispatch_batch_sequences WHERE company_id = ${companyId} FOR UPDATE`
         );
         let seqRow = (seqRows as any).rows?.[0];
         if (!seqRow) {
           await tx.execute(
-            sql`INSERT INTO customer_dispatch_batch_sequences (company_id, next_number) VALUES (${companyId}, 1) ON CONFLICT (company_id) DO NOTHING`,
+            sql`INSERT INTO customer_dispatch_batch_sequences (company_id, next_number) VALUES (${companyId}, 1) ON CONFLICT (company_id) DO NOTHING`
           );
           seqRows = await tx.execute(
-            sql`SELECT next_number FROM customer_dispatch_batch_sequences WHERE company_id = ${companyId} FOR UPDATE`,
+            sql`SELECT next_number FROM customer_dispatch_batch_sequences WHERE company_id = ${companyId} FOR UPDATE`
           );
           seqRow = (seqRows as any).rows?.[0];
         }
         const nextNum = seqRow.next_number || seqRow.nextNumber || 1;
         await tx.execute(
-          sql`UPDATE customer_dispatch_batch_sequences SET next_number = ${nextNum + 1} WHERE company_id = ${companyId}`,
+          sql`UPDATE customer_dispatch_batch_sequences SET next_number = ${nextNum + 1} WHERE company_id = ${companyId}`
         );
         const batchNumber = `DB-${String(nextNum).padStart(6, "0")}`;
 
@@ -231,7 +224,10 @@ export function registerDispatchBatchRoutes(app: Express) {
         const [pf] = await db.select().from(customerProformas).where(eq(customerProformas.id, batch.proformaId));
         if (pf) {
           proforma = pf;
-          proformaLines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, batch.proformaId));
+          proformaLines = await db
+            .select()
+            .from(customerProformaLines)
+            .where(eq(customerProformaLines.proformaId, batch.proformaId));
         }
       }
 
@@ -278,7 +274,11 @@ export function registerDispatchBatchRoutes(app: Express) {
       let finalInvoice: any = null;
       if (batch.finalOrderId) {
         const [inv] = await db
-          .select({ id: customerOrders.id, invoiceNumber: customerOrders.invoiceNumber, grandTotal: customerOrders.grandTotal })
+          .select({
+            id: customerOrders.id,
+            invoiceNumber: customerOrders.invoiceNumber,
+            grandTotal: customerOrders.grandTotal,
+          })
           .from(customerOrders)
           .where(eq(customerOrders.id, batch.finalOrderId));
         finalInvoice = inv || null;
@@ -307,7 +307,9 @@ export function registerDispatchBatchRoutes(app: Express) {
       const batchId = parseId(req.params.id);
       if (batchId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [batch] = await db.select().from(customerDispatchBatches)
+      const [batch] = await db
+        .select()
+        .from(customerDispatchBatches)
         .where(and(eq(customerDispatchBatches.id, batchId), eq(customerDispatchBatches.companyId, companyId)));
       if (!batch) return res.status(404).json({ message: "Batch not found" });
       if (batch.status === "INVOICED") return res.status(400).json({ message: "Cannot edit an invoiced batch" });
@@ -340,7 +342,9 @@ export function registerDispatchBatchRoutes(app: Express) {
       if (batchId === null) return res.status(400).json({ message: "Invalid id" });
 
       await db.transaction(async (tx: any) => {
-        const [batch] = await tx.select().from(customerDispatchBatches)
+        const [batch] = await tx
+          .select()
+          .from(customerDispatchBatches)
           .where(and(eq(customerDispatchBatches.id, batchId), eq(customerDispatchBatches.companyId, companyId)));
         if (!batch) throw new Error("Batch not found");
         if (batch.status === "INVOICED") throw new Error("Cannot cancel an invoiced batch");
@@ -360,12 +364,16 @@ export function registerDispatchBatchRoutes(app: Express) {
         }
 
         // Cancel all rides
-        await tx.update(customerDispatchTruckRides)
+        await tx
+          .update(customerDispatchTruckRides)
           .set({ status: "CANCELLED", updatedAt: new Date() })
-          .where(and(eq(customerDispatchTruckRides.batchId, batchId), eq(customerDispatchTruckRides.companyId, companyId)));
+          .where(
+            and(eq(customerDispatchTruckRides.batchId, batchId), eq(customerDispatchTruckRides.companyId, companyId))
+          );
 
         // Mark batch cancelled
-        await tx.update(customerDispatchBatches)
+        await tx
+          .update(customerDispatchBatches)
           .set({ status: "CANCELLED", cancelledAt: new Date(), updatedAt: new Date() })
           .where(and(eq(customerDispatchBatches.id, batchId), eq(customerDispatchBatches.companyId, companyId)));
       });
@@ -386,7 +394,9 @@ export function registerDispatchBatchRoutes(app: Express) {
       if (batchId === null) return res.status(400).json({ message: "Invalid id" });
 
       const result = await db.transaction(async (tx: any) => {
-        const [batch] = await tx.select().from(customerDispatchBatches)
+        const [batch] = await tx
+          .select()
+          .from(customerDispatchBatches)
           .where(and(eq(customerDispatchBatches.id, batchId), eq(customerDispatchBatches.companyId, companyId)));
         if (!batch) throw new Error("Batch not found");
         if (batch.status === "INVOICED") throw new Error("Batch is already invoiced");
@@ -394,27 +404,31 @@ export function registerDispatchBatchRoutes(app: Express) {
 
         // Get next ride number for this batch
         const countRows = await tx.execute(
-          sql`SELECT COALESCE(MAX(ride_number), 0) + 1 AS next_num FROM customer_dispatch_truck_rides WHERE batch_id = ${batchId}`,
+          sql`SELECT COALESCE(MAX(ride_number), 0) + 1 AS next_num FROM customer_dispatch_truck_rides WHERE batch_id = ${batchId}`
         );
         const nextRideNum = (countRows as any).rows?.[0]?.next_num || 1;
 
         const { truckPlate, driverName, destination, notes } = req.body;
 
-        const [ride] = await tx.insert(customerDispatchTruckRides).values({
-          companyId,
-          batchId,
-          rideNumber: parseInt(String(nextRideNum)),
-          truckPlate: truckPlate || null,
-          driverName: driverName || null,
-          destination: destination || null,
-          notes: notes || null,
-          status: "DRAFT",
-          createdBy: getUsername(req),
-        }).returning();
+        const [ride] = await tx
+          .insert(customerDispatchTruckRides)
+          .values({
+            companyId,
+            batchId,
+            rideNumber: parseInt(String(nextRideNum)),
+            truckPlate: truckPlate || null,
+            driverName: driverName || null,
+            destination: destination || null,
+            notes: notes || null,
+            status: "DRAFT",
+            createdBy: getUsername(req),
+          })
+          .returning();
 
         // Advance batch to LOADING if it was DRAFT
         if (batch.status === "DRAFT") {
-          await tx.update(customerDispatchBatches)
+          await tx
+            .update(customerDispatchBatches)
             .set({ status: "LOADING", updatedAt: new Date() })
             .where(eq(customerDispatchBatches.id, batchId));
         }
@@ -437,10 +451,13 @@ export function registerDispatchBatchRoutes(app: Express) {
       const rideId = parseId(req.params.id);
       if (rideId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [ride] = await db.select().from(customerDispatchTruckRides)
+      const [ride] = await db
+        .select()
+        .from(customerDispatchTruckRides)
         .where(and(eq(customerDispatchTruckRides.id, rideId), eq(customerDispatchTruckRides.companyId, companyId)));
       if (!ride) return res.status(404).json({ message: "Ride not found" });
-      if (ride.status === "DISPATCHED") return res.status(400).json({ message: "Cannot edit a dispatched ride. Reopen it first." });
+      if (ride.status === "DISPATCHED")
+        return res.status(400).json({ message: "Cannot edit a dispatched ride. Reopen it first." });
       if (ride.status === "CANCELLED") return res.status(400).json({ message: "Ride is cancelled" });
 
       const { truckPlate, driverName, destination, notes } = req.body;
@@ -450,7 +467,8 @@ export function registerDispatchBatchRoutes(app: Express) {
       if (destination !== undefined) updates.destination = destination;
       if (notes !== undefined) updates.notes = notes;
 
-      const [updated] = await db.update(customerDispatchTruckRides)
+      const [updated] = await db
+        .update(customerDispatchTruckRides)
         .set(updates)
         .where(and(eq(customerDispatchTruckRides.id, rideId), eq(customerDispatchTruckRides.companyId, companyId)))
         .returning();
@@ -474,14 +492,19 @@ export function registerDispatchBatchRoutes(app: Express) {
 
       const result = await db.transaction(async (tx: any) => {
         // 1. Validate ride
-        const [ride] = await tx.select().from(customerDispatchTruckRides)
+        const [ride] = await tx
+          .select()
+          .from(customerDispatchTruckRides)
           .where(and(eq(customerDispatchTruckRides.id, rideId), eq(customerDispatchTruckRides.companyId, companyId)));
         if (!ride) throw new Error("Truck ride not found");
-        if (ride.status === "DISPATCHED") throw new Error("This truck ride is already dispatched. Reopen it before scanning.");
+        if (ride.status === "DISPATCHED")
+          throw new Error("This truck ride is already dispatched. Reopen it before scanning.");
         if (ride.status === "CANCELLED") throw new Error("This truck ride is cancelled");
 
         // 2. Load batch (needed for proforma check)
-        const [batch] = await tx.select().from(customerDispatchBatches)
+        const [batch] = await tx
+          .select()
+          .from(customerDispatchBatches)
           .where(and(eq(customerDispatchBatches.id, ride.batchId), eq(customerDispatchBatches.companyId, companyId)));
         if (!batch) throw new Error("Dispatch batch not found");
         if (batch.status === "INVOICED") throw new Error("Batch already invoiced");
@@ -500,7 +523,8 @@ export function registerDispatchBatchRoutes(app: Express) {
         if (!bale) throw new Error(`Bale "${barcode}" not found`);
 
         // 4. Bale must be IN_STOCK
-        if (bale.status !== "IN_STOCK") throw new Error(`Bale ${barcode} is not available — current status: ${bale.status}`);
+        if (bale.status !== "IN_STOCK")
+          throw new Error(`Bale ${barcode} is not available — current status: ${bale.status}`);
 
         // 5. Cross-batch duplicate check (partial unique index handles DB level too)
         const dupCheck = await tx.execute(sql`
@@ -530,14 +554,15 @@ export function registerDispatchBatchRoutes(app: Express) {
         let scannedQtyForArticle = 0;
 
         if (batch.proformaId) {
-          const proformaLines = await tx.select()
+          const proformaLines = await tx
+            .select()
             .from(customerProformaLines)
             .where(eq(customerProformaLines.proformaId, batch.proformaId));
 
           const matchingLine = proformaLines.find((l: any) => l.articleCode === bale.articleCode);
           if (!matchingLine) {
             throw new Error(
-              `Bale ${barcode} has article code "${bale.articleCode}" which is not in the linked proforma. Scan blocked.`,
+              `Bale ${barcode} has article code "${bale.articleCode}" which is not in the linked proforma. Scan blocked.`
             );
           }
 
@@ -557,9 +582,10 @@ export function registerDispatchBatchRoutes(app: Express) {
         }
 
         // 8. Calculate amount (priceMode is on the batch, not the bale)
-        const amount = batch.priceMode === "PER_KG"
-          ? (parseFloat(priceUsed) * parseFloat(bale.weightKg || "0")).toFixed(2)
-          : priceUsed;
+        const amount =
+          batch.priceMode === "PER_KG"
+            ? (parseFloat(priceUsed) * parseFloat(bale.weightKg || "0")).toFixed(2)
+            : priceUsed;
 
         // 9. Reserve bale
         await tx.execute(sql`
@@ -568,24 +594,28 @@ export function registerDispatchBatchRoutes(app: Express) {
         `);
 
         // 10. Insert scan record
-        const [scan] = await tx.insert(customerDispatchBaleScans).values({
-          companyId,
-          batchId: batch.id,
-          truckRideId: rideId,
-          baleId: bale.id,
-          baleReference: bale.referenceNumber,
-          articleCode: bale.articleCode || null,
-          productName: bale.productName || null,
-          weightKg: String(bale.weightKg || "0"),
-          priceUsed,
-          amount: String(amount),
-          scannedBy: getUsername(req),
-          scannedAt: new Date(),
-        }).returning();
+        const [scan] = await tx
+          .insert(customerDispatchBaleScans)
+          .values({
+            companyId,
+            batchId: batch.id,
+            truckRideId: rideId,
+            baleId: bale.id,
+            baleReference: bale.referenceNumber,
+            articleCode: bale.articleCode || null,
+            productName: bale.productName || null,
+            weightKg: String(bale.weightKg || "0"),
+            priceUsed,
+            amount: String(amount),
+            scannedBy: getUsername(req),
+            scannedAt: new Date(),
+          })
+          .returning();
 
         // 11. Set ride to LOADING if it was DRAFT, stamp loadedAt
         if (ride.status === "DRAFT") {
-          await tx.update(customerDispatchTruckRides)
+          await tx
+            .update(customerDispatchTruckRides)
             .set({ status: "LOADING", loadedAt: new Date(), updatedAt: new Date() })
             .where(eq(customerDispatchTruckRides.id, rideId));
         }
@@ -612,7 +642,14 @@ export function registerDispatchBatchRoutes(app: Express) {
     } catch (err: any) {
       // Distinguish validation errors (400) from DB/system errors (500)
       const msg = err.message || "";
-      const is400 = msg.includes("not found") || msg.includes("not available") || msg.includes("already") || msg.includes("not in the linked") || msg.includes("cancelled") || msg.includes("dispatched") || msg.includes("invoiced");
+      const is400 =
+        msg.includes("not found") ||
+        msg.includes("not available") ||
+        msg.includes("already") ||
+        msg.includes("not in the linked") ||
+        msg.includes("cancelled") ||
+        msg.includes("dispatched") ||
+        msg.includes("invoiced");
       res.status(is400 ? 400 : 500).json({ message: err.message });
     }
   });
@@ -629,13 +666,17 @@ export function registerDispatchBatchRoutes(app: Express) {
       const { reason } = req.body;
 
       await db.transaction(async (tx: any) => {
-        const [scan] = await tx.select().from(customerDispatchBaleScans)
+        const [scan] = await tx
+          .select()
+          .from(customerDispatchBaleScans)
           .where(and(eq(customerDispatchBaleScans.id, scanId), eq(customerDispatchBaleScans.companyId, companyId)));
         if (!scan) throw new Error("Scan not found");
         if (scan.removedAt) throw new Error("Scan already removed");
 
         // Check if ride is dispatched — if so, only admin can remove
-        const [ride] = await tx.select().from(customerDispatchTruckRides)
+        const [ride] = await tx
+          .select()
+          .from(customerDispatchTruckRides)
           .where(eq(customerDispatchTruckRides.id, scan.truckRideId));
         if (ride?.status === "DISPATCHED") {
           const admin = await isAdmin(req, companyId);
@@ -643,12 +684,15 @@ export function registerDispatchBatchRoutes(app: Express) {
         }
 
         // Check batch not invoiced
-        const [batch] = await tx.select().from(customerDispatchBatches)
+        const [batch] = await tx
+          .select()
+          .from(customerDispatchBatches)
           .where(eq(customerDispatchBatches.id, scan.batchId));
         if (batch?.status === "INVOICED") throw new Error("Cannot remove bales from an invoiced batch");
 
         // Soft-delete the scan
-        await tx.update(customerDispatchBaleScans)
+        await tx
+          .update(customerDispatchBaleScans)
           .set({ removedAt: new Date(), removalReason: reason || null })
           .where(eq(customerDispatchBaleScans.id, scanId));
 
@@ -675,7 +719,9 @@ export function registerDispatchBatchRoutes(app: Express) {
       if (rideId === null) return res.status(400).json({ message: "Invalid id" });
 
       const result = await db.transaction(async (tx: any) => {
-        const [ride] = await tx.select().from(customerDispatchTruckRides)
+        const [ride] = await tx
+          .select()
+          .from(customerDispatchTruckRides)
           .where(and(eq(customerDispatchTruckRides.id, rideId), eq(customerDispatchTruckRides.companyId, companyId)));
         if (!ride) throw new Error("Ride not found");
         if (ride.status === "DISPATCHED") throw new Error("Ride already dispatched");
@@ -689,7 +735,8 @@ export function registerDispatchBatchRoutes(app: Express) {
         const cnt = parseInt(((countRows as any).rows || countRows)[0]?.cnt || "0");
         if (cnt === 0) throw new Error("Cannot dispatch a ride with no scanned bales");
 
-        const [updated] = await tx.update(customerDispatchTruckRides)
+        const [updated] = await tx
+          .update(customerDispatchTruckRides)
           .set({ status: "DISPATCHED", dispatchedAt: new Date(), updatedAt: new Date() })
           .where(and(eq(customerDispatchTruckRides.id, rideId), eq(customerDispatchTruckRides.companyId, companyId)))
           .returning();
@@ -716,20 +763,26 @@ export function registerDispatchBatchRoutes(app: Express) {
       if (!admin) return res.status(403).json({ message: "Only admins can reopen a dispatched ride" });
 
       const { reason } = req.body;
-      if (!reason || !reason.trim()) return res.status(400).json({ message: "reason is required to reopen a dispatched ride" });
+      if (!reason || !reason.trim())
+        return res.status(400).json({ message: "reason is required to reopen a dispatched ride" });
 
       const result = await db.transaction(async (tx: any) => {
-        const [ride] = await tx.select().from(customerDispatchTruckRides)
+        const [ride] = await tx
+          .select()
+          .from(customerDispatchTruckRides)
           .where(and(eq(customerDispatchTruckRides.id, rideId), eq(customerDispatchTruckRides.companyId, companyId)));
         if (!ride) throw new Error("Ride not found");
         if (ride.status !== "DISPATCHED") throw new Error("Only DISPATCHED rides can be reopened");
 
         // Check batch not invoiced
-        const [batch] = await tx.select().from(customerDispatchBatches)
+        const [batch] = await tx
+          .select()
+          .from(customerDispatchBatches)
           .where(eq(customerDispatchBatches.id, ride.batchId));
         if (batch?.status === "INVOICED") throw new Error("Batch is already invoiced — cannot reopen a ride");
 
-        const [updated] = await tx.update(customerDispatchTruckRides)
+        const [updated] = await tx
+          .update(customerDispatchTruckRides)
           .set({
             status: "LOADING",
             reopenedAt: new Date(),
@@ -758,7 +811,9 @@ export function registerDispatchBatchRoutes(app: Express) {
       const batchId = parseId(req.params.id);
       if (batchId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [batch] = await db.select().from(customerDispatchBatches)
+      const [batch] = await db
+        .select()
+        .from(customerDispatchBatches)
         .where(and(eq(customerDispatchBatches.id, batchId), eq(customerDispatchBatches.companyId, companyId)));
       if (!batch) return res.status(404).json({ message: "Batch not found" });
       if (batch.status === "INVOICED") return res.status(400).json({ message: "Batch already invoiced" });
@@ -772,12 +827,19 @@ export function registerDispatchBatchRoutes(app: Express) {
       if (batch.proformaId) {
         const rows = await db.select().from(customerProformas).where(eq(customerProformas.id, batch.proformaId));
         proforma = rows[0] || null;
-        proformaLines = await db.select().from(customerProformaLines).where(eq(customerProformaLines.proformaId, batch.proformaId));
+        proformaLines = await db
+          .select()
+          .from(customerProformaLines)
+          .where(eq(customerProformaLines.proformaId, batch.proformaId));
       }
 
       // Check for blocking conditions
-      const allRides = await db.select().from(customerDispatchTruckRides)
-        .where(and(eq(customerDispatchTruckRides.batchId, batchId), eq(customerDispatchTruckRides.companyId, companyId)));
+      const allRides = await db
+        .select()
+        .from(customerDispatchTruckRides)
+        .where(
+          and(eq(customerDispatchTruckRides.batchId, batchId), eq(customerDispatchTruckRides.companyId, companyId))
+        );
 
       const loadingRides = allRides.filter((r: any) => r.status === "LOADING" || r.status === "DRAFT");
       const dispatchedRides = allRides.filter((r: any) => r.status === "DISPATCHED");
@@ -815,11 +877,13 @@ export function registerDispatchBatchRoutes(app: Express) {
         FROM customer_dispatch_bale_scans sc
         WHERE sc.batch_id = ${batchId} AND sc.company_id = ${companyId} AND sc.removed_at IS NULL
           AND sc.article_code IS NOT NULL
-          ${batch.proformaId
-            ? sql`AND sc.article_code NOT IN (
+          ${
+            batch.proformaId
+              ? sql`AND sc.article_code NOT IN (
                 SELECT article_code FROM customer_proforma_lines WHERE proforma_id = ${batch.proformaId}
               )`
-            : sql`AND 1=0`}
+              : sql`AND 1=0`
+          }
       `);
       const mismatches = ((mismatchRows as any).rows || mismatchRows).map((r: any) => r.articleCode);
 
@@ -866,9 +930,12 @@ export function registerDispatchBatchRoutes(app: Express) {
         loadingRides: loadingRides.length,
         dispatchedRides: dispatchedRides.length,
         totalRides: allRides.length,
-        blockers: loadingRides.length > 0
-          ? [`${loadingRides.length} truck ride(s) are still in LOADING status. All rides must be DISPATCHED before generating an invoice.`]
-          : [],
+        blockers:
+          loadingRides.length > 0
+            ? [
+                `${loadingRides.length} truck ride(s) are still in LOADING status. All rides must be DISPATCHED before generating an invoice.`,
+              ]
+            : [],
         mismatchedArticles: mismatches,
         canGenerate: parseInt(totals?.totalBales || "0") > 0 && loadingRides.length === 0,
       });
@@ -903,12 +970,18 @@ export function registerDispatchBatchRoutes(app: Express) {
         let proforma: any = null;
         let proformaLines: any[] = [];
         if (batch.proforma_id) {
-          const pfRows = await tx.execute(sql`SELECT * FROM customer_proformas WHERE id = ${batch.proforma_id} FOR UPDATE`);
+          const pfRows = await tx.execute(
+            sql`SELECT * FROM customer_proformas WHERE id = ${batch.proforma_id} FOR UPDATE`
+          );
           proforma = ((pfRows as any).rows || pfRows)[0];
           if (!proforma) throw new Error("Linked proforma not found");
-          if (proforma.status === "CANCELLED") throw new Error("Linked proforma is CANCELLED — cannot generate invoice");
-          if (proforma.status === "FULLY_INVOICED") throw new Error("Linked proforma is FULLY_INVOICED — cannot generate another invoice");
-          const plRows = await tx.execute(sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${batch.proforma_id}`);
+          if (proforma.status === "CANCELLED")
+            throw new Error("Linked proforma is CANCELLED — cannot generate invoice");
+          if (proforma.status === "FULLY_INVOICED")
+            throw new Error("Linked proforma is FULLY_INVOICED — cannot generate another invoice");
+          const plRows = await tx.execute(
+            sql`SELECT * FROM customer_proforma_lines WHERE proforma_id = ${batch.proforma_id}`
+          );
           proformaLines = (plRows as any).rows || plRows;
         }
 
@@ -919,7 +992,10 @@ export function registerDispatchBatchRoutes(app: Express) {
         `);
         const rides = (rideRows as any).rows || rideRows;
         const loadingRides = rides.filter((r: any) => r.status === "LOADING" || r.status === "DRAFT");
-        if (loadingRides.length > 0) throw new Error(`${loadingRides.length} ride(s) are still in LOADING status. All rides must be DISPATCHED first.`);
+        if (loadingRides.length > 0)
+          throw new Error(
+            `${loadingRides.length} ride(s) are still in LOADING status. All rides must be DISPATCHED first.`
+          );
 
         // 4. Load all active bale scans
         const scanRows = await tx.execute(sql`
@@ -935,16 +1011,32 @@ export function registerDispatchBatchRoutes(app: Express) {
         `);
         let seqRow = ((seqRows as any).rows || seqRows)[0];
         if (!seqRow) {
-          await tx.execute(sql`INSERT INTO customer_invoice_sequences (company_id, next_number) VALUES (${companyId}, 1) ON CONFLICT DO NOTHING`);
-          seqRows = await tx.execute(sql`SELECT * FROM customer_invoice_sequences WHERE company_id = ${companyId} FOR UPDATE`);
+          await tx.execute(
+            sql`INSERT INTO customer_invoice_sequences (company_id, next_number) VALUES (${companyId}, 1) ON CONFLICT DO NOTHING`
+          );
+          seqRows = await tx.execute(
+            sql`SELECT * FROM customer_invoice_sequences WHERE company_id = ${companyId} FOR UPDATE`
+          );
           seqRow = ((seqRows as any).rows || seqRows)[0];
         }
         const invoiceNum = seqRow.next_number || seqRow.nextNumber;
-        await tx.execute(sql`UPDATE customer_invoice_sequences SET next_number = ${invoiceNum + 1} WHERE company_id = ${companyId}`);
+        await tx.execute(
+          sql`UPDATE customer_invoice_sequences SET next_number = ${invoiceNum + 1} WHERE company_id = ${companyId}`
+        );
         const invoiceNumber = `INV-${String(invoiceNum).padStart(6, "0")}`;
 
         // 6. Build grouped order lines by articleCode
-        const lineMap = new Map<string, { articleCode: string; baleName: string; qty: number; totalWeight: number; pricePerBale: number; totalPrice: number }>();
+        const lineMap = new Map<
+          string,
+          {
+            articleCode: string;
+            baleName: string;
+            qty: number;
+            totalWeight: number;
+            pricePerBale: number;
+            totalPrice: number;
+          }
+        >();
         for (const scan of scans) {
           const key = scan.article_code || "UNKNOWN";
           const existing = lineMap.get(key);
@@ -1002,10 +1094,13 @@ export function registerDispatchBatchRoutes(app: Express) {
         // 9. Insert customerOrderBales (individual bale rows)
         for (const scan of scans) {
           // Need erpLocationId from factoryBales for the customerOrderBales.location_id column
-          const baleRow = await tx.execute(sql`SELECT erp_location_id FROM factory_bales WHERE id = ${scan.bale_id} LIMIT 1`);
+          const baleRow = await tx.execute(
+            sql`SELECT erp_location_id FROM factory_bales WHERE id = ${scan.bale_id} LIMIT 1`
+          );
           const baleData = ((baleRow as any).rows || baleRow)[0];
           const locationId = baleData?.erp_location_id;
-          if (!locationId) throw new Error(`Bale ${scan.bale_reference} has no ERP location set — cannot create invoice line`);
+          if (!locationId)
+            throw new Error(`Bale ${scan.bale_reference} has no ERP location set — cannot create invoice line`);
 
           await tx.execute(sql`
             INSERT INTO customer_order_bales (order_id, bale_id, bale_reference, location_id, weight, article_code, bale_name, price_used, scanned_by)
@@ -1053,7 +1148,7 @@ export function registerDispatchBatchRoutes(app: Express) {
             GROUP BY cob.article_code
           `);
           const invoicedCounts: Record<string, number> = {};
-          for (const r of ((invoicedCountsRows as any).rows || invoicedCountsRows)) {
+          for (const r of (invoicedCountsRows as any).rows || invoicedCountsRows) {
             invoicedCounts[r.article_code] = parseInt(r.cnt || "0");
           }
 
@@ -1094,7 +1189,15 @@ export function registerDispatchBatchRoutes(app: Express) {
       res.status(201).json({ ok: true, ...result });
     } catch (err: any) {
       const msg = err.message || "";
-      const is400 = msg.includes("not found") || msg.includes("already") || msg.includes("cancelled") || msg.includes("must be DISPATCHED") || msg.includes("No scanned") || msg.includes("LOADING status") || msg.includes("FULLY_INVOICED") || msg.includes("CANCELLED");
+      const is400 =
+        msg.includes("not found") ||
+        msg.includes("already") ||
+        msg.includes("cancelled") ||
+        msg.includes("must be DISPATCHED") ||
+        msg.includes("No scanned") ||
+        msg.includes("LOADING status") ||
+        msg.includes("FULLY_INVOICED") ||
+        msg.includes("CANCELLED");
       res.status(is400 ? 400 : 500).json({ message: err.message });
     }
   });
@@ -1171,36 +1274,40 @@ export function registerDispatchBatchRoutes(app: Express) {
       }
 
       res.json({
-        bale: bale ? {
-          referenceNumber: bale.referenceNumber,
-          articleCode:     bale.articleCode,
-          productName:     bale.productName,
-          weightKg:        bale.weightKg,
-          status:          bale.status,
-        } : null,
+        bale: bale
+          ? {
+              referenceNumber: bale.referenceNumber,
+              articleCode: bale.articleCode,
+              productName: bale.productName,
+              weightKg: bale.weightKg,
+              status: bale.status,
+            }
+          : null,
         status,
-        dispatch: scan ? {
-          scanId:       scan.scanId,
-          batchId:      scan.batchId,
-          batchNumber:  scan.batchNumber,
-          batchStatus:  scan.batchStatus,
-          truckRideId:  scan.truckRideId,
-          rideNumber:   scan.rideNumber,
-          truckPlate:   scan.truckPlate,
-          driverName:   scan.driverName,
-          rideStatus:   scan.rideStatus,
-          customerId:   scan.customerId,
-          customerName: scan.customerName,
-          proformaName: scan.proformaName,
-          articleCode:  scan.articleCode,
-          productName:  scan.productName,
-          weightKg:     scan.weightKg,
-          amount:       scan.amount,
-          currency:     scan.currency,
-          scannedAt:    scan.scannedAt,
-          invoiceNumber: scan.invoiceNumber,
-          orderId:      scan.orderId,
-        } : null,
+        dispatch: scan
+          ? {
+              scanId: scan.scanId,
+              batchId: scan.batchId,
+              batchNumber: scan.batchNumber,
+              batchStatus: scan.batchStatus,
+              truckRideId: scan.truckRideId,
+              rideNumber: scan.rideNumber,
+              truckPlate: scan.truckPlate,
+              driverName: scan.driverName,
+              rideStatus: scan.rideStatus,
+              customerId: scan.customerId,
+              customerName: scan.customerName,
+              proformaName: scan.proformaName,
+              articleCode: scan.articleCode,
+              productName: scan.productName,
+              weightKg: scan.weightKg,
+              amount: scan.amount,
+              currency: scan.currency,
+              scannedAt: scan.scannedAt,
+              invoiceNumber: scan.invoiceNumber,
+              orderId: scan.orderId,
+            }
+          : null,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1246,12 +1353,12 @@ export function registerDispatchBatchRoutes(app: Express) {
       const ridesRow = ((ridesRes as any).rows || ridesRes)[0];
 
       res.json({
-        uninvoicedCount:                parseInt(s.uninvoicedCount  || "0"),
-        dispatchedCount:                parseInt(s.dispatchedCount  || "0"),
-        invoicedCount:                  parseInt(s.invoicedCount    || "0"),
-        loadingCount:                   parseInt(s.loadingCount     || "0"),
-        reservedBalesCount:             parseInt(reservedRow?.cnt   || "0"),
-        dispatchedRidesNotInvoiced:     parseInt(ridesRow?.cnt      || "0"),
+        uninvoicedCount: parseInt(s.uninvoicedCount || "0"),
+        dispatchedCount: parseInt(s.dispatchedCount || "0"),
+        invoicedCount: parseInt(s.invoicedCount || "0"),
+        loadingCount: parseInt(s.loadingCount || "0"),
+        reservedBalesCount: parseInt(reservedRow?.cnt || "0"),
+        dispatchedRidesNotInvoiced: parseInt(ridesRow?.cnt || "0"),
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });

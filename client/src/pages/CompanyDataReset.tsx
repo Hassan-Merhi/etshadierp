@@ -66,9 +66,9 @@ export default function CompanyDataReset() {
       });
     },
     onSuccess: (data: any) => {
-      toast({ 
-        title: "Undo Complete", 
-        description: `Restored ${data.vouchersRestored || 0} vouchers successfully` 
+      toast({
+        title: "Undo Complete",
+        description: `Restored ${data.vouchersRestored || 0} vouchers successfully`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
@@ -90,15 +90,13 @@ export default function CompanyDataReset() {
   };
 
   const toggleAccount = (accountId: number) => {
-    setSelectedAccountIds(prev => 
-      prev.includes(accountId) 
-        ? prev.filter(id => id !== accountId)
-        : [...prev, accountId]
+    setSelectedAccountIds((prev) =>
+      prev.includes(accountId) ? prev.filter((id) => id !== accountId) : [...prev, accountId]
     );
   };
 
   const selectAll = () => {
-    setSelectedAccountIds(allLedgerAccounts.map(a => a.id));
+    setSelectedAccountIds(allLedgerAccounts.map((a) => a.id));
   };
 
   const clearSelection = () => {
@@ -121,7 +119,10 @@ export default function CompanyDataReset() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div>
-        <PageHeader title="Company Data Reset" subtitle="Clear vouchers and opening balances for selected accounts. Supplier balances are preserved." />
+        <PageHeader
+          title="Company Data Reset"
+          subtitle="Clear vouchers and opening balances for selected accounts. Supplier balances are preserved."
+        />
       </div>
 
       <Card className="border-destructive/50">
@@ -131,8 +132,13 @@ export default function CompanyDataReset() {
             Warning: Destructive Action
           </CardTitle>
           <CardDescription>
-            This will delete ALL vouchers (including offloaded containers) and clear opening balances for selected accounts.
-            <strong className="text-foreground"> Only OTW (On The Way) container Purchase vouchers will be preserved.</strong> Supplier balances are also preserved.
+            This will delete ALL vouchers (including offloaded containers) and clear opening balances for selected
+            accounts.
+            <strong className="text-foreground">
+              {" "}
+              Only OTW (On The Way) container Purchase vouchers will be preserved.
+            </strong>{" "}
+            Supplier balances are also preserved.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -143,7 +149,7 @@ export default function CompanyDataReset() {
                 <SelectValue placeholder="Choose a company..." />
               </SelectTrigger>
               <SelectContent>
-                {companies.map(company => (
+                {companies.map((company) => (
                   <SelectItem key={company.id} value={company.id.toString()}>
                     {company.name}
                   </SelectItem>
@@ -188,11 +194,8 @@ export default function CompanyDataReset() {
                         <p className="p-4 text-sm text-muted-foreground">No accounts found</p>
                       ) : (
                         <div className="divide-y">
-                          {allLedgerAccounts.map(account => (
-                            <div 
-                              key={account.id} 
-                              className="flex items-center gap-3 p-3 hover:bg-muted/50"
-                            >
+                          {allLedgerAccounts.map((account) => (
+                            <div key={account.id} className="flex items-center gap-3 p-3 hover:bg-muted/50">
                               <Checkbox
                                 checked={selectedAccountIds.includes(account.id)}
                                 onCheckedChange={() => toggleAccount(account.id)}
@@ -200,9 +203,7 @@ export default function CompanyDataReset() {
                               />
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-mono text-xs text-muted-foreground">
-                                    {account.code}
-                                  </span>
+                                  <span className="font-mono text-xs text-muted-foreground">{account.code}</span>
                                   <span className="text-sm truncate">{account.name}</span>
                                 </div>
                                 <div className="flex items-center gap-2 mt-1">
@@ -240,9 +241,7 @@ export default function CompanyDataReset() {
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t">
-                <div className="text-sm text-muted-foreground">
-                  {selectedAccountIds.length} account(s) selected
-                </div>
+                <div className="text-sm text-muted-foreground">{selectedAccountIds.length} account(s) selected</div>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -256,7 +255,9 @@ export default function CompanyDataReset() {
                   <Button
                     variant="destructive"
                     onClick={handleReset}
-                    disabled={selectedAccountIds.length === 0 && !clearStockOpeningBalances || resetMutation.isPending}
+                    disabled={
+                      (selectedAccountIds.length === 0 && !clearStockOpeningBalances) || resetMutation.isPending
+                    }
                     data-testid="button-reset"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -284,8 +285,13 @@ export default function CompanyDataReset() {
               <li>Clear opening balances for the {selectedAccountIds.length} selected account(s)</li>
               {clearStockOpeningBalances && <li>Reset stock item opening balances to zero</li>}
             </ul>
-            <p className="font-medium mt-2 text-success">Only OTW (On The Way) container Purchase vouchers will be preserved. Supplier balances will also be preserved.</p>
-            <p className="text-sm">You can use "Undo Last Reset" to restore deleted vouchers (but not opening balances).</p>
+            <p className="font-medium mt-2 text-success">
+              Only OTW (On The Way) container Purchase vouchers will be preserved. Supplier balances will also be
+              preserved.
+            </p>
+            <p className="text-sm">
+              You can use "Undo Last Reset" to restore deleted vouchers (but not opening balances).
+            </p>
           </div>
         }
       />

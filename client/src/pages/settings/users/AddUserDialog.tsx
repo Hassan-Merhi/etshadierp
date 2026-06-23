@@ -61,19 +61,20 @@ export function AddUserDialog({ open, onOpenChange }: AddUserDialogProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => {
-      if (!v) setForm({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
-      onOpenChange(v);
-    }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) setForm({ username: "", password: "", displayName: "", hasErpAccess: true, hasFactoryAccess: true });
+        onOpenChange(v);
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="h-5 w-5" />
             Add New User
           </DialogTitle>
-          <DialogDescription>
-            Create a login account. You can configure permissions after creation.
-          </DialogDescription>
+          <DialogDescription>Create a login account. You can configure permissions after creation.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">

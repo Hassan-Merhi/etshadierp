@@ -7,29 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Bell, CheckCircle, XCircle, ArrowRight, ExternalLink,
-  CheckCheck, Loader2,
-} from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Bell, CheckCircle, XCircle, ArrowRight, ExternalLink, CheckCheck, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -90,20 +71,25 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 const EVENT_META: Record<string, { label: string; className: string }> = {
-  LOADING_STARTED:    { label: "Loading",       className: "bg-blue-500/15 text-blue-600 border-blue-300/50" },
-  LOADING_FINALIZED:  { label: "Loading",       className: "bg-blue-500/15 text-blue-600 border-blue-300/50" },
-  INVOICE_PENDING:    { label: "Invoice",       className: "bg-amber-500/15 text-amber-600 border-amber-300/50" },
-  INVOICE_FINALIZED:  { label: "Invoice",       className: "bg-emerald-500/15 text-emerald-600 border-emerald-300/50" },
+  LOADING_STARTED: { label: "Loading", className: "bg-blue-500/15 text-blue-600 border-blue-300/50" },
+  LOADING_FINALIZED: { label: "Loading", className: "bg-blue-500/15 text-blue-600 border-blue-300/50" },
+  INVOICE_PENDING: { label: "Invoice", className: "bg-amber-500/15 text-amber-600 border-amber-300/50" },
+  INVOICE_FINALIZED: { label: "Invoice", className: "bg-emerald-500/15 text-emerald-600 border-emerald-300/50" },
   INTERCOMPANY_REQUEST: { label: "Intercompany", className: "bg-purple-500/15 text-purple-600 border-purple-300/50" },
 };
 
 function getNavPath(item: NotificationItem): string | null {
   switch (item.eventType) {
-    case "LOADING_STARTED":   return "/factory/sales/loadings";
-    case "LOADING_FINALIZED": return "/factory/invoicing";
-    case "INVOICE_PENDING":   return "/factory/invoicing";
-    case "INVOICE_FINALIZED": return "/factory/invoicing";
-    default: return null;
+    case "LOADING_STARTED":
+      return "/factory/sales/loadings";
+    case "LOADING_FINALIZED":
+      return "/factory/invoicing";
+    case "INVOICE_PENDING":
+      return "/factory/invoicing";
+    case "INVOICE_FINALIZED":
+      return "/factory/invoicing";
+    default:
+      return null;
   }
 }
 
@@ -155,7 +141,7 @@ export function NotificationsCenter() {
   const totalBadge = (unreadData?.count ?? 0) + (icCountData?.count ?? 0);
 
   // ── Notifications list — always unread only, scoped to current company ────────
-  const typeParam = (activeTab === "all" || activeTab === "intercompany") ? undefined : activeTab;
+  const typeParam = activeTab === "all" || activeTab === "intercompany" ? undefined : activeTab;
 
   const qKey = ["/api/notifications", activeTab, companyId];
   const { data: notifList = [], isLoading: notifLoading } = useQuery<NotificationItem[]>({
@@ -260,12 +246,7 @@ export function NotificationsCenter() {
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <div className="relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Notifications"
-              data-testid="button-notifications-bell"
-            >
+            <Button variant="ghost" size="icon" title="Notifications" data-testid="button-notifications-bell">
               <Bell className="h-4 w-4" />
             </Button>
             {totalBadge > 0 && (
@@ -299,9 +280,11 @@ export function NotificationsCenter() {
                   data-testid="button-mark-all-read"
                   title="Mark all as read"
                 >
-                  {markAllReadMutation.isPending
-                    ? <Loader2 className="h-3 w-3 animate-spin" />
-                    : <CheckCheck className="h-3 w-3" />}
+                  {markAllReadMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <CheckCheck className="h-3 w-3" />
+                  )}
                   <span className="hidden sm:inline">Mark all read</span>
                 </Button>
               )}
@@ -310,7 +293,10 @@ export function NotificationsCenter() {
                   variant="ghost"
                   size="sm"
                   className="text-xs gap-1 h-7"
-                  onClick={() => { setOpen(false); navigate("/intercompany-requests"); }}
+                  onClick={() => {
+                    setOpen(false);
+                    navigate("/intercompany-requests");
+                  }}
                   data-testid="button-ic-view-all"
                 >
                   View all
@@ -322,7 +308,7 @@ export function NotificationsCenter() {
 
           {/* Tab bar */}
           <div className="flex border-b overflow-x-auto">
-            {TABS.map(tab => (
+            {TABS.map((tab) => (
               <button
                 key={tab.id}
                 data-testid={`tab-notif-${tab.id}`}
@@ -331,7 +317,7 @@ export function NotificationsCenter() {
                   "flex-1 px-2 py-2 text-xs font-medium whitespace-nowrap transition-colors",
                   activeTab === tab.id
                     ? "border-b-2 border-primary text-foreground"
-                    : "text-muted-foreground hover-elevate",
+                    : "text-muted-foreground hover-elevate"
                 )}
               >
                 {tab.label}
@@ -352,8 +338,8 @@ export function NotificationsCenter() {
           {/* Body */}
           <div className="max-h-[400px] overflow-y-auto">
             {/* Intercompany tab */}
-            {activeTab === "intercompany" && (
-              icLoading ? (
+            {activeTab === "intercompany" &&
+              (icLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
@@ -364,7 +350,7 @@ export function NotificationsCenter() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {icRequests.map(req => (
+                  {icRequests.map((req) => (
                     <div key={req.id} className="px-4 py-3 space-y-2" data-testid={`ic-request-${req.id}`}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 text-sm font-medium min-w-0">
@@ -380,14 +366,15 @@ export function NotificationsCenter() {
                         <span className="font-semibold">${formatAmount(req.amount)}</span>
                         <span className="text-muted-foreground text-xs truncate">CR: {req.linkDestLedgerName}</span>
                       </div>
-                      {req.description && (
-                        <p className="text-xs text-muted-foreground truncate">{req.description}</p>
-                      )}
+                      {req.description && <p className="text-xs text-muted-foreground truncate">{req.description}</p>}
                       <div className="flex gap-2 pt-0.5">
                         <Button
                           size="sm"
                           className="h-7 text-xs"
-                          onClick={() => { setApproveReq(req); setSelectedAccountId(""); }}
+                          onClick={() => {
+                            setApproveReq(req);
+                            setSelectedAccountId("");
+                          }}
                           data-testid={`button-approve-${req.id}`}
                         >
                           <CheckCircle className="h-3 w-3 mr-1" />
@@ -397,7 +384,10 @@ export function NotificationsCenter() {
                           size="sm"
                           variant="outline"
                           className="h-7 text-xs"
-                          onClick={() => { setDismissReq(req); setDismissNote(""); }}
+                          onClick={() => {
+                            setDismissReq(req);
+                            setDismissNote("");
+                          }}
                           data-testid={`button-dismiss-${req.id}`}
                         >
                           <XCircle className="h-3 w-3 mr-1" />
@@ -407,12 +397,11 @@ export function NotificationsCenter() {
                     </div>
                   ))}
                 </div>
-              )
-            )}
+              ))}
 
             {/* Notifications tabs */}
-            {activeTab !== "intercompany" && (
-              notifLoading ? (
+            {activeTab !== "intercompany" &&
+              (notifLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
@@ -423,7 +412,7 @@ export function NotificationsCenter() {
                 </div>
               ) : (
                 <div className="divide-y">
-                  {notifList.map(item => {
+                  {notifList.map((item) => {
                     const meta = EVENT_META[item.eventType];
                     const navPath = getNavPath(item);
                     return (
@@ -432,14 +421,12 @@ export function NotificationsCenter() {
                         data-testid={`notif-item-${item.id}`}
                         className={cn(
                           "px-4 py-3 space-y-1.5",
-                          !item.isRead && "bg-primary/5 border-l-2 border-l-primary",
+                          !item.isRead && "bg-primary/5 border-l-2 border-l-primary"
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            {!item.isRead && (
-                              <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 mt-0.5" />
-                            )}
+                            {!item.isRead && <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0 mt-0.5" />}
                             <span className="text-sm font-medium leading-snug truncate">{item.title}</span>
                           </div>
                           {meta && (
@@ -451,9 +438,7 @@ export function NotificationsCenter() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground leading-snug line-clamp-2">
-                          {item.message}
-                        </p>
+                        <p className="text-xs text-muted-foreground leading-snug line-clamp-2">{item.message}</p>
                         {/* Company info */}
                         {item.companyName && (
                           <p className="text-[10px] text-muted-foreground font-medium">{item.companyName}</p>
@@ -466,7 +451,10 @@ export function NotificationsCenter() {
                           <div className="flex items-center gap-1 shrink-0">
                             {!item.isRead && (
                               <button
-                                onClick={(e) => { e.stopPropagation(); markReadMutation.mutate(item.id); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  markReadMutation.mutate(item.id);
+                                }}
                                 className="text-[10px] text-muted-foreground underline hover:text-foreground"
                                 data-testid={`button-mark-read-${item.id}`}
                               >
@@ -478,7 +466,10 @@ export function NotificationsCenter() {
                                 size="sm"
                                 variant="outline"
                                 className="h-6 text-[10px] px-2 gap-0.5"
-                                onClick={(e) => { e.stopPropagation(); handleNotifClick(item); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleNotifClick(item);
+                                }}
                                 data-testid={`button-go-to-record-${item.id}`}
                               >
                                 Go to record
@@ -491,14 +482,18 @@ export function NotificationsCenter() {
                     );
                   })}
                 </div>
-              )
-            )}
+              ))}
           </div>
         </PopoverContent>
       </Popover>
 
       {/* IC Approve Dialog */}
-      <Dialog open={!!approveReq} onOpenChange={o => { if (!o) setApproveReq(null); }}>
+      <Dialog
+        open={!!approveReq}
+        onOpenChange={(o) => {
+          if (!o) setApproveReq(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Approve Payment Request</DialogTitle>
@@ -506,9 +501,15 @@ export function NotificationsCenter() {
           {approveReq && (
             <div className="space-y-4 py-2">
               <div className="text-sm space-y-1">
-                <p><span className="text-muted-foreground">From:</span> {approveReq.fromCompanyName}</p>
-                <p><span className="text-muted-foreground">Amount:</span> ${formatAmount(approveReq.amount)}</p>
-                <p><span className="text-muted-foreground">CR side:</span> {approveReq.linkDestLedgerName}</p>
+                <p>
+                  <span className="text-muted-foreground">From:</span> {approveReq.fromCompanyName}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Amount:</span> ${formatAmount(approveReq.amount)}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">CR side:</span> {approveReq.linkDestLedgerName}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dest-account-select">Debit account (where money was received)</Label>
@@ -518,23 +519,30 @@ export function NotificationsCenter() {
                   </SelectTrigger>
                   <SelectContent>
                     {destAccounts
-                      .filter(a => a.id !== approveReq.linkDestLedgerAccountId)
-                      .map(a => (
-                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      .filter((a) => a.id !== approveReq.linkDestLedgerAccountId)
+                      .map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
               </div>
               <p className="text-xs text-muted-foreground">
-                A Receipt voucher will be created in <strong>{approveReq.destCompanyName}</strong>:
-                DR selected account · CR {approveReq.linkDestLedgerName}
+                A Receipt voucher will be created in <strong>{approveReq.destCompanyName}</strong>: DR selected account
+                · CR {approveReq.linkDestLedgerName}
               </p>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveReq(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setApproveReq(null)}>
+              Cancel
+            </Button>
             <Button
-              onClick={() => approveReq && approveMutation.mutate({ id: approveReq.id, destLedgerAccountId: parseInt(selectedAccountId) })}
+              onClick={() =>
+                approveReq &&
+                approveMutation.mutate({ id: approveReq.id, destLedgerAccountId: parseInt(selectedAccountId) })
+              }
               disabled={!selectedAccountId || approveMutation.isPending}
               data-testid="button-confirm-approve"
             >
@@ -545,26 +553,35 @@ export function NotificationsCenter() {
       </Dialog>
 
       {/* IC Dismiss Dialog */}
-      <Dialog open={!!dismissReq} onOpenChange={o => { if (!o) setDismissReq(null); }}>
+      <Dialog
+        open={!!dismissReq}
+        onOpenChange={(o) => {
+          if (!o) setDismissReq(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Dismiss Request</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">This will mark the request as dismissed without posting a mirror voucher.</p>
+            <p className="text-sm text-muted-foreground">
+              This will mark the request as dismissed without posting a mirror voucher.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="dismiss-note">Note (optional)</Label>
               <Textarea
                 id="dismiss-note"
                 placeholder="Reason for dismissal…"
                 value={dismissNote}
-                onChange={e => setDismissNote(e.target.value)}
+                onChange={(e) => setDismissNote(e.target.value)}
                 data-testid="input-dismiss-note"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDismissReq(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDismissReq(null)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               onClick={() => dismissReq && dismissMutation.mutate({ id: dismissReq.id, note: dismissNote })}

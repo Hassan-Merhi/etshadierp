@@ -1,12 +1,6 @@
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
-} from "@/components/ui/form";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -26,8 +20,16 @@ interface BulkPaymentDialogProps {
 }
 
 export function BulkPaymentDialog({
-  open, onOpenChange, selectedPayments, totalAmount, workerStaff,
-  form, mutation, cashAccounts, bankAccounts, bankAccountsLoading,
+  open,
+  onOpenChange,
+  selectedPayments,
+  totalAmount,
+  workerStaff,
+  form,
+  mutation,
+  cashAccounts,
+  bankAccounts,
+  bankAccountsLoading,
 }: BulkPaymentDialogProps) {
   const { formatAmount } = useCurrencyContext();
 
@@ -48,7 +50,9 @@ export function BulkPaymentDialog({
               const worker = workerStaff.find((w) => w.id === payment.workerId);
               return (
                 <div key={payment.workerId} className="flex justify-between text-sm">
-                  <span>{worker?.firstName} {worker?.lastName} ({worker?.code})</span>
+                  <span>
+                    {worker?.firstName} {worker?.lastName} ({worker?.code})
+                  </span>
                   <span className="font-mono">{formatAmount(parseFloat(payment.amount))}</span>
                 </div>
               );
@@ -89,9 +93,7 @@ export function BulkPaymentDialog({
               name="paymentAccountId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    {form.watch("paymentAccountType") === "cash" ? "Cash Account" : "Bank Account"}
-                  </FormLabel>
+                  <FormLabel>{form.watch("paymentAccountType") === "cash" ? "Cash Account" : "Bank Account"}</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-bulk-account">
@@ -101,14 +103,20 @@ export function BulkPaymentDialog({
                     <SelectContent>
                       {form.watch("paymentAccountType") === "cash" ? (
                         cashAccounts.length === 0 ? (
-                          <SelectItem value="none" disabled>No cash accounts available</SelectItem>
+                          <SelectItem value="none" disabled>
+                            No cash accounts available
+                          </SelectItem>
                         ) : (
                           cashAccounts.map((account) => (
-                            <SelectItem key={account.id} value={account.id.toString()}>{account.name}</SelectItem>
+                            <SelectItem key={account.id} value={account.id.toString()}>
+                              {account.name}
+                            </SelectItem>
                           ))
                         )
                       ) : bankAccountsLoading ? (
-                        <SelectItem value="loading" disabled>Loading...</SelectItem>
+                        <SelectItem value="loading" disabled>
+                          Loading...
+                        </SelectItem>
                       ) : (
                         bankAccounts?.map((account) => (
                           <SelectItem key={account.id} value={account.id.toString()}>
@@ -152,7 +160,12 @@ export function BulkPaymentDialog({
             />
 
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-bulk">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                data-testid="button-cancel-bulk"
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={mutation.isPending} data-testid="button-submit-bulk">

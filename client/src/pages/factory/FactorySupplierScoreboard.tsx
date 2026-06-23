@@ -23,8 +23,8 @@ function getDefaultDateRange() {
   const from = new Date();
   from.setDate(from.getDate() - 90);
   return {
-    from: from.toLocaleDateString('en-CA'),
-    to: to.toLocaleDateString('en-CA'),
+    from: from.toLocaleDateString("en-CA"),
+    to: to.toLocaleDateString("en-CA"),
   };
 }
 
@@ -58,7 +58,8 @@ export default function FactorySupplierScoreboard() {
   const totalSuppliers = data.length;
   const avgScore = totalSuppliers > 0 ? data.reduce((sum, s) => sum + s.score, 0) / totalSuppliers : 0;
   const bestSupplier = totalSuppliers > 0 ? data.reduce((best, s) => (s.score > best.score ? s : best), data[0]) : null;
-  const worstSupplier = totalSuppliers > 0 ? data.reduce((worst, s) => (s.score < worst.score ? s : worst), data[0]) : null;
+  const worstSupplier =
+    totalSuppliers > 0 ? data.reduce((worst, s) => (s.score < worst.score ? s : worst), data[0]) : null;
 
   return (
     <div className="space-y-6">
@@ -96,7 +97,9 @@ export default function FactorySupplierScoreboard() {
             <CardTitle className="text-sm font-medium">Total Suppliers</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-total-suppliers">{totalSuppliers}</div>
+            <div className="text-2xl font-bold" data-testid="text-total-suppliers">
+              {totalSuppliers}
+            </div>
           </CardContent>
         </Card>
         <Card data-testid="card-avg-score">
@@ -104,7 +107,9 @@ export default function FactorySupplierScoreboard() {
             <CardTitle className="text-sm font-medium">Avg Score</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-avg-score">{avgScore.toFixed(1)}</div>
+            <div className="text-2xl font-bold" data-testid="text-avg-score">
+              {avgScore.toFixed(1)}
+            </div>
           </CardContent>
         </Card>
         <Card data-testid="card-best-supplier">
@@ -116,7 +121,9 @@ export default function FactorySupplierScoreboard() {
               {bestSupplier ? bestSupplier.supplierName : "—"}
             </div>
             {bestSupplier && (
-              <p className="text-xs text-muted-foreground" data-testid="text-best-score">Score: {bestSupplier.score.toFixed(1)}</p>
+              <p className="text-xs text-muted-foreground" data-testid="text-best-score">
+                Score: {bestSupplier.score.toFixed(1)}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -129,7 +136,9 @@ export default function FactorySupplierScoreboard() {
               {worstSupplier ? worstSupplier.supplierName : "—"}
             </div>
             {worstSupplier && (
-              <p className="text-xs text-muted-foreground" data-testid="text-worst-score">Score: {worstSupplier.score.toFixed(1)}</p>
+              <p className="text-xs text-muted-foreground" data-testid="text-worst-score">
+                Score: {worstSupplier.score.toFixed(1)}
+              </p>
             )}
           </CardContent>
         </Card>
@@ -147,7 +156,9 @@ export default function FactorySupplierScoreboard() {
             </div>
           ) : !Array.isArray(data) || data.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground" data-testid="text-no-data">No supplier data for selected range</p>
+              <p className="text-muted-foreground" data-testid="text-no-data">
+                No supplier data for selected range
+              </p>
             </div>
           ) : (
             <div className="table-responsive">
@@ -168,19 +179,34 @@ export default function FactorySupplierScoreboard() {
                   {data.map((supplier, idx) => (
                     <TableRow key={supplier.supplierName ?? idx} data-testid={`row-supplier-${idx}`}>
                       <TableCell>
-                        <Badge variant="outline" data-testid={`text-rank-${idx}`}>{idx + 1}</Badge>
+                        <Badge variant="outline" data-testid={`text-rank-${idx}`}>
+                          {idx + 1}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="font-medium" data-testid={`text-supplier-name-${idx}`}>{supplier.supplierName}</TableCell>
-                      <TableCell className="font-mono" data-testid={`text-total-kg-${idx}`}>{supplier.totalKg.toFixed(1)}</TableCell>
-                      <TableCell className="font-mono" data-testid={`text-waste-kg-${idx}`}>{supplier.wasteKg.toFixed(1)}</TableCell>
-                      <TableCell className="font-mono" data-testid={`text-waste-percent-${idx}`}>{supplier.wastePercent.toFixed(1)}%</TableCell>
-                      <TableCell className="font-mono" data-testid={`text-avg-cost-${idx}`}>${(supplier.avgCostPerKg ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</TableCell>
-                      <TableCell className="font-mono" data-testid={`text-output-bales-${idx}`}>{supplier.outputBales}</TableCell>
+                      <TableCell className="font-medium" data-testid={`text-supplier-name-${idx}`}>
+                        {supplier.supplierName}
+                      </TableCell>
+                      <TableCell className="font-mono" data-testid={`text-total-kg-${idx}`}>
+                        {supplier.totalKg.toFixed(1)}
+                      </TableCell>
+                      <TableCell className="font-mono" data-testid={`text-waste-kg-${idx}`}>
+                        {supplier.wasteKg.toFixed(1)}
+                      </TableCell>
+                      <TableCell className="font-mono" data-testid={`text-waste-percent-${idx}`}>
+                        {supplier.wastePercent.toFixed(1)}%
+                      </TableCell>
+                      <TableCell className="font-mono" data-testid={`text-avg-cost-${idx}`}>
+                        $
+                        {(supplier.avgCostPerKg ?? 0).toLocaleString(undefined, {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2,
+                        })}
+                      </TableCell>
+                      <TableCell className="font-mono" data-testid={`text-output-bales-${idx}`}>
+                        {supplier.outputBales}
+                      </TableCell>
                       <TableCell data-testid={`text-score-${idx}`}>
-                        <Badge
-                          variant={getScoreVariant(supplier.score)}
-                          className={getScoreClass(supplier.score)}
-                        >
+                        <Badge variant={getScoreVariant(supplier.score)} className={getScoreClass(supplier.score)}>
                           {supplier.score.toFixed(1)}
                         </Badge>
                       </TableCell>

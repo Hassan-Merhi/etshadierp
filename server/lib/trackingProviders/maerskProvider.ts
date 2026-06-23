@@ -73,18 +73,8 @@ function parseEvents(rawEvents: unknown): TrackingEvent[] {
   return rawEvents
     .map((e: any): TrackingEvent => {
       const date = parseDate(e.eventDateTime ?? e.eventDate ?? e.date ?? null);
-      const location =
-        e.location?.locationName ??
-        e.location?.UNLocationCode ??
-        e.portName ??
-        e.locationName ??
-        null;
-      const status =
-        e.transportEventTypeCode ??
-        e.eventCode ??
-        e.eventType ??
-        e.status ??
-        null;
+      const location = e.location?.locationName ?? e.location?.UNLocationCode ?? e.portName ?? e.locationName ?? null;
+      const status = e.transportEventTypeCode ?? e.eventCode ?? e.eventType ?? e.status ?? null;
       const description = e.description ?? e.eventDescription ?? null;
       return { date, status, location, description };
     })
@@ -144,17 +134,14 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     const token = await fetchToken();
     const key = process.env.MAERSK_CONSUMER_KEY!;
 
-    const res = await fetch(
-      `${API_BASE}/track/${encodeURIComponent(containerNumber)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Consumer-Key": key,
-          Accept: "application/json",
-        },
-        signal: AbortSignal.timeout(20_000),
+    const res = await fetch(`${API_BASE}/track/${encodeURIComponent(containerNumber)}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Consumer-Key": key,
+        Accept: "application/json",
       },
-    );
+      signal: AbortSignal.timeout(20_000),
+    });
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
@@ -171,10 +158,7 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
 
     // Events may be on entry.events or entry.containers[0].events
     const rawEvents: unknown =
-      entry.events ??
-      entry.containers?.[0]?.events ??
-      entry.ContainerStatus?.[0]?.events ??
-      [];
+      entry.events ?? entry.containers?.[0]?.events ?? entry.ContainerStatus?.[0]?.events ?? [];
 
     // Sort newest-first so events[0] is the latest
     const events = parseEvents(rawEvents).sort((a, b) => {
@@ -193,18 +177,12 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
       latest?.status ??
       null;
 
-    const latestLocation =
-      entry.location?.locationName ??
-      latest?.location ??
-      null;
+    const latestLocation = entry.location?.locationName ?? latest?.location ?? null;
 
     const latestDescription = latest?.description ?? null;
     const latestEventDate = latest?.date ?? null;
 
-    const eta =
-      pickEta(entry) ??
-      pickEta(entry.containers?.[0]) ??
-      null;
+    const eta = pickEta(entry) ?? pickEta(entry.containers?.[0]) ?? null;
 
     return {
       success: true,

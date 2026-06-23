@@ -12,33 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Plus, Trash2, Search, Package, MapPin, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -218,9 +195,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
     if (searchTerm.length === 0) return itemsWithStock;
     const term = searchTerm.toLowerCase();
     return itemsWithStock.filter(
-      (item) =>
-        item.name.toLowerCase().includes(term) ||
-        item.code.toLowerCase().includes(term)
+      (item) => item.name.toLowerCase().includes(term) || item.code.toLowerCase().includes(term)
     );
   }, [itemsWithStock, searchTerm]);
 
@@ -234,14 +209,10 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
 
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        setHighlightedIndex((prev) =>
-          prev < filteredItems.length - 1 ? prev + 1 : 0
-        );
+        setHighlightedIndex((prev) => (prev < filteredItems.length - 1 ? prev + 1 : 0));
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setHighlightedIndex((prev) =>
-          prev > 0 ? prev - 1 : filteredItems.length - 1
-        );
+        setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : filteredItems.length - 1));
       } else if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         const selectedItem = filteredItems[highlightedIndex];
@@ -356,7 +327,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
     setEditingVoucherId(null);
   };
 
-  const addItemToCart = (item: typeof itemsWithStock[0]) => {
+  const addItemToCart = (item: (typeof itemsWithStock)[0]) => {
     if (!selectedLocationId) {
       toast({
         title: "No location selected",
@@ -405,11 +376,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
   };
 
   const updateItemInventoryCost = (index: number, newCost: string) => {
-    setItems((prev) =>
-      prev.map((item, i) =>
-        i === index ? { ...item, inventoryCost: newCost } : item
-      )
-    );
+    setItems((prev) => prev.map((item, i) => (i === index ? { ...item, inventoryCost: newCost } : item)));
   };
 
   const totalRefund = items.reduce((sum, item) => {
@@ -489,12 +456,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
             </CardTitle>
             <div className="flex gap-2">
               {isEditMode && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={resetForm}
-                  data-testid="button-cancel-edit"
-                >
+                <Button type="button" variant="outline" onClick={resetForm} data-testid="button-cancel-edit">
                   Cancel
                 </Button>
               )}
@@ -520,11 +482,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Type</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                        disabled={isEditMode}
-                      >
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isEditMode}>
                         <FormControl>
                           <SelectTrigger data-testid="select-note-type">
                             <SelectValue placeholder="Select type" />
@@ -562,9 +520,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
                   name="cashAccountId"
                   render={() => (
                     <FormItem className="col-span-2">
-                      <FormLabel>
-                        {noteType === "Credit Note" ? "Refund From (Cash/Bank)" : "Receive Into"}
-                      </FormLabel>
+                      <FormLabel>{noteType === "Credit Note" ? "Refund From (Cash/Bank)" : "Receive Into"}</FormLabel>
                       <FormControl>
                         <AccountAutocomplete
                           value={
@@ -682,9 +638,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
                   <div className="text-sm text-muted-foreground">
                     Inventory Value: <span className="font-mono">{formatNumber(totalInventoryValue)}</span>
                     {Math.abs(totalRefund - totalInventoryValue) > 0.01 && (
-                      <span className="ml-2">
-                        (Variance: {formatNumber(totalRefund - totalInventoryValue)})
-                      </span>
+                      <span className="ml-2">(Variance: {formatNumber(totalRefund - totalInventoryValue)})</span>
                     )}
                   </div>
                 </div>
@@ -775,9 +729,7 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
                       data-index={index}
                       className={cn(
                         "p-3 rounded-md cursor-pointer border transition-colors",
-                        isHighlighted
-                          ? "bg-primary/10 border-primary"
-                          : "hover:bg-accent border-transparent"
+                        isHighlighted ? "bg-primary/10 border-primary" : "hover:bg-accent border-transparent"
                       )}
                       onClick={() => addItemToCart(item)}
                       data-testid={`item-${item.id}`}
@@ -787,17 +739,12 @@ export function CreditNoteTab({ allAccounts, editVoucherId }: CreditNoteTabProps
                           <p className="font-medium truncate text-sm">{item.name}</p>
                           <p className="text-xs text-muted-foreground">{item.code}</p>
                         </div>
-                        <Badge
-                          variant={item.stockQty > 0 ? "default" : "secondary"}
-                          className="ml-2 shrink-0"
-                        >
+                        <Badge variant={item.stockQty > 0 ? "default" : "secondary"} className="ml-2 shrink-0">
                           {formatNumber(item.stockQty, 0)} {item.uom}
                         </Badge>
                       </div>
                       {item.avgRate > 0 && (
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          Avg Cost: {formatNumber(item.avgRate)}
-                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">Avg Cost: {formatNumber(item.avgRate)}</div>
                       )}
                     </div>
                   );

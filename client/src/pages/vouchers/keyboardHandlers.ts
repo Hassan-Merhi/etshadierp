@@ -12,10 +12,11 @@ export function handlePaymentKeyDown(
   if (fieldName === "account" && e.key === "Tab" && !e.shiftKey) {
     e.preventDefault();
     setTimeout(() => {
-      const amountInput = document.querySelector(
-        `[data-testid="input-amount-${rowIndex}"]`
-      ) as HTMLInputElement;
-      if (amountInput) { amountInput.focus(); amountInput.select(); }
+      const amountInput = document.querySelector(`[data-testid="input-amount-${rowIndex}"]`) as HTMLInputElement;
+      if (amountInput) {
+        amountInput.focus();
+        amountInput.select();
+      }
     }, 50);
   }
 
@@ -25,7 +26,10 @@ export function handlePaymentKeyDown(
       if (rowIndex > 0) {
         setTimeout(() => {
           const prevInput = document.querySelector(`[data-testid="input-amount-${rowIndex - 1}"]`) as HTMLInputElement;
-          if (prevInput) { prevInput.focus(); prevInput.select(); }
+          if (prevInput) {
+            prevInput.focus();
+            prevInput.select();
+          }
         }, 50);
       }
       return;
@@ -34,7 +38,10 @@ export function handlePaymentKeyDown(
       if (rowIndex < fieldsLength - 1) {
         setTimeout(() => {
           const nextInput = document.querySelector(`[data-testid="input-amount-${rowIndex + 1}"]`) as HTMLInputElement;
-          if (nextInput) { nextInput.focus(); nextInput.select(); }
+          if (nextInput) {
+            nextInput.focus();
+            nextInput.select();
+          }
         }, 50);
       }
       return;
@@ -49,7 +56,9 @@ export function handlePaymentKeyDown(
       e.preventDefault();
       if (rowIndex < fieldsLength - 1) {
         setTimeout(() => {
-          const nextAccountInput = document.querySelector(`[data-testid="input-account-${rowIndex + 1}"]`) as HTMLInputElement;
+          const nextAccountInput = document.querySelector(
+            `[data-testid="input-account-${rowIndex + 1}"]`
+          ) as HTMLInputElement;
           if (nextAccountInput) nextAccountInput.focus();
         }, 50);
       }
@@ -63,9 +72,7 @@ export function handlePaymentKeyDown(
       append({ accountType: "ledger", accountId: 0, accountName: "", amount: "" });
     }
     setTimeout(() => {
-      const newRowInput = document.querySelector(
-        `[data-testid="input-account-${rowIndex + 1}"]`
-      ) as HTMLInputElement;
+      const newRowInput = document.querySelector(`[data-testid="input-account-${rowIndex + 1}"]`) as HTMLInputElement;
       if (newRowInput) newRowInput.focus();
     }, 100);
   }

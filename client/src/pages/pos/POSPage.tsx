@@ -13,13 +13,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { cn } from "@/lib/utils";
 import { MapPin, Search, Trash2, Printer, Check } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -121,9 +115,7 @@ function SpPOS() {
 
   // ── Derived: stock items at active location ─────────────────────────────────
   const stockAtLocation = selectedLocation
-    ? (Array.isArray(spStock) ? spStock : []).filter(
-        (m) => m.locationId === selectedLocation.id
-      )
+    ? (Array.isArray(spStock) ? spStock : []).filter((m) => m.locationId === selectedLocation.id)
     : [];
 
   // Group by articleCode → sum qtyRemaining
@@ -198,8 +190,14 @@ function SpPOS() {
     ? stockItems.filter((item) => {
         const q = searchTerm.toLowerCase().replace(/[\s.\-]/g, "");
         return (
-          item.name.toLowerCase().replace(/[\s.\-]/g, "").includes(q) ||
-          item.articleCode.toLowerCase().replace(/[\s.\-]/g, "").includes(q)
+          item.name
+            .toLowerCase()
+            .replace(/[\s.\-]/g, "")
+            .includes(q) ||
+          item.articleCode
+            .toLowerCase()
+            .replace(/[\s.\-]/g, "")
+            .includes(q)
         );
       })
     : stockItems;
@@ -314,9 +312,7 @@ function SpPOS() {
                 <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10">
                   <MapPin className="h-4 w-4 text-primary" />
                 </div>
-                {loc.city && (
-                  <span className="text-xs text-muted-foreground">{loc.city}</span>
-                )}
+                {loc.city && <span className="text-xs text-muted-foreground">{loc.city}</span>}
               </div>
               <div>
                 <h3 className="font-semibold text-base leading-tight">{loc.name}</h3>
@@ -371,9 +367,7 @@ function SpPOS() {
               <div className="p-4 text-center text-sm text-muted-foreground">Loading stock…</div>
             ) : filteredItems.length === 0 ? (
               <div className="p-4 text-center text-sm text-muted-foreground">
-                {stockItems.length === 0
-                  ? "No stock available at this location."
-                  : "No items match your search."}
+                {stockItems.length === 0 ? "No stock available at this location." : "No items match your search."}
               </div>
             ) : (
               filteredItems.map((item) => {
@@ -395,12 +389,8 @@ function SpPOS() {
                         <p className="text-xs text-muted-foreground">{item.articleCode}</p>
                       </div>
                       <div className="text-right flex-shrink-0">
-                        <p className="text-xs text-muted-foreground">
-                          Qty: {formatNumber(item.availableQty)}
-                        </p>
-                        {inCart && (
-                          <Check className="h-3.5 w-3.5 text-primary ml-auto mt-0.5" />
-                        )}
+                        <p className="text-xs text-muted-foreground">Qty: {formatNumber(item.availableQty)}</p>
+                        {inCart && <Check className="h-3.5 w-3.5 text-primary ml-auto mt-0.5" />}
                       </div>
                     </div>
                   </button>
@@ -420,73 +410,68 @@ function SpPOS() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground text-xs">
-                    <th className="text-left pb-2 font-medium">Item</th>
-                    <th className="text-right pb-2 font-medium w-20">Qty</th>
-                    <th className="text-right pb-2 font-medium w-28">Rate (USD)</th>
-                    <th className="text-right pb-2 font-medium w-24">Total</th>
-                    <th className="w-8"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row, idx) => {
-                    const stockItem = stockItems.find((s) => s.articleCode === row.articleCode);
-                    const overQty = stockItem && row.quantity > stockItem.availableQty;
-                    return (
-                      <tr key={row.id} className="border-b last:border-b-0">
-                        <td className="py-2 pr-2">
-                          <p className="font-medium">{row.name}</p>
-                          <p className="text-xs text-muted-foreground">{row.articleCode}</p>
-                          {overQty && (
-                            <p className="text-xs text-destructive">
-                              Available: {formatNumber(stockItem!.availableQty)}
-                            </p>
-                          )}
-                        </td>
-                        <td className="py-2 px-1">
-                          <Input
-                            type="number"
-                            min={0}
-                            value={row.quantity === 0 ? "" : row.quantity}
-                            onChange={(e) => updateRowField(idx, "quantity", e.target.value)}
-                            className={cn(
-                              "text-right w-20 ml-auto",
-                              overQty && "border-destructive"
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b text-muted-foreground text-xs">
+                      <th className="text-left pb-2 font-medium">Item</th>
+                      <th className="text-right pb-2 font-medium w-20">Qty</th>
+                      <th className="text-right pb-2 font-medium w-28">Rate (USD)</th>
+                      <th className="text-right pb-2 font-medium w-24">Total</th>
+                      <th className="w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, idx) => {
+                      const stockItem = stockItems.find((s) => s.articleCode === row.articleCode);
+                      const overQty = stockItem && row.quantity > stockItem.availableQty;
+                      return (
+                        <tr key={row.id} className="border-b last:border-b-0">
+                          <td className="py-2 pr-2">
+                            <p className="font-medium">{row.name}</p>
+                            <p className="text-xs text-muted-foreground">{row.articleCode}</p>
+                            {overQty && (
+                              <p className="text-xs text-destructive">
+                                Available: {formatNumber(stockItem!.availableQty)}
+                              </p>
                             )}
-                            data-testid={`input-qty-${idx}`}
-                          />
-                        </td>
-                        <td className="py-2 px-1">
-                          <Input
-                            type="number"
-                            min={0}
-                            step="0.01"
-                            value={row.rate === 0 ? "" : row.rate}
-                            onChange={(e) => updateRowField(idx, "rate", e.target.value)}
-                            className="text-right w-28 ml-auto"
-                            data-testid={`input-rate-${idx}`}
-                          />
-                        </td>
-                        <td className="py-2 pl-2 text-right font-medium tabular-nums">
-                          ${formatNumber(row.amount)}
-                        </td>
-                        <td className="py-2 pl-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => removeRow(idx)}
-                            data-testid={`button-remove-row-${idx}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-muted-foreground" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          </td>
+                          <td className="py-2 px-1">
+                            <Input
+                              type="number"
+                              min={0}
+                              value={row.quantity === 0 ? "" : row.quantity}
+                              onChange={(e) => updateRowField(idx, "quantity", e.target.value)}
+                              className={cn("text-right w-20 ml-auto", overQty && "border-destructive")}
+                              data-testid={`input-qty-${idx}`}
+                            />
+                          </td>
+                          <td className="py-2 px-1">
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={row.rate === 0 ? "" : row.rate}
+                              onChange={(e) => updateRowField(idx, "rate", e.target.value)}
+                              className="text-right w-28 ml-auto"
+                              data-testid={`input-rate-${idx}`}
+                            />
+                          </td>
+                          <td className="py-2 pl-2 text-right font-medium tabular-nums">${formatNumber(row.amount)}</td>
+                          <td className="py-2 pl-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeRow(idx)}
+                              data-testid={`button-remove-row-${idx}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -542,9 +527,7 @@ function SpPOS() {
             {/* Bank account (non-credit only) */}
             {!isCreditSale && (
               <div>
-                <Label className="text-xs text-muted-foreground mb-1 block">
-                  Payment Account
-                </Label>
+                <Label className="text-xs text-muted-foreground mb-1 block">Payment Account</Label>
                 <Select value={bankAccountId} onValueChange={setBankAccountId}>
                   <SelectTrigger data-testid="select-bank-account">
                     <SelectValue placeholder="Select account…" />
@@ -620,9 +603,7 @@ function SpPOS() {
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Sale Saved</AlertDialogTitle>
-            <AlertDialogDescription>
-              Your sale has been recorded. Print a receipt?
-            </AlertDialogDescription>
+            <AlertDialogDescription>Your sale has been recorded. Print a receipt?</AlertDialogDescription>
           </AlertDialogHeader>
 
           {/* Hidden print content */}
@@ -633,9 +614,7 @@ function SpPOS() {
                 <p className="text-xs">Point of Sale Receipt</p>
                 <p className="text-xs">{printTime}</p>
                 {(isCreditSale || savedSale?.customerName) && (
-                  <p className="text-xs mt-1">
-                    Customer: {savedSale?.customerName || customerName}
-                  </p>
+                  <p className="text-xs mt-1">Customer: {savedSale?.customerName || customerName}</p>
                 )}
               </div>
               <hr className="border-dashed my-2" />
@@ -669,9 +648,7 @@ function SpPOS() {
                 <span>TOTAL</span>
                 <span>{fmtPrint(grandTotal, "$")}</span>
               </div>
-              {notes && (
-                <p className="text-xs mt-2 opacity-70">Notes: {notes}</p>
-              )}
+              {notes && <p className="text-xs mt-2 opacity-70">Notes: {notes}</p>}
               <hr className="border-dashed my-2" />
               <p className="text-center text-xs opacity-60">Thank you!</p>
             </div>

@@ -26,7 +26,13 @@ interface CombinedStockViewProps {
   allStockCategoryFilter: string[];
   setAllStockCategoryFilter: (cats: string[] | ((prev: string[]) => string[])) => void;
   allStockSelectedRowIndex: number;
-  openMovement: (locId: number | null, locName: string | null, stockItemId: number, stockItemName: string, e?: any) => void;
+  openMovement: (
+    locId: number | null,
+    locName: string | null,
+    stockItemId: number,
+    stockItemName: string,
+    e?: any
+  ) => void;
   formatAmount: (amt: number) => string;
   posUser?: any;
   allStockTableRef: React.RefObject<HTMLDivElement>;
@@ -54,9 +60,7 @@ export function CombinedStockView({
   allStockTableRef,
 }: CombinedStockViewProps) {
   // Deduplicate locations by name for the dropdown
-  const uniqueLocationNames = Array.from(
-    new Map(allInventoryLocations.map((l) => [l.name, l])).values()
-  );
+  const uniqueLocationNames = Array.from(new Map(allInventoryLocations.map((l) => [l.name, l])).values());
 
   // When a location filter is active, only show columns for locations matching that name
   const visibleLocations = allStockLocationFilter
@@ -80,7 +84,9 @@ export function CombinedStockView({
           </div>
           {!posUser && (
             <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
-              <span className="text-sm font-semibold font-mono text-primary">{formatAmount(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0))}</span>
+              <span className="text-sm font-semibold font-mono text-primary">
+                {formatAmount(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0))}
+              </span>
               <span className="text-xs text-muted-foreground">total value</span>
             </div>
           )}
@@ -135,13 +141,20 @@ export function CombinedStockView({
           {categoriesList.length > 0 && (
             <Popover>
               <PopoverTrigger asChild>
-                <Button variant="outline" className="w-full sm:w-48 justify-between font-normal" data-testid="select-all-stock-category">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-48 justify-between font-normal"
+                  data-testid="select-all-stock-category"
+                >
                   <span className="truncate">
                     {allStockCategoryFilter.length === 0
                       ? "All Categories"
                       : allStockCategoryFilter.length === 1
-                      ? (categoriesList.find(c => String(c.id) === allStockCategoryFilter[0])?.name ?? allStockCategoryFilter[0] === "none" ? "No Category" : allStockCategoryFilter[0])
-                      : `${allStockCategoryFilter.length} Categories`}
+                        ? (categoriesList.find((c) => String(c.id) === allStockCategoryFilter[0])?.name ??
+                          allStockCategoryFilter[0] === "none")
+                          ? "No Category"
+                          : allStockCategoryFilter[0]
+                        : `${allStockCategoryFilter.length} Categories`}
                   </span>
                   <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -152,7 +165,15 @@ export function CombinedStockView({
                     const val = String(cat.id);
                     const checked = allStockCategoryFilter.includes(val);
                     return (
-                      <div key={cat.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer" onClick={() => setAllStockCategoryFilter(prev => checked ? prev.filter(v => v !== val) : [...prev, val])}>
+                      <div
+                        key={cat.id}
+                        className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer"
+                        onClick={() =>
+                          setAllStockCategoryFilter((prev) =>
+                            checked ? prev.filter((v) => v !== val) : [...prev, val]
+                          )
+                        }
+                      >
                         <Checkbox checked={checked} />
                         <span className="text-sm">{cat.name}</span>
                       </div>
@@ -161,7 +182,14 @@ export function CombinedStockView({
                 </div>
                 {allStockCategoryFilter.length > 0 && (
                   <div className="border-t mt-2 pt-2">
-                    <Button variant="ghost" size="sm" className="w-full text-xs" onClick={() => setAllStockCategoryFilter([])}>Clear</Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => setAllStockCategoryFilter([])}
+                    >
+                      Clear
+                    </Button>
                   </div>
                 )}
               </PopoverContent>
@@ -171,7 +199,7 @@ export function CombinedStockView({
 
         {allInventoryLoading ? (
           <div className="p-4 space-y-2">
-            {[1,2,3,4,5].map((i) => (
+            {[1, 2, 3, 4, 5].map((i) => (
               <Skeleton key={i} className="h-9 w-full" />
             ))}
           </div>
@@ -179,7 +207,11 @@ export function CombinedStockView({
           <EmptyState
             icon={Package}
             title={allInventoryData.length === 0 ? "No stock found" : "No matching items"}
-            description={allInventoryData.length === 0 ? "Stock has not been recorded across any location yet." : "Try adjusting your search to see other items."}
+            description={
+              allInventoryData.length === 0
+                ? "Stock has not been recorded across any location yet."
+                : "Try adjusting your search to see other items."
+            }
           />
         ) : (
           <div className="w-full overflow-auto max-h-[calc(100vh-200px)]" ref={allStockTableRef}>
@@ -195,7 +227,10 @@ export function CombinedStockView({
                     </th>
                   )}
                   {visibleLocations.map((loc) => (
-                    <th key={loc.id} className="text-right px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap">
+                    <th
+                      key={loc.id}
+                      className="text-right px-4 py-2.5 font-medium text-muted-foreground whitespace-nowrap"
+                    >
                       {loc.name}
                     </th>
                   ))}
@@ -220,7 +255,7 @@ export function CombinedStockView({
                     // Group separator when group changes
                     if (!allStockGroupFilter && row.stockGroupName !== lastGroup) {
                       lastGroup = row.stockGroupName;
-                      const groupRows = filteredCombinedRows.filter(r => r.stockGroupName === row.stockGroupName);
+                      const groupRows = filteredCombinedRows.filter((r) => r.stockGroupName === row.stockGroupName);
                       const groupTotal = groupRows.reduce((s, r) => s + r.totalQty, 0);
                       const groupValue = groupRows.reduce((s, r) => s + r.totalValue, 0);
                       rows.push(
@@ -237,10 +272,12 @@ export function CombinedStockView({
                                 </span>
                               </span>
                               <span className="text-xs font-mono text-muted-foreground whitespace-nowrap">
-                                {groupTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} units
-                                {groupValue > 0 && (
-                                  <span className="ml-3">{formatAmount(groupValue)}</span>
-                                )}
+                                {groupTotal.toLocaleString(undefined, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                units
+                                {groupValue > 0 && <span className="ml-3">{formatAmount(groupValue)}</span>}
                               </span>
                             </div>
                           </td>
@@ -253,25 +290,32 @@ export function CombinedStockView({
                         key={row.stockItemId}
                         className={cn(
                           "cursor-pointer transition-colors",
-                          isSelected
-                            ? "bg-accent text-accent-foreground"
-                            : "hover-elevate"
+                          isSelected ? "bg-accent text-accent-foreground" : "hover-elevate"
                         )}
                         data-testid={`row-allstock-${row.stockItemId}`}
                         data-allstock-row-index={currentIdx}
                         onClick={() => openMovement(null, null, row.stockItemId, row.stockItemName)}
                       >
-                        <td className={cn(
-                          "px-4 py-2 font-medium whitespace-nowrap sticky left-0 z-10 transition-colors",
-                          isSelected ? "bg-accent" : "bg-background"
-                        )}>
+                        <td
+                          className={cn(
+                            "px-4 py-2 font-medium whitespace-nowrap sticky left-0 z-10 transition-colors",
+                            isSelected ? "bg-accent" : "bg-background"
+                          )}
+                        >
                           {row.stockItemName}
                         </td>
                         {categoriesList.length > 0 && (
-                          <td className="px-4 py-2 whitespace-nowrap" data-testid={`allstock-category-${row.stockItemId}`}>
-                            {row.categoryName
-                              ? <Badge variant="secondary" className="text-xs font-normal">{row.categoryName}</Badge>
-                              : <span className="text-muted-foreground/40 text-xs">—</span>}
+                          <td
+                            className="px-4 py-2 whitespace-nowrap"
+                            data-testid={`allstock-category-${row.stockItemId}`}
+                          >
+                            {row.categoryName ? (
+                              <Badge variant="secondary" className="text-xs font-normal">
+                                {row.categoryName}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground/40 text-xs">—</span>
+                            )}
                           </td>
                         )}
                         {visibleLocations.map((loc) => (
@@ -280,20 +324,33 @@ export function CombinedStockView({
                             className="px-4 py-2 text-right font-mono whitespace-nowrap text-muted-foreground hover:text-foreground hover:underline"
                             title={`View movement for ${loc.name}`}
                             onClick={(e) => {
-                              if (row.qtyByLocation[loc.id] != null) openMovement(loc.id, loc.name, row.stockItemId, row.stockItemName, e);
+                              if (row.qtyByLocation[loc.id] != null)
+                                openMovement(loc.id, loc.name, row.stockItemId, row.stockItemName, e);
                               else e.stopPropagation();
                             }}
                           >
-                            {row.qtyByLocation[loc.id] != null && row.qtyByLocation[loc.id] > 0
-                              ? row.qtyByLocation[loc.id].toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-                              : <span className="text-muted-foreground/30">—</span>}
+                            {row.qtyByLocation[loc.id] != null && row.qtyByLocation[loc.id] > 0 ? (
+                              row.qtyByLocation[loc.id].toLocaleString(undefined, {
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 2,
+                              })
+                            ) : (
+                              <span className="text-muted-foreground/30">—</span>
+                            )}
                           </td>
                         ))}
                         <td className="px-4 py-2 text-right font-mono font-semibold whitespace-nowrap border-l">
-                          {row.totalQty.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          {row.totalQty.toLocaleString(undefined, {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}
                         </td>
                         <td className="px-4 py-2 text-right font-mono text-muted-foreground whitespace-nowrap">
-                          {row.avgCost > 0 ? formatAmount(row.avgCost) : <span className="text-muted-foreground/30">—</span>}
+                          {row.avgCost > 0 ? (
+                            formatAmount(row.avgCost)
+                          ) : (
+                            <span className="text-muted-foreground/30">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-2 text-right font-mono whitespace-nowrap">
                           {row.totalValue > 0 ? (
@@ -318,19 +375,24 @@ export function CombinedStockView({
                   {visibleLocations.map((loc) => {
                     const locTotal = filteredCombinedRows.reduce((s, r) => s + (r.qtyByLocation[loc.id] || 0), 0);
                     return (
-                      <td key={loc.id} className="px-4 py-2.5 text-right font-mono whitespace-nowrap text-muted-foreground">
-                        {locTotal > 0
-                          ? locTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-                          : <span className="opacity-30">—</span>}
+                      <td
+                        key={loc.id}
+                        className="px-4 py-2.5 text-right font-mono whitespace-nowrap text-muted-foreground"
+                      >
+                        {locTotal > 0 ? (
+                          locTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                        ) : (
+                          <span className="opacity-30">—</span>
+                        )}
                       </td>
                     );
                   })}
                   <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap border-l">
-                    {filteredCombinedRows.reduce((s, r) => s + r.totalQty, 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {filteredCombinedRows
+                      .reduce((s, r) => s + r.totalQty, 0)
+                      .toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap text-muted-foreground">
-                    —
-                  </td>
+                  <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap text-muted-foreground">—</td>
                   <td className="px-4 py-2.5 text-right font-mono whitespace-nowrap">
                     {formatAmount(filteredCombinedRows.reduce((s, r) => s + r.totalValue, 0))}
                   </td>

@@ -62,19 +62,17 @@ export function CompanyProvider({ children }: { children: ReactNode }) {
       active: uc.companyActive,
       companyType: uc.companyType || "erp",
     }))
-    .filter((company, index, self) => 
-      index === self.findIndex((c) => c.id === company.id)
-    );
+    .filter((company, index, self) => index === self.findIndex((c) => c.id === company.id));
 
   const invalidateCompanyQueries = () => {
     queryClient.invalidateQueries({
       predicate: (query) => {
         const key = query.queryKey[0];
-        if (typeof key === 'string' && (key.includes('/api/auth') || key.includes('/api/user/companies'))) {
+        if (typeof key === "string" && (key.includes("/api/auth") || key.includes("/api/user/companies"))) {
           return false;
         }
         return true;
-      }
+      },
     });
   };
 

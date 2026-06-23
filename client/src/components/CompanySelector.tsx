@@ -17,8 +17,8 @@ import { enqueueRequest } from "@/lib/offlineQueue";
 type CompanyType = "erp" | "factory" | "properties" | string;
 
 const TYPE_META: Record<string, { color: string; label: string }> = {
-  erp:        { color: "#3b82f6", label: "ERP" },
-  factory:    { color: "#f97316", label: "Factory" },
+  erp: { color: "#3b82f6", label: "ERP" },
+  factory: { color: "#f97316", label: "Factory" },
   properties: { color: "#6366f1", label: "Properties" },
 };
 
@@ -32,15 +32,7 @@ function getInitials(name: string) {
   return (words[0][0] + words[1][0]).toUpperCase();
 }
 
-function CompanyAvatar({
-  name,
-  type,
-  size = "sm",
-}: {
-  name: string;
-  type: CompanyType;
-  size?: "sm" | "md";
-}) {
+function CompanyAvatar({ name, type, size = "sm" }: { name: string; type: CompanyType; size?: "sm" | "md" }) {
   const { color } = getTypeMeta(type);
   const dim = size === "md" ? "h-7 w-7 text-[11px]" : "h-5 w-5 text-[9px]";
   return (
@@ -113,12 +105,7 @@ export function CompanySelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="button-company-selector"
-          className="gap-1.5 pr-2"
-        >
+        <Button variant="outline" size="sm" data-testid="button-company-selector" className="gap-1.5 pr-2">
           {isOnline ? (
             <CompanyAvatar name={selectedCompany.name} type={activeType} />
           ) : (
@@ -168,7 +155,9 @@ export function CompanySelector() {
               <CompanyAvatar name={company.name} type={cType} size="md" />
               <div className="flex flex-col flex-1 min-w-0">
                 <span className="text-sm font-medium leading-tight truncate">{company.name}</span>
-                <span className="text-[10px] leading-tight" style={{ color: `${color}cc` }}>{label}</span>
+                <span className="text-[10px] leading-tight" style={{ color: `${color}cc` }}>
+                  {label}
+                </span>
               </div>
               {isActive && (
                 <span
@@ -176,7 +165,13 @@ export function CompanySelector() {
                   style={{ backgroundColor: color }}
                 >
                   <svg viewBox="0 0 10 10" className="h-2.5 w-2.5" fill="none">
-                    <polyline points="1.5,5 4,7.5 8.5,2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <polyline
+                      points="1.5,5 4,7.5 8.5,2.5"
+                      stroke="white"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </span>
               )}

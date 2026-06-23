@@ -5,7 +5,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { Calendar, Download, Mail, MessageSquare, ChevronDown, RefreshCw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Recipient, ExportSettings, Company, BackupStatus } from "./ExportCenterTypes";
@@ -66,11 +71,7 @@ export function DailyExportTab({
       {/* Backup Status */}
       <div className="grid grid-cols-1 gap-4">
         {backupStatus && (
-          <BackupStatusCard
-            status={backupStatus}
-            onRefresh={refetchBackup}
-            isRefreshing={backupFetching}
-          />
+          <BackupStatusCard status={backupStatus} onRefresh={refetchBackup} isRefreshing={backupFetching} />
         )}
       </div>
 
@@ -78,20 +79,28 @@ export function DailyExportTab({
       <div className="border rounded-md">
         <button
           className="w-full flex items-center justify-between p-4 text-left hover-elevate"
-          onClick={() => setShowCompanies(v => !v)}
+          onClick={() => setShowCompanies((v) => !v)}
           data-testid="button-toggle-companies"
         >
           <span className="font-medium flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             Included Companies
-            <Badge variant="secondary" className="ml-1">{companies.length}</Badge>
+            <Badge variant="secondary" className="ml-1">
+              {companies.length}
+            </Badge>
           </span>
-          {showCompanies ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          {showCompanies ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
         </button>
         {showCompanies && (
           <div className="border-t p-4 flex flex-wrap gap-2 bg-muted/20">
-            {companies.map(c => (
-              <Badge key={c.id} variant="outline" className="bg-background">{c.name}</Badge>
+            {companies.map((c) => (
+              <Badge key={c.id} variant="outline" className="bg-background">
+                {c.name}
+              </Badge>
             ))}
           </div>
         )}
@@ -108,12 +117,30 @@ export function DailyExportTab({
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="space-y-1">
-              <Label className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" />From</Label>
-              <Input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)} className="w-40" data-testid="input-daily-from" />
+              <Label className="text-xs flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                From
+              </Label>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="w-40"
+                data-testid="input-daily-from"
+              />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs flex items-center gap-1"><Calendar className="h-3 w-3" />To</Label>
-              <Input type="date" value={toDate} onChange={e => setToDate(e.target.value)} className="w-40" data-testid="input-daily-to" />
+              <Label className="text-xs flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                To
+              </Label>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="w-40"
+                data-testid="input-daily-to"
+              />
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -127,11 +154,20 @@ export function DailyExportTab({
                 <DropdownMenuItem onClick={() => startExport("download")} data-testid="menu-export-download">
                   <Download className="h-4 w-4 mr-2" /> Download ZIP
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => startExport("email")} disabled={recipients.length === 0 || !settings?.gmailUser} data-testid="menu-export-email">
+                <DropdownMenuItem
+                  onClick={() => startExport("email")}
+                  disabled={recipients.length === 0 || !settings?.gmailUser}
+                  data-testid="menu-export-email"
+                >
                   <Mail className="h-4 w-4 mr-2" /> Send via Email
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={sendViaWhatsApp} disabled={!waReady || sendingWa} data-testid="menu-export-whatsapp">
-                  <MessageSquare className="h-4 w-4 mr-2 text-green-600" /> {sendingWa ? "Sending..." : "Send via WhatsApp"}
+                <DropdownMenuItem
+                  onClick={sendViaWhatsApp}
+                  disabled={!waReady || sendingWa}
+                  data-testid="menu-export-whatsapp"
+                >
+                  <MessageSquare className="h-4 w-4 mr-2 text-green-600" />{" "}
+                  {sendingWa ? "Sending..." : "Send via WhatsApp"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -143,14 +179,18 @@ export function DailyExportTab({
       <div className="border rounded-md">
         <button
           className="w-full flex items-center justify-between p-4 text-left hover-elevate"
-          onClick={() => setShowHistory(v => !v)}
+          onClick={() => setShowHistory((v) => !v)}
           data-testid="button-toggle-history"
         >
           <span className="font-medium flex items-center gap-2">
             <RefreshCw className="h-4 w-4" />
             Recent Runs History
           </span>
-          {showHistory ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          {showHistory ? (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          )}
         </button>
 
         {showHistory && (
@@ -158,7 +198,7 @@ export function DailyExportTab({
             {/* Filter pills */}
             {(backupStatus?.recentRuns ?? []).length > 0 && (
               <div className="flex flex-wrap gap-1.5">
-                {["all", "success", "failed", "running"].map(f => (
+                {["all", "success", "failed", "running"].map((f) => (
                   <button
                     key={f}
                     onClick={() => setHistoryFilter(f)}
@@ -179,7 +219,9 @@ export function DailyExportTab({
               </p>
             ) : (
               <div className="space-y-2">
-                {filteredRuns.map(run => <RunRow key={run.id} run={run} />)}
+                {filteredRuns.map((run) => (
+                  <RunRow key={run.id} run={run} />
+                ))}
               </div>
             )}
           </div>

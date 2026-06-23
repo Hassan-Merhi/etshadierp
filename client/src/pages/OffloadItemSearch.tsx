@@ -57,7 +57,6 @@ export default function OffloadItemSearch() {
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-
       {/* ── Header + Search ── */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
@@ -78,14 +77,8 @@ export default function OffloadItemSearch() {
               data-testid="input-item-search"
             />
           </div>
-          <Button
-            onClick={handleSearch}
-            disabled={!input.trim() || isLoading}
-            data-testid="button-search"
-          >
-            {isLoading
-              ? <Loader2 className="h-4 w-4 animate-spin" />
-              : <Search className="h-4 w-4" />}
+          <Button onClick={handleSearch} disabled={!input.trim() || isLoading} data-testid="button-search">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
             <span className="ml-1.5">Search</span>
           </Button>
         </div>
@@ -97,16 +90,22 @@ export default function OffloadItemSearch() {
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
             <Container className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Containers</span>
-            <span className="font-semibold" data-testid="stat-containers">{uniqueContainers}</span>
+            <span className="font-semibold" data-testid="stat-containers">
+              {uniqueContainers}
+            </span>
           </div>
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
             <Package className="h-4 w-4 text-muted-foreground" />
             <span className="text-muted-foreground">Total Qty</span>
-            <span className="font-semibold" data-testid="stat-qty">{fmtQty(totalQty)} BL</span>
+            <span className="font-semibold" data-testid="stat-qty">
+              {fmtQty(totalQty)} BL
+            </span>
           </div>
           <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm flex items-center gap-2">
             <span className="text-muted-foreground">Total Value</span>
-            <span className="font-semibold" data-testid="stat-value">{fmtMoney(totalValue)}</span>
+            <span className="font-semibold" data-testid="stat-value">
+              {fmtMoney(totalValue)}
+            </span>
           </div>
         </div>
       )}
@@ -114,7 +113,8 @@ export default function OffloadItemSearch() {
       {/* ── Result label ── */}
       {results.length > 0 && (
         <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{results.length}</span> line{results.length !== 1 ? "s" : ""} for &ldquo;{searchTerm}&rdquo;
+          <span className="font-medium text-foreground">{results.length}</span> line{results.length !== 1 ? "s" : ""}{" "}
+          for &ldquo;{searchTerm}&rdquo;
         </p>
       )}
 
@@ -163,18 +163,16 @@ export default function OffloadItemSearch() {
                       {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums">{fmtQty(row.quantity)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
-                      {fmtMoney(row.rate)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium">
-                      {fmtMoney(row.lineTotal)}
-                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{fmtMoney(row.rate)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">{fmtMoney(row.lineTotal)}</td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr className="border-t bg-muted/40">
-                  <td colSpan={3} className="px-4 py-2 text-sm font-medium">Total</td>
+                  <td colSpan={3} className="px-4 py-2 text-sm font-medium">
+                    Total
+                  </td>
                   <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmtQty(totalQty)}</td>
                   <td />
                   <td className="px-4 py-2 text-right tabular-nums font-semibold">{fmtMoney(totalValue)}</td>
@@ -189,11 +187,18 @@ export default function OffloadItemSearch() {
               <div key={i} className="border rounded-xl p-4 space-y-2" data-testid={`card-result-${i}`}>
                 <div className="flex items-start justify-between gap-2">
                   <span className="font-medium text-sm leading-tight">{row.itemName}</span>
-                  <Badge variant="outline" className="font-mono text-xs shrink-0">{row.containerNumber}</Badge>
+                  <Badge variant="outline" className="font-mono text-xs shrink-0">
+                    {row.containerNumber}
+                  </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <div><span className="text-foreground font-medium">Date:</span> {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}</div>
-                  <div><span className="text-foreground font-medium">Qty:</span> {fmtQty(row.quantity)} BL</div>
+                  <div>
+                    <span className="text-foreground font-medium">Date:</span>{" "}
+                    {row.offloadDate ? format(new Date(row.offloadDate), "dd MMM yyyy") : "—"}
+                  </div>
+                  <div>
+                    <span className="text-foreground font-medium">Qty:</span> {fmtQty(row.quantity)} BL
+                  </div>
                 </div>
                 <div className="flex justify-between items-center pt-1 border-t text-sm">
                   <span className="text-muted-foreground">{fmtMoney(row.rate)} / BL</span>
@@ -202,7 +207,9 @@ export default function OffloadItemSearch() {
               </div>
             ))}
             <div className="border rounded-xl px-4 py-3 bg-muted/40 flex justify-between text-sm font-semibold">
-              <span>Total ({uniqueContainers} container{uniqueContainers !== 1 ? "s" : ""})</span>
+              <span>
+                Total ({uniqueContainers} container{uniqueContainers !== 1 ? "s" : ""})
+              </span>
               <span>{fmtMoney(totalValue)}</span>
             </div>
           </div>

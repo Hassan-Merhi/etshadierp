@@ -7,28 +7,13 @@ import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
 import * as XLSX from "xlsx";
 import * as XLSXS from "xlsx-js-style";
 import { excelToFortune } from "@/lib/excelImport";
-import {
-  isExcelMode,
-  type SpreadsheetData,
-  arrayBufferToBase64,
-  syncFortuneToXlsx,
-} from "@/lib/excelSync";
+import { isExcelMode, type SpreadsheetData, arrayBufferToBase64, syncFortuneToXlsx } from "@/lib/excelSync";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import {
-  ArrowLeft,
-  Plus,
-  Upload,
-  Download,
-  FileSpreadsheet,
-  Trash2,
-  Check,
-  Loader2,
-  Pencil,
-} from "lucide-react";
+import { ArrowLeft, Plus, Upload, Download, FileSpreadsheet, Trash2, Check, Loader2, Pencil } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,10 +32,18 @@ import {
 
 // ─── Border style maps (Fortune Sheet number ↔ xlsx-js-style name) ──────────
 const FS_BORDER: Record<string, string> = {
-  "1": "thin",    "2": "hair",          "3": "dotted",
-  "4": "dashed",  "5": "dashDot",       "6": "dashDotDot",
-  "7": "double",  "8": "medium",        "9": "mediumDashed",
-  "10": "mediumDashDot", "11": "mediumDashDotDot", "12": "slantDashDot",
+  "1": "thin",
+  "2": "hair",
+  "3": "dotted",
+  "4": "dashed",
+  "5": "dashDot",
+  "6": "dashDotDot",
+  "7": "double",
+  "8": "medium",
+  "9": "mediumDashed",
+  "10": "mediumDashDot",
+  "11": "mediumDashDotDot",
+  "12": "slantDashDot",
   "13": "thick",
 };
 // ─── Fortune Sheet alignment encoding ───────────────────────────────────────
@@ -58,7 +51,6 @@ const FS_BORDER: Record<string, string> = {
 const FS_HT: Record<string, string> = { "0": "center", "1": "left", "2": "right" };
 // Vertical:   toolbar reveals value: 1=top, 0=middle, 2=bottom
 const FS_VT: Record<string, string> = { "0": "center", "1": "top", "2": "bottom" };
-
 
 // Fortune Sheet's onChange delivers sheets in dense `data` format.
 // When re-opening a saved sheet, convert back to sparse `celldata` so
@@ -98,8 +90,8 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
       const val = v.v ?? v.m;
       const xlCell: any = {
         v: val,
-        t: v.f ? "f" : (typeof val === "number" ? "n" : typeof val === "boolean" ? "b" : "s"),
-        w: v.m !== undefined ? String(v.m) : (val !== undefined ? String(val) : ""),
+        t: v.f ? "f" : typeof val === "number" ? "n" : typeof val === "boolean" ? "b" : "s",
+        w: v.m !== undefined ? String(v.m) : val !== undefined ? String(val) : "",
       };
 
       // Formula: stored without "=" in both SheetJS and Fortune Sheet
@@ -190,12 +182,12 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
       const cMax = Math.max(
         ...Object.keys(cfg.columnlen || {}).map(Number),
         ...Object.keys(cfg.colhidden || {}).map(Number),
-        maxC,
+        maxC
       );
       const xlCols: any[] = Array.from({ length: cMax + 1 }, () => ({}));
       for (const [ci, w] of Object.entries(cfg.columnlen || {})) {
         xlCols[Number(ci)].wpx = w;
-        xlCols[Number(ci)].wch = Math.round((w as number) / 7 * 100) / 100;
+        xlCols[Number(ci)].wch = Math.round(((w as number) / 7) * 100) / 100;
       }
       for (const ci of Object.keys(cfg.colhidden || {})) xlCols[Number(ci)].hidden = true;
       ws["!cols"] = xlCols;
@@ -206,12 +198,12 @@ function fortuneToXlsx(sheets: FortuneSheet[]): any {
       const rMax = Math.max(
         ...Object.keys(cfg.rowlen || {}).map(Number),
         ...Object.keys(cfg.rowhidden || {}).map(Number),
-        maxR,
+        maxR
       );
       const xlRows: any[] = Array.from({ length: rMax + 1 }, () => ({}));
       for (const [ri, h] of Object.entries(cfg.rowlen || {})) {
         xlRows[Number(ri)].hpx = h;
-        xlRows[Number(ri)].hpt = Math.round((h as number) / 1.333 * 100) / 100;
+        xlRows[Number(ri)].hpt = Math.round(((h as number) / 1.333) * 100) / 100;
       }
       for (const ri of Object.keys(cfg.rowhidden || {})) xlRows[Number(ri)].hidden = true;
       ws["!rows"] = xlRows;
@@ -258,17 +250,48 @@ function formatRelativeTime(ts: string | Date): string {
 // Reorder toolbar so merge, colors, borders, conditionFormat, filter are
 // visible before the wide font-name / font-size selectors.
 const TOOLBAR_ITEMS = [
-  "undo", "redo", "|",
-  "bold", "italic", "underline", "strike-through", "|",
-  "font-color", "background", "border", "|",
-  "merge-cell", "|",
-  "horizontal-align", "vertical-align", "text-wrap", "|",
-  "conditionFormat", "filter", "freeze", "|",
-  "font", "|", "font-size", "|",
-  "format-painter", "clear-format", "|",
-  "currency-format", "percentage-format", "number-decrease", "number-increase",
-  "format", "text-rotation", "link", "image", "comment",
-  "quick-formula", "dataVerification", "screenshot", "search",
+  "undo",
+  "redo",
+  "|",
+  "bold",
+  "italic",
+  "underline",
+  "strike-through",
+  "|",
+  "font-color",
+  "background",
+  "border",
+  "|",
+  "merge-cell",
+  "|",
+  "horizontal-align",
+  "vertical-align",
+  "text-wrap",
+  "|",
+  "conditionFormat",
+  "filter",
+  "freeze",
+  "|",
+  "font",
+  "|",
+  "font-size",
+  "|",
+  "format-painter",
+  "clear-format",
+  "|",
+  "currency-format",
+  "percentage-format",
+  "number-decrease",
+  "number-increase",
+  "format",
+  "text-rotation",
+  "link",
+  "image",
+  "comment",
+  "quick-formula",
+  "dataVerification",
+  "screenshot",
+  "search",
 ];
 
 /** Convert 0-based column index to Excel letter(s): 0→A, 25→Z, 26→AA … */
@@ -329,17 +352,14 @@ export default function SpreadsheetEditor() {
       setSheetName(sheet.name);
       setSaveStatus("saved");
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error creating spreadsheet", variant: "destructive" }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Error creating spreadsheet", variant: "destructive" });
+    },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({
-      id,
-      fields,
-    }: {
-      id: number;
-      fields: { name?: string; data?: any };
-    }) => {
+    mutationFn: async ({ id, fields }: { id: number; fields: { name?: string; data?: any } }) => {
       const res = await apiRequest("PATCH", `/api/spreadsheets/${id}`, fields);
       return res.json();
     },
@@ -347,7 +367,10 @@ export default function SpreadsheetEditor() {
       setSaveStatus("saved");
       queryClient.invalidateQueries({ queryKey: ["/api/spreadsheets"], exact: true });
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; setSaveStatus("unsaved"); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      setSaveStatus("unsaved");
+    },
   });
 
   const deleteMutation = useMutation({
@@ -359,7 +382,10 @@ export default function SpreadsheetEditor() {
       if (openSheetId === deleteTarget) setOpenSheetId(null);
       setDeleteTarget(null);
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Error deleting spreadsheet", variant: "destructive" }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Error deleting spreadsheet", variant: "destructive" });
+    },
   });
 
   const scheduleSave = useCallback(
@@ -464,10 +490,7 @@ export default function SpreadsheetEditor() {
         }
         startRow++; // first non-empty row
         const col = indexToColLetter(c);
-        const formula =
-          startRow < r
-            ? `=SUM(${col}${startRow + 1}:${col}${r})`
-            : `=SUM()`;
+        const formula = startRow < r ? `=SUM(${col}${startRow + 1}:${col}${r})` : `=SUM()`;
         hasInteractedRef.current = true;
         workbookRef.current?.setCellValue?.(r, c, formula);
         return;
@@ -654,11 +677,7 @@ export default function SpreadsheetEditor() {
   const initialData: FortuneSheet[] = (() => {
     if (!openedSheet?.data) return defaultBlankSheets();
     const d = openedSheet.data;
-    const sheets = isExcelMode(d)
-      ? d.sheets
-      : Array.isArray(d)
-        ? d
-        : [];
+    const sheets = isExcelMode(d) ? d.sheets : Array.isArray(d) ? d : [];
     return sheets.length > 0 ? sheets.map(ensureCelldata) : defaultBlankSheets();
   })();
 
@@ -708,12 +727,7 @@ export default function SpreadsheetEditor() {
             {saveStatus === "unsaved" && <span>Unsaved changes</span>}
           </div>
           <div className="ml-auto flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDownload}
-              data-testid="button-download-xlsx"
-            >
+            <Button variant="outline" size="sm" onClick={handleDownload} data-testid="button-download-xlsx">
               <Download className="h-4 w-4 mr-1.5" />
               Download .xlsx
             </Button>
@@ -727,7 +741,7 @@ export default function SpreadsheetEditor() {
           onKeyDown={markInteracted}
           onTouchStart={markInteracted}
         >
-          {(sheetLoading || !openedSheet) ? (
+          {sheetLoading || !openedSheet ? (
             <div className="flex items-center justify-center h-full text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin mr-2" />
               Loading spreadsheet…
@@ -831,14 +845,8 @@ export default function SpreadsheetEditor() {
                       <p className="text-sm font-medium truncate" data-testid={`text-sheet-name-${sheet.id}`}>
                         {sheet.name}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {formatRelativeTime(sheet.updatedAt)}
-                      </p>
-                      {sheet.createdBy && (
-                        <p className="text-xs text-muted-foreground truncate">
-                          {sheet.createdBy}
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground mt-0.5">{formatRelativeTime(sheet.updatedAt)}</p>
+                      {sheet.createdBy && <p className="text-xs text-muted-foreground truncate">{sheet.createdBy}</p>}
                     </div>
                   </div>
                   <Button

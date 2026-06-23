@@ -34,33 +34,31 @@ export const PROPERTIES_NAV_SECTIONS: NavSection[] = [
     label: "Rentals",
     color: NAV_COLOR.finance,
     items: [
-      { title: "Properties (Warehouses)", url: "/properties/rental/warehouses", icon: Building2      },
-      { title: "Shops Rented",            url: "/properties/rental/shops",      icon: Store          },
-      { title: "Payments Log",            url: "/properties/rental/payments",   icon: ClipboardList  },
-      { title: "Cash Transfer",           url: "/properties/transfer",          icon: ArrowLeftRight },
+      { title: "Properties (Warehouses)", url: "/properties/rental/warehouses", icon: Building2 },
+      { title: "Shops Rented", url: "/properties/rental/shops", icon: Store },
+      { title: "Payments Log", url: "/properties/rental/payments", icon: ClipboardList },
+      { title: "Cash Transfer", url: "/properties/transfer", icon: ArrowLeftRight },
     ],
   },
   {
     label: "Accounting",
     color: NAV_COLOR.accounting,
     items: [
-      { title: "Accounts",   url: "/properties/accounts",  icon: Landmark  },
-      { title: "Vouchers",   url: "/properties/vouchers",  icon: FileText  },
-      { title: "Analytics",  url: "/properties/analytics", icon: BarChart2 },
+      { title: "Accounts", url: "/properties/accounts", icon: Landmark },
+      { title: "Vouchers", url: "/properties/vouchers", icon: FileText },
+      { title: "Analytics", url: "/properties/analytics", icon: BarChart2 },
     ],
   },
 ];
 
-const PROPERTIES_PINNED_DEFAULTS: NavItem[] = [
-  { title: "Daybook", url: "/properties/daybook", icon: BookOpen },
-];
+const PROPERTIES_PINNED_DEFAULTS: NavItem[] = [{ title: "Daybook", url: "/properties/daybook", icon: BookOpen }];
 
 export function PropertiesSidebar({ user }: { user?: any }) {
   const isAdmin = user?.role === "Admin" || user?.role === "Developer";
 
   const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder(
     "properties-pinned-order",
-    PROPERTIES_PINNED_DEFAULTS,
+    PROPERTIES_PINNED_DEFAULTS
   );
 
   const { openSections, toggleSection } = useOpenSections(PROPERTIES_NAV_SECTIONS, {
@@ -68,11 +66,8 @@ export function PropertiesSidebar({ user }: { user?: any }) {
   });
 
   const allNavItems = useMemo(
-    () => [
-      ...PROPERTIES_PINNED_DEFAULTS,
-      ...PROPERTIES_NAV_SECTIONS.flatMap((s) => s.items),
-    ],
-    [],
+    () => [...PROPERTIES_PINNED_DEFAULTS, ...PROPERTIES_NAV_SECTIONS.flatMap((s) => s.items)],
+    []
   );
   const { selectedCompany } = useCompany();
   const recentItems = useRecentNav(allNavItems, selectedCompany?.id);
@@ -89,12 +84,7 @@ export function PropertiesSidebar({ user }: { user?: any }) {
       />
 
       <SidebarContent className="px-3 py-2 overflow-y-auto">
-        <PinnedNavList
-          items={pinnedItems}
-          color={NAV_COLOR.pinned}
-          onReorder={reorderPinned}
-          testIdFor={testIdFor}
-        />
+        <PinnedNavList items={pinnedItems} color={NAV_COLOR.pinned} onReorder={reorderPinned} testIdFor={testIdFor} />
 
         <div className="space-y-1">
           {PROPERTIES_NAV_SECTIONS.map((section) => (
@@ -129,9 +119,19 @@ export function PropertiesSidebar({ user }: { user?: any }) {
         )}
 
         <div className="mt-4 pt-3 border-t border-sidebar-border/60 space-y-0.5">
-          <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-properties-my-settings" />
+          <SidebarFlatLink
+            href="/my-settings"
+            icon={KeyRound}
+            label="My Settings"
+            testId="link-properties-my-settings"
+          />
           {isAdmin && (
-            <SidebarFlatLink href="/properties/settings" icon={Settings} label="Settings" testId="link-properties-settings" />
+            <SidebarFlatLink
+              href="/properties/settings"
+              icon={Settings}
+              label="Settings"
+              testId="link-properties-settings"
+            />
           )}
         </div>
       </SidebarContent>

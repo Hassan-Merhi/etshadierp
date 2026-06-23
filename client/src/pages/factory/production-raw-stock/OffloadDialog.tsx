@@ -1,7 +1,14 @@
 import { useState, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,7 +43,7 @@ export function OffloadDialog({
   mixBatches,
 }: OffloadDialogProps) {
   const { toast } = useToast();
-  const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [offloadDate, setOffloadDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [offloadDestination, setOffloadDestination] = useState("");
   const [selectedContainerId, setSelectedContainerId] = useState("");
   const [actualReceivedKg, setActualReceivedKg] = useState("");
@@ -104,7 +111,9 @@ export function OffloadDialog({
       setCommissionRate(String(commAmt));
       setCommissionFromContainer(true);
       setContainerCommissionCcy(container.commissionCurrencyCode || ccy);
-      const broker = container.commissionSupplierId ? factorySuppliers?.find((s: any) => s.id === container.commissionSupplierId) : null;
+      const broker = container.commissionSupplierId
+        ? factorySuppliers?.find((s: any) => s.id === container.commissionSupplierId)
+        : null;
       setCommissionPersonName(broker?.name || "Commission");
     }
   };
@@ -117,7 +126,7 @@ export function OffloadDialog({
 
   const handleSubmit = () => {
     if (!selectedContainerId) return;
-    const dutyStatus = dutyPending ? "PENDING" : (parseFloat(dutyAmount || "0") > 0 ? "CONFIRMED" : "NONE");
+    const dutyStatus = dutyPending ? "PENDING" : parseFloat(dutyAmount || "0") > 0 ? "CONFIRMED" : "NONE";
     const fxRate = parseFloat(fxRateToUsd || "1");
 
     const payload: any = {
@@ -131,13 +140,26 @@ export function OffloadDialog({
       freight: freight || "0",
       freightCurrencyCode,
       freightFxRate,
-      ...((() => { const p = parseAccountValue(freightAccountId); return p?.type === "supplier" ? { freightSupplierId: p.id } : { freightAccountId: p?.id ?? null }; })()),
-      ...((() => {
+      ...(() => {
+        const p = parseAccountValue(freightAccountId);
+        return p?.type === "supplier" ? { freightSupplierId: p.id } : { freightAccountId: p?.id ?? null };
+      })(),
+      ...(() => {
         const p = parseAccountValue(otherChargesAccountId);
-        return p?.type === "supplier" 
-          ? { otherChargesSupplierId: p.id, otherCharges: otherCharges || "0", otherChargesCurrencyCode, otherChargesFxRate }
-          : { otherChargesAccountId: p?.id ?? null, otherCharges: otherCharges || "0", otherChargesCurrencyCode, otherChargesFxRate };
-      })()),
+        return p?.type === "supplier"
+          ? {
+              otherChargesSupplierId: p.id,
+              otherCharges: otherCharges || "0",
+              otherChargesCurrencyCode,
+              otherChargesFxRate,
+            }
+          : {
+              otherChargesAccountId: p?.id ?? null,
+              otherCharges: otherCharges || "0",
+              otherChargesCurrencyCode,
+              otherChargesFxRate,
+            };
+      })(),
       dutyAmount: (() => {
         const rawAmt = parseFloat(dutyAmount || "0");
         if (rawAmt === 0) return "0";
@@ -147,20 +169,24 @@ export function OffloadDialog({
       dutyAccountId: dutyAccountId ? parseInt(dutyAccountId) : null,
       dutyStatus,
       dutyNotes: dutyNotes || null,
-      additionalCharges: additionalCharges.filter(c => parseFloat(c.amount || "0") > 0).map(c => {
-        const p = parseAccountValue(c.ledgerAccountId);
-        return {
-          description: c.description || "Additional Charge",
-          amount: c.amount,
-          currencyCode: c.currencyCode || "USD",
-          ledgerAccountId: p?.type === "ledger" ? p.id : null,
-          supplierId: p?.type === "supplier" ? p.id : null,
-        };
-      }),
-      mixBatchAllocations: mixBatchAllocations.filter(a => a.mixBatchId && parseFloat(a.weightKg || "0") > 0).map(a => ({
-        mixBatchId: parseInt(a.mixBatchId),
-        weightKg: a.weightKg,
-      })),
+      additionalCharges: additionalCharges
+        .filter((c) => parseFloat(c.amount || "0") > 0)
+        .map((c) => {
+          const p = parseAccountValue(c.ledgerAccountId);
+          return {
+            description: c.description || "Additional Charge",
+            amount: c.amount,
+            currencyCode: c.currencyCode || "USD",
+            ledgerAccountId: p?.type === "ledger" ? p.id : null,
+            supplierId: p?.type === "supplier" ? p.id : null,
+          };
+        }),
+      mixBatchAllocations: mixBatchAllocations
+        .filter((a) => a.mixBatchId && parseFloat(a.weightKg || "0") > 0)
+        .map((a) => ({
+          mixBatchId: parseInt(a.mixBatchId),
+          weightKg: a.weightKg,
+        })),
     };
 
     if (commissionPersonName.trim() && parseFloat(commissionRate || "0") > 0) {
@@ -194,9 +220,11 @@ export function OffloadDialog({
             <div className="space-y-2">
               <Label>Select Container</Label>
               <Select value={selectedContainerId} onValueChange={handleContainerSelect}>
-                <SelectTrigger><SelectValue placeholder="Select container..." /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select container..." />
+                </SelectTrigger>
                 <SelectContent>
-                  {availableContainers?.map(c => (
+                  {availableContainers?.map((c) => (
                     <SelectItem key={c.id} value={c.id.toString()}>
                       {c.containerNumber} ({c.totalKg} kg — {c.supplierName})
                     </SelectItem>
@@ -206,18 +234,30 @@ export function OffloadDialog({
             </div>
             <div className="space-y-2">
               <Label>Offload Date</Label>
-              <Input type="date" value={offloadDate} onChange={e => setOffloadDate(e.target.value)} />
+              <Input type="date" value={offloadDate} onChange={(e) => setOffloadDate(e.target.value)} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Received Weight (KG)</Label>
-              <Input type="number" step="0.001" value={actualReceivedKg} onChange={e => setActualReceivedKg(e.target.value)} placeholder="0.000" />
+              <Input
+                type="number"
+                step="0.001"
+                value={actualReceivedKg}
+                onChange={(e) => setActualReceivedKg(e.target.value)}
+                placeholder="0.000"
+              />
             </div>
             <div className="space-y-2">
               <Label>Base Cost per KG ({currencyCode})</Label>
-              <Input type="number" step="0.0001" value={costPerKg} onChange={e => setCostPerKg(e.target.value)} placeholder="0.0000" />
+              <Input
+                type="number"
+                step="0.0001"
+                value={costPerKg}
+                onChange={(e) => setCostPerKg(e.target.value)}
+                placeholder="0.0000"
+              />
             </div>
           </div>
 
@@ -227,16 +267,22 @@ export function OffloadDialog({
               <h3 className="font-semibold text-sm">Freight & Other Charges</h3>
               <div className="space-y-2">
                 <Label>Freight Cost ({freightCurrencyCode})</Label>
-                <Input type="number" step="0.01" value={freight} onChange={e => setFreight(e.target.value)} disabled={freightFromContainer} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={freight}
+                  onChange={(e) => setFreight(e.target.value)}
+                  disabled={freightFromContainer}
+                />
               </div>
               <div className="space-y-2">
                 <Label>Freight Account</Label>
-                <AccountCombobox 
-                    value={freightAccountId} 
-                    onChange={setFreightAccountId} 
-                    ledgerAccounts={ledgerAccounts} 
-                    factorySuppliers={factorySuppliers} 
-                    disabled={freightFromContainer} 
+                <AccountCombobox
+                  value={freightAccountId}
+                  onChange={setFreightAccountId}
+                  ledgerAccounts={ledgerAccounts}
+                  factorySuppliers={factorySuppliers}
+                  disabled={freightFromContainer}
                 />
               </div>
             </div>
@@ -245,7 +291,7 @@ export function OffloadDialog({
               <h3 className="font-semibold text-sm">Duty Details</h3>
               <div className="space-y-2">
                 <Label>Duty Amount (USD)</Label>
-                <Input type="number" step="0.01" value={dutyAmount} onChange={e => setDutyAmount(e.target.value)} />
+                <Input type="number" step="0.01" value={dutyAmount} onChange={(e) => setDutyAmount(e.target.value)} />
               </div>
               <div className="flex items-center space-x-2">
                 <Switch checked={dutyPending} onCheckedChange={setDutyPending} />
@@ -255,8 +301,13 @@ export function OffloadDialog({
           </div>
 
           <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={() => wrapAdminAction(handleSubmit, "Offload Container")} disabled={offloadMutation.isPending || !selectedContainerId}>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(handleSubmit, "Offload Container")}
+              disabled={offloadMutation.isPending || !selectedContainerId}
+            >
               {offloadMutation.isPending ? "Offloading..." : "Confirm Offload"}
             </Button>
           </div>

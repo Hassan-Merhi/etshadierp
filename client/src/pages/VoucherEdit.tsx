@@ -19,14 +19,14 @@ import { ArrowLeft } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 
 // Sub-components
-import { 
-  VoucherData, 
-  BankAccount, 
-  LedgerAccount, 
-  Supplier, 
-  StockItem, 
+import {
+  VoucherData,
+  BankAccount,
+  LedgerAccount,
+  Supplier,
+  StockItem,
   Location,
-  focusByTestId 
+  focusByTestId,
 } from "./voucher-edit/VoucherEditHelpers";
 import { PaymentReceiptEditForm } from "./voucher-edit/PaymentReceiptEditForm";
 import { JournalEditForm } from "./voucher-edit/JournalEditForm";
@@ -46,16 +46,16 @@ import {
   SalesFormData,
   PurchaseFormData,
   AdjustmentFormData,
-  TransferFormData
+  TransferFormData,
 } from "./voucher-edit/VoucherEditSchemas";
 
-import { 
-  preparePaymentReceiptData, 
-  prepareJournalData, 
-  prepareSalesData, 
-  preparePurchaseData, 
-  prepareAdjustmentData, 
-  prepareTransferData 
+import {
+  preparePaymentReceiptData,
+  prepareJournalData,
+  prepareSalesData,
+  preparePurchaseData,
+  prepareAdjustmentData,
+  prepareTransferData,
 } from "./voucher-edit/VoucherSubmitHelpers";
 
 import { useAccountsWithBalances, AccountWithBalance } from "./voucher-edit/VoucherAccountHelpers";
@@ -81,7 +81,11 @@ export default function VoucherEdit() {
     setFormInitialized(false);
   }, [id]);
 
-  const { data: voucher, isLoading: voucherLoading, error: voucherError } = useQuery<VoucherData>({
+  const {
+    data: voucher,
+    isLoading: voucherLoading,
+    error: voucherError,
+  } = useQuery<VoucherData>({
     queryKey: [`/api/vouchers/${id}`],
     enabled: !!id,
   });
@@ -148,13 +152,7 @@ export default function VoucherEdit() {
     balanceAdjustments
   );
 
-  useBalanceAdjustments(
-    isPaymentOrReceipt,
-    paymentForm,
-    voucherType,
-    exchangeRate,
-    setBalanceAdjustments
-  );
+  useBalanceAdjustments(isPaymentOrReceipt, paymentForm, voucherType, exchangeRate, setBalanceAdjustments);
 
   const journalForm = useForm<JournalFormData>({
     resolver: zodResolver(journalFormSchema),
@@ -240,10 +238,10 @@ export default function VoucherEdit() {
       queryClient.invalidateQueries({ queryKey: [`/api/vouchers/${id}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
-      queryClient.invalidateQueries({ predicate: keyStartsWith('/api/accounts/') });
-      queryClient.invalidateQueries({ predicate: keyStartsWith('/api/factory/customers/') });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/accounts/") });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customers/") });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customers"] });
-      queryClient.invalidateQueries({ predicate: keyStartsWith('/api/factory/customer-orders') });
+      queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       toast({ title: "Success", description: "Voucher updated successfully" });
       handleBack();
     },
@@ -265,7 +263,11 @@ export default function VoucherEdit() {
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
-      toast({ title: "Error", description: error.message || "Failed to update optional status", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update optional status",
+        variant: "destructive",
+      });
     },
   });
 
@@ -311,7 +313,11 @@ export default function VoucherEdit() {
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
-      toast({ title: "Error", description: error.message || "Failed to update purchase voucher", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update purchase voucher",
+        variant: "destructive",
+      });
     },
   });
 
@@ -334,7 +340,11 @@ export default function VoucherEdit() {
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
-      toast({ title: "Error", description: error.message || "Failed to update adjustment voucher", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update adjustment voucher",
+        variant: "destructive",
+      });
     },
   });
 
@@ -357,7 +367,11 @@ export default function VoucherEdit() {
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
-      toast({ title: "Error", description: error.message || "Failed to update stock transfer voucher", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update stock transfer voucher",
+        variant: "destructive",
+      });
     },
   });
 
@@ -371,29 +385,165 @@ export default function VoucherEdit() {
     updateMutation.mutate({ voucherUpdates, entries });
   };
 
-  if (voucherLoading) return <div className="space-y-6"><div className="flex items-center gap-4"><Skeleton className="h-8 w-8" /><Skeleton className="h-8 w-64" /></div><Skeleton className="h-[400px] w-full" /></div>;
-  if (voucherError || !voucher) return <div className="space-y-6"><div className="flex items-center gap-4"><Button variant="ghost" size="icon" onClick={() => handleBack()}><ArrowLeft className="h-4 w-4" /></Button><PageHeader title="Edit Voucher" /></div><div className="text-center py-8">Voucher not found</div></div>;
+  if (voucherLoading)
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-8 w-8" />
+          <Skeleton className="h-8 w-64" />
+        </div>
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
+  if (voucherError || !voucher)
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => handleBack()}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <PageHeader title="Edit Voucher" />
+        </div>
+        <div className="text-center py-8">Voucher not found</div>
+      </div>
+    );
 
-  const paymentTotal = isPaymentOrReceipt ? paymentForm.watch("entries").reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0) : 0;
-  const journalDRTotal = isJournal ? journalForm.watch("entries").filter(e => e.type === "DR").reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0) : 0;
-  const journalCRTotal = isJournal ? journalForm.watch("entries").filter(e => e.type === "CR").reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0) : 0;
+  const paymentTotal = isPaymentOrReceipt
+    ? paymentForm.watch("entries").reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0)
+    : 0;
+  const journalDRTotal = isJournal
+    ? journalForm
+        .watch("entries")
+        .filter((e) => e.type === "DR")
+        .reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0)
+    : 0;
+  const journalCRTotal = isJournal
+    ? journalForm
+        .watch("entries")
+        .filter((e) => e.type === "CR")
+        .reduce((sum, entry) => sum + (parseFloat(entry.amount) || 0), 0)
+    : 0;
 
   const renderForm = () => {
-    if (isPaymentOrReceipt) return <PaymentReceiptEditForm form={paymentForm} voucherType={voucherType!} onSubmit={onSubmitPaymentReceipt} onCancel={handleBack} isPending={updateMutation.isPending} allAccountsWithBalances={allAccountsWithBalances} formatDisplayDate={formatDisplayDate} formatAmount={formatAmount} total={paymentTotal} focusByTestId={focusByTestId} />;
-    if (isJournal) return <JournalEditForm form={journalForm} onSubmit={onSubmitJournal} onCancel={handleBack} isPending={updateMutation.isPending} allAccountsWithBalances={allAccountsWithBalances} formatDisplayDate={formatDisplayDate} formatAmount={formatAmount} drTotal={journalDRTotal} crTotal={journalCRTotal} focusByTestId={focusByTestId} />;
-    if (isPurchase) return <PurchaseEditForm form={purchaseForm} voucher={voucher} onSubmit={updatePurchaseMutation.mutate} onCancel={handleBack} onToggleOptional={toggleOptionalMutation.mutate} isPending={updatePurchaseMutation.isPending} isTogglingOptional={toggleOptionalMutation.isPending} stockItems={stockItems} formatDisplayDate={formatDisplayDate} formatAmount={formatAmount} grandTotal={purchaseForm.watch("items").reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0)), 0)} />;
-    if (isSales) return <SalesEditForm form={salesForm} voucher={voucher} onSubmit={updateSalesMutation.mutate} onCancel={handleBack} onToggleOptional={toggleOptionalMutation.mutate} isPending={updateSalesMutation.isPending} isTogglingOptional={toggleOptionalMutation.isPending} stockItems={stockItems} locations={locations} formatDisplayDate={formatDisplayDate} formatAmount={formatAmount} grandTotal={salesForm.watch("items").reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.sellingPrice) || 0)), 0)} />;
-    if (isConsumption) return <AdjustmentEditForm form={adjustmentForm} voucher={voucher} onSubmit={updateAdjustmentMutation.mutate} onCancel={handleBack} onToggleOptional={toggleOptionalMutation.mutate} isPending={updateAdjustmentMutation.isPending} isTogglingOptional={toggleOptionalMutation.isPending} stockItems={stockItems} locations={locations} formatDisplayDate={formatDisplayDate} formatAmount={formatAmount} grandTotal={adjustmentForm.watch("items").reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0)), 0)} voucherType={voucherType!} />;
-    if (isStockTransfer) return <TransferEditForm form={transferForm} voucher={voucher} onSubmit={updateTransferMutation.mutate} onCancel={handleBack} onToggleOptional={toggleOptionalMutation.mutate} isPending={updateTransferMutation.isPending} isTogglingOptional={toggleOptionalMutation.isPending} stockItems={stockItems} locations={locations} formatDisplayDate={formatDisplayDate} formatAmount={formatAmount} grandTotal={transferForm.watch("items").reduce((sum, item) => sum + ((parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0)), 0)} />;
+    if (isPaymentOrReceipt)
+      return (
+        <PaymentReceiptEditForm
+          form={paymentForm}
+          voucherType={voucherType!}
+          onSubmit={onSubmitPaymentReceipt}
+          onCancel={handleBack}
+          isPending={updateMutation.isPending}
+          allAccountsWithBalances={allAccountsWithBalances}
+          formatDisplayDate={formatDisplayDate}
+          formatAmount={formatAmount}
+          total={paymentTotal}
+          focusByTestId={focusByTestId}
+        />
+      );
+    if (isJournal)
+      return (
+        <JournalEditForm
+          form={journalForm}
+          onSubmit={onSubmitJournal}
+          onCancel={handleBack}
+          isPending={updateMutation.isPending}
+          allAccountsWithBalances={allAccountsWithBalances}
+          formatDisplayDate={formatDisplayDate}
+          formatAmount={formatAmount}
+          drTotal={journalDRTotal}
+          crTotal={journalCRTotal}
+          focusByTestId={focusByTestId}
+        />
+      );
+    if (isPurchase)
+      return (
+        <PurchaseEditForm
+          form={purchaseForm}
+          voucher={voucher}
+          onSubmit={updatePurchaseMutation.mutate}
+          onCancel={handleBack}
+          onToggleOptional={toggleOptionalMutation.mutate}
+          isPending={updatePurchaseMutation.isPending}
+          isTogglingOptional={toggleOptionalMutation.isPending}
+          stockItems={stockItems}
+          formatDisplayDate={formatDisplayDate}
+          formatAmount={formatAmount}
+          grandTotal={purchaseForm
+            .watch("items")
+            .reduce((sum, item) => sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0), 0)}
+        />
+      );
+    if (isSales)
+      return (
+        <SalesEditForm
+          form={salesForm}
+          voucher={voucher}
+          onSubmit={updateSalesMutation.mutate}
+          onCancel={handleBack}
+          onToggleOptional={toggleOptionalMutation.mutate}
+          isPending={updateSalesMutation.isPending}
+          isTogglingOptional={toggleOptionalMutation.isPending}
+          stockItems={stockItems}
+          locations={locations}
+          formatDisplayDate={formatDisplayDate}
+          formatAmount={formatAmount}
+          grandTotal={salesForm
+            .watch("items")
+            .reduce((sum, item) => sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.sellingPrice) || 0), 0)}
+        />
+      );
+    if (isConsumption)
+      return (
+        <AdjustmentEditForm
+          form={adjustmentForm}
+          voucher={voucher}
+          onSubmit={updateAdjustmentMutation.mutate}
+          onCancel={handleBack}
+          onToggleOptional={toggleOptionalMutation.mutate}
+          isPending={updateAdjustmentMutation.isPending}
+          isTogglingOptional={toggleOptionalMutation.isPending}
+          stockItems={stockItems}
+          locations={locations}
+          formatDisplayDate={formatDisplayDate}
+          formatAmount={formatAmount}
+          grandTotal={adjustmentForm
+            .watch("items")
+            .reduce((sum, item) => sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0), 0)}
+          voucherType={voucherType!}
+        />
+      );
+    if (isStockTransfer)
+      return (
+        <TransferEditForm
+          form={transferForm}
+          voucher={voucher}
+          onSubmit={updateTransferMutation.mutate}
+          onCancel={handleBack}
+          onToggleOptional={toggleOptionalMutation.mutate}
+          isPending={updateTransferMutation.isPending}
+          isTogglingOptional={toggleOptionalMutation.isPending}
+          stockItems={stockItems}
+          locations={locations}
+          formatDisplayDate={formatDisplayDate}
+          formatAmount={formatAmount}
+          grandTotal={transferForm
+            .watch("items")
+            .reduce((sum, item) => sum + (parseFloat(item.quantity) || 0) * (parseFloat(item.rate) || 0), 0)}
+        />
+      );
     return <div className="text-center py-8">Unsupported Voucher Type: {voucherType}</div>;
   };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => handleBack()} data-testid="button-back"><ArrowLeft className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon" onClick={() => handleBack()} data-testid="button-back">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
         <div>
-          <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">Edit {voucherType} Voucher</h1>
+          <h1 className="text-xl md:text-3xl font-bold" data-testid="text-page-title">
+            Edit {voucherType} Voucher
+          </h1>
           <p className="text-muted-foreground mt-1">Voucher #{voucher.voucherNumber}</p>
         </div>
       </div>

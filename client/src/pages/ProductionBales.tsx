@@ -3,21 +3,34 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  CheckCircle, Trash2, Package, ScanLine, AlertCircle,
-  XCircle, AlertTriangle, Printer, ArrowLeft, Hash, Scale, Calendar, PlusCircle, Info
+  CheckCircle,
+  Trash2,
+  Package,
+  ScanLine,
+  AlertCircle,
+  XCircle,
+  AlertTriangle,
+  Printer,
+  ArrowLeft,
+  Hash,
+  Scale,
+  Calendar,
+  PlusCircle,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -28,20 +41,22 @@ import { useEscapeBack } from "@/hooks/use-escape-back";
 import { CreateMixBatchDialog } from "@/components/CreateMixBatchDialog";
 
 function formatLabelNum(val: string | number): string {
-  const n = typeof val === 'string' ? parseFloat(val) : val;
+  const n = typeof val === "string" ? parseFloat(val) : val;
   if (isNaN(n)) return String(val);
   return n % 1 === 0 ? n.toFixed(0) : parseFloat(n.toFixed(3)).toString();
 }
 
-function generateFinalLabelHtml(labels: Array<{
-  referenceNumber: string;
-  articleCode: string;
-  pieces: number;
-  approxWeightKg: string;
-  productName: string;
-  locationName?: string;
-}>) {
-  let labelsHtml = '';
+function generateFinalLabelHtml(
+  labels: Array<{
+    referenceNumber: string;
+    articleCode: string;
+    pieces: number;
+    approxWeightKg: string;
+    productName: string;
+    locationName?: string;
+  }>
+) {
+  let labelsHtml = "";
   for (const label of labels) {
     labelsHtml += `
       <div class="page-container">
@@ -136,7 +151,10 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
 
     try {
       const excludeParam = scannedBaleIds.size > 0 ? `&excludeIds=${Array.from(scannedBaleIds).join(",")}` : "";
-      const response = await apiRequest("GET", `/api/factory/bales/lookup/${encodeURIComponent(value.trim())}?batchId=${batch.id}${excludeParam}`);
+      const response = await apiRequest(
+        "GET",
+        `/api/factory/bales/lookup/${encodeURIComponent(value.trim())}?batchId=${batch.id}${excludeParam}`
+      );
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.message || "Bale not found");
@@ -273,7 +291,11 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
             toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
           }
         } else {
-          toast({ title: "Warning", description: "Finalized but could not generate new labels", variant: "destructive" });
+          toast({
+            title: "Warning",
+            description: "Finalized but could not generate new labels",
+            variant: "destructive",
+          });
         }
       } catch {
         toast({ title: "Warning", description: "Finalized but label printing failed", variant: "destructive" });
@@ -326,7 +348,9 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {batch.status === "PARTIALLY_FINALIZED" && (
-            <Badge variant="outline" className="text-xs">Partially Finalized</Badge>
+            <Badge variant="outline" className="text-xs">
+              Partially Finalized
+            </Badge>
           )}
           {hasScanned && (
             <Badge variant={countsMatch ? "default" : "secondary"} data-testid="badge-scan-count">
@@ -347,7 +371,10 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
               <Input
                 ref={scanRef}
                 value={scanInput}
-                onChange={(e) => { setScanInput(e.target.value); setScanError(""); }}
+                onChange={(e) => {
+                  setScanInput(e.target.value);
+                  setScanError("");
+                }}
                 onKeyDown={handleScanKeyDown}
                 placeholder="Scan barcode..."
                 autoFocus
@@ -396,7 +423,9 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-sm">{bale.referenceNumber}</TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">{bale.articleCode || "-"}</TableCell>
+                      <TableCell className="font-mono text-sm text-muted-foreground">
+                        {bale.articleCode || "-"}
+                      </TableCell>
                       <TableCell>{bale.productName || "-"}</TableCell>
                       <TableCell className="text-right font-mono tabular-nums">
                         {formatNumber(parseFloat(bale.weightKg || "0"))}
@@ -451,14 +480,20 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
                         );
                       })
                     ) : (
-                      <SelectItem value="none" disabled>No active batches — create one above</SelectItem>
+                      <SelectItem value="none" disabled>
+                        No active batches — create one above
+                      </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
                 {selectedMixBatch ? (
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Remaining: {formatNumber(mixBatchRemaining)} kg |
-                    Will consume: <span className={totalScannedWeight > mixBatchRemaining + 0.001 ? "text-destructive font-medium" : ""}>{formatNumber(totalScannedWeight)} kg</span>
+                    Remaining: {formatNumber(mixBatchRemaining)} kg | Will consume:{" "}
+                    <span
+                      className={totalScannedWeight > mixBatchRemaining + 0.001 ? "text-destructive font-medium" : ""}
+                    >
+                      {formatNumber(totalScannedWeight)} kg
+                    </span>
                   </div>
                 ) : (
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -487,7 +522,14 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-4 text-sm">
                 <span>
-                  Scanned: <span className={`font-bold ${countsMatch ? "text-green-600" : hasScanned ? "text-amber-500" : ""}`} data-testid="text-scanned-count">{scannedCount}</span> / <span data-testid="text-expected-count">{expectedCount}</span>
+                  Scanned:{" "}
+                  <span
+                    className={`font-bold ${countsMatch ? "text-green-600" : hasScanned ? "text-amber-500" : ""}`}
+                    data-testid="text-scanned-count"
+                  >
+                    {scannedCount}
+                  </span>{" "}
+                  / <span data-testid="text-expected-count">{expectedCount}</span>
                 </span>
                 {missingBales.length > 0 && hasScanned && (
                   <span className="text-amber-500 flex items-center gap-1">
@@ -519,14 +561,11 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
       <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {countsMatch ? "Confirm Finalization" : "Finalize with Missing Bales?"}
-            </DialogTitle>
+            <DialogTitle>{countsMatch ? "Confirm Finalization" : "Finalize with Missing Bales?"}</DialogTitle>
             <DialogDescription>
               {countsMatch
                 ? `All ${scannedCount} bales have been verified. Ready to finalize and print labels.`
-                : `${scannedCount} of ${expectedCount} bales scanned. ${missingBales.length} bale(s) are missing.`
-              }
+                : `${scannedCount} of ${expectedCount} bales scanned. ${missingBales.length} bale(s) are missing.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -550,7 +589,9 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
                       <TableRow key={bale.id}>
                         <TableCell className="font-mono text-sm">{bale.referenceNumber}</TableCell>
                         <TableCell className="text-sm">{bale.productName || "-"}</TableCell>
-                        <TableCell className="text-right font-mono text-sm">{formatNumber(parseFloat(bale.weightKg || "0"))} kg</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {formatNumber(parseFloat(bale.weightKg || "0"))} kg
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -563,9 +604,19 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
           )}
 
           <div className="text-sm space-y-1">
-            <p>Location: <span className="font-medium">{selectedLocationName ? `${selectedLocationName.code} - ${selectedLocationName.name}` : "-"}</span></p>
-            <p>Daily Usage Batch: <span className="font-medium">{selectedMixBatch?.name || selectedMixBatch?.batchCode || "-"}</span></p>
-            <p>Weight to consume: <span className="font-medium">{formatNumber(totalScannedWeight)} kg</span></p>
+            <p>
+              Location:{" "}
+              <span className="font-medium">
+                {selectedLocationName ? `${selectedLocationName.code} - ${selectedLocationName.name}` : "-"}
+              </span>
+            </p>
+            <p>
+              Daily Usage Batch:{" "}
+              <span className="font-medium">{selectedMixBatch?.name || selectedMixBatch?.batchCode || "-"}</span>
+            </p>
+            <p>
+              Weight to consume: <span className="font-medium">{formatNumber(totalScannedWeight)} kg</span>
+            </p>
           </div>
 
           <DialogFooter className="gap-2">
@@ -577,7 +628,9 @@ function BatchDetailView({ batch, onBack }: { batch: any; onBack: () => void }) 
               disabled={finalizeMutation.isPending}
               data-testid="button-confirm-finalize"
             >
-              {finalizeMutation.isPending ? "Finalizing..." : (
+              {finalizeMutation.isPending ? (
+                "Finalizing..."
+              ) : (
                 <>
                   <Printer className="h-4 w-4 mr-2" />
                   {countsMatch ? "Finalize & Print Labels" : `Finalize ${scannedCount} Bales & Print`}
@@ -624,12 +677,7 @@ export default function ProductionBales() {
   }
 
   if (selectedBatch) {
-    return (
-      <BatchDetailView
-        batch={selectedBatch}
-        onBack={() => setSelectedBatchId(null)}
-      />
-    );
+    return <BatchDetailView batch={selectedBatch} onBack={() => setSelectedBatchId(null)} />;
   }
 
   return (
@@ -689,7 +737,9 @@ export default function ProductionBales() {
                           </Badge>
                         )}
                         {batch.status === "PARTIALLY_FINALIZED" && (
-                          <Badge variant="outline" className="text-xs">Partial</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            Partial
+                          </Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">

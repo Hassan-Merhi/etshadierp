@@ -1,10 +1,4 @@
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle 
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,10 +26,15 @@ export function WorkerDeductionDialog({
   setReason,
   date,
   setDate,
-  mutation
+  mutation,
 }: WorkerDeductionDialogProps) {
   return (
-    <Dialog open={!!target} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open={!!target}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent data-testid="dialog-worker-deduction">
         <DialogHeader>
           <DialogTitle>Add Deduction</DialogTitle>

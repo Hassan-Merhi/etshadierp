@@ -70,7 +70,11 @@ export function ImportBalesTab() {
         }
 
         if (headerRowIdx === -1) {
-          toast({ title: "Error", description: "Could not find header row with 'ITEM NAME' column", variant: "destructive" });
+          toast({
+            title: "Error",
+            description: "Could not find header row with 'ITEM NAME' column",
+            variant: "destructive",
+          });
           return;
         }
 
@@ -80,7 +84,9 @@ export function ImportBalesTab() {
         const barcodeIdx = headers.findIndex((h) => h.includes("BARCODE"));
         const qtyIdx = headers.findIndex((h) => h.includes("QUANTITY"));
         const dateIdx = headers.findIndex((h) => h.includes("PRODUCTION DATE"));
-        const refIdx = headers.findIndex((h) => h.includes("REF NUMBER") || h === "REF" || h === "REF CODE" || h === "REFERENCE");
+        const refIdx = headers.findIndex(
+          (h) => h.includes("REF NUMBER") || h === "REF" || h === "REF CODE" || h === "REFERENCE"
+        );
 
         const parseExcelDate = (val: any): string => {
           if (!val && val !== 0) return "";
@@ -128,7 +134,11 @@ export function ImportBalesTab() {
         setImportRows(rows);
         toast({ title: "File Parsed", description: `Found ${rows.length} bale(s) to import` });
       } catch (err: any) {
-        toast({ title: "Parse Error", description: err.message || "Failed to parse Excel file", variant: "destructive" });
+        toast({
+          title: "Parse Error",
+          description: err.message || "Failed to parse Excel file",
+          variant: "destructive",
+        });
       }
     };
     reader.readAsArrayBuffer(file);
@@ -150,7 +160,10 @@ export function ImportBalesTab() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
-      toast({ title: "Import Complete", description: `${result.imported || importRows.length} bale(s) imported successfully` });
+      toast({
+        title: "Import Complete",
+        description: `${result.imported || importRows.length} bale(s) imported successfully`,
+      });
       setImportRows([]);
       setFileName("");
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -189,19 +202,11 @@ export function ImportBalesTab() {
               className="hidden"
               data-testid="input-import-file"
             />
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              data-testid="button-upload-excel"
-            >
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-upload-excel">
               <Upload className="h-4 w-4 mr-2" />
               {fileName || "Choose File..."}
             </Button>
-            <Button
-              variant="outline"
-              onClick={downloadTemplate}
-              data-testid="button-download-template"
-            >
+            <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
               <Download className="h-4 w-4 mr-2" />
               Download Template
             </Button>
@@ -247,11 +252,21 @@ export function ImportBalesTab() {
                   {importRows.map((row, idx) => (
                     <TableRow key={idx} data-testid={`row-import-${idx}`}>
                       <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="font-medium" data-testid={`text-import-name-${idx}`}>{row.itemName}</TableCell>
-                      <TableCell className="text-right" data-testid={`text-import-weight-${idx}`}>{row.weight}</TableCell>
-                      <TableCell className="font-mono text-sm" data-testid={`text-import-barcode-${idx}`}>{row.barcode}</TableCell>
-                      <TableCell className="font-mono text-sm" data-testid={`text-import-ref-${idx}`}>{row.refNumber || <span className="text-muted-foreground text-xs">auto</span>}</TableCell>
-                      <TableCell className="text-center" data-testid={`text-import-qty-${idx}`}>{row.quantity}</TableCell>
+                      <TableCell className="font-medium" data-testid={`text-import-name-${idx}`}>
+                        {row.itemName}
+                      </TableCell>
+                      <TableCell className="text-right" data-testid={`text-import-weight-${idx}`}>
+                        {row.weight}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-import-barcode-${idx}`}>
+                        {row.barcode}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-import-ref-${idx}`}>
+                        {row.refNumber || <span className="text-muted-foreground text-xs">auto</span>}
+                      </TableCell>
+                      <TableCell className="text-center" data-testid={`text-import-qty-${idx}`}>
+                        {row.quantity}
+                      </TableCell>
                       <TableCell data-testid={`text-import-date-${idx}`}>{row.productionDate}</TableCell>
                     </TableRow>
                   ))}
@@ -267,8 +282,12 @@ export function ImportBalesTab() {
           <CardContent className="py-12">
             <div className="text-center text-muted-foreground">
               <FileSpreadsheet className="h-10 w-10 mx-auto mb-3 opacity-50" />
-              <p className="font-medium" data-testid="text-import-empty">Upload an Excel file to preview bales for import</p>
-              <p className="text-sm mt-1">Expected columns: ITEM NAME, WEIGHT, ITEM BARCODE, QUANTITY, PRODUCTION DATE, REF NUMBER (optional)</p>
+              <p className="font-medium" data-testid="text-import-empty">
+                Upload an Excel file to preview bales for import
+              </p>
+              <p className="text-sm mt-1">
+                Expected columns: ITEM NAME, WEIGHT, ITEM BARCODE, QUANTITY, PRODUCTION DATE, REF NUMBER (optional)
+              </p>
             </div>
           </CardContent>
         </Card>

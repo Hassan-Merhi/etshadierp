@@ -48,13 +48,13 @@ function roundRect(ctx: SKRSContext2D, x: number, y: number, w: number, h: numbe
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + w - r, y);
-  ctx.arcTo(x + w, y,     x + w, y + r,     r);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
   ctx.lineTo(x + w, y + h - r);
   ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
   ctx.lineTo(x + r, y + h);
-  ctx.arcTo(x,     y + h, x,     y + h - r, r);
-  ctx.lineTo(x,     y + r);
-  ctx.arcTo(x,     y,     x + r, y,         r);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
 }
 
@@ -68,32 +68,32 @@ function clamp(ctx: SKRSContext2D, text: string, maxW: number): string {
 // ── Transfer card (green) ────────────────────────────────────────────────────
 
 export function generateTransferImageBuffer(data: TransferImageData): Promise<Buffer> {
-  const SCALE      = 2;           // 2× for crisp HiDPI rendering
-  const W          = 452;
-  const MARGIN     = 16;
-  const CARD_W     = W - MARGIN * 2;
-  const HEADER_H   = 62;
-  const ROUTE_H    = 54;
-  const ITEMS_HDR  = 28;
-  const ROW_H      = 34;
-  const FOOTER_H   = 44;
-  const CARD_H     = HEADER_H + ROUTE_H + ITEMS_HDR + ROW_H * data.items.length + FOOTER_H;
-  const TOTAL_H    = CARD_H + MARGIN * 2;
+  const SCALE = 2; // 2× for crisp HiDPI rendering
+  const W = 452;
+  const MARGIN = 16;
+  const CARD_W = W - MARGIN * 2;
+  const HEADER_H = 62;
+  const ROUTE_H = 54;
+  const ITEMS_HDR = 28;
+  const ROW_H = 34;
+  const FOOTER_H = 44;
+  const CARD_H = HEADER_H + ROUTE_H + ITEMS_HDR + ROW_H * data.items.length + FOOTER_H;
+  const TOTAL_H = CARD_H + MARGIN * 2;
 
-  const GREEN      = "#059669";
-  const GREEN_LT   = "#a7f3d0";
-  const GREEN_BG   = "#ecfdf5";
-  const SLATE_50   = "#f8fafc";
-  const SLATE_200  = "#e2e8f0";
-  const SLATE_400  = "#94a3b8";
-  const SLATE_700  = "#334155";
-  const SLATE_800  = "#1e293b";
-  const WHITE      = "#ffffff";
-  const BG         = "#f0fdf4";
+  const GREEN = "#059669";
+  const GREEN_LT = "#a7f3d0";
+  const GREEN_BG = "#ecfdf5";
+  const SLATE_50 = "#f8fafc";
+  const SLATE_200 = "#e2e8f0";
+  const SLATE_400 = "#94a3b8";
+  const SLATE_700 = "#334155";
+  const SLATE_800 = "#1e293b";
+  const WHITE = "#ffffff";
+  const BG = "#f0fdf4";
 
   // Canvas is physically 2× but we draw in logical units via scale()
   const canvas = createCanvas(W * SCALE, TOTAL_H * SCALE);
-  const ctx    = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d");
   ctx.scale(SCALE, SCALE);
 
   // Background
@@ -152,7 +152,7 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
   ctx.fillRect(MARGIN, y, CARD_W, ROUTE_H);
 
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 0.5;
+  ctx.lineWidth = 0.5;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y + ROUTE_H);
   ctx.lineTo(MARGIN + CARD_W, y + ROUTE_H);
@@ -162,53 +162,53 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
 
   // FROM
   ctx.fillStyle = SLATE_400;
-  ctx.font      = "700 9px sans-serif";
+  ctx.font = "700 9px sans-serif";
   ctx.textBaseline = "top";
   ctx.fillText("FROM", MARGIN + 20, y + 12);
   ctx.fillStyle = SLATE_800;
-  ctx.font      = "700 14px sans-serif";
+  ctx.font = "700 14px sans-serif";
   ctx.textBaseline = "top";
   ctx.fillText(clamp(ctx, data.sourceLocationName, COL_W - 8), MARGIN + 20, y + 26);
 
   // Arrow circle
   const AX = MARGIN + CARD_W / 2;
-  ctx.fillStyle   = GREEN_BG;
+  ctx.fillStyle = GREEN_BG;
   ctx.beginPath();
   ctx.arc(AX, y + ROUTE_H / 2, 14, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle   = GREEN;
-  ctx.font        = "bold 16px sans-serif";
-  ctx.textAlign   = "center";
+  ctx.fillStyle = GREEN;
+  ctx.font = "bold 16px sans-serif";
+  ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("→", AX, y + ROUTE_H / 2);
 
   // TO
-  ctx.fillStyle   = SLATE_400;
-  ctx.font        = "700 9px sans-serif";
-  ctx.textAlign   = "right";
+  ctx.fillStyle = SLATE_400;
+  ctx.font = "700 9px sans-serif";
+  ctx.textAlign = "right";
   ctx.textBaseline = "top";
   ctx.fillText("TO", MARGIN + CARD_W - 20, y + 12);
-  ctx.fillStyle   = SLATE_800;
-  ctx.font        = "700 14px sans-serif";
+  ctx.fillStyle = SLATE_800;
+  ctx.font = "700 14px sans-serif";
   ctx.fillText(clamp(ctx, data.destLocationName, COL_W - 8), MARGIN + CARD_W - 20, y + 26);
 
   y += ROUTE_H;
 
   // ── Items header ─────────────────────────────────────────────────────────
-  ctx.fillStyle   = SLATE_400;
-  ctx.font        = "700 9px sans-serif";
-  ctx.textAlign   = "left";
+  ctx.fillStyle = SLATE_400;
+  ctx.font = "700 9px sans-serif";
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  const ITEM_X    = MARGIN + 20;
-  const QTY_X     = MARGIN + CARD_W - 84;
-  const UOM_X     = MARGIN + CARD_W - 20;
-  ctx.fillText("ITEM",  ITEM_X, y + ITEMS_HDR / 2);
+  const ITEM_X = MARGIN + 20;
+  const QTY_X = MARGIN + CARD_W - 84;
+  const UOM_X = MARGIN + CARD_W - 20;
+  ctx.fillText("ITEM", ITEM_X, y + ITEMS_HDR / 2);
   ctx.textAlign = "right";
-  ctx.fillText("QTY",  QTY_X,  y + ITEMS_HDR / 2);
-  ctx.fillText("UNIT", UOM_X,  y + ITEMS_HDR / 2);
+  ctx.fillText("QTY", QTY_X, y + ITEMS_HDR / 2);
+  ctx.fillText("UNIT", UOM_X, y + ITEMS_HDR / 2);
 
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 1;
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y + ITEMS_HDR);
   ctx.lineTo(MARGIN + CARD_W, y + ITEMS_HDR);
@@ -222,7 +222,7 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
   data.items.forEach((item, idx) => {
     if (idx > 0) {
       ctx.strokeStyle = "#f1f5f9";
-      ctx.lineWidth   = 0.5;
+      ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.moveTo(MARGIN, y);
       ctx.lineTo(MARGIN + CARD_W, y);
@@ -231,19 +231,19 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
 
     const cy = y + ROW_H / 2;
 
-    ctx.fillStyle   = SLATE_700;
-    ctx.font        = "500 12px sans-serif";
-    ctx.textAlign   = "left";
+    ctx.fillStyle = SLATE_700;
+    ctx.font = "500 12px sans-serif";
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(clamp(ctx, item.name, NAME_MAX), ITEM_X, cy);
 
-    ctx.fillStyle   = GREEN;
-    ctx.font        = "800 14px sans-serif";
-    ctx.textAlign   = "right";
+    ctx.fillStyle = GREEN;
+    ctx.font = "800 14px sans-serif";
+    ctx.textAlign = "right";
     ctx.fillText(fmtQty(item.quantity), QTY_X, cy);
 
-    ctx.fillStyle   = SLATE_400;
-    ctx.font        = "600 10px sans-serif";
+    ctx.fillStyle = SLATE_400;
+    ctx.font = "600 10px sans-serif";
     ctx.fillText(item.uom, UOM_X, cy);
 
     y += ROW_H;
@@ -251,7 +251,7 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
 
   // ── Footer ───────────────────────────────────────────────────────────────
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 1;
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y);
   ctx.lineTo(MARGIN + CARD_W, y);
@@ -261,22 +261,22 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
   ctx.fillRect(MARGIN, y, CARD_W, FOOTER_H);
 
   const totalQty = data.items.reduce((s, i) => s + i.quantity, 0);
-  const uoms     = [...new Set(data.items.map((i) => i.uom))];
+  const uoms = [...new Set(data.items.map((i) => i.uom))];
   const uomLabel = uoms.length === 1 ? uoms[0] : "Mixed";
 
-  ctx.fillStyle   = SLATE_400;
-  ctx.font        = "700 9px sans-serif";
-  ctx.textAlign   = "left";
+  ctx.fillStyle = SLATE_400;
+  ctx.font = "700 9px sans-serif";
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
   ctx.fillText("TOTAL ITEMS", ITEM_X, y + FOOTER_H / 2);
 
-  ctx.fillStyle   = GREEN;
-  ctx.font        = "800 20px sans-serif";
-  ctx.textAlign   = "right";
+  ctx.fillStyle = GREEN;
+  ctx.font = "800 20px sans-serif";
+  ctx.textAlign = "right";
   ctx.fillText(fmtQty(totalQty), MARGIN + CARD_W - 48, y + FOOTER_H / 2);
 
-  ctx.fillStyle   = SLATE_400;
-  ctx.font        = "600 11px sans-serif";
+  ctx.fillStyle = SLATE_400;
+  ctx.font = "600 11px sans-serif";
   ctx.fillText(uomLabel, MARGIN + CARD_W - 20, y + FOOTER_H / 2);
 
   return Promise.resolve(canvas.toBuffer("image/png") as unknown as Buffer);
@@ -285,36 +285,36 @@ export function generateTransferImageBuffer(data: TransferImageData): Promise<Bu
 // ── Revised Transfer card (amber) ────────────────────────────────────────────
 
 export function generateRevisedTransferImageBuffer(data: RevisedTransferImageData): Promise<Buffer> {
-  const SCALE      = 2;           // 2× for crisp HiDPI rendering
-  const W          = 472;
-  const MARGIN     = 16;
-  const CARD_W     = W - MARGIN * 2;
-  const HEADER_H   = 70;
-  const ROUTE_H    = 54;
-  const ITEMS_HDR  = 28;
-  const ROW_H      = 34;
-  const FOOTER_H   = 44;
-  const CARD_H     = HEADER_H + ROUTE_H + ITEMS_HDR + ROW_H * data.items.length + FOOTER_H;
-  const TOTAL_H    = CARD_H + MARGIN * 2;
+  const SCALE = 2; // 2× for crisp HiDPI rendering
+  const W = 472;
+  const MARGIN = 16;
+  const CARD_W = W - MARGIN * 2;
+  const HEADER_H = 70;
+  const ROUTE_H = 54;
+  const ITEMS_HDR = 28;
+  const ROW_H = 34;
+  const FOOTER_H = 44;
+  const CARD_H = HEADER_H + ROUTE_H + ITEMS_HDR + ROW_H * data.items.length + FOOTER_H;
+  const TOTAL_H = CARD_H + MARGIN * 2;
 
-  const AMBER      = "#d97706";
-  const AMBER_LT   = "#fde68a";
-  const AMBER_BG   = "#fffbeb";
-  const AMBER_TXT  = "#92400e";
-  const BLUE       = "#2563eb";
-  const RED        = "#ef4444";
-  const GREEN      = "#059669";
-  const SLATE_50   = "#f8fafc";
-  const SLATE_200  = "#e2e8f0";
-  const SLATE_400  = "#94a3b8";
-  const SLATE_700  = "#334155";
-  const SLATE_800  = "#1e293b";
-  const WHITE      = "#ffffff";
-  const BG         = "#fffbeb";
+  const AMBER = "#d97706";
+  const AMBER_LT = "#fde68a";
+  const AMBER_BG = "#fffbeb";
+  const AMBER_TXT = "#92400e";
+  const BLUE = "#2563eb";
+  const RED = "#ef4444";
+  const GREEN = "#059669";
+  const SLATE_50 = "#f8fafc";
+  const SLATE_200 = "#e2e8f0";
+  const SLATE_400 = "#94a3b8";
+  const SLATE_700 = "#334155";
+  const SLATE_800 = "#1e293b";
+  const WHITE = "#ffffff";
+  const BG = "#fffbeb";
 
   // Canvas is physically 2× but we draw in logical units via scale()
   const canvas = createCanvas(W * SCALE, TOTAL_H * SCALE);
-  const ctx    = canvas.getContext("2d");
+  const ctx = canvas.getContext("2d");
   ctx.scale(SCALE, SCALE);
 
   // Background
@@ -376,65 +376,65 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
   ctx.fillRect(MARGIN, y, CARD_W, ROUTE_H);
 
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 0.5;
+  ctx.lineWidth = 0.5;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y + ROUTE_H);
   ctx.lineTo(MARGIN + CARD_W, y + ROUTE_H);
   ctx.stroke();
 
   const COL_W = (CARD_W - 48) / 2;
-  const AX    = MARGIN + CARD_W / 2;
+  const AX = MARGIN + CARD_W / 2;
 
-  ctx.fillStyle   = SLATE_400;
-  ctx.font        = "700 9px sans-serif";
-  ctx.textAlign   = "left";
+  ctx.fillStyle = SLATE_400;
+  ctx.font = "700 9px sans-serif";
+  ctx.textAlign = "left";
   ctx.textBaseline = "top";
   ctx.fillText("FROM", MARGIN + 20, y + 12);
-  ctx.fillStyle   = SLATE_800;
-  ctx.font        = "700 14px sans-serif";
+  ctx.fillStyle = SLATE_800;
+  ctx.font = "700 14px sans-serif";
   ctx.fillText(clamp(ctx, data.sourceLocationName, COL_W - 8), MARGIN + 20, y + 26);
 
-  ctx.fillStyle   = AMBER_BG;
+  ctx.fillStyle = AMBER_BG;
   ctx.beginPath();
   ctx.arc(AX, y + ROUTE_H / 2, 14, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle   = AMBER;
-  ctx.font        = "bold 16px sans-serif";
-  ctx.textAlign   = "center";
+  ctx.fillStyle = AMBER;
+  ctx.font = "bold 16px sans-serif";
+  ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("→", AX, y + ROUTE_H / 2);
 
-  ctx.fillStyle   = SLATE_400;
-  ctx.font        = "700 9px sans-serif";
-  ctx.textAlign   = "right";
+  ctx.fillStyle = SLATE_400;
+  ctx.font = "700 9px sans-serif";
+  ctx.textAlign = "right";
   ctx.textBaseline = "top";
   ctx.fillText("TO", MARGIN + CARD_W - 20, y + 12);
-  ctx.fillStyle   = SLATE_800;
-  ctx.font        = "700 14px sans-serif";
+  ctx.fillStyle = SLATE_800;
+  ctx.font = "700 14px sans-serif";
   ctx.fillText(clamp(ctx, data.destLocationName, COL_W - 8), MARGIN + CARD_W - 20, y + 26);
 
   y += ROUTE_H;
 
   // ── Items header ─────────────────────────────────────────────────────────
-  const NAME_END  = MARGIN + CARD_W - 178;
-  const BEF_X     = MARGIN + CARD_W - 138;
-  const CHG_X     = MARGIN + CARD_W - 88;
-  const AFT_X     = MARGIN + CARD_W - 42;
-  const UOM_X2    = MARGIN + CARD_W - 16;
+  const NAME_END = MARGIN + CARD_W - 178;
+  const BEF_X = MARGIN + CARD_W - 138;
+  const CHG_X = MARGIN + CARD_W - 88;
+  const AFT_X = MARGIN + CARD_W - 42;
+  const UOM_X2 = MARGIN + CARD_W - 16;
 
-  ctx.fillStyle    = SLATE_400;
-  ctx.font         = "700 9px sans-serif";
-  ctx.textAlign    = "left";
+  ctx.fillStyle = SLATE_400;
+  ctx.font = "700 9px sans-serif";
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  ctx.fillText("ITEM",   MARGIN + 20, y + ITEMS_HDR / 2);
+  ctx.fillText("ITEM", MARGIN + 20, y + ITEMS_HDR / 2);
   ctx.textAlign = "right";
   ctx.fillText("BEFORE", BEF_X, y + ITEMS_HDR / 2);
   ctx.fillText("CHANGE", CHG_X, y + ITEMS_HDR / 2);
-  ctx.fillText("AFTER",  AFT_X, y + ITEMS_HDR / 2);
-  ctx.fillText("UNIT",   UOM_X2, y + ITEMS_HDR / 2);
+  ctx.fillText("AFTER", AFT_X, y + ITEMS_HDR / 2);
+  ctx.fillText("UNIT", UOM_X2, y + ITEMS_HDR / 2);
 
   ctx.strokeStyle = SLATE_200;
-  ctx.lineWidth   = 1;
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y + ITEMS_HDR);
   ctx.lineTo(MARGIN + CARD_W, y + ITEMS_HDR);
@@ -448,7 +448,7 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
   data.items.forEach((item, idx) => {
     if (idx > 0) {
       ctx.strokeStyle = "#f1f5f9";
-      ctx.lineWidth   = 0.5;
+      ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.moveTo(MARGIN, y);
       ctx.lineTo(MARGIN + CARD_W, y);
@@ -457,28 +457,28 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
 
     const cy = y + ROW_H / 2;
 
-    ctx.fillStyle   = SLATE_700;
-    ctx.font        = "500 12px sans-serif";
-    ctx.textAlign   = "left";
+    ctx.fillStyle = SLATE_700;
+    ctx.font = "500 12px sans-serif";
+    ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(clamp(ctx, item.name, NAME_MAX2), MARGIN + 20, cy);
 
-    ctx.fillStyle   = SLATE_400;
-    ctx.font        = "700 12px sans-serif";
-    ctx.textAlign   = "right";
+    ctx.fillStyle = SLATE_400;
+    ctx.font = "700 12px sans-serif";
+    ctx.textAlign = "right";
     ctx.fillText(fmtQty(item.before), BEF_X, cy);
 
-    const deltaStr   = item.delta > 0 ? `+${fmtQty(item.delta)}` : fmtQty(item.delta);
-    ctx.fillStyle    = item.delta > 0 ? GREEN : item.delta < 0 ? RED : SLATE_400;
-    ctx.font         = "800 13px sans-serif";
+    const deltaStr = item.delta > 0 ? `+${fmtQty(item.delta)}` : fmtQty(item.delta);
+    ctx.fillStyle = item.delta > 0 ? GREEN : item.delta < 0 ? RED : SLATE_400;
+    ctx.font = "800 13px sans-serif";
     ctx.fillText(deltaStr, CHG_X, cy);
 
-    ctx.fillStyle   = BLUE;
-    ctx.font        = "800 13px sans-serif";
+    ctx.fillStyle = BLUE;
+    ctx.font = "800 13px sans-serif";
     ctx.fillText(fmtQty(item.after), AFT_X, cy);
 
-    ctx.fillStyle   = SLATE_400;
-    ctx.font        = "600 10px sans-serif";
+    ctx.fillStyle = SLATE_400;
+    ctx.font = "600 10px sans-serif";
     ctx.fillText(item.uom, UOM_X2, cy);
 
     y += ROW_H;
@@ -486,7 +486,7 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
 
   // ── Footer ───────────────────────────────────────────────────────────────
   ctx.strokeStyle = AMBER_LT;
-  ctx.lineWidth   = 1;
+  ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(MARGIN, y);
   ctx.lineTo(MARGIN + CARD_W, y);
@@ -501,20 +501,20 @@ export function generateRevisedTransferImageBuffer(data: RevisedTransferImageDat
   ctx.fillStyle = AMBER;
   roundRect(ctx, PILL_X, PILL_Y, 66, 20, 10);
   ctx.fill();
-  ctx.fillStyle    = WHITE;
-  ctx.font         = "800 9px sans-serif";
-  ctx.textAlign    = "center";
+  ctx.fillStyle = WHITE;
+  ctx.font = "800 9px sans-serif";
+  ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText("REVISION", PILL_X + 33, PILL_Y + 10);
 
-  ctx.fillStyle    = AMBER_TXT;
-  ctx.font         = "700 13px sans-serif";
-  ctx.textAlign    = "right";
+  ctx.fillStyle = AMBER_TXT;
+  ctx.font = "700 13px sans-serif";
+  ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   ctx.fillText(
     `${data.items.length} item${data.items.length !== 1 ? "s" : ""} revised`,
     MARGIN + CARD_W - 20,
-    y + FOOTER_H / 2,
+    y + FOOTER_H / 2
   );
 
   return Promise.resolve(canvas.toBuffer("image/png") as unknown as Buffer);

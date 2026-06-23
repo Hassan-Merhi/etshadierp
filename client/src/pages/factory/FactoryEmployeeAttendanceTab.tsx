@@ -7,18 +7,24 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import {
-  CalendarDays, CheckCircle, XCircle, RotateCcw, Save,
-  Users, UserCheck, UserX, Clock, User, ChevronsUpDown, Check,
+  CalendarDays,
+  CheckCircle,
+  XCircle,
+  RotateCcw,
+  Save,
+  Users,
+  UserCheck,
+  UserX,
+  Clock,
+  User,
+  ChevronsUpDown,
+  Check,
 } from "lucide-react";
 
 type AttendanceStatus = "Present" | "Absent" | "Late" | "Half Day" | "Leave";
@@ -53,7 +59,9 @@ const STATUS_COLORS: Record<string, string> = {
 function localDateStr(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
-function todayStr() { return localDateStr(new Date()); }
+function todayStr() {
+  return localDateStr(new Date());
+}
 function currentMonthStart() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -66,21 +74,43 @@ function generateDateRange(start: string, end: string): string[] {
   const dates: string[] = [];
   const cur = new Date(start + "T00:00:00");
   const endDate = new Date(end + "T00:00:00");
-  while (cur <= endDate) { dates.push(localDateStr(cur)); cur.setDate(cur.getDate() + 1); }
+  while (cur <= endDate) {
+    dates.push(localDateStr(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
   return dates;
 }
 function formatDate(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
-function SummaryCard({ icon, label, value, color, testId }: { icon: any; label: string; value: number; color: string; testId: string }) {
+function SummaryCard({
+  icon,
+  label,
+  value,
+  color,
+  testId,
+}: {
+  icon: any;
+  label: string;
+  value: number;
+  color: string;
+  testId: string;
+}) {
   return (
     <Card>
       <CardContent className="pt-4 pb-3">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground">{label}</p>
-            <p className={`text-2xl font-bold ${color}`} data-testid={testId}>{value}</p>
+            <p className={`text-2xl font-bold ${color}`} data-testid={testId}>
+              {value}
+            </p>
           </div>
           <div className={`opacity-60 ${color}`}>{icon}</div>
         </div>
@@ -121,8 +151,7 @@ export default function FactoryEmployeeAttendanceTab() {
   }, [data]);
 
   const saveMutation = useMutation({
-    mutationFn: (records: any[]) =>
-      apiRequest("POST", "/api/factory/employee-attendance/bulk", { records }),
+    mutationFn: (records: any[]) => apiRequest("POST", "/api/factory/employee-attendance/bulk", { records }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employee-attendance", selectedDate] });
       toast({ title: "Attendance saved", description: `Saved for ${selectedDate}` });
@@ -219,16 +248,30 @@ export default function FactoryEmployeeAttendanceTab() {
                   />
                 </div>
                 <div className="flex flex-wrap gap-2 ml-auto items-center">
-                  <Button variant="outline" onClick={() => markAll("Present")} disabled={!emps.length} data-testid="button-mark-all-present">
+                  <Button
+                    variant="outline"
+                    onClick={() => markAll("Present")}
+                    disabled={!emps.length}
+                    data-testid="button-mark-all-present"
+                  >
                     <UserCheck className="h-4 w-4 mr-1" /> Mark All Present
                   </Button>
-                  <Button variant="outline" onClick={() => markAll("Absent")} disabled={!emps.length} data-testid="button-mark-all-absent">
+                  <Button
+                    variant="outline"
+                    onClick={() => markAll("Absent")}
+                    disabled={!emps.length}
+                    data-testid="button-mark-all-absent"
+                  >
                     <UserX className="h-4 w-4 mr-1" /> Mark All Absent
                   </Button>
                   <Button variant="ghost" onClick={reset} disabled={!emps.length} data-testid="button-reset">
                     <RotateCcw className="h-4 w-4 mr-1" /> Reset
                   </Button>
-                  <Button onClick={handleSave} disabled={!emps.length || saveMutation.isPending} data-testid="button-save-attendance">
+                  <Button
+                    onClick={handleSave}
+                    disabled={!emps.length || saveMutation.isPending}
+                    data-testid="button-save-attendance"
+                  >
                     <Save className="h-4 w-4 mr-1" />
                     {saveMutation.isPending ? "Saving…" : "Save Attendance"}
                   </Button>
@@ -239,10 +282,34 @@ export default function FactoryEmployeeAttendanceTab() {
 
           {emps.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <SummaryCard icon={<Users className="h-4 w-4" />} label="Total" value={counts.total} color="text-foreground" testId="stat-total" />
-              <SummaryCard icon={<CheckCircle className="h-4 w-4" />} label="Present" value={counts.present} color="text-green-600 dark:text-green-400" testId="stat-present" />
-              <SummaryCard icon={<XCircle className="h-4 w-4" />} label="Absent" value={counts.absent} color="text-red-600 dark:text-red-400" testId="stat-absent" />
-              <SummaryCard icon={<Clock className="h-4 w-4" />} label="Other" value={counts.other} color="text-amber-600 dark:text-amber-400" testId="stat-other" />
+              <SummaryCard
+                icon={<Users className="h-4 w-4" />}
+                label="Total"
+                value={counts.total}
+                color="text-foreground"
+                testId="stat-total"
+              />
+              <SummaryCard
+                icon={<CheckCircle className="h-4 w-4" />}
+                label="Present"
+                value={counts.present}
+                color="text-green-600 dark:text-green-400"
+                testId="stat-present"
+              />
+              <SummaryCard
+                icon={<XCircle className="h-4 w-4" />}
+                label="Absent"
+                value={counts.absent}
+                color="text-red-600 dark:text-red-400"
+                testId="stat-absent"
+              />
+              <SummaryCard
+                icon={<Clock className="h-4 w-4" />}
+                label="Other"
+                value={counts.other}
+                color="text-amber-600 dark:text-amber-400"
+                testId="stat-other"
+              />
             </div>
           )}
 
@@ -254,13 +321,17 @@ export default function FactoryEmployeeAttendanceTab() {
                 {shift && <Badge variant="secondary">{shift}</Badge>}
               </CardTitle>
               {emps.length > 0 && (
-                <span className="text-sm text-muted-foreground">{emps.length} employee{emps.length !== 1 ? "s" : ""}</span>
+                <span className="text-sm text-muted-foreground">
+                  {emps.length} employee{emps.length !== 1 ? "s" : ""}
+                </span>
               )}
             </CardHeader>
             <CardContent className="p-0">
               {isLoading ? (
                 <div className="p-4 space-y-2">
-                  {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full rounded-md" />)}
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Skeleton key={i} className="h-10 w-full rounded-md" />
+                  ))}
                 </div>
               ) : emps.length === 0 ? (
                 <div className="text-center text-muted-foreground py-12 text-sm">
@@ -284,7 +355,11 @@ export default function FactoryEmployeeAttendanceTab() {
                         {emps.map((emp, idx) => {
                           const status = attendanceMap[emp.id] ?? "Present";
                           return (
-                            <tr key={emp.id} className="border-b last:border-0 hover-elevate" data-testid={`row-employee-${emp.id}`}>
+                            <tr
+                              key={emp.id}
+                              className="border-b last:border-0 hover-elevate"
+                              data-testid={`row-employee-${emp.id}`}
+                            >
                               <td className="px-4 py-2 text-muted-foreground">{idx + 1}</td>
                               <td className="px-4 py-2 font-medium" data-testid={`text-employee-name-${emp.id}`}>
                                 {emp.firstName} {emp.lastName}
@@ -294,7 +369,9 @@ export default function FactoryEmployeeAttendanceTab() {
                               <td className="px-4 py-2">
                                 <Select
                                   value={status}
-                                  onValueChange={(v) => setAttendanceMap((p) => ({ ...p, [emp.id]: v as AttendanceStatus }))}
+                                  onValueChange={(v) =>
+                                    setAttendanceMap((p) => ({ ...p, [emp.id]: v as AttendanceStatus }))
+                                  }
                                 >
                                   <SelectTrigger
                                     data-testid={`select-status-${emp.id}`}
@@ -304,7 +381,9 @@ export default function FactoryEmployeeAttendanceTab() {
                                   </SelectTrigger>
                                   <SelectContent>
                                     {STATUS_OPTIONS.map((s) => (
-                                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                                      <SelectItem key={s} value={s}>
+                                        {s}
+                                      </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -328,9 +407,15 @@ export default function FactoryEmployeeAttendanceTab() {
                     {emps.map((emp, idx) => {
                       const status = attendanceMap[emp.id] ?? "Present";
                       return (
-                        <div key={emp.id} className="border rounded-md p-3 space-y-2" data-testid={`card-employee-${emp.id}`}>
+                        <div
+                          key={emp.id}
+                          className="border rounded-md p-3 space-y-2"
+                          data-testid={`card-employee-${emp.id}`}
+                        >
                           <div className="flex items-start justify-between gap-2">
-                            <p className="font-medium text-sm">{emp.firstName} {emp.lastName}</p>
+                            <p className="font-medium text-sm">
+                              {emp.firstName} {emp.lastName}
+                            </p>
                             <span className="text-xs text-muted-foreground shrink-0">{idx + 1}</span>
                           </div>
                           <Select
@@ -341,7 +426,11 @@ export default function FactoryEmployeeAttendanceTab() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                              {STATUS_OPTIONS.map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {s}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <Input
@@ -412,8 +501,7 @@ function PerEmployeeView() {
   const absentCount = dates.length - presentCount;
 
   const saveMutation = useMutation({
-    mutationFn: (records: any[]) =>
-      apiRequest("POST", "/api/factory/employee-attendance/bulk", { records }),
+    mutationFn: (records: any[]) => apiRequest("POST", "/api/factory/employee-attendance/bulk", { records }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/factory/employee-attendance/employee", empIdNum, startDate, endDate],
@@ -458,7 +546,13 @@ function PerEmployeeView() {
               <Label className="text-xs text-muted-foreground">Employee</Label>
               <Popover open={empComboOpen} onOpenChange={setEmpComboOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" aria-expanded={empComboOpen} className="w-56 justify-between font-normal" data-testid="select-employee">
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={empComboOpen}
+                    className="w-56 justify-between font-normal"
+                    data-testid="select-employee"
+                  >
                     <span className="truncate">
                       {selectedEmp ? `${selectedEmp.firstName} ${selectedEmp.lastName}` : "Select employee"}
                     </span>
@@ -472,9 +566,17 @@ function PerEmployeeView() {
                       <CommandEmpty>No employees found.</CommandEmpty>
                       <CommandGroup>
                         {(empList ?? []).map((e) => (
-                          <CommandItem key={e.id} value={`${e.firstName} ${e.lastName} ${e.code ?? ""}`}
-                            onSelect={() => { setSelectedEmpId(String(e.id)); setEmpComboOpen(false); }}>
-                            <Check className={`mr-2 h-4 w-4 shrink-0 ${selectedEmpId === String(e.id) ? "opacity-100" : "opacity-0"}`} />
+                          <CommandItem
+                            key={e.id}
+                            value={`${e.firstName} ${e.lastName} ${e.code ?? ""}`}
+                            onSelect={() => {
+                              setSelectedEmpId(String(e.id));
+                              setEmpComboOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 shrink-0 ${selectedEmpId === String(e.id) ? "opacity-100" : "opacity-0"}`}
+                            />
                             {e.firstName} {e.lastName}
                             {e.code && <span className="ml-1 text-muted-foreground">({e.code})</span>}
                           </CommandItem>
@@ -487,20 +589,54 @@ function PerEmployeeView() {
             </div>
             <div className="flex flex-col gap-1">
               <Label className="text-xs text-muted-foreground">From</Label>
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-40" data-testid="input-start-date" />
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-40"
+                data-testid="input-start-date"
+              />
             </div>
             <div className="flex flex-col gap-1">
               <Label className="text-xs text-muted-foreground">To</Label>
-              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40" data-testid="input-end-date" />
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-40"
+                data-testid="input-end-date"
+              />
             </div>
             <div className="flex gap-2 ml-auto items-center flex-wrap">
-              <Button variant="outline" onClick={() => { const n: Record<string, boolean> = {}; for (const d of dates) n[d] = true; setCheckedDates(n); }} disabled={!empIdNum} data-testid="button-select-all">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const n: Record<string, boolean> = {};
+                  for (const d of dates) n[d] = true;
+                  setCheckedDates(n);
+                }}
+                disabled={!empIdNum}
+                data-testid="button-select-all"
+              >
                 <UserCheck className="h-4 w-4 mr-1" /> Select All
               </Button>
-              <Button variant="outline" onClick={() => { const n: Record<string, boolean> = {}; for (const d of dates) n[d] = false; setCheckedDates(n); }} disabled={!empIdNum} data-testid="button-deselect-all">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const n: Record<string, boolean> = {};
+                  for (const d of dates) n[d] = false;
+                  setCheckedDates(n);
+                }}
+                disabled={!empIdNum}
+                data-testid="button-deselect-all"
+              >
                 <UserX className="h-4 w-4 mr-1" /> Deselect All
               </Button>
-              <Button onClick={handleSave} disabled={!empIdNum || saveMutation.isPending} data-testid="button-save-per-employee">
+              <Button
+                onClick={handleSave}
+                disabled={!empIdNum || saveMutation.isPending}
+                data-testid="button-save-per-employee"
+              >
                 <Save className="h-4 w-4 mr-1" />
                 {saveMutation.isPending ? "Saving…" : "Save"}
               </Button>
@@ -523,7 +659,8 @@ function PerEmployeeView() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                {selectedEmp ? `${selectedEmp.firstName} ${selectedEmp.lastName}` : "Employee"} — {startDate} to {endDate}
+                {selectedEmp ? `${selectedEmp.firstName} ${selectedEmp.lastName}` : "Employee"} — {startDate} to{" "}
+                {endDate}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -540,9 +677,10 @@ function PerEmployeeView() {
                           onClick={() => setCheckedDates((p) => ({ ...p, [d]: !p[d] }))}
                           data-testid={`day-${d}`}
                           className={`flex flex-col items-center justify-center rounded-md py-2 px-1 text-xs border transition-colors
-                            ${isPresent
-                              ? "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
-                              : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
+                            ${
+                              isPresent
+                                ? "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-800 dark:text-green-200"
+                                : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400"
                             }`}
                         >
                           <span className="font-medium">{dayNum}</span>

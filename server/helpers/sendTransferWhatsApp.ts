@@ -34,14 +34,7 @@ export interface SendTransferWAOptions {
  * Designed to be called fire-and-forget inside setImmediate — never throws.
  */
 export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise<void> {
-  const {
-    destinationLocationId,
-    sourceLocationName,
-    destLocationName,
-    items,
-    voucherNumber,
-    voucherDate,
-  } = opts;
+  const { destinationLocationId, sourceLocationName, destLocationName, items, voucherNumber, voucherDate } = opts;
 
   console.log(`[TransferWA] Starting for ${voucherNumber} → destLocId=${destinationLocationId}, items=${items.length}`);
 
@@ -56,7 +49,7 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
   // Look up destination location
   const [destLoc] = await db
     .select({
-      companyId:             locations.companyId,
+      companyId: locations.companyId,
       transferWaGroupChatId: locations.transferWaGroupChatId,
     })
     .from(locations)
@@ -114,7 +107,9 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
   let displayDate = voucherDate;
   try {
     displayDate = format(new Date(voucherDate), "dd MMM yyyy");
-  } catch { /* keep raw string */ }
+  } catch {
+    /* keep raw string */
+  }
 
   const caption = [
     `*Stock Transfer*`,
@@ -136,7 +131,9 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
     });
     console.log(`[TransferWA] PNG generated (${pngBuffer.length} bytes).`);
   } catch (imgErr: any) {
-    console.warn(`[TransferWA] Image generation failed for ${voucherNumber} — falling back to text. Error: ${imgErr?.message}`);
+    console.warn(
+      `[TransferWA] Image generation failed for ${voucherNumber} — falling back to text. Error: ${imgErr?.message}`
+    );
   }
 
   const safeVoucher = voucherNumber.replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -149,7 +146,9 @@ export async function sendTransferWhatsApp(opts: SendTransferWAOptions): Promise
       if (result.success) {
         console.log(`[TransferWA] Sent ${voucherNumber} image to group ${chatId}`);
       } else {
-        console.warn(`[TransferWA] Image send failed for ${voucherNumber} → ${chatId}: ${result.error} — trying text fallback`);
+        console.warn(
+          `[TransferWA] Image send failed for ${voucherNumber} → ${chatId}: ${result.error} — trying text fallback`
+        );
         const textResult = await sendWhatsAppTextToChatIdPos(chatId, caption);
         if (textResult.success) {
           console.log(`[TransferWA] Text fallback sent for ${voucherNumber} → ${chatId}`);

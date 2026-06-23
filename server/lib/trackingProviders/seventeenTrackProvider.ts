@@ -29,7 +29,7 @@ export function getMonthlyLimit(): number {
 
 // ── Carrier codes (17track cannot auto-detect ocean container prefixes) ────────
 export const CARRIER_CODES: Record<string, number> = {
-  CMA: 100755,  // CMA CGM (incl. ANL, APL, CNC subsidiaries)
+  CMA: 100755, // CMA CGM (incl. ANL, APL, CNC subsidiaries)
 };
 
 // ── v2.2 response shapes ──────────────────────────────────────────────────────
@@ -88,10 +88,7 @@ interface T17Response {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function emptyResult(
-  containerNumber: string,
-  extra: Partial<CarrierTrackResult>,
-): CarrierTrackResult {
+function emptyResult(containerNumber: string, extra: Partial<CarrierTrackResult>): CarrierTrackResult {
   return {
     success: false,
     provider: "17track",
@@ -147,7 +144,7 @@ export async function track(containerNumber: string, carrierCode?: number): Prom
       throw new Error(`17track register HTTP ${regRes.status}`);
     }
 
-    const regData = await regRes.json() as T17Response;
+    const regData = (await regRes.json()) as T17Response;
 
     // If rejected at register step, bail early
     const regRejected = regData.data?.rejected?.find((r) => r.number === containerNumber);
@@ -202,7 +199,7 @@ export async function track(containerNumber: string, carrierCode?: number): Prom
     }
 
     // ── Parse latest status & location from top-level fields ──────────────────
-    const latestStatus   = trackInfo.latest_status?.status ?? null;
+    const latestStatus = trackInfo.latest_status?.status ?? null;
     const latestLocation = trackInfo.latest_event?.location ?? null;
     const latestEventDate = parseIsoDate(trackInfo.latest_event?.time_iso ?? trackInfo.latest_event?.time_utc);
     const latestDescription = trackInfo.latest_event?.description ?? null;
@@ -219,8 +216,8 @@ export async function track(containerNumber: string, carrierCode?: number): Prom
     // ── Parse ETA from time_metrics.estimated_delivery_date ──────────────────
     let eta: string | null = null;
     const edFrom = trackInfo.time_metrics?.estimated_delivery_date?.from;
-    const edTo   = trackInfo.time_metrics?.estimated_delivery_date?.to;
-    const edRaw  = edTo ?? edFrom;
+    const edTo = trackInfo.time_metrics?.estimated_delivery_date?.to;
+    const edRaw = edTo ?? edFrom;
     if (edRaw) {
       const d = new Date(edRaw);
       if (!isNaN(d.getTime())) eta = d.toISOString().slice(0, 10);

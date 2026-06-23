@@ -35,22 +35,16 @@ export function useVoucherEntries({ form }: UseVoucherEntriesProps) {
     ]);
   };
 
-  const addEntryFromSidebar = (
-    accountType: VoucherEntry["accountType"],
-    accountId: number,
-    accountName: string
-  ) => {
+  const addEntryFromSidebar = (accountType: VoucherEntry["accountType"], accountId: number, accountName: string) => {
     const currentEntries = form.getValues("entries");
-    
-    const emptyIndex = currentEntries.findIndex(
-      (e: VoucherEntry) => !e.accountId || e.accountId === 0
-    );
+
+    const emptyIndex = currentEntries.findIndex((e: VoucherEntry) => !e.accountId || e.accountId === 0);
 
     if (emptyIndex >= 0) {
       form.setValue(`entries.${emptyIndex}.accountType`, accountType);
       form.setValue(`entries.${emptyIndex}.accountId`, accountId);
       form.setValue(`entries.${emptyIndex}.accountName`, accountName);
-      
+
       setTimeout(() => {
         focusAmount(emptyIndex);
       }, 50);
@@ -66,7 +60,7 @@ export function useVoucherEntries({ form }: UseVoucherEntriesProps) {
           amount: "",
         },
       ]);
-      
+
       setTimeout(() => {
         focusAmount(newIndex);
       }, 50);
@@ -83,9 +77,9 @@ export function useVoucherEntries({ form }: UseVoucherEntriesProps) {
 
   const resetForNextEntry = () => {
     const currentEntries = form.getValues("entries");
-    
+
     const hasEmpty = currentEntries.some((e: VoucherEntry) => !e.accountId || e.accountId === 0);
-    
+
     if (!hasEmpty) {
       const newIndex = currentEntries.length;
       form.setValue("entries", [
@@ -103,7 +97,7 @@ export function useVoucherEntries({ form }: UseVoucherEntriesProps) {
   const removeEntry = (index: number) => {
     const currentEntries = form.getValues("entries");
     const filtered = currentEntries.filter((_: any, i: number) => i !== index);
-    
+
     if (filtered.length === 0) {
       form.setValue("entries", [
         {

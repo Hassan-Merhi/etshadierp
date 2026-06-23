@@ -5,29 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  Plus, Users, ChevronDown, Pencil, Trash2, AlertCircle, DollarSign, MinusCircle 
-} from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Users, ChevronDown, Pencil, Trash2, AlertCircle, DollarSign, MinusCircle } from "lucide-react";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { cn } from "@/lib/utils";
@@ -97,10 +78,7 @@ export function WorkersTab({
       <Card className="p-6 mb-4">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4">
           <h3 className="text-lg font-semibold">Worker Payment Summary</h3>
-          <Button
-            onClick={() => setNewWorkerDialogOpen(true)}
-            data-testid="button-create-worker"
-          >
+          <Button onClick={() => setNewWorkerDialogOpen(true)} data-testid="button-create-worker">
             <Plus className="h-4 w-4 mr-1" />
             Create Workers
           </Button>
@@ -195,7 +173,7 @@ export function WorkersTab({
                   return sum + (payment?.selected ? parseFloat(payment.amount || "0") : 0);
                 }, 0);
                 const selectedCount = groupMembers.filter((m: Employee) => workerPayments[m.id]?.selected).length;
-                
+
                 return (
                   <Collapsible
                     key={group.id}
@@ -210,7 +188,8 @@ export function WorkersTab({
                             <div>
                               <h3 className="font-semibold">{group.name}</h3>
                               <p className="text-sm text-muted-foreground">
-                                {groupMembers.length} workers - {selectedCount} selected - Total: {formatAmount(groupTotal)}
+                                {groupMembers.length} workers - {selectedCount} selected - Total:{" "}
+                                {formatAmount(groupTotal)}
                               </p>
                             </div>
                           </div>
@@ -223,7 +202,9 @@ export function WorkersTab({
                                 setWorkerGroupMembersDialogOpen(true);
                                 // Initialize selections
                                 const selections: Record<number, boolean> = {};
-                                groupMembers.forEach((m: Employee) => { selections[m.id] = true; });
+                                groupMembers.forEach((m: Employee) => {
+                                  selections[m.id] = true;
+                                });
                                 setWorkerGroupMemberSelections(selections);
                               }}
                               data-testid={`button-manage-group-${group.id}`}

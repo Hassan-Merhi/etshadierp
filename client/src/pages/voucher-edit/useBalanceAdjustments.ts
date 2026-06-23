@@ -26,13 +26,20 @@ export const useBalanceAdjustments = (
         const entryUsdAmount = formValues.currency === "CFA" && exchangeRate ? amount / exchangeRate : amount;
         totalAmount += entryUsdAmount;
         const entryKey = `${accountType}-${accountId}`;
-        const isLiability = accountType === "supplier" || accountType === "factorySupplier" || accountType === "employee";
+        const isLiability =
+          accountType === "supplier" || accountType === "factorySupplier" || accountType === "employee";
         const sign = (voucherType === "Payment" && !isLiability) || (voucherType === "Receipt" && isLiability) ? -1 : 1;
-        newAdjustments[entryKey] = (newAdjustments[entryKey] || 0) + (sign * entryUsdAmount);
+        newAdjustments[entryKey] = (newAdjustments[entryKey] || 0) + sign * entryUsdAmount;
       });
-      const isPaymentLiability = paymentAccountType === "supplier" || paymentAccountType === "factorySupplier" || paymentAccountType === "employee";
-      const paymentSign = (voucherType === "Receipt" && !isPaymentLiability) || (voucherType === "Payment" && isPaymentLiability) ? 1 : -1;
-      newAdjustments[paymentKey] = (newAdjustments[paymentKey] || 0) + (paymentSign * totalAmount);
+      const isPaymentLiability =
+        paymentAccountType === "supplier" ||
+        paymentAccountType === "factorySupplier" ||
+        paymentAccountType === "employee";
+      const paymentSign =
+        (voucherType === "Receipt" && !isPaymentLiability) || (voucherType === "Payment" && isPaymentLiability)
+          ? 1
+          : -1;
+      newAdjustments[paymentKey] = (newAdjustments[paymentKey] || 0) + paymentSign * totalAmount;
       setBalanceAdjustments(newAdjustments);
     });
     return () => subscription.unsubscribe();

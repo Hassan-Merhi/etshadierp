@@ -84,7 +84,9 @@ export function StockEntrySidebar({
                   <SelectContent>
                     <SelectItem value="all">All Workers</SelectItem>
                     {workerCategoryGroups.map((c: any) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -97,9 +99,13 @@ export function StockEntrySidebar({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">No Global Logo</SelectItem>
-                    {allCustomers.filter((c: any) => c.active).map((c: any) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
-                    ))}
+                    {allCustomers
+                      .filter((c: any) => c.active)
+                      .map((c: any) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.legalName}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -110,12 +116,16 @@ export function StockEntrySidebar({
         <div className="pt-4 border-t space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">Total Bales</span>
-            <span className="text-xl font-black text-primary" data-testid="text-total-qty">{totalQty}</span>
+            <span className="text-xl font-black text-primary" data-testid="text-total-qty">
+              {totalQty}
+            </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-muted-foreground">Total Weight</span>
             <div className="text-right">
-              <span className="text-xl font-black text-primary" data-testid="text-total-kg">{totalKg.toFixed(1)}</span>
+              <span className="text-xl font-black text-primary" data-testid="text-total-kg">
+                {totalKg.toFixed(1)}
+              </span>
               <span className="text-xs font-bold text-muted-foreground ml-1">KG</span>
             </div>
           </div>
@@ -127,10 +137,15 @@ export function StockEntrySidebar({
           onClick={onConfirm}
           data-testid="button-confirm-stock-entry"
         >
-          {isPending
-            ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing…</>
-            : <><CheckCircle className="h-4 w-4" /> Confirm & Print Labels{totalQty > 0 && ` (${totalQty})`}</>
-          }
+          {isPending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Processing…
+            </>
+          ) : (
+            <>
+              <CheckCircle className="h-4 w-4" /> Confirm & Print Labels{totalQty > 0 && ` (${totalQty})`}
+            </>
+          )}
         </Button>
       </div>
     </div>

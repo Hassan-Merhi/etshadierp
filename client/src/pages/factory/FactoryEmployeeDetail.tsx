@@ -4,23 +4,26 @@ import { useAdminOverride } from "@/hooks/use-admin-override";
 import { useRoute, useLocation } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import {
-  ArrowLeft, DollarSign, Calendar, Phone, Plus, Loader2, Pencil,
-  TrendingUp, TrendingDown, CheckCircle2, RefreshCw,
+  ArrowLeft,
+  DollarSign,
+  Calendar,
+  Phone,
+  Plus,
+  Loader2,
+  Pencil,
+  TrendingUp,
+  TrendingDown,
+  CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -66,9 +69,12 @@ interface LedgerAccount {
 }
 
 const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700", "bg-purple-100 text-purple-700",
-  "bg-emerald-100 text-emerald-700", "bg-amber-100 text-amber-700",
-  "bg-rose-100 text-rose-700", "bg-cyan-100 text-cyan-700",
+  "bg-blue-100 text-blue-700",
+  "bg-purple-100 text-purple-700",
+  "bg-emerald-100 text-emerald-700",
+  "bg-amber-100 text-amber-700",
+  "bg-rose-100 text-rose-700",
+  "bg-cyan-100 text-cyan-700",
 ];
 
 function getAvatarColor(name: string) {
@@ -78,7 +84,13 @@ function getAvatarColor(name: string) {
 }
 
 function getInitials(name: string) {
-  return name.split(" ").filter(Boolean).slice(0, 2).map((n) => n[0]).join("").toUpperCase();
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase();
 }
 
 function fmt(val: string | number | null | undefined) {
@@ -99,31 +111,39 @@ export default function FactoryEmployeeDetail() {
 
   const formatDate = (val: string | Date | null | undefined) => {
     if (!val) return "—";
-    try { return formatDisplayDate(val instanceof Date ? val : new Date(val)); } catch { return "—"; }
+    try {
+      return formatDisplayDate(val instanceof Date ? val : new Date(val));
+    } catch {
+      return "—";
+    }
   };
 
   // State for dialogs
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({
-    firstName: "", lastName: "", department: "", phone: "", monthlySalary: "",
+    firstName: "",
+    lastName: "",
+    department: "",
+    phone: "",
+    monthlySalary: "",
   });
 
   // Deposit form
   const [depositOpen, setDepositOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
-  const [depositDate, setDepositDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [depositDate, setDepositDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [depositNotes, setDepositNotes] = useState("");
   const [depositEffectiveDate, setDepositEffectiveDate] = useState("");
 
   // Withdrawal form
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [withdrawDate, setWithdrawDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [withdrawDate, setWithdrawDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [withdrawNotes, setWithdrawNotes] = useState("");
   const [withdrawCashAccountId, setWithdrawCashAccountId] = useState("");
 
   // Payroll (bulk) state
-  const [payrollDate, setPayrollDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [payrollDate, setPayrollDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [payrollNotes, setPayrollNotes] = useState("");
   const [payrollEffectiveDate, setPayrollEffectiveDate] = useState("");
 
@@ -132,7 +152,11 @@ export default function FactoryEmployeeDetail() {
   const [payrollAmounts, setPayrollAmounts] = useState<Record<number, string>>({});
 
   // Queries
-  const { data: employee, isLoading: empLoading, error: empError } = useQuery<Employee>({
+  const {
+    data: employee,
+    isLoading: empLoading,
+    error: empError,
+  } = useQuery<Employee>({
     queryKey: ["/api/factory/employees", employeeId],
     queryFn: async () => {
       const res = await factoryApiRequest("GET", `/api/factory/employees/${employeeId}`);
@@ -167,8 +191,8 @@ export default function FactoryEmployeeDetail() {
       const res = await fetch("/api/ledger-accounts", { credentials: "include" });
       if (!res.ok) return [];
       const data = await res.json();
-      return (data || []).filter((a: LedgerAccount) =>
-        a.accountType === "Cash" || a.accountType?.toLowerCase().includes("cash")
+      return (data || []).filter(
+        (a: LedgerAccount) => a.accountType === "Cash" || a.accountType?.toLowerCase().includes("cash")
       );
     },
   });
@@ -177,7 +201,10 @@ export default function FactoryEmployeeDetail() {
   const updateMutation = useMutation({
     mutationFn: async (data: typeof editForm) => {
       const res = await factoryApiRequest("PATCH", `/api/factory/employees/${employeeId}`, data);
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -186,13 +213,19 @@ export default function FactoryEmployeeDetail() {
       toast({ title: "Employee updated" });
       setEditOpen(false);
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ variant: "destructive", title: e.message });
+    },
   });
 
   const recalcMutation = useMutation({
     mutationFn: async () => {
       const res = await factoryApiRequest("POST", `/api/factory/employees/${employeeId}/recalculate-balance`);
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -200,15 +233,24 @@ export default function FactoryEmployeeDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       toast({ title: "Balance recalculated", description: `New balance: $${data.newBalance?.toFixed(2)}` });
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ variant: "destructive", title: e.message });
+    },
   });
 
   const depositMutation = useMutation({
     mutationFn: async () => {
       const res = await factoryApiRequest("POST", `/api/factory/employees/${employeeId}/deposit`, {
-        amount: depositAmount, date: depositDate, notes: depositNotes, effectiveDate: depositEffectiveDate || null,
+        amount: depositAmount,
+        date: depositDate,
+        notes: depositNotes,
+        effectiveDate: depositEffectiveDate || null,
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -217,17 +259,28 @@ export default function FactoryEmployeeDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       toast({ title: "Deposit recorded" });
       setDepositOpen(false);
-      setDepositAmount(""); setDepositNotes(""); setDepositEffectiveDate("");
+      setDepositAmount("");
+      setDepositNotes("");
+      setDepositEffectiveDate("");
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ variant: "destructive", title: e.message });
+    },
   });
 
   const withdrawMutation = useMutation({
     mutationFn: async () => {
       const res = await factoryApiRequest("POST", `/api/factory/employees/${employeeId}/withdraw`, {
-        amount: withdrawAmount, date: withdrawDate, notes: withdrawNotes, cashAccountId: withdrawCashAccountId,
+        amount: withdrawAmount,
+        date: withdrawDate,
+        notes: withdrawNotes,
+        cashAccountId: withdrawCashAccountId,
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -236,22 +289,35 @@ export default function FactoryEmployeeDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/employees"] });
       toast({ title: "Withdrawal recorded" });
       setWithdrawOpen(false);
-      setWithdrawAmount(""); setWithdrawNotes(""); setWithdrawCashAccountId("");
+      setWithdrawAmount("");
+      setWithdrawNotes("");
+      setWithdrawCashAccountId("");
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ variant: "destructive", title: e.message }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ variant: "destructive", title: e.message });
+    },
   });
 
   const bulkPayrollMutation = useMutation({
     mutationFn: async () => {
-      const deposits = Array.from(selectedEmployees).map((empId) => ({
-        employeeId: empId,
-        amount: payrollAmounts[empId] || allEmployees.find((e) => e.id === empId)?.monthlySalary || "0",
-      })).filter((d) => parseFloat(d.amount) > 0);
+      const deposits = Array.from(selectedEmployees)
+        .map((empId) => ({
+          employeeId: empId,
+          amount: payrollAmounts[empId] || allEmployees.find((e) => e.id === empId)?.monthlySalary || "0",
+        }))
+        .filter((d) => parseFloat(d.amount) > 0);
 
       const res = await factoryApiRequest("POST", "/api/factory/employees/bulk-payroll", {
-        deposits, date: payrollDate, notes: payrollNotes, effectiveDate: payrollEffectiveDate || null,
+        deposits,
+        date: payrollDate,
+        notes: payrollNotes,
+        effectiveDate: payrollEffectiveDate || null,
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -311,7 +377,12 @@ export default function FactoryEmployeeDetail() {
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="icon" onClick={() => navigate("/factory/payroll-hub?tab=employees")} data-testid="button-back">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => navigate("/factory/payroll-hub?tab=employees")}
+        data-testid="button-back"
+      >
         <ArrowLeft className="h-4 w-4" />
       </Button>
 
@@ -327,10 +398,10 @@ export default function FactoryEmployeeDetail() {
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <h2 className="font-bold text-lg leading-tight" data-testid="text-employee-name">{fullName}</h2>
-                  {employee.department && (
-                    <p className="text-sm text-muted-foreground mt-0.5">{employee.department}</p>
-                  )}
+                  <h2 className="font-bold text-lg leading-tight" data-testid="text-employee-name">
+                    {fullName}
+                  </h2>
+                  {employee.department && <p className="text-sm text-muted-foreground mt-0.5">{employee.department}</p>}
                 </div>
                 <Badge
                   variant={employee.active ? "default" : "secondary"}
@@ -344,12 +415,16 @@ export default function FactoryEmployeeDetail() {
               <div className="border-t pt-3 space-y-1.5">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground text-xs">Code</span>
-                  <span className="font-mono text-xs" data-testid="text-employee-code">{employee.code}</span>
+                  <span className="font-mono text-xs" data-testid="text-employee-code">
+                    {employee.code}
+                  </span>
                 </div>
                 {employee.phone && (
                   <div className="flex justify-between text-sm">
                     <Phone className="h-3 w-3 text-muted-foreground shrink-0 mt-0.5" />
-                    <span className="text-xs" data-testid="text-employee-phone">{employee.phone}</span>
+                    <span className="text-xs" data-testid="text-employee-phone">
+                      {employee.phone}
+                    </span>
                   </div>
                 )}
                 {employee.joinDate && (
@@ -377,11 +452,15 @@ export default function FactoryEmployeeDetail() {
                 <div className="grid grid-cols-2 gap-2 text-xs text-center">
                   <div>
                     <div className="text-muted-foreground">Deposits</div>
-                    <div className="font-mono font-medium text-green-600 dark:text-green-400">{fmt(employee.totalDeposits)}</div>
+                    <div className="font-mono font-medium text-green-600 dark:text-green-400">
+                      {fmt(employee.totalDeposits)}
+                    </div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Withdrawn</div>
-                    <div className="font-mono font-medium text-red-600 dark:text-red-400">{fmt(employee.totalWithdrawals)}</div>
+                    <div className="font-mono font-medium text-red-600 dark:text-red-400">
+                      {fmt(employee.totalWithdrawals)}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -403,7 +482,8 @@ export default function FactoryEmployeeDetail() {
                   }}
                   data-testid="button-edit-employee"
                 >
-                  <Pencil className="h-3.5 w-3.5 mr-2" />Edit
+                  <Pencil className="h-3.5 w-3.5 mr-2" />
+                  Edit
                 </Button>
                 {isDeveloper && (
                   <Button
@@ -414,9 +494,11 @@ export default function FactoryEmployeeDetail() {
                     disabled={recalcMutation.isPending}
                     data-testid="button-recalculate-balance"
                   >
-                    {recalcMutation.isPending
-                      ? <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                      : <RefreshCw className="h-3.5 w-3.5 mr-2" />}
+                    {recalcMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                    )}
                     Recalculate
                   </Button>
                 )}
@@ -433,7 +515,11 @@ export default function FactoryEmployeeDetail() {
             </CardHeader>
             <CardContent className="px-5 pb-4 overflow-x-auto">
               {stmtLoading ? (
-                <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+                <div className="space-y-2">
+                  {[...Array(5)].map((_, i) => (
+                    <Skeleton key={i} className="h-10 w-full" />
+                  ))}
+                </div>
               ) : !statement?.rows || statement.rows.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">No transactions yet</p>
               ) : (
@@ -453,18 +539,26 @@ export default function FactoryEmployeeDetail() {
                       <TableRow key={row.id} data-testid={`row-stmt-${row.id}`}>
                         <TableCell className="text-sm">{formatDate(row.voucherDate)}</TableCell>
                         <TableCell className="font-mono text-xs text-muted-foreground">{row.voucherNumber}</TableCell>
-                        <TableCell className="text-sm" dir="ltr">{row.narration || row.description || "—"}</TableCell>
+                        <TableCell className="text-sm" dir="ltr">
+                          {row.narration || row.description || "—"}
+                        </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {row.credit > 0 ? (
                             <span className="text-green-600 dark:text-green-400">{fmt(row.credit)}</span>
-                          ) : "—"}
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {row.debit > 0 ? (
                             <span className="text-red-600 dark:text-red-400">{fmt(row.debit)}</span>
-                          ) : "—"}
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
-                        <TableCell className={`text-right font-mono text-sm font-semibold ${row.balance < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                        <TableCell
+                          className={`text-right font-mono text-sm font-semibold ${row.balance < 0 ? "text-red-600 dark:text-red-400" : ""}`}
+                        >
                           {fmt(row.balance)}
                         </TableCell>
                       </TableRow>
@@ -487,29 +581,58 @@ export default function FactoryEmployeeDetail() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
                 <Label>First Name</Label>
-                <Input value={editForm.firstName} onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))} data-testid="input-edit-first-name" />
+                <Input
+                  value={editForm.firstName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, firstName: e.target.value }))}
+                  data-testid="input-edit-first-name"
+                />
               </div>
               <div className="space-y-1">
                 <Label>Last Name</Label>
-                <Input value={editForm.lastName} onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))} data-testid="input-edit-last-name" />
+                <Input
+                  value={editForm.lastName}
+                  onChange={(e) => setEditForm((f) => ({ ...f, lastName: e.target.value }))}
+                  data-testid="input-edit-last-name"
+                />
               </div>
             </div>
             <div className="space-y-1">
               <Label>Department</Label>
-              <Input value={editForm.department} onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))} data-testid="input-edit-department" />
+              <Input
+                value={editForm.department}
+                onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
+                data-testid="input-edit-department"
+              />
             </div>
             <div className="space-y-1">
               <Label>Phone</Label>
-              <Input value={editForm.phone} onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))} data-testid="input-edit-phone" />
+              <Input
+                value={editForm.phone}
+                onChange={(e) => setEditForm((f) => ({ ...f, phone: e.target.value }))}
+                data-testid="input-edit-phone"
+              />
             </div>
             <div className="space-y-1">
               <Label>Monthly Salary</Label>
-              <Input type="number" min="0" step="0.01" value={editForm.monthlySalary} onChange={(e) => setEditForm((f) => ({ ...f, monthlySalary: e.target.value }))} data-testid="input-edit-salary" />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={editForm.monthlySalary}
+                onChange={(e) => setEditForm((f) => ({ ...f, monthlySalary: e.target.value }))}
+                data-testid="input-edit-salary"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button onClick={() => wrapAdminAction(() => updateMutation.mutate(editForm), "Save Employee")} disabled={updateMutation.isPending} data-testid="button-save-edit">
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(() => updateMutation.mutate(editForm), "Save Employee")}
+              disabled={updateMutation.isPending}
+              data-testid="button-save-edit"
+            >
               {updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
@@ -526,7 +649,9 @@ export default function FactoryEmployeeDetail() {
             <div className="space-y-1">
               <Label>Amount *</Label>
               <Input
-                type="number" min="0.01" step="0.01"
+                type="number"
+                min="0.01"
+                step="0.01"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
                 placeholder="0.00"
@@ -535,26 +660,65 @@ export default function FactoryEmployeeDetail() {
             </div>
             <div className="space-y-1">
               <Label>Entry Date *</Label>
-              <Input type="date" value={depositDate} onChange={(e) => setDepositDate(e.target.value)} data-testid="input-deposit-date" />
+              <Input
+                type="date"
+                value={depositDate}
+                onChange={(e) => setDepositDate(e.target.value)}
+                data-testid="input-deposit-date"
+              />
             </div>
             <div className="space-y-1">
-              <Label>Effective Date <span className="text-muted-foreground">(optional — period it belongs to)</span></Label>
-              <Input type="date" value={depositEffectiveDate} onChange={(e) => setDepositEffectiveDate(e.target.value)} data-testid="input-deposit-effective-date" />
+              <Label>
+                Effective Date <span className="text-muted-foreground">(optional — period it belongs to)</span>
+              </Label>
+              <Input
+                type="date"
+                value={depositEffectiveDate}
+                onChange={(e) => setDepositEffectiveDate(e.target.value)}
+                data-testid="input-deposit-effective-date"
+              />
             </div>
             <div className="space-y-1">
               <Label>Notes</Label>
-              <Input value={depositNotes} onChange={(e) => setDepositNotes(e.target.value)} placeholder="Optional notes" data-testid="input-deposit-notes" />
+              <Input
+                value={depositNotes}
+                onChange={(e) => setDepositNotes(e.target.value)}
+                placeholder="Optional notes"
+                data-testid="input-deposit-notes"
+              />
             </div>
             <div className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
               <div className="font-medium text-xs text-muted-foreground mb-1">Accounting Entry</div>
-              <div className="flex justify-between"><span>DR: Payroll Expense</span><span className="font-mono">{fmt(depositAmount || 0)}</span></div>
-              <div className="flex justify-between"><span>CR: Employee Account ({employee.code})</span><span className="font-mono">{fmt(depositAmount || 0)}</span></div>
+              <div className="flex justify-between">
+                <span>DR: Payroll Expense</span>
+                <span className="font-mono">{fmt(depositAmount || 0)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>CR: Employee Account ({employee.code})</span>
+                <span className="font-mono">{fmt(depositAmount || 0)}</span>
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDepositOpen(false)}>Cancel</Button>
-            <Button onClick={() => wrapAdminAction(() => depositMutation.mutate(), "Post Deposit")} disabled={depositMutation.isPending || !depositAmount} data-testid="button-confirm-deposit">
-              {depositMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Posting...</> : <><TrendingUp className="h-4 w-4 mr-2" />Post Deposit</>}
+            <Button variant="outline" onClick={() => setDepositOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(() => depositMutation.mutate(), "Post Deposit")}
+              disabled={depositMutation.isPending || !depositAmount}
+              data-testid="button-confirm-deposit"
+            >
+              {depositMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Post Deposit
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -570,7 +734,9 @@ export default function FactoryEmployeeDetail() {
             <div className="space-y-1">
               <Label>Amount *</Label>
               <Input
-                type="number" min="0.01" step="0.01"
+                type="number"
+                min="0.01"
+                step="0.01"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
                 placeholder="0.00"
@@ -579,7 +745,12 @@ export default function FactoryEmployeeDetail() {
             </div>
             <div className="space-y-1">
               <Label>Date *</Label>
-              <Input type="date" value={withdrawDate} onChange={(e) => setWithdrawDate(e.target.value)} data-testid="input-withdraw-date" />
+              <Input
+                type="date"
+                value={withdrawDate}
+                onChange={(e) => setWithdrawDate(e.target.value)}
+                data-testid="input-withdraw-date"
+              />
             </div>
             <div className="space-y-1">
               <Label>Cash Account *</Label>
@@ -598,19 +769,48 @@ export default function FactoryEmployeeDetail() {
             </div>
             <div className="space-y-1">
               <Label>Notes</Label>
-              <Input value={withdrawNotes} onChange={(e) => setWithdrawNotes(e.target.value)} placeholder="Optional notes" data-testid="input-withdraw-notes" />
+              <Input
+                value={withdrawNotes}
+                onChange={(e) => setWithdrawNotes(e.target.value)}
+                placeholder="Optional notes"
+                data-testid="input-withdraw-notes"
+              />
             </div>
             <div className="bg-muted/50 rounded-md p-3 text-sm space-y-1">
               <div className="font-medium text-xs text-muted-foreground mb-1">Accounting Entry</div>
-              <div className="flex justify-between"><span>DR: Employee Account ({employee.code})</span><span className="font-mono">{fmt(withdrawAmount || 0)}</span></div>
-              <div className="flex justify-between"><span>CR: Cash</span><span className="font-mono">{fmt(withdrawAmount || 0)}</span></div>
+              <div className="flex justify-between">
+                <span>DR: Employee Account ({employee.code})</span>
+                <span className="font-mono">{fmt(withdrawAmount || 0)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>CR: Cash</span>
+                <span className="font-mono">{fmt(withdrawAmount || 0)}</span>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">Note: Withdrawals are allowed even if they result in a negative balance.</p>
+            <p className="text-xs text-muted-foreground">
+              Note: Withdrawals are allowed even if they result in a negative balance.
+            </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setWithdrawOpen(false)}>Cancel</Button>
-            <Button onClick={() => wrapAdminAction(() => withdrawMutation.mutate(), "Post Withdrawal")} disabled={withdrawMutation.isPending || !withdrawAmount || !withdrawCashAccountId} data-testid="button-confirm-withdraw">
-              {withdrawMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Posting...</> : <><TrendingDown className="h-4 w-4 mr-2" />Post Withdrawal</>}
+            <Button variant="outline" onClick={() => setWithdrawOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(() => withdrawMutation.mutate(), "Post Withdrawal")}
+              disabled={withdrawMutation.isPending || !withdrawAmount || !withdrawCashAccountId}
+              data-testid="button-confirm-withdraw"
+            >
+              {withdrawMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Posting...
+                </>
+              ) : (
+                <>
+                  <TrendingDown className="h-4 w-4 mr-2" />
+                  Post Withdrawal
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

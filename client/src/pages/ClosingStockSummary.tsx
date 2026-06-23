@@ -8,7 +8,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Package, ChevronRight, RefreshCw, Calendar } from "lucide-react";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Label } from "@/components/ui/label";
@@ -117,32 +124,18 @@ export default function ClosingStockSummary() {
     <div className="p-3 sm:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleBack}
-            data-testid="button-back"
-          >
+          <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
             <PageHeader title="Closing Stock Summary" icon={<Package className="h-5 w-5" />} />
-            <p className="text-muted-foreground text-sm">
-              Current inventory values - {selectedCompany?.name}
-            </p>
+            <p className="text-muted-foreground text-sm">Current inventory values - {selectedCompany?.name}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <PeriodFilter
-            value={periodFilter}
-            onChange={setPeriodFilter}
-            data-testid="period-filter-closing-stock"
-          />
+          <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter-closing-stock" />
           {data?.grandTotal && data.grandTotal.value > 0 && (
-            <Button
-              onClick={() => setShowCarryForwardDialog(true)}
-              data-testid="button-carryforward-stock"
-            >
+            <Button onClick={() => setShowCarryForwardDialog(true)} data-testid="button-carryforward-stock">
               <RefreshCw className="h-4 w-4 mr-2" />
               Set as Opening Stock
             </Button>
@@ -183,7 +176,9 @@ export default function ClosingStockSummary() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Current Inventory Value:</span>
-                <span className="font-mono font-medium">{formatAmount(data?.grandTotal ? data.grandTotal.value : 0)}</span>
+                <span className="font-mono font-medium">
+                  {formatAmount(data?.grandTotal ? data.grandTotal.value : 0)}
+                </span>
               </div>
             </div>
           </div>
@@ -239,9 +234,7 @@ export default function ClosingStockSummary() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <span className="truncate">{group.name}</span>
                   </div>
-                  <div className="text-right font-mono text-sm">
-                    {formatQty(group.closing.quantity)}
-                  </div>
+                  <div className="text-right font-mono text-sm">{formatQty(group.closing.quantity)}</div>
                   <div className="hidden sm:block text-right font-mono text-sm">
                     {group.closing.rate > 0 ? formatAmount(group.closing.rate) : ""}
                   </div>
@@ -252,9 +245,7 @@ export default function ClosingStockSummary() {
               ))}
             </>
           ) : (
-            <div className="p-8 text-center text-muted-foreground">
-              No closing stock data available.
-            </div>
+            <div className="p-8 text-center text-muted-foreground">No closing stock data available.</div>
           )}
         </div>
 
@@ -262,15 +253,9 @@ export default function ClosingStockSummary() {
           <div className="bg-muted/50 border-t-2 border-primary">
             <div className="grid grid-cols-2 sm:grid-cols-4 p-2 sm:p-3 font-bold">
               <div className="text-xs sm:text-sm">Grand Total</div>
-              <div className="text-right font-mono">
-                {formatNumber(data.grandTotal.quantity)} BL
-              </div>
-              <div className="hidden sm:block text-right font-mono">
-                {formatAmount(data.grandTotal.rate)}
-              </div>
-              <div className="hidden sm:block text-right font-mono">
-                {formatAmount(data.grandTotal.value)}
-              </div>
+              <div className="text-right font-mono">{formatNumber(data.grandTotal.quantity)} BL</div>
+              <div className="hidden sm:block text-right font-mono">{formatAmount(data.grandTotal.rate)}</div>
+              <div className="hidden sm:block text-right font-mono">{formatAmount(data.grandTotal.value)}</div>
             </div>
           </div>
         )}

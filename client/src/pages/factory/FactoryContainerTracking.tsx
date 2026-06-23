@@ -3,9 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ExternalLink, Search, Ship } from "lucide-react";
 import { formatNumber } from "@/lib/formatNumber";
 
@@ -40,16 +38,15 @@ function TrackingStatus({ row }: { row: InvoiceContainerRow }) {
   }
   const lower = raw.toLowerCase();
   const isDelivered = lower.includes("return") || lower.includes("delivered") || lower.includes("gate-out");
-  const isInTransit = lower.includes("transit") || lower.includes("gate-in") || lower.includes("vessel") || lower.includes("loaded");
+  const isInTransit =
+    lower.includes("transit") || lower.includes("gate-in") || lower.includes("vessel") || lower.includes("loaded");
   const colorClass = isDelivered
     ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
     : isInTransit
-    ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
-    : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+      : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}>
-      {raw}
-    </span>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${colorClass}`}>{raw}</span>
   );
 }
 
@@ -140,22 +137,31 @@ export default function FactoryContainerTracking() {
             <TableBody>
               {filtered.map((row, idx) => (
                 <TableRow key={row.id} data-testid={`row-container-tracking-${row.id}`}>
-                  <TableCell className="text-center text-muted-foreground text-sm">
-                    {idx + 1}
-                  </TableCell>
-                  <TableCell className="font-mono font-medium text-sm whitespace-nowrap" data-testid={`text-container-num-${row.id}`}>
+                  <TableCell className="text-center text-muted-foreground text-sm">{idx + 1}</TableCell>
+                  <TableCell
+                    className="font-mono font-medium text-sm whitespace-nowrap"
+                    data-testid={`text-container-num-${row.id}`}
+                  >
                     {row.containerNumber}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-sm" data-testid={`text-customer-${row.id}`}>
                     {row.customerName ?? <span className="text-muted-foreground">—</span>}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-sm text-muted-foreground" data-testid={`text-invoice-${row.id}`}>
+                  <TableCell
+                    className="whitespace-nowrap text-sm text-muted-foreground"
+                    data-testid={`text-invoice-${row.id}`}
+                  >
                     {row.invoiceNumber ?? "—"}
                   </TableCell>
-                  <TableCell className="text-right whitespace-nowrap text-sm tabular-nums" data-testid={`text-cost-${row.id}`}>
-                    {row.grandTotal
-                      ? `$${formatNumber(parseFloat(row.grandTotal))}`
-                      : <span className="text-muted-foreground">—</span>}
+                  <TableCell
+                    className="text-right whitespace-nowrap text-sm tabular-nums"
+                    data-testid={`text-cost-${row.id}`}
+                  >
+                    {row.grandTotal ? (
+                      `$${formatNumber(parseFloat(row.grandTotal))}`
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-sm font-medium" data-testid={`text-eta-${row.id}`}>
                     {row.eta ? (

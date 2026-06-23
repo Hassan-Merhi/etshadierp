@@ -2,7 +2,14 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +29,11 @@ export function CleanEmptyAccountsDialog({ open, onOpenChange, companyId }: Clea
   const [selected, setSelected] = useState<number[]>([]);
   const [filter, setFilter] = useState("");
 
-  const { data: emptyAccounts = [], isLoading, refetch } = useQuery<any[]>({
+  const {
+    data: emptyAccounts = [],
+    isLoading,
+    refetch,
+  } = useQuery<any[]>({
     queryKey: ["/api/ledger-accounts/empty", companyId],
     enabled: open && !!companyId,
   });
@@ -50,7 +61,7 @@ export function CleanEmptyAccountsDialog({ open, onOpenChange, companyId }: Clea
     },
   });
 
-  const filtered = emptyAccounts.filter(a => a.name.toLowerCase().includes(filter.toLowerCase()));
+  const filtered = emptyAccounts.filter((a) => a.name.toLowerCase().includes(filter.toLowerCase()));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -60,9 +71,7 @@ export function CleanEmptyAccountsDialog({ open, onOpenChange, companyId }: Clea
             <Eraser className="h-5 w-5 text-rose-500" />
             Clean Empty Accounts
           </DialogTitle>
-          <DialogDescription>
-            Delete ledger accounts with zero transactions across all vouchers.
-          </DialogDescription>
+          <DialogDescription>Delete ledger accounts with zero transactions across all vouchers.</DialogDescription>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col gap-4 mt-2">
@@ -84,7 +93,7 @@ export function CleanEmptyAccountsDialog({ open, onOpenChange, companyId }: Clea
                     <Checkbox
                       checked={filtered.length > 0 && selected.length === filtered.length}
                       onCheckedChange={(checked) => {
-                        if (checked) setSelected(filtered.map(a => a.id));
+                        if (checked) setSelected(filtered.map((a) => a.id));
                         else setSelected([]);
                       }}
                     />
@@ -95,31 +104,47 @@ export function CleanEmptyAccountsDialog({ open, onOpenChange, companyId }: Clea
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">Loading accounts...</TableCell></TableRow>
-                ) : filtered.length === 0 ? (
-                  <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">No empty accounts found</TableCell></TableRow>
-                ) : filtered.map((account) => (
-                  <TableRow key={account.id}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selected.includes(account.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) setSelected([...selected, account.id]);
-                          else setSelected(selected.filter(id => id !== account.id));
-                        }}
-                      />
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      Loading accounts...
                     </TableCell>
-                    <TableCell className="font-medium text-sm">{account.name}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px]">{account.accountType}</Badge></TableCell>
                   </TableRow>
-                ))}
+                ) : filtered.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                      No empty accounts found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filtered.map((account) => (
+                    <TableRow key={account.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selected.includes(account.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) setSelected([...selected, account.id]);
+                            else setSelected(selected.filter((id) => id !== account.id));
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">{account.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px]">
+                          {account.accountType}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
         </div>
 
         <DialogFooter className="border-t pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
             variant="destructive"
             disabled={selected.length === 0 || deleteMutation.isPending}

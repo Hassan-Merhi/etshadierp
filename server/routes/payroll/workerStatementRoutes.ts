@@ -34,22 +34,41 @@ function getFactoryCompanyId(req: any): number | undefined {
 }
 
 /** Write a single daybook entry (factory audit log). */
-async function writeDaybookEntry(dbOrTx: any, opts: {
-  companyId: number; txDate: string; txType: string;
-  referenceId?: number; referenceTable?: string; description: string;
-  metaJson?: string; currencyCode?: string; amountCurrency?: number;
-  fxRateToUsd?: number; amountUsd?: number; createdBy?: number;
-}) {
+async function writeDaybookEntry(
+  dbOrTx: any,
+  opts: {
+    companyId: number;
+    txDate: string;
+    txType: string;
+    referenceId?: number;
+    referenceTable?: string;
+    description: string;
+    metaJson?: string;
+    currencyCode?: string;
+    amountCurrency?: number;
+    fxRateToUsd?: number;
+    amountUsd?: number;
+    createdBy?: number;
+  }
+) {
   const currency = opts.currencyCode || "USD";
   const fxRate = opts.fxRateToUsd || 1;
   const amtCurrency = opts.amountCurrency || 0;
-  const amtUsd = opts.amountUsd !== undefined ? opts.amountUsd : (currency === "USD" ? amtCurrency : amtCurrency * fxRate);
+  const amtUsd =
+    opts.amountUsd !== undefined ? opts.amountUsd : currency === "USD" ? amtCurrency : amtCurrency * fxRate;
   await dbOrTx.insert(factoryDaybookEntries).values({
-    companyId: opts.companyId, txDate: opts.txDate, txType: opts.txType,
-    referenceId: opts.referenceId || null, referenceTable: opts.referenceTable || null,
-    description: opts.description, metaJson: opts.metaJson || null,
-    currencyCode: currency, amountCurrency: String(amtCurrency),
-    fxRateToUsd: String(fxRate), amountUsd: String(amtUsd), createdBy: opts.createdBy || null,
+    companyId: opts.companyId,
+    txDate: opts.txDate,
+    txType: opts.txType,
+    referenceId: opts.referenceId || null,
+    referenceTable: opts.referenceTable || null,
+    description: opts.description,
+    metaJson: opts.metaJson || null,
+    currencyCode: currency,
+    amountCurrency: String(amtCurrency),
+    fxRateToUsd: String(fxRate),
+    amountUsd: String(amtUsd),
+    createdBy: opts.createdBy || null,
   });
 }
 
@@ -90,16 +109,16 @@ const workerUpload = multer({
 
 function computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
   const start = new Date(startStr + "T00:00:00");
-  const end   = new Date(endStr   + "T00:00:00");
+  const end = new Date(endStr + "T00:00:00");
   let total = 0;
   let cur = new Date(start.getFullYear(), start.getMonth(), 1);
   while (cur <= end) {
-    const year  = cur.getFullYear();
+    const year = cur.getFullYear();
     const month = cur.getMonth();
-    const monthLastDay    = new Date(year, month + 1, 0);
+    const monthLastDay = new Date(year, month + 1, 0);
     const daysInThisMonth = monthLastDay.getDate();
     const segStart = new Date(Math.max(cur.getTime(), start.getTime()));
-    const segEnd   = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
+    const segEnd = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
     const daysInSeg = Math.floor((segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     total += salary * (daysInSeg / daysInThisMonth);
     cur = new Date(year, month + 1, 1);
@@ -130,7 +149,6 @@ function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string
   return attendedDays * dailyRate;
 }
 
-
 export function registerWorkerStatementRoutes(app: Express) {
   app.delete("/api/factory/advance-repayments/:id", requireAuth, async (req: any, res: any) => {
     try {
@@ -143,11 +161,15 @@ export function registerWorkerStatementRoutes(app: Express) {
       const repaymentId = parseId(req.params.id);
       if (repaymentId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [repayment] = await db.select().from(factoryAdvanceRepayments)
+      const [repayment] = await db
+        .select()
+        .from(factoryAdvanceRepayments)
         .where(and(eq(factoryAdvanceRepayments.id, repaymentId), eq(factoryAdvanceRepayments.companyId, companyId)));
       if (!repayment) return res.status(404).json({ message: "Repayment not found" });
 
-      const [advance] = await db.select().from(factoryWorkerAdvances)
+      const [advance] = await db
+        .select()
+        .from(factoryWorkerAdvances)
         .where(eq(factoryWorkerAdvances.id, repayment.advanceId));
 
       const repayAmt = parseFloat(repayment.amount || "0");
@@ -155,22 +177,27 @@ export function registerWorkerStatementRoutes(app: Express) {
       const restoredBal = currentBal + repayAmt;
 
       await db.transaction(async (tx: any) => {
-        await tx.delete(factoryAdvanceRepayments)
-          .where(eq(factoryAdvanceRepayments.id, repaymentId));
+        await tx.delete(factoryAdvanceRepayments).where(eq(factoryAdvanceRepayments.id, repaymentId));
 
         if (advance) {
-          await tx.update(factoryWorkerAdvances).set({
-            remainingBalance: restoredBal.toFixed(2),
-            fullyPaid: false,
-          }).where(eq(factoryWorkerAdvances.id, advance.id));
+          await tx
+            .update(factoryWorkerAdvances)
+            .set({
+              remainingBalance: restoredBal.toFixed(2),
+              fullyPaid: false,
+            })
+            .where(eq(factoryWorkerAdvances.id, advance.id));
         }
       });
 
-      const [worker] = await db.select({ fullName: factoryWorkers.fullName })
-        .from(factoryWorkers).where(eq(factoryWorkers.id, repayment.workerId));
+      const [worker] = await db
+        .select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers)
+        .where(eq(factoryWorkers.id, repayment.workerId));
 
       await writeDaybookEntry(db, {
-        companyId, txDate: getClientDate(req),
+        companyId,
+        txDate: getClientDate(req),
         txType: "ADVANCE_REPAYMENT_DELETED",
         referenceId: repaymentId,
         referenceTable: "factory_advance_repayments",
@@ -198,36 +225,46 @@ export function registerWorkerStatementRoutes(app: Express) {
       const companyId = req.body.companyId || getFactoryCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const paidPayrolls = await db.select({
-        id: factoryPayrolls.id,
-        companyId: factoryPayrolls.companyId,
-        workerId: factoryPayrolls.workerId,
-        netSalary: factoryPayrolls.netSalary,
-        cashAccountId: factoryPayrolls.cashAccountId,
-        periodStart: factoryPayrolls.periodStart,
-        periodEnd: factoryPayrolls.periodEnd,
-        paidAt: factoryPayrolls.paidAt,
-      }).from(factoryPayrolls)
-        .where(and(
-          eq(factoryPayrolls.companyId, companyId),
-          eq(factoryPayrolls.status, "PAID"),
-          isNotNull(factoryPayrolls.cashAccountId),
-        ));
+      const paidPayrolls = await db
+        .select({
+          id: factoryPayrolls.id,
+          companyId: factoryPayrolls.companyId,
+          workerId: factoryPayrolls.workerId,
+          netSalary: factoryPayrolls.netSalary,
+          cashAccountId: factoryPayrolls.cashAccountId,
+          periodStart: factoryPayrolls.periodStart,
+          periodEnd: factoryPayrolls.periodEnd,
+          paidAt: factoryPayrolls.paidAt,
+        })
+        .from(factoryPayrolls)
+        .where(
+          and(
+            eq(factoryPayrolls.companyId, companyId),
+            eq(factoryPayrolls.status, "PAID"),
+            isNotNull(factoryPayrolls.cashAccountId)
+          )
+        );
 
-      const existingVouchers = await db.select({
-        voucherNumber: vouchers.voucherNumber,
-      }).from(vouchers)
-        .where(and(
-          eq(vouchers.sourceModule, "FACTORY"),
-          eq(vouchers.voucherType, "Payment"),
-          sql`${vouchers.voucherNumber} LIKE 'PAYMENT-PAY-%'`,
-        ));
+      const existingVouchers = await db
+        .select({
+          voucherNumber: vouchers.voucherNumber,
+        })
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.sourceModule, "FACTORY"),
+            eq(vouchers.voucherType, "Payment"),
+            sql`${vouchers.voucherNumber} LIKE 'PAYMENT-PAY-%'`
+          )
+        );
 
       const existingPayrollIds = new Set(
-        existingVouchers.map((v: any) => {
-          const parts = v.voucherNumber.split("-");
-          return parseInt(parts[2]);
-        }).filter((id: number) => !isNaN(id))
+        existingVouchers
+          .map((v: any) => {
+            const parts = v.voucherNumber.split("-");
+            return parseInt(parts[2]);
+          })
+          .filter((id: number) => !isNaN(id))
       );
 
       const toBackfill = paidPayrolls.filter((p: any) => {
@@ -235,10 +272,12 @@ export function registerWorkerStatementRoutes(app: Express) {
         return net > 0 && !existingPayrollIds.has(p.id);
       });
 
-      const skipped = paidPayrolls.filter((p: any) => {
-        const net = parseFloat(p.netSalary || "0");
-        return net <= 0 || existingPayrollIds.has(p.id);
-      }).map((p: any) => p.id);
+      const skipped = paidPayrolls
+        .filter((p: any) => {
+          const net = parseFloat(p.netSalary || "0");
+          return net <= 0 || existingPayrollIds.has(p.id);
+        })
+        .map((p: any) => p.id);
 
       if (toBackfill.length === 0) {
         return res.json({ message: "No payrolls need backfill", found: paidPayrolls.length, backfilled: 0, skipped });
@@ -247,7 +286,8 @@ export function registerWorkerStatementRoutes(app: Express) {
       const companyIds = [...new Set(toBackfill.map((p: any) => p.companyId))];
       const workerIds = [...new Set(toBackfill.map((p: any) => p.workerId))];
 
-      const workerRows = await db.select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
+      const workerRows = await db
+        .select({ id: factoryWorkers.id, fullName: factoryWorkers.fullName })
         .from(factoryWorkers)
         .where(inArray(factoryWorkers.id, workerIds));
       const workerMap = new Map(workerRows.map((w: any) => [w.id, w.fullName]));
@@ -258,21 +298,28 @@ export function registerWorkerStatementRoutes(app: Express) {
         const payrollAccountCache = new Map<number, number>();
 
         for (const cid of companyIds) {
-          let [found] = await tx.select({ id: ledgerAccounts.id })
+          let [found] = await tx
+            .select({ id: ledgerAccounts.id })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, cid), eq(ledgerAccounts.name, "Factory Worker Payroll")));
 
           if (!found) {
-            const [maxCode] = await tx.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+            const [maxCode] = await tx
+              .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
               .from(ledgerAccounts)
               .where(and(eq(ledgerAccounts.companyId, cid), sql`code ~ '^\d+$'`));
             const nextCode = String((parseInt(maxCode?.maxCode || "0") || 0) + 1);
-            [found] = await tx.insert(ledgerAccounts).values({
-              companyId: cid, code: nextCode,
-              name: "Factory Worker Payroll",
-              accountType: "Expense",
-              active: true, isHidden: false,
-            }).returning();
+            [found] = await tx
+              .insert(ledgerAccounts)
+              .values({
+                companyId: cid,
+                code: nextCode,
+                name: "Factory Worker Payroll",
+                accountType: "Expense",
+                active: true,
+                isHidden: false,
+              })
+              .returning();
           }
           payrollAccountCache.set(cid, found.id);
         }
@@ -285,16 +332,19 @@ export function registerWorkerStatementRoutes(app: Express) {
           const narration = `Payroll backfill: ${workerName} (${pr.periodStart} – ${pr.periodEnd})`;
           const voucherDate = pr.paidAt ? new Date(pr.paidAt).toISOString().split("T")[0] : getClientDate(req);
 
-          const [pVoucher] = await tx.insert(vouchers).values({
-            companyId: pr.companyId,
-            voucherNumber: `PAYMENT-PAY-${pr.id}-${Date.now()}`,
-            voucherType: "Payment",
-            voucherDate,
-            description: narration,
-            totalAmount: netAmt.toFixed(2),
-            currency: "USD",
-            sourceModule: "FACTORY",
-          }).returning();
+          const [pVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId: pr.companyId,
+              voucherNumber: `PAYMENT-PAY-${pr.id}-${Date.now()}`,
+              voucherType: "Payment",
+              voucherDate,
+              description: narration,
+              totalAmount: netAmt.toFixed(2),
+              currency: "USD",
+              sourceModule: "FACTORY",
+            })
+            .returning();
 
           await tx.insert(voucherEntries).values([
             {
@@ -429,31 +479,60 @@ export function registerWorkerStatementRoutes(app: Express) {
       const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
 
       // Worker info
-      const [worker] = await db.select().from(factoryWorkers)
+      const [worker] = await db
+        .select()
+        .from(factoryWorkers)
         .where(and(eq(factoryWorkers.id, workerId), eq(factoryWorkers.companyId, companyId)));
       if (!worker) return res.status(404).json({ message: "Worker not found" });
       const workerName = worker.fullName || `Worker #${workerId}`;
 
       // Advances
-      const advConds: any[] = [eq(factoryWorkerAdvances.workerId, workerId), eq(factoryWorkerAdvances.companyId, companyId)];
+      const advConds: any[] = [
+        eq(factoryWorkerAdvances.workerId, workerId),
+        eq(factoryWorkerAdvances.companyId, companyId),
+      ];
       if (startDate) advConds.push(sql`${factoryWorkerAdvances.advanceDate} >= ${startDate}`);
       if (endDate) advConds.push(sql`${factoryWorkerAdvances.advanceDate} <= ${endDate}`);
-      const advances = await db.select().from(factoryWorkerAdvances).where(and(...advConds)).orderBy(factoryWorkerAdvances.advanceDate);
+      const advances = await db
+        .select()
+        .from(factoryWorkerAdvances)
+        .where(and(...advConds))
+        .orderBy(factoryWorkerAdvances.advanceDate);
 
       // Payrolls
-      const payConds: any[] = [eq(factoryPayrolls.workerId, workerId), eq(factoryPayrolls.companyId, companyId), eq(factoryPayrolls.status, "PAID")];
+      const payConds: any[] = [
+        eq(factoryPayrolls.workerId, workerId),
+        eq(factoryPayrolls.companyId, companyId),
+        eq(factoryPayrolls.status, "PAID"),
+      ];
       if (startDate) payConds.push(sql`${factoryPayrolls.paidAt}::date >= ${startDate}`);
       if (endDate) payConds.push(sql`${factoryPayrolls.paidAt}::date <= ${endDate}`);
-      const payrolls = await db.select().from(factoryPayrolls).where(and(...payConds)).orderBy(factoryPayrolls.paidAt);
+      const payrolls = await db
+        .select()
+        .from(factoryPayrolls)
+        .where(and(...payConds))
+        .orderBy(factoryPayrolls.paidAt);
 
       // Build entries
       const entries: any[] = [];
       for (const adv of advances) {
-        entries.push({ date: adv.advanceDate, type: "Advance", description: adv.notes || "Advance payment", debit: parseFloat(adv.amount || "0"), credit: 0 });
+        entries.push({
+          date: adv.advanceDate,
+          type: "Advance",
+          description: adv.notes || "Advance payment",
+          debit: parseFloat(adv.amount || "0"),
+          credit: 0,
+        });
       }
       for (const pr of payrolls) {
         const paidDate = pr.paidAt ? new Date(pr.paidAt).toISOString().split("T")[0] : pr.periodEnd;
-        entries.push({ date: paidDate, type: "Payroll", description: `Payroll ${pr.periodStart} to ${pr.periodEnd}`, debit: 0, credit: parseFloat(pr.netSalary || "0") });
+        entries.push({
+          date: paidDate,
+          type: "Payroll",
+          description: `Payroll ${pr.periodStart} to ${pr.periodEnd}`,
+          debit: 0,
+          credit: parseFloat(pr.netSalary || "0"),
+        });
       }
       entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -465,15 +544,35 @@ export function registerWorkerStatementRoutes(app: Express) {
 
       // Company info
       const [co] = await db.select().from(companies).where(eq(companies.id, companyId));
-      const [sett] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId)).catch(() => [null]);
+      const [sett] = await db
+        .select()
+        .from(companySettings)
+        .where(eq(companySettings.companyId, companyId))
+        .catch(() => [null]);
       const companyName = (co as any)?.name ?? "Company";
       const logoUrl: string | null = (sett as any)?.logoUrl ?? null;
       const baseCurrency = (co as any)?.baseCurrency ?? "USD";
       const currMap: Record<string, string> = { USD: "$ ", GBP: "£", EUR: "€", CFA: "CFA ", AED: "AED " };
-      const sym = currMap[baseCurrency.toUpperCase()] ?? (baseCurrency + " ");
-      const fmtAmt = (n: number) => sym + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-      const fmtDate = (s: string) => new Date(s.split("T")[0] + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-      const periodStr = startDate && endDate ? `${fmtDate(startDate)} — ${fmtDate(endDate)}` : startDate ? `From ${fmtDate(startDate)}` : endDate ? `Up to ${fmtDate(endDate)}` : "All Time";
+      const sym = currMap[baseCurrency.toUpperCase()] ?? baseCurrency + " ";
+      const fmtAmt = (n: number) =>
+        sym +
+        Math.abs(n)
+          .toFixed(2)
+          .replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      const fmtDate = (s: string) =>
+        new Date(s.split("T")[0] + "T00:00:00").toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        });
+      const periodStr =
+        startDate && endDate
+          ? `${fmtDate(startDate)} — ${fmtDate(endDate)}`
+          : startDate
+            ? `From ${fmtDate(startDate)}`
+            : endDate
+              ? `Up to ${fmtDate(endDate)}`
+              : "All Time";
       const generatedStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 
       const PDFDocument = (await import("pdfkit")).default;
@@ -492,7 +591,10 @@ export function registerWorkerStatementRoutes(app: Express) {
 
       // Arabic reshaping helpers — always loaded
       let wConvertArabic: ((t: string) => string) | null = null;
-      let wBidiInst: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
+      let wBidiInst: {
+        getEmbeddingLevels: (t: string, d: string) => any;
+        getReorderedString: (t: string, l: any) => string;
+      } | null = null;
       try {
         const reshaperMod = require("arabic-reshaper") as { convertArabic: (t: string) => string };
         wConvertArabic = reshaperMod.convertArabic;
@@ -510,27 +612,44 @@ export function registerWorkerStatementRoutes(app: Express) {
             return wBidiInst.getReorderedString(reshaped, levels);
           }
           return reshaped;
-        } catch { return text; }
+        } catch {
+          return text;
+        }
       };
 
       // Render text with automatic Arabic font switching per cell
-      const wRenderText = (text: string, x: number, yPos: number, w: number, align: "left"|"right") => {
+      const wRenderText = (text: string, x: number, yPos: number, w: number, align: "left" | "right") => {
         const hasAr = hasArabicFont && wContainsArabic(text);
-        doc.font(hasAr ? "Arabic" : "Helvetica").fontSize(7.5)
+        doc
+          .font(hasAr ? "Arabic" : "Helvetica")
+          .fontSize(7.5)
           .text(hasAr ? wShapeText(text) : text, x, yPos, { width: w, align: hasAr ? "right" : align });
       };
 
       // Header
       const wHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(wHmdLogoPath)) {
-        try { doc.image(wHmdLogoPath, (doc.page.width - 220) / 2, 20, { width: 220 }); } catch {}
+        try {
+          doc.image(wHmdLogoPath, (doc.page.width - 220) / 2, 20, { width: 220 });
+        } catch {}
       }
       const wNameHasAr = hasArabicFont && wContainsArabic(workerName);
-      doc.fontSize(10).font(wNameHasAr ? "Arabic" : "Helvetica").fillColor("#555555")
-        .text(wNameHasAr ? `كشف حساب: ${wShapeText(workerName)}` : `Account Statement: ${workerName}`, 40, 102, { width: 515, align: wNameHasAr ? "right" : "center" });
+      doc
+        .fontSize(10)
+        .font(wNameHasAr ? "Arabic" : "Helvetica")
+        .fillColor("#555555")
+        .text(wNameHasAr ? `كشف حساب: ${wShapeText(workerName)}` : `Account Statement: ${workerName}`, 40, 102, {
+          width: 515,
+          align: wNameHasAr ? "right" : "center",
+        });
 
       const headerBottom = 110;
-      doc.moveTo(40, headerBottom + 4).lineTo(555, headerBottom + 4).lineWidth(0.5).strokeColor("#cccccc").stroke();
+      doc
+        .moveTo(40, headerBottom + 4)
+        .lineTo(555, headerBottom + 4)
+        .lineWidth(0.5)
+        .strokeColor("#cccccc")
+        .stroke();
       doc.lineWidth(1).strokeColor("#000000");
 
       const metaY = headerBottom + 10;
@@ -570,8 +689,16 @@ export function registerWorkerStatementRoutes(app: Express) {
 
       // Rows
       rowsWithBalance.forEach((row, idx) => {
-        if (y + ROW_H > PAGE_H - MARGIN_BOTTOM) { doc.addPage(); y = 40; drawHdr(y); y += HDR_H; }
-        if (idx % 2 === 1) { doc.rect(40, y, 515, ROW_H).fill("#F8F8F8"); doc.fillColor("#000000"); }
+        if (y + ROW_H > PAGE_H - MARGIN_BOTTOM) {
+          doc.addPage();
+          y = 40;
+          drawHdr(y);
+          y += HDR_H;
+        }
+        if (idx % 2 === 1) {
+          doc.rect(40, y, 515, ROW_H).fill("#F8F8F8");
+          doc.fillColor("#000000");
+        }
         const bal = row.runningBalance;
         const balSide = bal >= 0 ? "Dr" : "Cr";
         wRenderText(fmtDate(row.date), colX[0] + 2, y + 3, colW[0] - 4, "left");
@@ -593,7 +720,10 @@ export function registerWorkerStatementRoutes(app: Express) {
       const closing = rowsWithBalance.length > 0 ? rowsWithBalance[rowsWithBalance.length - 1].runningBalance : 0;
       const closingSide = closing >= 0 ? "Dr" : "Cr";
 
-      if (y + 52 > PAGE_H - 20) { doc.addPage(); y = 40; }
+      if (y + 52 > PAGE_H - 20) {
+        doc.addPage();
+        y = 40;
+      }
       doc.rect(40, y, 515, 16).fill("#EFF3FB");
       doc.fillColor("#000000").font("Helvetica").fontSize(8);
       doc.text("Current Period Total", colX[2] + 2, y + 4, { width: colW[2] - 4, align: "left" });
@@ -622,20 +752,27 @@ export function registerWorkerStatementRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid worker ID" });
 
       // Check if the worker has any bale entries
-      const baleCheck = await db.execute(sql`SELECT COUNT(*) as cnt FROM factory_bales WHERE worker_id = ${id} AND company_id = ${companyId} AND status NOT IN ('REMOVED','DELETED')`);
+      const baleCheck = await db.execute(
+        sql`SELECT COUNT(*) as cnt FROM factory_bales WHERE worker_id = ${id} AND company_id = ${companyId} AND status NOT IN ('REMOVED','DELETED')`
+      );
       const baleCount = parseInt((baleCheck.rows[0] as any)?.cnt || "0");
       if (baleCount > 0) {
-        return res.status(400).json({ message: `Cannot delete: this worker has ${baleCount} bale entries. Remove all bale entries first.` });
+        return res.status(400).json({
+          message: `Cannot delete: this worker has ${baleCount} bale entries. Remove all bale entries first.`,
+        });
       }
 
       // Check for payroll entries
-      const payrollCheck = await db.execute(sql`SELECT COUNT(*) as cnt FROM factory_payrolls WHERE worker_id = ${id} AND company_id = ${companyId}`);
+      const payrollCheck = await db.execute(
+        sql`SELECT COUNT(*) as cnt FROM factory_payrolls WHERE worker_id = ${id} AND company_id = ${companyId}`
+      );
       const payrollCount = parseInt((payrollCheck.rows[0] as any)?.cnt || "0");
       if (payrollCount > 0) {
         return res.status(400).json({ message: `Cannot delete: this worker has ${payrollCount} payroll record(s).` });
       }
 
-      const [deleted] = await db.delete(factoryWorkers)
+      const [deleted] = await db
+        .delete(factoryWorkers)
         .where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)))
         .returning({ id: factoryWorkers.id });
 
@@ -669,10 +806,7 @@ export function registerWorkerStatementRoutes(app: Express) {
         const payVouchers = await tx
           .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
           .from(vouchers)
-          .where(and(
-            eq(vouchers.companyId, companyId),
-            sql`${vouchers.voucherNumber} LIKE 'PAYMENT-PAY-%'`,
-          ));
+          .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE 'PAYMENT-PAY-%'`));
 
         const orphanedPayVoucherIds: number[] = [];
         for (const v of payVouchers) {
@@ -703,10 +837,7 @@ export function registerWorkerStatementRoutes(app: Express) {
         const advVouchers = await tx
           .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
           .from(vouchers)
-          .where(and(
-            eq(vouchers.companyId, companyId),
-            sql`${vouchers.voucherNumber} LIKE 'PAYMENT-ADV-%'`,
-          ));
+          .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE 'PAYMENT-ADV-%'`));
 
         const orphanedAdvVoucherIds: number[] = [];
         for (const v of advVouchers) {
@@ -738,15 +869,20 @@ export function registerWorkerStatementRoutes(app: Express) {
         const repayVouchers = await tx
           .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber })
           .from(vouchers)
-          .where(and(
-            eq(vouchers.companyId, companyId),
-            sql`(${vouchers.voucherNumber} LIKE 'REPAY-SAL-%' OR ${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%')`,
-          ));
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              sql`(${vouchers.voucherNumber} LIKE 'REPAY-SAL-%' OR ${vouchers.voucherNumber} LIKE 'RECEIPT-REPAY-%')`
+            )
+          );
 
         const orphanedRepayVoucherIds: number[] = [];
         for (const v of repayVouchers) {
           const m = v.voucherNumber.match(/^(?:REPAY-SAL|RECEIPT-REPAY)-(\d+)-/);
-          if (!m) { orphanedRepayVoucherIds.push(v.id); continue; }
+          if (!m) {
+            orphanedRepayVoucherIds.push(v.id);
+            continue;
+          }
           const repaymentId = parseInt(m[1]);
           const [repayment] = await tx
             .select({ id: factoryAdvanceRepayments.id })

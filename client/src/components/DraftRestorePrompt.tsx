@@ -28,23 +28,11 @@ export function DraftRestorePrompt({
       description={`saved ${draftAge}`}
       actions={
         <>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={onRestore}
-            data-testid="button-restore-draft"
-          >
+          <Button type="button" size="sm" variant="outline" onClick={onRestore} data-testid="button-restore-draft">
             <RotateCcw className="h-3.5 w-3.5 mr-1" />
             Restore
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            onClick={onDiscard}
-            data-testid="button-discard-draft"
-          >
+          <Button type="button" size="sm" variant="ghost" onClick={onDiscard} data-testid="button-discard-draft">
             <Trash2 className="h-3.5 w-3.5 mr-1" />
             Discard
           </Button>

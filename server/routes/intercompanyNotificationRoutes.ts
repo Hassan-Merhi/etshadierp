@@ -27,7 +27,7 @@ export async function triggerIntercompanyNotifications(
   amount: string,
   description: string | null,
   entryLedgerAccountIds: (number | null)[],
-  voucherType?: string,
+  voucherType?: string
 ) {
   try {
     // Only trigger for Payment and Receipt vouchers — other types (Journal, Sales, etc.)
@@ -45,24 +45,27 @@ export async function triggerIntercompanyNotifications(
         and(
           eq(intercompanyAccountLinks.sourceCompanyId, companyId),
           eq(intercompanyAccountLinks.active, true),
-          inArray(intercompanyAccountLinks.sourceLedgerAccountId, ledgerIds),
-        ),
+          inArray(intercompanyAccountLinks.sourceLedgerAccountId, ledgerIds)
+        )
       );
 
     if (links.length === 0) return;
 
     for (const link of links) {
       // Insert one pending request per matching link
-      const [inserted] = await db.insert(intercompanyPaymentRequests).values({
-        linkId: link.id,
-        fromCompanyId: companyId,
-        fromVoucherId: voucherId,
-        fromVoucherNumber: voucherNumber,
-        fromVoucherDate: voucherDate,
-        amount,
-        description: description || null,
-        status: "pending",
-      }).returning({ id: intercompanyPaymentRequests.id });
+      const [inserted] = await db
+        .insert(intercompanyPaymentRequests)
+        .values({
+          linkId: link.id,
+          fromCompanyId: companyId,
+          fromVoucherId: voucherId,
+          fromVoucherNumber: voucherNumber,
+          fromVoucherDate: voucherDate,
+          amount,
+          description: description || null,
+          status: "pending",
+        })
+        .returning({ id: intercompanyPaymentRequests.id });
 
       // Dispatch INTERCOMPANY_REQUEST notification via the unified notification system
       dispatchNotification({
@@ -103,11 +106,13 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
 
       // Enrich with dest company and dest ledger names
       const allCompanies = await db.select({ id: companies.id, name: companies.name }).from(companies);
-      const allAccounts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name, companyId: ledgerAccounts.companyId }).from(ledgerAccounts);
-      const companyMap = new Map(allCompanies.map(c => [c.id, c.name]));
-      const accountMap = new Map(allAccounts.map(a => [a.id, a.name]));
+      const allAccounts = await db
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, companyId: ledgerAccounts.companyId })
+        .from(ledgerAccounts);
+      const companyMap = new Map(allCompanies.map((c) => [c.id, c.name]));
+      const accountMap = new Map(allAccounts.map((a) => [a.id, a.name]));
 
-      const enriched = links.map(l => ({
+      const enriched = links.map((l) => ({
         ...l,
         destCompanyName: companyMap.get(l.destCompanyId) ?? "Unknown",
         destLedgerName: accountMap.get(l.destLedgerAccountId) ?? "Unknown",
@@ -120,26 +125,31 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
   });
 
   // ── GET /api/intercompany-links/:id/recipients ──────────────────────────────
-  app.get("/api/intercompany-links/:id/recipients", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
-    try {
-      const linkId = parseInt(req.params.id);
-      if (isNaN(linkId)) return res.status(400).json({ message: "Invalid ID" });
+  app.get(
+    "/api/intercompany-links/:id/recipients",
+    requireAuth,
+    requireRole("Admin", "Developer"),
+    async (req, res) => {
+      try {
+        const linkId = parseInt(req.params.id);
+        if (isNaN(linkId)) return res.status(400).json({ message: "Invalid ID" });
 
-      const rows = await db
-        .select({
-          id: intercompanyLinkRecipients.id,
-          userId: intercompanyLinkRecipients.userId,
-          username: users.username,
-        })
-        .from(intercompanyLinkRecipients)
-        .leftJoin(users, eq(users.id, intercompanyLinkRecipients.userId))
-        .where(eq(intercompanyLinkRecipients.linkId, linkId));
+        const rows = await db
+          .select({
+            id: intercompanyLinkRecipients.id,
+            userId: intercompanyLinkRecipients.userId,
+            username: users.username,
+          })
+          .from(intercompanyLinkRecipients)
+          .leftJoin(users, eq(users.id, intercompanyLinkRecipients.userId))
+          .where(eq(intercompanyLinkRecipients.linkId, linkId));
 
-      res.json(rows);
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+        res.json(rows);
+      } catch (err: any) {
+        res.status(500).json({ message: err.message });
+      }
     }
-  });
+  );
 
   // ── GET /api/companies/:id/member-ids ─────────────────────────────────────
   // Returns IDs of users that have any role in the given company (Admin/Dev only)
@@ -150,13 +160,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       const rows = await db
         .select({ userId: userCompanyRoles.userId })
         .from(userCompanyRoles)
-        .where(
-          and(
-            eq(userCompanyRoles.companyId, companyId),
-            ne(userCompanyRoles.role, "Developer"),
-          )
-        );
-      res.json(rows.map(r => r.userId));
+        .where(and(eq(userCompanyRoles.companyId, companyId), ne(userCompanyRoles.role, "Developer")));
+      res.json(rows.map((r) => r.userId));
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -165,7 +170,14 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
   // ── POST /api/intercompany-links ────────────────────────────────────────────
   app.post("/api/intercompany-links", requireAuth, requireRole("Admin", "Developer"), async (req, res) => {
     try {
-      const { label, sourceCompanyId, sourceLedgerAccountId, destCompanyId, destLedgerAccountId, recipientUserIds = [] } = req.body;
+      const {
+        label,
+        sourceCompanyId,
+        sourceLedgerAccountId,
+        destCompanyId,
+        destLedgerAccountId,
+        recipientUserIds = [],
+      } = req.body;
       if (!sourceCompanyId || !sourceLedgerAccountId || !destCompanyId || !destLedgerAccountId) {
         return res.status(400).json({ message: "Missing required fields" });
       }
@@ -176,31 +188,33 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
           .select({ userId: userCompanyRoles.userId })
           .from(userCompanyRoles)
           .where(
-            and(
-              eq(userCompanyRoles.companyId, destCompanyId),
-              inArray(userCompanyRoles.userId, recipientUserIds),
-            ),
+            and(eq(userCompanyRoles.companyId, destCompanyId), inArray(userCompanyRoles.userId, recipientUserIds))
           );
-        const validIds = new Set(destMembers.map(r => r.userId));
-        const invalid = (recipientUserIds as string[]).filter(uid => !validIds.has(uid));
+        const validIds = new Set(destMembers.map((r) => r.userId));
+        const invalid = (recipientUserIds as string[]).filter((uid) => !validIds.has(uid));
         if (invalid.length > 0) {
-          return res.status(400).json({ message: "Some selected recipients do not have a role in the destination company" });
+          return res
+            .status(400)
+            .json({ message: "Some selected recipients do not have a role in the destination company" });
         }
       }
 
-      const [link] = await db.insert(intercompanyAccountLinks).values({
-        label: label || null,
-        sourceCompanyId,
-        sourceLedgerAccountId,
-        destCompanyId,
-        destLedgerAccountId,
-        active: true,
-      }).returning();
+      const [link] = await db
+        .insert(intercompanyAccountLinks)
+        .values({
+          label: label || null,
+          sourceCompanyId,
+          sourceLedgerAccountId,
+          destCompanyId,
+          destLedgerAccountId,
+          active: true,
+        })
+        .returning();
 
       if (Array.isArray(recipientUserIds) && recipientUserIds.length > 0) {
-        await db.insert(intercompanyLinkRecipients).values(
-          recipientUserIds.map((uid: string) => ({ linkId: link.id, userId: uid }))
-        );
+        await db
+          .insert(intercompanyLinkRecipients)
+          .values(recipientUserIds.map((uid: string) => ({ linkId: link.id, userId: uid })));
       }
 
       res.json(link);
@@ -215,7 +229,15 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       const linkId = parseInt(req.params.id);
       if (isNaN(linkId)) return res.status(400).json({ message: "Invalid ID" });
 
-      const { label, sourceCompanyId, sourceLedgerAccountId, destCompanyId, destLedgerAccountId, active, recipientUserIds } = req.body;
+      const {
+        label,
+        sourceCompanyId,
+        sourceLedgerAccountId,
+        destCompanyId,
+        destLedgerAccountId,
+        active,
+        recipientUserIds,
+      } = req.body;
 
       const linkFields = {
         ...(label !== undefined ? { label } : {}),
@@ -228,7 +250,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
 
       let updated: typeof intercompanyAccountLinks.$inferSelect | undefined;
       if (Object.keys(linkFields).length > 0) {
-        const [row] = await db.update(intercompanyAccountLinks)
+        const [row] = await db
+          .update(intercompanyAccountLinks)
           .set(linkFields)
           .where(eq(intercompanyAccountLinks.id, linkId))
           .returning();
@@ -255,20 +278,22 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
             .where(
               and(
                 eq(userCompanyRoles.companyId, effectiveDestCompanyId),
-                inArray(userCompanyRoles.userId, recipientUserIds),
-              ),
+                inArray(userCompanyRoles.userId, recipientUserIds)
+              )
             );
-          const validIds = new Set(destMembers.map(r => r.userId));
-          const invalid = (recipientUserIds as string[]).filter(uid => !validIds.has(uid));
+          const validIds = new Set(destMembers.map((r) => r.userId));
+          const invalid = (recipientUserIds as string[]).filter((uid) => !validIds.has(uid));
           if (invalid.length > 0) {
-            return res.status(400).json({ message: "Some selected recipients do not have a role in the destination company" });
+            return res
+              .status(400)
+              .json({ message: "Some selected recipients do not have a role in the destination company" });
           }
         }
         await db.delete(intercompanyLinkRecipients).where(eq(intercompanyLinkRecipients.linkId, linkId));
         if (recipientUserIds.length > 0) {
-          await db.insert(intercompanyLinkRecipients).values(
-            recipientUserIds.map((uid: string) => ({ linkId, userId: uid }))
-          );
+          await db
+            .insert(intercompanyLinkRecipients)
+            .values(recipientUserIds.map((uid: string) => ({ linkId, userId: uid })));
         }
       }
 
@@ -305,7 +330,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
 
       if (recipientLinks.length === 0) return res.json({ count: 0 });
 
-      const linkIds = recipientLinks.map(r => r.linkId);
+      const linkIds = recipientLinks.map((r) => r.linkId);
       const [row] = await db
         .select({ count: sql<number>`count(*)::int` })
         .from(intercompanyPaymentRequests)
@@ -314,8 +339,8 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
           and(
             eq(intercompanyPaymentRequests.status, "pending"),
             inArray(intercompanyPaymentRequests.linkId, linkIds),
-            isNull(vouchers.deletedAt),
-          ),
+            isNull(vouchers.deletedAt)
+          )
         );
 
       res.json({ count: row?.count ?? 0 });
@@ -341,7 +366,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         .where(eq(intercompanyLinkRecipients.userId, userId));
 
       if (recipientLinks.length === 0) return res.json([]);
-      const candidateLinkIds = recipientLinks.map(r => r.linkId);
+      const candidateLinkIds = recipientLinks.map((r) => r.linkId);
 
       // Load links and filter to those where user has a destCompany role
       const candidateLinks = await db
@@ -353,11 +378,9 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         .select({ companyId: userCompanyRoles.companyId })
         .from(userCompanyRoles)
         .where(eq(userCompanyRoles.userId, userId));
-      const userCompanySet = new Set(userCompanies.map(r => r.companyId));
+      const userCompanySet = new Set(userCompanies.map((r) => r.companyId));
 
-      const linkIds = candidateLinks
-        .filter(l => userCompanySet.has(l.destCompanyId))
-        .map(l => l.id);
+      const linkIds = candidateLinks.filter((l) => userCompanySet.has(l.destCompanyId)).map((l) => l.id);
 
       if (linkIds.length === 0) return res.json([]);
 
@@ -367,23 +390,25 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         .where(
           and(
             inArray(intercompanyPaymentRequests.linkId, linkIds),
-            ...(statusFilter ? [eq(intercompanyPaymentRequests.status, statusFilter)] : []),
-          ),
+            ...(statusFilter ? [eq(intercompanyPaymentRequests.status, statusFilter)] : [])
+          )
         )
         .orderBy(desc(intercompanyPaymentRequests.createdAt));
 
       // Enrich with company names, link info
       const allLinks = await db.select().from(intercompanyAccountLinks);
       const allCompanies = await db.select({ id: companies.id, name: companies.name }).from(companies);
-      const allAccounts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name, companyId: ledgerAccounts.companyId }).from(ledgerAccounts);
+      const allAccounts = await db
+        .select({ id: ledgerAccounts.id, name: ledgerAccounts.name, companyId: ledgerAccounts.companyId })
+        .from(ledgerAccounts);
       const allUsers = await db.select({ id: users.id, username: users.username }).from(users);
 
-      const linkMap = new Map(allLinks.map(l => [l.id, l]));
-      const companyMap = new Map(allCompanies.map(c => [c.id, c.name]));
-      const accountMap = new Map(allAccounts.map(a => [a.id, { name: a.name, companyId: a.companyId }]));
-      const userMap = new Map(allUsers.map(u => [u.id, u.username]));
+      const linkMap = new Map(allLinks.map((l) => [l.id, l]));
+      const companyMap = new Map(allCompanies.map((c) => [c.id, c.name]));
+      const accountMap = new Map(allAccounts.map((a) => [a.id, { name: a.name, companyId: a.companyId }]));
+      const userMap = new Map(allUsers.map((u) => [u.id, u.username]));
 
-      const enriched = requestRows.map(r => {
+      const enriched = requestRows.map((r) => {
         const link = linkMap.get(r.linkId);
         return {
           ...r,
@@ -420,12 +445,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       const [hasAccess] = await db
         .select({ id: userCompanyRoles.id })
         .from(userCompanyRoles)
-        .where(
-          and(
-            eq(userCompanyRoles.userId, userId),
-            eq(userCompanyRoles.companyId, voucherRow.companyId),
-          ),
-        );
+        .where(and(eq(userCompanyRoles.userId, userId), eq(userCompanyRoles.companyId, voucherRow.companyId)));
       if (!hasAccess) return res.status(403).json({ message: "Access denied" });
 
       const requests = await db
@@ -439,11 +459,11 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       const allCompanies = await db.select({ id: companies.id, name: companies.name }).from(companies);
       const allUsers = await db.select({ id: users.id, username: users.username }).from(users);
 
-      const linkMap = new Map(allLinks.map(l => [l.id, l]));
-      const companyMap = new Map(allCompanies.map(c => [c.id, c.name]));
-      const userMap = new Map(allUsers.map(u => [u.id, u.username]));
+      const linkMap = new Map(allLinks.map((l) => [l.id, l]));
+      const companyMap = new Map(allCompanies.map((c) => [c.id, c.name]));
+      const userMap = new Map(allUsers.map((u) => [u.id, u.username]));
 
-      const enriched = requests.map(r => {
+      const enriched = requests.map((r) => {
         const link = linkMap.get(r.linkId);
         return {
           ...r,
@@ -475,17 +495,15 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         .from(intercompanyPaymentRequests)
         .where(eq(intercompanyPaymentRequests.id, requestId));
       if (!request) return res.status(404).json({ message: "Request not found" });
-      if (request.status !== "pending") return res.status(400).json({ message: "Request is already " + request.status });
+      if (request.status !== "pending")
+        return res.status(400).json({ message: "Request is already " + request.status });
 
       // Verify this user is a recipient of the link
       const [recipient] = await db
         .select()
         .from(intercompanyLinkRecipients)
         .where(
-          and(
-            eq(intercompanyLinkRecipients.linkId, request.linkId),
-            eq(intercompanyLinkRecipients.userId, userId),
-          ),
+          and(eq(intercompanyLinkRecipients.linkId, request.linkId), eq(intercompanyLinkRecipients.userId, userId))
         );
       if (!recipient) return res.status(403).json({ message: "You are not authorised to approve this request" });
 
@@ -499,12 +517,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
       const [destMembership] = await db
         .select({ id: userCompanyRoles.id })
         .from(userCompanyRoles)
-        .where(
-          and(
-            eq(userCompanyRoles.userId, userId),
-            eq(userCompanyRoles.companyId, link.destCompanyId),
-          ),
-        );
+        .where(and(eq(userCompanyRoles.userId, userId), eq(userCompanyRoles.companyId, link.destCompanyId)));
       if (!destMembership) {
         return res.status(403).json({ message: "You do not have a role in the destination company" });
       }
@@ -526,9 +539,10 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         .where(eq(ledgerAccounts.id, link.destLedgerAccountId));
 
       // Use provided description or fall back to "Received from [CR] into [DR]"
-      const resolvedDescription = (customDescription && customDescription.trim())
-        ? customDescription.trim()
-        : `Received from ${crAccount?.name ?? "IC account"} into ${chosenAccount.name}`;
+      const resolvedDescription =
+        customDescription && customDescription.trim()
+          ? customDescription.trim()
+          : `Received from ${crAccount?.name ?? "IC account"} into ${chosenAccount.name}`;
 
       const destCompanyId = link.destCompanyId;
       const voucherNumber = `IC-RCPT-${Date.now()}`;
@@ -547,12 +561,7 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
             approvedByUserId: userId,
             approvedAt,
           })
-          .where(
-            and(
-              eq(intercompanyPaymentRequests.id, requestId),
-              eq(intercompanyPaymentRequests.status, "pending"),
-            ),
-          )
+          .where(and(eq(intercompanyPaymentRequests.id, requestId), eq(intercompanyPaymentRequests.status, "pending")))
           .returning({ id: intercompanyPaymentRequests.id });
 
         if (claimed.length === 0) {
@@ -562,16 +571,19 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         // Create Receipt voucher in dest company
         // DR: chosen account (cash/bank received)
         // CR: link.destLedgerAccountId (the intercompany account in dest)
-        const [createdVoucher] = await tx.insert(vouchers).values({
-          companyId: destCompanyId,
-          voucherNumber,
-          voucherType: "Receipt",
-          voucherDate: request.fromVoucherDate,
-          description: resolvedDescription,
-          totalAmount: request.amount,
-          optional: false,
-          sourceModule: "ERP",
-        }).returning();
+        const [createdVoucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId: destCompanyId,
+            voucherNumber,
+            voucherType: "Receipt",
+            voucherDate: request.fromVoucherDate,
+            description: resolvedDescription,
+            totalAmount: request.amount,
+            optional: false,
+            sourceModule: "ERP",
+          })
+          .returning();
 
         await tx.insert(voucherEntries).values([
           {
@@ -623,16 +635,14 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         .from(intercompanyPaymentRequests)
         .where(eq(intercompanyPaymentRequests.id, requestId));
       if (!request) return res.status(404).json({ message: "Request not found" });
-      if (request.status !== "pending") return res.status(400).json({ message: "Request is already " + request.status });
+      if (request.status !== "pending")
+        return res.status(400).json({ message: "Request is already " + request.status });
 
       const [recipient] = await db
         .select()
         .from(intercompanyLinkRecipients)
         .where(
-          and(
-            eq(intercompanyLinkRecipients.linkId, request.linkId),
-            eq(intercompanyLinkRecipients.userId, userId),
-          ),
+          and(eq(intercompanyLinkRecipients.linkId, request.linkId), eq(intercompanyLinkRecipients.userId, userId))
         );
       if (!recipient) return res.status(403).json({ message: "You are not authorised to dismiss this request" });
 
@@ -645,31 +655,22 @@ export function registerIntercompanyNotificationRoutes(app: Express) {
         const [dimMembership] = await db
           .select({ id: userCompanyRoles.id })
           .from(userCompanyRoles)
-          .where(
-            and(
-              eq(userCompanyRoles.userId, userId),
-              eq(userCompanyRoles.companyId, dimLink.destCompanyId),
-            ),
-          );
+          .where(and(eq(userCompanyRoles.userId, userId), eq(userCompanyRoles.companyId, dimLink.destCompanyId)));
         if (!dimMembership) {
           return res.status(403).json({ message: "You do not have a role in the destination company" });
         }
       }
 
       // Atomic conditional claim — same pattern as approve to prevent TOCTOU race
-      const claimed = await db.update(intercompanyPaymentRequests)
+      const claimed = await db
+        .update(intercompanyPaymentRequests)
         .set({
           status: "dismissed",
           approvedByUserId: userId,
           approvedAt: new Date(),
           dismissNote: note || null,
         })
-        .where(
-          and(
-            eq(intercompanyPaymentRequests.id, requestId),
-            eq(intercompanyPaymentRequests.status, "pending"),
-          ),
-        )
+        .where(and(eq(intercompanyPaymentRequests.id, requestId), eq(intercompanyPaymentRequests.status, "pending")))
         .returning({ id: intercompanyPaymentRequests.id });
 
       if (claimed.length === 0) {

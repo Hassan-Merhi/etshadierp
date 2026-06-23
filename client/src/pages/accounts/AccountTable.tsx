@@ -86,9 +86,7 @@ function AccountRows({
             )}
             <div className="min-w-0">
               <span className="block truncate max-w-[320px]">{account.name}</span>
-              {account.code && (
-                <span className="text-[10px] font-mono text-muted-foreground">{account.code}</span>
-              )}
+              {account.code && <span className="text-[10px] font-mono text-muted-foreground">{account.code}</span>}
             </div>
           </div>
         </TableCell>
@@ -118,18 +116,20 @@ function AccountRows({
           </Button>
         </TableCell>
       </TableRow>
-      {hasChildren && isExpanded && account.children.map((child: any) => (
-        <AccountRows
-          key={child.id}
-          account={child}
-          level={level + 1}
-          expandedParents={expandedParents}
-          toggleParent={toggleParent}
-          handleAccountChange={handleAccountChange}
-          hideBalances={hideBalances}
-          formatAmount={formatAmount}
-        />
-      ))}
+      {hasChildren &&
+        isExpanded &&
+        account.children.map((child: any) => (
+          <AccountRows
+            key={child.id}
+            account={child}
+            level={level + 1}
+            expandedParents={expandedParents}
+            toggleParent={toggleParent}
+            handleAccountChange={handleAccountChange}
+            hideBalances={hideBalances}
+            formatAmount={formatAmount}
+          />
+        ))}
     </>
   );
 }

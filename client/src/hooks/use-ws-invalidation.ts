@@ -5,10 +5,10 @@ import { useQueryClient } from "@tanstack/react-query";
 // These are expensive to compute, have a manual Refresh button, and should not jump
 // around every time any write happens anywhere in the system.
 const STABLE_QUERY_PREFIXES = [
-  "/api/auth/me",           // staleTime=Infinity on purpose — spurious auth re-checks cause login redirects
-  "/api/stats/net-profit",  // full balance-sheet computation; user refreshes manually
+  "/api/auth/me", // staleTime=Infinity on purpose — spurious auth re-checks cause login redirects
+  "/api/stats/net-profit", // full balance-sheet computation; user refreshes manually
   "/api/reports/net-profit-statement", // P&L report; heavy computation
-  "/api/balance-sheet",     // balance sheet; heavy computation
+  "/api/balance-sheet", // balance sheet; heavy computation
 ];
 
 export function useWsInvalidation() {
@@ -42,8 +42,7 @@ export function useWsInvalidation() {
     }
 
     // Capacitor builds set VITE_WS_URL explicitly; web builds derive it from window.location.
-    const _CAPACITOR_WS_URL: string =
-      ((import.meta as any).env?.VITE_WS_URL as string) || "";
+    const _CAPACITOR_WS_URL: string = ((import.meta as any).env?.VITE_WS_URL as string) || "";
 
     function connect() {
       if (unmountedRef.current) return;
@@ -73,8 +72,7 @@ export function useWsInvalidation() {
           if (msg.type === "invalidate") {
             handleInvalidate();
           }
-        } catch {
-        }
+        } catch {}
       };
 
       ws.onclose = () => {

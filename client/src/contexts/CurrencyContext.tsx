@@ -31,10 +31,10 @@ const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const { selectedCompany } = useCompany();
-  
+
   const [selectedCurrency, setSelectedCurrency] = useState<Currency>(() => {
     const stored = localStorage.getItem("selectedCurrency");
-    return (stored === "USD" || stored === "CFA") ? stored : "USD";
+    return stored === "USD" || stored === "CFA" ? stored : "USD";
   });
 
   // Fetch user preferences (includes preferredCurrency for logged-in users)
@@ -74,7 +74,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   const isLoadingCompany = !selectedCompany?.id || isLoadingCompanyQuery || !company;
 
   const baseCurrency = company?.baseCurrency || "USD";
-  const displayCurrency = company?.displayCurrency && company.displayCurrency !== "none" ? company.displayCurrency : null;
+  const displayCurrency =
+    company?.displayCurrency && company.displayCurrency !== "none" ? company.displayCurrency : null;
   const isMultiCurrency = !!displayCurrency;
 
   // Fetch the latest exchange rate using company's currencies
@@ -99,14 +100,16 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   // Warn if multi-currency but no exchange rate
   useEffect(() => {
     if (isMultiCurrency && !isLoadingRate && !exchangeRate) {
-      console.warn("[Currency] Multi-currency company but no exchange rate found. Prices will display in base currency (USD). Set exchange rate in Settings.");
+      console.warn(
+        "[Currency] Multi-currency company but no exchange rate found. Prices will display in base currency (USD). Set exchange rate in Settings."
+      );
     }
   }, [isMultiCurrency, isLoadingRate, exchangeRate]);
 
   const setCurrency = (currency: Currency) => {
     setSelectedCurrency(currency);
     localStorage.setItem("selectedCurrency", currency);
-    
+
     // Save to backend for logged-in users (fire and forget)
     saveCurrencyMutation.mutate(currency);
   };
@@ -172,7 +175,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     const curr = currency || selectedCurrency;
     const numAmount = typeof amount === "string" ? parseFloat(amount) : amount;
     if (isNaN(numAmount)) return "";
-    
+
     // If requesting display currency format (CFA), first convert from USD
     let displayAmount = numAmount;
     if (curr === "CFA" && exchangeRate) {
@@ -183,7 +186,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       const isWhole = Math.abs(numAmount) % 1 === 0;
       return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
     }
-    
+
     if (curr === "USD") {
       const isWhole = Math.abs(numAmount) % 1 === 0;
       return `$ ${numAmount.toLocaleString(undefined, { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
@@ -193,22 +196,24 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <CurrencyContext.Provider value={{ 
-      selectedCurrency, 
-      setCurrency,
-      toggleCurrency,
-      exchangeRate,
-      isLoadingRate,
-      isLoadingCompany,
-      baseCurrency,
-      displayCurrency,
-      isMultiCurrency,
-      formatAmount,
-      formatAmountRaw,
-      formatCashAmount,
-      convertToDisplay,
-      convertToUSD
-    }}>
+    <CurrencyContext.Provider
+      value={{
+        selectedCurrency,
+        setCurrency,
+        toggleCurrency,
+        exchangeRate,
+        isLoadingRate,
+        isLoadingCompany,
+        baseCurrency,
+        displayCurrency,
+        isMultiCurrency,
+        formatAmount,
+        formatAmountRaw,
+        formatCashAmount,
+        convertToDisplay,
+        convertToUSD,
+      }}
+    >
       {children}
     </CurrencyContext.Provider>
   );

@@ -23,9 +23,17 @@ export const PrintTemplate = ({
 }) => {
   const voucherRef = `${voucherType === "Payment" ? "PV" : "RV"}-${format(date, "yyyyMMdd")}-${Date.now().toString().slice(-4)}`;
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "32px", maxWidth: "720px", margin: "0 auto", background: "#fff", color: "#000" }}>
+    <div
+      style={{
+        fontFamily: "Arial, sans-serif",
+        padding: "32px",
+        maxWidth: "720px",
+        margin: "0 auto",
+        background: "#fff",
+        color: "#000",
+      }}
+    >
       <div style={{ border: "1px solid #000" }}>
-
         {/* Header */}
         <div style={{ background: "#1a1a2e", color: "#fff", padding: "20px 28px", textAlign: "center" }}>
           {companyName && (
@@ -39,13 +47,24 @@ export const PrintTemplate = ({
         </div>
 
         {/* Meta row */}
-        <div style={{ display: "flex", justifyContent: "space-between", padding: "14px 28px", borderBottom: "1px solid #ddd", background: "#f9f9f9", fontSize: "13px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            padding: "14px 28px",
+            borderBottom: "1px solid #ddd",
+            background: "#f9f9f9",
+            fontSize: "13px",
+          }}
+        >
           <div>
             <span style={{ color: "#555" }}>{voucherType === "Payment" ? "Paid From:" : "Received In:"}</span>
             <span style={{ fontWeight: "600", marginLeft: "8px" }}>{paymentAccountName || "—"}</span>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div><span style={{ color: "#555" }}>Date:</span> <strong>{format(date, "dd MMM yyyy")}</strong></div>
+            <div>
+              <span style={{ color: "#555" }}>Date:</span> <strong>{format(date, "dd MMM yyyy")}</strong>
+            </div>
             <div style={{ fontSize: "11px", color: "#777", marginTop: "2px" }}>Ref: {voucherRef}</div>
           </div>
         </div>
@@ -56,8 +75,12 @@ export const PrintTemplate = ({
             <thead className="sticky top-0 z-30 bg-muted/50">
               <tr style={{ background: "#f0f0f0" }}>
                 <th style={{ border: "1px solid #ccc", padding: "8px 10px", textAlign: "left", width: "40px" }}>#</th>
-                <th style={{ border: "1px solid #ccc", padding: "8px 10px", textAlign: "left" }}>Account / Description</th>
-                <th style={{ border: "1px solid #ccc", padding: "8px 10px", textAlign: "right", width: "130px" }}>Amount</th>
+                <th style={{ border: "1px solid #ccc", padding: "8px 10px", textAlign: "left" }}>
+                  Account / Description
+                </th>
+                <th style={{ border: "1px solid #ccc", padding: "8px 10px", textAlign: "right", width: "130px" }}>
+                  Amount
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -65,7 +88,14 @@ export const PrintTemplate = ({
                 <tr key={index} style={{ background: index % 2 === 1 ? "#fafafa" : "#fff" }}>
                   <td style={{ border: "1px solid #ccc", padding: "8px 10px" }}>{index + 1}</td>
                   <td style={{ border: "1px solid #ccc", padding: "8px 10px" }}>{entry.accountName}</td>
-                  <td style={{ border: "1px solid #ccc", padding: "8px 10px", textAlign: "right", fontFamily: "monospace" }}>
+                  <td
+                    style={{
+                      border: "1px solid #ccc",
+                      padding: "8px 10px",
+                      textAlign: "right",
+                      fontFamily: "monospace",
+                    }}
+                  >
                     {formatAmount(entry.amount || "0")}
                   </td>
                 </tr>
@@ -73,10 +103,21 @@ export const PrintTemplate = ({
             </tbody>
             <tfoot>
               <tr style={{ background: "#1a1a2e", color: "#fff", fontWeight: "700" }}>
-                <td colSpan={2} style={{ border: "1px solid #000", padding: "9px 10px", textAlign: "right", letterSpacing: "0.5px" }}>
+                <td
+                  colSpan={2}
+                  style={{ border: "1px solid #000", padding: "9px 10px", textAlign: "right", letterSpacing: "0.5px" }}
+                >
                   TOTAL
                 </td>
-                <td style={{ border: "1px solid #000", padding: "9px 10px", textAlign: "right", fontFamily: "monospace", fontSize: "14px" }}>
+                <td
+                  style={{
+                    border: "1px solid #000",
+                    padding: "9px 10px",
+                    textAlign: "right",
+                    fontFamily: "monospace",
+                    fontSize: "14px",
+                  }}
+                >
                   {formatAmount(total)}
                 </td>
               </tr>
@@ -95,7 +136,15 @@ export const PrintTemplate = ({
         )}
 
         {/* Signature section */}
-        <div style={{ borderTop: "1px solid #ddd", padding: "24px 28px 28px", display: "flex", justifyContent: "space-between", gap: "16px" }}>
+        <div
+          style={{
+            borderTop: "1px solid #ddd",
+            padding: "24px 28px 28px",
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "16px",
+          }}
+        >
           {[
             { label: "Prepared By", sub: "Name & Signature" },
             { label: "Received By", sub: "Name & Signature" },
@@ -111,10 +160,19 @@ export const PrintTemplate = ({
         </div>
 
         {/* Footer strip */}
-        <div style={{ background: "#1a1a2e", color: "#aaa", fontSize: "10px", textAlign: "center", padding: "6px", letterSpacing: "0.5px" }}>
-          {companyName ? `${companyName} — ` : ""}{voucherType} Voucher · {format(date, "dd MMM yyyy")} · {voucherRef}
+        <div
+          style={{
+            background: "#1a1a2e",
+            color: "#aaa",
+            fontSize: "10px",
+            textAlign: "center",
+            padding: "6px",
+            letterSpacing: "0.5px",
+          }}
+        >
+          {companyName ? `${companyName} — ` : ""}
+          {voucherType} Voucher · {format(date, "dd MMM yyyy")} · {voucherRef}
         </div>
-
       </div>
     </div>
   );
@@ -131,4 +189,3 @@ export function parseDateLocal(dateStr: string): Date {
   }
   return new Date(dateStr);
 }
-

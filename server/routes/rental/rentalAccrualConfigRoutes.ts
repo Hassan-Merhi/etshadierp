@@ -1,14 +1,31 @@
 import type { Express } from "express";
-import { getCompanyId, findOrCreateLedgerAccount, maybeRunAutoTransfer, ensureMonthlyLedgerRows, findEarliestOutstandingMonth, ensureMonthlyForCompany, postRentAccrualForCompany, type RentalModule } from "./_rentalShared";
+import {
+  getCompanyId,
+  findOrCreateLedgerAccount,
+  maybeRunAutoTransfer,
+  ensureMonthlyLedgerRows,
+  findEarliestOutstandingMonth,
+  ensureMonthlyForCompany,
+  postRentAccrualForCompany,
+  type RentalModule,
+} from "./_rentalShared";
 import { db } from "../../db";
 import { requireAuth } from "../../auth";
 import { z } from "zod";
 import { eq, and, sql, desc, inArray, isNull, isNotNull, ne } from "drizzle-orm";
 import {
-  propertyUnits, propertyContracts, propertyMonthlyLedger, propertyPayments,
-  insertPropertyUnitSchema, insertPropertyContractSchema,
-  ledgerAccounts, vouchers, voucherEntries, rentalAutoTransferConfigs,
-  interCompanyTransfers, companies,
+  propertyUnits,
+  propertyContracts,
+  propertyMonthlyLedger,
+  propertyPayments,
+  insertPropertyUnitSchema,
+  insertPropertyContractSchema,
+  ledgerAccounts,
+  vouchers,
+  voucherEntries,
+  rentalAutoTransferConfigs,
+  interCompanyTransfers,
+  companies,
 } from "@shared/schema";
 import { parseId, parseOptionalId } from "../../lib/parseId";
 import { logAudit } from "../_helpers";
@@ -19,7 +36,7 @@ export function registerRentalAccrualConfigRoutes(
   module: RentalModule,
   urlPrefix: string,
   incomeAccountName: string,
-  shopExpenseAccountName: string = "Rent Expense - Shops",
+  shopExpenseAccountName: string = "Rent Expense - Shops"
 ) {
   const tag = `[${module}/rental]`;
 
@@ -35,12 +52,14 @@ export function registerRentalAccrualConfigRoutes(
         .select({ id: propertyContracts.id })
         .from(propertyContracts)
         .innerJoin(propertyUnits, eq(propertyUnits.id, propertyContracts.unitId))
-        .where(and(
-          eq(propertyContracts.companyId, companyId),
-          eq(propertyContracts.module, module as any),
-          eq(propertyContracts.status, "ACTIVE"),
-          eq(propertyUnits.unitType, "SHOP"),
-        ));
+        .where(
+          and(
+            eq(propertyContracts.companyId, companyId),
+            eq(propertyContracts.module, module as any),
+            eq(propertyContracts.status, "ACTIVE"),
+            eq(propertyUnits.unitType, "SHOP")
+          )
+        );
 
       // 1b. Phantom-accrual repair (ALL months, historical + current).
       //
@@ -66,39 +85,35 @@ export function registerRentalAccrualConfigRoutes(
       //   Cr AP      = old_accrual − correction = expected − paid    ✓ (outstanding)
       //   Dr Expense = old_accrual + payment − correction = expected ✓
       if (shopContracts.length > 0) {
-        const contractIds = shopContracts.map(c => c.id);
+        const contractIds = shopContracts.map((c) => c.id);
 
         // Find AP account for this company
         const [apAcct] = await db
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
-          .where(and(
-            eq(ledgerAccounts.companyId, companyId),
-            eq(ledgerAccounts.code, "ACCR-RENT-PAY"),
-          ));
+          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "ACCR-RENT-PAY")));
 
         const [expAcct] = await db
           .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
-          .where(and(
-            eq(ledgerAccounts.companyId, companyId),
-            eq(ledgerAccounts.code, "SHOP-RENT-EXP"),
-          ));
+          .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, "SHOP-RENT-EXP")));
 
         if (apAcct && expAcct) {
           // All accrued rows with some payment (candidates for phantom)
           const candidateRows = await db
             .select({
-              id:             propertyMonthlyLedger.id,
+              id: propertyMonthlyLedger.id,
               expectedAmount: propertyMonthlyLedger.expectedAmount,
-              paidAmount:     propertyMonthlyLedger.paidAmount,
+              paidAmount: propertyMonthlyLedger.paidAmount,
             })
             .from(propertyMonthlyLedger)
-            .where(and(
-              inArray(propertyMonthlyLedger.contractId, contractIds),
-              isNotNull(propertyMonthlyLedger.accrualVoucherId),
-              sql`${propertyMonthlyLedger.paidAmount}::numeric > 0`,
-            ));
+            .where(
+              and(
+                inArray(propertyMonthlyLedger.contractId, contractIds),
+                isNotNull(propertyMonthlyLedger.accrualVoucherId),
+                sql`${propertyMonthlyLedger.paidAmount}::numeric > 0`
+              )
+            );
 
           // For each candidate, check whether any payment voucher debited AP
           // (= post-accrual payment, already correct).  If no AP debit found,
@@ -118,7 +133,7 @@ export function registerRentalAccrualConfigRoutes(
               .where(eq(propertyPayments.ledgerRowId, row.id));
 
             const payVoucherIds = paymentVouchers
-              .map(p => p.voucherId)
+              .map((p) => p.voucherId)
               .filter((id): id is number => id !== null && id !== undefined);
 
             if (payVoucherIds.length === 0) continue;
@@ -127,11 +142,13 @@ export function registerRentalAccrualConfigRoutes(
             const [apDebitEntry] = await db
               .select({ id: voucherEntries.id })
               .from(voucherEntries)
-              .where(and(
-                inArray(voucherEntries.voucherId, payVoucherIds),
-                eq(voucherEntries.ledgerAccountId, apAcct.id),
-                sql`${voucherEntries.debitAmount}::numeric > 0`,
-              ))
+              .where(
+                and(
+                  inArray(voucherEntries.voucherId, payVoucherIds),
+                  eq(voucherEntries.ledgerAccountId, apAcct.id),
+                  sql`${voucherEntries.debitAmount}::numeric > 0`
+                )
+              )
               .limit(1);
 
             // Also check for AP-CLEAR auto-clearing journals linked to these payment vouchers.
@@ -143,23 +160,30 @@ export function registerRentalAccrualConfigRoutes(
                 const [clj] = await db
                   .select({ id: vouchers.id })
                   .from(vouchers)
-                  .where(and(
-                    eq(vouchers.companyId, companyId),
-                    eq(vouchers.voucherNumber, `AP-CLEAR-${pvId}`),
-                    isNull(vouchers.deletedAt),
-                  ))
+                  .where(
+                    and(
+                      eq(vouchers.companyId, companyId),
+                      eq(vouchers.voucherNumber, `AP-CLEAR-${pvId}`),
+                      isNull(vouchers.deletedAt)
+                    )
+                  )
                   .limit(1);
                 if (clj) {
                   const [apDr] = await db
                     .select({ id: voucherEntries.id })
                     .from(voucherEntries)
-                    .where(and(
-                      eq(voucherEntries.voucherId, clj.id),
-                      eq(voucherEntries.ledgerAccountId, apAcct.id),
-                      sql`${voucherEntries.debitAmount}::numeric > 0`,
-                    ))
+                    .where(
+                      and(
+                        eq(voucherEntries.voucherId, clj.id),
+                        eq(voucherEntries.ledgerAccountId, apAcct.id),
+                        sql`${voucherEntries.debitAmount}::numeric > 0`
+                      )
+                    )
                     .limit(1);
-                  if (apDr) { apClearJournalDebit = true; break; }
+                  if (apDr) {
+                    apClearJournalDebit = true;
+                    break;
+                  }
                 }
               }
             }
@@ -175,36 +199,42 @@ export function registerRentalAccrualConfigRoutes(
           if (phantomRows.length > 0) {
             console.log(`[re-accrue] phantom fix: ${phantomRows.length} rows, total correction=${phantomFixTotal}`);
             await db.transaction(async (tx) => {
-              const [corrV] = await tx.insert(vouchers).values({
-                companyId,
-                voucherNumber: `PHANTOM-FIX-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                voucherType:  "Journal",
-                voucherDate:  new Date().toISOString().slice(0, 10) as any,
-                description:  `Phantom accrual correction — Dr AP / Cr Rent Expense (${phantomRows.length} rows)`,
-                totalAmount:  String(phantomFixTotal),
-                currency:     "USD",
-                sourceModule: module as any,
-              }).returning();
+              const [corrV] = await tx
+                .insert(vouchers)
+                .values({
+                  companyId,
+                  voucherNumber: `PHANTOM-FIX-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  voucherType: "Journal",
+                  voucherDate: new Date().toISOString().slice(0, 10) as any,
+                  description: `Phantom accrual correction — Dr AP / Cr Rent Expense (${phantomRows.length} rows)`,
+                  totalAmount: String(phantomFixTotal),
+                  currency: "USD",
+                  sourceModule: module as any,
+                })
+                .returning();
 
               const corrEntries: {
-                voucherId: number; ledgerAccountId: number;
-                debitAmount: string; creditAmount: string; narration: string;
+                voucherId: number;
+                ledgerAccountId: number;
+                debitAmount: string;
+                creditAmount: string;
+                narration: string;
               }[] = [];
 
               for (const p of phantomRows) {
                 corrEntries.push({
-                  voucherId:        corrV.id,
-                  ledgerAccountId:  apAcct.id,
-                  debitAmount:      String(p.correction),
-                  creditAmount:     "0",
-                  narration:        `Phantom accrual correction — ledger row ${p.id}`,
+                  voucherId: corrV.id,
+                  ledgerAccountId: apAcct.id,
+                  debitAmount: String(p.correction),
+                  creditAmount: "0",
+                  narration: `Phantom accrual correction — ledger row ${p.id}`,
                 });
                 corrEntries.push({
-                  voucherId:        corrV.id,
-                  ledgerAccountId:  expAcct.id,
-                  debitAmount:      "0",
-                  creditAmount:     String(p.correction),
-                  narration:        `Phantom accrual correction — ledger row ${p.id}`,
+                  voucherId: corrV.id,
+                  ledgerAccountId: expAcct.id,
+                  debitAmount: "0",
+                  creditAmount: String(p.correction),
+                  narration: `Phantom accrual correction — ledger row ${p.id}`,
                 });
               }
               await tx.insert(voucherEntries).values(corrEntries);
@@ -220,7 +250,7 @@ export function registerRentalAccrualConfigRoutes(
         return res.json({ reset: 0, accrued: 0, skipped: 0 });
       }
 
-      const contractIds = shopContracts.map(c => c.id);
+      const contractIds = shopContracts.map((c) => c.id);
 
       // 2a. Dangling-reference sweep (ALL months):
       //     If the user manually deleted vouchers through the UI the voucher rows
@@ -238,34 +268,42 @@ export function registerRentalAccrualConfigRoutes(
       //     to zero for those months and the next accrual starts clean.
       const danglingRows = await db
         .select({
-          id:         propertyMonthlyLedger.id,
+          id: propertyMonthlyLedger.id,
           paidAmount: propertyMonthlyLedger.paidAmount,
         })
         .from(propertyMonthlyLedger)
-        .where(and(
-          inArray(propertyMonthlyLedger.contractId, contractIds),
-          isNotNull(propertyMonthlyLedger.accrualVoucherId),
-          sql`${propertyMonthlyLedger.accrualVoucherId} NOT IN (
+        .where(
+          and(
+            inArray(propertyMonthlyLedger.contractId, contractIds),
+            isNotNull(propertyMonthlyLedger.accrualVoucherId),
+            sql`${propertyMonthlyLedger.accrualVoucherId} NOT IN (
             SELECT id FROM vouchers WHERE deleted_at IS NULL
           )`,
-          sql`${propertyMonthlyLedger.paidAmount}::numeric > 0`,
-        ));
+            sql`${propertyMonthlyLedger.paidAmount}::numeric > 0`
+          )
+        );
 
       if (danglingRows.length > 0) {
-        const [apAcctD] = await db.select({ id: ledgerAccounts.id })
+        const [apAcctD] = await db
+          .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
-          .where(and(
-            eq(ledgerAccounts.companyId, companyId),
-            eq(ledgerAccounts.code, "ACCR-RENT-PAY"),
-            isNull(ledgerAccounts.deletedAt),
-          ));
-        const [expAcctD] = await db.select({ id: ledgerAccounts.id })
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.code, "ACCR-RENT-PAY"),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
+        const [expAcctD] = await db
+          .select({ id: ledgerAccounts.id })
           .from(ledgerAccounts)
-          .where(and(
-            eq(ledgerAccounts.companyId, companyId),
-            eq(ledgerAccounts.code, "SHOP-RENT-EXP"),
-            isNull(ledgerAccounts.deletedAt),
-          ));
+          .where(
+            and(
+              eq(ledgerAccounts.companyId, companyId),
+              eq(ledgerAccounts.code, "SHOP-RENT-EXP"),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
 
         if (apAcctD && expAcctD) {
           // For each dangling paid row, find how much was debited from AP in payment vouchers
@@ -279,18 +317,20 @@ export function registerRentalAccrualConfigRoutes(
               .from(propertyPayments)
               .where(eq(propertyPayments.ledgerRowId, dr.id));
             const payVoucherIds = payVouchers
-              .map(p => p.voucherId)
+              .map((p) => p.voucherId)
               .filter((id): id is number => id !== null && id !== undefined);
             if (payVoucherIds.length === 0) continue;
 
             const apDebits = await db
               .select({ amount: voucherEntries.debitAmount })
               .from(voucherEntries)
-              .where(and(
-                inArray(voucherEntries.voucherId, payVoucherIds),
-                eq(voucherEntries.ledgerAccountId, apAcctD.id),
-                sql`${voucherEntries.debitAmount}::numeric > 0`,
-              ));
+              .where(
+                and(
+                  inArray(voucherEntries.voucherId, payVoucherIds),
+                  eq(voucherEntries.ledgerAccountId, apAcctD.id),
+                  sql`${voucherEntries.debitAmount}::numeric > 0`
+                )
+              );
             const rowApDebit = apDebits.reduce((s, e) => s + Number(e.amount), 0);
             if (rowApDebit > 0) {
               orphanRows.push({ ledgerRowId: dr.id, apDebit: rowApDebit });
@@ -300,40 +340,48 @@ export function registerRentalAccrualConfigRoutes(
 
           if (orphanRows.length > 0) {
             await db.transaction(async (tx) => {
-              const [corrV] = await tx.insert(vouchers).values({
-                companyId,
-                voucherNumber: `ORPHAN-AP-FIX-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                voucherType:   "Journal",
-                voucherDate:   new Date().toISOString().slice(0, 10) as any,
-                description:   `Orphaned AP debit correction (${orphanRows.length} row${orphanRows.length > 1 ? "s" : ""}) — Dr Rent Expense / Cr AP`,
-                totalAmount:   String(orphanedTotal),
-                currency:      "USD",
-                sourceModule:  module as any,
-              }).returning();
+              const [corrV] = await tx
+                .insert(vouchers)
+                .values({
+                  companyId,
+                  voucherNumber: `ORPHAN-AP-FIX-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  voucherType: "Journal",
+                  voucherDate: new Date().toISOString().slice(0, 10) as any,
+                  description: `Orphaned AP debit correction (${orphanRows.length} row${orphanRows.length > 1 ? "s" : ""}) — Dr Rent Expense / Cr AP`,
+                  totalAmount: String(orphanedTotal),
+                  currency: "USD",
+                  sourceModule: module as any,
+                })
+                .returning();
 
               const corrEntries: {
-                voucherId: number; ledgerAccountId: number;
-                debitAmount: string; creditAmount: string; narration: string;
+                voucherId: number;
+                ledgerAccountId: number;
+                debitAmount: string;
+                creditAmount: string;
+                narration: string;
               }[] = [];
               for (const o of orphanRows) {
                 corrEntries.push({
-                  voucherId:       corrV.id,
+                  voucherId: corrV.id,
                   ledgerAccountId: expAcctD.id,
-                  debitAmount:     String(o.apDebit),
-                  creditAmount:    "0",
-                  narration:       `Orphaned AP debit correction — ledger row ${o.ledgerRowId}`,
+                  debitAmount: String(o.apDebit),
+                  creditAmount: "0",
+                  narration: `Orphaned AP debit correction — ledger row ${o.ledgerRowId}`,
                 });
                 corrEntries.push({
-                  voucherId:       corrV.id,
+                  voucherId: corrV.id,
                   ledgerAccountId: apAcctD.id,
-                  debitAmount:     "0",
-                  creditAmount:    String(o.apDebit),
-                  narration:       `Orphaned AP debit correction — ledger row ${o.ledgerRowId}`,
+                  debitAmount: "0",
+                  creditAmount: String(o.apDebit),
+                  narration: `Orphaned AP debit correction — ledger row ${o.ledgerRowId}`,
                 });
               }
               await tx.insert(voucherEntries).values(corrEntries);
             });
-            console.log(`[re-accrue] orphaned AP debit fix: ${orphanRows.length} rows, total corrected=${orphanedTotal}`);
+            console.log(
+              `[re-accrue] orphaned AP debit fix: ${orphanRows.length} rows, total corrected=${orphanedTotal}`
+            );
           }
         }
       }
@@ -341,13 +389,15 @@ export function registerRentalAccrualConfigRoutes(
       await db
         .update(propertyMonthlyLedger)
         .set({ accrualVoucherId: null })
-        .where(and(
-          inArray(propertyMonthlyLedger.contractId, contractIds),
-          isNotNull(propertyMonthlyLedger.accrualVoucherId),
-          sql`${propertyMonthlyLedger.accrualVoucherId} NOT IN (
+        .where(
+          and(
+            inArray(propertyMonthlyLedger.contractId, contractIds),
+            isNotNull(propertyMonthlyLedger.accrualVoucherId),
+            sql`${propertyMonthlyLedger.accrualVoucherId} NOT IN (
             SELECT id FROM vouchers WHERE deleted_at IS NULL
-          )`,
-        ));
+          )`
+          )
+        );
       console.log(`[re-accrue] dangling stamp sweep cleared rows`);
 
       // 2b. Full reset for ALL fully-unpaid months (paidAmount = 0):
@@ -362,32 +412,37 @@ export function registerRentalAccrualConfigRoutes(
       //     where multiple past months are outstanding but only the current month's
       //     accrual was being rebuilt.
       const now = new Date();
-      const curYear  = now.getUTCFullYear();
+      const curYear = now.getUTCFullYear();
       const curMonth = now.getUTCMonth() + 1;
 
       // All accrued rows with no payment whatsoever (safe to delete + re-accrue)
       const allUnpaidAccruedRows = await db
         .select({
-          id:               propertyMonthlyLedger.id,
+          id: propertyMonthlyLedger.id,
           accrualVoucherId: propertyMonthlyLedger.accrualVoucherId,
-          paidAmount:       propertyMonthlyLedger.paidAmount,
-          expectedAmount:   propertyMonthlyLedger.expectedAmount,
-          year:             propertyMonthlyLedger.year,
-          month:            propertyMonthlyLedger.month,
+          paidAmount: propertyMonthlyLedger.paidAmount,
+          expectedAmount: propertyMonthlyLedger.expectedAmount,
+          year: propertyMonthlyLedger.year,
+          month: propertyMonthlyLedger.month,
         })
         .from(propertyMonthlyLedger)
-        .where(and(
-          inArray(propertyMonthlyLedger.contractId, contractIds),
-          isNotNull(propertyMonthlyLedger.accrualVoucherId),
-          sql`${propertyMonthlyLedger.paidAmount}::numeric = 0`,
-        ));
-      console.log(`[re-accrue] company=${companyId} ${curYear}-${curMonth} unpaidAccruedRows=${allUnpaidAccruedRows.length}`, JSON.stringify(allUnpaidAccruedRows));
+        .where(
+          and(
+            inArray(propertyMonthlyLedger.contractId, contractIds),
+            isNotNull(propertyMonthlyLedger.accrualVoucherId),
+            sql`${propertyMonthlyLedger.paidAmount}::numeric = 0`
+          )
+        );
+      console.log(
+        `[re-accrue] company=${companyId} ${curYear}-${curMonth} unpaidAccruedRows=${allUnpaidAccruedRows.length}`,
+        JSON.stringify(allUnpaidAccruedRows)
+      );
 
       const voucherIdsToDelete = [
         ...new Set(
           allUnpaidAccruedRows
-            .map(r => r.accrualVoucherId)
-            .filter((id): id is number => id !== null && id !== undefined),
+            .map((r) => r.accrualVoucherId)
+            .filter((id): id is number => id !== null && id !== undefined)
         ),
       ];
 
@@ -396,23 +451,31 @@ export function registerRentalAccrualConfigRoutes(
       let reset = 0;
       if (voucherIdsToDelete.length > 0) {
         await db.transaction(async (tx) => {
-          await tx.delete(voucherEntries)
-            .where(inArray(voucherEntries.voucherId, voucherIdsToDelete));
-          await tx.delete(vouchers)
-            .where(and(
-              inArray(vouchers.id, voucherIdsToDelete),
-              eq(vouchers.companyId, companyId),
-            ));
+          await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, voucherIdsToDelete));
+          await tx
+            .delete(vouchers)
+            .where(and(inArray(vouchers.id, voucherIdsToDelete), eq(vouchers.companyId, companyId)));
           // Clear stamps on all the rows we just wiped
-          await tx.update(propertyMonthlyLedger)
+          await tx
+            .update(propertyMonthlyLedger)
             .set({ accrualVoucherId: null })
-            .where(inArray(propertyMonthlyLedger.id, allUnpaidAccruedRows.map(r => r.id)));
+            .where(
+              inArray(
+                propertyMonthlyLedger.id,
+                allUnpaidAccruedRows.map((r) => r.id)
+              )
+            );
         });
         reset = voucherIdsToDelete.length;
       }
 
       // 3. Re-run the combined accrual
-      const { accrued, skipped } = await postRentAccrualForCompany(companyId, shopExpenseAccountName, module, incomeAccountName);
+      const { accrued, skipped } = await postRentAccrualForCompany(
+        companyId,
+        shopExpenseAccountName,
+        module,
+        incomeAccountName
+      );
       console.log(`[re-accrue] result reset=${reset} accrued=${accrued} skipped=${skipped}`);
 
       res.json({ reset, accrued, skipped });
@@ -432,24 +495,34 @@ export function registerRentalAccrualConfigRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      if (module !== "ERP") return res.status(400).json({ message: "Accrual reversal is only available for ERP module" });
+      if (module !== "ERP")
+        return res.status(400).json({ message: "Accrual reversal is only available for ERP module" });
 
       const rowId = parseId(req.params.rowId);
       if (rowId === null) return res.status(400).json({ message: "Invalid row id" });
 
       // Load ledger row and verify company ownership
-      const [row] = await db.select().from(propertyMonthlyLedger).where(and(
-        eq(propertyMonthlyLedger.id, rowId),
-        eq(propertyMonthlyLedger.companyId, companyId),
-        eq(propertyMonthlyLedger.module, "ERP"),
-      ));
+      const [row] = await db
+        .select()
+        .from(propertyMonthlyLedger)
+        .where(
+          and(
+            eq(propertyMonthlyLedger.id, rowId),
+            eq(propertyMonthlyLedger.companyId, companyId),
+            eq(propertyMonthlyLedger.module, "ERP")
+          )
+        );
       if (!row) return res.status(404).json({ message: "Ledger row not found" });
-      if (!row.accrualVoucherId) return res.status(400).json({ message: "This month has no posted accrual to reverse" });
+      if (!row.accrualVoucherId)
+        return res.status(400).json({ message: "This month has no posted accrual to reverse" });
 
       // Verify unit is SHOP type
-      const [unit] = await db.select({ unitType: propertyUnits.unitType, unitNumber: propertyUnits.unitNumber })
-        .from(propertyUnits).where(eq(propertyUnits.id, row.unitId));
-      if (!unit || unit.unitType !== "SHOP") return res.status(400).json({ message: "Accrual reversal is only available for SHOP units" });
+      const [unit] = await db
+        .select({ unitType: propertyUnits.unitType, unitNumber: propertyUnits.unitNumber })
+        .from(propertyUnits)
+        .where(eq(propertyUnits.id, row.unitId));
+      if (!unit || unit.unitType !== "SHOP")
+        return res.status(400).json({ message: "Accrual reversal is only available for SHOP units" });
 
       // Block if payments have already been applied (they debited Accrued Rent Payable).
       if (Number(row.paidAmount) > 0) {
@@ -461,34 +534,50 @@ export function registerRentalAccrualConfigRoutes(
       const amount = String(Number(row.expectedAmount) - Number(row.paidAmount));
 
       const reversalVoucherId = await db.transaction(async (tx) => {
-        const liabilityAccountId = await findOrCreateLedgerAccount(tx, companyId, "Accrued Rent Payable", "Liability", "ACCR-RENT-PAY");
-        const expenseAccountId   = await findOrCreateLedgerAccount(tx, companyId, shopExpenseAccountName, "Indirect Expense", "SHOP-RENT-EXP");
+        const liabilityAccountId = await findOrCreateLedgerAccount(
+          tx,
+          companyId,
+          "Accrued Rent Payable",
+          "Liability",
+          "ACCR-RENT-PAY"
+        );
+        const expenseAccountId = await findOrCreateLedgerAccount(
+          tx,
+          companyId,
+          shopExpenseAccountName,
+          "Indirect Expense",
+          "SHOP-RENT-EXP"
+        );
 
-        const monthStr  = `${String(row.month).padStart(2, "0")}/${row.year}`;
+        const monthStr = `${String(row.month).padStart(2, "0")}/${row.year}`;
         const unitLabel = `unit${row.unitId}${unit.unitNumber ? `-${unit.unitNumber}` : ""}`;
         const narration = `Accrual reversal - ${unitLabel} - ${monthStr}`;
 
-        const [v] = await tx.insert(vouchers).values({
-          companyId,
-          voucherNumber: `ACCR-REV-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${rowId}`,
-          voucherType: "Journal",
-          voucherDate:  new Date().toISOString().slice(0, 10) as any,
-          description:  narration,
-          totalAmount:  amount,
-          currency:     "USD",
-          sourceModule: "ERP",
-        }).returning();
+        const [v] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherNumber: `ACCR-REV-${Date.now()}-${Math.random().toString(36).slice(2, 6)}-${rowId}`,
+            voucherType: "Journal",
+            voucherDate: new Date().toISOString().slice(0, 10) as any,
+            description: narration,
+            totalAmount: amount,
+            currency: "USD",
+            sourceModule: "ERP",
+          })
+          .returning();
 
         // Mirror image of the original accrual:
         //   Original:  Dr Rent Expense  /  Cr Accrued Rent Payable
         //   Reversal:  Dr Accrued Rent Payable  /  Cr Rent Expense
         await tx.insert(voucherEntries).values([
           { voucherId: v.id, ledgerAccountId: liabilityAccountId, debitAmount: amount, creditAmount: "0", narration },
-          { voucherId: v.id, ledgerAccountId: expenseAccountId,   debitAmount: "0",   creditAmount: amount, narration },
+          { voucherId: v.id, ledgerAccountId: expenseAccountId, debitAmount: "0", creditAmount: amount, narration },
         ]);
 
         // Clear the stamp — month is now clean and eligible to be re-accrued
-        await tx.update(propertyMonthlyLedger)
+        await tx
+          .update(propertyMonthlyLedger)
           .set({ accrualVoucherId: null })
           .where(eq(propertyMonthlyLedger.id, rowId));
 
@@ -510,24 +599,37 @@ export function registerRentalAccrualConfigRoutes(
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       // Return all configs for this company+module, enriched with names
-      const allCfgs = await db.select().from(rentalAutoTransferConfigs).where(and(
-        eq(rentalAutoTransferConfigs.companyId, companyId),
-        eq(rentalAutoTransferConfigs.module, module),
-      ));
+      const allCfgs = await db
+        .select()
+        .from(rentalAutoTransferConfigs)
+        .where(and(eq(rentalAutoTransferConfigs.companyId, companyId), eq(rentalAutoTransferConfigs.module, module)));
 
-      const enriched = await Promise.all(allCfgs.map(async cfg => {
-        const [destCompany] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, cfg.destCompanyId));
-        const [destAccount] = await db.select({ name: ledgerAccounts.name }).from(ledgerAccounts).where(eq(ledgerAccounts.id, cfg.destLedgerAccountId));
-        const sourceIds = (cfg.sourceCashAccountIds ?? []) as number[];
-        let sourceAccountNames: { id: number; name: string }[] = [];
-        if (sourceIds.length > 0) {
-          sourceAccountNames = await db
-            .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+      const enriched = await Promise.all(
+        allCfgs.map(async (cfg) => {
+          const [destCompany] = await db
+            .select({ name: companies.name })
+            .from(companies)
+            .where(eq(companies.id, cfg.destCompanyId));
+          const [destAccount] = await db
+            .select({ name: ledgerAccounts.name })
             .from(ledgerAccounts)
-            .where(inArray(ledgerAccounts.id, sourceIds));
-        }
-        return { ...cfg, destCompanyName: destCompany?.name ?? null, destAccountName: destAccount?.name ?? null, sourceAccountNames };
-      }));
+            .where(eq(ledgerAccounts.id, cfg.destLedgerAccountId));
+          const sourceIds = (cfg.sourceCashAccountIds ?? []) as number[];
+          let sourceAccountNames: { id: number; name: string }[] = [];
+          if (sourceIds.length > 0) {
+            sourceAccountNames = await db
+              .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+              .from(ledgerAccounts)
+              .where(inArray(ledgerAccounts.id, sourceIds));
+          }
+          return {
+            ...cfg,
+            destCompanyName: destCompany?.name ?? null,
+            destAccountName: destAccount?.name ?? null,
+            sourceAccountNames,
+          };
+        })
+      );
 
       res.json(enriched);
     } catch (e: any) {
@@ -540,20 +642,28 @@ export function registerRentalAccrualConfigRoutes(
     try {
       const companyId = getCompanyId(req);
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const data = z.object({
-        destCompanyId: z.number().min(1),
-        destLedgerAccountId: z.number().min(1),
-        sourceCashAccountIds: z.array(z.number()).default([]),
-        enabled: z.boolean().default(true),
-      }).parse(req.body);
+      const data = z
+        .object({
+          destCompanyId: z.number().min(1),
+          destLedgerAccountId: z.number().min(1),
+          sourceCashAccountIds: z.array(z.number()).default([]),
+          enabled: z.boolean().default(true),
+        })
+        .parse(req.body);
 
       // Always insert a new rule (multiple rules per company+module are supported)
-      const [created] = await db.insert(rentalAutoTransferConfigs).values({
-        companyId, module, ...data,
-      }).returning();
+      const [created] = await db
+        .insert(rentalAutoTransferConfigs)
+        .values({
+          companyId,
+          module,
+          ...data,
+        })
+        .returning();
       res.status(201).json(created);
     } catch (e: any) {
-      if (e instanceof z.ZodError) return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
+      if (e instanceof z.ZodError)
+        return res.status(400).json({ message: e.errors.map((err: any) => err.message).join(", ") });
       res.status(500).json({ message: e.message });
     }
   });
@@ -566,10 +676,9 @@ export function registerRentalAccrualConfigRoutes(
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
-      await db.delete(rentalAutoTransferConfigs).where(and(
-        eq(rentalAutoTransferConfigs.id, id),
-        eq(rentalAutoTransferConfigs.companyId, companyId),
-      ));
+      await db
+        .delete(rentalAutoTransferConfigs)
+        .where(and(eq(rentalAutoTransferConfigs.id, id), eq(rentalAutoTransferConfigs.companyId, companyId)));
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ message: e.message });

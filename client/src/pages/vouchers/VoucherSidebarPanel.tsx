@@ -1,16 +1,16 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
-import { 
-  Plus, 
-  Search, 
-  Loader2, 
-  ArrowDownCircle, 
-  ArrowUpCircle, 
-  BookOpen, 
-  ArrowLeftRight, 
-  ClipboardList, 
-  SlidersHorizontal, 
-  FileText 
+import {
+  Plus,
+  Search,
+  Loader2,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  BookOpen,
+  ArrowLeftRight,
+  ClipboardList,
+  SlidersHorizontal,
+  FileText,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -79,17 +79,13 @@ export function VoucherSidebarPanel({
     },
   ];
 
-  const visibleSidebarGroups = isFactoryMode
-    ? sidebarGroups.filter((g) => g.label !== "Adjustments")
-    : sidebarGroups;
+  const visibleSidebarGroups = isFactoryMode ? sidebarGroups.filter((g) => g.label !== "Adjustments") : sidebarGroups;
 
   const filteredSidebarAccounts = useMemo(() => {
     if (!sidebarSearchValue.trim()) return sidebarAccounts;
     const term = sidebarSearchValue.toLowerCase();
     return sidebarAccounts.filter(
-      (acc) =>
-        acc.name.toLowerCase().includes(term) ||
-        (acc.code && acc.code.toLowerCase().includes(term))
+      (acc) => acc.name.toLowerCase().includes(term) || (acc.code && acc.code.toLowerCase().includes(term))
     );
   }, [sidebarAccounts, sidebarSearchValue]);
 
@@ -100,9 +96,7 @@ export function VoucherSidebarPanel({
       <nav className="space-y-6">
         {visibleSidebarGroups.map((group) => (
           <div key={group.label} className="space-y-2">
-            <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              {group.label}
-            </h3>
+            <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</h3>
             <div className="space-y-1">
               {group.items.map((item) => (
                 <button
@@ -117,10 +111,7 @@ export function VoucherSidebarPanel({
                   data-testid={`button-tab-${item.key}`}
                 >
                   <item.icon
-                    className={cn(
-                      "h-4 w-4",
-                      activeTab === item.key ? "text-primary-foreground" : ""
-                    )}
+                    className={cn("h-4 w-4", activeTab === item.key ? "text-primary-foreground" : "")}
                     style={{ color: activeTab === item.key ? undefined : group.color }}
                   />
                   {item.label}
@@ -137,13 +128,7 @@ export function VoucherSidebarPanel({
             <div className="flex items-center justify-between gap-2 mb-2">
               <h3 className="text-sm font-semibold">Accounts</h3>
               {onCreateAccount && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={onCreateAccount}
-                  className="h-7 px-2"
-                >
+                <Button type="button" variant="outline" size="sm" onClick={onCreateAccount} className="h-7 px-2">
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   New
                 </Button>
@@ -170,9 +155,7 @@ export function VoucherSidebarPanel({
           <div className="flex-1 overflow-y-auto p-2">
             <div className="space-y-1">
               {filteredSidebarAccounts.length === 0 ? (
-                <div className="text-center py-8 text-xs text-muted-foreground">
-                  No accounts found
-                </div>
+                <div className="text-center py-8 text-xs text-muted-foreground">No accounts found</div>
               ) : (
                 filteredSidebarAccounts.map((account, idx) => {
                   const isHighlighted = idx === sidebarHighlightedIndex && activeRowIndex !== null;
@@ -193,12 +176,18 @@ export function VoucherSidebarPanel({
                       <div className="flex-1 truncate">
                         <div className="font-medium truncate">{account.name}</div>
                       </div>
-                      <div className={cn(
-                        "text-xs font-mono",
-                        (account.type === "employee" || account.type === "supplier")
-                          ? (balance >= 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")
-                          : (balance >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")
-                      )}>
+                      <div
+                        className={cn(
+                          "text-xs font-mono",
+                          account.type === "employee" || account.type === "supplier"
+                            ? balance >= 0
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                            : balance >= 0
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-red-600 dark:text-red-400"
+                        )}
+                      >
                         {formatAmount(Math.abs(balance))}
                       </div>
                     </button>

@@ -6,27 +6,9 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { insertUserCompanyRoleSchema } from "@shared/schema";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -94,7 +76,9 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
             .then((mappings) => {
               if (Array.isArray(mappings)) {
                 const record: Record<number, number> = {};
-                mappings.forEach((m: any) => { record[m.locationId] = m.cashAccountId; });
+                mappings.forEach((m: any) => {
+                  record[m.locationId] = m.cashAccountId;
+                });
                 setLocationCashAccounts(record);
               }
             })
@@ -188,7 +172,12 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{editingRole ? "Edit Role Assignment" : "Add Role Assignment"}</DialogTitle>
@@ -201,10 +190,7 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Company *</FormLabel>
-                  <Select
-                    onValueChange={(v) => field.onChange(parseInt(v))}
-                    value={field.value?.toString() || ""}
-                  >
+                  <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString() || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-role-company">
                         <SelectValue placeholder="Select company" />
@@ -212,7 +198,9 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                     </FormControl>
                     <SelectContent>
                       {companies.map((c: any) => (
-                        <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                        <SelectItem key={c.id} value={c.id.toString()}>
+                          {c.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -255,7 +243,10 @@ export function UserRoleDialog({ open, onClose, userId, companies, editingRole }
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assigned Locations *</FormLabel>
-                      <div className="border rounded-md p-3 space-y-3 max-h-56 overflow-y-auto" data-testid="select-locations">
+                      <div
+                        className="border rounded-md p-3 space-y-3 max-h-56 overflow-y-auto"
+                        data-testid="select-locations"
+                      >
                         {(locations as any[]).map((loc: any) => {
                           const isChecked = selectedLocationIds.includes(loc.id);
                           return (

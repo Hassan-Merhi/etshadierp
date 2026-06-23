@@ -2,21 +2,21 @@ import { pool } from "../db";
 
 /** Maps camelCase field names to their snake_case DB column names. */
 const FIELD_MAP: Record<string, string> = {
-  status:             "status",
-  finishedAt:         "finished_at",
-  zipSizeBytes:       "zip_size_bytes",
-  companiesCount:     "companies_count",
-  companyFilesCount:  "company_files_count",
-  skippedCompanies:   "skipped_companies",
-  emailAttempted:     "email_attempted",
-  emailSuccess:       "email_success",
-  emailError:         "email_error",
-  emailAttempts:      "email_attempts",
-  whatsappAttempted:  "whatsapp_attempted",
-  whatsappSuccess:    "whatsapp_success",
-  whatsappError:      "whatsapp_error",
-  whatsappAttempts:   "whatsapp_attempts",
-  skippedReason:      "skipped_reason",
+  status: "status",
+  finishedAt: "finished_at",
+  zipSizeBytes: "zip_size_bytes",
+  companiesCount: "companies_count",
+  companyFilesCount: "company_files_count",
+  skippedCompanies: "skipped_companies",
+  emailAttempted: "email_attempted",
+  emailSuccess: "email_success",
+  emailError: "email_error",
+  emailAttempts: "email_attempts",
+  whatsappAttempted: "whatsapp_attempted",
+  whatsappSuccess: "whatsapp_success",
+  whatsappError: "whatsapp_error",
+  whatsappAttempts: "whatsapp_attempts",
+  skippedReason: "skipped_reason",
 };
 
 /**
@@ -24,13 +24,12 @@ const FIELD_MAP: Record<string, string> = {
  * Returns the new row id, or 0 on failure (tracking is best-effort).
  */
 export async function createExportRun(
-  runType: "scheduled" | "manual_email" | "manual_whatsapp" | "manual_download",
+  runType: "scheduled" | "manual_email" | "manual_whatsapp" | "manual_download"
 ): Promise<number> {
   try {
-    const r = await pool.query(
-      `INSERT INTO daily_export_runs (run_type, status) VALUES ($1, 'running') RETURNING id`,
-      [runType],
-    );
+    const r = await pool.query(`INSERT INTO daily_export_runs (run_type, status) VALUES ($1, 'running') RETURNING id`, [
+      runType,
+    ]);
     return r.rows[0].id as number;
   } catch (err: any) {
     console.warn("[ExportRun] Failed to create run record:", err.message);
@@ -42,20 +41,14 @@ export async function createExportRun(
  * Update arbitrary fields on a run row.
  * Keys must be camelCase names from FIELD_MAP above; unknown keys are silently ignored.
  */
-export async function updateExportRun(
-  id: number,
-  data: Record<string, any>,
-): Promise<void> {
+export async function updateExportRun(id: number, data: Record<string, any>): Promise<void> {
   if (!id) return;
   const entries = Object.entries(data).filter(([k]) => FIELD_MAP[k] !== undefined);
   if (!entries.length) return;
   const setClauses = entries.map(([k], i) => `${FIELD_MAP[k]} = $${i + 1}`);
   const values = [...entries.map(([, v]) => v), id];
   try {
-    await pool.query(
-      `UPDATE daily_export_runs SET ${setClauses.join(", ")} WHERE id = $${values.length}`,
-      values,
-    );
+    await pool.query(`UPDATE daily_export_runs SET ${setClauses.join(", ")} WHERE id = $${values.length}`, values);
   } catch (err: any) {
     console.warn(`[ExportRun] Failed to update run ${id}:`, err.message);
   }
@@ -64,9 +57,6 @@ export async function updateExportRun(
 /**
  * Finish a run: merges data and sets finished_at = now().
  */
-export async function finishExportRun(
-  id: number,
-  data: Record<string, any>,
-): Promise<void> {
+export async function finishExportRun(id: number, data: Record<string, any>): Promise<void> {
   return updateExportRun(id, { ...data, finishedAt: new Date() });
 }

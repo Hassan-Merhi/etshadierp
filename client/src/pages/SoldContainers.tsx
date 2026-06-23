@@ -36,7 +36,7 @@ export default function SoldContainers() {
   const [searchTerm, setSearchTerm] = useState("");
   const { selectedCompany } = useCompany();
   const { formatDisplayDate } = useDateFormat();
-  
+
   const { data: soldContainers = [], isLoading } = useQuery<SoldContainer[]>({
     queryKey: ["/api/containers/sold", selectedCompany?.id],
     enabled: !!selectedCompany?.id,
@@ -45,11 +45,10 @@ export default function SoldContainers() {
   // Filter based on search term
   const filteredSales = soldContainers.filter((sale) => {
     if (!searchTerm) return true;
-    
+
     const searchLower = searchTerm.toLowerCase();
     return (
-      sale.containerNumber.toLowerCase().includes(searchLower) ||
-      sale.customerName.toLowerCase().includes(searchLower)
+      sale.containerNumber.toLowerCase().includes(searchLower) || sale.customerName.toLowerCase().includes(searchLower)
     );
   });
 
@@ -89,9 +88,7 @@ export default function SoldContainers() {
             <HandCoins className="w-16 h-16 text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold mb-2">No sold containers found</h2>
             <p className="text-muted-foreground">
-              {soldContainers.length === 0 
-                ? "No containers have been sold yet"
-                : "Try adjusting your search"}
+              {soldContainers.length === 0 ? "No containers have been sold yet" : "Try adjusting your search"}
             </p>
           </CardContent>
         </Card>
@@ -113,19 +110,18 @@ export default function SoldContainers() {
               <TableBody>
                 {filteredSales.map((sale) => (
                   <TableRow key={sale.saleId} data-testid={`row-sale-${sale.saleId}`}>
-                    <TableCell className="font-mono font-medium">
-                      {sale.containerNumber}
-                    </TableCell>
-                    <TableCell data-testid={`text-customer-${sale.saleId}`}>
-                      {sale.customerName}
-                    </TableCell>
+                    <TableCell className="font-mono font-medium">{sale.containerNumber}</TableCell>
+                    <TableCell data-testid={`text-customer-${sale.saleId}`}>{sale.customerName}</TableCell>
                     <TableCell className="font-mono" data-testid={`text-sale-date-${sale.saleId}`}>
                       {formatDisplayDate(sale.saleDate)}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-sale-price-${sale.saleId}`}>
                       ${formatNumber(parseFloat(sale.containerCost))}
                     </TableCell>
-                    <TableCell className="text-right font-mono hidden sm:table-cell" data-testid={`text-commission-${sale.saleId}`}>
+                    <TableCell
+                      className="text-right font-mono hidden sm:table-cell"
+                      data-testid={`text-commission-${sale.saleId}`}
+                    >
                       ${formatNumber(parseFloat(sale.commission))}
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-${sale.saleId}`}>

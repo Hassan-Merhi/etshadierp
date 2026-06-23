@@ -13,15 +13,15 @@ import { eq, and, isNull, lte, gte } from "drizzle-orm";
 import { round2 } from "../netPositionHelper";
 
 export interface IncomeLineItem {
-  label:    string;
-  value:    number;          // always positive
+  label: string;
+  value: number; // always positive
   category: string;
 }
 
 export interface IncomeStatement {
   // Revenue
-  totalRevenue:   number;
-  revenueLines:   IncomeLineItem[];
+  totalRevenue: number;
+  revenueLines: IncomeLineItem[];
 
   // Direct expenses (COGS, purchases, etc.)
   totalDirectExp: number;
@@ -36,15 +36,15 @@ export interface IncomeStatement {
   generalExpLines: IncomeLineItem[];
 
   // Totals
-  totalExpenses:  number;
-  grossProfit:    number;    // Revenue - DirectExp
-  netProfit:      number;    // Revenue - ALL expenses
+  totalExpenses: number;
+  grossProfit: number; // Revenue - DirectExp
+  netProfit: number; // Revenue - ALL expenses
 }
 
 export async function calculateIncomeStatementForPeriod(
   companyId: number,
-  fromDate:  string,   // YYYY-MM-DD  (inclusive)
-  toDate:    string,   // YYYY-MM-DD  (inclusive)
+  fromDate: string, // YYYY-MM-DD  (inclusive)
+  toDate: string // YYYY-MM-DD  (inclusive)
 ): Promise<IncomeStatement> {
   const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
@@ -52,26 +52,28 @@ export async function calculateIncomeStatementForPeriod(
   const periodEntries = await db
     .select({
       ledgerAccountId: voucherEntries.ledgerAccountId,
-      debitAmount:     voucherEntries.debitAmount,
-      creditAmount:    voucherEntries.creditAmount,
+      debitAmount: voucherEntries.debitAmount,
+      creditAmount: voucherEntries.creditAmount,
     })
     .from(voucherEntries)
     .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-    .where(and(
-      eq(vouchers.companyId, companyId),
-      eq(vouchers.optional, false),
-      isNull(vouchers.deletedAt),
-      gte(vouchers.voucherDate, fromDate),
-      lte(vouchers.voucherDate, toDate),
-    ))
+    .where(
+      and(
+        eq(vouchers.companyId, companyId),
+        eq(vouchers.optional, false),
+        isNull(vouchers.deletedAt),
+        gte(vouchers.voucherDate, fromDate),
+        lte(vouchers.voucherDate, toDate)
+      )
+    )
     .execute();
 
   // Sum debits and credits per account
   const accountActivity = new Map<number, { debit: number; credit: number }>();
   for (const e of periodEntries) {
     if (!e.ledgerAccountId) continue;
-    const d   = parseFloat(e.debitAmount  || "0");
-    const c   = parseFloat(e.creditAmount || "0");
+    const d = parseFloat(e.debitAmount || "0");
+    const c = parseFloat(e.creditAmount || "0");
     const cur = accountActivity.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
     accountActivity.set(e.ledgerAccountId, { debit: cur.debit + d, credit: cur.credit + c });
   }
@@ -79,10 +81,10 @@ export async function calculateIncomeStatementForPeriod(
   // Build account lookup
   const accountMap = new Map(companyAccounts.map((a: any) => [a.id, a]));
 
-  const revenueLines:   IncomeLineItem[] = [];
+  const revenueLines: IncomeLineItem[] = [];
   const directExpLines: IncomeLineItem[] = [];
   const indirectExpLines: IncomeLineItem[] = [];
-  const generalExpLines:  IncomeLineItem[] = [];
+  const generalExpLines: IncomeLineItem[] = [];
 
   for (const [accId, activity] of accountActivity) {
     const acc = accountMap.get(accId) as any;
@@ -121,13 +123,13 @@ export async function calculateIncomeStatementForPeriod(
   indirectExpLines.sort(sortDesc);
   generalExpLines.sort(sortDesc);
 
-  const totalRevenue    = round2(revenueLines.reduce((s, l) => s + l.value, 0));
-  const totalDirectExp  = round2(directExpLines.reduce((s, l) => s + l.value, 0));
-  const totalIndirectExp= round2(indirectExpLines.reduce((s, l) => s + l.value, 0));
+  const totalRevenue = round2(revenueLines.reduce((s, l) => s + l.value, 0));
+  const totalDirectExp = round2(directExpLines.reduce((s, l) => s + l.value, 0));
+  const totalIndirectExp = round2(indirectExpLines.reduce((s, l) => s + l.value, 0));
   const totalGeneralExp = round2(generalExpLines.reduce((s, l) => s + l.value, 0));
-  const totalExpenses   = round2(totalDirectExp + totalIndirectExp + totalGeneralExp);
-  const grossProfit     = round2(totalRevenue - totalDirectExp);
-  const netProfit       = round2(totalRevenue - totalExpenses);
+  const totalExpenses = round2(totalDirectExp + totalIndirectExp + totalGeneralExp);
+  const grossProfit = round2(totalRevenue - totalDirectExp);
+  const netProfit = round2(totalRevenue - totalExpenses);
 
   return {
     totalRevenue,

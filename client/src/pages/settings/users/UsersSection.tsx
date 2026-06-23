@@ -40,9 +40,7 @@ export function UsersSection() {
             <Users className="h-6 w-6" />
             User Management
           </h2>
-          <p className="text-muted-foreground mt-1">
-            Select a user to manage their account, access, and permissions.
-          </p>
+          <p className="text-muted-foreground mt-1">Select a user to manage their account, access, and permissions.</p>
         </div>
         <Button onClick={() => setAddDialogOpen(true)} data-testid="button-add-user">
           <UserPlus className="h-4 w-4 mr-2" />
@@ -50,12 +48,7 @@ export function UsersSection() {
         </Button>
       </div>
 
-      <UserListTable
-        users={users}
-        isLoading={isLoading}
-        selectedUserId={selectedUser?.id}
-        onSelectUser={openDrawer}
-      />
+      <UserListTable users={users} isLoading={isLoading} selectedUserId={selectedUser?.id} onSelectUser={openDrawer} />
 
       <UserManagementDrawer
         user={selectedUser}

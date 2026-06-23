@@ -9,26 +9,35 @@ export const OTW_NOTES_KEY = "factory-otw-notes";
 export const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "PARTIALLY_RECEIVED"]);
 
 export const CCY_SYMBOLS: Record<string, string> = {
-  USD: "$", EUR: "€", GBP: "£", AUD: "A$", CAD: "C$",
-  CHF: "CHF", JPY: "¥", CNY: "¥", AED: "AED", SAR: "SAR", LBP: "LL",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  AUD: "A$",
+  CAD: "C$",
+  CHF: "CHF",
+  JPY: "¥",
+  CNY: "¥",
+  AED: "AED",
+  SAR: "SAR",
+  LBP: "LL",
 };
 
 export const OTW_STATUS_LABEL: Record<string, string> = {
-  PENDING:    "Pending",
+  PENDING: "Pending",
   IN_TRANSIT: "In Transit",
-  ARRIVED:    "Arrived",
+  ARRIVED: "Arrived",
 };
 
 export const CONTAINER_STATUS_LABELS: Record<string, string> = {
-  PENDING:            "Pending",
-  IN_TRANSIT:         "In Transit",
-  ARRIVED:            "Arrived",
-  OFFLOADED:          "Offloaded",
+  PENDING: "Pending",
+  IN_TRANSIT: "In Transit",
+  ARRIVED: "Arrived",
+  OFFLOADED: "Offloaded",
   PARTIALLY_RECEIVED: "Partially Offloaded",
-  RECEIVED:           "Received",
-  AVAILABLE:          "Available",
-  CLOSED:             "Closed",
-  COMPLETED:          "Completed",
+  RECEIVED: "Received",
+  AVAILABLE: "Available",
+  CLOSED: "Closed",
+  COMPLETED: "Completed",
 };
 
 export function getContainerStatusLabel(status: string): string {
@@ -57,9 +66,10 @@ export function otwAddToCurrency(map: Record<string, number>, ccy: string, amoun
 export function otwContainerByCurrency(c: ContainerWithSupplier): Record<string, number> {
   const amounts: Record<string, number> = {};
   const containerCcy = (c as any).currencyCode || "USD";
-  const goodsValue = otwNum((c as any).finalPayableAmount) > 0
-    ? otwNum((c as any).finalPayableAmount)
-    : otwNum(c.ratePerKg) * otwNum(c.totalKg);
+  const goodsValue =
+    otwNum((c as any).finalPayableAmount) > 0
+      ? otwNum((c as any).finalPayableAmount)
+      : otwNum(c.ratePerKg) * otwNum(c.totalKg);
   otwAddToCurrency(amounts, containerCcy, goodsValue);
   otwAddToCurrency(amounts, (c as any).freightCurrencyCode || containerCcy, otwNum((c as any).freight));
   otwAddToCurrency(amounts, (c as any).commissionCurrencyCode || "USD", otwNum((c as any).commissionAmount));

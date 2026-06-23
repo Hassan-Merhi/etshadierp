@@ -6,7 +6,20 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Plus, Trash2, MessageSquare, CheckCircle2, AlertTriangle, Users, XCircle, Settings2, EyeOff, Eye, Loader2 } from "lucide-react";
+import {
+  Mail,
+  Plus,
+  Trash2,
+  MessageSquare,
+  CheckCircle2,
+  AlertTriangle,
+  Users,
+  XCircle,
+  Settings2,
+  EyeOff,
+  Eye,
+  Loader2,
+} from "lucide-react";
 import { Recipient, ExportSettings, WaRecipient } from "./ExportCenterTypes";
 import { apiRequest } from "@/lib/queryClient";
 import { WhatsAppExportSection } from "./WhatsAppExportSection";
@@ -77,28 +90,43 @@ export function RecipientsTab({
           </p>
         </div>
         <div className="flex gap-2">
-          <Input type="email" placeholder="Add email address..."
-            value={newEmail} onChange={e => setNewEmail(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && newEmail) addEmailRecipient.mutate(newEmail); }}
-            data-testid="input-new-recipient" />
-          <Button onClick={() => newEmail && addEmailRecipient.mutate(newEmail)}
-            disabled={!newEmail || addEmailRecipient.isPending} data-testid="button-add-recipient">
+          <Input
+            type="email"
+            placeholder="Add email address..."
+            value={newEmail}
+            onChange={(e) => setNewEmail(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newEmail) addEmailRecipient.mutate(newEmail);
+            }}
+            data-testid="input-new-recipient"
+          />
+          <Button
+            onClick={() => newEmail && addEmailRecipient.mutate(newEmail)}
+            disabled={!newEmail || addEmailRecipient.isPending}
+            data-testid="button-add-recipient"
+          >
             <Plus className="h-4 w-4 mr-1" /> Add
           </Button>
         </div>
         {emailRecipients.length > 0 ? (
           <div className="rounded-md border divide-y">
-            {emailRecipients.map(r => (
-              <div key={r.id} className="flex items-center justify-between gap-2 px-3 py-2"
-                data-testid={`row-recipient-${r.id}`}>
+            {emailRecipients.map((r) => (
+              <div
+                key={r.id}
+                className="flex items-center justify-between gap-2 px-3 py-2"
+                data-testid={`row-recipient-${r.id}`}
+              >
                 <span className="font-mono text-sm truncate">{r.email}</span>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="text-xs text-muted-foreground hidden sm:block">
                     {new Date(r.created_at).toLocaleDateString()}
                   </span>
-                  <Button size="icon" variant="ghost"
+                  <Button
+                    size="icon"
+                    variant="ghost"
                     onClick={() => removeEmailRecipient.mutate(r.id)}
-                    data-testid={`button-remove-recipient-${r.id}`}>
+                    data-testid={`button-remove-recipient-${r.id}`}
+                  >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
@@ -106,7 +134,9 @@ export function RecipientsTab({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-4 border rounded-md">No recipients yet. Add an email address above.</p>
+          <p className="text-sm text-muted-foreground text-center py-4 border rounded-md">
+            No recipients yet. Add an email address above.
+          </p>
         )}
       </div>
 
@@ -120,30 +150,53 @@ export function RecipientsTab({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div className="rounded-md border p-3 space-y-1">
             <p className="font-medium text-muted-foreground">Daily Export Group</p>
-            {dailyWaGroup
-              ? <p className="flex items-center gap-1.5 font-medium"><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />{dailyWaGroup.name}</p>
-              : <p className="flex items-center gap-1.5 text-amber-600"><AlertTriangle className="h-3.5 w-3.5" />Not configured</p>}
+            {dailyWaGroup ? (
+              <p className="flex items-center gap-1.5 font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                {dailyWaGroup.name}
+              </p>
+            ) : (
+              <p className="flex items-center gap-1.5 text-amber-600">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Not configured
+              </p>
+            )}
           </div>
           <div className="rounded-md border p-3 space-y-1">
             <p className="font-medium text-muted-foreground">Net Position Export Group</p>
-            {npWaGroup
-              ? <p className="flex items-center gap-1.5 font-medium"><CheckCircle2 className="h-3.5 w-3.5 text-green-600" />{npWaGroup.name}</p>
-              : <p className="flex items-center gap-1.5 text-amber-600"><AlertTriangle className="h-3.5 w-3.5" />Not configured</p>}
+            {npWaGroup ? (
+              <p className="flex items-center gap-1.5 font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                {npWaGroup.name}
+              </p>
+            ) : (
+              <p className="flex items-center gap-1.5 text-amber-600">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Not configured
+              </p>
+            )}
           </div>
         </div>
         {waRecipients.length > 0 && (
           <div className="rounded-md border divide-y">
-            {waRecipients.map(r => (
-              <div key={r.id} className="flex items-center gap-2 px-3 py-2"
-                data-testid={`row-wa-recipient-${r.id}`}>
-                {r.isGroup
-                  ? <Users className="h-3.5 w-3.5 shrink-0 text-blue-500" />
-                  : <MessageSquare className="h-3.5 w-3.5 shrink-0 text-green-500" />}
+            {waRecipients.map((r) => (
+              <div key={r.id} className="flex items-center gap-2 px-3 py-2" data-testid={`row-wa-recipient-${r.id}`}>
+                {r.isGroup ? (
+                  <Users className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                ) : (
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0 text-green-500" />
+                )}
                 <span className="text-sm font-medium truncate">{r.name}</span>
-                {r.isGroup && <Badge variant="secondary" className="text-xs shrink-0">Group</Badge>}
-                {r.active
-                  ? <CheckCircle2 className="h-3.5 w-3.5 text-green-500 ml-auto shrink-0" />
-                  : <XCircle className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />}
+                {r.isGroup && (
+                  <Badge variant="secondary" className="text-xs shrink-0">
+                    Group
+                  </Badge>
+                )}
+                {r.active ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500 ml-auto shrink-0" />
+                ) : (
+                  <XCircle className="h-3.5 w-3.5 text-muted-foreground ml-auto shrink-0" />
+                )}
               </div>
             ))}
           </div>
@@ -156,7 +209,7 @@ export function RecipientsTab({
       <div className="space-y-4">
         <button
           className="flex items-center gap-2 text-sm font-semibold hover:underline"
-          onClick={() => setShowAdvanced(v => !v)}
+          onClick={() => setShowAdvanced((v) => !v)}
         >
           <Settings2 className="h-4 w-4" />
           {showAdvanced ? "Hide Advanced Settings" : "Show Advanced Settings"}
@@ -182,18 +235,32 @@ export function RecipientsTab({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs">Gmail Address</Label>
-                  <Input type="email" placeholder={exportSettings?.gmailUser || "sender@gmail.com"}
-                    value={gmailUser} onChange={e => setGmailUser(e.target.value)}
-                    data-testid="input-gmail-user" />
+                  <Input
+                    type="email"
+                    placeholder={exportSettings?.gmailUser || "sender@gmail.com"}
+                    value={gmailUser}
+                    onChange={(e) => setGmailUser(e.target.value)}
+                    data-testid="input-gmail-user"
+                  />
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">App Password</Label>
                   <div className="relative">
-                    <Input type={showPassword ? "text" : "password"} placeholder="xxxx xxxx xxxx xxxx"
-                      value={gmailPassword} onChange={e => setGmailPassword(e.target.value)}
-                      className="pr-10" data-testid="input-gmail-password" />
-                    <Button size="icon" variant="ghost" className="absolute right-0 top-0 h-full"
-                      onClick={() => setShowPassword(!showPassword)} type="button">
+                    <Input
+                      type={showPassword ? "text" : "password"}
+                      placeholder="xxxx xxxx xxxx xxxx"
+                      value={gmailPassword}
+                      onChange={(e) => setGmailPassword(e.target.value)}
+                      className="pr-10"
+                      data-testid="input-gmail-password"
+                    />
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="absolute right-0 top-0 h-full"
+                      onClick={() => setShowPassword(!showPassword)}
+                      type="button"
+                    >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
                   </div>

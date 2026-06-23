@@ -14,7 +14,11 @@ export type CombinedAccount = {
 
 export interface AccountAutocompleteProps {
   value: { type: string; id: number; name: string } | null;
-  onChange: (type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier", id: number, name: string) => void;
+  onChange: (
+    type: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier",
+    id: number,
+    name: string
+  ) => void;
   allAccounts: CombinedAccount[];
   placeholder?: string;
   disabled?: boolean;
@@ -80,9 +84,8 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
     const filteredAccounts = useMemo(() => {
       const term = (searchTerm ?? "").toLowerCase();
 
-      return allAccounts.filter((acc) =>
-        (acc?.name ?? "").toLowerCase().includes(term) ||
-        (acc?.code ?? "").toLowerCase().includes(term)
+      return allAccounts.filter(
+        (acc) => (acc?.name ?? "").toLowerCase().includes(term) || (acc?.code ?? "").toLowerCase().includes(term)
       );
     }, [allAccounts, searchTerm]);
 
@@ -161,8 +164,8 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
       }
     };
 
-    // Show searchTerm if user has started editing (not null), otherwise show selected value  
-    const displayValue = searchTerm !== null ? searchTerm : (value?.name || "");
+    // Show searchTerm if user has started editing (not null), otherwise show selected value
+    const displayValue = searchTerm !== null ? searchTerm : value?.name || "";
 
     // Unique IDs for accessibility
     const listboxId = `account-listbox-${rowIndex}`;
@@ -201,14 +204,12 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
           data-testid={testId || `input-account-${rowIndex}`}
         />
         {open && filteredAccounts.length > 0 && (
-          <div 
+          <div
             ref={listRef}
             id={listboxId}
             className={cn(
               "absolute z-50 bg-popover text-popover-foreground border rounded-md shadow-md max-h-60 overflow-y-auto",
-              dropdownPosition === "right" 
-                ? "left-full ml-1 top-0 w-64" 
-                : "w-full mt-1"
+              dropdownPosition === "right" ? "left-full ml-1 top-0 w-64" : "w-full mt-1"
             )}
             role="listbox"
           >
@@ -230,15 +231,17 @@ export const AccountAutocomplete = forwardRef<AccountAutocompleteHandle, Account
                 <Check
                   className={cn(
                     "h-4 w-4 flex-shrink-0",
-                    value?.type === account.type && value?.id === account.id
-                      ? "opacity-100"
-                      : "opacity-0"
+                    value?.type === account.type && value?.id === account.id ? "opacity-100" : "opacity-0"
                   )}
                 />
                 <span className="flex-1">{account.name}</span>
                 {account.balance !== undefined && (
                   <span className="text-sm text-muted-foreground font-mono">
-                    ${parseFloat(account.balance || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    $
+                    {parseFloat(account.balance || "0").toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 )}
               </button>

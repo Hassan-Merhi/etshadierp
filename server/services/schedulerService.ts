@@ -5,7 +5,13 @@ import { fetchAllCompanies } from "./exportDataService";
 import { sendExportEmail } from "./emailService";
 import { pool } from "../db";
 import { ensureMonthlyForCompany, postRentAccrualForCompany } from "../routes/rental/_rentalShared";
-import { getWaSettings, getActiveRecipients, sendWhatsAppFile, sendWhatsAppFileToChatId, sendWhatsAppText } from "./whatsappService";
+import {
+  getWaSettings,
+  getActiveRecipients,
+  sendWhatsAppFile,
+  sendWhatsAppFileToChatId,
+  sendWhatsAppText,
+} from "./whatsappService";
 import { generateNetPositionExcel } from "../helpers/generateNetPositionExcel";
 import { generateStockPdf } from "../helpers/generateStockPdf";
 import { storage } from "../storage";
@@ -24,11 +30,7 @@ function getTodayLabel(): string {
 /**
  * Build a ZIP containing per-company net position Excel files.
  */
-async function buildNetPositionZip(
-  companies: any[],
-  startDate: string,
-  endDate: string
-): Promise<Buffer> {
+async function buildNetPositionZip(companies: any[], startDate: string, endDate: string): Promise<Buffer> {
   return new Promise(async (resolve, reject) => {
     const chunks: Buffer[] = [];
     const arc = archiver("zip", { zlib: { level: 6 } });
@@ -66,7 +68,9 @@ async function hasTodayExportSucceeded(): Promise<boolean> {
        LIMIT 1
     `);
     return (r.rowCount ?? 0) > 0;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 async function isTodayExportRunning(): Promise<boolean> {
@@ -79,7 +83,9 @@ async function isTodayExportRunning(): Promise<boolean> {
        LIMIT 1
     `);
     return (r.rowCount ?? 0) > 0;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -134,20 +140,19 @@ async function runDailyExport(): Promise<boolean> {
   console.log(`[DailyExport] Scheduled run triggered at ${cronFiredAt}`);
 
   // ── Check what's enabled BEFORE any expensive work ──────────────────────
-  const emailEnabled  = await isScheduleEnabled();
-  const waSettings    = await getWaSettings();
-  const whatsappReady = !!(
-    waSettings?.enabled &&
-    waSettings?.dailyAutoSend &&
-    waSettings?.dailyRecipientId
-  );
+  const emailEnabled = await isScheduleEnabled();
+  const waSettings = await getWaSettings();
+  const whatsappReady = !!(waSettings?.enabled && waSettings?.dailyAutoSend && waSettings?.dailyRecipientId);
 
   console.log(`[DailyExport] Email enabled: ${emailEnabled} | WhatsApp ready: ${whatsappReady}`);
 
   if (!emailEnabled && !whatsappReady) {
     console.log("[DailyExport] Email schedule and WhatsApp daily auto-send are both disabled. Nothing to send.");
     const rid = await createExportRun("scheduled");
-    await finishExportRun(rid, { status: "skipped", skippedReason: "Email schedule and WhatsApp daily auto-send are both disabled." });
+    await finishExportRun(rid, {
+      status: "skipped",
+      skippedReason: "Email schedule and WhatsApp daily auto-send are both disabled.",
+    });
     return true;
   }
 
@@ -171,7 +176,9 @@ async function runDailyExport(): Promise<boolean> {
     threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
     const exportFromDate = threeYearsAgo.toISOString().substring(0, 10);
 
-    console.log(`[DailyExport] Building export for ${companies.length} company/companies (label: ${today}, from: ${exportFromDate})`);
+    console.log(
+      `[DailyExport] Building export for ${companies.length} company/companies (label: ${today}, from: ${exportFromDate})`
+    );
 
     const { zip, names, skipped } = await buildFullExportZip(companies, exportFromDate, undefined);
 
@@ -186,18 +193,20 @@ async function runDailyExport(): Promise<boolean> {
     }
 
     const zipSizeBytes = zip.length;
-    const zipSizeMb    = (zipSizeBytes / 1024 / 1024).toFixed(1);
-    console.log(`[DailyExport] Run ${runId} — ZIP ready: ${zipSizeMb} MB, ${names.length} companies${skipped.length ? `, ${skipped.length} skipped: ${skipped.join(", ")}` : ""}`);
+    const zipSizeMb = (zipSizeBytes / 1024 / 1024).toFixed(1);
+    console.log(
+      `[DailyExport] Run ${runId} — ZIP ready: ${zipSizeMb} MB, ${names.length} companies${skipped.length ? `, ${skipped.length} skipped: ${skipped.join(", ")}` : ""}`
+    );
 
     await updateExportRun(runId, {
-      companiesCount:    companies.length,
+      companiesCount: companies.length,
       companyFilesCount: names.length,
       zipSizeBytes,
-      skippedCompanies:  skipped.join(", ") || null,
+      skippedCompanies: skipped.join(", ") || null,
     });
 
     // ── Email (retried up to 3×, 2 min between attempts) ───────────────────
-    let emailSuccess  = false;
+    let emailSuccess = false;
     let emailError: string | undefined;
     let emailAttempts = 0;
 
@@ -206,18 +215,21 @@ async function runDailyExport(): Promise<boolean> {
       console.log("[DailyExport] Sending email (up to 3 attempts, 2 min delay)...");
 
       const emailRes = await retryAsync({
-        label:       "DailyExport/Email",
-        attempts:    3,
-        delayMs:     2 * 60 * 1000,
-        fn:          () => sendExportEmail(zip, today, names),
-        isSuccess:   r => r.success,
-        shouldRetry: r => !r.error || !isEmailConfigError(r.error),
-        onAttempt:   n => { emailAttempts = n; console.log(`[DailyExport] Email attempt ${n}/3...`); },
+        label: "DailyExport/Email",
+        attempts: 3,
+        delayMs: 2 * 60 * 1000,
+        fn: () => sendExportEmail(zip, today, names),
+        isSuccess: (r) => r.success,
+        shouldRetry: (r) => !r.error || !isEmailConfigError(r.error),
+        onAttempt: (n) => {
+          emailAttempts = n;
+          console.log(`[DailyExport] Email attempt ${n}/3...`);
+        },
       });
 
-      emailSuccess  = emailRes.result.success;
+      emailSuccess = emailRes.result.success;
       emailAttempts = emailRes.attempts;
-      emailError    = emailRes.result.error;
+      emailError = emailRes.result.error;
 
       if (emailSuccess) {
         console.log(`[DailyExport] Email sent successfully (attempt ${emailAttempts}).`);
@@ -230,7 +242,7 @@ async function runDailyExport(): Promise<boolean> {
     }
 
     // ── WhatsApp (retried up to 3×, 2 min between attempts) ────────────────
-    let waSuccess  = false;
+    let waSuccess = false;
     let waError: string | undefined;
     let waAttempts = 0;
 
@@ -239,18 +251,21 @@ async function runDailyExport(): Promise<boolean> {
       console.log("[DailyExport] Sending via WhatsApp (up to 3 attempts, 2 min delay)...");
 
       const waRes = await retryAsync({
-        label:       "DailyExport/WhatsApp",
-        attempts:    3,
-        delayMs:     2 * 60 * 1000,
-        fn:          () => runDailyWhatsAppSend(zip, today, companies),
-        isSuccess:   r => r.sent,
-        shouldRetry: r => !r.skipped && (!r.error || !isWaConfigError(r.error)),
-        onAttempt:   n => { waAttempts = n; console.log(`[DailyExport] WhatsApp attempt ${n}/3...`); },
+        label: "DailyExport/WhatsApp",
+        attempts: 3,
+        delayMs: 2 * 60 * 1000,
+        fn: () => runDailyWhatsAppSend(zip, today, companies),
+        isSuccess: (r) => r.sent,
+        shouldRetry: (r) => !r.skipped && (!r.error || !isWaConfigError(r.error)),
+        onAttempt: (n) => {
+          waAttempts = n;
+          console.log(`[DailyExport] WhatsApp attempt ${n}/3...`);
+        },
       });
 
-      waSuccess  = waRes.result.sent;
+      waSuccess = waRes.result.sent;
       waAttempts = waRes.attempts;
-      waError    = waRes.result.error || waRes.result.skipReason;
+      waError = waRes.result.error || waRes.result.skipReason;
 
       if (waSuccess) {
         console.log(`[DailyExport] WhatsApp sent successfully (attempt ${waAttempts}).`);
@@ -265,30 +280,31 @@ async function runDailyExport(): Promise<boolean> {
 
     // ── Determine final run status ──────────────────────────────────────────
     const bothSucceeded = (!emailEnabled || emailSuccess) && (!whatsappReady || waSuccess);
-    const atLeastOne    = (emailEnabled && emailSuccess) || (whatsappReady && waSuccess);
-    const finalStatus   = bothSucceeded ? "success" : atLeastOne ? "partial_failed" : "failed";
+    const atLeastOne = (emailEnabled && emailSuccess) || (whatsappReady && waSuccess);
+    const finalStatus = bothSucceeded ? "success" : atLeastOne ? "partial_failed" : "failed";
 
     console.log(
       `[DailyExport] Run ${runId} finished — status: ${finalStatus}` +
-      ` | email: ${emailEnabled ? (emailSuccess ? "ok" : "failed") : "n/a"}` +
-      ` | wa: ${whatsappReady ? (waSuccess ? "ok" : "failed") : "n/a"}`,
+        ` | email: ${emailEnabled ? (emailSuccess ? "ok" : "failed") : "n/a"}` +
+        ` | wa: ${whatsappReady ? (waSuccess ? "ok" : "failed") : "n/a"}`
     );
 
     await finishExportRun(runId, {
-      status:           finalStatus,
+      status: finalStatus,
       emailSuccess,
-      emailError:       emailError ?? null,
+      emailError: emailError ?? null,
       emailAttempts,
-      whatsappSuccess:  waSuccess,
-      whatsappError:    waError ?? null,
+      whatsappSuccess: waSuccess,
+      whatsappError: waError ?? null,
       whatsappAttempts: waAttempts,
     });
 
     return finalStatus !== "failed";
-
   } catch (err: any) {
     console.error(`[DailyExport] Unexpected error in run ${runId}:`, err?.stack || err?.message || err);
-    await finishExportRun(runId, { status: "failed", skippedReason: err?.message || "Unexpected error" }).catch(() => {});
+    await finishExportRun(runId, { status: "failed", skippedReason: err?.message || "Unexpected error" }).catch(
+      () => {}
+    );
     return false;
   }
 }
@@ -296,17 +312,17 @@ async function runDailyExport(): Promise<boolean> {
 // ─── Daily WhatsApp send (6 PM) ───────────────────────────────────────────────
 
 interface DailyWaSendResult {
-  sent:        boolean;
-  skipped:     boolean;
+  sent: boolean;
+  skipped: boolean;
   skipReason?: string;
-  error?:      string;
+  error?: string;
 }
 
 async function runDailyWhatsAppSend(
   dailyZip: Buffer,
   dateLabel: string,
   companies: { id: number; name: string }[],
-  opts: { bypassAutoSendCheck?: boolean } = {},
+  opts: { bypassAutoSendCheck?: boolean } = {}
 ): Promise<DailyWaSendResult> {
   const skip = (skipReason: string): DailyWaSendResult => {
     console.log(`[WhatsApp] ${skipReason} — skipping daily ZIP send.`);
@@ -329,10 +345,9 @@ async function runDailyWhatsAppSend(
     return skip("No daily export WhatsApp group configured");
   }
 
-  const rRow = await pool.query(
-    "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
-    [recipientId],
-  );
+  const rRow = await pool.query("SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true", [
+    recipientId,
+  ]);
   if (!rRow.rows.length) {
     return skip(`Daily export recipient id=${recipientId} not found or inactive`);
   }
@@ -345,9 +360,9 @@ async function runDailyWhatsAppSend(
     return { sent: false, skipped: false, error: msg };
   }
 
-  const chatId      = rRow.rows[0].chat_id as string;
+  const chatId = rRow.rows[0].chat_id as string;
   const zipFileName = `DailyExport_${dateLabel}.zip`;
-  const zipCaption  = "";
+  const zipCaption = "";
   console.log(`[WhatsApp] Sending daily export ZIP (${zipSizeMb.toFixed(1)} MB) to ${chatId}…`);
 
   try {
@@ -370,27 +385,27 @@ async function runDailyWhatsAppSend(
 
 /** Returns true if, given frequency/day config and last_sent_at, it's time to send. */
 function shouldSendStockReport(cfg: {
-  frequency:     string;
-  sendHour:      number;
+  frequency: string;
+  sendHour: number;
   sendDayOfWeek: number | null;
-  lastSentAt:    Date | null;
+  lastSentAt: Date | null;
 }): boolean {
   // All times in EST (America/New_York)
   const nowEst = new Date(new Date().toLocaleString("en-US", { timeZone: "America/New_York" }));
   const currentHour = nowEst.getHours();
-  const currentDay  = nowEst.getDay();  // 0=Sun … 6=Sat
+  const currentDay = nowEst.getDay(); // 0=Sun … 6=Sat
 
   if (currentHour !== cfg.sendHour) return false;
 
   // Check if already sent in the current period
   if (cfg.lastSentAt) {
     const lastEst = new Date(new Date(cfg.lastSentAt).toLocaleString("en-US", { timeZone: "America/New_York" }));
-    const sameDay   = lastEst.toDateString() === nowEst.toDateString();
-    const sameWeek  = isSameIsoWeek(lastEst, nowEst);
+    const sameDay = lastEst.toDateString() === nowEst.toDateString();
+    const sameWeek = isSameIsoWeek(lastEst, nowEst);
     const sameMonth = lastEst.getFullYear() === nowEst.getFullYear() && lastEst.getMonth() === nowEst.getMonth();
 
-    if (cfg.frequency === "daily"   && sameDay)   return false;
-    if (cfg.frequency === "weekly"  && sameWeek)  return false;
+    if (cfg.frequency === "daily" && sameDay) return false;
+    if (cfg.frequency === "weekly" && sameWeek) return false;
     if (cfg.frequency === "monthly" && sameMonth) return false;
   }
 
@@ -425,7 +440,7 @@ export async function checkAndRunStockReport(): Promise<void> {
     const r = await pool.query(
       `SELECT company_id, recipient_id, auto_send, enabled,
               frequency, send_hour, send_day_of_week, last_sent_at
-       FROM whatsapp_stock_settings WHERE id = 1`,
+       FROM whatsapp_stock_settings WHERE id = 1`
     );
     if (!r.rows.length) return;
     const row = r.rows[0];
@@ -434,19 +449,18 @@ export async function checkAndRunStockReport(): Promise<void> {
     if (!row.company_id || !row.recipient_id) return;
 
     const cfg = {
-      frequency:     (row.frequency     ?? "daily") as string,
-      sendHour:      (row.send_hour     ?? 18)       as number,
-      sendDayOfWeek: (row.send_day_of_week           ?? null) as number | null,
-      lastSentAt:    row.last_sent_at ? new Date(row.last_sent_at) : null,
+      frequency: (row.frequency ?? "daily") as string,
+      sendHour: (row.send_hour ?? 18) as number,
+      sendDayOfWeek: (row.send_day_of_week ?? null) as number | null,
+      lastSentAt: row.last_sent_at ? new Date(row.last_sent_at) : null,
     };
 
     if (!shouldSendStockReport(cfg)) return;
 
     // Fetch recipient chatId
-    const rq = await pool.query(
-      "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
-      [row.recipient_id],
-    );
+    const rq = await pool.query("SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true", [
+      row.recipient_id,
+    ]);
     if (!rq.rows.length) {
       console.log("[StockReport] Recipient inactive — skipping.");
       return;
@@ -454,17 +468,23 @@ export async function checkAndRunStockReport(): Promise<void> {
     const chatId = rq.rows[0].chat_id as string;
 
     const allCompanies = await storage.getAllCompanies();
-    const company      = (allCompanies as any[]).find((c) => c.id === row.company_id);
-    if (!company) { console.log(`[StockReport] Company ${row.company_id} not found.`); return; }
+    const company = (allCompanies as any[]).find((c) => c.id === row.company_id);
+    if (!company) {
+      console.log(`[StockReport] Company ${row.company_id} not found.`);
+      return;
+    }
 
-    const today     = getTodayLabel();
+    const today = getTodayLabel();
     const yearStart = `${new Date().getUTCFullYear()}-01-01`;
 
     console.log(`[StockReport] Sending to ${company.name} → ${chatId} (${cfg.frequency})…`);
 
     // 1. Stock PDF
-    const { buffer: pdfBuf, pageCount: pdfPageCount, rowCount: pdfRowCount } =
-      await generateStockPdf(row.company_id, company.name, undefined, undefined, true);
+    const {
+      buffer: pdfBuf,
+      pageCount: pdfPageCount,
+      rowCount: pdfRowCount,
+    } = await generateStockPdf(row.company_id, company.name, undefined, undefined, true);
 
     // Safety guard: if PDF is absurdly over-paginated, skip send rather than
     // delivering a broken 100+ page file. Root cause: PDFKit ≥0.17 exposes
@@ -473,35 +493,38 @@ export async function checkAndRunStockReport(): Promise<void> {
     if (pdfPageCount > maxAllowedPages) {
       console.error(
         `[StockReport] SAFETY GUARD: PDF has ${pdfPageCount} pages for ${pdfRowCount} rows ` +
-        `(max allowed: ${maxAllowedPages}). company="${company.name}". Skipping WhatsApp send.`,
+          `(max allowed: ${maxAllowedPages}). company="${company.name}". Skipping WhatsApp send.`
       );
       return;
     }
 
     const pdfName = `Stock_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.pdf`;
-    const pdfCap  = "";
+    const pdfCap = "";
     console.log(
       `[StockReport] Uploading stock PDF — chatId=${chatId} file=${pdfName} ` +
-      `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount}`,
+        `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount}`
     );
-    const pdfRes  = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
+    const pdfRes = await sendWhatsAppFileToChatId(chatId, pdfBuf, pdfName, pdfCap, "application/pdf");
     if (pdfRes.success) {
       console.log(`[StockReport] PDF sent — chatId=${chatId} file=${pdfName}`);
     } else {
       console.error(
         `[StockReport] PDF upload failed — chatId=${chatId} file=${pdfName} ` +
-        `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount} ` +
-        `greenApiError="${pdfRes.error}"`,
+          `size=${pdfBuf.length} pageCount=${pdfPageCount} rowCount=${pdfRowCount} ` +
+          `greenApiError="${pdfRes.error}"`
       );
     }
 
     // 2. Net Position Excel (Jan 1 → today)
-    const xlsBuf  = await generateNetPositionExcel(row.company_id, company.name, yearStart, today);
+    const xlsBuf = await generateNetPositionExcel(row.company_id, company.name, yearStart, today);
     const xlsName = `NetPosition_${company.name.replace(/[^a-z0-9]/gi, "_")}_${today}.xlsx`;
-    const xlsCap  = "";
-    const xlsRes  = await sendWhatsAppFileToChatId(
-      chatId, xlsBuf, xlsName, xlsCap,
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    const xlsCap = "";
+    const xlsRes = await sendWhatsAppFileToChatId(
+      chatId,
+      xlsBuf,
+      xlsName,
+      xlsCap,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     );
     console.log(`[StockReport] Net Position Excel: ${xlsRes.success ? "sent" : xlsRes.error}`);
 
@@ -520,7 +543,7 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
     const r = await pool.query(
       `SELECT recipient_id, frequency, send_hour, send_day_of_week,
               enabled, auto_send, last_sent_at
-       FROM net_position_export_settings WHERE id = 1`,
+       FROM net_position_export_settings WHERE id = 1`
     );
     if (!r.rows.length) return;
     const row = r.rows[0];
@@ -528,35 +551,36 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
     if (!row.enabled || !row.auto_send) return;
 
     const cfg = {
-      frequency:     (row.frequency      ?? "daily") as string,
-      sendHour:      (row.send_hour      ?? 18)       as number,
-      sendDayOfWeek: (row.send_day_of_week            ?? null) as number | null,
-      lastSentAt:    row.last_sent_at ? new Date(row.last_sent_at) : null,
+      frequency: (row.frequency ?? "daily") as string,
+      sendHour: (row.send_hour ?? 18) as number,
+      sendDayOfWeek: (row.send_day_of_week ?? null) as number | null,
+      lastSentAt: row.last_sent_at ? new Date(row.last_sent_at) : null,
     };
 
     if (!shouldSendStockReport(cfg)) return;
 
-    const companies = await storage.getAllCompanies() as any[];
+    const companies = (await storage.getAllCompanies()) as any[];
     if (!companies.length) {
       console.log("[NetPositionExport] No companies found — skipping.");
       return;
     }
 
-    const today    = getTodayLabel();
-    const year     = new Date().getUTCFullYear();
-    const npStart  = `${year}-01-01`;
-    const npEnd    = today;
+    const today = getTodayLabel();
+    const year = new Date().getUTCFullYear();
+    const npStart = `${year}-01-01`;
+    const npEnd = today;
 
-    console.log(`[NetPositionExport] Building net position ZIP for ${companies.length} companies (${npStart}→${npEnd})…`);
+    console.log(
+      `[NetPositionExport] Building net position ZIP for ${companies.length} companies (${npStart}→${npEnd})…`
+    );
     const zipBuf = await buildNetPositionZip(companies, npStart, npEnd);
     console.log(`[NetPositionExport] ZIP ready (${(zipBuf.length / 1024).toFixed(0)} KB)`);
 
     // Send to WhatsApp group
     if (row.recipient_id) {
-      const rq = await pool.query(
-        "SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true",
-        [row.recipient_id],
-      );
+      const rq = await pool.query("SELECT chat_id FROM whatsapp_recipients WHERE id = $1 AND active = true", [
+        row.recipient_id,
+      ]);
       if (rq.rows.length) {
         const chatId = rq.rows[0].chat_id as string;
         const waSettings = await getWaSettings();
@@ -566,7 +590,7 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
             zipBuf,
             `NetPosition_AllCompanies_${today}.zip`,
             "",
-            "application/zip",
+            "application/zip"
           );
           console.log(`[NetPositionExport] WhatsApp: ${waRes.success ? "sent" : waRes.error}`);
         } else {
@@ -578,7 +602,11 @@ export async function checkAndRunNetPositionExport(): Promise<void> {
     }
 
     // Send via email (uses existing export_recipients + export_settings for credentials)
-    const emailResult = await sendExportEmail(zipBuf, today, companies.map((c) => c.name));
+    const emailResult = await sendExportEmail(
+      zipBuf,
+      today,
+      companies.map((c) => c.name)
+    );
     console.log(`[NetPositionExport] Email: ${emailResult.success ? "sent" : emailResult.error}`);
 
     // Mark as sent
@@ -616,7 +644,7 @@ async function runMonthlyWhatsAppNetPosition() {
     }
 
     const companies = await storage.getAllCompanies();
-    const endDate   = getTodayLabel();
+    const endDate = getTodayLabel();
     const startDate = (() => {
       const d = new Date(endDate);
       d.setFullYear(d.getFullYear() - 1);
@@ -626,11 +654,11 @@ async function runMonthlyWhatsAppNetPosition() {
     for (const company of companies as any[]) {
       try {
         console.log(`[WhatsApp] Generating net-position Excel for ${company.name}…`);
-        const buffer   = await generateNetPositionExcel(company.id, company.name, startDate, endDate);
-        const safe     = company.name.replace(/[^a-z0-9]/gi, "_");
+        const buffer = await generateNetPositionExcel(company.id, company.name, startDate, endDate);
+        const safe = company.name.replace(/[^a-z0-9]/gi, "_");
         const fileName = `NetPosition_${safe}_${endDate}.xlsx`;
-        const caption  = "";
-        const result   = await sendWhatsAppFile(buffer, fileName, caption);
+        const caption = "";
+        const result = await sendWhatsAppFile(buffer, fileName, caption);
         console.log(`[WhatsApp] ${company.name}: sent=${result.sent} failed=${result.failed}`);
       } catch (compErr: any) {
         console.error(`[WhatsApp] Failed for ${company.name}:`, compErr.message);
@@ -728,8 +756,9 @@ export async function checkOverdueCustomers(): Promise<void> {
       return;
     }
 
-    const lines = overdue.map((c) =>
-      `• ${c.name}: $${c.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — due ${c.dueDate} (${c.daysOverdue === 0 ? "due today" : `${c.daysOverdue}d overdue`})`
+    const lines = overdue.map(
+      (c) =>
+        `• ${c.name}: $${c.balance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} — due ${c.dueDate} (${c.daysOverdue === 0 ? "due today" : `${c.daysOverdue}d overdue`})`
     );
 
     const message = `*Payment Reminder*\n\nThe following customers have outstanding balances past their due date:\n\n${lines.join("\n")}\n\nPlease follow up.`;
@@ -790,7 +819,7 @@ async function checkAndRunScheduledDailyExport(): Promise<void> {
       }
       if (attempt < MAX_ATTEMPTS) {
         console.log(`[DailyExport] Attempt ${attempt}/${MAX_ATTEMPTS} failed — retrying in 15 minutes...`);
-        await new Promise<void>(res => setTimeout(res, 15 * 60 * 1000));
+        await new Promise<void>((res) => setTimeout(res, 15 * 60 * 1000));
       } else {
         console.error(`[DailyExport] All ${MAX_ATTEMPTS} attempts failed.`);
       }
@@ -810,8 +839,8 @@ async function runMonthlyRentalAccrual() {
   try {
     const { rows } = await pool.query<{ id: number }>("SELECT id FROM companies");
     const modules: Array<{ module: string; income: string; expense: string }> = [
-      { module: "ERP",        income: "Rental Income - ERP",        expense: "Rent Expense - ERP Shops" },
-      { module: "FACTORY",    income: "Rental Income - Factory",    expense: "Rent Expense - Factory Shops" },
+      { module: "ERP", income: "Rental Income - ERP", expense: "Rent Expense - ERP Shops" },
+      { module: "FACTORY", income: "Rental Income - Factory", expense: "Rent Expense - Factory Shops" },
       { module: "PROPERTIES", income: "Rental Income - Properties", expense: "Rent Expense - Property Shops" },
     ];
 
@@ -838,67 +867,93 @@ export function startScheduler() {
   schedulerStarted = true;
 
   // Run on the 1st of every month at 7:00 AM EST — send net-position Excel via WhatsApp
-  cron.schedule("0 7 1 * *", async () => {
-    await runMonthlyWhatsAppNetPosition();
-  }, {
-    timezone: "America/New_York",
-  });
+  cron.schedule(
+    "0 7 1 * *",
+    async () => {
+      await runMonthlyWhatsAppNetPosition();
+    },
+    {
+      timezone: "America/New_York",
+    }
+  );
 
   // Run on the 2nd of every month at 6:00 AM EST — auto-post rent accrual vouchers
-  cron.schedule("0 6 2 * *", async () => {
-    await runMonthlyRentalAccrual();
-  }, {
-    timezone: "America/New_York",
-  });
+  cron.schedule(
+    "0 6 2 * *",
+    async () => {
+      await runMonthlyRentalAccrual();
+    },
+    {
+      timezone: "America/New_York",
+    }
+  );
 
   // Every hour: check stock report, net position export, AND the configurable daily export.
   // The daily export fires when the current local hour (in the stored timezone) matches
   // the stored schedule_hour — this replaces the old hardcoded 6 PM EST cron.
-  cron.schedule("0 * * * *", async () => {
-    await checkAndRunStockReport();
-    await checkAndRunNetPositionExport();
-    await checkAndRunScheduledDailyExport();
-    await checkAndRunContainersWhatsApp();
-  }, {
-    timezone: "America/New_York",
-  });
+  cron.schedule(
+    "0 * * * *",
+    async () => {
+      await checkAndRunStockReport();
+      await checkAndRunNetPositionExport();
+      await checkAndRunScheduledDailyExport();
+      await checkAndRunContainersWhatsApp();
+    },
+    {
+      timezone: "America/New_York",
+    }
+  );
 
   // Overdue customer payment reminder — runs every day at 9:00 AM EST
-  cron.schedule("0 9 * * *", async () => {
-    console.log("[OverdueCheck] 9 AM cron fired.");
-    await checkOverdueCustomers();
-  }, {
-    timezone: "America/New_York",
-  });
+  cron.schedule(
+    "0 9 * * *",
+    async () => {
+      console.log("[OverdueCheck] 9 AM cron fired.");
+      await checkOverdueCustomers();
+    },
+    {
+      timezone: "America/New_York",
+    }
+  );
 
   // Purge soft-deleted items older than 30 days — runs daily at 2:00 AM EST
-  cron.schedule("0 2 * * *", async () => {
-    console.log("[Purge] 30-day soft-delete purge started.");
-    await purgeOldSoftDeletes();
-  }, {
-    timezone: "America/New_York",
-  });
+  cron.schedule(
+    "0 2 * * *",
+    async () => {
+      console.log("[Purge] 30-day soft-delete purge started.");
+      await purgeOldSoftDeletes();
+    },
+    {
+      timezone: "America/New_York",
+    }
+  );
 
   // Container auto-tracking — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST)
-  cron.schedule("0 */6 * * *", async () => {
-    console.log("[ContainerTracking] 6-hour auto-tracking cron fired.");
-    try {
-      const { trackDueContainers } = await import("./containerTrackingService");
-      await trackDueContainers();
-    } catch (err: any) {
-      console.error("[ContainerTracking] Cron error:", err?.message);
+  cron.schedule(
+    "0 */6 * * *",
+    async () => {
+      console.log("[ContainerTracking] 6-hour auto-tracking cron fired.");
+      try {
+        const { trackDueContainers } = await import("./containerTrackingService");
+        await trackDueContainers();
+      } catch (err: any) {
+        console.error("[ContainerTracking] Cron error:", err?.message);
+      }
+      try {
+        const { trackDueFactoryContainers } = await import("./factoryContainerTrackingService");
+        await trackDueFactoryContainers();
+      } catch (err: any) {
+        console.error("[FactoryTracking] Cron error:", err?.message);
+      }
+    },
+    {
+      timezone: "America/New_York",
     }
-    try {
-      const { trackDueFactoryContainers } = await import("./factoryContainerTrackingService");
-      await trackDueFactoryContainers();
-    } catch (err: any) {
-      console.error("[FactoryTracking] Cron error:", err?.message);
-    }
-  }, {
-    timezone: "America/New_York",
-  });
+  );
 
-  console.log("[ContainerTracking] Auto-tracking scheduler started — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST).");
+  console.log(
+    "[ContainerTracking] Auto-tracking scheduler started — runs every 6 hours (00:00, 06:00, 12:00, 18:00 EST)."
+  );
   console.log("[DailyExport] Scheduler started — time-configurable via export settings (checked every hour).");
   console.log("[WhatsApp] Monthly net-position scheduler started — runs on the 1st of each month at 7:00 AM EST.");
   console.log("[RentalAccrual] Monthly auto-accrual scheduler started — runs on the 2nd of each month at 6:00 AM EST.");
@@ -924,7 +979,7 @@ async function purgeOldSoftDeletes(): Promise<void> {
       [cutoff]
     );
     if (oldStockItems.rows.length > 0) {
-      const ids = oldStockItems.rows.map(r => r.id);
+      const ids = oldStockItems.rows.map((r) => r.id);
       const placeholders = ids.map((_, i) => `$${i + 1}`).join(",");
       await client.query(`DELETE FROM sales_items                       WHERE stock_item_id IN (${placeholders})`, ids);
       await client.query(`DELETE FROM stock_adjustment_items            WHERE stock_item_id IN (${placeholders})`, ids);
@@ -935,7 +990,10 @@ async function purgeOldSoftDeletes(): Promise<void> {
       await client.query(`DELETE FROM credit_note_items                 WHERE stock_item_id IN (${placeholders})`, ids);
       await client.query(`DELETE FROM inventory                         WHERE stock_item_id IN (${placeholders})`, ids);
       await client.query(`DELETE FROM waste_dispatch_items              WHERE stock_item_id IN (${placeholders})`, ids);
-      await client.query(`DELETE FROM stock_group_location_archive_items WHERE stock_item_id IN (${placeholders})`, ids);
+      await client.query(
+        `DELETE FROM stock_group_location_archive_items WHERE stock_item_id IN (${placeholders})`,
+        ids
+      );
       await client.query(`DELETE FROM stock_item_code_aliases           WHERE stock_item_id IN (${placeholders})`, ids);
       await client.query(`DELETE FROM stock_item_location_prices        WHERE stock_item_id IN (${placeholders})`, ids);
       await client.query(`DELETE FROM stock_items WHERE id IN (${placeholders})`, ids);
@@ -944,29 +1002,26 @@ async function purgeOldSoftDeletes(): Promise<void> {
 
     // ── Simple tables with no FK children referencing them ──────────────────
     const simplePurges: Array<{ table: string; col: string }> = [
-      { table: "stock_groups",                   col: "deleted_at" },
-      { table: "locations",                      col: "deleted_at" },
-      { table: "ledger_accounts",                col: "deleted_at" },
-      { table: "employees",                      col: "deleted_at" },
-      { table: "customers",                      col: "deleted_at" },
-      { table: "suppliers",                      col: "deleted_at" },
-      { table: "bank_accounts",                  col: "deleted_at" },
-      { table: "factory_categories",             col: "deleted_at" },
-      { table: "factory_bale_products",          col: "deleted_at" },
-      { table: "factory_containers",             col: "deleted_at" },
-      { table: "factory_raw_stock",              col: "deleted_at" },
+      { table: "stock_groups", col: "deleted_at" },
+      { table: "locations", col: "deleted_at" },
+      { table: "ledger_accounts", col: "deleted_at" },
+      { table: "employees", col: "deleted_at" },
+      { table: "customers", col: "deleted_at" },
+      { table: "suppliers", col: "deleted_at" },
+      { table: "bank_accounts", col: "deleted_at" },
+      { table: "factory_categories", col: "deleted_at" },
+      { table: "factory_bale_products", col: "deleted_at" },
+      { table: "factory_containers", col: "deleted_at" },
+      { table: "factory_raw_stock", col: "deleted_at" },
       { table: "factory_raw_material_adjustments", col: "deleted_at" },
-      { table: "factory_mix_batches",            col: "deleted_at" },
-      { table: "factory_bales",                  col: "deleted_at" },
-      { table: "customer_proformas",             col: "deleted_at" },
-      { table: "customer_orders",                col: "deleted_at" },
+      { table: "factory_mix_batches", col: "deleted_at" },
+      { table: "factory_bales", col: "deleted_at" },
+      { table: "customer_proformas", col: "deleted_at" },
+      { table: "customer_orders", col: "deleted_at" },
     ];
 
     for (const { table, col } of simplePurges) {
-      const result = await client.query(
-        `DELETE FROM ${table} WHERE ${col} IS NOT NULL AND ${col} < $1`,
-        [cutoff]
-      );
+      const result = await client.query(`DELETE FROM ${table} WHERE ${col} IS NOT NULL AND ${col} < $1`, [cutoff]);
       if (result.rowCount && result.rowCount > 0) {
         console.log(`[Purge] Permanently deleted ${result.rowCount} ${table} row(s) older than 30 days.`);
       }
@@ -986,7 +1041,8 @@ async function purgeOldSoftDeletes(): Promise<void> {
 
 async function checkAndRunContainersWhatsApp(): Promise<void> {
   try {
-    const { getContainersWaSettings, sendWhatsAppFileToChatId, markContainersWaSent } = await import("./whatsappService");
+    const { getContainersWaSettings, sendWhatsAppFileToChatId, markContainersWaSent } =
+      await import("./whatsappService");
     const settings = await getContainersWaSettings();
 
     if (!settings?.scheduleEnabled || !settings?.groupChatId) return;
@@ -1008,13 +1064,11 @@ async function checkAndRunContainersWhatsApp(): Promise<void> {
     const { generateContainersPdf } = await import("../helpers/generateContainersPdf");
     const { buffer, rowCount } = await generateContainersPdf();
 
-    const today    = new Date().toISOString().substring(0, 10);
-    const caption  = "";
+    const today = new Date().toISOString().substring(0, 10);
+    const caption = "";
     const fileName = `Containers_${today}.pdf`;
 
-    const result = await sendWhatsAppFileToChatId(
-      settings.groupChatId, buffer, fileName, caption, "application/pdf",
-    );
+    const result = await sendWhatsAppFileToChatId(settings.groupChatId, buffer, fileName, caption, "application/pdf");
 
     if (result.success) {
       await markContainersWaSent();
@@ -1033,10 +1087,7 @@ async function checkAndRunContainersWhatsApp(): Promise<void> {
  *  Records the attempt in daily_export_runs.
  *  Throws an Error with a human-readable message if WhatsApp is not configured or the send fails.
  */
-export async function triggerDailyWhatsAppSendNow(
-  fromDate?: string,
-  toDate?: string,
-): Promise<{ message: string }> {
+export async function triggerDailyWhatsAppSendNow(fromDate?: string, toDate?: string): Promise<{ message: string }> {
   const runId = await createExportRun("manual_whatsapp");
   console.log(`[ManualWhatsApp] Run id=${runId} started.`);
 
@@ -1056,55 +1107,55 @@ export async function triggerDailyWhatsAppSendNow(
   }
 
   await updateExportRun(runId, {
-    companiesCount:    companies.length,
+    companiesCount: companies.length,
     companyFilesCount: names.length,
-    zipSizeBytes:      zip.length,
-    skippedCompanies:  skipped.join(", ") || null,
+    zipSizeBytes: zip.length,
+    skippedCompanies: skipped.join(", ") || null,
     whatsappAttempted: true,
   });
 
-  const rangeLabel  = (fromDate || toDate) ? ` (${fromDate || "start"} → ${toDate || "today"})` : " (full history)";
+  const rangeLabel = fromDate || toDate ? ` (${fromDate || "start"} → ${toDate || "today"})` : " (full history)";
   const skippedNote = skipped.length > 0 ? ` (${skipped.length} skipped)` : "";
 
   // Retry up to 3× with 30-second delays (manual trigger is interactive — shorter delay)
   const waRes = await retryAsync({
-    label:       "ManualWhatsApp",
-    attempts:    3,
-    delayMs:     30 * 1000,
-    fn:          () => runDailyWhatsAppSend(zip, today, companies, { bypassAutoSendCheck: true }),
-    isSuccess:   r => r.sent,
-    shouldRetry: r => !r.skipped && (!r.error || !isWaConfigError(r.error)),
-    onAttempt:   n => console.log(`[ManualWhatsApp] Attempt ${n}/3...`),
+    label: "ManualWhatsApp",
+    attempts: 3,
+    delayMs: 30 * 1000,
+    fn: () => runDailyWhatsAppSend(zip, today, companies, { bypassAutoSendCheck: true }),
+    isSuccess: (r) => r.sent,
+    shouldRetry: (r) => !r.skipped && (!r.error || !isWaConfigError(r.error)),
+    onAttempt: (n) => console.log(`[ManualWhatsApp] Attempt ${n}/3...`),
   });
 
   const result = waRes.result;
 
   if (result.skipped) {
     await finishExportRun(runId, {
-      status:           "failed",
-      whatsappSuccess:  false,
-      whatsappError:    result.skipReason,
+      status: "failed",
+      whatsappSuccess: false,
+      whatsappError: result.skipReason,
       whatsappAttempts: waRes.attempts,
     });
     throw new Error(
       `WhatsApp not configured or not ready: ${result.skipReason}. ` +
-      `Please enable WhatsApp and select a Daily Export recipient in WhatsApp settings.`,
+        `Please enable WhatsApp and select a Daily Export recipient in WhatsApp settings.`
     );
   }
 
   if (!result.sent) {
     await finishExportRun(runId, {
-      status:           "failed",
-      whatsappSuccess:  false,
-      whatsappError:    result.error || "Unknown error",
+      status: "failed",
+      whatsappSuccess: false,
+      whatsappError: result.error || "Unknown error",
       whatsappAttempts: waRes.attempts,
     });
     throw new Error(`WhatsApp send failed after ${waRes.attempts} attempt(s): ${result.error || "Unknown error"}`);
   }
 
   await finishExportRun(runId, {
-    status:           "success",
-    whatsappSuccess:  true,
+    status: "success",
+    whatsappSuccess: true,
     whatsappAttempts: waRes.attempts,
   });
 

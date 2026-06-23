@@ -1,13 +1,7 @@
 import { Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 
 interface DaybookFiltersProps {
@@ -23,12 +17,7 @@ interface DaybookFiltersProps {
   setFilters: (v: any) => void;
 }
 
-export function DaybookFilters({
-  periodFilter,
-  setPeriodFilter,
-  filters,
-  setFilters,
-}: DaybookFiltersProps) {
+export function DaybookFilters({ periodFilter, setPeriodFilter, filters, setFilters }: DaybookFiltersProps) {
   const hasActiveFilters =
     periodFilter.preset !== "today" ||
     filters.voucherType !== "all" ||
@@ -40,18 +29,11 @@ export function DaybookFilters({
   return (
     <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-col gap-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <PeriodFilter
-          value={periodFilter}
-          onChange={setPeriodFilter}
-          data-testid="period-filter"
-        />
+        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
 
         <div className="h-6 w-px bg-border hidden sm:block" />
 
-        <Select
-          value={filters.voucherType}
-          onValueChange={(value) => setFilters({ ...filters, voucherType: value })}
-        >
+        <Select value={filters.voucherType} onValueChange={(value) => setFilters({ ...filters, voucherType: value })}>
           <SelectTrigger id="voucher-type" data-testid="select-voucher-type" className="w-[130px]">
             <SelectValue />
           </SelectTrigger>

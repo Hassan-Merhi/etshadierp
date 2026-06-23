@@ -11,7 +11,16 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useDateFormat } from "@/contexts/DateFormatContext";
@@ -35,7 +44,15 @@ interface AccountComboboxProps {
   testId?: string;
 }
 
-export function AccountCombobox({ value, onValueChange, accounts, suppliers, placeholder = "Select account", disabled = false, testId }: AccountComboboxProps) {
+export function AccountCombobox({
+  value,
+  onValueChange,
+  accounts,
+  suppliers,
+  placeholder = "Select account",
+  disabled = false,
+  testId,
+}: AccountComboboxProps) {
   const [open, setOpen] = useState(false);
   const parsed = parseAccountValue(value);
   const selectedAccount = parsed?.type === "ledger" ? accounts.find((a) => a.id === parsed.id) : null;
@@ -43,7 +60,9 @@ export function AccountCombobox({ value, onValueChange, accounts, suppliers, pla
   const displayLabel = selectedSupplier
     ? selectedSupplier.name
     : selectedAccount
-      ? (selectedAccount.code ? `${selectedAccount.code} - ${selectedAccount.name}` : selectedAccount.name)
+      ? selectedAccount.code
+        ? `${selectedAccount.code} - ${selectedAccount.name}`
+        : selectedAccount.name
       : placeholder;
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -71,7 +90,10 @@ export function AccountCombobox({ value, onValueChange, accounts, suppliers, pla
                   <CommandItem
                     key={`sup-${s.id}`}
                     value={`supplier ${s.name}`}
-                    onSelect={() => { onValueChange(`SUP:${s.id}`); setOpen(false); }}
+                    onSelect={() => {
+                      onValueChange(`SUP:${s.id}`);
+                      setOpen(false);
+                    }}
                   >
                     <Check className={cn("mr-2 h-4 w-4", value === `SUP:${s.id}` ? "opacity-100" : "opacity-0")} />
                     {s.name}
@@ -84,9 +106,14 @@ export function AccountCombobox({ value, onValueChange, accounts, suppliers, pla
                 <CommandItem
                   key={`acc-${account.id}`}
                   value={account.code ? `${account.code} ${account.name}` : account.name}
-                  onSelect={() => { onValueChange(account.id.toString()); setOpen(false); }}
+                  onSelect={() => {
+                    onValueChange(account.id.toString());
+                    setOpen(false);
+                  }}
                 >
-                  <Check className={cn("mr-2 h-4 w-4", value === account.id.toString() ? "opacity-100" : "opacity-0")} />
+                  <Check
+                    className={cn("mr-2 h-4 w-4", value === account.id.toString() ? "opacity-100" : "opacity-0")}
+                  />
                   {account.code ? `${account.code} - ${account.name}` : account.name}
                 </CommandItem>
               ))}
@@ -98,9 +125,7 @@ export function AccountCombobox({ value, onValueChange, accounts, suppliers, pla
   );
 }
 
-export function AdjustmentsHistoryCard({ onDeleteRequest }: {
-  onDeleteRequest: (id: number) => void;
-}) {
+export function AdjustmentsHistoryCard({ onDeleteRequest }: { onDeleteRequest: (id: number) => void }) {
   const { formatDisplayDate } = useDateFormat();
   const [open, setOpen] = useState(false);
   const { data: adjustments, isLoading } = useQuery<any[]>({
@@ -110,7 +135,13 @@ export function AdjustmentsHistoryCard({ onDeleteRequest }: {
 
   if (!open) {
     return (
-      <Button variant="ghost" size="sm" className="w-full text-muted-foreground" onClick={() => setOpen(true)} data-testid="button-show-adjustments-history">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="w-full text-muted-foreground"
+        onClick={() => setOpen(true)}
+        data-testid="button-show-adjustments-history"
+      >
         <SlidersHorizontal className="h-3.5 w-3.5 mr-1.5" />
         Show Manual Stock Adjustments History
       </Button>
@@ -137,56 +168,59 @@ export function AdjustmentsHistoryCard({ onDeleteRequest }: {
           </div>
         ) : adjustments && adjustments.length > 0 ? (
           <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Material / Supplier</TableHead>
-                <TableHead className="text-right">Qty (kg)</TableHead>
-                <TableHead className="text-right">Cost/kg</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {adjustments.map((adj: any) => (
-                <TableRow key={adj.id} data-testid={`row-adjustment-${adj.id}`}>
-                  <TableCell className="text-sm text-muted-foreground">{formatDisplayDate(adj.date)}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={adj.type === "ADD" ? "default" : adj.type === "DEDUCT" ? "destructive" : "secondary"}
-                      data-testid={`badge-adj-type-${adj.id}`}
-                    >
-                      {adj.type === "DEDUCT" ? "DEDUCT" : adj.type}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {adj.materialLabel || adj.supplierName || `Supplier #${adj.supplierId}`}
-                  </TableCell>
-                  <TableCell className="text-right font-mono">
-                    {adj.type === "DEDUCT" ? "-" : ""}{parseFloat(adj.kg).toFixed(3)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-muted-foreground">
-                    {(adj.type === "ADD" || adj.type === "DEDUCT") && parseFloat(adj.costPerKg) > 0
-                      ? `${adj.currencyCode} ${parseFloat(adj.costPerKg).toFixed(4)}`
-                      : "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{adj.notes || "—"}</TableCell>
-                  <TableCell>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => onDeleteRequest(adj.id)}
-                      data-testid={`button-delete-adjustment-${adj.id}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </TableCell>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Material / Supplier</TableHead>
+                  <TableHead className="text-right">Qty (kg)</TableHead>
+                  <TableHead className="text-right">Cost/kg</TableHead>
+                  <TableHead>Notes</TableHead>
+                  <TableHead></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {adjustments.map((adj: any) => (
+                  <TableRow key={adj.id} data-testid={`row-adjustment-${adj.id}`}>
+                    <TableCell className="text-sm text-muted-foreground">{formatDisplayDate(adj.date)}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={adj.type === "ADD" ? "default" : adj.type === "DEDUCT" ? "destructive" : "secondary"}
+                        data-testid={`badge-adj-type-${adj.id}`}
+                      >
+                        {adj.type === "DEDUCT" ? "DEDUCT" : adj.type}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {adj.materialLabel || adj.supplierName || `Supplier #${adj.supplierId}`}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {adj.type === "DEDUCT" ? "-" : ""}
+                      {parseFloat(adj.kg).toFixed(3)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-muted-foreground">
+                      {(adj.type === "ADD" || adj.type === "DEDUCT") && parseFloat(adj.costPerKg) > 0
+                        ? `${adj.currencyCode} ${parseFloat(adj.costPerKg).toFixed(4)}`
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                      {adj.notes || "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => onDeleteRequest(adj.id)}
+                        data-testid={`button-delete-adjustment-${adj.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         ) : (
           <p className="text-center text-muted-foreground py-6 text-sm">No manual adjustments recorded yet.</p>
@@ -202,13 +236,7 @@ interface SupplierCategory {
   displayOrder: number;
 }
 
-export function SupplierCategoriesDialog({
-  open,
-  onClose,
-}: {
-  open: boolean;
-  onClose: () => void;
-}) {
+export function SupplierCategoriesDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { toast } = useToast();
   const [newCatName, setNewCatName] = useState("");
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -299,145 +327,200 @@ export function SupplierCategoriesDialog({
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const catToDelete = deletingId ? categories.find(c => c.id === deletingId) : null;
-  const supplierCountForCat = (catId: number) =>
-    fullSuppliers.filter(s => s.supplierCategoryId === catId).length;
+  const catToDelete = deletingId ? categories.find((c) => c.id === deletingId) : null;
+  const supplierCountForCat = (catId: number) => fullSuppliers.filter((s) => s.supplierCategoryId === catId).length;
 
   return (
     <>
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Tag className="h-4 w-4" />
-            Manage Supplier Categories
-          </DialogTitle>
-          <DialogDescription>
-            Create categories to group your suppliers, then assign each supplier to a category.
-          </DialogDescription>
-        </DialogHeader>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (!v) onClose();
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-4 w-4" />
+              Manage Supplier Categories
+            </DialogTitle>
+            <DialogDescription>
+              Create categories to group your suppliers, then assign each supplier to a category.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto space-y-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">New Category</label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="e.g. Cyprus, Australia…"
-                value={newCatName}
-                onChange={e => setNewCatName(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && newCatName.trim()) wrapAdminAction(() => createMutation.mutate(newCatName), "Create Category"); }}
-                data-testid="input-new-category-name"
-              />
-              <Button
-                onClick={() => { if (newCatName.trim()) wrapAdminAction(() => createMutation.mutate(newCatName), "Create Category"); }}
-                disabled={!newCatName.trim() || createMutation.isPending}
-                data-testid="button-create-category"
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
+          <div className="flex-1 overflow-y-auto space-y-6">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Category</label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="e.g. Cyprus, Australia…"
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newCatName.trim())
+                      wrapAdminAction(() => createMutation.mutate(newCatName), "Create Category");
+                  }}
+                  data-testid="input-new-category-name"
+                />
+                <Button
+                  onClick={() => {
+                    if (newCatName.trim()) wrapAdminAction(() => createMutation.mutate(newCatName), "Create Category");
+                  }}
+                  disabled={!newCatName.trim() || createMutation.isPending}
+                  data-testid="button-create-category"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
             </div>
+
+            {categories.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Categories</label>
+                <div className="border rounded-md divide-y">
+                  {categories.map((cat) => (
+                    <div key={cat.id} className="flex items-center gap-2 px-3 py-2">
+                      <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
+                      {editingId === cat.id ? (
+                        <Input
+                          autoFocus
+                          value={editingName}
+                          onChange={(e) => setEditingName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && editingName.trim())
+                              wrapAdminAction(
+                                () => renameMutation.mutate({ id: cat.id, name: editingName }),
+                                "Rename Category"
+                              );
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          className="h-7 text-sm flex-1"
+                          data-testid={`input-rename-category-${cat.id}`}
+                        />
+                      ) : (
+                        <span className="flex-1 text-sm font-medium">{cat.name}</span>
+                      )}
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {supplierCountForCat(cat.id)} supplier{supplierCountForCat(cat.id) !== 1 ? "s" : ""}
+                      </span>
+                      {editingId === cat.id ? (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              if (editingName.trim())
+                                wrapAdminAction(
+                                  () => renameMutation.mutate({ id: cat.id, name: editingName }),
+                                  "Rename Category"
+                                );
+                            }}
+                            data-testid={`button-save-rename-${cat.id}`}
+                          >
+                            <Check className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingId(cat.id);
+                              setEditingName(cat.name);
+                            }}
+                            data-testid={`button-rename-category-${cat.id}`}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setDeletingId(cat.id)}
+                            data-testid={`button-delete-category-${cat.id}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {fullSuppliers.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Assign Suppliers to Categories</label>
+                <div className="border rounded-md divide-y">
+                  {fullSuppliers.map((sup) => (
+                    <div key={sup.id} className="flex items-center gap-3 px-3 py-2">
+                      <span className="flex-1 text-sm truncate">{sup.name}</span>
+                      <Select
+                        value={sup.supplierCategoryId != null ? String(sup.supplierCategoryId) : "none"}
+                        onValueChange={(val) => {
+                          wrapAdminAction(
+                            () =>
+                              assignMutation.mutate({
+                                supplierId: sup.id,
+                                categoryId: val === "none" ? null : parseInt(val),
+                              }),
+                            "Assign Category"
+                          );
+                        }}
+                      >
+                        <SelectTrigger className="h-7 w-40 text-xs" data-testid={`select-supplier-category-${sup.id}`}>
+                          <SelectValue placeholder="Uncategorized" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Uncategorized</SelectItem>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.id} value={String(cat.id)}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
-          {categories.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Categories</label>
-              <div className="border rounded-md divide-y">
-                {categories.map(cat => (
-                  <div key={cat.id} className="flex items-center gap-2 px-3 py-2">
-                    <Folder className="h-4 w-4 text-muted-foreground shrink-0" />
-                    {editingId === cat.id ? (
-                      <Input
-                        autoFocus
-                        value={editingName}
-                        onChange={e => setEditingName(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter" && editingName.trim()) wrapAdminAction(() => renameMutation.mutate({ id: cat.id, name: editingName }), "Rename Category");
-                          if (e.key === "Escape") setEditingId(null);
-                        }}
-                        className="h-7 text-sm flex-1"
-                        data-testid={`input-rename-category-${cat.id}`}
-                      />
-                    ) : (
-                      <span className="flex-1 text-sm font-medium">{cat.name}</span>
-                    )}
-                    <span className="text-xs text-muted-foreground shrink-0">
-                      {supplierCountForCat(cat.id)} supplier{supplierCountForCat(cat.id) !== 1 ? "s" : ""}
-                    </span>
-                    {editingId === cat.id ? (
-                      <>
-                        <Button size="sm" variant="ghost" onClick={() => { if (editingName.trim()) wrapAdminAction(() => renameMutation.mutate({ id: cat.id, name: editingName }), "Rename Category"); }} data-testid={`button-save-rename-${cat.id}`}>
-                          <Check className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}>
-                          <X className="h-3.5 w-3.5" />
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button size="sm" variant="ghost" onClick={() => { setEditingId(cat.id); setEditingName(cat.name); }} data-testid={`button-rename-category-${cat.id}`}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => setDeletingId(cat.id)} data-testid={`button-delete-category-${cat.id}`}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {fullSuppliers.length > 0 && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Assign Suppliers to Categories</label>
-              <div className="border rounded-md divide-y">
-                {fullSuppliers.map(sup => (
-                  <div key={sup.id} className="flex items-center gap-3 px-3 py-2">
-                    <span className="flex-1 text-sm truncate">{sup.name}</span>
-                    <Select
-                      value={sup.supplierCategoryId != null ? String(sup.supplierCategoryId) : "none"}
-                      onValueChange={val => {
-                        wrapAdminAction(() => assignMutation.mutate({ supplierId: sup.id, categoryId: val === "none" ? null : parseInt(val) }), "Assign Category");
-                      }}
-                    >
-                      <SelectTrigger className="h-7 w-40 text-xs" data-testid={`select-supplier-category-${sup.id}`}>
-                        <SelectValue placeholder="Uncategorized" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Uncategorized</SelectItem>
-                        {categories.map(cat => (
-                          <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <AlertDialog open={!!deletingId} onOpenChange={open => { if (!open) setDeletingId(null); }}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete category "{catToDelete?.name}"?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Suppliers in this category will become uncategorized. This cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { if (deletingId) wrapAdminAction(() => deleteMutation.mutate(deletingId!), "Delete Category"); }}>
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </DialogContent>
-    </Dialog>
-    {AdminDialog}
+          <AlertDialog
+            open={!!deletingId}
+            onOpenChange={(open) => {
+              if (!open) setDeletingId(null);
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete category "{catToDelete?.name}"?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Suppliers in this category will become uncategorized. This cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    if (deletingId) wrapAdminAction(() => deleteMutation.mutate(deletingId!), "Delete Category");
+                  }}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </DialogContent>
+      </Dialog>
+      {AdminDialog}
     </>
   );
 }

@@ -17,11 +17,7 @@ interface Entry {
 
 const store = new Map<string, Entry>();
 
-export async function cache<T>(
-  key: string,
-  ttlMs: number,
-  loader: () => Promise<T>,
-): Promise<T> {
+export async function cache<T>(key: string, ttlMs: number, loader: () => Promise<T>): Promise<T> {
   const now = Date.now();
   const entry = store.get(key);
   if (entry && entry.expiresAt > now) {

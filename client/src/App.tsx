@@ -10,7 +10,19 @@ import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ChatWidget } from "@/components/ChatWidget";
-import { SidebarProvider, SidebarTrigger, Sidebar, SidebarContent, SidebarHeader, SidebarFooter, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarGroup, SidebarGroupContent } from "@/components/ui/sidebar";
+import {
+  SidebarProvider,
+  SidebarTrigger,
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarFooter,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarGroup,
+  SidebarGroupContent,
+} from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CurrencyToggle } from "@/components/CurrencyToggle";
@@ -26,7 +38,22 @@ import { CursorNavProvider } from "@/contexts/CursorNavContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, ShoppingCart, MapPin, BookOpen, Package, Users, Upload, Factory, MessageSquare, Cog, Search, Tag, Building2, ClipboardList } from "lucide-react";
+import {
+  LogOut,
+  ShoppingCart,
+  MapPin,
+  BookOpen,
+  Package,
+  Users,
+  Upload,
+  Factory,
+  MessageSquare,
+  Cog,
+  Search,
+  Tag,
+  Building2,
+  ClipboardList,
+} from "lucide-react";
 import { FactorySidebar, FACTORY_NAV_SECTIONS, FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
 import { PropertiesSidebar } from "@/components/PropertiesSidebar";
 import { OfflineBanner } from "@/components/OfflineBanner";
@@ -63,7 +90,7 @@ const Analytics = lazy(() => import("@/pages/Analytics"));
 const AccountingCreate = lazy(() => import("@/pages/AccountingCreate"));
 const POImport = lazy(() => import("@/pages/POImport"));
 const AiValidationPage = lazy(() => import("@/pages/AiValidationPage"));
-const AICommandCenter  = lazy(() => import("@/pages/AICommandCenter"));
+const AICommandCenter = lazy(() => import("@/pages/AICommandCenter"));
 const POSImport = lazy(() => import("@/pages/pos/POSImport"));
 const ContainerDetail = lazy(() => import("@/pages/ContainerDetail"));
 const ContainerDetailPage = lazy(() => import("@/pages/ContainerDetailPage"));
@@ -124,8 +151,12 @@ const PressingBales = lazy(() => import("@/pages/PressingBales"));
 const BaleStockEntry = lazy(() => import("@/pages/factory/BaleStockEntry"));
 const BalesHistory = lazy(() => import("@/pages/factory/BalesHistory"));
 const FactoryBaleProductHistory = lazy(() => import("@/pages/factory/FactoryBaleProductHistory"));
-const FactoryBaleProductMonthDetail = lazy(() => import("@/pages/factory/FactoryBaleProductHistory").then(m => ({ default: m.FactoryBaleProductMonthDetail })));
-const FactoryBaleProductAllMonths = lazy(() => import("@/pages/factory/FactoryBaleProductHistory").then(m => ({ default: m.FactoryBaleProductAllMonths })));
+const FactoryBaleProductMonthDetail = lazy(() =>
+  import("@/pages/factory/FactoryBaleProductHistory").then((m) => ({ default: m.FactoryBaleProductMonthDetail }))
+);
+const FactoryBaleProductAllMonths = lazy(() =>
+  import("@/pages/factory/FactoryBaleProductHistory").then((m) => ({ default: m.FactoryBaleProductAllMonths }))
+);
 const BarcodeLookup = lazy(() => import("@/pages/BarcodeLookup"));
 const FactoryBalesHub = lazy(() => import("@/pages/factory/FactoryBalesHub"));
 const FactoryReprintLabels = lazy(() => import("@/pages/factory/FactoryReprintLabels"));
@@ -236,14 +267,14 @@ const PropertiesRentalPayments = lazy(() => import("@/pages/properties/Propertie
 const MySettings = lazy(() => import("@/pages/MySettings"));
 
 // ── Supplier Partner pages ────────────────────────────────────────────────────
-const SpSetup           = lazy(() => import("@/pages/sp/SpSetup"));
-const SpReports         = lazy(() => import("@/pages/sp/SpReports"));
-const SpOpeningStock    = lazy(() => import("@/pages/sp/SpOpeningStock"));
-const SpAliases             = lazy(() => import("@/pages/sp/SpAliases"));
-const SpMigrationRehearsal  = lazy(() => import("@/pages/sp/SpMigrationRehearsal"));
-const GcLshiMigration       = lazy(() => import("@/pages/sp/GcLshiMigration"));
-const IntercompanyLinks     = lazy(() => import("@/pages/IntercompanyLinks"));
-const IntercompanyRequests  = lazy(() => import("@/pages/IntercompanyRequests"));
+const SpSetup = lazy(() => import("@/pages/sp/SpSetup"));
+const SpReports = lazy(() => import("@/pages/sp/SpReports"));
+const SpOpeningStock = lazy(() => import("@/pages/sp/SpOpeningStock"));
+const SpAliases = lazy(() => import("@/pages/sp/SpAliases"));
+const SpMigrationRehearsal = lazy(() => import("@/pages/sp/SpMigrationRehearsal"));
+const GcLshiMigration = lazy(() => import("@/pages/sp/GcLshiMigration"));
+const IntercompanyLinks = lazy(() => import("@/pages/IntercompanyLinks"));
+const IntercompanyRequests = lazy(() => import("@/pages/IntercompanyRequests"));
 
 import { CommandPalette } from "@/components/CommandPalette";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -290,18 +321,22 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
         navigate("/");
       }
     }, [navigate]);
-    
+
     return (
       <Switch>
         <Route path="/">{() => <POS posUser={user} />}</Route>
         <Route path="/pos/edit/:id">{(params) => <POS posUser={user} editVoucherId={params.id} />}</Route>
         <Route path="/location-inventory">{() => <LocationInventory posUser={user} />}</Route>
-        <Route path="/locations/:locationId/stock-items/:stockItemId/history">{() => <LocationMonthlySummary posUser={user} />}</Route>
-        <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">{() => <LocationVouchers posUser={user} />}</Route>
+        <Route path="/locations/:locationId/stock-items/:stockItemId/history">
+          {() => <LocationMonthlySummary posUser={user} />}
+        </Route>
+        <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">
+          {() => <LocationVouchers posUser={user} />}
+        </Route>
         <Route path="/pos-daybook" component={POSDaybook} />
         <Route path="/pos-dashboard">{() => <POSDashboard posUser={user} />}</Route>
         <Route path="/pos-customers">{() => <POSCustomers />}</Route>
-        <Route path="/pos-import">{() => posImportEnabled ? <POSImport /> : <Redirect to="/" />}</Route>
+        <Route path="/pos-import">{() => (posImportEnabled ? <POSImport /> : <Redirect to="/" />)}</Route>
         <Route path="/vouchers">{() => <Vouchers posUser={user} />}</Route>
         <Route path="/pos-chat" component={Chat} />
         <Route path="/pos-settings" component={POSSettings} />
@@ -319,43 +354,68 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
   // Optimistic (true) while the access data is still loading so pages don't
   // flicker on first render. fullAccess:true means no restrictions (Admin/Dev/
   // Owner with no explicit restrictions set).
-  const canAccess = (key: string) =>
-    !erpAccess || erpAccess.fullAccess || erpAccess.pageKeys.includes(key);
+  const canAccess = (key: string) => !erpAccess || erpAccess.fullAccess || erpAccess.pageKeys.includes(key);
 
   // Helper: renders a guarded Route that redirects to /tracking when blocked.
   const G = (path: string, key: string, Comp: React.ComponentType<any>) =>
-    canAccess(key)
-      ? <Route path={path} component={Comp} />
-      : <Route path={path}><Redirect to="/tracking" /></Route>;
+    canAccess(key) ? (
+      <Route path={path} component={Comp} />
+    ) : (
+      <Route path={path}>
+        <Redirect to="/tracking" />
+      </Route>
+    );
 
   // All other users see full interface
   return (
     <Switch>
       {/* Home — ContainersOTW for Admin/Dev; others land on Tracking */}
-      <Route path="/">{() => isAdminOrDev ? <ContainersOTW /> : <Redirect to="/tracking" />}</Route>
+      <Route path="/">{() => (isAdminOrDev ? <ContainersOTW /> : <Redirect to="/tracking" />)}</Route>
 
       {/* Tracking / Dashboard — always accessible (safe fallback for restricted users) */}
       <Route path="/tracking" component={TrackingHub} />
       <Route path="/financial-overview" component={Dashboard} />
 
       {/* POS (ERP-mode) */}
-      {canAccess("pos")
-        ? <Route path="/pos">{() => <POSPage />}</Route>
-        : <Route path="/pos"><Redirect to="/tracking" /></Route>}
+      {canAccess("pos") ? (
+        <Route path="/pos">{() => <POSPage />}</Route>
+      ) : (
+        <Route path="/pos">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
       {canAccess("pos") && <Route path="/pos/edit/:id">{(params) => <POS editVoucherId={params.id} />}</Route>}
 
       {/* Inventory & Stock */}
       {G("/inventory", "stock_items", InventoryHub)}
       {G("/stock", "stock_items", StockHub)}
-      {canAccess("location_inventory")
-        ? <Route path="/location-inventory"><Redirect to="/inventory?tab=by-location" /></Route>
-        : <Route path="/location-inventory"><Redirect to="/tracking" /></Route>}
-      {canAccess("stock_items")
-        ? <Route path="/stock-items"><Redirect to="/stock?tab=items" /></Route>
-        : <Route path="/stock-items"><Redirect to="/tracking" /></Route>}
-      {canAccess("stock_otw")
-        ? <Route path="/stock-otw"><Redirect to="/inventory?tab=on-the-way" /></Route>
-        : <Route path="/stock-otw"><Redirect to="/tracking" /></Route>}
+      {canAccess("location_inventory") ? (
+        <Route path="/location-inventory">
+          <Redirect to="/inventory?tab=by-location" />
+        </Route>
+      ) : (
+        <Route path="/location-inventory">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
+      {canAccess("stock_items") ? (
+        <Route path="/stock-items">
+          <Redirect to="/stock?tab=items" />
+        </Route>
+      ) : (
+        <Route path="/stock-items">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
+      {canAccess("stock_otw") ? (
+        <Route path="/stock-otw">
+          <Redirect to="/inventory?tab=on-the-way" />
+        </Route>
+      ) : (
+        <Route path="/stock-otw">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
 
       {/* Containers OTW — Admin/Dev only */}
       {isAdminOrDev && <Route path="/mock-containers-otw" component={ContainersOTW} />}
@@ -369,9 +429,15 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {G("/containers/:containerId/verification", "containers", ContainerVerification)}
       {G("/containers/:id", "containers", ContainerDetailPage)}
       {G("/containers", "containers", ContainersPage)}
-      {canAccess("containers")
-        ? <Route path="/sold-containers"><Redirect to="/containers" /></Route>
-        : <Route path="/sold-containers"><Redirect to="/tracking" /></Route>}
+      {canAccess("containers") ? (
+        <Route path="/sold-containers">
+          <Redirect to="/containers" />
+        </Route>
+      ) : (
+        <Route path="/sold-containers">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
       <Route path="/offloads/:id" component={OffloadDetail} />
 
       {/* Admin / internal tools (no feature key — role-gated above) */}
@@ -386,41 +452,77 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
 
       {/* Accounts & Ledger */}
       {G("/accounts", "accounts", Accounts)}
-      {canAccess("accounts")
-        ? <Route path="/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
-        : <Route path="/ledger-monthly/:accountId"><Redirect to="/tracking" /></Route>}
-      {canAccess("accounts")
-        ? <Route path="/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
-        : <Route path="/ledger-vouchers/:accountId/:year/:month"><Redirect to="/tracking" /></Route>}
+      {canAccess("accounts") ? (
+        <Route path="/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
+      ) : (
+        <Route path="/ledger-monthly/:accountId">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
+      {canAccess("accounts") ? (
+        <Route path="/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
+      ) : (
+        <Route path="/ledger-vouchers/:accountId/:year/:month">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
 
       {/* Parties (Suppliers / Customers) */}
-      {(canAccess("suppliers") || canAccess("customers"))
-        ? <Route path="/parties" component={PartiesHub} />
-        : <Route path="/parties"><Redirect to="/tracking" /></Route>}
-      {canAccess("suppliers")
-        ? <Route path="/suppliers"><Redirect to="/parties?tab=suppliers" /></Route>
-        : <Route path="/suppliers"><Redirect to="/tracking" /></Route>}
-      {canAccess("customers")
-        ? <Route path="/customers"><Redirect to="/parties?tab=customers" /></Route>
-        : <Route path="/customers"><Redirect to="/tracking" /></Route>}
+      {canAccess("suppliers") || canAccess("customers") ? (
+        <Route path="/parties" component={PartiesHub} />
+      ) : (
+        <Route path="/parties">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
+      {canAccess("suppliers") ? (
+        <Route path="/suppliers">
+          <Redirect to="/parties?tab=suppliers" />
+        </Route>
+      ) : (
+        <Route path="/suppliers">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
+      {canAccess("customers") ? (
+        <Route path="/customers">
+          <Redirect to="/parties?tab=customers" />
+        </Route>
+      ) : (
+        <Route path="/customers">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
       {canAccess("suppliers") && <Route path="/suppliers/:supplierId/proformas" component={SupplierProformas} />}
       {canAccess("suppliers") && <Route path="/suppliers/:id/edit" component={EditSupplier} />}
       {canAccess("suppliers") && <Route path="/supplier-profit-check" component={SupplierProfitCheck} />}
 
       {/* Vouchers */}
-      {canAccess("vouchers")
-        ? <Route path="/vouchers">{() => <Vouchers />}</Route>
-        : <Route path="/vouchers"><Redirect to="/tracking" /></Route>}
+      {canAccess("vouchers") ? (
+        <Route path="/vouchers">{() => <Vouchers />}</Route>
+      ) : (
+        <Route path="/vouchers">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
       {canAccess("vouchers") && <Route path="/vouchers/:id/edit" component={VoucherEdit} />}
       {canAccess("vouchers") && <Route path="/purchase-orders/:id/edit" component={PurchaseOrderEdit} />}
-      {canAccess("vouchers")
-        ? <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />
-        : <Route path="/voucher-detail/:voucherId"><Redirect to="/tracking" /></Route>}
+      {canAccess("vouchers") ? (
+        <Route path="/voucher-detail/:voucherId" component={VoucherDetail} />
+      ) : (
+        <Route path="/voucher-detail/:voucherId">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
 
       {/* Daybook */}
-      {canAccess("daybook")
-        ? <Route path="/daybook">{() => <Daybook user={user} />}</Route>
-        : <Route path="/daybook"><Redirect to="/tracking" /></Route>}
+      {canAccess("daybook") ? (
+        <Route path="/daybook">{() => <Daybook user={user} />}</Route>
+      ) : (
+        <Route path="/daybook">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
       <Route path="/transaction-journal" component={TransactionJournal} />
 
       {/* Payroll */}
@@ -431,23 +533,47 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
 
       {/* Stock Items & Query */}
       <Route path="/import-stock-items" component={ImportStockItems} />
-      {canAccess("stock_query")
-        ? <Route path="/stock-query/:id" component={StockItemDetail} />
-        : <Route path="/stock-query/:id"><Redirect to="/tracking" /></Route>}
-      {canAccess("stock_query")
-        ? <Route path="/stock-query"><Redirect to="/stock?tab=query" /></Route>
-        : <Route path="/stock-query"><Redirect to="/tracking" /></Route>}
-      {canAccess("stock_items")
-        ? <Route path="/offload-item-search"><Redirect to="/stock?tab=offload" /></Route>
-        : <Route path="/offload-item-search"><Redirect to="/tracking" /></Route>}
-      {canAccess("stock_query")
-        ? <Route path="/location-summary"><Redirect to="/stock-query?tab=summary" /></Route>
-        : <Route path="/location-summary"><Redirect to="/tracking" /></Route>}
+      {canAccess("stock_query") ? (
+        <Route path="/stock-query/:id" component={StockItemDetail} />
+      ) : (
+        <Route path="/stock-query/:id">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
+      {canAccess("stock_query") ? (
+        <Route path="/stock-query">
+          <Redirect to="/stock?tab=query" />
+        </Route>
+      ) : (
+        <Route path="/stock-query">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
+      {canAccess("stock_items") ? (
+        <Route path="/offload-item-search">
+          <Redirect to="/stock?tab=offload" />
+        </Route>
+      ) : (
+        <Route path="/offload-item-search">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
+      {canAccess("stock_query") ? (
+        <Route path="/location-summary">
+          <Redirect to="/stock-query?tab=summary" />
+        </Route>
+      ) : (
+        <Route path="/location-summary">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
       <Route path="/stock-transfer-order" component={StockTransferOrder} />
 
       {/* Sales Tools Hub */}
       <Route path="/sales-tools" component={SalesToolsHub} />
-      <Route path="/stock-transfers"><Redirect to="/sales-tools?tab=transfers" /></Route>
+      <Route path="/stock-transfers">
+        <Redirect to="/sales-tools?tab=transfers" />
+      </Route>
 
       {/* Optional Vouchers */}
       {G("/optional-vouchers", "optional_vouchers", OptionalVouchers)}
@@ -455,9 +581,17 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {/* Stock item detail sub-pages — inherit stock_items access */}
       {canAccess("stock_items") && <Route path="/stock-items/:id/history" component={StockItemHistory} />}
       {canAccess("stock_items") && <Route path="/stock-items/:id/history/:year/:month" component={StockItemVouchers} />}
-      {canAccess("stock_items") && <Route path="/stock-items/:stockItemId/monthly-summary">{() => <LocationMonthlySummary />}</Route>}
-      {canAccess("location_inventory") && <Route path="/locations/:locationId/stock-items/:stockItemId/history">{() => <LocationMonthlySummary />}</Route>}
-      {canAccess("location_inventory") && <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">{() => <LocationVouchers />}</Route>}
+      {canAccess("stock_items") && (
+        <Route path="/stock-items/:stockItemId/monthly-summary">{() => <LocationMonthlySummary />}</Route>
+      )}
+      {canAccess("location_inventory") && (
+        <Route path="/locations/:locationId/stock-items/:stockItemId/history">{() => <LocationMonthlySummary />}</Route>
+      )}
+      {canAccess("location_inventory") && (
+        <Route path="/locations/:locationId/stock-items/:stockItemId/vouchers/:year/:month">
+          {() => <LocationVouchers />}
+        </Route>
+      )}
 
       {/* Sales Report */}
       {G("/sales-report", "sales_report", SalesReport)}
@@ -471,17 +605,33 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       {user?.role === "Developer" && <Route path="/live-sheets" component={LiveSheets} />}
 
       {/* Inventory combined redirect */}
-      {canAccess("stock_items")
-        ? <Route path="/combined-inventory"><Redirect to="/inventory?tab=combined" /></Route>
-        : <Route path="/combined-inventory"><Redirect to="/tracking" /></Route>}
+      {canAccess("stock_items") ? (
+        <Route path="/combined-inventory">
+          <Redirect to="/inventory?tab=combined" />
+        </Route>
+      ) : (
+        <Route path="/combined-inventory">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
 
       {/* Other stock/accounting utilities */}
       <Route path="/bale-ledger" component={BaleLedger} />
-      {canAccess("pos_daybook")
-        ? <Route path="/pos-daybook"><Redirect to="/sales-tools?tab=daybook" /></Route>
-        : <Route path="/pos-daybook"><Redirect to="/tracking" /></Route>}
-      <Route path="/pos-price-list"><Redirect to="/sales-tools?tab=pricelist" /></Route>
-      <Route path="/price-list"><Redirect to="/sales-tools?tab=pricelist" /></Route>
+      {canAccess("pos_daybook") ? (
+        <Route path="/pos-daybook">
+          <Redirect to="/sales-tools?tab=daybook" />
+        </Route>
+      ) : (
+        <Route path="/pos-daybook">
+          <Redirect to="/tracking" />
+        </Route>
+      )}
+      <Route path="/pos-price-list">
+        <Redirect to="/sales-tools?tab=pricelist" />
+      </Route>
+      <Route path="/price-list">
+        <Redirect to="/sales-tools?tab=pricelist" />
+      </Route>
       <Route path="/opening-stock" component={OpeningStockSummary} />
       <Route path="/opening-stock/:groupId" component={OpeningStockDetail} />
       <Route path="/closing-stock-summary" component={ClosingStockSummary} />
@@ -492,10 +642,18 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
       <Route path="/chat" component={Chat} />
 
       {/* Factory redirects */}
-      <Route path="/factory-production"><Redirect to="/factory/raw-stock" /></Route>
-      <Route path="/bales"><Redirect to="/factory/raw-stock" /></Route>
-      <Route path="/production-bales"><Redirect to="/factory/stock-entry" /></Route>
-      <Route path="/bale-products"><Redirect to="/factory/bale-products" /></Route>
+      <Route path="/factory-production">
+        <Redirect to="/factory/raw-stock" />
+      </Route>
+      <Route path="/bales">
+        <Redirect to="/factory/raw-stock" />
+      </Route>
+      <Route path="/production-bales">
+        <Redirect to="/factory/stock-entry" />
+      </Route>
+      <Route path="/bale-products">
+        <Redirect to="/factory/bale-products" />
+      </Route>
 
       {/* Rental */}
       <Route path="/erp/rental/warehouses" component={ErpRentalWarehouses} />
@@ -507,21 +665,49 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
 
       {/* Admin/Developer-only system pages */}
       {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/settings" component={Settings} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/intercompany-links" component={IntercompanyLinks} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/intercompany-links" component={IntercompanyLinks} />
+      )}
       <Route path="/intercompany-requests" component={IntercompanyRequests} />
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/orphaned-records" component={OrphanedRecords} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/deleted-items" component={DeletedItems} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/chatbot-settings" component={ChatbotSettings} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/notification-settings" component={NotificationSettings} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-groups" component={AccountGroups} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/test-data-import" component={TestDataImport} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/inventory-repair" component={InventoryRepair} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/balance-repair" component={BalanceRepair} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/net-position-details" component={NetProfitDetails} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/company-data-reset" component={CompanyDataReset} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-migration" component={AccountMigration} />}
-      {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/account-transfer" component={AccountTransfer} />}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/orphaned-records" component={OrphanedRecords} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/deleted-items" component={DeletedItems} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/chatbot-settings" component={ChatbotSettings} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/notification-settings" component={NotificationSettings} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/account-groups" component={AccountGroups} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/test-data-import" component={TestDataImport} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/import-cycle-diagnostics" component={ImportCycleDiagnostics} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/inventory-repair" component={InventoryRepair} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/balance-repair" component={BalanceRepair} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/net-position-details" component={NetProfitDetails} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/company-data-reset" component={CompanyDataReset} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/account-migration" component={AccountMigration} />
+      )}
+      {(user?.role === "Admin" || user?.role === "Developer") && (
+        <Route path="/account-transfer" component={AccountTransfer} />
+      )}
 
       {/* Personal settings — always accessible */}
       <Route path="/my-settings" component={MySettings} />
@@ -541,8 +727,8 @@ function Router({ user, posImportEnabled }: { user: any; posImportEnabled?: bool
 
 function AuthenticatedApp() {
   const { selectedCompany } = useCompany();
-  usePresence();    // Track user presence
-  useScreenFeed();  // Silently capture screen frames for admin Watch feature
+  usePresence(); // Track user presence
+  useScreenFeed(); // Silently capture screen frames for admin Watch feature
   useWsInvalidation(); // Real-time cache invalidation via WebSocket
   useDialogScrollFix(); // Global fix: prevent Radix dialogs from leaving body frozen after close
   const [location, setLocation] = useLocation();
@@ -557,8 +743,12 @@ function AuthenticatedApp() {
     const main = document.querySelector("main");
     if (main) main.scrollTop = 0;
   }, [currentLocation]);
-  
-  const { data: user, isLoading, error } = useQuery<any>({
+
+  const {
+    data: user,
+    isLoading,
+    error,
+  } = useQuery<any>({
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
@@ -593,7 +783,11 @@ function AuthenticatedApp() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
-      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable;
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable;
 
       // Arrow key / page scrolling
       const scrollKeys = ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"];
@@ -601,12 +795,18 @@ function AuthenticatedApp() {
         const main = document.querySelector("main");
         if (main) {
           e.preventDefault();
-          const amount = e.key === "ArrowDown" ? 80
-            : e.key === "ArrowUp" ? -80
-            : e.key === "PageDown" ? window.innerHeight * 0.85
-            : e.key === "PageUp" ? -window.innerHeight * 0.85
-            : e.key === "End" ? 99999
-            : -99999;
+          const amount =
+            e.key === "ArrowDown"
+              ? 80
+              : e.key === "ArrowUp"
+                ? -80
+                : e.key === "PageDown"
+                  ? window.innerHeight * 0.85
+                  : e.key === "PageUp"
+                    ? -window.innerHeight * 0.85
+                    : e.key === "End"
+                      ? 99999
+                      : -99999;
           main.scrollBy({ top: amount, behavior: "smooth" });
         }
         return;
@@ -679,7 +879,19 @@ function AuthenticatedApp() {
     setAppTimezone(posCompanySettings?.timezone);
   }, [posCompanySettings?.timezone]);
 
-  const { data: myAccess, isLoading: myAccessLoading, isError: myAccessError } = useQuery<{ fullAccess: boolean; pageKeys: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; companyId?: number; companyName?: string; hiddenCostFields?: string[] }>({
+  const {
+    data: myAccess,
+    isLoading: myAccessLoading,
+    isError: myAccessError,
+  } = useQuery<{
+    fullAccess: boolean;
+    pageKeys: string[];
+    hasErpAccess: boolean;
+    hasFactoryAccess: boolean;
+    companyId?: number;
+    companyName?: string;
+    hiddenCostFields?: string[];
+  }>({
     queryKey: ["/api/factory/my-access"],
     enabled: !!user && !isPOS,
     staleTime: 30000,
@@ -688,7 +900,10 @@ function AuthenticatedApp() {
 
   const { data: factorySettings } = useQuery<Record<string, any>>({
     queryKey: ["/api/factory/settings"],
-    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    queryFn: async () => {
+      const r = await fetch("/api/factory/settings");
+      return r.ok ? r.json() : {};
+    },
     enabled: !!user && !isPOS,
     staleTime: 60000,
   });
@@ -760,18 +975,90 @@ function AuthenticatedApp() {
     const isOnPriceList = currentLocation === "/pos-price-list";
     const isOnTransferOrders = currentLocation === "/pos-transfer-orders";
 
-
     const posNavItems = [
-      { label: "Point of Sale", icon: ShoppingCart, active: isOnPOS, testId: "button-pos-tab", onClick: () => setLocation("/") },
-      { label: "Daybook", icon: BookOpen, active: isOnDaybook, testId: "button-daybook-tab", onClick: () => setLocation("/pos-daybook") },
-      { label: "Inventory", icon: MapPin, active: isOnInventory, testId: "button-inventory-tab", onClick: () => setLocation("/location-inventory") },
-      { label: "Price List", icon: Tag, active: isOnPriceList, testId: "button-price-list-tab", onClick: () => setLocation("/pos-price-list") },
-      { label: "Transfer", icon: Package, active: isOnTransfer, testId: "button-stock-transfer-tab", onClick: () => setLocation("/vouchers?tab=transfer") },
-      { label: "Orders", icon: ClipboardList, active: isOnTransferOrders, testId: "button-transfer-orders-tab", onClick: () => setLocation("/pos-transfer-orders") },
-      ...(user.canAccessCustomers ? [{ label: "Customers", icon: Users, active: isOnCustomers, testId: "button-customers-tab", onClick: () => setLocation("/pos-customers") }] : []),
-      ...(posImportEnabled ? [{ label: "Import", icon: Upload, active: isOnImport, testId: "button-pos-import-tab", onClick: () => setLocation("/pos-import") }] : []),
-      ...(user.role === "Developer" ? [{ label: "Chat", icon: MessageSquare, active: isOnChat, testId: "button-chat-tab", onClick: () => setLocation("/pos-chat"), badge: chatUnread?.count || 0 }] : []),
-      { label: "Settings", icon: Cog, active: isOnSettings, testId: "button-settings-tab", onClick: () => setLocation("/pos-settings") },
+      {
+        label: "Point of Sale",
+        icon: ShoppingCart,
+        active: isOnPOS,
+        testId: "button-pos-tab",
+        onClick: () => setLocation("/"),
+      },
+      {
+        label: "Daybook",
+        icon: BookOpen,
+        active: isOnDaybook,
+        testId: "button-daybook-tab",
+        onClick: () => setLocation("/pos-daybook"),
+      },
+      {
+        label: "Inventory",
+        icon: MapPin,
+        active: isOnInventory,
+        testId: "button-inventory-tab",
+        onClick: () => setLocation("/location-inventory"),
+      },
+      {
+        label: "Price List",
+        icon: Tag,
+        active: isOnPriceList,
+        testId: "button-price-list-tab",
+        onClick: () => setLocation("/pos-price-list"),
+      },
+      {
+        label: "Transfer",
+        icon: Package,
+        active: isOnTransfer,
+        testId: "button-stock-transfer-tab",
+        onClick: () => setLocation("/vouchers?tab=transfer"),
+      },
+      {
+        label: "Orders",
+        icon: ClipboardList,
+        active: isOnTransferOrders,
+        testId: "button-transfer-orders-tab",
+        onClick: () => setLocation("/pos-transfer-orders"),
+      },
+      ...(user.canAccessCustomers
+        ? [
+            {
+              label: "Customers",
+              icon: Users,
+              active: isOnCustomers,
+              testId: "button-customers-tab",
+              onClick: () => setLocation("/pos-customers"),
+            },
+          ]
+        : []),
+      ...(posImportEnabled
+        ? [
+            {
+              label: "Import",
+              icon: Upload,
+              active: isOnImport,
+              testId: "button-pos-import-tab",
+              onClick: () => setLocation("/pos-import"),
+            },
+          ]
+        : []),
+      ...(user.role === "Developer"
+        ? [
+            {
+              label: "Chat",
+              icon: MessageSquare,
+              active: isOnChat,
+              testId: "button-chat-tab",
+              onClick: () => setLocation("/pos-chat"),
+              badge: chatUnread?.count || 0,
+            },
+          ]
+        : []),
+      {
+        label: "Settings",
+        icon: Cog,
+        active: isOnSettings,
+        testId: "button-settings-tab",
+        onClick: () => setLocation("/pos-settings"),
+      },
     ];
 
     const posStyle = { "--sidebar-width": "11rem", "--sidebar-width-icon": "3rem" };
@@ -796,15 +1083,15 @@ function AuthenticatedApp() {
                     <SidebarMenu>
                       {posNavItems.map((item) => (
                         <SidebarMenuItem key={item.label}>
-                          <SidebarMenuButton
-                            isActive={item.active}
-                            onClick={item.onClick}
-                            data-testid={item.testId}
-                          >
+                          <SidebarMenuButton isActive={item.active} onClick={item.onClick} data-testid={item.testId}>
                             <item.icon className="h-4 w-4" />
                             <span className="flex-1">{item.label}</span>
                             {"badge" in item && (item as any).badge > 0 && (
-                              <Badge variant="default" className="text-xs min-w-5 justify-center" data-testid="badge-chat-unread-pos">
+                              <Badge
+                                variant="default"
+                                className="text-xs min-w-5 justify-center"
+                                data-testid="badge-chat-unread-pos"
+                              >
                                 {(item as any).badge}
                               </Badge>
                             )}
@@ -833,18 +1120,20 @@ function AuthenticatedApp() {
                 <div className="flex items-center gap-2 ml-auto">
                   <PendingSyncIndicator />
                   {(user?.role === "Admin" || user?.role === "Owner" || user?.role === "Developer") && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex items-center gap-1.5 text-muted-foreground"
-                    onClick={() => setPaletteOpen(true)}
-                    data-testid="button-open-palette"
-                  >
-                    <Search className="h-4 w-4" />
-                    <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
-                      {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌘ /" : "Ctrl /"}
-                    </kbd>
-                  </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="flex items-center gap-1.5 text-muted-foreground"
+                      onClick={() => setPaletteOpen(true)}
+                      data-testid="button-open-palette"
+                    >
+                      <Search className="h-4 w-4" />
+                      <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border bg-muted px-1.5 text-[10px] font-mono">
+                        {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+                          ? "⌘ /"
+                          : "Ctrl /"}
+                      </kbd>
+                    </Button>
                   )}
                   <Button variant="ghost" size="icon" onClick={handleLogout} data-testid="button-logout-header">
                     <LogOut className="h-4 w-4" />
@@ -855,7 +1144,13 @@ function AuthenticatedApp() {
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
                   <ErrorBoundary resetKey={currentLocation}>
-                    <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Loading...</div>}>
+                    <Suspense
+                      fallback={
+                        <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+                          Loading...
+                        </div>
+                      }
+                    >
                       <Router user={user} posImportEnabled={posImportEnabled} />
                     </Suspense>
                   </ErrorBoundary>
@@ -864,12 +1159,7 @@ function AuthenticatedApp() {
             </div>
           </div>
         </SidebarProvider>
-        <CommandPalette
-          open={paletteOpen}
-          onOpenChange={setPaletteOpen}
-          isPOS={true}
-          user={user}
-        />
+        <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} isPOS={true} user={user} />
         {leaveConfirmDialog}
       </>
     );
@@ -878,7 +1168,12 @@ function AuthenticatedApp() {
   const isPropertiesCompany = selectedCompany?.companyType === "properties";
   const isPropertiesRoute = currentLocation.startsWith("/properties/");
 
-  if (isPropertiesCompany && !isPropertiesRoute && currentLocation !== "/my-settings" && currentLocation !== "/balance-repair") {
+  if (
+    isPropertiesCompany &&
+    !isPropertiesRoute &&
+    currentLocation !== "/my-settings" &&
+    currentLocation !== "/balance-repair"
+  ) {
     return <Redirect to="/properties/daybook" />;
   }
 
@@ -906,7 +1201,13 @@ function AuthenticatedApp() {
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
                   <ErrorBoundary resetKey={currentLocation}>
-                    <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Loading...</div>}>
+                    <Suspense
+                      fallback={
+                        <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+                          Loading...
+                        </div>
+                      }
+                    >
                       <Switch>
                         <Route path="/properties/dashboard" component={PropertiesDashboard} />
                         <Route path="/properties/accounts" component={PropertiesAccounts} />
@@ -919,21 +1220,48 @@ function AuthenticatedApp() {
                         <Route path="/properties/rental/warehouses" component={PropertiesRentalWarehouses} />
                         <Route path="/properties/rental/shops" component={PropertiesRentalShops} />
                         <Route path="/properties/rental/payments" component={PropertiesRentalPayments} />
-                        {user?.role === "Developer" && <Route path="/properties/transfer" component={CompanyTransfer} />}
+                        {user?.role === "Developer" && (
+                          <Route path="/properties/transfer" component={CompanyTransfer} />
+                        )}
                         <Route path="/properties/ledger-monthly/:accountId" component={PropertiesLedgerMonthly} />
-                        <Route path="/properties/ledger-vouchers/:accountId/:year/:month" component={PropertiesLedgerVouchers} />
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/settings" component={PropertiesSettings} />}
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/net-position-details" component={NetProfitDetails} />}
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/deleted-items" component={DeletedItems} />}
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/orphaned-records" component={OrphanedRecords} />}
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/chatbot-settings" component={ChatbotSettings} />}
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/inventory-repair" component={InventoryRepair} />}
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/company-data-reset" component={CompanyDataReset} />}
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/properties/account-groups" component={AccountGroups} />}
-                        {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/balance-repair" component={BalanceRepair} />}
+                        <Route
+                          path="/properties/ledger-vouchers/:accountId/:year/:month"
+                          component={PropertiesLedgerVouchers}
+                        />
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/properties/settings" component={PropertiesSettings} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/properties/net-position-details" component={NetProfitDetails} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/properties/deleted-items" component={DeletedItems} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/properties/orphaned-records" component={OrphanedRecords} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/properties/chatbot-settings" component={ChatbotSettings} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/properties/import-cycle-diagnostics" component={ImportCycleDiagnostics} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/properties/inventory-repair" component={InventoryRepair} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/properties/company-data-reset" component={CompanyDataReset} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/properties/account-groups" component={AccountGroups} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/balance-repair" component={BalanceRepair} />
+                        )}
                         <Route path="/my-settings" component={MySettings} />
-                        <Route><Redirect to="/properties/daybook" /></Route>
+                        <Route>
+                          <Redirect to="/properties/daybook" />
+                        </Route>
                       </Switch>
                     </Suspense>
                   </ErrorBoundary>
@@ -956,42 +1284,41 @@ function AuthenticatedApp() {
     );
   }
 
-
   const isFactoryCompany = selectedCompany?.companyType === "factory" || selectedCompany?.companyType === "factory_v2";
   const isFactoryRoute = currentLocation.startsWith("/factory/");
 
   // Sub-page → parent pageKey for detail/action routes that aren't direct nav items.
   // Also used by factoryDefaultPage to accept old pre-merge page keys for hub pages.
   const SUBPAGE_PARENT: [prefix: string, parentKey: string][] = [
-    ["/factory/sales/invoices",          "factory/invoicing"],
-    ["/factory/sales/new",               "factory/invoicing"],
-    ["/factory/sales/pending-invoices",  "factory/invoicing"],
-    ["/factory/invoices",                "factory/invoicing"],
-    ["/factory/sales/loading/",          "factory/sales/loadings"],
-    ["/factory/bale-product-history",    "factory/bales-hub"],
-    ["/factory/reprint-labels",          "factory/bales-hub"],
-    ["/factory/bales-history",           "factory/bales-hub"],
-    ["/factory/barcode-lookup",          "factory/bales-hub"],
-    ["/factory/payroll",                 "factory/payroll-hub"],
-    ["/factory/worker-payroll",          "factory/payroll-hub"],
-    ["/factory/workers",                 "factory/payroll-hub"],
-    ["/factory/employees",               "factory/payroll-hub"],
-    ["/factory/containers/new",          "factory/containers-hub"],
-    ["/factory/containers",              "factory/containers-hub"],
-    ["/factory/stock-otw",              "factory/containers-hub"],
-    ["/factory/customers",               "factory/parties"],
-    ["/factory/suppliers",               "factory/parties"],
-    ["/factory/net-position-details",    "factory/intelligence/financial-hub"],
-    ["/factory/net-position",            "factory/intelligence/financial-hub"],
-    ["/factory/net-profit-analytics",    "factory/intelligence/financial-hub"],
-    ["/factory/supplier-report",         "factory/intelligence/supplier-hub"],
-    ["/factory/supplier-statement",      "factory/intelligence/supplier-hub"],
-    ["/factory/production-summary",      "factory/intelligence/production-hub"],
-    ["/factory/ledger-monthly",          "factory/accounts"],
-    ["/factory/ledger-vouchers",         "factory/accounts"],
-    ["/factory/voucher-detail",          "factory/vouchers"],
-    ["/factory/create",                  "factory/accounts"],
-    ["/factory/financial-snapshot",      "factory/analytics"],
+    ["/factory/sales/invoices", "factory/invoicing"],
+    ["/factory/sales/new", "factory/invoicing"],
+    ["/factory/sales/pending-invoices", "factory/invoicing"],
+    ["/factory/invoices", "factory/invoicing"],
+    ["/factory/sales/loading/", "factory/sales/loadings"],
+    ["/factory/bale-product-history", "factory/bales-hub"],
+    ["/factory/reprint-labels", "factory/bales-hub"],
+    ["/factory/bales-history", "factory/bales-hub"],
+    ["/factory/barcode-lookup", "factory/bales-hub"],
+    ["/factory/payroll", "factory/payroll-hub"],
+    ["/factory/worker-payroll", "factory/payroll-hub"],
+    ["/factory/workers", "factory/payroll-hub"],
+    ["/factory/employees", "factory/payroll-hub"],
+    ["/factory/containers/new", "factory/containers-hub"],
+    ["/factory/containers", "factory/containers-hub"],
+    ["/factory/stock-otw", "factory/containers-hub"],
+    ["/factory/customers", "factory/parties"],
+    ["/factory/suppliers", "factory/parties"],
+    ["/factory/net-position-details", "factory/intelligence/financial-hub"],
+    ["/factory/net-position", "factory/intelligence/financial-hub"],
+    ["/factory/net-profit-analytics", "factory/intelligence/financial-hub"],
+    ["/factory/supplier-report", "factory/intelligence/supplier-hub"],
+    ["/factory/supplier-statement", "factory/intelligence/supplier-hub"],
+    ["/factory/production-summary", "factory/intelligence/production-hub"],
+    ["/factory/ledger-monthly", "factory/accounts"],
+    ["/factory/ledger-vouchers", "factory/accounts"],
+    ["/factory/voucher-detail", "factory/vouchers"],
+    ["/factory/create", "factory/accounts"],
+    ["/factory/financial-snapshot", "factory/analytics"],
   ];
 
   // Compute the right landing page for this user.
@@ -1007,17 +1334,22 @@ function AuthenticatedApp() {
         const key = item.url.replace(/^\//, "");
         if (myAccess.pageKeys.includes(key)) return item.url;
         // Accept old pre-hub-merge keys that now redirect to this hub
-        const legacyKeys = SUBPAGE_PARENT
-          .filter(([, parentKey]) => parentKey === key)
-          .map(([prefix]) => prefix.replace(/^\//, ""));
-        if (legacyKeys.some(lk => myAccess.pageKeys.includes(lk))) return item.url;
+        const legacyKeys = SUBPAGE_PARENT.filter(([, parentKey]) => parentKey === key).map(([prefix]) =>
+          prefix.replace(/^\//, "")
+        );
+        if (legacyKeys.some((lk) => myAccess.pageKeys.includes(lk))) return item.url;
       }
     }
     if (myAccess.pageKeys.includes("factory/daybook")) return "/factory/daybook";
     return "/factory/production-report";
   })();
 
-  if (isFactoryCompany && !isFactoryRoute && currentLocation !== "/my-settings" && currentLocation !== "/intercompany-requests") {
+  if (
+    isFactoryCompany &&
+    !isFactoryRoute &&
+    currentLocation !== "/my-settings" &&
+    currentLocation !== "/intercompany-requests"
+  ) {
     // Wait for myAccess before redirecting so restricted users land on their real first page.
     // If the query is still in-flight show a spinner; if it hard-failed after retries fall
     // through so the user gets the factory shell rather than a permanent blank screen.
@@ -1036,7 +1368,14 @@ function AuthenticatedApp() {
     return <Redirect to="/" />;
   }
 
-  if (!isFactoryCompany && !hasErpAccess && hasFactoryAccess && !isFactoryRoute && currentLocation !== "/my-settings" && currentLocation !== "/intercompany-requests") {
+  if (
+    !isFactoryCompany &&
+    !hasErpAccess &&
+    hasFactoryAccess &&
+    !isFactoryRoute &&
+    currentLocation !== "/my-settings" &&
+    currentLocation !== "/intercompany-requests"
+  ) {
     return <Redirect to={factoryDefaultPage} />;
   }
 
@@ -1078,9 +1417,9 @@ function AuthenticatedApp() {
     // to "factory/payroll-hub") so restricted users aren't locked out of merged hubs.
     if (isRestrictedUser && requiredKey) {
       const hasDirectAccess = myAccess.pageKeys.includes(requiredKey);
-      const hasLegacyAccess = SUBPAGE_PARENT
-        .filter(([, parentKey]) => parentKey === requiredKey)
-        .some(([prefix]) => myAccess.pageKeys.includes(prefix.replace(/^\//, "")));
+      const hasLegacyAccess = SUBPAGE_PARENT.filter(([, parentKey]) => parentKey === requiredKey).some(([prefix]) =>
+        myAccess.pageKeys.includes(prefix.replace(/^\//, ""))
+      );
       if (!hasDirectAccess && !hasLegacyAccess) {
         return <Redirect to={factoryDefaultPage} />;
       }
@@ -1094,9 +1433,7 @@ function AuthenticatedApp() {
           if (itemKey === requiredKey && (item as any).featureFlag) {
             const flag = (item as any).featureFlag as string;
             const defaultOn = !!(item as any).featureFlagDefaultOn;
-            const enabled = defaultOn
-              ? factorySettings[flag] !== false
-              : factorySettings[flag] === true;
+            const enabled = defaultOn ? factorySettings[flag] !== false : factorySettings[flag] === true;
             if (!enabled) return <Redirect to={factoryDefaultPage} />;
           }
         }
@@ -1104,8 +1441,10 @@ function AuthenticatedApp() {
     }
 
     // 3. hiddenCostFields — per-user tab restrictions that aren't in pageKeys
-    if (currentLocation === "/factory/production-report" &&
-        myAccess.hiddenCostFields?.includes("hide_tab_production_analytics")) {
+    if (
+      currentLocation === "/factory/production-report" &&
+      myAccess.hiddenCostFields?.includes("hide_tab_production_analytics")
+    ) {
       return <Redirect to={factoryDefaultPage} />;
     }
   }
@@ -1136,7 +1475,9 @@ function AuthenticatedApp() {
                     <Factory className="h-4 w-4 text-orange-600" />
                     <span className="text-xs font-semibold text-orange-600 uppercase tracking-wider">Factory Mode</span>
                     {myAccess?.companyName && (
-                      <span className="hidden sm:inline text-xs text-orange-600/70 font-normal normal-case tracking-normal border-l border-orange-600/20 pl-2">{myAccess.companyName}</span>
+                      <span className="hidden sm:inline text-xs text-orange-600/70 font-normal normal-case tracking-normal border-l border-orange-600/20 pl-2">
+                        {myAccess.companyName}
+                      </span>
                     )}
                   </div>
                 }
@@ -1146,123 +1487,217 @@ function AuthenticatedApp() {
               <main className="flex-1 overflow-y-auto p-3 sm:p-6">
                 <div className="w-full">
                   <ErrorBoundary resetKey={currentLocation}>
-                  <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Loading...</div>}>
-                  <Switch>
-                    <Route path="/factory/daybook" component={FactoryDaybook} />
-                    <Route path="/factory/transporters" component={FactoryTransporters} />
-                    <Route path="/factory/finance"><Redirect to="/factory/workers" /></Route>
-                    <Route path="/factory/suppliers"><Redirect to="/factory/parties?section=suppliers" /></Route>
-                    <Route path="/factory/containers/new" component={FactoryContainerCreate} />
-                    <Route path="/factory/containers"><Redirect to="/factory/containers-hub?section=containers" /></Route>
-                    <Route path="/factory/bale-products" component={BaleProducts} />
-                    <Route path="/factory/raw-stock/opening-balance/:id/edit" component={FactoryOpeningBalanceEdit} />
-                    <Route path="/factory/raw-stock" component={ProductionRawStock} />
-                    <Route path="/factory/raw-materials" component={FactoryRawMaterialsHub} />
-                    <Route path="/factory/pressing"><Redirect to="/factory/stock-entry" /></Route>
-                    <Route path="/factory/finalize"><Redirect to="/factory/stock-entry" /></Route>
-                    <Route path="/factory/stock-entry" component={BaleStockEntry} />
-                    <Route path="/factory/bales-history" component={BalesHistory} />
-                    <Route path="/factory/bales-hub" component={FactoryBalesHub} />
-                    <Route path="/factory/reprint-labels" component={FactoryReprintLabels} />
-                    <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
-                    <Route path="/factory/location-inventory-mockup" component={FactoryLocationInventoryMockup} />
-                    <Route path="/factory/bale-product-history/:productId/:locationId/:year/all" component={FactoryBaleProductAllMonths} />
-                    <Route path="/factory/bale-product-history/:productId/:locationId/:year/:month" component={FactoryBaleProductMonthDetail} />
-                    <Route path="/factory/bale-product-history/:productId/:locationId" component={FactoryBaleProductHistory} />
-                    <Route path="/factory/containers-hub" component={FactoryContainersHub} />
-                    <Route path="/factory/stock-otw"><Redirect to="/factory/containers-hub" /></Route>
-                    <Route path="/factory/stock-bale-list" component={FactoryStockBaleList} />
-                    <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
-                    <Route path="/factory/stock-query" component={StockQuery} />
-                    <Route path="/factory/accounts" component={FactoryAccounts} />
-                    <Route path="/factory/agents" component={Agents} />
-                    <Route path="/factory/vouchers">{() => <FactoryVouchers />}</Route>
-                    <Route path="/factory/vouchers/:id/edit" component={VoucherEdit} />
-                    <Route path="/factory/voucher-detail/:voucherId" component={VoucherDetail} />
-                    <Route path="/factory/create" component={AccountingCreate} />
-                    <Route path="/factory/payroll" component={Payroll} />
-                    <Route path="/factory/analytics" component={Analytics} />
-                    <Route path="/factory/production-summary"><Redirect to="/factory/intelligence/production-hub?section=production-summary" /></Route>
-                    <Route path="/factory/sales/new" component={FactoryInvoiceCreate} />
-                    <Route path="/factory/sales/loading/pending" component={FactoryPendingLoadings} />
-                    <Route path="/factory/sales/loading/new" component={FactoryContainerLoadingScan} />
-                    <Route path="/factory/sales/loadings" component={FactoryLoadingsHub} />
-                    <Route path="/factory/sales/pending-invoices/:id/verify" component={FactoryPendingInvoiceVerify} />
-                    <Route path="/factory/invoices/:id/loading-scan" component={FactoryInvoiceLoadingScan} />
-                    <Route path="/factory/sales/invoices/:id" component={FactoryInvoiceDetail} />
-                    <Route path="/factory/price-list" component={FactoryPriceList} />
-                    <Route path="/factory/sales/proformas/:proformaId/add-line" component={ProformaAddLine} />
-                    <Route path="/factory/bale-tracking" component={FactoryBaleTracking} />
-                    <Route path="/factory/dispatch-batches/:batchId/rides/:rideId/scan" component={FactoryDispatchBatchScan} />
-                    <Route path="/factory/dispatch-batches/:id" component={FactoryDispatchBatchDetail} />
-                    <Route path="/factory/dispatch-batches" component={FactoryDispatchBatches} />
-                    <Route path="/factory/invoicing" component={FactoryInvoicing} />
-                    <Route path="/factory/stock-allocation" component={FactoryStockAllocation} />
-                    <Route path="/factory/stock-allocation-v3" component={FactoryStockAllocationV3} />
-                    <Route path="/factory/stock-allocation-v5" component={FactoryStockAllocationV5} />
-                    <Route path="/factory/parties" component={FactoryPartiesHub} />
-                    <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
-                    <Route path="/factory/customers"><Redirect to="/factory/parties?section=customers" /></Route>
-                    <Route path="/factory/payroll-hub" component={FactoryPayrollHub} />
-                    <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
-                    <Route path="/factory/employees"><Redirect to="/factory/payroll-hub?section=employees" /></Route>
-                    <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
-                    <Route path="/factory/workers"><Redirect to="/factory/payroll-hub?section=workers" /></Route>
-                    <Route path="/factory/worker-payroll"><Redirect to="/factory/workers?tab=payroll" /></Route>
-                    <Route path="/factory/supplier-report"><Redirect to="/factory/intelligence/supplier-hub?section=report" /></Route>
-                    <Route path="/factory/supplier-statement"><Redirect to="/factory/intelligence/supplier-hub?section=statement" /></Route>
-                    <Route path="/factory/broker-visual-statement" component={FactoryBrokerVisualStatement} />
-                    <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
-                    <Route path="/factory/import" component={FactoryImport} />
-                    <Route path="/factory/bale-relabeling" component={FactoryBaleRelabeling} />
-                    <Route path="/factory/merge-bale-products" component={MergeBaleProducts} />
-                    <Route path="/factory/bale-product-images" component={BaleProductImages} />
-                    <Route path="/factory/customer-logos" component={CustomerLogosSettings} />
-                    <Route path="/factory/label-banners" component={LabelBannersSettings} />
-                    <Route path="/factory/bale-relabeling/wipers-re-entry" component={WipersReEntry} />
-                    <Route path="/factory/users"><Redirect to="/factory/settings" /></Route>
-                    <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
-                    <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
-                    <Route path="/factory/intelligence/dashboard" component={FactoryDashboardIntel} />
-                    <Route path="/factory/intelligence/kpis" component={FactoryKpis} />
-                    <Route path="/factory/intelligence/profitability"><Redirect to="/factory/intelligence/financial-hub?section=profitability" /></Route>
-                    <Route path="/factory/intelligence/alerts" component={FactoryAlerts} />
-                    <Route path="/factory/intelligence/supplier-hub" component={FactorySupplierHub} />
-                    <Route path="/factory/intelligence/financial-hub" component={FactoryFinancialHub} />
-                    <Route path="/factory/intelligence/production-hub" component={FactoryProductionIntelHub} />
-                    <Route path="/factory/intelligence/supplier-scores"><Redirect to="/factory/intelligence/supplier-hub?section=scores" /></Route>
-                    <Route path="/factory/intelligence/mix-optimizer"><Redirect to="/factory/intelligence/production-hub?section=mix-optimizer" /></Route>
-                    <Route path="/factory/intelligence/cashflow"><Redirect to="/factory/intelligence/financial-hub?section=cashflow" /></Route>
-                    <Route path="/factory/intelligence/waste"><Redirect to="/factory/intelligence/production-hub?section=waste" /></Route>
-                    <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
-                    <Route path="/factory/pos" component={FactoryPOS} />
-                    <Route path="/factory/bale-ledger">{() => <Redirect to="/factory/production-report" />}</Route>
-                    <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
-                    {(user?.role === "Admin" || user?.role === "Developer" || myAccess?.fullAccess) && <Route path="/factory/spreadsheet" component={SpreadsheetEditor} />}
-                    <Route path="/factory/chat" component={Chat} />
-                    <Route path="/factory/conflicts" component={ConflictCenter} />
-                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/settings" component={Settings} />}
-                    <Route path="/my-settings" component={MySettings} />
-                    <Route path="/intercompany-requests" component={IntercompanyRequests} />
-                    <Route path="/intercompany-links" component={IntercompanyLinks} />
-                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/deleted-items" component={DeletedItems} />}
-                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/orphaned-records" component={OrphanedRecords} />}
-                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/chatbot-settings" component={ChatbotSettings} />}
-                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/import-cycle-diagnostics" component={ImportCycleDiagnostics} />}
-                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/inventory-repair" component={InventoryRepair} />}
-                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/factory/company-data-reset" component={CompanyDataReset} />}
-                    <Route path="/factory/net-position-details" component={FactoryNetPositionDetails} />
-                    <Route path="/factory/net-profit-analytics"><Redirect to="/factory/intelligence/financial-hub?section=net-profit" /></Route>
-                    <Route path="/factory/net-position"><Redirect to="/factory/intelligence/financial-hub?section=net-position" /></Route>
-                    <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
-                    <Route path="/factory/production-report">{() => myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics") ? <Redirect to={factoryDefaultPage} /> : <DailyProductionReport />}</Route>
-                    <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
-                    <Route path="/factory/rental/shops" component={FactoryRentalShops} />
-                    <Route path="/factory/rental/payments" component={FactoryRentalPayments} />
-                    {(user?.role === "Admin" || user?.role === "Developer") && <Route path="/balance-repair" component={BalanceRepair} />}
-                    <Route><Redirect to={factoryDefaultPage} /></Route>
-                  </Switch>
-                  </Suspense>
+                    <Suspense
+                      fallback={
+                        <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+                          Loading...
+                        </div>
+                      }
+                    >
+                      <Switch>
+                        <Route path="/factory/daybook" component={FactoryDaybook} />
+                        <Route path="/factory/transporters" component={FactoryTransporters} />
+                        <Route path="/factory/finance">
+                          <Redirect to="/factory/workers" />
+                        </Route>
+                        <Route path="/factory/suppliers">
+                          <Redirect to="/factory/parties?section=suppliers" />
+                        </Route>
+                        <Route path="/factory/containers/new" component={FactoryContainerCreate} />
+                        <Route path="/factory/containers">
+                          <Redirect to="/factory/containers-hub?section=containers" />
+                        </Route>
+                        <Route path="/factory/bale-products" component={BaleProducts} />
+                        <Route
+                          path="/factory/raw-stock/opening-balance/:id/edit"
+                          component={FactoryOpeningBalanceEdit}
+                        />
+                        <Route path="/factory/raw-stock" component={ProductionRawStock} />
+                        <Route path="/factory/raw-materials" component={FactoryRawMaterialsHub} />
+                        <Route path="/factory/pressing">
+                          <Redirect to="/factory/stock-entry" />
+                        </Route>
+                        <Route path="/factory/finalize">
+                          <Redirect to="/factory/stock-entry" />
+                        </Route>
+                        <Route path="/factory/stock-entry" component={BaleStockEntry} />
+                        <Route path="/factory/bales-history" component={BalesHistory} />
+                        <Route path="/factory/bales-hub" component={FactoryBalesHub} />
+                        <Route path="/factory/reprint-labels" component={FactoryReprintLabels} />
+                        <Route path="/factory/location-inventory" component={FactoryLocationInventory} />
+                        <Route path="/factory/location-inventory-mockup" component={FactoryLocationInventoryMockup} />
+                        <Route
+                          path="/factory/bale-product-history/:productId/:locationId/:year/all"
+                          component={FactoryBaleProductAllMonths}
+                        />
+                        <Route
+                          path="/factory/bale-product-history/:productId/:locationId/:year/:month"
+                          component={FactoryBaleProductMonthDetail}
+                        />
+                        <Route
+                          path="/factory/bale-product-history/:productId/:locationId"
+                          component={FactoryBaleProductHistory}
+                        />
+                        <Route path="/factory/containers-hub" component={FactoryContainersHub} />
+                        <Route path="/factory/stock-otw">
+                          <Redirect to="/factory/containers-hub" />
+                        </Route>
+                        <Route path="/factory/stock-bale-list" component={FactoryStockBaleList} />
+                        <Route path="/factory/stock-query/:id" component={FactoryStockItemDetail} />
+                        <Route path="/factory/stock-query" component={StockQuery} />
+                        <Route path="/factory/accounts" component={FactoryAccounts} />
+                        <Route path="/factory/agents" component={Agents} />
+                        <Route path="/factory/vouchers">{() => <FactoryVouchers />}</Route>
+                        <Route path="/factory/vouchers/:id/edit" component={VoucherEdit} />
+                        <Route path="/factory/voucher-detail/:voucherId" component={VoucherDetail} />
+                        <Route path="/factory/create" component={AccountingCreate} />
+                        <Route path="/factory/payroll" component={Payroll} />
+                        <Route path="/factory/analytics" component={Analytics} />
+                        <Route path="/factory/production-summary">
+                          <Redirect to="/factory/intelligence/production-hub?section=production-summary" />
+                        </Route>
+                        <Route path="/factory/sales/new" component={FactoryInvoiceCreate} />
+                        <Route path="/factory/sales/loading/pending" component={FactoryPendingLoadings} />
+                        <Route path="/factory/sales/loading/new" component={FactoryContainerLoadingScan} />
+                        <Route path="/factory/sales/loadings" component={FactoryLoadingsHub} />
+                        <Route
+                          path="/factory/sales/pending-invoices/:id/verify"
+                          component={FactoryPendingInvoiceVerify}
+                        />
+                        <Route path="/factory/invoices/:id/loading-scan" component={FactoryInvoiceLoadingScan} />
+                        <Route path="/factory/sales/invoices/:id" component={FactoryInvoiceDetail} />
+                        <Route path="/factory/price-list" component={FactoryPriceList} />
+                        <Route path="/factory/sales/proformas/:proformaId/add-line" component={ProformaAddLine} />
+                        <Route path="/factory/bale-tracking" component={FactoryBaleTracking} />
+                        <Route
+                          path="/factory/dispatch-batches/:batchId/rides/:rideId/scan"
+                          component={FactoryDispatchBatchScan}
+                        />
+                        <Route path="/factory/dispatch-batches/:id" component={FactoryDispatchBatchDetail} />
+                        <Route path="/factory/dispatch-batches" component={FactoryDispatchBatches} />
+                        <Route path="/factory/invoicing" component={FactoryInvoicing} />
+                        <Route path="/factory/stock-allocation" component={FactoryStockAllocation} />
+                        <Route path="/factory/stock-allocation-v3" component={FactoryStockAllocationV3} />
+                        <Route path="/factory/stock-allocation-v5" component={FactoryStockAllocationV5} />
+                        <Route path="/factory/parties" component={FactoryPartiesHub} />
+                        <Route path="/factory/customers/:id" component={FactoryCustomerStatement} />
+                        <Route path="/factory/customers">
+                          <Redirect to="/factory/parties?section=customers" />
+                        </Route>
+                        <Route path="/factory/payroll-hub" component={FactoryPayrollHub} />
+                        <Route path="/factory/employees/:id" component={FactoryEmployeeDetail} />
+                        <Route path="/factory/employees">
+                          <Redirect to="/factory/payroll-hub?section=employees" />
+                        </Route>
+                        <Route path="/factory/workers/:id" component={FactoryWorkerDetail} />
+                        <Route path="/factory/workers">
+                          <Redirect to="/factory/payroll-hub?section=workers" />
+                        </Route>
+                        <Route path="/factory/worker-payroll">
+                          <Redirect to="/factory/workers?tab=payroll" />
+                        </Route>
+                        <Route path="/factory/supplier-report">
+                          <Redirect to="/factory/intelligence/supplier-hub?section=report" />
+                        </Route>
+                        <Route path="/factory/supplier-statement">
+                          <Redirect to="/factory/intelligence/supplier-hub?section=statement" />
+                        </Route>
+                        <Route path="/factory/broker-visual-statement" component={FactoryBrokerVisualStatement} />
+                        <Route path="/factory/barcode-lookup" component={BarcodeLookup} />
+                        <Route path="/factory/import" component={FactoryImport} />
+                        <Route path="/factory/bale-relabeling" component={FactoryBaleRelabeling} />
+                        <Route path="/factory/merge-bale-products" component={MergeBaleProducts} />
+                        <Route path="/factory/bale-product-images" component={BaleProductImages} />
+                        <Route path="/factory/customer-logos" component={CustomerLogosSettings} />
+                        <Route path="/factory/label-banners" component={LabelBannersSettings} />
+                        <Route path="/factory/bale-relabeling/wipers-re-entry" component={WipersReEntry} />
+                        <Route path="/factory/users">
+                          <Redirect to="/factory/settings" />
+                        </Route>
+                        <Route path="/factory/ledger-monthly/:accountId" component={LedgerMonthlySummary} />
+                        <Route path="/factory/ledger-vouchers/:accountId/:year/:month" component={LedgerVouchers} />
+                        <Route path="/factory/intelligence/dashboard" component={FactoryDashboardIntel} />
+                        <Route path="/factory/intelligence/kpis" component={FactoryKpis} />
+                        <Route path="/factory/intelligence/profitability">
+                          <Redirect to="/factory/intelligence/financial-hub?section=profitability" />
+                        </Route>
+                        <Route path="/factory/intelligence/alerts" component={FactoryAlerts} />
+                        <Route path="/factory/intelligence/supplier-hub" component={FactorySupplierHub} />
+                        <Route path="/factory/intelligence/financial-hub" component={FactoryFinancialHub} />
+                        <Route path="/factory/intelligence/production-hub" component={FactoryProductionIntelHub} />
+                        <Route path="/factory/intelligence/supplier-scores">
+                          <Redirect to="/factory/intelligence/supplier-hub?section=scores" />
+                        </Route>
+                        <Route path="/factory/intelligence/mix-optimizer">
+                          <Redirect to="/factory/intelligence/production-hub?section=mix-optimizer" />
+                        </Route>
+                        <Route path="/factory/intelligence/cashflow">
+                          <Redirect to="/factory/intelligence/financial-hub?section=cashflow" />
+                        </Route>
+                        <Route path="/factory/intelligence/waste">
+                          <Redirect to="/factory/intelligence/production-hub?section=waste" />
+                        </Route>
+                        <Route path="/factory/waste-dispatch" component={WasteDispatchPage} />
+                        <Route path="/factory/pos" component={FactoryPOS} />
+                        <Route path="/factory/bale-ledger">{() => <Redirect to="/factory/production-report" />}</Route>
+                        <Route path="/factory/intelligence/settings" component={FactoryIntelSettings} />
+                        {(user?.role === "Admin" || user?.role === "Developer" || myAccess?.fullAccess) && (
+                          <Route path="/factory/spreadsheet" component={SpreadsheetEditor} />
+                        )}
+                        <Route path="/factory/chat" component={Chat} />
+                        <Route path="/factory/conflicts" component={ConflictCenter} />
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/factory/settings" component={Settings} />
+                        )}
+                        <Route path="/my-settings" component={MySettings} />
+                        <Route path="/intercompany-requests" component={IntercompanyRequests} />
+                        <Route path="/intercompany-links" component={IntercompanyLinks} />
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/factory/deleted-items" component={DeletedItems} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/factory/orphaned-records" component={OrphanedRecords} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/factory/chatbot-settings" component={ChatbotSettings} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/factory/import-cycle-diagnostics" component={ImportCycleDiagnostics} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/factory/inventory-repair" component={InventoryRepair} />
+                        )}
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/factory/company-data-reset" component={CompanyDataReset} />
+                        )}
+                        <Route path="/factory/net-position-details" component={FactoryNetPositionDetails} />
+                        <Route path="/factory/net-profit-analytics">
+                          <Redirect to="/factory/intelligence/financial-hub?section=net-profit" />
+                        </Route>
+                        <Route path="/factory/net-position">
+                          <Redirect to="/factory/intelligence/financial-hub?section=net-position" />
+                        </Route>
+                        <Route path="/factory/financial-snapshot" component={FactoryFinancialSnapshot} />
+                        <Route path="/factory/production-report">
+                          {() =>
+                            myAccess?.hiddenCostFields?.includes("hide_tab_production_analytics") ? (
+                              <Redirect to={factoryDefaultPage} />
+                            ) : (
+                              <DailyProductionReport />
+                            )
+                          }
+                        </Route>
+                        <Route path="/factory/rental/warehouses" component={FactoryRentalWarehouses} />
+                        <Route path="/factory/rental/shops" component={FactoryRentalShops} />
+                        <Route path="/factory/rental/payments" component={FactoryRentalPayments} />
+                        {(user?.role === "Admin" || user?.role === "Developer") && (
+                          <Route path="/balance-repair" component={BalanceRepair} />
+                        )}
+                        <Route>
+                          <Redirect to={factoryDefaultPage} />
+                        </Route>
+                      </Switch>
+                    </Suspense>
                   </ErrorBoundary>
                 </div>
               </main>
@@ -1302,7 +1737,13 @@ function AuthenticatedApp() {
             <main className="flex-1 overflow-y-auto p-3 sm:p-6">
               <div className="w-full">
                 <ErrorBoundary resetKey={currentLocation}>
-                  <Suspense fallback={<div className="flex items-center justify-center h-48 text-muted-foreground text-sm">Loading...</div>}>
+                  <Suspense
+                    fallback={
+                      <div className="flex items-center justify-center h-48 text-muted-foreground text-sm">
+                        Loading...
+                      </div>
+                    }
+                  >
                     <Router user={user} />
                   </Suspense>
                 </ErrorBoundary>
@@ -1368,7 +1809,9 @@ function UpdateBanner() {
                     Object.keys(sessionStorage)
                       .filter((k) => k.startsWith("chunkReload:") || k.startsWith("chunkRetry:"))
                       .forEach((k) => sessionStorage.removeItem(k));
-                  } catch { /* ignore */ }
+                  } catch {
+                    /* ignore */
+                  }
                   window.location.reload();
                 }}
               >
@@ -1377,7 +1820,9 @@ function UpdateBanner() {
             ) as any,
           });
         }
-      } catch { /* network error — ignore, will retry next interval */ }
+      } catch {
+        /* network error — ignore, will retry next interval */
+      }
     }
 
     checkVersion(); // initial check

@@ -1,30 +1,11 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { insertStockItemSchema, type InsertStockItem } from "@shared/schema";
@@ -63,10 +44,7 @@ const formSchema = insertStockItemSchema.extend({
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function StockItemCreateDialog({
-  open,
-  onOpenChange,
-}: StockItemCreateDialogProps) {
+export function StockItemCreateDialog({ open, onOpenChange }: StockItemCreateDialogProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
 
@@ -150,7 +128,7 @@ export function StockItemCreateDialog({
     const errorMessages = Object.values(errors)
       .map((err: any) => err.message)
       .filter(Boolean);
-    
+
     if (errorMessages.length > 0) {
       toast({
         title: "Validation Error",
@@ -182,11 +160,7 @@ export function StockItemCreateDialog({
                   <FormItem>
                     <FormLabel>Code *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., ITEM001"
-                        data-testid="input-code"
-                      />
+                      <Input {...field} placeholder="e.g., ITEM001" data-testid="input-code" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -200,11 +174,7 @@ export function StockItemCreateDialog({
                   <FormItem>
                     <FormLabel>Name *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Item name"
-                        data-testid="input-name"
-                      />
+                      <Input {...field} placeholder="Item name" data-testid="input-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -220,11 +190,7 @@ export function StockItemCreateDialog({
                   <FormItem>
                     <FormLabel>Unit of Measure *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., Pieces, Kg, Box"
-                        data-testid="input-uom"
-                      />
+                      <Input {...field} placeholder="e.g., Pieces, Kg, Box" data-testid="input-uom" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -322,7 +288,7 @@ export function StockItemCreateDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-4" style={{display:"none"}}>
+            <div className="grid grid-cols-3 gap-4" style={{ display: "none" }}>
               <FormField
                 control={form.control}
                 name="openingQty"
@@ -365,20 +331,16 @@ export function StockItemCreateDialog({
             </div>
 
             <DialogFooter>
-              <Button 
+              <Button
                 type="button"
-                variant="outline" 
-                onClick={handleCancel} 
+                variant="outline"
+                onClick={handleCancel}
                 disabled={createMutation.isPending}
                 data-testid="button-cancel"
               >
                 Cancel
               </Button>
-              <Button 
-                type="submit"
-                disabled={createMutation.isPending}
-                data-testid="button-create"
-              >
+              <Button type="submit" disabled={createMutation.isPending} data-testid="button-create">
                 {createMutation.isPending ? "Creating..." : "Create Item"}
               </Button>
             </DialogFooter>

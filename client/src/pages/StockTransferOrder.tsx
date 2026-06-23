@@ -16,40 +16,39 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronDown, ChevronRight, ChevronUp, MapPin, Package, Trash2, Check, AlertCircle, ArrowRight, Settings2, CalendarIcon, FileDown, List, GitBranch, Upload, FileSpreadsheet, TrendingUp, TrendingDown, ExternalLink, Plus, Search } from "lucide-react";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  MapPin,
+  Package,
+  Trash2,
+  Check,
+  AlertCircle,
+  ArrowRight,
+  Settings2,
+  CalendarIcon,
+  FileDown,
+  List,
+  GitBranch,
+  Upload,
+  FileSpreadsheet,
+  TrendingUp,
+  TrendingDown,
+  ExternalLink,
+  Plus,
+  Search,
+} from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/components/ui/sheet";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -129,7 +128,7 @@ interface ImportPreviewRow {
   newQty: number;
   sourceLocationId: number | null;
   sourceLocationName: string;
-  status: 'ok' | 'not_found' | 'remove' | 'new_item';
+  status: "ok" | "not_found" | "remove" | "new_item";
 }
 
 const STORAGE_KEY = "stockTransferOrder_selectedLocations";
@@ -160,7 +159,10 @@ export default function StockTransferOrder() {
     if (editVoucherId !== null) return null; // don't restore when editing existing voucher
     try {
       const ss = sessionStorage.getItem(SESSION_STATE_KEY);
-      if (ss) { sessionStorage.removeItem(SESSION_STATE_KEY); return JSON.parse(ss); }
+      if (ss) {
+        sessionStorage.removeItem(SESSION_STATE_KEY);
+        return JSON.parse(ss);
+      }
     } catch {}
     return null;
   })();
@@ -172,10 +174,8 @@ export default function StockTransferOrder() {
   const [destinationLocationId, setDestinationLocationId] = useState<number | null>(
     () => _sessionSnapshot?.destinationLocationId ?? null
   );
-  const [orderItems, setOrderItems] = useState<OrderItem[]>(
-    () => _sessionSnapshot?.orderItems || []
-  );
-  
+  const [orderItems, setOrderItems] = useState<OrderItem[]>(() => _sessionSnapshot?.orderItems || []);
+
   const [quantityPicker, setQuantityPicker] = useState<QuantityPickerState>({
     open: false,
     stockItem: null,
@@ -184,13 +184,13 @@ export default function StockTransferOrder() {
     availableQty: 0,
   });
   const [pickerQuantity, setPickerQuantity] = useState("");
-  
+
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [transferDate, setTransferDate] = useState<Date>(new Date());
   const [isOptional, setIsOptional] = useState(false);
   const [editDataLoaded, setEditDataLoaded] = useState(false);
-  
+
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const matrixRef = useRef<HTMLDivElement>(null);
   const [focusedCell, setFocusedCell] = useState<{ row: number; col: number } | null>(null);
@@ -224,9 +224,7 @@ export default function StockTransferOrder() {
   const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [historyItem, setHistoryItem] = useState<StockItemData | null>(null);
   const [historyLocation, setHistoryLocation] = useState<Location | null>(null);
-  const [historyPeriod, setHistoryPeriod] = useState<PeriodFilterValue>(
-    () => getDefaultPeriodValue("this_year")
-  );
+  const [historyPeriod, setHistoryPeriod] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
 
   // Drill-down detail dialog state
   const [detailOpen, setDetailOpen] = useState(false);
@@ -317,16 +315,16 @@ export default function StockTransferOrder() {
   });
 
   const { data: summaryData, isLoading } = useQuery<LocationSummaryResponse>({
-    queryKey: ["/api/location-summary", { locationIds: selectedLocationIds.join(',') }],
+    queryKey: ["/api/location-summary", { locationIds: selectedLocationIds.join(",") }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (selectedLocationIds.length > 0) {
-        params.append('locationIds', selectedLocationIds.join(','));
+        params.append("locationIds", selectedLocationIds.join(","));
       }
       const res = await fetch(`/api/location-summary?${params.toString()}`, {
-        credentials: 'include',
+        credentials: "include",
       });
-      if (!res.ok) throw new Error('Failed to fetch location summary');
+      if (!res.ok) throw new Error("Failed to fetch location summary");
       return res.json();
     },
     enabled: selectedLocationIds.length > 0,
@@ -354,7 +352,14 @@ export default function StockTransferOrder() {
 
   // Load items and destination once both transfer data and reference data are ready
   useEffect(() => {
-    if (editVoucherId && existingTransfer && existingVoucher && locations.length > 0 && stockItems.length > 0 && !editDataLoaded) {
+    if (
+      editVoucherId &&
+      existingTransfer &&
+      existingVoucher &&
+      locations.length > 0 &&
+      stockItems.length > 0 &&
+      !editDataLoaded
+    ) {
       const destId = existingTransfer.destinationLocationId;
       if (destId) setDestinationLocationId(destId);
 
@@ -395,7 +400,7 @@ export default function StockTransferOrder() {
         }
       }
     } catch {}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Autosave debounce effect (new transfers only)
@@ -406,19 +411,24 @@ export default function StockTransferOrder() {
     autosaveTimer.current = setTimeout(() => {
       setAutosaveStatus("saving");
       try {
-        localStorage.setItem(DRAFT_KEY, JSON.stringify({
-          destinationLocationId,
-          orderItems,
-          transferDate: transferDate.toISOString(),
-          isOptional,
-          savedAt: new Date().toISOString(),
-        }));
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({
+            destinationLocationId,
+            orderItems,
+            transferDate: transferDate.toISOString(),
+            isOptional,
+            savedAt: new Date().toISOString(),
+          })
+        );
         setAutosaveStatus("saved");
       } catch {
         setAutosaveStatus("failed");
       }
     }, 800);
-    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current); };
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    };
   }, [destinationLocationId, orderItems, transferDate, isOptional, editVoucherId]);
 
   const restoreDraft = async () => {
@@ -458,13 +468,13 @@ export default function StockTransferOrder() {
   }, [focusedCell]);
 
   const selectedLocations = selectedLocationIds
-    .map(id => locations.find(loc => loc.id === id))
+    .map((id) => locations.find((loc) => loc.id === id))
     .filter((loc): loc is Location => loc !== undefined);
 
   const availableDestinations = locations;
 
   const toggleGroup = async (groupId: number) => {
-    setExpandedGroups(prev => {
+    setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(groupId)) {
         next.delete(groupId);
@@ -476,10 +486,8 @@ export default function StockTransferOrder() {
   };
 
   const toggleLocation = async (locationId: number) => {
-    setSelectedLocationIds(prev => 
-      prev.includes(locationId) 
-        ? prev.filter(id => id !== locationId)
-        : [...prev, locationId]
+    setSelectedLocationIds((prev) =>
+      prev.includes(locationId) ? prev.filter((id) => id !== locationId) : [...prev, locationId]
     );
   };
 
@@ -487,101 +495,101 @@ export default function StockTransferOrder() {
     return [...items].sort((a, b) => a.sourceLocationName.localeCompare(b.sourceLocationName));
   };
 
-  const flatItems = summaryData?.stockGroups.flatMap((group) => 
-    expandedGroups.has(group.id) 
-      ? [...group.items].sort((a, b) => a.name.localeCompare(b.name))
-      : []
-  ) || [];
+  const flatItems =
+    summaryData?.stockGroups.flatMap((group) =>
+      expandedGroups.has(group.id) ? [...group.items].sort((a, b) => a.name.localeCompare(b.name)) : []
+    ) || [];
 
-  const openQuantityPicker = useCallback((
-    item: StockItemData,
-    locationId: number,
-    locationName: string,
-    availableQty: number
-  ) => {
-    if (availableQty <= 0) {
-      toast({
-        title: "No Stock",
-        description: `${item.name} has no available stock at ${locationName}`,
-        variant: "destructive",
+  const openQuantityPicker = useCallback(
+    (item: StockItemData, locationId: number, locationName: string, availableQty: number) => {
+      if (availableQty <= 0) {
+        toast({
+          title: "No Stock",
+          description: `${item.name} has no available stock at ${locationName}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setQuantityPicker({
+        open: true,
+        stockItem: item,
+        locationId,
+        locationName,
+        availableQty,
       });
-      return;
-    }
+      setPickerQuantity("");
 
-    setQuantityPicker({
-      open: true,
-      stockItem: item,
-      locationId,
-      locationName,
-      availableQty,
-    });
-    setPickerQuantity("");
-    
-    setTimeout(() => {
-      quantityInputRef.current?.focus();
-    }, 100);
-  }, [toast]);
+      setTimeout(() => {
+        quantityInputRef.current?.focus();
+      }, 100);
+    },
+    [toast]
+  );
 
-  const handleMatrixKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (quantityPicker.open) return;
-    if (flatItems.length === 0 || selectedLocations.length === 0) return;
+  const handleMatrixKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (quantityPicker.open) return;
+      if (flatItems.length === 0 || selectedLocations.length === 0) return;
 
-    const { key } = e;
-    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'Enter'].includes(key)) return;
+      const { key } = e;
+      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Enter"].includes(key)) return;
 
-    e.preventDefault();
+      e.preventDefault();
 
-    if (key === 'Enter' && focusedCell !== null) {
-      const item = flatItems[focusedCell.row];
-      const loc = selectedLocations[focusedCell.col];
-      if (item && loc) {
-        setHistoryItem(item);
-        setHistoryLocation(loc);
-        setHistoryPeriod(getDefaultPeriodValue("this_year"));
-        setHistoryDialogOpen(true);
-      }
-      return;
-    }
-
-    setFocusedCell((current) => {
-      const maxRow = flatItems.length - 1;
-      const maxCol = selectedLocations.length - 1;
-
-      if (current === null) {
-        return { row: 0, col: 0 };
+      if (key === "Enter" && focusedCell !== null) {
+        const item = flatItems[focusedCell.row];
+        const loc = selectedLocations[focusedCell.col];
+        if (item && loc) {
+          setHistoryItem(item);
+          setHistoryLocation(loc);
+          setHistoryPeriod(getDefaultPeriodValue("this_year"));
+          setHistoryDialogOpen(true);
+        }
+        return;
       }
 
-      let { row, col } = current;
+      setFocusedCell((current) => {
+        const maxRow = flatItems.length - 1;
+        const maxCol = selectedLocations.length - 1;
 
-      switch (key) {
-        case 'ArrowUp':
-          row = Math.max(0, row - 1);
-          break;
-        case 'ArrowDown':
-          row = Math.min(maxRow, row + 1);
-          break;
-        case 'ArrowLeft':
-          col = Math.max(0, col - 1);
-          break;
-        case 'ArrowRight':
-          col = Math.min(maxCol, col + 1);
-          break;
-        case ' ':
-          const item = flatItems[row];
-          const loc = selectedLocations[col];
-          if (item && loc) {
-            const locData = item.locationData[loc.id];
-            const qty = locData?.quantity || 0;
-            if (qty > 0) {
-              openQuantityPicker(item, loc.id, loc.name, qty);
+        if (current === null) {
+          return { row: 0, col: 0 };
+        }
+
+        let { row, col } = current;
+
+        switch (key) {
+          case "ArrowUp":
+            row = Math.max(0, row - 1);
+            break;
+          case "ArrowDown":
+            row = Math.min(maxRow, row + 1);
+            break;
+          case "ArrowLeft":
+            col = Math.max(0, col - 1);
+            break;
+          case "ArrowRight":
+            col = Math.min(maxCol, col + 1);
+            break;
+          case " ":
+            const item = flatItems[row];
+            const loc = selectedLocations[col];
+            if (item && loc) {
+              const locData = item.locationData[loc.id];
+              const qty = locData?.quantity || 0;
+              if (qty > 0) {
+                openQuantityPicker(item, loc.id, loc.name, qty);
+              }
             }
-          }
-          return current;
-      }
+            return current;
+        }
 
-      return { row, col };
-    });
-  }, [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker, focusedCell, navigate]);
+        return { row, col };
+      });
+    },
+    [flatItems, selectedLocations, quantityPicker.open, openQuantityPicker, focusedCell, navigate]
+  );
 
   const handleCellClick = async (
     item: StockItemData,
@@ -594,7 +602,7 @@ export default function StockTransferOrder() {
 
   const handleAddToOrder = async () => {
     const qty = parseFloat(pickerQuantity);
-    
+
     if (isNaN(qty) || qty === 0) {
       toast({
         title: "Invalid Quantity",
@@ -605,11 +613,11 @@ export default function StockTransferOrder() {
     }
 
     const { stockItem, locationId, locationName, availableQty } = quantityPicker;
-    
+
     if (!stockItem) return;
 
     const existingIdx = orderItems.findIndex(
-      item => item.stockItemId === stockItem.id && item.sourceLocationId === locationId
+      (item) => item.stockItemId === stockItem.id && item.sourceLocationId === locationId
     );
 
     const currentAllocated = existingIdx >= 0 ? orderItems[existingIdx].quantity : 0;
@@ -760,7 +768,7 @@ export default function StockTransferOrder() {
 
   const validateOrder = (): string[] => {
     const errors: string[] = [];
-    
+
     if (!destinationLocationId) {
       errors.push("Please select a destination location");
     }
@@ -771,7 +779,9 @@ export default function StockTransferOrder() {
 
     for (const item of orderItems) {
       if (item.quantity > item.availableQty) {
-        errors.push(`${item.stockItemName} from ${item.sourceLocationName}: Requested ${formatNumber(item.quantity, 0)} but only ${formatNumber(item.availableQty, 0)} available`);
+        errors.push(
+          `${item.stockItemName} from ${item.sourceLocationName}: Requested ${formatNumber(item.quantity, 0)} but only ${formatNumber(item.availableQty, 0)} available`
+        );
       }
       if (item.sourceLocationId === destinationLocationId) {
         errors.push(`${item.stockItemName}: Source and destination cannot be the same location`);
@@ -784,7 +794,7 @@ export default function StockTransferOrder() {
   const handleValidate = async () => {
     const errors = validateOrder();
     setValidationErrors(errors);
-    
+
     if (errors.length === 0) {
       toast({
         title: "Validation Passed",
@@ -809,7 +819,7 @@ export default function StockTransferOrder() {
       return;
     }
 
-    const destLocation = locations.find(l => l.id === destinationLocationId);
+    const destLocation = locations.find((l) => l.id === destinationLocationId);
     const exportDate = format(transferDate, "M/d/yy");
     const companyName = selectedCompany?.name || "ETS";
     const destName = destLocation?.name || "";
@@ -832,36 +842,31 @@ export default function StockTransferOrder() {
 
     // ── Print / page setup ───────────────────────────────────────────────────
     ws.pageSetup = {
-      paperSize: 9,            // A4
+      paperSize: 9, // A4
       orientation: "portrait",
       fitToPage: true,
       fitToWidth: 1,
-      fitToHeight: 0,          // grow vertically as needed
+      fitToHeight: 0, // grow vertically as needed
       horizontalCentered: true,
       margins: { left: 0.4, right: 0.4, top: 0.4, bottom: 0.4, header: 0.2, footer: 0.2 },
     } as ExcelJS.PageSetup;
 
     // Column widths sized for A4 portrait
-    ws.columns = [
-      { width: 46 },
-      { width: 20 },
-      { width: 14 },
-      ...(includeCost ? [{ width: 14 }, { width: 16 }] : []),
-    ];
+    ws.columns = [{ width: 46 }, { width: 20 }, { width: 14 }, ...(includeCost ? [{ width: 14 }, { width: 16 }] : [])];
 
     // Color palette
-    const OLIVE_BG   = "FF6B7A2C";
+    const OLIVE_BG = "FF6B7A2C";
     const COL_HDR_BG = "FFD4E89E";
-    const SUB_BG     = "FFC6EFCE";
-    const WHITE      = "FFFFFFFF";
-    const BLACK      = "FF000000";
-    const RED        = "FFCC0000";
+    const SUB_BG = "FFC6EFCE";
+    const WHITE = "FFFFFFFF";
+    const BLACK = "FF000000";
+    const RED = "FFCC0000";
 
     const thinBorder: Partial<ExcelJS.Borders> = {
-      top:    { style: "thin", color: { argb: "FFB0B0B0" } },
-      left:   { style: "thin", color: { argb: "FFB0B0B0" } },
+      top: { style: "thin", color: { argb: "FFB0B0B0" } },
+      left: { style: "thin", color: { argb: "FFB0B0B0" } },
       bottom: { style: "thin", color: { argb: "FFB0B0B0" } },
-      right:  { style: "thin", color: { argb: "FFB0B0B0" } },
+      right: { style: "thin", color: { argb: "FFB0B0B0" } },
     };
 
     const applyBorder = (row: ExcelJS.Row, cols: number) => {
@@ -882,7 +887,7 @@ export default function StockTransferOrder() {
     // ── Row 2: TRUCK TRIP | DESTINATION: | destName ─────────────────────────
     const row2 = ws.addRow(["TRUCK TRIP", "DESTINATION:", destName, ...(includeCost ? ["", ""] : [])]);
     row2.height = 26;
-    if (numCols > 3) ws.mergeCells(`A2:A3`);   // TRUCK TRIP spans rows 2+3
+    if (numCols > 3) ws.mergeCells(`A2:A3`); // TRUCK TRIP spans rows 2+3
     const r2c1 = row2.getCell(1);
     r2c1.font = { bold: true, size: 16 };
     r2c1.alignment = { horizontal: "center", vertical: "middle" };
@@ -923,12 +928,7 @@ export default function StockTransferOrder() {
     if (numCols === 3) ws.mergeCells("A2:A3");
 
     // ── Row 4: Column headers ────────────────────────────────────────────────
-    const colHeaders = [
-      "ITEM  NAME",
-      "LOCATION",
-      "Quantity",
-      ...(includeCost ? ["Rate", "Amount"] : []),
-    ];
+    const colHeaders = ["ITEM  NAME", "LOCATION", "Quantity", ...(includeCost ? ["Rate", "Amount"] : [])];
     const row4 = ws.addRow(colHeaders);
     row4.height = 22;
     for (let c = 1; c <= numCols; c++) {
@@ -996,12 +996,7 @@ export default function StockTransferOrder() {
     // ── Grand total row ──────────────────────────────────────────────────────
     const grandQty = orderItems.reduce((s, i) => s + i.quantity, 0);
     const grandAmt = orderItems.reduce((s, i) => s + i.quantity * i.rate, 0);
-    const grandVals: (string | number)[] = [
-      "TOTAL",
-      "",
-      grandQty,
-      ...(includeCost ? ["", grandAmt] : []),
-    ];
+    const grandVals: (string | number)[] = ["TOTAL", "", grandQty, ...(includeCost ? ["", grandAmt] : [])];
     const grandRow = ws.addRow(grandVals);
     grandRow.height = 26;
     ws.mergeCells(`A${grandRow.number}:B${grandRow.number}`);
@@ -1027,7 +1022,12 @@ export default function StockTransferOrder() {
   };
 
   const processOrderMutation = useMutation({
-    mutationFn: async (data: { orderItems: OrderItem[]; destinationLocationId: number; voucherDate: string; optional: boolean }) => {
+    mutationFn: async (data: {
+      orderItems: OrderItem[];
+      destinationLocationId: number;
+      voucherDate: string;
+      optional: boolean;
+    }) => {
       if (editVoucherId && existingTransfer?.id) {
         await apiRequest("PATCH", `/api/vouchers/${editVoucherId}`, {
           voucherDate: data.voucherDate,
@@ -1036,7 +1036,7 @@ export default function StockTransferOrder() {
         const response = await apiRequest("PUT", `/api/stock-transfers/${existingTransfer.id}`, {
           destinationLocationId: data.destinationLocationId,
           notes: `Stock Transfer Order - ${data.orderItems.length} items`,
-          items: data.orderItems.map(item => ({
+          items: data.orderItems.map((item) => ({
             stockItemId: item.stockItemId,
             sourceLocationId: item.sourceLocationId,
             quantity: item.quantity,
@@ -1050,7 +1050,7 @@ export default function StockTransferOrder() {
           notes: `Stock Transfer Order - ${data.orderItems.length} items`,
           voucherDate: data.voucherDate,
           optional: data.optional,
-          items: data.orderItems.map(item => ({
+          items: data.orderItems.map((item) => ({
             stockItemId: item.stockItemId,
             sourceLocationId: item.sourceLocationId,
             quantity: item.quantity.toString(),
@@ -1064,7 +1064,9 @@ export default function StockTransferOrder() {
       setAutosaveStatus("idle");
       toast({
         title: editVoucherId ? "Order Updated" : "Order Processed",
-        description: editVoucherId ? "Successfully updated stock transfer voucher" : "Successfully created stock transfer voucher",
+        description: editVoucherId
+          ? "Successfully updated stock transfer voucher"
+          : "Successfully created stock transfer voucher",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", editVoucherId] });
@@ -1087,7 +1089,10 @@ export default function StockTransferOrder() {
   const computeRevisionItems = () => {
     if (!existingTransfer?.items) return [];
     type RevKey = string;
-    const originalMap = new Map<RevKey, { qty: number; name: string; srcName: string; stockItemId: number; sourceLocationId: number | null }>();
+    const originalMap = new Map<
+      RevKey,
+      { qty: number; name: string; srcName: string; stockItemId: number; sourceLocationId: number | null }
+    >();
     for (const item of existingTransfer.items) {
       const key: RevKey = `${item.stockItemId}-${item.sourceLocationId ?? "null"}`;
       const si = stockItems.find((s) => s.id === item.stockItemId);
@@ -1107,9 +1112,13 @@ export default function StockTransferOrder() {
     }
     const allKeys = new Set([...originalMap.keys(), ...currentMap.keys()]);
     const result: Array<{
-      stockItemId: number; stockItemName: string;
-      sourceLocationId: number | null; sourceLocationName: string;
-      originalQuantity: number; delta: number; newQuantity: number;
+      stockItemId: number;
+      stockItemName: string;
+      sourceLocationId: number | null;
+      sourceLocationName: string;
+      originalQuantity: number;
+      delta: number;
+      newQuantity: number;
     }> = [];
     for (const key of allKeys) {
       const orig = originalMap.get(key);
@@ -1151,42 +1160,65 @@ export default function StockTransferOrder() {
     try {
       const wb = await readFile(file);
       const ws = wb.getWorksheet(1);
-      if (!ws) { toast({ title: "Error", description: "Could not read worksheet", variant: "destructive" }); return; }
-      const rows = utils.sheet_to_json<{ Code?: any; Name?: any; "Qty Change"?: any; "Item Name"?: any; Change?: any; Qty?: any }>(ws);
+      if (!ws) {
+        toast({ title: "Error", description: "Could not read worksheet", variant: "destructive" });
+        return;
+      }
+      const rows = utils.sheet_to_json<{
+        Code?: any;
+        Name?: any;
+        "Qty Change"?: any;
+        "Item Name"?: any;
+        Change?: any;
+        Qty?: any;
+      }>(ws);
 
       const preview: ImportPreviewRow[] = rows
-        .filter(row => row.Code !== undefined || row.Name !== undefined || row["Item Name"] !== undefined)
-        .map(row => {
+        .filter((row) => row.Code !== undefined || row.Name !== undefined || row["Item Name"] !== undefined)
+        .map((row) => {
           const code = String(row.Code ?? "").trim();
           const name = String(row.Name ?? row["Item Name"] ?? "").trim();
           const change = parseFloat(String(row["Qty Change"] ?? row.Change ?? row.Qty ?? "0")) || 0;
 
-          let matched = code ? stockItems.find(s => s.code?.toLowerCase() === code.toLowerCase()) : undefined;
-          if (!matched && name) matched = stockItems.find(s => s.name.toLowerCase() === name.toLowerCase());
+          let matched = code ? stockItems.find((s) => s.code?.toLowerCase() === code.toLowerCase()) : undefined;
+          if (!matched && name) matched = stockItems.find((s) => s.name.toLowerCase() === name.toLowerCase());
 
           if (!matched) {
-            return { rawCode: code, rawName: name, stockItemId: null, stockItemName: name || code || "Unknown", currentQty: 0, change, newQty: Math.max(0, change), sourceLocationId: null, sourceLocationName: "", status: "not_found" as const };
+            return {
+              rawCode: code,
+              rawName: name,
+              stockItemId: null,
+              stockItemName: name || code || "Unknown",
+              currentQty: 0,
+              change,
+              newQty: Math.max(0, change),
+              sourceLocationId: null,
+              sourceLocationName: "",
+              status: "not_found" as const,
+            };
           }
 
-          const currentQty = orderItems.filter(i => i.stockItemId === matched!.id).reduce((s, i) => s + i.quantity, 0);
+          const currentQty = orderItems
+            .filter((i) => i.stockItemId === matched!.id)
+            .reduce((s, i) => s + i.quantity, 0);
           const newQty = currentQty + change;
 
           let srcLocId: number | null = null;
           let srcLocName = "";
-          const existingOrderItem = orderItems.find(i => i.stockItemId === matched!.id);
+          const existingOrderItem = orderItems.find((i) => i.stockItemId === matched!.id);
           if (existingOrderItem) {
             srcLocId = existingOrderItem.sourceLocationId;
             srcLocName = existingOrderItem.sourceLocationName;
           } else if (summaryData) {
             let bestQty = 0;
             for (const group of summaryData.stockGroups) {
-              const si = group.items.find(i => i.id === matched!.id);
+              const si = group.items.find((i) => i.id === matched!.id);
               if (si) {
                 for (const [locIdStr, locData] of Object.entries(si.locationData)) {
                   if (locData.quantity > bestQty) {
                     bestQty = locData.quantity;
                     srcLocId = parseInt(locIdStr);
-                    srcLocName = locations.find(l => l.id === srcLocId)?.name || "";
+                    srcLocName = locations.find((l) => l.id === srcLocId)?.name || "";
                   }
                 }
               }
@@ -1194,7 +1226,18 @@ export default function StockTransferOrder() {
           }
 
           const status: ImportPreviewRow["status"] = newQty <= 0 ? "remove" : currentQty === 0 ? "new_item" : "ok";
-          return { rawCode: code, rawName: name, stockItemId: matched.id, stockItemName: matched.name, currentQty, change, newQty: Math.max(0, newQty), sourceLocationId: srcLocId, sourceLocationName: srcLocName, status };
+          return {
+            rawCode: code,
+            rawName: name,
+            stockItemId: matched.id,
+            stockItemName: matched.name,
+            currentQty,
+            change,
+            newQty: Math.max(0, newQty),
+            sourceLocationId: srcLocId,
+            sourceLocationName: srcLocName,
+            status,
+          };
         });
 
       setImportPreview(preview);
@@ -1209,27 +1252,41 @@ export default function StockTransferOrder() {
     const updated = [...orderItems];
     for (const row of importPreview) {
       if (row.status === "not_found") continue;
-      const idx = updated.findIndex(i => i.stockItemId === row.stockItemId);
+      const idx = updated.findIndex((i) => i.stockItemId === row.stockItemId);
       if (idx >= 0) {
         const newQty = updated[idx].quantity + row.change;
         if (newQty <= 0) updated.splice(idx, 1);
         else updated[idx] = { ...updated[idx], quantity: newQty };
       } else if (row.stockItemId && row.newQty > 0 && row.sourceLocationId) {
-        const si = stockItems.find(s => s.id === row.stockItemId)!;
+        const si = stockItems.find((s) => s.id === row.stockItemId)!;
         let availableQty = 0;
         if (summaryData) {
           for (const group of summaryData.stockGroups) {
-            const sitem = group.items.find(i => i.id === row.stockItemId);
-            if (sitem && sitem.locationData[row.sourceLocationId!]) availableQty = sitem.locationData[row.sourceLocationId!].quantity;
+            const sitem = group.items.find((i) => i.id === row.stockItemId);
+            if (sitem && sitem.locationData[row.sourceLocationId!])
+              availableQty = sitem.locationData[row.sourceLocationId!].quantity;
           }
         }
-        updated.push({ stockItemId: row.stockItemId, stockItemName: row.stockItemName, stockItemCode: si?.code || "", uom: si?.uom || "", sourceLocationId: row.sourceLocationId, sourceLocationName: row.sourceLocationName, quantity: row.newQty, availableQty, rate: 0 });
+        updated.push({
+          stockItemId: row.stockItemId,
+          stockItemName: row.stockItemName,
+          stockItemCode: si?.code || "",
+          uom: si?.uom || "",
+          sourceLocationId: row.sourceLocationId,
+          sourceLocationName: row.sourceLocationName,
+          quantity: row.newQty,
+          availableQty,
+          rate: 0,
+        });
       }
     }
     setOrderItems(updated);
     setImportDialogOpen(false);
     setImportPreview([]);
-    toast({ title: "Import Applied", description: `${importPreview.filter(r => r.status !== "not_found").length} items updated` });
+    toast({
+      title: "Import Applied",
+      description: `${importPreview.filter((r) => r.status !== "not_found").length} items updated`,
+    });
   };
 
   const exportPreviewExcel = async () => {
@@ -1237,7 +1294,7 @@ export default function StockTransferOrder() {
     const ws = wb.addWorksheet("Transfer Order");
     ws.addRow(["Item Name", "Qty"]);
     ws.getRow(1).font = { bold: true };
-    for (const row of importPreview.filter(r => r.newQty > 0 && r.status !== "not_found")) {
+    for (const row of importPreview.filter((r) => r.newQty > 0 && r.status !== "not_found")) {
       ws.addRow([row.stockItemName, row.newQty]);
     }
     ws.getColumn(1).width = 36;
@@ -1253,8 +1310,17 @@ export default function StockTransferOrder() {
     doc.text("Transfer Order Preview", 14, 18);
     doc.setFontSize(10);
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 25);
-    const rows = importPreview.filter(r => r.newQty > 0 && r.status !== "not_found").map((r, i) => [i + 1, r.stockItemName, r.newQty]);
-    autoTable(doc, { startY: 30, head: [["#", "Item Name", "Qty"]], body: rows, styles: { fontSize: 9 }, headStyles: { fillColor: [30, 30, 30] }, columnStyles: { 0: { cellWidth: 12 }, 2: { cellWidth: 20, halign: "right" } } });
+    const rows = importPreview
+      .filter((r) => r.newQty > 0 && r.status !== "not_found")
+      .map((r, i) => [i + 1, r.stockItemName, r.newQty]);
+    autoTable(doc, {
+      startY: 30,
+      head: [["#", "Item Name", "Qty"]],
+      body: rows,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [30, 30, 30] },
+      columnStyles: { 0: { cellWidth: 12 }, 2: { cellWidth: 20, halign: "right" } },
+    });
     doc.save("transfer_order_preview.pdf");
   };
 
@@ -1271,7 +1337,11 @@ export default function StockTransferOrder() {
   const confirmSaveAsRevision = async () => {
     const revisionItems = computeRevisionItems();
     if (revisionItems.length === 0) {
-      toast({ title: "No Changes", description: "No differences found compared to the saved order", variant: "destructive" });
+      toast({
+        title: "No Changes",
+        description: "No differences found compared to the saved order",
+        variant: "destructive",
+      });
       setRevisionDialogOpen(false);
       return;
     }
@@ -1285,7 +1355,11 @@ export default function StockTransferOrder() {
       });
       const nonZeroItems = orderItems.filter((item) => item.quantity > 0);
       if (nonZeroItems.length === 0) {
-        toast({ title: "Cannot Save", description: "All items have been removed — cannot save an empty transfer as a revision", variant: "destructive" });
+        toast({
+          title: "Cannot Save",
+          description: "All items have been removed — cannot save an empty transfer as a revision",
+          variant: "destructive",
+        });
         setRevisionDialogOpen(false);
         setIsSavingRevision(false);
         return;
@@ -1357,19 +1431,35 @@ export default function StockTransferOrder() {
   return (
     <div className="space-y-4">
       {hasDraft && !editVoucherId && (
-        <div className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 px-4 py-2 text-sm" data-testid="banner-draft-restore">
-          <span className="text-amber-800 dark:text-amber-300">You have an unsaved draft. Restore it to continue where you left off.</span>
+        <div
+          className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 px-4 py-2 text-sm"
+          data-testid="banner-draft-restore"
+        >
+          <span className="text-amber-800 dark:text-amber-300">
+            You have an unsaved draft. Restore it to continue where you left off.
+          </span>
           <div className="flex gap-2 flex-shrink-0">
-            <Button size="sm" variant="outline" onClick={discardDraft} data-testid="button-discard-draft">Discard</Button>
-            <Button size="sm" onClick={restoreDraft} data-testid="button-restore-draft">Restore Draft</Button>
+            <Button size="sm" variant="outline" onClick={discardDraft} data-testid="button-discard-draft">
+              Discard
+            </Button>
+            <Button size="sm" onClick={restoreDraft} data-testid="button-restore-draft">
+              Restore Draft
+            </Button>
           </div>
         </div>
       )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <PageHeader title={editVoucherId ? "Edit Stock Transfer Order" : "Stock Transfer Order"} subtitle={editVoucherId ? "Edit and update this stock transfer using the order view" : "Build orders by selecting items from multiple source locations"} />
+          <PageHeader
+            title={editVoucherId ? "Edit Stock Transfer Order" : "Stock Transfer Order"}
+            subtitle={
+              editVoucherId
+                ? "Edit and update this stock transfer using the order view"
+                : "Build orders by selecting items from multiple source locations"
+            }
+          />
         </div>
-        
+
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
             <Label className="text-sm whitespace-nowrap">Destination:</Label>
@@ -1382,8 +1472,8 @@ export default function StockTransferOrder() {
               </SelectTrigger>
               <SelectContent>
                 {availableDestinations.map((loc) => (
-                  <SelectItem 
-                    key={loc.id} 
+                  <SelectItem
+                    key={loc.id}
                     value={loc.id.toString()}
                     data-testid={`select-destination-option-${loc.id}`}
                   >
@@ -1393,13 +1483,9 @@ export default function StockTransferOrder() {
               </SelectContent>
             </Select>
           </div>
-          
+
           <Dialog open={locationDialogOpen} onOpenChange={setLocationDialogOpen}>
-            <Button 
-              variant="outline" 
-              onClick={() => setLocationDialogOpen(true)}
-              data-testid="button-select-sources"
-            >
+            <Button variant="outline" onClick={() => setLocationDialogOpen(true)} data-testid="button-select-sources">
               <Settings2 className="h-4 w-4 mr-2" />
               Source Locations ({selectedLocations.length})
             </Button>
@@ -1431,7 +1517,7 @@ export default function StockTransferOrder() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          
+
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -1455,7 +1541,7 @@ export default function StockTransferOrder() {
               />
             </PopoverContent>
           </Popover>
-          
+
           <div className="flex items-center gap-2">
             <Switch
               id="optional-mode"
@@ -1482,12 +1568,7 @@ export default function StockTransferOrder() {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={orderItems.length === 0}
-                data-testid="button-export-order"
-              >
+              <Button variant="outline" size="sm" disabled={orderItems.length === 0} data-testid="button-export-order">
                 <FileDown className="h-4 w-4 mr-1" />
                 Export
                 <ChevronDown className="h-4 w-4 ml-1" />
@@ -1531,7 +1612,9 @@ export default function StockTransferOrder() {
                 <MapPin className="h-5 w-5" />
                 <CardTitle className="text-base">Inventory Matrix</CardTitle>
               </div>
-              <p className="text-xs text-muted-foreground">Click to focus, then use arrow keys + spacebar to add / Enter to view history</p>
+              <p className="text-xs text-muted-foreground">
+                Click to focus, then use arrow keys + spacebar to add / Enter to view history
+              </p>
             </div>
           </CardHeader>
           <CardContent>
@@ -1539,11 +1622,7 @@ export default function StockTransferOrder() {
               <div className="text-center py-12 text-muted-foreground">
                 <MapPin className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>Select source locations to view inventory</p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => setLocationDialogOpen(true)}
-                >
+                <Button variant="outline" className="mt-4" onClick={() => setLocationDialogOpen(true)}>
                   Select Locations
                 </Button>
               </div>
@@ -1554,7 +1633,7 @@ export default function StockTransferOrder() {
                 ))}
               </div>
             ) : (
-              <div 
+              <div
                 ref={matrixRef}
                 tabIndex={0}
                 onKeyDown={handleMatrixKeyDown}
@@ -1612,42 +1691,51 @@ export default function StockTransferOrder() {
                           [...group.items]
                             .sort((a, b) => a.name.localeCompare(b.name))
                             .map((item) => {
-                              const flatRowIndex = flatItems.findIndex(fi => fi.id === item.id);
+                              const flatRowIndex = flatItems.findIndex((fi) => fi.id === item.id);
                               return (
-                              <tr key={item.id} data-testid={`item-row-${item.id}`} className="border-b transition-colors hover:bg-muted/50 bg-background">
-                                <td className="p-4 align-middle pl-8 sticky left-0 bg-background z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
-                                  <p className="text-sm">{item.name}</p>
-                                </td>
-                                {selectedLocations.map((loc, colIndex) => {
-                                  const locData = item.locationData[loc.id];
-                                  const qty = locData?.quantity || 0;
-                                  const hasStock = qty > 0;
-                                  const isFocused = focusedCell?.row === flatRowIndex && focusedCell?.col === colIndex;
-                                  
-                                  return (
-                                    <td key={loc.id} className="p-1 align-middle" data-focused={isFocused ? "true" : undefined}>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className={cn(
-                                          "w-full font-mono",
-                                          hasStock && "hover:bg-primary/10 cursor-pointer",
-                                          isFocused && "ring-2 ring-primary ring-offset-1"
-                                        )}
-                                        disabled={!hasStock}
-                                        onClick={() => {
-                                          setFocusedCell({ row: flatRowIndex, col: colIndex });
-                                          handleCellClick(item, loc.id, loc.name, qty);
-                                        }}
-                                        data-testid={`cell-item-${item.id}-loc-${loc.id}`}
+                                <tr
+                                  key={item.id}
+                                  data-testid={`item-row-${item.id}`}
+                                  className="border-b transition-colors hover:bg-muted/50 bg-background"
+                                >
+                                  <td className="p-4 align-middle pl-8 sticky left-0 bg-background z-20 border-r shadow-[2px_0_4px_-2px_rgba(0,0,0,0.1)]">
+                                    <p className="text-sm">{item.name}</p>
+                                  </td>
+                                  {selectedLocations.map((loc, colIndex) => {
+                                    const locData = item.locationData[loc.id];
+                                    const qty = locData?.quantity || 0;
+                                    const hasStock = qty > 0;
+                                    const isFocused =
+                                      focusedCell?.row === flatRowIndex && focusedCell?.col === colIndex;
+
+                                    return (
+                                      <td
+                                        key={loc.id}
+                                        className="p-1 align-middle"
+                                        data-focused={isFocused ? "true" : undefined}
                                       >
-                                        {hasStock ? formatNumber(qty, 0) : "-"}
-                                      </Button>
-                                    </td>
-                                  );
-                                })}
-                              </tr>
-                            );
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className={cn(
+                                            "w-full font-mono",
+                                            hasStock && "hover:bg-primary/10 cursor-pointer",
+                                            isFocused && "ring-2 ring-primary ring-offset-1"
+                                          )}
+                                          disabled={!hasStock}
+                                          onClick={() => {
+                                            setFocusedCell({ row: flatRowIndex, col: colIndex });
+                                            handleCellClick(item, loc.id, loc.name, qty);
+                                          }}
+                                          data-testid={`cell-item-${item.id}-loc-${loc.id}`}
+                                        >
+                                          {hasStock ? formatNumber(qty, 0) : "-"}
+                                        </Button>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              );
                             })}
                       </Fragment>
                     ))}
@@ -1662,11 +1750,7 @@ export default function StockTransferOrder() {
           {/* Mobile-only: Add Item Sheet */}
           <div className="lg:hidden">
             <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
-              <Button
-                className="w-full"
-                onClick={() => setMobileSheetOpen(true)}
-                data-testid="button-mobile-add-item"
-              >
+              <Button className="w-full" onClick={() => setMobileSheetOpen(true)} data-testid="button-mobile-add-item">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Item
               </Button>
@@ -1691,10 +1775,11 @@ export default function StockTransferOrder() {
                     <ScrollArea className="h-48 border rounded-md">
                       <div className="p-1 space-y-0.5">
                         {stockItems
-                          .filter((s) =>
-                            mobileSearchTerm.trim() === "" ||
-                            s.name.toLowerCase().includes(mobileSearchTerm.toLowerCase()) ||
-                            s.code.toLowerCase().includes(mobileSearchTerm.toLowerCase())
+                          .filter(
+                            (s) =>
+                              mobileSearchTerm.trim() === "" ||
+                              s.name.toLowerCase().includes(mobileSearchTerm.toLowerCase()) ||
+                              s.code.toLowerCase().includes(mobileSearchTerm.toLowerCase())
                           )
                           .map((s) => (
                             <button
@@ -1702,9 +1787,7 @@ export default function StockTransferOrder() {
                               type="button"
                               className={cn(
                                 "w-full text-left px-3 py-2 rounded-md text-sm transition-colors",
-                                mobileSelectedItemId === s.id
-                                  ? "bg-primary text-primary-foreground"
-                                  : "hover:bg-muted"
+                                mobileSelectedItemId === s.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
                               )}
                               onClick={() => setMobileSelectedItemId(s.id)}
                               data-testid={`mobile-item-option-${s.id}`}
@@ -1734,7 +1817,11 @@ export default function StockTransferOrder() {
                         </SelectTrigger>
                         <SelectContent>
                           {selectedLocations.map((loc) => (
-                            <SelectItem key={loc.id} value={loc.id.toString()} data-testid={`mobile-source-option-${loc.id}`}>
+                            <SelectItem
+                              key={loc.id}
+                              value={loc.id.toString()}
+                              data-testid={`mobile-source-option-${loc.id}`}
+                            >
                               {loc.name}
                             </SelectItem>
                           ))}
@@ -1759,11 +1846,7 @@ export default function StockTransferOrder() {
                   </div>
                 </div>
                 <SheetFooter className="border-t pt-3 shrink-0">
-                  <Button
-                    className="w-full"
-                    onClick={handleMobileAddItem}
-                    data-testid="button-mobile-confirm-add"
-                  >
+                  <Button className="w-full" onClick={handleMobileAddItem} data-testid="button-mobile-confirm-add">
                     <Plus className="h-4 w-4 mr-2" />
                     Add to Order
                   </Button>
@@ -1778,14 +1861,12 @@ export default function StockTransferOrder() {
                 <div className="flex items-center gap-2 text-sm">
                   <ArrowRight className="h-4 w-4 text-primary" />
                   <span className="text-muted-foreground">Sending to:</span>
-                  <span className="font-medium">
-                    {locations.find(l => l.id === destinationLocationId)?.name}
-                  </span>
+                  <span className="font-medium">{locations.find((l) => l.id === destinationLocationId)?.name}</span>
                 </div>
               </CardContent>
             </Card>
           )}
-          
+
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between gap-2">
@@ -1798,7 +1879,10 @@ export default function StockTransferOrder() {
                   <Button
                     size="icon"
                     variant="outline"
-                    onClick={() => { setImportPreview([]); setImportDialogOpen(true); }}
+                    onClick={() => {
+                      setImportPreview([]);
+                      setImportDialogOpen(true);
+                    }}
                     data-testid="button-open-import"
                     title="Import from Excel"
                   >
@@ -1811,7 +1895,9 @@ export default function StockTransferOrder() {
               {orderItems.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm hidden lg:block">Click on quantities or use arrow keys + spacebar to add items</p>
+                  <p className="text-sm hidden lg:block">
+                    Click on quantities or use arrow keys + spacebar to add items
+                  </p>
                   <p className="text-sm lg:hidden">Tap "Add Item" above to add items to the order</p>
                 </div>
               ) : (
@@ -1842,16 +1928,23 @@ export default function StockTransferOrder() {
                       ))}
                     </div>
                   </ScrollArea>
-                  
+
                   <div className="pt-2 border-t space-y-3">
                     <div className="flex justify-between text-sm font-medium">
                       <span>Total Bales:</span>
                       <span className="font-mono text-lg">{formatNumber(totalBales, 0)}</span>
                     </div>
-                    
+
                     {!editVoucherId && autosaveStatus !== "idle" && (
-                      <p className={`text-xs text-center ${autosaveStatus === "saved" ? "text-green-600 dark:text-green-400" : autosaveStatus === "failed" ? "text-destructive" : "text-muted-foreground"}`} data-testid="text-autosave-status">
-                        {autosaveStatus === "saving" ? "Saving draft..." : autosaveStatus === "saved" ? "Draft saved" : "Draft save failed"}
+                      <p
+                        className={`text-xs text-center ${autosaveStatus === "saved" ? "text-green-600 dark:text-green-400" : autosaveStatus === "failed" ? "text-destructive" : "text-muted-foreground"}`}
+                        data-testid="text-autosave-status"
+                      >
+                        {autosaveStatus === "saving"
+                          ? "Saving draft..."
+                          : autosaveStatus === "saved"
+                            ? "Draft saved"
+                            : "Draft save failed"}
                       </p>
                     )}
                     <div className="flex gap-2">
@@ -1872,7 +1965,13 @@ export default function StockTransferOrder() {
                         className="flex-1"
                         data-testid="button-process-order"
                       >
-                        {isProcessing ? (editVoucherId ? "Updating..." : "Processing...") : (editVoucherId ? "Update Order" : "Process")}
+                        {isProcessing
+                          ? editVoucherId
+                            ? "Updating..."
+                            : "Processing..."
+                          : editVoucherId
+                            ? "Update Order"
+                            : "Process"}
                       </Button>
                     </div>
                     {editVoucherId && existingTransfer?.id && (
@@ -1899,34 +1998,41 @@ export default function StockTransferOrder() {
       {/* ── Revision History Panel (edit mode only) ── */}
       {editVoucherId && existingTransfer?.id && (
         <Card>
-          <CardHeader
-            className="p-4 sm:p-5 cursor-pointer select-none"
-            onClick={() => setRevisionsExpanded((v) => !v)}
-          >
+          <CardHeader className="p-4 sm:p-5 cursor-pointer select-none" onClick={() => setRevisionsExpanded((v) => !v)}>
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <GitBranch className="h-4 w-4 text-muted-foreground" />
                 <CardTitle className="text-base">Revision History</CardTitle>
                 {revisions.length > 0 && (
-                  <Badge variant="secondary" className="ml-1">{revisions.length}</Badge>
+                  <Badge variant="secondary" className="ml-1">
+                    {revisions.length}
+                  </Badge>
                 )}
               </div>
-              {revisionsExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+              {revisionsExpanded ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              )}
             </div>
           </CardHeader>
           {revisionsExpanded && (
             <CardContent className="pt-0 space-y-4">
               {revisions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">No revisions yet. Use "Save as Revision" to record tracked changes.</p>
+                <p className="text-sm text-muted-foreground text-center py-6">
+                  No revisions yet. Use "Save as Revision" to record tracked changes.
+                </p>
               ) : (
                 revisions.map((rev: any) => (
                   <div key={rev.id} className="border rounded-md overflow-hidden">
                     <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 flex-wrap">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Badge variant={rev.optional ? "secondary" : "default"}>
-                          Rev {rev.revisionNumber}
-                        </Badge>
-                        {rev.optional && <Badge variant="outline" className="text-xs">Reference Only</Badge>}
+                        <Badge variant={rev.optional ? "secondary" : "default"}>Rev {rev.revisionNumber}</Badge>
+                        {rev.optional && (
+                          <Badge variant="outline" className="text-xs">
+                            Reference Only
+                          </Badge>
+                        )}
                         <span className="text-xs text-muted-foreground">
                           {rev.revisionDate ? new Date(rev.revisionDate).toLocaleDateString() : ""}
                         </span>
@@ -1938,8 +2044,12 @@ export default function StockTransferOrder() {
                           <Switch
                             checked={rev.optional}
                             onCheckedChange={async (checked) => {
-                              await apiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, { optional: checked });
-                              queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"] });
+                              await apiRequest("PATCH", `/api/stock-transfer-revisions/${rev.id}/optional`, {
+                                optional: checked,
+                              });
+                              queryClient.invalidateQueries({
+                                queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"],
+                              });
                             }}
                             data-testid={`switch-revision-optional-${rev.id}`}
                           />
@@ -1951,7 +2061,9 @@ export default function StockTransferOrder() {
                           onClick={async () => {
                             if (!window.confirm(`Delete Rev ${rev.revisionNumber}? This cannot be undone.`)) return;
                             await apiRequest("DELETE", `/api/stock-transfer-revisions/${rev.id}`);
-                            queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"] });
+                            queryClient.invalidateQueries({
+                              queryKey: ["/api/stock-transfers", existingTransfer.id, "revisions"],
+                            });
                           }}
                           data-testid={`button-delete-revision-${rev.id}`}
                         >
@@ -1977,12 +2089,21 @@ export default function StockTransferOrder() {
                               return (
                                 <tr key={idx} className="border-t">
                                   <td className="p-2 font-medium">{item.stockItemName}</td>
-                                  <td className="p-2 text-muted-foreground hidden sm:table-cell">{item.sourceLocationName || "—"}</td>
-                                  <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(parseFloat(item.originalQuantity), 0)}</td>
-                                  <td className={`p-2 text-right font-mono font-semibold ${delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
-                                    {delta > 0 ? "+" : ""}{formatNumber(delta, 0)}
+                                  <td className="p-2 text-muted-foreground hidden sm:table-cell">
+                                    {item.sourceLocationName || "—"}
                                   </td>
-                                  <td className="p-2 text-right font-mono font-semibold">{formatNumber(parseFloat(item.newQuantity), 0)}</td>
+                                  <td className="p-2 text-right font-mono text-muted-foreground">
+                                    {formatNumber(parseFloat(item.originalQuantity), 0)}
+                                  </td>
+                                  <td
+                                    className={`p-2 text-right font-mono font-semibold ${delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
+                                  >
+                                    {delta > 0 ? "+" : ""}
+                                    {formatNumber(delta, 0)}
+                                  </td>
+                                  <td className="p-2 text-right font-mono font-semibold">
+                                    {formatNumber(parseFloat(item.newQuantity), 0)}
+                                  </td>
                                 </tr>
                               );
                             })}
@@ -2033,9 +2154,14 @@ export default function StockTransferOrder() {
                       {items.map((item, idx) => (
                         <tr key={idx} className="border-t">
                           <td className="p-2 font-medium truncate max-w-[120px]">{item.stockItemName}</td>
-                          <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(item.originalQuantity, 0)}</td>
-                          <td className={`p-2 text-right font-mono font-semibold ${item.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
-                            {item.delta > 0 ? "+" : ""}{formatNumber(item.delta, 0)}
+                          <td className="p-2 text-right font-mono text-muted-foreground">
+                            {formatNumber(item.originalQuantity, 0)}
+                          </td>
+                          <td
+                            className={`p-2 text-right font-mono font-semibold ${item.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
+                          >
+                            {item.delta > 0 ? "+" : ""}
+                            {formatNumber(item.delta, 0)}
                           </td>
                           <td className="p-2 text-right font-mono">{formatNumber(item.newQuantity, 0)}</td>
                         </tr>
@@ -2073,7 +2199,13 @@ export default function StockTransferOrder() {
       </Dialog>
 
       {/* ── Excel Import Dialog ── */}
-      <Dialog open={importDialogOpen} onOpenChange={(o) => { setImportDialogOpen(o); if (!o) setImportPreview([]); }}>
+      <Dialog
+        open={importDialogOpen}
+        onOpenChange={(o) => {
+          setImportDialogOpen(o);
+          if (!o) setImportPreview([]);
+        }}
+      >
         <DialogContent className="sm:max-w-[680px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -2086,11 +2218,16 @@ export default function StockTransferOrder() {
             {importPreview.length === 0 ? (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Upload an Excel file with columns: <strong>Code</strong>, <strong>Name</strong>, <strong>Qty Change</strong>.
-                  Use positive values to add and negative to reduce.
+                  Upload an Excel file with columns: <strong>Code</strong>, <strong>Name</strong>,{" "}
+                  <strong>Qty Change</strong>. Use positive values to add and negative to reduce.
                 </p>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={downloadImportTemplate} data-testid="button-download-template">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadImportTemplate}
+                    data-testid="button-download-template"
+                  >
                     <FileDown className="h-4 w-4 mr-1" />
                     Download Template
                   </Button>
@@ -2098,8 +2235,12 @@ export default function StockTransferOrder() {
                 <label
                   className="flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md p-8 cursor-pointer hover-elevate text-muted-foreground"
                   data-testid="label-import-dropzone"
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImportFile(f); }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const f = e.dataTransfer.files[0];
+                    if (f) handleImportFile(f);
+                  }}
                 >
                   <input
                     ref={importFileRef}
@@ -2107,10 +2248,16 @@ export default function StockTransferOrder() {
                     accept=".xlsx,.xls"
                     className="hidden"
                     data-testid="input-import-file"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f); e.target.value = ""; }}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleImportFile(f);
+                      e.target.value = "";
+                    }}
                   />
                   <Upload className="h-8 w-8 opacity-40" />
-                  <span className="text-sm font-medium">{importLoading ? "Parsing..." : "Click or drag & drop Excel file"}</span>
+                  <span className="text-sm font-medium">
+                    {importLoading ? "Parsing..." : "Click or drag & drop Excel file"}
+                  </span>
                   <span className="text-xs">.xlsx / .xls supported</span>
                 </label>
                 {importLoading && <p className="text-sm text-center text-muted-foreground">Reading file…</p>}
@@ -2119,20 +2266,48 @@ export default function StockTransferOrder() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <div className="flex gap-2 text-xs">
-                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">{importPreview.filter(r => r.status === 'ok' || r.status === 'new_item').length} to update</span>
-                    {importPreview.filter(r => r.status === 'remove').length > 0 && <span className="text-destructive font-medium">{importPreview.filter(r => r.status === 'remove').length} to remove</span>}
-                    {importPreview.filter(r => r.status === 'not_found').length > 0 && <span className="text-muted-foreground">{importPreview.filter(r => r.status === 'not_found').length} unmatched</span>}
+                    <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                      {importPreview.filter((r) => r.status === "ok" || r.status === "new_item").length} to update
+                    </span>
+                    {importPreview.filter((r) => r.status === "remove").length > 0 && (
+                      <span className="text-destructive font-medium">
+                        {importPreview.filter((r) => r.status === "remove").length} to remove
+                      </span>
+                    )}
+                    {importPreview.filter((r) => r.status === "not_found").length > 0 && (
+                      <span className="text-muted-foreground">
+                        {importPreview.filter((r) => r.status === "not_found").length} unmatched
+                      </span>
+                    )}
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={exportPreviewExcel} data-testid="button-export-preview-excel">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportPreviewExcel}
+                      data-testid="button-export-preview-excel"
+                    >
                       <FileDown className="h-3 w-3 mr-1" />
                       Excel
                     </Button>
-                    <Button variant="outline" size="sm" onClick={exportPreviewPDF} data-testid="button-export-preview-pdf">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportPreviewPDF}
+                      data-testid="button-export-preview-pdf"
+                    >
                       <FileDown className="h-3 w-3 mr-1" />
                       PDF
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setImportPreview([]); if (importFileRef.current) importFileRef.current.value = ""; }} data-testid="button-clear-import">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setImportPreview([]);
+                        if (importFileRef.current) importFileRef.current.value = "";
+                      }}
+                      data-testid="button-clear-import"
+                    >
                       Clear
                     </Button>
                   </div>
@@ -2152,26 +2327,54 @@ export default function StockTransferOrder() {
                       </thead>
                       <tbody>
                         {importPreview.map((row, idx) => (
-                          <tr key={idx} className={cn("border-t", row.status === 'not_found' && "opacity-50")}>
+                          <tr key={idx} className={cn("border-t", row.status === "not_found" && "opacity-50")}>
                             <td className="p-2">
                               <p className="font-medium truncate max-w-[220px]">{row.stockItemName}</p>
-                              {row.status === 'new_item' && <p className="text-xs text-emerald-600 dark:text-emerald-400">New — from {row.sourceLocationName || "?"}</p>}
-                              {row.status === 'not_found' && <p className="text-xs text-destructive">Not found — skipped</p>}
-                              {row.status === 'remove' && <p className="text-xs text-destructive">Will be removed from order</p>}
+                              {row.status === "new_item" && (
+                                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                  New — from {row.sourceLocationName || "?"}
+                                </p>
+                              )}
+                              {row.status === "not_found" && (
+                                <p className="text-xs text-destructive">Not found — skipped</p>
+                              )}
+                              {row.status === "remove" && (
+                                <p className="text-xs text-destructive">Will be removed from order</p>
+                              )}
                             </td>
-                            <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(row.currentQty, 0)}</td>
-                            <td className={cn("p-2 text-right font-mono font-semibold", row.change > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive")}>
+                            <td className="p-2 text-right font-mono text-muted-foreground">
+                              {formatNumber(row.currentQty, 0)}
+                            </td>
+                            <td
+                              className={cn(
+                                "p-2 text-right font-mono font-semibold",
+                                row.change > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+                              )}
+                            >
                               <span className="inline-flex items-center gap-0.5">
-                                {row.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                                {row.change > 0 ? "+" : ""}{formatNumber(row.change, 0)}
+                                {row.change > 0 ? (
+                                  <TrendingUp className="h-3 w-3" />
+                                ) : (
+                                  <TrendingDown className="h-3 w-3" />
+                                )}
+                                {row.change > 0 ? "+" : ""}
+                                {formatNumber(row.change, 0)}
                               </span>
                             </td>
-                            <td className="p-2 text-right font-mono font-semibold">{row.status !== 'not_found' ? formatNumber(row.newQty, 0) : "—"}</td>
+                            <td className="p-2 text-right font-mono font-semibold">
+                              {row.status !== "not_found" ? formatNumber(row.newQty, 0) : "—"}
+                            </td>
                             <td className="p-2 text-center">
-                              {row.status === 'ok' && <Check className="h-4 w-4 text-emerald-500 mx-auto" />}
-                              {row.status === 'new_item' && <span className="text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full">+New</span>}
-                              {row.status === 'remove' && <AlertCircle className="h-4 w-4 text-destructive mx-auto" />}
-                              {row.status === 'not_found' && <AlertCircle className="h-4 w-4 text-muted-foreground mx-auto" />}
+                              {row.status === "ok" && <Check className="h-4 w-4 text-emerald-500 mx-auto" />}
+                              {row.status === "new_item" && (
+                                <span className="text-xs bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 px-1.5 py-0.5 rounded-full">
+                                  +New
+                                </span>
+                              )}
+                              {row.status === "remove" && <AlertCircle className="h-4 w-4 text-destructive mx-auto" />}
+                              {row.status === "not_found" && (
+                                <AlertCircle className="h-4 w-4 text-muted-foreground mx-auto" />
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -2184,13 +2387,20 @@ export default function StockTransferOrder() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportPreview([]); }} data-testid="button-cancel-import">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportDialogOpen(false);
+                setImportPreview([]);
+              }}
+              data-testid="button-cancel-import"
+            >
               Cancel
             </Button>
             {importPreview.length > 0 && (
               <Button
                 onClick={applyImport}
-                disabled={importPreview.every(r => r.status === 'not_found')}
+                disabled={importPreview.every((r) => r.status === "not_found")}
                 data-testid="button-apply-import"
               >
                 Apply to Order
@@ -2200,10 +2410,7 @@ export default function StockTransferOrder() {
         </DialogContent>
       </Dialog>
 
-      <Dialog
-        open={quantityPicker.open}
-        onOpenChange={(open) => setQuantityPicker({ ...quantityPicker, open })}
-      >
+      <Dialog open={quantityPicker.open} onOpenChange={(open) => setQuantityPicker({ ...quantityPicker, open })}>
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle>Add to Order</DialogTitle>
@@ -2211,18 +2418,21 @@ export default function StockTransferOrder() {
           <div className="space-y-4">
             <div className="p-3 bg-muted rounded-md">
               <p className="font-medium">{quantityPicker.stockItem?.name}</p>
-              <p className="text-sm text-muted-foreground">
-                From: {quantityPicker.locationName}
-              </p>
+              <p className="text-sm text-muted-foreground">From: {quantityPicker.locationName}</p>
               <p className="text-sm text-muted-foreground">
                 Available: <span className="font-mono">{formatNumber(quantityPicker.availableQty, 0)}</span>{" "}
                 {quantityPicker.stockItem?.uom}
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="picker-quantity">
-                Quantity{editVoucherId ? <span className="text-muted-foreground font-normal ml-1 text-xs">(negative = reduce, e.g. -1)</span> : ""}
+                Quantity
+                {editVoucherId ? (
+                  <span className="text-muted-foreground font-normal ml-1 text-xs">(negative = reduce, e.g. -1)</span>
+                ) : (
+                  ""
+                )}
               </Label>
               <Input
                 id="picker-quantity"
@@ -2248,10 +2458,7 @@ export default function StockTransferOrder() {
             </div>
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setQuantityPicker({ ...quantityPicker, open: false })}
-            >
+            <Button variant="outline" onClick={() => setQuantityPicker({ ...quantityPicker, open: false })}>
               Cancel
             </Button>
             <Button
@@ -2303,29 +2510,51 @@ export default function StockTransferOrder() {
             ) : !historyData?.monthlyData?.some(
                 (m: any) => m.inwardQty > 0 || m.outwardQty > 0 || m.openingQty !== 0 || m.closingQty !== 0
               ) ? (
-              <div className="text-center py-12 text-muted-foreground text-sm">
-                No stock movement for this period
-              </div>
+              <div className="text-center py-12 text-muted-foreground text-sm">No stock movement for this period</div>
             ) : (
               <table className="w-full text-sm border-collapse" style={{ minWidth: "700px" }}>
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-muted border-b">
-                    <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">Month</th>
-                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">Opening</th>
-                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400">Stock In</th>
-                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400">Stock Out</th>
-                    <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary">Closing</th>
+                    <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">
+                      Month
+                    </th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">
+                      Opening
+                    </th>
+                    <th
+                      colSpan={3}
+                      className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400"
+                    >
+                      Stock In
+                    </th>
+                    <th
+                      colSpan={3}
+                      className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400"
+                    >
+                      Stock Out
+                    </th>
+                    <th colSpan={3} className="text-center px-2 py-1.5 font-semibold text-primary">
+                      Closing
+                    </th>
                   </tr>
                   <tr className="bg-muted/70 border-b text-xs">
                     <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Qty</th>
                     <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Rate</th>
                     <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Value</th>
-                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Qty</th>
-                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Rate</th>
-                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Value</th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">
+                      Qty
+                    </th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">
+                      Rate
+                    </th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">
+                      Value
+                    </th>
                     <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Qty</th>
                     <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Rate</th>
-                    <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Value</th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">
+                      Value
+                    </th>
                     <th className="text-right px-3 py-1.5 font-medium text-primary">Qty</th>
                     <th className="text-right px-3 py-1.5 font-medium text-primary">Rate</th>
                     <th className="text-right px-3 py-1.5 font-medium text-primary">Value</th>
@@ -2333,16 +2562,32 @@ export default function StockTransferOrder() {
                 </thead>
                 <tbody>
                   {(historyData?.monthlyData ?? []).map((month: any) => {
-                    const isActive = month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0;
-                    const fmtQty = (n: number) => n === 0 ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-                    const fmtRate = (n: number) => n === 0 ? "—" : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    const fmtVal = (n: number) => n === 0 ? "—" : formatAmount(n);
+                    const isActive =
+                      month.inwardQty > 0 || month.outwardQty > 0 || month.openingQty !== 0 || month.closingQty !== 0;
+                    const fmtQty = (n: number) =>
+                      n === 0
+                        ? "—"
+                        : n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                    const fmtRate = (n: number) =>
+                      n === 0
+                        ? "—"
+                        : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const fmtVal = (n: number) => (n === 0 ? "—" : formatAmount(n));
                     return (
-                      <tr key={month.month} className={`border-b transition-colors ${isActive ? "" : "text-muted-foreground/50"}`}>
+                      <tr
+                        key={month.month}
+                        className={`border-b transition-colors ${isActive ? "" : "text-muted-foreground/50"}`}
+                      >
                         <td className="font-medium px-3 py-2 border-r">{month.monthName}</td>
-                        <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{fmtQty(month.openingQty)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{fmtRate(month.openingRate)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{fmtVal(month.openingValue)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                          {fmtQty(month.openingQty)}
+                        </td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                          {fmtRate(month.openingRate)}
+                        </td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                          {fmtVal(month.openingValue)}
+                        </td>
                         <td
                           className={`text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400 font-medium ${month.inwardQty > 0 ? "cursor-pointer underline underline-offset-2 decoration-dotted hover:text-green-900 dark:hover:text-green-200" : ""}`}
                           onClick={() => {
@@ -2355,9 +2600,15 @@ export default function StockTransferOrder() {
                             }
                           }}
                           title={month.inwardQty > 0 ? "Click to see individual transactions" : undefined}
-                        >{fmtQty(month.inwardQty)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{fmtRate(month.inwardRate)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{fmtVal(month.inwardValue)}</td>
+                        >
+                          {fmtQty(month.inwardQty)}
+                        </td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                          {fmtRate(month.inwardRate)}
+                        </td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                          {fmtVal(month.inwardValue)}
+                        </td>
                         <td
                           className={`text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400 font-medium ${month.outwardQty > 0 ? "cursor-pointer underline underline-offset-2 decoration-dotted hover:text-red-900 dark:hover:text-red-200" : ""}`}
                           onClick={() => {
@@ -2370,10 +2621,18 @@ export default function StockTransferOrder() {
                             }
                           }}
                           title={month.outwardQty > 0 ? "Click to see individual transactions" : undefined}
-                        >{fmtQty(month.outwardQty)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{fmtRate(month.outwardRate)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{fmtVal(month.outwardValue)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">{fmtQty(month.closingQty)}</td>
+                        >
+                          {fmtQty(month.outwardQty)}
+                        </td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                          {fmtRate(month.outwardRate)}
+                        </td>
+                        <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                          {fmtVal(month.outwardValue)}
+                        </td>
+                        <td className="text-right px-3 py-2 tabular-nums font-semibold text-foreground">
+                          {fmtQty(month.closingQty)}
+                        </td>
                         <td className="text-right px-3 py-2 tabular-nums font-medium">{fmtRate(month.closingRate)}</td>
                         <td className="text-right px-3 py-2 tabular-nums font-medium">{fmtVal(month.closingValue)}</td>
                       </tr>
@@ -2384,18 +2643,78 @@ export default function StockTransferOrder() {
                   <tfoot className="sticky bottom-0 z-10">
                     <tr className="bg-muted font-bold border-t-2">
                       <td className="px-3 py-2 border-r">Total</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{historyData.grandTotal.openingQty === 0 ? "—" : historyData.grandTotal.openingQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{historyData.grandTotal.openingRate === 0 ? "—" : historyData.grandTotal.openingRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">{historyData.grandTotal.openingValue === 0 ? "—" : formatAmount(historyData.grandTotal.openingValue)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{historyData.grandTotal.inwardQty === 0 ? "—" : historyData.grandTotal.inwardQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{historyData.grandTotal.inwardRate === 0 ? "—" : historyData.grandTotal.inwardRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">{historyData.grandTotal.inwardValue === 0 ? "—" : formatAmount(historyData.grandTotal.inwardValue)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{historyData.grandTotal.outwardQty === 0 ? "—" : historyData.grandTotal.outwardQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{historyData.grandTotal.outwardRate === 0 ? "—" : historyData.grandTotal.outwardRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">{historyData.grandTotal.outwardValue === 0 ? "—" : formatAmount(historyData.grandTotal.outwardValue)}</td>
-                      <td className="text-right px-3 py-2 tabular-nums text-foreground">{historyData.grandTotal.closingQty === 0 ? "—" : historyData.grandTotal.closingQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                      <td className="text-right px-3 py-2 tabular-nums">{historyData.grandTotal.closingRate === 0 ? "—" : historyData.grandTotal.closingRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                      <td className="text-right px-3 py-2 tabular-nums">{historyData.grandTotal.closingValue === 0 ? "—" : formatAmount(historyData.grandTotal.closingValue)}</td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                        {historyData.grandTotal.openingQty === 0
+                          ? "—"
+                          : historyData.grandTotal.openingQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                        {historyData.grandTotal.openingRate === 0
+                          ? "—"
+                          : historyData.grandTotal.openingRate.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-muted-foreground">
+                        {historyData.grandTotal.openingValue === 0
+                          ? "—"
+                          : formatAmount(historyData.grandTotal.openingValue)}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                        {historyData.grandTotal.inwardQty === 0
+                          ? "—"
+                          : historyData.grandTotal.inwardQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                        {historyData.grandTotal.inwardRate === 0
+                          ? "—"
+                          : historyData.grandTotal.inwardRate.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-green-700 dark:text-green-400">
+                        {historyData.grandTotal.inwardValue === 0
+                          ? "—"
+                          : formatAmount(historyData.grandTotal.inwardValue)}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                        {historyData.grandTotal.outwardQty === 0
+                          ? "—"
+                          : historyData.grandTotal.outwardQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                        {historyData.grandTotal.outwardRate === 0
+                          ? "—"
+                          : historyData.grandTotal.outwardRate.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums border-r text-red-700 dark:text-red-400">
+                        {historyData.grandTotal.outwardValue === 0
+                          ? "—"
+                          : formatAmount(historyData.grandTotal.outwardValue)}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums text-foreground">
+                        {historyData.grandTotal.closingQty === 0
+                          ? "—"
+                          : historyData.grandTotal.closingQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums">
+                        {historyData.grandTotal.closingRate === 0
+                          ? "—"
+                          : historyData.grandTotal.closingRate.toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                      </td>
+                      <td className="text-right px-3 py-2 tabular-nums">
+                        {historyData.grandTotal.closingValue === 0
+                          ? "—"
+                          : formatAmount(historyData.grandTotal.closingValue)}
+                      </td>
                     </tr>
                   </tfoot>
                 )}
@@ -2404,18 +2723,10 @@ export default function StockTransferOrder() {
           </div>
 
           <DialogFooter className="flex-shrink-0 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => setHistoryDialogOpen(false)}
-              data-testid="button-history-close"
-            >
+            <Button variant="outline" onClick={() => setHistoryDialogOpen(false)} data-testid="button-history-close">
               Close
             </Button>
-            <Button
-              variant="default"
-              asChild
-              data-testid="button-history-open-full"
-            >
+            <Button variant="default" asChild data-testid="button-history-open-full">
               <a
                 href={`/locations/${historyLocation?.id}/stock-items/${historyItem?.id}/history`}
                 target="_blank"
@@ -2440,7 +2751,9 @@ export default function StockTransferOrder() {
                 <span className="text-red-700 dark:text-red-400">Stock Out</span>
               )}
               <span className="text-muted-foreground font-normal">—</span>
-              <span>{detailMonthName} {detailYear}</span>
+              <span>
+                {detailMonthName} {detailYear}
+              </span>
             </DialogTitle>
             <DialogDescription>
               {historyItem?.name} · {historyLocation?.name}
@@ -2450,20 +2763,25 @@ export default function StockTransferOrder() {
           <div className="flex-1 overflow-auto min-h-0 border rounded-md">
             {detailLoading ? (
               <div className="space-y-2 p-4">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-8 w-full" />
+                ))}
               </div>
             ) : (
               (() => {
-                const rows = detailDirection === "in"
-                  ? (detailData?.inTransactions ?? [])
-                  : (detailData?.outTransactions ?? []);
+                const rows =
+                  detailDirection === "in" ? (detailData?.inTransactions ?? []) : (detailData?.outTransactions ?? []);
 
                 const typeBadgeClass = (type: string) => {
                   if (type === "Sale") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-                  if (type.startsWith("Transfer In")) return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-                  if (type.startsWith("Transfer Out")) return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
-                  if (type.startsWith("Adjustment")) return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-                  if (type === "Credit Note") return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+                  if (type.startsWith("Transfer In"))
+                    return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+                  if (type.startsWith("Transfer Out"))
+                    return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+                  if (type.startsWith("Adjustment"))
+                    return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+                  if (type === "Credit Note")
+                    return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
                   return "bg-muted text-muted-foreground";
                 };
 
@@ -2475,9 +2793,9 @@ export default function StockTransferOrder() {
                   );
                 }
 
-                const totalQty   = rows.reduce((s: number, r: any) => s + (r.qty   || 0), 0);
+                const totalQty = rows.reduce((s: number, r: any) => s + (r.qty || 0), 0);
                 const totalValue = rows.reduce((s: number, r: any) => s + (r.value || 0), 0);
-                const avgRate    = totalQty > 0 ? totalValue / totalQty : 0;
+                const avgRate = totalQty > 0 ? totalValue / totalQty : 0;
 
                 return (
                   <table className="w-full text-sm border-collapse">
@@ -2495,7 +2813,9 @@ export default function StockTransferOrder() {
                       {rows.map((tx: any, i: number) => (
                         <tr key={i} className="border-b hover:bg-muted/30 transition-colors">
                           <td className="px-3 py-2">
-                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeBadgeClass(tx.type)}`}>
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeBadgeClass(tx.type)}`}
+                            >
                               {tx.type}
                             </span>
                           </td>
@@ -2505,18 +2825,20 @@ export default function StockTransferOrder() {
                             {(tx.qty || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                           </td>
                           <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">
-                            {(tx.rate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {(tx.rate || 0).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
                           </td>
-                          <td className="text-right px-3 py-2 tabular-nums">
-                            {formatAmount(tx.value || 0)}
-                          </td>
+                          <td className="text-right px-3 py-2 tabular-nums">{formatAmount(tx.value || 0)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="sticky bottom-0 bg-muted border-t-2 font-semibold">
                       <tr>
                         <td colSpan={3} className="px-3 py-2 text-xs text-muted-foreground">
-                          {rows.length} transaction{rows.length !== 1 ? "s" : ""} · Avg rate: {avgRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {rows.length} transaction{rows.length !== 1 ? "s" : ""} · Avg rate:{" "}
+                          {avgRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="text-right px-3 py-2 tabular-nums">
                           {totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -2532,7 +2854,9 @@ export default function StockTransferOrder() {
           </div>
 
           <DialogFooter className="flex-shrink-0 pt-2">
-            <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setDetailOpen(false)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

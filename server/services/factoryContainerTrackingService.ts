@@ -8,11 +8,7 @@
  */
 
 import { db } from "../db";
-import {
-  factoryContainers,
-  factoryContainerTrackingEvents,
-  factoryContainerTrackingChecks,
-} from "../../shared/schema";
+import { factoryContainers, factoryContainerTrackingEvents, factoryContainerTrackingChecks } from "../../shared/schema";
 import { and, eq, gte, sql } from "drizzle-orm";
 import {
   trackContainer,
@@ -70,7 +66,10 @@ function initProgress(containerId: number): void {
 
 function ep(containerId: number, provider: string, status: ProgressStep["status"], detail?: string): void {
   let steps = _progressStore.get(containerId);
-  if (!steps) { steps = []; _progressStore.set(containerId, steps); }
+  if (!steps) {
+    steps = [];
+    _progressStore.set(containerId, steps);
+  }
   const existing = steps.find((s) => s.provider === provider);
   if (existing) {
     existing.status = status;
@@ -93,10 +92,7 @@ async function checkParcelsAppQuota(): Promise<boolean> {
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(containerTrackingChecks)
       .where(
-        and(
-          eq(containerTrackingChecks.provider, "parcelsapp"),
-          gte(containerTrackingChecks.checkedAt, startOfMonth),
-        ),
+        and(eq(containerTrackingChecks.provider, "parcelsapp"), gte(containerTrackingChecks.checkedAt, startOfMonth))
       );
     const used = result[0]?.count ?? 0;
     return used < limit;
@@ -115,10 +111,7 @@ async function check17trackQuota(): Promise<boolean> {
       .select({ count: sql<number>`COUNT(*)::int` })
       .from(containerTrackingChecks)
       .where(
-        and(
-          eq(containerTrackingChecks.provider, "17track"),
-          gte(containerTrackingChecks.checkedAt, startOfMonth),
-        ),
+        and(eq(containerTrackingChecks.provider, "17track"), gte(containerTrackingChecks.checkedAt, startOfMonth))
       );
     const used = result[0]?.count ?? 0;
     return used < limit;
@@ -144,7 +137,7 @@ async function saveTrackingCheck(
   provider: string,
   status: string,
   errorMessage: string | null,
-  rawResponse: unknown,
+  rawResponse: unknown
 ): Promise<void> {
   try {
     await db.insert(factoryContainerTrackingChecks).values({
@@ -213,12 +206,15 @@ async function saveParcelsAppEvents(containerId: number, shipment: ParcelsAppShi
 async function setSchedulerMeta(
   containerId: number,
   skipReason: string | null,
-  nextCheckAt: Date | null | undefined,
+  nextCheckAt: Date | null | undefined
 ): Promise<void> {
   try {
     const patch: Record<string, unknown> = { trackingLastSkipReason: skipReason };
     if (nextCheckAt !== undefined) patch.trackingNextCheckAt = nextCheckAt;
-    await db.update(factoryContainers).set(patch as any).where(eq(factoryContainers.id, containerId));
+    await db
+      .update(factoryContainers)
+      .set(patch as any)
+      .where(eq(factoryContainers.id, containerId));
   } catch (err: any) {
     console.warn("[FactoryTracking] setSchedulerMeta warn:", err?.message);
   }
@@ -229,7 +225,7 @@ async function setSchedulerMeta(
 function resolveEtaFromProvider(
   providerEta: string | null,
   _events: any[] | undefined,
-  currentEta: string | null,
+  currentEta: string | null
 ): { eta: string | null; source: "api" | "manual" | null } {
   if (providerEta) return { eta: providerEta, source: "api" };
   if (currentEta) return { eta: currentEta, source: "manual" };
@@ -238,7 +234,7 @@ function resolveEtaFromProvider(
 
 function resolveEtaFromShipment(
   shipment: ParcelsAppShipment,
-  currentEta: string | null,
+  currentEta: string | null
 ): { eta: string | null; source: "api" | "manual" | null } {
   const derived = deriveEstimatedDeliveryDate(shipment);
   if (derived) return { eta: derived, source: "api" };
@@ -252,7 +248,7 @@ async function trackOneContainer(
   containerId: number,
   containerNumber: string,
   destinationCountry: string = "Congo",
-  manualCarrierHint: string | null = null,
+  manualCarrierHint: string | null = null
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -264,7 +260,10 @@ async function trackOneContainer(
   const now = new Date();
 
   const [currentRow] = await db
-    .select({ arrivalDate: factoryContainers.arrivalDate, trackingLastCheckedAt: factoryContainers.trackingLastCheckedAt })
+    .select({
+      arrivalDate: factoryContainers.arrivalDate,
+      trackingLastCheckedAt: factoryContainers.trackingLastCheckedAt,
+    })
     .from(factoryContainers)
     .where(eq(factoryContainers.id, containerId))
     .limit(1);
@@ -278,7 +277,14 @@ async function trackOneContainer(
       .update(factoryContainers)
       .set({ trackingLastCheckedAt: now, trackingError: errMsg } as any)
       .where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: errMsg };
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: errMsg,
+    };
   }
 
   const { detectedCarrier, tryDirect } = resolveProvider(containerNumber);
@@ -305,7 +311,10 @@ async function trackOneContainer(
       };
       if (finalEta) updateSet.arrivalDate = finalEta;
 
-      await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+      await db
+        .update(factoryContainers)
+        .set(updateSet as any)
+        .where(eq(factoryContainers.id, containerId));
       console.log(`[FactoryTracking] ${containerNumber} → ${result.provider}: status=${result.latestStatus ?? "?"}`);
 
       return {
@@ -324,7 +333,16 @@ async function trackOneContainer(
     lastDirectFallbackReason = result.provider + "_failed";
   }
 
-  return await trackViaParcelsApp(containerId, containerNumber, detectedCarrier, lastDirectFallbackReason, now, currentEta, destinationCountry, manualCarrierHint);
+  return await trackViaParcelsApp(
+    containerId,
+    containerNumber,
+    detectedCarrier,
+    lastDirectFallbackReason,
+    now,
+    currentEta,
+    destinationCountry,
+    manualCarrierHint
+  );
 }
 
 // ParcelsApp-only fallback — used by CMA chain after exhausting carrier-specific providers.
@@ -336,7 +354,7 @@ async function trackViaParcelsAppFallback(
   now: Date,
   currentEta: string | null,
   destinationCountry: string = "Congo",
-  manualCarrierHint: string | null = null,
+  manualCarrierHint: string | null = null
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -347,19 +365,45 @@ async function trackViaParcelsAppFallback(
 }> {
   if (!process.env.PARCELSAPP_API_KEY) {
     const noProviderError = "No tracking provider configured";
-    await db.update(factoryContainers).set({ trackingLastCheckedAt: now, trackingError: noProviderError } as any).where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: noProviderError };
+    await db
+      .update(factoryContainers)
+      .set({ trackingLastCheckedAt: now, trackingError: noProviderError } as any)
+      .where(eq(factoryContainers.id, containerId));
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: noProviderError,
+    };
   }
   ep(containerId, "ParcelsApp API", "running");
   const effectiveHint = manualCarrierHint || (detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : null);
-  console.log(`[FactoryTracking] ${containerNumber} ParcelsApp fallback: dest=${destinationCountry} hint=${effectiveHint ?? "none"} manualHint=${manualCarrierHint ?? "none"} detected=${detectedCarrier ?? "none"}`);
+  console.log(
+    `[FactoryTracking] ${containerNumber} ParcelsApp fallback: dest=${destinationCountry} hint=${effectiveHint ?? "none"} manualHint=${manualCarrierHint ?? "none"} detected=${detectedCarrier ?? "none"}`
+  );
   let result = await trackContainer(containerNumber, destinationCountry, effectiveHint ?? undefined);
-  await saveTrackingCheck(containerId, "parcelsapp", result.success ? "success" : result.timedOut ? "timeout" : "error", result.error ?? null, result.rawResponse);
+  await saveTrackingCheck(
+    containerId,
+    "parcelsapp",
+    result.success ? "success" : result.timedOut ? "timeout" : "error",
+    result.error ?? null,
+    result.rawResponse
+  );
   if (result.timedOut && effectiveHint) {
-    console.log(`[FactoryTracking] ${containerNumber} ParcelsApp fallback timed out with hint="${effectiveHint}" — retrying without hint`);
+    console.log(
+      `[FactoryTracking] ${containerNumber} ParcelsApp fallback timed out with hint="${effectiveHint}" — retrying without hint`
+    );
     ep(containerId, "ParcelsApp API (retry no hint)", "running");
     const retryResult = await trackContainer(containerNumber, destinationCountry, undefined);
-    await saveTrackingCheck(containerId, "parcelsapp_retry_no_hint", retryResult.success ? "success" : retryResult.timedOut ? "timeout" : "error", retryResult.error ?? null, retryResult.rawResponse);
+    await saveTrackingCheck(
+      containerId,
+      "parcelsapp_retry_no_hint",
+      retryResult.success ? "success" : retryResult.timedOut ? "timeout" : "error",
+      retryResult.error ?? null,
+      retryResult.rawResponse
+    );
     if (retryResult.success && retryResult.shipment) {
       result = { ...retryResult, rawResponse: retryResult.rawResponse };
       ep(containerId, "ParcelsApp API (retry no hint)", "success", retryResult.shipment ? "got data" : "no data");
@@ -369,9 +413,21 @@ async function trackViaParcelsAppFallback(
   }
   if (!result.success || !result.shipment) {
     ep(containerId, "ParcelsApp API", "fail", result.error ?? "no data");
-    const errMsg = result.timedOut ? `Carrier timed out (dest=${destinationCountry})` : (result.error ?? "Tracking failed");
-    await db.update(factoryContainers).set({ trackingLastCheckedAt: now, trackingError: errMsg, trackingProvider: "parcelsapp" } as any).where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: errMsg };
+    const errMsg = result.timedOut
+      ? `Carrier timed out (dest=${destinationCountry})`
+      : (result.error ?? "Tracking failed");
+    await db
+      .update(factoryContainers)
+      .set({ trackingLastCheckedAt: now, trackingError: errMsg, trackingProvider: "parcelsapp" } as any)
+      .where(eq(factoryContainers.id, containerId));
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: errMsg,
+    };
   }
   const shipment = result.shipment;
   const lastStatus = deriveLastStatus(shipment);
@@ -381,13 +437,22 @@ async function trackViaParcelsAppFallback(
   const { eta: finalEta } = resolveEtaFromShipment(shipment, currentEta);
   await saveParcelsAppEvents(containerId, shipment);
   const updateSet: Record<string, unknown> = {
-    trackingLastCheckedAt: now, trackingLastStatus: lastStatus,
-    trackingLastEventDate: lastEventDate, trackingLastDescription: lastDescription,
-    trackingError: null, trackingChangedAt: now, trackingProvider: "parcelsapp",
-    trackingDetectedCarrier: detectedCarrier, trackingFallbackUsed: !!fallbackReason, trackingFallbackReason: fallbackReason,
+    trackingLastCheckedAt: now,
+    trackingLastStatus: lastStatus,
+    trackingLastEventDate: lastEventDate,
+    trackingLastDescription: lastDescription,
+    trackingError: null,
+    trackingChangedAt: now,
+    trackingProvider: "parcelsapp",
+    trackingDetectedCarrier: detectedCarrier,
+    trackingFallbackUsed: !!fallbackReason,
+    trackingFallbackReason: fallbackReason,
   };
   if (finalEta) updateSet.arrivalDate = finalEta;
-  await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+  await db
+    .update(factoryContainers)
+    .set(updateSet as any)
+    .where(eq(factoryContainers.id, containerId));
   ep(containerId, "ParcelsApp API", "success", lastStatus ?? "got data");
   console.log(`[FactoryTracking] ${containerNumber} → parcelsapp (CMA fallback): status=${lastStatus ?? "?"}`);
   return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
@@ -401,7 +466,7 @@ async function trackViaParcelsApp(
   now: Date,
   currentEta: string | null,
   destinationCountry: string = "Congo",
-  manualCarrierHint: string | null = null,
+  manualCarrierHint: string | null = null
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -434,13 +499,20 @@ async function trackViaParcelsApp(
       const { eta: finalEta } = resolveEtaFromShipment(shipment, currentEta);
       await saveParcelsAppEvents(containerId, shipment);
       const updateSet: Record<string, unknown> = {
-        trackingLastCheckedAt: now, trackingLastStatus: lastStatus,
-        trackingLastEventDate: lastEventDate, trackingLastDescription: lastDescription,
-        trackingError: null, trackingChangedAt: now, trackingProvider: "http_scraper",
+        trackingLastCheckedAt: now,
+        trackingLastStatus: lastStatus,
+        trackingLastEventDate: lastEventDate,
+        trackingLastDescription: lastDescription,
+        trackingError: null,
+        trackingChangedAt: now,
+        trackingProvider: "http_scraper",
         trackingDetectedCarrier: detectedCarrier,
       };
       if (finalEta) updateSet.arrivalDate = finalEta;
-      await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+      await db
+        .update(factoryContainers)
+        .set(updateSet as any)
+        .where(eq(factoryContainers.id, containerId));
       ep(containerId, "HTTP scraper", "success", lastStatus ?? "got data");
       console.log(`[FactoryTracking] ${containerNumber} → http_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
@@ -456,31 +528,58 @@ async function trackViaParcelsApp(
     if (isMaerskDirectScraperAvailable()) {
       ep(containerId, "Maersk Puppeteer", "running");
       const mdResult = await scrapeMaerskDirect(containerNumber);
-      await saveTrackingCheck(containerId, "maersk_scraper",
+      await saveTrackingCheck(
+        containerId,
+        "maersk_scraper",
         mdResult.success ? "success" : mdResult.blocked ? "blocked" : "error",
-        mdResult.error ?? null, mdResult.raw ?? null);
+        mdResult.error ?? null,
+        mdResult.raw ?? null
+      );
 
       if (mdResult.success && (mdResult.latestStatus || mdResult.eta)) {
         const { eta: finalEta } = resolveEtaFromProvider(mdResult.eta ?? null, mdResult.events, currentEta);
         const updateSet: Record<string, unknown> = {
-          trackingLastCheckedAt: now, trackingLastStatus: mdResult.latestStatus,
-          trackingLastEventDate: mdResult.latestEventDate, trackingLastDescription: mdResult.latestDescription,
-          trackingError: null, trackingChangedAt: now, trackingProvider: "maersk_scraper",
+          trackingLastCheckedAt: now,
+          trackingLastStatus: mdResult.latestStatus,
+          trackingLastEventDate: mdResult.latestEventDate,
+          trackingLastDescription: mdResult.latestDescription,
+          trackingError: null,
+          trackingChangedAt: now,
+          trackingProvider: "maersk_scraper",
           trackingDetectedCarrier: detectedCarrier,
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
-        await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+        await db
+          .update(factoryContainers)
+          .set(updateSet as any)
+          .where(eq(factoryContainers.id, containerId));
         if (mdResult.events?.length) {
           const fakeShipment: ParcelsAppShipment = {
-            trackingId: containerNumber, done: true,
-            attributes: { ...(mdResult.latestStatus ? { status: mdResult.latestStatus } : {}), ...(finalEta ? { estimatedArrival: finalEta } : {}) },
-            states: mdResult.events.map((e) => ({ date: e.date?.toISOString().slice(0, 10) ?? "", status: e.status ?? "", location: e.location ?? "", description: e.description ?? "" })),
+            trackingId: containerNumber,
+            done: true,
+            attributes: {
+              ...(mdResult.latestStatus ? { status: mdResult.latestStatus } : {}),
+              ...(finalEta ? { estimatedArrival: finalEta } : {}),
+            },
+            states: mdResult.events.map((e) => ({
+              date: e.date?.toISOString().slice(0, 10) ?? "",
+              status: e.status ?? "",
+              location: e.location ?? "",
+              description: e.description ?? "",
+            })),
           };
           await saveParcelsAppEvents(containerId, fakeShipment);
         }
         ep(containerId, "Maersk Puppeteer", "success", mdResult.latestStatus ?? "got data");
         console.log(`[FactoryTracking] ${containerNumber} → maersk_scraper: status=${mdResult.latestStatus ?? "?"}`);
-        return { success: true, lastStatus: mdResult.latestStatus, lastLocation: mdResult.latestLocation, lastDescription: mdResult.latestDescription, lastCheckedAt: now, error: null };
+        return {
+          success: true,
+          lastStatus: mdResult.latestStatus,
+          lastLocation: mdResult.latestLocation,
+          lastDescription: mdResult.latestDescription,
+          lastCheckedAt: now,
+          error: null,
+        };
       }
       ep(containerId, "Maersk Puppeteer", "fail", mdResult.error ?? "no data");
     } else {
@@ -490,23 +589,43 @@ async function trackViaParcelsApp(
     // Maersk public HTTP (no credentials, always available)
     ep(containerId, "Maersk public HTTP", "running");
     const mpResult = await maerskPublicProvider.track(containerNumber);
-    const mpStatus = mpResult.success ? "success" : mpResult.blocked ? "blocked" : mpResult.error === "rate_limited" ? "skipped" : "error";
+    const mpStatus = mpResult.success
+      ? "success"
+      : mpResult.blocked
+        ? "blocked"
+        : mpResult.error === "rate_limited"
+          ? "skipped"
+          : "error";
     await saveTrackingCheck(containerId, "maersk_public", mpStatus, mpResult.error ?? null, mpResult.raw ?? null);
 
     if (mpResult.success && (mpResult.latestStatus || mpResult.events.length > 0)) {
       await saveDirectEvents(containerId, mpResult);
       const { eta: finalEta } = resolveEtaFromProvider(mpResult.eta ?? null, mpResult.events, currentEta);
       const updateSet: Record<string, unknown> = {
-        trackingLastCheckedAt: now, trackingLastStatus: mpResult.latestStatus,
-        trackingLastEventDate: mpResult.latestEventDate, trackingLastDescription: mpResult.latestDescription,
-        trackingError: null, trackingChangedAt: now, trackingProvider: "maersk_public",
+        trackingLastCheckedAt: now,
+        trackingLastStatus: mpResult.latestStatus,
+        trackingLastEventDate: mpResult.latestEventDate,
+        trackingLastDescription: mpResult.latestDescription,
+        trackingError: null,
+        trackingChangedAt: now,
+        trackingProvider: "maersk_public",
         trackingDetectedCarrier: detectedCarrier,
       };
       if (finalEta) updateSet.arrivalDate = finalEta;
-      await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+      await db
+        .update(factoryContainers)
+        .set(updateSet as any)
+        .where(eq(factoryContainers.id, containerId));
       ep(containerId, "Maersk public HTTP", "success", mpResult.latestStatus ?? "got data");
       console.log(`[FactoryTracking] ${containerNumber} → maersk_public: status=${mpResult.latestStatus ?? "?"}`);
-      return { success: true, lastStatus: mpResult.latestStatus, lastLocation: mpResult.latestLocation, lastDescription: mpResult.latestDescription, lastCheckedAt: now, error: null };
+      return {
+        success: true,
+        lastStatus: mpResult.latestStatus,
+        lastLocation: mpResult.latestLocation,
+        lastDescription: mpResult.latestDescription,
+        lastCheckedAt: now,
+        error: null,
+      };
     } else if (mpResult.error === "rate_limited") {
       ep(containerId, "Maersk public HTTP", "skip", "rate-limited");
     } else {
@@ -525,24 +644,42 @@ async function trackViaParcelsApp(
     if (cmaCgmApiProvider.isConfigured()) {
       ep(containerId, "CMA CGM API", "running");
       const apiResult = await cmaCgmApiProvider.track(containerNumber);
-      await saveTrackingCheck(containerId, "cma_cgm_api",
+      await saveTrackingCheck(
+        containerId,
+        "cma_cgm_api",
         apiResult.success ? "success" : apiResult.noData ? "no_data" : "error",
-        apiResult.error ?? null, apiResult.raw ?? null);
+        apiResult.error ?? null,
+        apiResult.raw ?? null
+      );
 
       if (apiResult.success && (apiResult.latestStatus || apiResult.events.length > 0)) {
         await saveDirectEvents(containerId, apiResult);
         const { eta: finalEta } = resolveEtaFromProvider(apiResult.eta ?? null, apiResult.events, currentEta);
         const updateSet: Record<string, unknown> = {
-          trackingLastCheckedAt: now, trackingLastStatus: apiResult.latestStatus,
-          trackingLastEventDate: apiResult.latestEventDate, trackingLastDescription: apiResult.latestDescription,
-          trackingError: null, trackingChangedAt: now, trackingProvider: "cma_cgm_api",
+          trackingLastCheckedAt: now,
+          trackingLastStatus: apiResult.latestStatus,
+          trackingLastEventDate: apiResult.latestEventDate,
+          trackingLastDescription: apiResult.latestDescription,
+          trackingError: null,
+          trackingChangedAt: now,
+          trackingProvider: "cma_cgm_api",
           trackingDetectedCarrier: detectedCarrier,
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
-        await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+        await db
+          .update(factoryContainers)
+          .set(updateSet as any)
+          .where(eq(factoryContainers.id, containerId));
         ep(containerId, "CMA CGM API", "success", apiResult.latestStatus ?? "got data");
         console.log(`[FactoryTracking] ${containerNumber} → cma_cgm_api: status=${apiResult.latestStatus ?? "?"}`);
-        return { success: true, lastStatus: apiResult.latestStatus, lastLocation: apiResult.latestLocation, lastDescription: apiResult.latestDescription, lastCheckedAt: now, error: null };
+        return {
+          success: true,
+          lastStatus: apiResult.latestStatus,
+          lastLocation: apiResult.latestLocation,
+          lastDescription: apiResult.latestDescription,
+          lastCheckedAt: now,
+          error: null,
+        };
       }
       ep(containerId, "CMA CGM API", apiResult.noData ? "skip" : "fail", apiResult.error ?? "no data");
       console.log(`[FactoryTracking] ${containerNumber}: CMA official API returned no data — trying public...`);
@@ -554,24 +691,42 @@ async function trackViaParcelsApp(
     if (cmaPublicProvider.isEnabled()) {
       ep(containerId, "CMA public HTTP", "running");
       const cmaResult = await cmaPublicProvider.track(containerNumber);
-      await saveTrackingCheck(containerId, "cma_public",
+      await saveTrackingCheck(
+        containerId,
+        "cma_public",
         cmaResult.success ? "success" : cmaResult.blocked ? "blocked" : "error",
-        cmaResult.error ?? null, cmaResult.raw ?? null);
+        cmaResult.error ?? null,
+        cmaResult.raw ?? null
+      );
 
       if (cmaResult.success && (cmaResult.latestStatus || cmaResult.events.length > 0)) {
         await saveDirectEvents(containerId, cmaResult);
         const { eta: finalEta } = resolveEtaFromProvider(cmaResult.eta ?? null, cmaResult.events, currentEta);
         const updateSet: Record<string, unknown> = {
-          trackingLastCheckedAt: now, trackingLastStatus: cmaResult.latestStatus,
-          trackingLastEventDate: cmaResult.latestEventDate, trackingLastDescription: cmaResult.latestDescription,
-          trackingError: null, trackingChangedAt: now, trackingProvider: "cma_public",
+          trackingLastCheckedAt: now,
+          trackingLastStatus: cmaResult.latestStatus,
+          trackingLastEventDate: cmaResult.latestEventDate,
+          trackingLastDescription: cmaResult.latestDescription,
+          trackingError: null,
+          trackingChangedAt: now,
+          trackingProvider: "cma_public",
           trackingDetectedCarrier: detectedCarrier,
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
-        await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+        await db
+          .update(factoryContainers)
+          .set(updateSet as any)
+          .where(eq(factoryContainers.id, containerId));
         ep(containerId, "CMA public HTTP", "success", cmaResult.latestStatus ?? "got data");
         console.log(`[FactoryTracking] ${containerNumber} → cma_public: status=${cmaResult.latestStatus ?? "?"}`);
-        return { success: true, lastStatus: cmaResult.latestStatus, lastLocation: cmaResult.latestLocation, lastDescription: cmaResult.latestDescription, lastCheckedAt: now, error: null };
+        return {
+          success: true,
+          lastStatus: cmaResult.latestStatus,
+          lastLocation: cmaResult.latestLocation,
+          lastDescription: cmaResult.latestDescription,
+          lastCheckedAt: now,
+          error: null,
+        };
       }
       ep(containerId, "CMA public HTTP", cmaResult.blocked ? "blocked" : "fail", cmaResult.error ?? "no data");
       console.log(`[FactoryTracking] ${containerNumber}: CMA public failed — trying 17track...`);
@@ -585,30 +740,57 @@ async function trackViaParcelsApp(
       if (quotaOk17) {
         ep(containerId, "17track API (CMA)", "running");
         const result17 = await seventeenTrack.track(containerNumber, seventeenTrack.CARRIER_CODES?.CMA);
-        await saveTrackingCheck(containerId, "17track",
+        await saveTrackingCheck(
+          containerId,
+          "17track",
           result17.success ? "success" : result17.noData ? "no_data" : "error",
-          result17.error ?? null, result17.raw);
+          result17.error ?? null,
+          result17.raw
+        );
         if (result17.success) {
           await saveDirectEvents(containerId, result17);
           const { eta: finalEta } = resolveEtaFromProvider(result17.eta ?? null, result17.events, currentEta);
           const updateSet: Record<string, unknown> = {
-            trackingLastCheckedAt: now, trackingLastStatus: result17.latestStatus,
-            trackingLastEventDate: result17.latestEventDate, trackingLastDescription: result17.latestDescription,
-            trackingError: null, trackingChangedAt: now, trackingProvider: "17track",
+            trackingLastCheckedAt: now,
+            trackingLastStatus: result17.latestStatus,
+            trackingLastEventDate: result17.latestEventDate,
+            trackingLastDescription: result17.latestDescription,
+            trackingError: null,
+            trackingChangedAt: now,
+            trackingProvider: "17track",
             trackingDetectedCarrier: detectedCarrier,
           };
           if (finalEta) updateSet.arrivalDate = finalEta;
-          await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+          await db
+            .update(factoryContainers)
+            .set(updateSet as any)
+            .where(eq(factoryContainers.id, containerId));
           ep(containerId, "17track API (CMA)", "success", result17.latestStatus ?? "got data");
           console.log(`[FactoryTracking] ${containerNumber} → 17track (CMA): status=${result17.latestStatus ?? "?"}`);
-          return { success: true, lastStatus: result17.latestStatus, lastLocation: result17.latestLocation, lastDescription: result17.latestDescription, lastCheckedAt: now, error: null };
+          return {
+            success: true,
+            lastStatus: result17.latestStatus,
+            lastLocation: result17.latestLocation,
+            lastDescription: result17.latestDescription,
+            lastCheckedAt: now,
+            error: null,
+          };
         }
         ep(containerId, "17track API (CMA)", "fail", result17.error ?? "no data");
       }
     }
 
     // Fall through to ParcelsApp for CMA (skip generic Puppeteer / 17track blocks)
-    return await trackViaParcelsAppFallback(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta, destinationCountry, manualCarrierHint);
+    return await trackViaParcelsAppFallback(
+      containerId,
+      containerNumber,
+      detectedCarrier,
+      fallbackReason,
+      now,
+      currentEta,
+      destinationCountry,
+      manualCarrierHint
+    );
   }
 
   // ── CMA CGM API — leasing / unknown-carrier containers ───────────────────────
@@ -619,13 +801,21 @@ async function trackViaParcelsApp(
   // Maersk and CMA-prefix containers are already handled above.
   // Note: CAJU is a CMA CGM prefix — excluded from Maersk regex intentionally.
   const MAERSK_PREFIXES_FC = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM)/i;
-  if (!CMA_PREFIXES.test(containerNumber) && !MAERSK_PREFIXES_FC.test(containerNumber) && cmaCgmApiProvider.isConfigured()) {
+  if (
+    !CMA_PREFIXES.test(containerNumber) &&
+    !MAERSK_PREFIXES_FC.test(containerNumber) &&
+    cmaCgmApiProvider.isConfigured()
+  ) {
     ep(containerId, "CMA CGM API", "running", "checking if container is on a CMA ship");
     console.log(`[FactoryTracking] ${containerNumber}: trying CMA CGM API (leasing/unknown carrier)...`);
     const cmaFallResult = await cmaCgmApiProvider.track(containerNumber);
-    await saveTrackingCheck(containerId, "cma_cgm_api",
+    await saveTrackingCheck(
+      containerId,
+      "cma_cgm_api",
       cmaFallResult.success ? "success" : cmaFallResult.noData ? "no_data" : "error",
-      cmaFallResult.error ?? null, cmaFallResult.raw ?? null);
+      cmaFallResult.error ?? null,
+      cmaFallResult.raw ?? null
+    );
     if (cmaFallResult.success && (cmaFallResult.latestStatus || cmaFallResult.events.length > 0)) {
       await saveDirectEvents(containerId, cmaFallResult);
       const { eta: finalEta } = resolveEtaFromProvider(cmaFallResult.eta ?? null, cmaFallResult.events, currentEta);
@@ -640,13 +830,27 @@ async function trackViaParcelsApp(
         trackingDetectedCarrier: detectedCarrier,
       };
       if (finalEta) updateSet.arrivalDate = finalEta;
-      await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+      await db
+        .update(factoryContainers)
+        .set(updateSet as any)
+        .where(eq(factoryContainers.id, containerId));
       ep(containerId, "CMA CGM API", "success", cmaFallResult.latestStatus ?? "got data");
-      console.log(`[FactoryTracking] ${containerNumber} → cma_cgm_api (leasing): status=${cmaFallResult.latestStatus ?? "?"}`);
-      return { success: true, lastStatus: cmaFallResult.latestStatus, lastLocation: cmaFallResult.latestLocation, lastDescription: cmaFallResult.latestDescription, lastCheckedAt: now, error: null };
+      console.log(
+        `[FactoryTracking] ${containerNumber} → cma_cgm_api (leasing): status=${cmaFallResult.latestStatus ?? "?"}`
+      );
+      return {
+        success: true,
+        lastStatus: cmaFallResult.latestStatus,
+        lastLocation: cmaFallResult.latestLocation,
+        lastDescription: cmaFallResult.latestDescription,
+        lastCheckedAt: now,
+        error: null,
+      };
     }
     ep(containerId, "CMA CGM API", cmaFallResult.noData ? "skip" : "fail", cmaFallResult.error ?? "not on CMA ship");
-    console.log(`[FactoryTracking] ${containerNumber}: CMA API — not on CMA ship (${cmaFallResult.error ?? "no data"}) — proceeding`);
+    console.log(
+      `[FactoryTracking] ${containerNumber}: CMA API — not on CMA ship (${cmaFallResult.error ?? "no data"}) — proceeding`
+    );
   }
 
   // ── Puppeteer scraper ─────────────────────────────────────────────────────
@@ -663,13 +867,20 @@ async function trackViaParcelsApp(
       const { eta: finalEta } = resolveEtaFromShipment(shipment, currentEta);
       await saveParcelsAppEvents(containerId, shipment);
       const updateSet: Record<string, unknown> = {
-        trackingLastCheckedAt: now, trackingLastStatus: lastStatus,
-        trackingLastEventDate: lastEventDate, trackingLastDescription: lastDescription,
-        trackingError: null, trackingChangedAt: now, trackingProvider: "parcelsapp_scraper",
+        trackingLastCheckedAt: now,
+        trackingLastStatus: lastStatus,
+        trackingLastEventDate: lastEventDate,
+        trackingLastDescription: lastDescription,
+        trackingError: null,
+        trackingChangedAt: now,
+        trackingProvider: "parcelsapp_scraper",
         trackingDetectedCarrier: detectedCarrier,
       };
       if (finalEta) updateSet.arrivalDate = finalEta;
-      await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+      await db
+        .update(factoryContainers)
+        .set(updateSet as any)
+        .where(eq(factoryContainers.id, containerId));
       ep(containerId, "Puppeteer scraper", "success", lastStatus ?? "got data");
       console.log(`[FactoryTracking] ${containerNumber} → parcelsapp_scraper: status=${lastStatus ?? "?"}`);
       return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
@@ -684,28 +895,40 @@ async function trackViaParcelsApp(
       ep(containerId, "17track API", "running");
       const result17 = await seventeenTrack.track(containerNumber);
       await saveTrackingCheck(
-        containerId, "17track",
+        containerId,
+        "17track",
         result17.success ? "success" : result17.noData ? "no_data" : "error",
-        result17.error ?? null, result17.raw,
+        result17.error ?? null,
+        result17.raw
       );
 
       if (result17.success) {
         await saveDirectEvents(containerId, result17);
         const { eta: finalEta } = resolveEtaFromProvider(result17.eta ?? null, result17.events, currentEta);
         const updateSet: Record<string, unknown> = {
-          trackingLastCheckedAt: now, trackingLastStatus: result17.latestStatus,
-          trackingLastEventDate: result17.latestEventDate, trackingLastDescription: result17.latestDescription,
-          trackingError: null, trackingChangedAt: now, trackingProvider: "17track",
+          trackingLastCheckedAt: now,
+          trackingLastStatus: result17.latestStatus,
+          trackingLastEventDate: result17.latestEventDate,
+          trackingLastDescription: result17.latestDescription,
+          trackingError: null,
+          trackingChangedAt: now,
+          trackingProvider: "17track",
           trackingDetectedCarrier: detectedCarrier,
         };
         if (finalEta) updateSet.arrivalDate = finalEta;
-        await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+        await db
+          .update(factoryContainers)
+          .set(updateSet as any)
+          .where(eq(factoryContainers.id, containerId));
         ep(containerId, "17track API", "success", result17.latestStatus ?? "got data");
         console.log(`[FactoryTracking] ${containerNumber} → 17track: status=${result17.latestStatus ?? "?"}`);
         return {
-          success: true, lastStatus: result17.latestStatus,
-          lastLocation: result17.latestLocation, lastDescription: result17.latestDescription,
-          lastCheckedAt: now, error: null,
+          success: true,
+          lastStatus: result17.latestStatus,
+          lastLocation: result17.latestLocation,
+          lastDescription: result17.latestDescription,
+          lastCheckedAt: now,
+          error: null,
         };
       }
       ep(containerId, "17track API", "fail", result17.error ?? "no data");
@@ -721,25 +944,45 @@ async function trackViaParcelsApp(
       .update(factoryContainers)
       .set({ trackingLastCheckedAt: now, trackingError: noProviderError } as any)
       .where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: noProviderError };
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: noProviderError,
+    };
   }
 
   ep(containerId, "ParcelsApp API", "running");
-  const effectiveHintMain = manualCarrierHint || (detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : null);
-  console.log(`[FactoryTracking] ${containerNumber} ParcelsApp: dest=${destinationCountry} hint=${effectiveHintMain ?? "none"} manualHint=${manualCarrierHint ?? "none"} detected=${detectedCarrier ?? "none"}`);
+  const effectiveHintMain =
+    manualCarrierHint || (detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : null);
+  console.log(
+    `[FactoryTracking] ${containerNumber} ParcelsApp: dest=${destinationCountry} hint=${effectiveHintMain ?? "none"} manualHint=${manualCarrierHint ?? "none"} detected=${detectedCarrier ?? "none"}`
+  );
   let result = await trackContainer(containerNumber, destinationCountry, effectiveHintMain ?? undefined);
 
   await saveTrackingCheck(
-    containerId, "parcelsapp",
+    containerId,
+    "parcelsapp",
     result.success ? "success" : result.timedOut ? "timeout" : "error",
-    result.error ?? null, result.rawResponse,
+    result.error ?? null,
+    result.rawResponse
   );
 
   if (result.timedOut && effectiveHintMain) {
-    console.log(`[FactoryTracking] ${containerNumber} ParcelsApp timed out with hint="${effectiveHintMain}" — retrying without hint`);
+    console.log(
+      `[FactoryTracking] ${containerNumber} ParcelsApp timed out with hint="${effectiveHintMain}" — retrying without hint`
+    );
     ep(containerId, "ParcelsApp API (retry no hint)", "running");
     const retryResult = await trackContainer(containerNumber, destinationCountry, undefined);
-    await saveTrackingCheck(containerId, "parcelsapp_retry_no_hint", retryResult.success ? "success" : retryResult.timedOut ? "timeout" : "error", retryResult.error ?? null, retryResult.rawResponse);
+    await saveTrackingCheck(
+      containerId,
+      "parcelsapp_retry_no_hint",
+      retryResult.success ? "success" : retryResult.timedOut ? "timeout" : "error",
+      retryResult.error ?? null,
+      retryResult.rawResponse
+    );
     if (retryResult.success && retryResult.shipment) {
       result = { ...retryResult, rawResponse: retryResult.rawResponse };
       ep(containerId, "ParcelsApp API (retry no hint)", "success", "got data");
@@ -750,12 +993,21 @@ async function trackViaParcelsApp(
 
   if (!result.success || !result.shipment) {
     ep(containerId, "ParcelsApp API", "fail", result.error ?? "no data");
-    const errMsg = result.timedOut ? `Carrier timed out (dest=${destinationCountry})` : (result.error ?? "Tracking failed");
+    const errMsg = result.timedOut
+      ? `Carrier timed out (dest=${destinationCountry})`
+      : (result.error ?? "Tracking failed");
     await db
       .update(factoryContainers)
       .set({ trackingLastCheckedAt: now, trackingError: errMsg, trackingProvider: "parcelsapp" } as any)
       .where(eq(factoryContainers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: errMsg };
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: errMsg,
+    };
   }
 
   const shipment = result.shipment;
@@ -767,14 +1019,22 @@ async function trackViaParcelsApp(
   await saveParcelsAppEvents(containerId, shipment);
 
   const updateSet: Record<string, unknown> = {
-    trackingLastCheckedAt: now, trackingLastStatus: lastStatus,
-    trackingLastEventDate: lastEventDate, trackingLastDescription: lastDescription,
-    trackingError: null, trackingChangedAt: now, trackingProvider: "parcelsapp",
+    trackingLastCheckedAt: now,
+    trackingLastStatus: lastStatus,
+    trackingLastEventDate: lastEventDate,
+    trackingLastDescription: lastDescription,
+    trackingError: null,
+    trackingChangedAt: now,
+    trackingProvider: "parcelsapp",
     trackingDetectedCarrier: detectedCarrier,
-    trackingFallbackUsed: !!fallbackReason, trackingFallbackReason: fallbackReason,
+    trackingFallbackUsed: !!fallbackReason,
+    trackingFallbackReason: fallbackReason,
   };
   if (finalEta) updateSet.arrivalDate = finalEta;
-  await db.update(factoryContainers).set(updateSet as any).where(eq(factoryContainers.id, containerId));
+  await db
+    .update(factoryContainers)
+    .set(updateSet as any)
+    .where(eq(factoryContainers.id, containerId));
 
   ep(containerId, "ParcelsApp API", "success", lastStatus ?? "got data");
   console.log(`[FactoryTracking] ${containerNumber} → parcelsapp: status=${lastStatus ?? "?"}`);
@@ -822,7 +1082,9 @@ export async function trackOneFactoryContainerById(containerId: number): Promise
   const trackStartedAt = new Date();
   const destinationCountry = row.destination || "Congo";
   const manualCarrierHint = row.trackingCarrierHint ?? null;
-  console.log(`[FactoryTracking] trackOneFactoryContainerById: container=${row.containerNumber} dest="${destinationCountry}" manualHint=${manualCarrierHint ?? "none"}`);
+  console.log(
+    `[FactoryTracking] trackOneFactoryContainerById: container=${row.containerNumber} dest="${destinationCountry}" manualHint=${manualCarrierHint ?? "none"}`
+  );
 
   const result = await trackOneContainer(row.id, row.containerNumber, destinationCountry, manualCarrierHint);
   await setSchedulerMeta(row.id, null, new Date(Date.now() + 24 * 60 * 60 * 1000));
@@ -846,8 +1108,8 @@ export async function trackOneFactoryContainerById(containerId: number): Promise
     .where(
       and(
         eq(factoryContainerTrackingChecks.containerId, containerId),
-        gte(factoryContainerTrackingChecks.checkedAt, trackStartedAt),
-      ),
+        gte(factoryContainerTrackingChecks.checkedAt, trackStartedAt)
+      )
     )
     .orderBy(factoryContainerTrackingChecks.checkedAt);
 
@@ -899,12 +1161,7 @@ export async function trackDueFactoryContainers(): Promise<void> {
         trackingCarrierHint: factoryContainers.trackingCarrierHint,
       })
       .from(factoryContainers)
-      .where(
-        and(
-          eq(factoryContainers.trackingEnabled, true),
-          activeStatusFilter,
-        ),
-      );
+      .where(and(eq(factoryContainers.trackingEnabled, true), activeStatusFilter));
   } catch (err: any) {
     console.error("[FactoryTracking] Failed to fetch containers:", err?.message);
     return;
@@ -922,7 +1179,7 @@ export async function trackDueFactoryContainers(): Promise<void> {
     if (!r.trackingAutoUpdate) return false;
     if (!isValidContainerNumber(r.containerNumber)) return false;
     if (r.trackingNextCheckAt && r.trackingNextCheckAt.getTime() > now) return false;
-    if (r.trackingLastCheckedAt && (now - r.trackingLastCheckedAt.getTime()) < MIN_INTERVAL_MS) return false;
+    if (r.trackingLastCheckedAt && now - r.trackingLastCheckedAt.getTime() < MIN_INTERVAL_MS) return false;
     return true;
   });
 
@@ -944,7 +1201,7 @@ export async function trackDueFactoryContainers(): Promise<void> {
 
 export async function updateFactoryContainerTrackingSettings(
   containerId: number,
-  settings: { trackingEnabled?: boolean; trackingAutoUpdate?: boolean; trackingCarrierHint?: string | null },
+  settings: { trackingEnabled?: boolean; trackingAutoUpdate?: boolean; trackingCarrierHint?: string | null }
 ): Promise<void> {
   await db
     .update(factoryContainers)

@@ -160,57 +160,65 @@ class ERPDatabase extends Dexie {
 
     // v1 — original schema
     this.version(1).stores({
-      syncQueue:           "++id, idempotencyKey, mode, entityType, status, createdAt",
-      syncState:           "++id, &key",
-      syncLogs:            "++id, timestamp, type",
-      conflicts:           "++id, syncQueueItemId, entityType, resolved",
-      localDrafts:         "++id, entityType, mode, companyId, createdAt",
-      offlinePackages:     "++id, &key, entityType, companyId",
-      users:               "id, companyId, fetchedAt",
-      companies:           "id, companyId, fetchedAt",
-      companySettings:     "id, companyId, fetchedAt",
-      permissions:         "id, companyId, fetchedAt",
-      locations:           "id, companyId, fetchedAt",
-      ledgerAccounts:      "id, companyId, fetchedAt",
-      bankAccounts:        "id, companyId, fetchedAt",
-      suppliers:           "id, companyId, fetchedAt",
-      customers:           "id, companyId, fetchedAt",
-      employees:           "id, companyId, fetchedAt",
-      fixedAssets:         "id, companyId, fetchedAt",
-      stockItems:          "id, companyId, fetchedAt",
+      syncQueue: "++id, idempotencyKey, mode, entityType, status, createdAt",
+      syncState: "++id, &key",
+      syncLogs: "++id, timestamp, type",
+      conflicts: "++id, syncQueueItemId, entityType, resolved",
+      localDrafts: "++id, entityType, mode, companyId, createdAt",
+      offlinePackages: "++id, &key, entityType, companyId",
+      users: "id, companyId, fetchedAt",
+      companies: "id, companyId, fetchedAt",
+      companySettings: "id, companyId, fetchedAt",
+      permissions: "id, companyId, fetchedAt",
+      locations: "id, companyId, fetchedAt",
+      ledgerAccounts: "id, companyId, fetchedAt",
+      bankAccounts: "id, companyId, fetchedAt",
+      suppliers: "id, companyId, fetchedAt",
+      customers: "id, companyId, fetchedAt",
+      employees: "id, companyId, fetchedAt",
+      fixedAssets: "id, companyId, fetchedAt",
+      stockItems: "id, companyId, fetchedAt",
       inventoryByLocation: "id, companyId, fetchedAt",
     });
 
     // v2 — add nextRetryAt index to syncQueue; richer Conflict schema
-    this.version(2).stores({
-      syncQueue:  "++id, idempotencyKey, mode, entityType, status, createdAt, nextRetryAt",
-      conflicts:  "++id, syncQueueItemId, entityType, resolved, createdAt",
-    }).upgrade(tx =>
-      tx.table("syncQueue").toCollection().modify((item: any) => {
-        if (item.nextRetryAt === undefined) item.nextRetryAt = 0;
+    this.version(2)
+      .stores({
+        syncQueue: "++id, idempotencyKey, mode, entityType, status, createdAt, nextRetryAt",
+        conflicts: "++id, syncQueueItemId, entityType, resolved, createdAt",
       })
-    );
+      .upgrade((tx) =>
+        tx
+          .table("syncQueue")
+          .toCollection()
+          .modify((item: any) => {
+            if (item.nextRetryAt === undefined) item.nextRetryAt = 0;
+          })
+      );
 
     // v3 — add url/method fields to conflicts for retry capability
-    this.version(3).upgrade(tx =>
-      tx.table("conflicts").toCollection().modify((c: any) => {
-        if (c.url === undefined) c.url = "";
-        if (c.method === undefined) c.method = "POST";
-        if (c.localPayload === undefined && c.payload !== undefined) {
-          c.localPayload = c.payload;
-        }
-        if (c.conflictReason === undefined) c.conflictReason = c.serverResponse || "";
-      })
+    this.version(3).upgrade((tx) =>
+      tx
+        .table("conflicts")
+        .toCollection()
+        .modify((c: any) => {
+          if (c.url === undefined) c.url = "";
+          if (c.method === undefined) c.method = "POST";
+          if (c.localPayload === undefined && c.payload !== undefined) {
+            c.localPayload = c.payload;
+          }
+          if (c.conflictReason === undefined) c.conflictReason = c.serverResponse || "";
+        })
     );
 
     // v4 — factory offline tables + offline preparation metadata
     this.version(4).stores({
-      factorySuppliers:  "id, companyId, fetchedAt",
+      factorySuppliers: "id, companyId, fetchedAt",
       factoryCategories: "id, companyId, fetchedAt",
       factoryBaleProducts: "id, companyId, fetchedAt",
       factoryContainers: "id, companyId, fetchedAt",
-      factoryRawStock:   "id, companyId, fetchedAt",
-      offlineMeta:       "++id, &key",
+      factoryRawStock: "id, companyId, fetchedAt",
+      offlineMeta: "++id, &key",
     });
 
     // v5 — pre-allocated label reference number pool for offline printing
@@ -263,10 +271,7 @@ export async function getUnresolvedConflicts(): Promise<Conflict[]> {
   return db.conflicts.where("resolved").equals(0).reverse().sortBy("createdAt");
 }
 
-export async function resolveConflict(
-  id: number,
-  resolution: "local" | "server"
-): Promise<void> {
+export async function resolveConflict(id: number, resolution: "local" | "server"): Promise<void> {
   await db.conflicts.update(id, {
     resolved: true,
     resolvedAt: Date.now(),
@@ -293,9 +298,7 @@ export async function getGlobalSyncState(): Promise<SyncState | null> {
   return state ?? null;
 }
 
-export async function upsertGlobalSyncState(
-  updates: Partial<Omit<SyncState, "id" | "key">>
-): Promise<void> {
+export async function upsertGlobalSyncState(updates: Partial<Omit<SyncState, "id" | "key">>): Promise<void> {
   const existing = await db.syncState.where("key").equals("global").first();
   if (existing?.id !== undefined) {
     await db.syncState.update(existing.id, updates);
@@ -318,11 +321,7 @@ export async function upsertGlobalSyncState(
 let _syncLogWriteCount = 0;
 const SYNC_LOG_PRUNE_EVERY = 25;
 
-export async function appendSyncLog(
-  type: SyncLog["type"],
-  message: string,
-  metadata?: object
-): Promise<void> {
+export async function appendSyncLog(type: SyncLog["type"], message: string, metadata?: object): Promise<void> {
   try {
     await db.syncLogs.add({
       timestamp: Date.now(),
@@ -334,7 +333,10 @@ export async function appendSyncLog(
     if (_syncLogWriteCount % SYNC_LOG_PRUNE_EVERY === 0) {
       const count = await db.syncLogs.count();
       if (count > 500) {
-        const oldest = await db.syncLogs.orderBy("timestamp").limit(count - 500).primaryKeys();
+        const oldest = await db.syncLogs
+          .orderBy("timestamp")
+          .limit(count - 500)
+          .primaryKeys();
         await db.syncLogs.bulkDelete(oldest as number[]);
       }
     }

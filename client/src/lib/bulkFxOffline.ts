@@ -2,7 +2,11 @@ import { db, BulkFxCacheEntry, BulkFxSupplierEntry } from "./db";
 
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
-export async function cacheBulkFxData(brokerId: number, currency: string, suppliers: BulkFxSupplierEntry[]): Promise<void> {
+export async function cacheBulkFxData(
+  brokerId: number,
+  currency: string,
+  suppliers: BulkFxSupplierEntry[]
+): Promise<void> {
   await db.bulkFxCache.put({ brokerId, currency, suppliers, cachedAt: Date.now() });
 }
 

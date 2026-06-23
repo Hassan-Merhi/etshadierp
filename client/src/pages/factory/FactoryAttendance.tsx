@@ -8,13 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -25,14 +19,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { useToast } from "@/hooks/use-toast";
 import {
   CalendarDays,
@@ -178,8 +165,7 @@ export default function FactoryAttendance() {
   }, [data]);
 
   const saveMutation = useMutation({
-    mutationFn: (records: any[]) =>
-      apiRequest("POST", "/api/factory/attendance/bulk", { records }),
+    mutationFn: (records: any[]) => apiRequest("POST", "/api/factory/attendance/bulk", { records }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/attendance", selectedDate] });
       toast({ title: "Attendance saved", description: `Saved for ${selectedDate}` });
@@ -230,10 +216,9 @@ export default function FactoryAttendance() {
     setIsExportingRange(true);
     setRangePrintDialog(null);
     try {
-      const res = await fetch(
-        `/api/factory/attendance/range?startDate=${rangeStart}&endDate=${rangeEnd}`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/factory/attendance/range?startDate=${rangeStart}&endDate=${rangeEnd}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch range data");
       const { workers: rangeWorkers, attendance: rangeAttendance } = await res.json();
       const dates = generateDateRange(rangeStart, rangeEnd);
@@ -272,7 +257,7 @@ export default function FactoryAttendance() {
       openPrintWindow(html);
     } else if (printDialog === "results") {
       const html = generateWeeklyResultsSheetHtml(
-        workers,           // active workers only
+        workers, // active workers only
         attendanceMap,
         notesMap,
         weekDays,
@@ -382,32 +367,20 @@ export default function FactoryAttendance() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuItem
-                        data-testid="menu-mark-all-present"
-                        onClick={() => markAll("Present")}
-                      >
+                      <DropdownMenuItem data-testid="menu-mark-all-present" onClick={() => markAll("Present")}>
                         <UserCheck className="h-4 w-4 mr-2" />
                         Mark All Present
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        data-testid="menu-mark-all-absent"
-                        onClick={() => markAll("Absent")}
-                      >
+                      <DropdownMenuItem data-testid="menu-mark-all-absent" onClick={() => markAll("Absent")}>
                         <UserX className="h-4 w-4 mr-2" />
                         Mark All Absent
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        data-testid="menu-reset"
-                        onClick={reset}
-                      >
+                      <DropdownMenuItem data-testid="menu-reset" onClick={reset}>
                         <RotateCcw className="h-4 w-4 mr-2" />
                         Reset
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        data-testid="menu-print-blank"
-                        onClick={() => setPrintDialog("blank")}
-                      >
+                      <DropdownMenuItem data-testid="menu-print-blank" onClick={() => setPrintDialog("blank")}>
                         <Printer className="h-4 w-4 mr-2" />
                         Print Blank Sheet
                       </DropdownMenuItem>
@@ -418,17 +391,11 @@ export default function FactoryAttendance() {
                         <FileDown className="h-4 w-4 mr-2" />
                         Blank Excel
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        data-testid="menu-export-pdf"
-                        onClick={() => setPrintDialog("results")}
-                      >
+                      <DropdownMenuItem data-testid="menu-export-pdf" onClick={() => setPrintDialog("results")}>
                         <Printer className="h-4 w-4 mr-2" />
                         Export PDF
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        data-testid="menu-export-excel"
-                        onClick={() => setPrintDialog("excel-results")}
-                      >
+                      <DropdownMenuItem data-testid="menu-export-excel" onClick={() => setPrintDialog("excel-results")}>
                         <FileDown className="h-4 w-4 mr-2" />
                         Export Excel
                       </DropdownMenuItem>
@@ -506,10 +473,34 @@ export default function FactoryAttendance() {
           {/* Summary Cards */}
           {workers.length > 0 && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <SummaryCard icon={<Users className="h-4 w-4" />} label="Total" value={counts.total} color="text-foreground" testId="stat-total" />
-              <SummaryCard icon={<CheckCircle className="h-4 w-4" />} label="Present" value={counts.present} color="text-green-600 dark:text-green-400" testId="stat-present" />
-              <SummaryCard icon={<XCircle className="h-4 w-4" />} label="Absent" value={counts.absent} color="text-red-600 dark:text-red-400" testId="stat-absent" />
-              <SummaryCard icon={<Clock className="h-4 w-4" />} label="Other" value={counts.other} color="text-amber-600 dark:text-amber-400" testId="stat-other" />
+              <SummaryCard
+                icon={<Users className="h-4 w-4" />}
+                label="Total"
+                value={counts.total}
+                color="text-foreground"
+                testId="stat-total"
+              />
+              <SummaryCard
+                icon={<CheckCircle className="h-4 w-4" />}
+                label="Present"
+                value={counts.present}
+                color="text-green-600 dark:text-green-400"
+                testId="stat-present"
+              />
+              <SummaryCard
+                icon={<XCircle className="h-4 w-4" />}
+                label="Absent"
+                value={counts.absent}
+                color="text-red-600 dark:text-red-400"
+                testId="stat-absent"
+              />
+              <SummaryCard
+                icon={<Clock className="h-4 w-4" />}
+                label="Other"
+                value={counts.other}
+                color="text-amber-600 dark:text-amber-400"
+                testId="stat-other"
+              />
             </div>
           )}
 
@@ -522,7 +513,9 @@ export default function FactoryAttendance() {
                 {shift && <Badge variant="secondary">{shift}</Badge>}
               </CardTitle>
               {workers.length > 0 && (
-                <span className="text-sm text-muted-foreground">{workers.length} worker{workers.length !== 1 ? "s" : ""}</span>
+                <span className="text-sm text-muted-foreground">
+                  {workers.length} worker{workers.length !== 1 ? "s" : ""}
+                </span>
               )}
             </CardHeader>
             <CardContent className="p-0">
@@ -560,7 +553,10 @@ export default function FactoryAttendance() {
                               className="border-b last:border-0 hover-elevate"
                             >
                               <td className="px-4 py-2 text-muted-foreground">{idx + 1}</td>
-                              <td className="px-4 py-2 font-mono text-xs text-muted-foreground" data-testid={`text-worker-code-${worker.id}`}>
+                              <td
+                                className="px-4 py-2 font-mono text-xs text-muted-foreground"
+                                data-testid={`text-worker-code-${worker.id}`}
+                              >
                                 {worker.employeeCode ?? "—"}
                               </td>
                               <td
@@ -627,17 +623,17 @@ export default function FactoryAttendance() {
                                 {worker.fullName}
                               </p>
                               {worker.employeeCode && (
-                                <span className="text-xs font-mono text-muted-foreground" data-testid={`text-worker-code-mobile-${worker.id}`}>
+                                <span
+                                  className="text-xs font-mono text-muted-foreground"
+                                  data-testid={`text-worker-code-mobile-${worker.id}`}
+                                >
                                   {worker.employeeCode}
                                 </span>
                               )}
                             </div>
                             <span className="text-xs text-muted-foreground shrink-0">{idx + 1}</span>
                           </div>
-                          <Select
-                            value={status}
-                            onValueChange={(v) => setStatus(worker.id, v as AttendanceStatus)}
-                          >
+                          <Select value={status} onValueChange={(v) => setStatus(worker.id, v as AttendanceStatus)}>
                             <SelectTrigger
                               data-testid={`select-status-mobile-${worker.id}`}
                               className={`h-9 text-sm font-medium ${STATUS_COLORS[status] ?? ""}`}
@@ -671,7 +667,12 @@ export default function FactoryAttendance() {
         </>
       )}
 
-      <Dialog open={printDialog !== null} onOpenChange={(open) => { if (!open) setPrintDialog(null); }}>
+      <Dialog
+        open={printDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) setPrintDialog(null);
+        }}
+      >
         <DialogContent className="max-w-xs" data-testid="dialog-print-language">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -680,10 +681,7 @@ export default function FactoryAttendance() {
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3 pt-2">
-            <Button
-              onClick={() => handlePrintWithLang("en")}
-              data-testid="button-print-english"
-            >
+            <Button onClick={() => handlePrintWithLang("en")} data-testid="button-print-english">
               English
             </Button>
             <Button
@@ -698,7 +696,12 @@ export default function FactoryAttendance() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={rangePrintDialog !== null} onOpenChange={(open) => { if (!open) setRangePrintDialog(null); }}>
+      <Dialog
+        open={rangePrintDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) setRangePrintDialog(null);
+        }}
+      >
         <DialogContent className="max-w-xs" data-testid="dialog-range-language">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -707,10 +710,7 @@ export default function FactoryAttendance() {
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3 pt-2">
-            <Button
-              onClick={() => handleRangeExport("en", rangePrintDialog!)}
-              data-testid="button-range-english"
-            >
+            <Button onClick={() => handleRangeExport("en", rangePrintDialog!)} data-testid="button-range-english">
               English
             </Button>
             <Button
@@ -798,8 +798,7 @@ function PerWorkerView() {
   };
 
   const saveMutation = useMutation({
-    mutationFn: (records: any[]) =>
-      apiRequest("POST", "/api/factory/attendance/bulk", { records }),
+    mutationFn: (records: any[]) => apiRequest("POST", "/api/factory/attendance/bulk", { records }),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["/api/factory/attendance/worker", workerIdNum, startDate, endDate],
@@ -858,8 +857,8 @@ function PerWorkerView() {
                       {selectedWorker
                         ? `${selectedWorker.fullName}${selectedWorker.employeeCode ? ` (${selectedWorker.employeeCode})` : ""}`
                         : loadingWorkers
-                        ? "Loading…"
-                        : "Select worker"}
+                          ? "Loading…"
+                          : "Select worker"}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -955,9 +954,27 @@ function PerWorkerView() {
       {/* Summary */}
       {workerIdNum && dates.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
-          <SummaryCard icon={<CalendarDays className="h-4 w-4" />} label="Days in Range" value={dates.length} color="text-foreground" testId="stat-pw-total" />
-          <SummaryCard icon={<CheckCircle className="h-4 w-4" />} label="Present" value={presentCount} color="text-green-600 dark:text-green-400" testId="stat-pw-present" />
-          <SummaryCard icon={<XCircle className="h-4 w-4" />} label="Absent" value={absentCount} color="text-red-600 dark:text-red-400" testId="stat-pw-absent" />
+          <SummaryCard
+            icon={<CalendarDays className="h-4 w-4" />}
+            label="Days in Range"
+            value={dates.length}
+            color="text-foreground"
+            testId="stat-pw-total"
+          />
+          <SummaryCard
+            icon={<CheckCircle className="h-4 w-4" />}
+            label="Present"
+            value={presentCount}
+            color="text-green-600 dark:text-green-400"
+            testId="stat-pw-present"
+          />
+          <SummaryCard
+            icon={<XCircle className="h-4 w-4" />}
+            label="Absent"
+            value={absentCount}
+            color="text-red-600 dark:text-red-400"
+            testId="stat-pw-absent"
+          />
         </div>
       )}
 
@@ -967,9 +984,7 @@ function PerWorkerView() {
           <CardTitle className="text-base flex items-center gap-2">
             <User className="h-4 w-4" />
             {selectedWorker ? selectedWorker.fullName : "Select a worker"}
-            {selectedWorker?.employeeCode && (
-              <Badge variant="secondary">{selectedWorker.employeeCode}</Badge>
-            )}
+            {selectedWorker?.employeeCode && <Badge variant="secondary">{selectedWorker.employeeCode}</Badge>}
           </CardTitle>
           {workerIdNum && dates.length > 0 && (
             <span className="text-sm text-muted-foreground">
@@ -989,9 +1004,7 @@ function PerWorkerView() {
               ))}
             </div>
           ) : dates.length === 0 ? (
-            <div className="text-center text-muted-foreground py-12 text-sm">
-              No dates in the selected range.
-            </div>
+            <div className="text-center text-muted-foreground py-12 text-sm">No dates in the selected range.</div>
           ) : (
             <div className="table-responsive">
               <table className="w-full text-sm">
@@ -1014,7 +1027,7 @@ function PerWorkerView() {
                       <tr
                         key={date}
                         data-testid={`row-date-${date}`}
-                        className={`border-b last:border-0 cursor-pointer hover-elevate ${(isFriday || isSaturday) ? "bg-muted/20" : isSunday ? "bg-blue-50/40 dark:bg-blue-950/20" : ""}`}
+                        className={`border-b last:border-0 cursor-pointer hover-elevate ${isFriday || isSaturday ? "bg-muted/20" : isSunday ? "bg-blue-50/40 dark:bg-blue-950/20" : ""}`}
                         onClick={() => toggleDate(date)}
                       >
                         <td className="px-4 py-3 text-muted-foreground">{idx + 1}</td>
@@ -1025,8 +1038,11 @@ function PerWorkerView() {
                             day: "numeric",
                           })}
                         </td>
-                        <td className={`px-4 py-3 text-sm ${(isFriday || isSaturday) ? "text-muted-foreground italic" : isSunday ? "text-blue-600 dark:text-blue-400 font-medium" : "text-muted-foreground"}`}>
-                          {dayName}{isSunday ? " *" : ""}
+                        <td
+                          className={`px-4 py-3 text-sm ${isFriday || isSaturday ? "text-muted-foreground italic" : isSunday ? "text-blue-600 dark:text-blue-400 font-medium" : "text-muted-foreground"}`}
+                        >
+                          {dayName}
+                          {isSunday ? " *" : ""}
                         </td>
                         <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center gap-2">
@@ -1035,7 +1051,9 @@ function PerWorkerView() {
                               checked={isChecked}
                               onCheckedChange={() => toggleDate(date)}
                             />
-                            <span className={`text-xs font-medium ${isChecked ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}>
+                            <span
+                              className={`text-xs font-medium ${isChecked ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400"}`}
+                            >
                               {isChecked ? "Present" : "Absent"}
                             </span>
                           </div>
@@ -1114,7 +1132,14 @@ function getWeekDays(dateStr: string): WeekDay[] {
   const monday = new Date(d);
   monday.setDate(d.getDate() - ((dow === 0 ? 7 : dow) - 1));
   const enNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const arNames = ["\u0627\u0644\u0627\u062B\u0646\u064A\u0646", "\u0627\u0644\u062B\u0644\u0627\u062B\u0627\u0621", "\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621", "\u0627\u0644\u062E\u0645\u064A\u0633", "\u0627\u0644\u062C\u0645\u0639\u0629", "\u0627\u0644\u0633\u0628\u062A"];
+  const arNames = [
+    "\u0627\u0644\u0627\u062B\u0646\u064A\u0646",
+    "\u0627\u0644\u062B\u0644\u0627\u062B\u0627\u0621",
+    "\u0627\u0644\u0623\u0631\u0628\u0639\u0627\u0621",
+    "\u0627\u0644\u062E\u0645\u064A\u0633",
+    "\u0627\u0644\u062C\u0645\u0639\u0629",
+    "\u0627\u0644\u0633\u0628\u062A",
+  ];
   const days: WeekDay[] = [];
   for (let i = 0; i < 6; i++) {
     const cur = new Date(monday);
@@ -1148,7 +1173,8 @@ const LABELS = {
   },
   ar: {
     title: "\u0643\u0634\u0641 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u0623\u0633\u0628\u0648\u0639\u064A",
-    resultTitle: "\u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u0623\u0633\u0628\u0648\u0639\u064A",
+    resultTitle:
+      "\u062A\u0642\u0631\u064A\u0631 \u0627\u0644\u062D\u0636\u0648\u0631 \u0627\u0644\u0623\u0633\u0628\u0648\u0639\u064A",
     workerName: "\u0627\u0633\u0645 \u0627\u0644\u0639\u0627\u0645\u0644",
     notes: "\u0645\u0644\u0627\u062D\u0638\u0627\u062A / \u062A\u0648\u0642\u064A\u0639",
     preparedBy: "\u0623\u0639\u062F\u0647",
@@ -1206,27 +1232,26 @@ const WEEKLY_COLGROUP = `
   </colgroup>
 `;
 
-function generateWeeklyBlankSheetHtml(
-  workers: WorkerRow[],
-  weekDays: WeekDay[],
-  shift: string,
-  lang: PrintLang
-) {
+function generateWeeklyBlankSheetHtml(workers: WorkerRow[], weekDays: WeekDay[], shift: string, lang: PrintLang) {
   const L = LABELS[lang];
-  const dayHeaders = weekDays.map((d) => {
-    const name = lang === "ar" ? d.dayNameAr : d.dayName;
-    return `<th>${name}<br/>${d.dayNum}</th>`;
-  }).join("");
+  const dayHeaders = weekDays
+    .map((d) => {
+      const name = lang === "ar" ? d.dayNameAr : d.dayName;
+      return `<th>${name}<br/>${d.dayNum}</th>`;
+    })
+    .join("");
 
-  const rows = workers.map((w, i) => {
-    const dayCells = weekDays.map(() => `<td class="day"></td>`).join("");
-    return `<tr>
+  const rows = workers
+    .map((w, i) => {
+      const dayCells = weekDays.map(() => `<td class="day"></td>`).join("");
+      return `<tr>
       <td class="num">${i + 1}</td>
       <td class="name" dir="auto">${escHtml(w.fullName)}</td>
       ${dayCells}
       <td class="notes"></td>
     </tr>`;
-  }).join("");
+    })
+    .join("");
 
   const htmlLang = lang === "ar" ? "ar" : "en";
 
@@ -1299,36 +1324,42 @@ function generateWeeklyResultsSheetHtml(
 ) {
   const L = LABELS[lang];
 
-  const dayHeaders = weekDays.map((d) => {
-    const name = lang === "ar" ? d.dayNameAr : d.dayName;
-    const isSelected = d.iso === selectedDate;
-    const bg = isSelected ? " style=\"background:#d0e0f0\"" : "";
-    return `<th${bg}>${name}<br/>${d.dayNum}</th>`;
-  }).join("");
+  const dayHeaders = weekDays
+    .map((d) => {
+      const name = lang === "ar" ? d.dayNameAr : d.dayName;
+      const isSelected = d.iso === selectedDate;
+      const bg = isSelected ? ' style="background:#d0e0f0"' : "";
+      return `<th${bg}>${name}<br/>${d.dayNum}</th>`;
+    })
+    .join("");
 
   const present = workers.filter((w) => (attendanceMap[w.id] ?? "Present") === "Present").length;
   const absent = workers.filter((w) => attendanceMap[w.id] === "Absent").length;
 
-  const rows = workers.map((w, i) => {
-    const status = attendanceMap[w.id] ?? "Present";
-    const color = STATUS_PRINT_COLORS[status] ?? "#374151";
-    const mark = STATUS_MARKS[status] ?? status.charAt(0);
-    const notes = escHtml(notesMap[w.id] ?? "");
+  const rows = workers
+    .map((w, i) => {
+      const status = attendanceMap[w.id] ?? "Present";
+      const color = STATUS_PRINT_COLORS[status] ?? "#374151";
+      const mark = STATUS_MARKS[status] ?? status.charAt(0);
+      const notes = escHtml(notesMap[w.id] ?? "");
 
-    const dayCells = weekDays.map((d) => {
-      if (d.iso === selectedDate) {
-        return `<td class="day" style="font-weight:700;color:${color};font-size:9pt">${mark}</td>`;
-      }
-      return `<td class="day"></td>`;
-    }).join("");
+      const dayCells = weekDays
+        .map((d) => {
+          if (d.iso === selectedDate) {
+            return `<td class="day" style="font-weight:700;color:${color};font-size:9pt">${mark}</td>`;
+          }
+          return `<td class="day"></td>`;
+        })
+        .join("");
 
-    return `<tr>
+      return `<tr>
       <td class="num">${i + 1}</td>
       <td class="name" dir="auto">${escHtml(w.fullName)}</td>
       ${dayCells}
       <td class="notes" style="color:#555">${notes}</td>
     </tr>`;
-  }).join("");
+    })
+    .join("");
 
   const htmlLang = lang === "ar" ? "ar" : "en";
 
@@ -1391,9 +1422,7 @@ function buildWeeklySheet(
   sheetLabel: string
 ) {
   const L = LABELS[lang];
-  const dayColHeaders = weekDays.map((d) =>
-    `${lang === "ar" ? d.dayNameAr : d.dayName} ${d.dayNum}`
-  );
+  const dayColHeaders = weekDays.map((d) => `${lang === "ar" ? d.dayNameAr : d.dayName} ${d.dayNum}`);
   const headers = ["#", L.workerName, ...dayColHeaders, L.notes];
 
   const dataRows = workers.map((w, i) => {
@@ -1409,12 +1438,7 @@ function buildWeeklySheet(
   });
 
   const totalCols = 2 + weekDays.length + 1;
-  const colWidths = [
-    { wch: 4 },
-    { wch: 30 },
-    ...weekDays.map(() => ({ wch: 10 })),
-    { wch: 22 },
-  ];
+  const colWidths = [{ wch: 4 }, { wch: 30 }, ...weekDays.map(() => ({ wch: 10 })), { wch: 22 }];
 
   const subtitle = `${sheetLabel}  |  ${L.week}: ${weekLabel(weekDays)}${shift ? `  |  ${L.shift}: ${shift}` : ""}  |  ${L.totalWorkers}: ${workers.length}`;
   const allRows = [[L.title], [subtitle], headers, ...dataRows];
@@ -1439,13 +1463,33 @@ async function exportWeeklyExcel(
 ) {
   const wb = XLSX.utils.book_new();
 
-  const activeWorkers   = workers.filter((w) => w.active !== false);
+  const activeWorkers = workers.filter((w) => w.active !== false);
   const inactiveWorkers = workers.filter((w) => w.active === false);
 
-  const activeSheet = buildWeeklySheet(activeWorkers, weekDays, shift, lang, type, attendanceMap, notesMap, selectedDate, lang === "ar" ? "العمال النشطون" : "Active Workers");
+  const activeSheet = buildWeeklySheet(
+    activeWorkers,
+    weekDays,
+    shift,
+    lang,
+    type,
+    attendanceMap,
+    notesMap,
+    selectedDate,
+    lang === "ar" ? "العمال النشطون" : "Active Workers"
+  );
   XLSX.utils.book_append_sheet(wb, activeSheet, lang === "ar" ? "نشط" : "Active Workers");
 
-  const inactiveSheet = buildWeeklySheet(inactiveWorkers, weekDays, shift, lang, type, {}, {}, selectedDate, lang === "ar" ? "العمال غير النشطين" : "Inactive Workers");
+  const inactiveSheet = buildWeeklySheet(
+    inactiveWorkers,
+    weekDays,
+    shift,
+    lang,
+    type,
+    {},
+    {},
+    selectedDate,
+    lang === "ar" ? "العمال غير النشطين" : "Inactive Workers"
+  );
   XLSX.utils.book_append_sheet(wb, inactiveSheet, lang === "ar" ? "غير نشط" : "Inactive Workers");
 
   const weekRange = weekLabel(weekDays).replace(/[^a-z0-9]/gi, "-");
@@ -1460,7 +1504,7 @@ function buildRangeSheet(
   endDate: string,
   lang: PrintLang,
   sheetTitle: string,
-  useBlankDefault = false   // true for inactive workers: no record = blank cell, not Present
+  useBlankDefault = false // true for inactive workers: no record = blank cell, not Present
 ) {
   const dateHeaders = dates.map((d) => {
     const dt = new Date(d + "T00:00:00");
@@ -1472,18 +1516,18 @@ function buildRangeSheet(
   const workerLabel = lang === "ar" ? "اسم العامل" : "Worker Name";
   const totalPLabel = lang === "ar" ? "الحضور" : "Present";
   const totalALabel = lang === "ar" ? "الغياب" : "Absent";
-  const rangeLabel  = `${startDate}  →  ${endDate}  |  ${sheetTitle}  |  ${lang === "ar" ? "العمال" : "Workers"}: ${workers.length}`;
+  const rangeLabel = `${startDate}  →  ${endDate}  |  ${sheetTitle}  |  ${lang === "ar" ? "العمال" : "Workers"}: ${workers.length}`;
 
-  const headers  = ["#", workerLabel, ...dateHeaders, totalPLabel, totalALabel];
+  const headers = ["#", workerLabel, ...dateHeaders, totalPLabel, totalALabel];
   const dataRows = workers.map((w, i) => {
     const wMap = lookup.get(w.id) ?? new Map();
     let presentCount = 0;
-    let absentCount  = 0;
+    let absentCount = 0;
     const dayCells = dates.map((d) => {
       const recorded = wMap.get(d);
       // Inactive workers: if no explicit record exists, leave cell blank.
       const status = recorded ?? (useBlankDefault ? null : "Present");
-      if (!status) return "";          // blank cell for inactive with no record
+      if (!status) return ""; // blank cell for inactive with no record
       const mark = STATUS_MARKS[status] ?? status.charAt(0);
       if (status === "Absent") absentCount++;
       else presentCount++;
@@ -1493,17 +1537,11 @@ function buildRangeSheet(
   });
 
   const titleLabel = lang === "ar" ? "كشف الحضور" : "Attendance Sheet";
-  const totalCols  = 2 + dates.length + 2;
+  const totalCols = 2 + dates.length + 2;
   const allRows = [[titleLabel], [rangeLabel], headers, ...dataRows];
 
   const ws = XLSX.utils.aoa_to_sheet(allRows);
-  ws["!cols"] = [
-    { wch: 4 },
-    { wch: 28 },
-    ...dates.map(() => ({ wch: 6 })),
-    { wch: 9 },
-    { wch: 9 },
-  ];
+  ws["!cols"] = [{ wch: 4 }, { wch: 28 }, ...dates.map(() => ({ wch: 6 })), { wch: 9 }, { wch: 9 }];
   ws["!merges"] = [
     { s: { r: 0, c: 0 }, e: { r: 0, c: totalCols - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: totalCols - 1 } },
@@ -1528,16 +1566,16 @@ async function exportRangeExcel(
     lookup.get(r.workerId)!.set(r.attendanceDate, r.status);
   }
 
-  const activeWorkers   = workers.filter((w) => w.active !== false);
+  const activeWorkers = workers.filter((w) => w.active !== false);
   const inactiveWorkers = workers.filter((w) => w.active === false);
 
-  const activeLabel   = lang === "ar" ? "العمال النشطون"      : "Active Workers";
+  const activeLabel = lang === "ar" ? "العمال النشطون" : "Active Workers";
   const inactiveLabel = lang === "ar" ? "العمال غير النشطين" : "Inactive Workers";
 
-  const activeSheet   = buildRangeSheet(activeWorkers,   lookup, dates, startDate, endDate, lang, activeLabel, false);
+  const activeSheet = buildRangeSheet(activeWorkers, lookup, dates, startDate, endDate, lang, activeLabel, false);
   const inactiveSheet = buildRangeSheet(inactiveWorkers, lookup, dates, startDate, endDate, lang, inactiveLabel, true);
 
-  XLSX.utils.book_append_sheet(wb, activeSheet,   lang === "ar" ? "نشط"      : "Active Workers");
+  XLSX.utils.book_append_sheet(wb, activeSheet, lang === "ar" ? "نشط" : "Active Workers");
   XLSX.utils.book_append_sheet(wb, inactiveSheet, lang === "ar" ? "غير نشط" : "Inactive Workers");
 
   await XLSX.writeFile(wb, `attendance-range-${startDate}-to-${endDate}.xlsx`);
@@ -1562,38 +1600,46 @@ function generateRangePrintHtml(
   const totalPLabel = lang === "ar" ? "حضور" : "P";
   const totalALabel = lang === "ar" ? "غياب" : "A";
 
-  const dateHeaders = dates.map((d) => {
-    const dt = new Date(d + "T00:00:00");
-    const day = dt.getDate();
-    const weekday = dt.toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { weekday: "short" });
-    const isFri = dt.getDay() === 5;
-    const isSat = dt.getDay() === 6;
-    const bg = (isFri || isSat) ? ' style="background:#f0f0f0"' : '';
-    return `<th${bg}>${day}<br/><span style="font-size:6pt;color:#777">${weekday}</span></th>`;
-  }).join("");
-
-  const rows = workers.map((w, i) => {
-    const wMap = lookup.get(w.id) ?? new Map();
-    let presentCount = 0, absentCount = 0;
-    const dayCells = dates.map((d) => {
+  const dateHeaders = dates
+    .map((d) => {
       const dt = new Date(d + "T00:00:00");
+      const day = dt.getDate();
+      const weekday = dt.toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { weekday: "short" });
       const isFri = dt.getDay() === 5;
       const isSat = dt.getDay() === 6;
-      const status = wMap.get(d) ?? "Present";
-      const mark = STATUS_MARKS[status] ?? status.charAt(0);
-      const color = STATUS_PRINT_COLORS[status] ?? "#374151";
-      if (status === "Absent") absentCount++; else presentCount++;
-      const bgStyle = (isFri || isSat) ? "background:#f7f7f7;" : "";
-      return `<td class="day" style="${bgStyle}color:${color};font-weight:600">${mark}</td>`;
-    }).join("");
-    return `<tr>
+      const bg = isFri || isSat ? ' style="background:#f0f0f0"' : "";
+      return `<th${bg}>${day}<br/><span style="font-size:6pt;color:#777">${weekday}</span></th>`;
+    })
+    .join("");
+
+  const rows = workers
+    .map((w, i) => {
+      const wMap = lookup.get(w.id) ?? new Map();
+      let presentCount = 0,
+        absentCount = 0;
+      const dayCells = dates
+        .map((d) => {
+          const dt = new Date(d + "T00:00:00");
+          const isFri = dt.getDay() === 5;
+          const isSat = dt.getDay() === 6;
+          const status = wMap.get(d) ?? "Present";
+          const mark = STATUS_MARKS[status] ?? status.charAt(0);
+          const color = STATUS_PRINT_COLORS[status] ?? "#374151";
+          if (status === "Absent") absentCount++;
+          else presentCount++;
+          const bgStyle = isFri || isSat ? "background:#f7f7f7;" : "";
+          return `<td class="day" style="${bgStyle}color:${color};font-weight:600">${mark}</td>`;
+        })
+        .join("");
+      return `<tr>
       <td class="num">${i + 1}</td>
       <td class="name" dir="auto">${escHtml(w.fullName)}</td>
       ${dayCells}
       <td class="day" style="color:#15803d;font-weight:700">${presentCount}</td>
       <td class="day" style="color:#b91c1c;font-weight:700">${absentCount}</td>
     </tr>`;
-  }).join("");
+    })
+    .join("");
 
   const htmlLang = lang === "ar" ? "ar" : "en";
   const colCount = 2 + dates.length + 2;
@@ -1652,9 +1698,5 @@ function generateRangePrintHtml(
 }
 
 function escHtml(str: string) {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

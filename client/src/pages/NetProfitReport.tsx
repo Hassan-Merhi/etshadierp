@@ -21,7 +21,15 @@ import {
   TrendingUp,
 } from "lucide-react";
 
-type Period = "today" | "yesterday" | "this_week" | "this_month" | "this_year" | "all_time" | "specific_month" | "custom_range";
+type Period =
+  | "today"
+  | "yesterday"
+  | "this_week"
+  | "this_month"
+  | "this_year"
+  | "all_time"
+  | "specific_month"
+  | "custom_range";
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "today", label: "Today" },
@@ -35,8 +43,18 @@ const PERIODS: { value: Period; label: string }[] = [
 ];
 
 const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 function getDateRange(
@@ -95,7 +113,12 @@ function getDateRange(
 }
 
 function formatAmount(n: number) {
-  return "$" + new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.abs(Math.round(n)));
+  return (
+    "$" +
+    new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(
+      Math.abs(Math.round(n))
+    )
+  );
 }
 
 function AmountCell({ value, alwaysGreen }: { value: number; alwaysGreen?: boolean }) {
@@ -103,8 +126,8 @@ function AmountCell({ value, alwaysGreen }: { value: number; alwaysGreen?: boole
   const color = alwaysGreen
     ? "text-green-700 dark:text-green-400"
     : isNeg
-    ? "text-red-600 dark:text-red-400"
-    : "text-green-700 dark:text-green-400";
+      ? "text-red-600 dark:text-red-400"
+      : "text-green-700 dark:text-green-400";
   return (
     <span className={color}>
       {isNeg ? "-" : ""}
@@ -113,13 +136,21 @@ function AmountCell({ value, alwaysGreen }: { value: number; alwaysGreen?: boole
   );
 }
 
-function KpiCard({ title, value, icon: Icon, color, isProfit }: { title: string; value: number; icon: any; color: string; isProfit?: boolean }) {
+function KpiCard({
+  title,
+  value,
+  icon: Icon,
+  color,
+  isProfit,
+}: {
+  title: string;
+  value: number;
+  icon: any;
+  color: string;
+  isProfit?: boolean;
+}) {
   const isNeg = value < 0;
-  const textColor = isProfit
-    ? isNeg
-      ? "text-red-600 dark:text-red-400"
-      : "text-green-700 dark:text-green-400"
-    : "";
+  const textColor = isProfit ? (isNeg ? "text-red-600 dark:text-red-400" : "text-green-700 dark:text-green-400") : "";
   return (
     <Card>
       <CardContent className="p-4 flex items-center gap-4">
@@ -159,15 +190,21 @@ function AccountSection({
       <CollapsibleTrigger className="w-full" data-testid={`toggle-section-${title.toLowerCase().replace(/\s+/g, "-")}`}>
         <div className="flex items-center justify-between p-3 rounded-md hover-elevate cursor-pointer">
           <div className="flex items-center gap-2">
-            {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+            {open ? (
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            )}
             <Badge className={badgeColor}>{title}</Badge>
-            <span className="text-xs text-muted-foreground">{filteredAccounts.length} account{filteredAccounts.length !== 1 ? "s" : ""}</span>
+            <span className="text-xs text-muted-foreground">
+              {filteredAccounts.length} account{filteredAccounts.length !== 1 ? "s" : ""}
+            </span>
           </div>
-          <span className={`font-semibold text-sm ${
-            type === "income"
-              ? "text-green-700 dark:text-green-400"
-              : "text-red-600 dark:text-red-400"
-          }`}>
+          <span
+            className={`font-semibold text-sm ${
+              type === "income" ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"
+            }`}
+          >
             {formatAmount(Math.abs(total))}
           </span>
         </div>
@@ -407,8 +444,18 @@ export default function NetProfitReport() {
           <>
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <KpiCard title="Total Revenue" value={salesTotal + directIncTotal + indirectIncTotal} icon={ShoppingCart} color="bg-blue-600" />
-              <KpiCard title="Total Expenses" value={purchasesTotal + directExpTotal + indirectExpTotal} icon={Receipt} color="bg-red-600" />
+              <KpiCard
+                title="Total Revenue"
+                value={salesTotal + directIncTotal + indirectIncTotal}
+                icon={ShoppingCart}
+                color="bg-blue-600"
+              />
+              <KpiCard
+                title="Total Expenses"
+                value={purchasesTotal + directExpTotal + indirectExpTotal}
+                icon={Receipt}
+                color="bg-red-600"
+              />
               <KpiCard
                 title="Net Profit"
                 value={netProfit}
@@ -448,7 +495,9 @@ export default function NetProfitReport() {
 
                   {/* Expense side */}
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Expenses</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                      Expenses
+                    </p>
                     {[
                       { label: "Opening Stock", value: openingStock },
                       { label: "Purchases", value: purchasesTotal },
@@ -471,18 +520,19 @@ export default function NetProfitReport() {
                 <Separator className="my-4" />
 
                 {/* Net Profit bottom line */}
-                <div className={`flex justify-between items-center font-bold text-base rounded-md px-4 py-3 ${
-                  netProfit >= 0
-                    ? "bg-green-50 dark:bg-green-950/30"
-                    : "bg-red-50 dark:bg-red-950/30"
-                }`}>
+                <div
+                  className={`flex justify-between items-center font-bold text-base rounded-md px-4 py-3 ${
+                    netProfit >= 0 ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"
+                  }`}
+                >
                   <span>{netProfit >= 0 ? "Net Profit" : "Net Loss"}</span>
-                  <span className={`font-mono ${
-                    netProfit >= 0
-                      ? "text-green-700 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}>
-                    {netProfit < 0 ? "-" : ""}{formatAmount(Math.abs(netProfit))}
+                  <span
+                    className={`font-mono ${
+                      netProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {netProfit < 0 ? "-" : ""}
+                    {formatAmount(Math.abs(netProfit))}
                   </span>
                 </div>
               </CardContent>

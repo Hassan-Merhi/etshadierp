@@ -9,21 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -103,7 +90,7 @@ export default function BaleTransfers() {
   const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
   const [sourceLocationId, setSourceLocationId] = useState("");
   const [destLocationId, setDestLocationId] = useState("");
-  const [transferDate, setTransferDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [transferDate, setTransferDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [notes, setNotes] = useState("");
   const [selectedBaleIds, setSelectedBaleIds] = useState<number[]>([]);
   const { toast } = useToast();
@@ -202,15 +189,13 @@ export default function BaleTransfers() {
     setDialogOpen(false);
     setSourceLocationId("");
     setDestLocationId("");
-    setTransferDate(new Date().toLocaleDateString('en-CA'));
+    setTransferDate(new Date().toLocaleDateString("en-CA"));
     setNotes("");
     setSelectedBaleIds([]);
   };
 
   const handleToggleBale = (baleId: number) => {
-    setSelectedBaleIds((prev) =>
-      prev.includes(baleId) ? prev.filter((id) => id !== baleId) : [...prev, baleId]
-    );
+    setSelectedBaleIds((prev) => (prev.includes(baleId) ? prev.filter((id) => id !== baleId) : [...prev, baleId]));
   };
 
   const handleSelectAll = () => {
@@ -274,7 +259,9 @@ export default function BaleTransfers() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
           <ArrowRightLeft className="h-5 w-5 text-muted-foreground" />
-          <h2 className="text-lg font-semibold" data-testid="text-page-title">Bale Transfers</h2>
+          <h2 className="text-lg font-semibold" data-testid="text-page-title">
+            Bale Transfers
+          </h2>
           <Badge variant="secondary" data-testid="badge-transfer-count">
             {transfers?.length || 0} transfers
           </Badge>
@@ -346,7 +333,10 @@ export default function BaleTransfers() {
                               {transfer.status}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-sm text-muted-foreground" data-testid={`text-created-by-${transfer.id}`}>
+                          <TableCell
+                            className="text-sm text-muted-foreground"
+                            data-testid={`text-created-by-${transfer.id}`}
+                          >
                             {transfer.createdBy || "-"}
                           </TableCell>
                           <TableCell className="text-right">
@@ -394,8 +384,15 @@ export default function BaleTransfers() {
                                         <TableRow key={item.id} data-testid={`row-transfer-item-${item.id}`}>
                                           <TableCell className="font-mono text-xs">{item.baleCode}</TableCell>
                                           <TableCell>{item.productName || "-"}</TableCell>
-                                          <TableCell className="text-right font-mono">{parseFloat(item.weightKg).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</TableCell>
-                                          <TableCell className="text-right font-mono">{parseFloat(item.costPerKg).toFixed(4)}</TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            {parseFloat(item.weightKg).toLocaleString(undefined, {
+                                              minimumFractionDigits: 0,
+                                              maximumFractionDigits: 2,
+                                            })}
+                                          </TableCell>
+                                          <TableCell className="text-right font-mono">
+                                            {parseFloat(item.costPerKg).toFixed(4)}
+                                          </TableCell>
                                         </TableRow>
                                       ))}
                                     </TableBody>
@@ -426,22 +423,28 @@ export default function BaleTransfers() {
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>New Bale Transfer</DialogTitle>
-            <DialogDescription>
-              Transfer bales from one location to another
-            </DialogDescription>
+            <DialogDescription>Transfer bales from one location to another</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Source Location</Label>
-                <Select value={sourceLocationId} onValueChange={(val) => { setSourceLocationId(val); setSelectedBaleIds([]); }}>
+                <Select
+                  value={sourceLocationId}
+                  onValueChange={(val) => {
+                    setSourceLocationId(val);
+                    setSelectedBaleIds([]);
+                  }}
+                >
                   <SelectTrigger data-testid="select-source-location">
                     <SelectValue placeholder="Select source" />
                   </SelectTrigger>
                   <SelectContent>
                     {locations?.map((loc) => (
-                      <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                      <SelectItem key={loc.id} value={String(loc.id)}>
+                        {loc.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -453,9 +456,13 @@ export default function BaleTransfers() {
                     <SelectValue placeholder="Select destination" />
                   </SelectTrigger>
                   <SelectContent>
-                    {locations?.filter((l) => String(l.id) !== sourceLocationId).map((loc) => (
-                      <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
-                    ))}
+                    {locations
+                      ?.filter((l) => String(l.id) !== sourceLocationId)
+                      .map((loc) => (
+                        <SelectItem key={loc.id} value={String(loc.id)}>
+                          {loc.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -492,7 +499,9 @@ export default function BaleTransfers() {
                 )}
               </div>
               {!sourceLocationId ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">Select a source location to see available bales</p>
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  Select a source location to see available bales
+                </p>
               ) : availableBales.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4 text-center">No finalized bales at this location</p>
               ) : (
@@ -519,8 +528,15 @@ export default function BaleTransfers() {
                           </TableCell>
                           <TableCell className="font-mono text-xs">{row.bale.baleCode}</TableCell>
                           <TableCell>{row.product?.name || "-"}</TableCell>
-                          <TableCell className="text-right font-mono">{parseFloat(row.bale.weightKg).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</TableCell>
-                          <TableCell className="text-right font-mono">{parseFloat(row.bale.costPerKg).toFixed(4)}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {parseFloat(row.bale.weightKg).toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2,
+                            })}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {parseFloat(row.bale.costPerKg).toFixed(4)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

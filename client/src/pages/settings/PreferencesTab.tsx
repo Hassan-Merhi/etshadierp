@@ -8,15 +8,14 @@ interface PreferencesTabProps {
   isDateFormatPending: boolean;
 }
 
-export function PreferencesTab({
-  dateFormat,
-  setDateFormat,
-  isDateFormatPending,
-}: PreferencesTabProps) {
+export function PreferencesTab({ dateFormat, setDateFormat, isDateFormatPending }: PreferencesTabProps) {
   return (
     <div className="space-y-6 max-w-lg">
       <div>
-        <h2 className="text-2xl font-semibold flex items-center gap-2"><Settings2 className="h-5 w-5" />Preferences</h2>
+        <h2 className="text-2xl font-semibold flex items-center gap-2">
+          <Settings2 className="h-5 w-5" />
+          Preferences
+        </h2>
         <p className="text-muted-foreground text-sm mt-1">Customize your display and regional settings.</p>
       </div>
       <Card>

@@ -16,8 +16,37 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Package, DollarSign, FileText, Truck, Trash2, HandCoins, Calendar, User, RotateCcw, Edit, Download, Printer, Upload, CheckCircle2, Circle, XCircle, Plus, CreditCard, Ship, ChevronDown, RefreshCw } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  ArrowLeft,
+  Package,
+  DollarSign,
+  FileText,
+  Truck,
+  Trash2,
+  HandCoins,
+  Calendar,
+  User,
+  RotateCcw,
+  Edit,
+  Download,
+  Printer,
+  Upload,
+  CheckCircle2,
+  Circle,
+  XCircle,
+  Plus,
+  CreditCard,
+  Ship,
+  ChevronDown,
+  RefreshCw,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OffloadDialog } from "@/components/OffloadDialog";
 import { SpOffloadDialog } from "@/components/SpOffloadDialog";
@@ -36,7 +65,9 @@ interface ContainerDetailData {
 
 const saleFormSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
-  commission: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Commission must be non-negative"),
+  commission: z
+    .string()
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Commission must be non-negative"),
   commissionAccountId: z.string().optional(),
   saleDate: z.string().min(1, "Sale date is required"),
 });
@@ -57,14 +88,14 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   // forceErp: when an SP company opens an ERP-sourced container, treat it as a regular ERP container
   const isSupplierPartner = forceErp ? false : selectedCompany?.companyType === "supplier_partner";
   const printRef = useRef<HTMLDivElement>(null);
-  
+
   // Check for auto-print query parameter
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('print') === 'true') {
+    if (urlParams.get("print") === "true") {
       // Remove the print param from URL to prevent re-printing on refresh
       const newUrl = window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
+      window.history.replaceState({}, "", newUrl);
       // Trigger print after a short delay to allow content to load
       setTimeout(() => {
         handlePrint();
@@ -82,8 +113,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
   const { data: spContainerData, isLoading: spDetailLoading } = useQuery<any>({
     queryKey: [`/api/sp/containers/${containerId}`],
-    queryFn: () =>
-      fetch(`/api/sp/containers/${containerId}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch(`/api/sp/containers/${containerId}`, { credentials: "include" }).then((r) => r.json()),
     enabled: !!containerId && isSupplierPartner,
   });
 
@@ -197,11 +227,16 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         const vals = row.values as any[];
         if (headerRow === -1) {
           vals.forEach((cell: any, colIdx: number) => {
-            const v = String(cell || "").toLowerCase().trim();
+            const v = String(cell || "")
+              .toLowerCase()
+              .trim();
             if (v === "barcode" || v === "barcodes" || v === "bar_code" || v === "code") barcodeCol = colIdx;
-            if (v === "price" || v === "new_price" || v === "newprice" || v === "unit_price" || v === "unit price") priceCol = colIdx;
+            if (v === "price" || v === "new_price" || v === "newprice" || v === "unit_price" || v === "unit price")
+              priceCol = colIdx;
           });
-          if (barcodeCol !== -1 && priceCol !== -1) { headerRow = rowNumber; }
+          if (barcodeCol !== -1 && priceCol !== -1) {
+            headerRow = rowNumber;
+          }
           return;
         }
         const barcode = String(vals[barcodeCol] ?? "").trim();
@@ -210,17 +245,31 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       });
 
       if (rows.length === 0 && (barcodeCol === -1 || priceCol === -1)) {
-        const headerKeywords = ["barcode", "barcodes", "bar_code", "code", "price", "new_price", "newprice", "unit_price", "unit price"];
+        const headerKeywords = [
+          "barcode",
+          "barcodes",
+          "bar_code",
+          "code",
+          "price",
+          "new_price",
+          "newprice",
+          "unit_price",
+          "unit price",
+        ];
         sheet.eachRow((row: any) => {
           const vals = row.values as any[];
-          const firstCell = String(vals[1] ?? "").toLowerCase().trim();
+          const firstCell = String(vals[1] ?? "")
+            .toLowerCase()
+            .trim();
           if (headerKeywords.includes(firstCell)) return;
           const barcode = String(vals[1] ?? "").trim();
           const price = String(vals[2] ?? "").trim();
           if (barcode) rows.push({ barcode, price });
         });
         if (rows.length === 0) {
-          setPriceImportError('Could not detect columns. Use headers "barcode" and "price", or put barcodes in column A and prices in column B.');
+          setPriceImportError(
+            'Could not detect columns. Use headers "barcode" and "price", or put barcodes in column A and prices in column B.'
+          );
           setPriceImportParsing(false);
           return;
         }
@@ -249,7 +298,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         method: "POST",
         body: formData,
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -272,7 +324,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       queryClient.invalidateQueries({ queryKey: [`/api/containers/${containerId}`] });
       toast({ title: "Document deleted" });
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Delete failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+    },
   });
 
   async function handleViewDoc(storageKey: string) {
@@ -283,9 +338,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         const msg = isJson ? (await resp.json()).message : await resp.text();
         toast({
           title: resp.status === 404 ? "File no longer available" : "File unavailable",
-          description: resp.status === 404
-            ? "This file was uploaded before database storage was enabled and cannot be retrieved. Please delete it and re-upload."
-            : (msg || `Server returned ${resp.status}`),
+          description:
+            resp.status === 404
+              ? "This file was uploaded before database storage was enabled and cannot be retrieved. Please delete it and re-upload."
+              : msg || `Server returned ${resp.status}`,
           variant: "destructive",
         });
         return;
@@ -314,7 +370,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       freightForm.reset();
       toast({ title: "Freight charge added" });
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const deleteFreightMutation = useMutation({
@@ -325,11 +384,14 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       toast({ title: "Freight charge removed" });
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const paymentForm = useForm({
-    defaultValues: { paymentDate: new Date().toLocaleDateString('en-CA'), amount: "", method: "", reference: "" },
+    defaultValues: { paymentDate: new Date().toLocaleDateString("en-CA"), amount: "", method: "", reference: "" },
   });
 
   const addPaymentMutation = useMutation({
@@ -340,10 +402,13 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       setShowPaymentDialog(null);
-      paymentForm.reset({ paymentDate: new Date().toLocaleDateString('en-CA'), amount: "", method: "", reference: "" });
+      paymentForm.reset({ paymentDate: new Date().toLocaleDateString("en-CA"), amount: "", method: "", reference: "" });
       toast({ title: "Payment recorded" });
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const deletePaymentMutation = useMutation({
@@ -354,11 +419,17 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers", containerId, "freight"] });
       toast({ title: "Payment deleted" });
     },
-    onError: (e: any) => { if (e?._handledGlobally) return; toast({ title: "Failed", description: e.message, variant: "destructive" }); },
+    onError: (e: any) => {
+      if (e?._handledGlobally) return;
+      toast({ title: "Failed", description: e.message, variant: "destructive" });
+    },
   });
 
   const handleExportContainer = async () => {
-    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
+    if (!navigator.onLine) {
+      toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" });
+      return;
+    }
     try {
       const response = await fetch(`/api/containers/${containerId}/export`);
       const data = await response.json();
@@ -389,7 +460,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   };
 
   const handleExportContainerNoCost = async () => {
-    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
+    if (!navigator.onLine) {
+      toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" });
+      return;
+    }
     try {
       const response = await fetch(`/api/containers/${containerId}/export`);
       const data = await response.json();
@@ -402,10 +476,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         data.container?.supplierName ||
         "";
       const containerNumber = data.container?.containerNumber || "";
-      const truckNumber =
-        data.container?.numberPlate ||
-        data.container?.truckNumber ||
-        "";
+      const truckNumber = data.container?.numberPlate || data.container?.truckNumber || "";
 
       // ── build ExcelJS workbook directly for full styling support ──
       const wb = new ExcelJS.Workbook();
@@ -413,10 +484,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
       // Column definitions: NO | BARCODE (hidden) | DESCRIPTION | Q'TY
       ws.columns = [
-        { key: "no",   width: 6 },
-        { key: "bc",   width: 20, hidden: true },
+        { key: "no", width: 6 },
+        { key: "bc", width: 20, hidden: true },
         { key: "desc", width: 70 },
-        { key: "qty",  width: 18 },
+        { key: "qty", width: 18 },
       ];
 
       // ── Row 1: supplier label (merged A1:D1) ──
@@ -425,12 +496,14 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       const r1 = ws.getRow(1);
       r1.height = 28;
       r1.eachCell((cell) => {
-        cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1B2A4A" } };
-        cell.font   = { bold: true, color: { argb: "FFFFFFFF" }, size: 13 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1B2A4A" } };
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 13 };
         cell.alignment = { horizontal: "center", vertical: "middle" };
         cell.border = {
-          top: { style: "thin" }, bottom: { style: "thin" },
-          left: { style: "thin" }, right: { style: "thin" },
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
         };
       });
 
@@ -440,12 +513,14 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       const r2 = ws.getRow(2);
       r2.height = 22;
       r2.eachCell({ includeEmpty: true }, (cell) => {
-        cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FFBDD7EE" } };
-        cell.font   = { bold: true, size: 11 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFBDD7EE" } };
+        cell.font = { bold: true, size: 11 };
         cell.alignment = { horizontal: "center", vertical: "middle" };
         cell.border = {
-          top: { style: "thin" }, bottom: { style: "thin" },
-          left: { style: "thin" }, right: { style: "thin" },
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
         };
       });
 
@@ -453,15 +528,17 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       ws.addRow(["NO", "BARCODE", "DESCRIPTION", "Q'TY"]);
       const r3 = ws.getRow(3);
       r3.eachCell((cell, colNum) => {
-        cell.fill   = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2E3B4E" } };
-        cell.font   = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2E3B4E" } };
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 10 };
         cell.alignment = {
           horizontal: colNum === 3 ? "left" : "center",
           vertical: "middle",
         };
         cell.border = {
-          top: { style: "thin" }, bottom: { style: "thin" },
-          left: { style: "thin" }, right: { style: "thin" },
+          top: { style: "thin" },
+          bottom: { style: "thin" },
+          left: { style: "thin" },
+          right: { style: "thin" },
         };
       });
 
@@ -486,8 +563,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               wrapText: colNum === 3,
             };
             cell.border = {
-              top: { style: "thin" }, bottom: { style: "thin" },
-              left: { style: "thin" }, right: { style: "thin" },
+              top: { style: "thin" },
+              bottom: { style: "thin" },
+              left: { style: "thin" },
+              right: { style: "thin" },
             };
             cell.font = { size: 10 };
           });
@@ -516,8 +595,6 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     }
   };
 
-
-
   // Determine the back URL based on container status
   const backUrl = containerData?.container?.status === "SOLD" ? "/sold-containers" : "/containers";
 
@@ -527,7 +604,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       customerId: "",
       commission: "0.00",
       commissionAccountId: "",
-      saleDate: new Date().toLocaleDateString('en-CA'),
+      saleDate: new Date().toLocaleDateString("en-CA"),
     },
   });
 
@@ -711,7 +788,9 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     const spFmt = (v: any) => {
       const n = parseFloat(String(v ?? "0"));
       const isWhole = Math.abs(n) % 1 === 0;
-    return isNaN(n) ? "$0" : `$${n.toLocaleString("en-US", { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
+      return isNaN(n)
+        ? "$0"
+        : `$${n.toLocaleString("en-US", { minimumFractionDigits: isWhole ? 0 : 2, maximumFractionDigits: 2 })}`;
     };
 
     if (spDetailLoading) {
@@ -742,7 +821,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
     const discFactor = 1 - parseFloat(spc.discountPct || "0") / 100;
     const baseCost = (spc.lines || []).reduce(
       (s: number, l: any) => s + parseFloat(l.qty || "0") * parseFloat(l.unitRateUsd || "0") * discFactor,
-      0,
+      0
     );
 
     return (
@@ -762,9 +841,13 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {spc.status === "offloaded" ? (
-              <Badge variant="outline" className="text-green-600 border-green-600/40">Offloaded</Badge>
+              <Badge variant="outline" className="text-green-600 border-green-600/40">
+                Offloaded
+              </Badge>
             ) : (
-              <Badge variant="outline" className="text-blue-600 border-blue-600/40">Open / OTW</Badge>
+              <Badge variant="outline" className="text-blue-600 border-blue-600/40">
+                Open / OTW
+              </Badge>
             )}
             {spc.status !== "offloaded" && (
               <Button onClick={() => setShowSpOffloadDialog(true)} data-testid="button-sp-offload">
@@ -823,7 +906,9 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               <TableBody>
                 {(spc.lines || []).length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">No line items</TableCell>
+                    <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                      No line items
+                    </TableCell>
                   </TableRow>
                 ) : (
                   (spc.lines || []).map((line: any) => {
@@ -836,7 +921,9 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                         <TableCell className="text-right tabular-nums">
                           {parseFloat(line.qty).toLocaleString("en-US", { maximumFractionDigits: 2 })}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums text-muted-foreground">{spFmt(line.unitRateUsd)}</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {spFmt(line.unitRateUsd)}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums">{spFmt(discRate)}</TableCell>
                         <TableCell className="text-right tabular-nums font-medium">{spFmt(lineCost)}</TableCell>
                       </TableRow>
@@ -928,9 +1015,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           open={showSpOffloadDialog}
           onOpenChange={setShowSpOffloadDialog}
           container={spc}
-          onSuccess={() =>
-            queryClient.invalidateQueries({ queryKey: [`/api/sp/containers/${containerId}`] })
-          }
+          onSuccess={() => queryClient.invalidateQueries({ queryKey: [`/api/sp/containers/${containerId}`] })}
         />
       </div>
     );
@@ -944,12 +1029,15 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
   const itemsTotal = pos.reduce((sum: number, po: any) => sum + parseFloat(po.itemsTotal || "0"), 0);
   const chargesTotal = charges.reduce((sum: number, c: any) => sum + parseFloat(c.amount || "0"), 0);
   const grandTotal = itemsTotal + chargesTotal;
-  
+
   // Calculate total bales from all line items
   const totalBales = pos.reduce((total: number, po: any) => {
-    return total + po.items.reduce((sum: number, item: any) => {
-      return sum + parseFloat(item.quantity || "0");
-    }, 0);
+    return (
+      total +
+      po.items.reduce((sum: number, item: any) => {
+        return sum + parseFloat(item.quantity || "0");
+      }, 0)
+    );
   }, 0);
 
   // Format quantity: strip trailing zeros (e.g. "7.000" → "7", "2.500" → "2.5")
@@ -975,7 +1063,9 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 Container {container.containerNumber}
               </h1>
               <Badge
-                variant={container.status === "OTW" ? "default" : container.status === "OFFLOADED" ? "secondary" : "outline"}
+                variant={
+                  container.status === "OTW" ? "default" : container.status === "OFFLOADED" ? "secondary" : "outline"
+                }
                 className="shrink-0"
                 data-testid="badge-status"
               >
@@ -988,119 +1078,114 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-        {/* Actions dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2" data-testid="button-actions-dropdown">
-              Actions
-              <ChevronDown className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {isDeveloper && (
-              <>
-                <DropdownMenuItem
-                  onClick={() => syncVoucherMutation.mutate()}
-                  disabled={syncVoucherMutation.isPending}
-                  data-testid="button-sync-voucher"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  {syncVoucherMutation.isPending ? "Syncing..." : "Sync Supplier Balance"}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
-            <DropdownMenuItem
-              onClick={() => setLocation(`/containers/${containerId}/verification`)}
-              data-testid="button-verify-container"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Verify
-            </DropdownMenuItem>
-            {!containerSale && (
+          {/* Actions dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2" data-testid="button-actions-dropdown">
+                Actions
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {isDeveloper && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => syncVoucherMutation.mutate()}
+                    disabled={syncVoucherMutation.isPending}
+                    data-testid="button-sync-voucher"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    {syncVoucherMutation.isPending ? "Syncing..." : "Sync Supplier Balance"}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem
-                onClick={() => setShowSellDialog(true)}
-                data-testid="button-sell-container"
+                onClick={() => setLocation(`/containers/${containerId}/verification`)}
+                data-testid="button-verify-container"
               >
-                <HandCoins className="w-4 h-4 mr-2" />
-                Sell Container
+                <FileText className="w-4 h-4 mr-2" />
+                Verify
               </DropdownMenuItem>
-            )}
-            {container.status !== "OFFLOADED" && (
+              {!containerSale && (
+                <DropdownMenuItem onClick={() => setShowSellDialog(true)} data-testid="button-sell-container">
+                  <HandCoins className="w-4 h-4 mr-2" />
+                  Sell Container
+                </DropdownMenuItem>
+              )}
+              {container.status !== "OFFLOADED" && (
+                <DropdownMenuItem onClick={() => setShowOffloadDialog(true)} data-testid="button-offload-container">
+                  <Truck className="w-4 h-4 mr-2" />
+                  Offload Container
+                </DropdownMenuItem>
+              )}
+              {container.status === "OFFLOADED" && (
+                <>
+                  <DropdownMenuItem onClick={() => setShowOffloadDialog(true)} data-testid="button-edit-offload">
+                    <Edit className="w-4 h-4 mr-2" />
+                    Edit Offload
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setPendingDelete(() => () => reverseOffloadMutation.mutate(parseInt(containerId!)))}
+                    disabled={reverseOffloadMutation.isPending}
+                    data-testid="button-reverse-offload"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Reverse Offload
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Export dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2" data-testid="button-export-dropdown">
+                <Download className="w-4 h-4" />
+                Export
+                <ChevronDown className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={handleExportContainer} data-testid="button-export-excel">
+                <Download className="w-4 h-4 mr-2" />
+                Full Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportContainerNoCost} data-testid="button-export-no-cost">
+                <Download className="w-4 h-4 mr-2" />
+                No Cost / Freight Export
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handlePrint} data-testid="button-export-pdf">
+                <Printer className="w-4 h-4 mr-2" />
+                Export PDF
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => setShowOffloadDialog(true)}
-                data-testid="button-offload-container"
+                onClick={() => {
+                  setPriceImportPreview(null);
+                  setPriceImportError(null);
+                  setShowPriceImportDialog(true);
+                }}
+                data-testid="button-import-pricing"
               >
-                <Truck className="w-4 h-4 mr-2" />
-                Offload Container
+                <Upload className="w-4 h-4 mr-2" />
+                Import Pricing (Excel)
               </DropdownMenuItem>
-            )}
-            {container.status === "OFFLOADED" && (
-              <>
-                <DropdownMenuItem
-                  onClick={() => setShowOffloadDialog(true)}
-                  data-testid="button-edit-offload"
-                >
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Offload
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setPendingDelete(() => () => reverseOffloadMutation.mutate(parseInt(containerId!)))}
-                  disabled={reverseOffloadMutation.isPending}
-                  data-testid="button-reverse-offload"
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Reverse Offload
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        {/* Export dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="gap-2" data-testid="button-export-dropdown">
-              <Download className="w-4 h-4" />
-              Export
-              <ChevronDown className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={handleExportContainer} data-testid="button-export-excel">
-              <Download className="w-4 h-4 mr-2" />
-              Full Export
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleExportContainerNoCost} data-testid="button-export-no-cost">
-              <Download className="w-4 h-4 mr-2" />
-              No Cost / Freight Export
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handlePrint} data-testid="button-export-pdf">
-              <Printer className="w-4 h-4 mr-2" />
-              Export PDF
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => { setPriceImportPreview(null); setPriceImportError(null); setShowPriceImportDialog(true); }}
-              data-testid="button-import-pricing"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Import Pricing (Excel)
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Button
-          variant="destructive"
-          onClick={handleDeleteContainer}
-          disabled={deleteContainerMutation.isPending}
-          className="gap-2"
-          data-testid="button-delete-container"
-        >
-          <Trash2 className="w-4 h-4" />
-          <span className="hidden sm:inline">Delete Container</span>
-          <span className="sm:hidden">Delete</span>
-        </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDeleteContainer}
+            disabled={deleteContainerMutation.isPending}
+            className="gap-2"
+            data-testid="button-delete-container"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Delete Container</span>
+            <span className="sm:hidden">Delete</span>
+          </Button>
         </div>
       </div>
 
@@ -1170,7 +1255,9 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
         <div className="rounded-lg border bg-card p-4 space-y-1">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Items Total</p>
-          <p className="text-2xl font-bold tabular-nums" data-testid="text-items-total">{formatAmount(itemsTotal)}</p>
+          <p className="text-2xl font-bold tabular-nums" data-testid="text-items-total">
+            {formatAmount(itemsTotal)}
+          </p>
           <p className="text-xs text-muted-foreground">
             {pos.reduce((sum: number, po: any) => sum + po.items.length, 0)} items in {pos.length} PO(s)
           </p>
@@ -1178,7 +1265,9 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
 
         <div className="rounded-lg border bg-card p-4 space-y-1">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Grand Total</p>
-          <p className="text-2xl font-bold tabular-nums" data-testid="text-grand-total">{formatAmount(grandTotal)}</p>
+          <p className="text-2xl font-bold tabular-nums" data-testid="text-grand-total">
+            {formatAmount(grandTotal)}
+          </p>
           {chargesTotal > 0 && (
             <p className="text-xs text-muted-foreground">Including {formatAmount(Math.abs(chargesTotal))} in charges</p>
           )}
@@ -1189,7 +1278,9 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide px-0.5">Purchase Orders</h2>
       </div>
       {pos.length === 0 ? (
-        <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">No purchase orders found</div>
+        <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
+          No purchase orders found
+        </div>
       ) : (
         <div className="space-y-4">
           {pos.map((po: any) => (
@@ -1197,15 +1288,28 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               {/* PO header bar */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 bg-muted/40 border-b">
                 <div className="flex items-center gap-3">
-                  <span className="font-semibold text-sm" data-testid={`text-po-${po.poNumber}`}>{po.poNumber}</span>
+                  <span className="font-semibold text-sm" data-testid={`text-po-${po.poNumber}`}>
+                    {po.poNumber}
+                  </span>
                   <span className="text-xs text-muted-foreground">{po.currency}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-semibold tabular-nums">{formatAmount(po.itemsTotal)}</span>
-                  <Button variant="ghost" size="icon" onClick={() => setLocation(`/purchase-orders/${po.id}/edit`)} data-testid={`button-edit-po-${po.id}`}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setLocation(`/purchase-orders/${po.id}/edit`)}
+                    data-testid={`button-edit-po-${po.id}`}
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handleDeletePO(po.id, po.poNumber)} disabled={deletePOMutation.isPending} data-testid={`button-delete-po-${po.id}`}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeletePO(po.id, po.poNumber)}
+                    disabled={deletePOMutation.isPending}
+                    data-testid={`button-delete-po-${po.id}`}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -1216,19 +1320,33 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Item Name</TableHead>
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Qty</TableHead>
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Rate</TableHead>
-                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Total</TableHead>
+                      <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Item Name
+                      </TableHead>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Qty
+                      </TableHead>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Rate
+                      </TableHead>
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Total
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {po.items.map((item: any) => (
                       <TableRow key={item.id} data-testid={`row-item-${item.id}`} className="text-sm">
                         <TableCell className="font-medium py-2">{item.itemName}</TableCell>
-                        <TableCell className="text-right tabular-nums py-2 text-muted-foreground">{fmtQty(item.quantity)}</TableCell>
-                        <TableCell className="text-right tabular-nums py-2 text-muted-foreground">{formatAmount(item.rate)}</TableCell>
-                        <TableCell className="text-right tabular-nums py-2 font-semibold">{formatAmount(item.lineTotal)}</TableCell>
+                        <TableCell className="text-right tabular-nums py-2 text-muted-foreground">
+                          {fmtQty(item.quantity)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums py-2 text-muted-foreground">
+                          {formatAmount(item.rate)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums py-2 font-semibold">
+                          {formatAmount(item.lineTotal)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -1241,14 +1359,22 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                   <div key={item.id} className="px-4 py-3 text-sm" data-testid={`row-item-${item.id}`}>
                     <p className="font-medium mb-1.5">{item.itemName}</p>
                     <div className="grid grid-cols-3 gap-2 text-muted-foreground text-xs">
-                      <div><span className="block">Qty</span><span className="font-mono font-medium text-foreground">{fmtQty(item.quantity)}</span></div>
-                      <div><span className="block">Rate</span><span className="font-mono font-medium text-foreground">{formatAmount(item.rate)}</span></div>
-                      <div><span className="block">Total</span><span className="font-mono font-semibold text-foreground">{formatAmount(item.lineTotal)}</span></div>
+                      <div>
+                        <span className="block">Qty</span>
+                        <span className="font-mono font-medium text-foreground">{fmtQty(item.quantity)}</span>
+                      </div>
+                      <div>
+                        <span className="block">Rate</span>
+                        <span className="font-mono font-medium text-foreground">{formatAmount(item.rate)}</span>
+                      </div>
+                      <div>
+                        <span className="block">Total</span>
+                        <span className="font-mono font-semibold text-foreground">{formatAmount(item.lineTotal)}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-
             </div>
           ))}
         </div>
@@ -1262,15 +1388,21 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b">
-                <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Misc Type</th>
-                <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Amount</th>
+                <th className="text-left px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Misc Type
+                </th>
+                <th className="text-right px-4 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Amount
+                </th>
               </tr>
             </thead>
             <tbody>
               {charges.map((c: any, i: number) => (
                 <tr key={i} className="border-t first:border-t-0">
                   <td className="px-4 py-2.5 text-muted-foreground">{c.chargeType}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatAmount(parseFloat(c.amount || "0"))}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-medium">
+                    {formatAmount(parseFloat(c.amount || "0"))}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1370,9 +1502,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                   <span className="text-sm font-medium">Container Cost</span>
                   <span className="text-lg font-bold">{formatAmount(grandTotal)}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Full balance will be charged to customer
-                </p>
+                <p className="text-xs text-muted-foreground">Full balance will be charged to customer</p>
               </div>
 
               <FormField
@@ -1382,13 +1512,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                   <FormItem>
                     <FormLabel>Commission</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        {...field}
-                        data-testid="input-commission"
-                      />
+                      <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-commission" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1432,11 +1556,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={sellContainerMutation.isPending}
-                  data-testid="button-submit-sale"
-                >
+                <Button type="submit" disabled={sellContainerMutation.isPending} data-testid="button-submit-sale">
                   {sellContainerMutation.isPending ? "Processing..." : "Record Sale"}
                 </Button>
               </div>
@@ -1460,7 +1580,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                 </SelectTrigger>
                 <SelectContent>
                   {(docsData?.docTypes || []).map((dt: any) => (
-                    <SelectItem key={dt.id} value={String(dt.id)}>{dt.label}{dt.isRequired ? " *" : ""}</SelectItem>
+                    <SelectItem key={dt.id} value={String(dt.id)}>
+                      {dt.label}
+                      {dt.isRequired ? " *" : ""}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1475,7 +1598,9 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowUploadDialog(false)} data-testid="button-cancel-upload">Cancel</Button>
+              <Button variant="outline" onClick={() => setShowUploadDialog(false)} data-testid="button-cancel-upload">
+                Cancel
+              </Button>
               <Button
                 disabled={!uploadDocTypeId || !uploadFile || uploadDocMutation.isPending}
                 onClick={() => uploadDocMutation.mutate({ docTypeId: Number(uploadDocTypeId), file: uploadFile! })}
@@ -1494,22 +1619,36 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             <DialogTitle>Add Freight Charge</DialogTitle>
             <DialogDescription>Record a freight/shipping charge for this container</DialogDescription>
           </DialogHeader>
-          <form noValidate
+          <form
+            noValidate
             onSubmit={freightForm.handleSubmit((data) => addFreightMutation.mutate(data))}
             className="space-y-4"
           >
             <div>
               <label className="text-sm font-medium">Vendor Name</label>
-              <Input {...freightForm.register("vendorName")} placeholder="Shipping company" data-testid="input-freight-vendor" />
+              <Input
+                {...freightForm.register("vendorName")}
+                placeholder="Shipping company"
+                data-testid="input-freight-vendor"
+              />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-sm font-medium">Amount</label>
-                <Input {...freightForm.register("freightAmount")} type="number" step="0.01" placeholder="0.00" data-testid="input-freight-amount" />
+                <Input
+                  {...freightForm.register("freightAmount")}
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  data-testid="input-freight-amount"
+                />
               </div>
               <div>
                 <label className="text-sm font-medium">Currency</label>
-                <Select value={freightForm.watch("currency")} onValueChange={(v) => freightForm.setValue("currency", v)}>
+                <Select
+                  value={freightForm.watch("currency")}
+                  onValueChange={(v) => freightForm.setValue("currency", v)}
+                >
                   <SelectTrigger data-testid="select-freight-currency">
                     <SelectValue />
                   </SelectTrigger>
@@ -1527,10 +1666,21 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             </div>
             <div>
               <label className="text-sm font-medium">Notes (optional)</label>
-              <Textarea {...freightForm.register("notes")} placeholder="Additional details" data-testid="input-freight-notes" />
+              <Textarea
+                {...freightForm.register("notes")}
+                placeholder="Additional details"
+                data-testid="input-freight-notes"
+              />
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowFreightDialog(false)} data-testid="button-cancel-freight">Cancel</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowFreightDialog(false)}
+                data-testid="button-cancel-freight"
+              >
+                Cancel
+              </Button>
               <Button type="submit" disabled={addFreightMutation.isPending} data-testid="button-submit-freight">
                 {addFreightMutation.isPending ? "Adding..." : "Add Freight"}
               </Button>
@@ -1539,13 +1689,19 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showPaymentDialog !== null} onOpenChange={(open) => { if (!open) setShowPaymentDialog(null); }}>
+      <Dialog
+        open={showPaymentDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) setShowPaymentDialog(null);
+        }}
+      >
         <DialogContent data-testid="dialog-add-payment">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
             <DialogDescription>Record a payment toward this freight charge</DialogDescription>
           </DialogHeader>
-          <form noValidate
+          <form
+            noValidate
             onSubmit={paymentForm.handleSubmit((data) => {
               if (showPaymentDialog !== null) addPaymentMutation.mutate({ freightId: showPaymentDialog, data });
             })}
@@ -1558,7 +1714,13 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               </div>
               <div>
                 <label className="text-sm font-medium">Amount</label>
-                <Input {...paymentForm.register("amount")} type="number" step="0.01" placeholder="0.00" data-testid="input-payment-amount" />
+                <Input
+                  {...paymentForm.register("amount")}
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  data-testid="input-payment-amount"
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -1578,11 +1740,22 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               </div>
               <div>
                 <label className="text-sm font-medium">Reference</label>
-                <Input {...paymentForm.register("reference")} placeholder="Transaction ref" data-testid="input-payment-reference" />
+                <Input
+                  {...paymentForm.register("reference")}
+                  placeholder="Transaction ref"
+                  data-testid="input-payment-reference"
+                />
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setShowPaymentDialog(null)} data-testid="button-cancel-payment">Cancel</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowPaymentDialog(null)}
+                data-testid="button-cancel-payment"
+              >
+                Cancel
+              </Button>
               <Button type="submit" disabled={addPaymentMutation.isPending} data-testid="button-submit-payment">
                 {addPaymentMutation.isPending ? "Recording..." : "Record Payment"}
               </Button>
@@ -1592,20 +1765,32 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
       </Dialog>
       <DeleteConfirmDialog
         open={!!pendingDelete}
-        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
-        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          pendingDelete?.();
+          setPendingDelete(null);
+        }}
       />
 
       {/* Price Import Dialog */}
-      <Dialog open={showPriceImportDialog} onOpenChange={(open) => {
-        if (!open) { setPriceImportPreview(null); setPriceImportError(null); }
-        setShowPriceImportDialog(open);
-      }}>
+      <Dialog
+        open={showPriceImportDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPriceImportPreview(null);
+            setPriceImportError(null);
+          }
+          setShowPriceImportDialog(open);
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Import Pricing from Excel</DialogTitle>
             <DialogDescription>
-              Upload an Excel file with columns <strong>barcode</strong> and <strong>price</strong>. Review the preview, then save to apply.
+              Upload an Excel file with columns <strong>barcode</strong> and <strong>price</strong>. Review the preview,
+              then save to apply.
             </DialogDescription>
           </DialogHeader>
 
@@ -1624,8 +1809,11 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             >
               <Upload className="w-8 h-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground text-center">
-                Click or drag an Excel file here<br />
-                <span className="text-xs">Columns: <code>barcode</code> and <code>price</code> (or A/B if no headers)</span>
+                Click or drag an Excel file here
+                <br />
+                <span className="text-xs">
+                  Columns: <code>barcode</code> and <code>price</code> (or A/B if no headers)
+                </span>
               </p>
               <input
                 ref={priceImportFileRef}
@@ -1645,9 +1833,7 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
               <p className="text-sm text-muted-foreground text-center">Reading file and fetching preview…</p>
             )}
 
-            {priceImportError && (
-              <p className="text-sm text-destructive">{priceImportError}</p>
-            )}
+            {priceImportError && <p className="text-sm text-destructive">{priceImportError}</p>}
 
             {/* Preview table */}
             {priceImportPreview && priceImportPreview.length > 0 && (
@@ -1674,12 +1860,36 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
                           {row.newRate != null ? formatAmount(row.newRate) : "—"}
                         </TableCell>
                         <TableCell>
-                          {row.status === "will_update" && <Badge variant="default" data-testid={`status-preview-${i}`}>Will Update</Badge>}
-                          {row.status === "no_change" && <Badge variant="secondary" data-testid={`status-preview-${i}`}>No Change</Badge>}
-                          {row.status === "not_found" && <Badge variant="destructive" data-testid={`status-preview-${i}`}>Not Found</Badge>}
-                          {row.status === "not_in_container" && <Badge variant="secondary" data-testid={`status-preview-${i}`}>Not in Container</Badge>}
-                          {row.status === "invalid_price" && <Badge variant="destructive" data-testid={`status-preview-${i}`}>Invalid Price</Badge>}
-                          {row.status === "invalid" && <Badge variant="destructive" data-testid={`status-preview-${i}`}>Invalid Row</Badge>}
+                          {row.status === "will_update" && (
+                            <Badge variant="default" data-testid={`status-preview-${i}`}>
+                              Will Update
+                            </Badge>
+                          )}
+                          {row.status === "no_change" && (
+                            <Badge variant="secondary" data-testid={`status-preview-${i}`}>
+                              No Change
+                            </Badge>
+                          )}
+                          {row.status === "not_found" && (
+                            <Badge variant="destructive" data-testid={`status-preview-${i}`}>
+                              Not Found
+                            </Badge>
+                          )}
+                          {row.status === "not_in_container" && (
+                            <Badge variant="secondary" data-testid={`status-preview-${i}`}>
+                              Not in Container
+                            </Badge>
+                          )}
+                          {row.status === "invalid_price" && (
+                            <Badge variant="destructive" data-testid={`status-preview-${i}`}>
+                              Invalid Price
+                            </Badge>
+                          )}
+                          {row.status === "invalid" && (
+                            <Badge variant="destructive" data-testid={`status-preview-${i}`}>
+                              Invalid Row
+                            </Badge>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1697,8 +1907,10 @@ export default function ContainerDetail({ id: idProp, forceErp }: { id?: string;
             <div className="flex justify-between items-center pt-2 border-t gap-2 flex-wrap">
               <p className="text-sm text-muted-foreground">
                 {priceImportPreview.filter((r: any) => r.status === "will_update").length} item(s) will be updated
-                {priceImportPreview.some((r: any) => r.status === "not_found") && ` · ${priceImportPreview.filter((r: any) => r.status === "not_found").length} not found`}
-                {priceImportPreview.some((r: any) => r.status === "not_in_container") && ` · ${priceImportPreview.filter((r: any) => r.status === "not_in_container").length} not in this container`}
+                {priceImportPreview.some((r: any) => r.status === "not_found") &&
+                  ` · ${priceImportPreview.filter((r: any) => r.status === "not_found").length} not found`}
+                {priceImportPreview.some((r: any) => r.status === "not_in_container") &&
+                  ` · ${priceImportPreview.filter((r: any) => r.status === "not_in_container").length} not in this container`}
               </p>
               <Button
                 onClick={() => {

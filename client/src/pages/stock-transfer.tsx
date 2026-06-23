@@ -10,20 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,7 +26,19 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useState, useEffect, useRef } from "react";
 import { format, parseISO } from "date-fns";
-import { X, Plus, Package, ArrowRight, Eye, Trash2, Upload, Search, AlertCircle, FileDown, ChevronDown } from "lucide-react";
+import {
+  X,
+  Plus,
+  Package,
+  ArrowRight,
+  Eye,
+  Trash2,
+  Upload,
+  Search,
+  AlertCircle,
+  FileDown,
+  ChevronDown,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -88,16 +88,16 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const { toast } = useToast();
   const [_location, navigate] = useLocation();
   const isPOS = !!posUser;
-  
+
   const posSourceLocation = isPOS ? posUser?.assignedLocationId : null;
-  
+
   const [selectedSourceLocation, setSelectedSourceLocation] = useState<number | null>(posSourceLocation);
   const [selectedDestLocation, setSelectedDestLocation] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
   const [entries, setEntries] = useState<TransferEntry[]>([
-    { stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }
+    { stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 },
   ]);
-  
+
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingTransfer, setViewingTransfer] = useState<StockTransferVoucher | null>(null);
 
@@ -111,7 +111,9 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   const [zeroStockItem, setZeroStockItem] = useState("");
 
   const [negativeStockWarning, setNegativeStockWarning] = useState(false);
-  const [negativeStockItems, setNegativeStockItems] = useState<Array<{ name: string; available: number; requested: number }>>([]);
+  const [negativeStockItems, setNegativeStockItems] = useState<
+    Array<{ name: string; available: number; requested: number }>
+  >([]);
 
   useEffect(() => {
     if (isPOS && posUser?.assignedLocationId) {
@@ -127,7 +129,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     queryKey: ["/api/stock-items"],
   });
 
-  const activeSourceLocation = isPOS ? (posUser?.assignedLocationId || selectedSourceLocation) : selectedSourceLocation;
+  const activeSourceLocation = isPOS ? posUser?.assignedLocationId || selectedSourceLocation : selectedSourceLocation;
 
   const { data: inventoryItems = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
     queryKey: ["/api/inventory-by-location", activeSourceLocation],
@@ -148,9 +150,10 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   });
 
   // All stock transfer vouchers for export
-  const allStockTransferVouchers = vouchers
-    .filter((v: any) => v.voucherType === "Stock Transfer" || v.voucherType === "StockTransfer");
-  
+  const allStockTransferVouchers = vouchers.filter(
+    (v: any) => v.voucherType === "Stock Transfer" || v.voucherType === "StockTransfer"
+  );
+
   // Limited list for UI display (last 20)
   const stockTransferVouchers = allStockTransferVouchers.slice(0, 20);
 
@@ -192,19 +195,19 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
   };
 
   const getAvailableQty = (stockItemId: number): number => {
-    const invItem = inventoryItems.find(i => i.stockItemId === stockItemId);
+    const invItem = inventoryItems.find((i) => i.stockItemId === stockItemId);
     return invItem ? parseFloat(invItem.quantity) : 0;
   };
 
   const handleItemChange = async (index: number, stockItemId: number, stockItemName: string) => {
     const availableQty = getAvailableQty(stockItemId);
-    
+
     if (stockItemId > 0 && availableQty === 0) {
       setZeroStockItem(stockItemName);
       setZeroStockAlert(true);
       return;
     }
-    
+
     const newEntries = [...entries];
     newEntries[index] = {
       ...newEntries[index],
@@ -215,7 +218,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
     setEntries(newEntries);
     setActiveRowIndex(null);
     setSearchTerm("");
-    
+
     setTimeout(() => {
       const qtyInput = document.querySelector(`[data-testid="input-quantity-${index}"]`) as HTMLInputElement;
       if (qtyInput) {
@@ -263,25 +266,27 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
   const getFilteredInventory = () => {
     if (!searchTerm.trim()) {
-      return inventoryItems.map(inv => {
-        const stockItem = stockItems.find((si: any) => si.id === inv.stockItemId);
-        return {
-          stockItemId: inv.stockItemId,
-          name: inv.stockItemName || stockItem?.name || "",
-          code: inv.stockItemCode || stockItem?.code || "",
-          stock: parseFloat(inv.quantity),
-        };
-      }).sort((a, b) => a.name.localeCompare(b.name));
+      return inventoryItems
+        .map((inv) => {
+          const stockItem = stockItems.find((si: any) => si.id === inv.stockItemId);
+          return {
+            stockItemId: inv.stockItemId,
+            name: inv.stockItemName || stockItem?.name || "",
+            code: inv.stockItemCode || stockItem?.code || "",
+            stock: parseFloat(inv.quantity),
+          };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
     }
-    
+
     const term = searchTerm.toLowerCase();
     return inventoryItems
-      .filter(inv => {
+      .filter((inv) => {
         const name = inv.stockItemName?.toLowerCase() || "";
         const code = inv.stockItemCode?.toLowerCase() || "";
         return name.includes(term) || code.includes(term);
       })
-      .map(inv => {
+      .map((inv) => {
         const stockItem = stockItems.find((si: any) => si.id === inv.stockItemId);
         return {
           stockItemId: inv.stockItemId,
@@ -295,25 +300,25 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
   const selectItem = async (item: { stockItemId: number; name: string; code: string; stock: number }) => {
     if (activeRowIndex === null) return;
-    
+
     if (item.stock === 0) {
       setZeroStockItem(item.name);
       setZeroStockAlert(true);
       return;
     }
-    
+
     handleItemChange(activeRowIndex, item.stockItemId, item.name);
   };
 
   const handleItemKeyDown = async (e: React.KeyboardEvent, index: number) => {
     const filteredItems = getFilteredInventory();
-    
+
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightedIndex(prev => Math.min(prev + 1, filteredItems.length - 1));
+      setHighlightedIndex((prev) => Math.min(prev + 1, filteredItems.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightedIndex(prev => Math.max(prev - 1, 0));
+      setHighlightedIndex((prev) => Math.max(prev - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (filteredItems[highlightedIndex]) {
@@ -348,27 +353,27 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       return;
     }
 
-    const validEntries = entries.filter(e => e.stockItemId > 0 && parseFloat(e.quantity || "0") > 0);
-    
+    const validEntries = entries.filter((e) => e.stockItemId > 0 && parseFloat(e.quantity || "0") > 0);
+
     if (validEntries.length === 0) {
       toast({ title: "Error", description: "Please add at least one item with quantity", variant: "destructive" });
       return;
     }
 
     const itemsWithNegativeStock: Array<{ name: string; available: number; requested: number }> = [];
-    
+
     for (const entry of validEntries) {
       const transferQty = parseFloat(entry.quantity || "0");
-      
+
       if (entry.availableQty === 0) {
-        toast({ 
-          title: "Error", 
-          description: `${entry.stockItemName} has 0 stock available and cannot be transferred.`, 
-          variant: "destructive" 
+        toast({
+          title: "Error",
+          description: `${entry.stockItemName} has 0 stock available and cannot be transferred.`,
+          variant: "destructive",
         });
         return;
       }
-      
+
       if (transferQty > entry.availableQty) {
         itemsWithNegativeStock.push({
           name: entry.stockItemName,
@@ -405,14 +410,14 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       if (res.ok) {
         const data = await res.json();
         const transfer = Array.isArray(data) ? data[0] : data;
-        
+
         const sourceLocation = locations.find((l: any) => l.id === transfer?.sourceLocationId);
         const destLocation = locations.find((l: any) => l.id === transfer?.destinationLocationId);
-        
+
         setViewingTransfer({
           ...voucher,
-          sourceLocationName: sourceLocation?.name || 'Unknown',
-          destinationLocationName: destLocation?.name || 'Unknown',
+          sourceLocationName: sourceLocation?.name || "Unknown",
+          destinationLocationName: destLocation?.name || "Unknown",
           items: transfer?.items || [],
         });
         setViewDialogOpen(true);
@@ -434,8 +439,8 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
     const exportData = allStockTransferVouchers.map((voucher: any) => ({
       "Voucher Number": voucher.voucherNumber,
-      "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
-      "Description": voucher.description || "",
+      Date: format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+      Description: voucher.description || "",
       "Total Amount": voucher.totalAmount,
     }));
 
@@ -451,9 +456,9 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       description: `Downloaded ${fileName} with ${allStockTransferVouchers.length} records.`,
     });
   };
-  
+
   const [isExportingDetailed, setIsExportingDetailed] = useState(false);
-  
+
   const handleExportDetailedToExcel = async () => {
     if (allStockTransferVouchers.length === 0) {
       toast({
@@ -463,21 +468,21 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
       });
       return;
     }
-    
+
     setIsExportingDetailed(true);
-    
+
     try {
       const detailedData: Array<{
         "Voucher Number": string;
-        "Date": string;
-        "Description": string;
+        Date: string;
+        Description: string;
         "Source Location": string;
         "Destination Location": string;
         "Item Code": string;
         "Item Name": string;
-        "Quantity": string;
+        Quantity: string;
       }> = [];
-      
+
       // Fetch details for each voucher
       for (const voucher of allStockTransferVouchers) {
         try {
@@ -485,33 +490,33 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
           if (res.ok) {
             const data = await res.json();
             const transfer = Array.isArray(data) ? data[0] : data;
-            
+
             const sourceLocation = locations.find((l: any) => l.id === transfer?.sourceLocationId);
             const destLocation = locations.find((l: any) => l.id === transfer?.destinationLocationId);
-            
+
             if (transfer?.items && transfer.items.length > 0) {
               for (const item of transfer.items) {
                 detailedData.push({
                   "Voucher Number": voucher.voucherNumber,
-                  "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
-                  "Description": voucher.description || "",
+                  Date: format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+                  Description: voucher.description || "",
                   "Source Location": item.sourceLocationName || sourceLocation?.name || "Unknown",
                   "Destination Location": destLocation?.name || "Unknown",
                   "Item Code": item.stockItemCode || "",
                   "Item Name": item.stockItemName || `Item ${item.stockItemId}`,
-                  "Quantity": formatNumber(parseFloat(item.quantity || "0"), 0),
+                  Quantity: formatNumber(parseFloat(item.quantity || "0"), 0),
                 });
               }
             } else {
               detailedData.push({
                 "Voucher Number": voucher.voucherNumber,
-                "Date": format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
-                "Description": voucher.description || "",
+                Date: format(parseISO(voucher.voucherDate), "yyyy-MM-dd"),
+                Description: voucher.description || "",
                 "Source Location": sourceLocation?.name || "Unknown",
                 "Destination Location": destLocation?.name || "Unknown",
                 "Item Code": "",
                 "Item Name": "",
-                "Quantity": "",
+                Quantity: "",
               });
             }
           }
@@ -519,7 +524,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
           console.error(`Error fetching transfer ${voucher.id}:`, error);
         }
       }
-      
+
       if (detailedData.length === 0) {
         toast({
           title: "No data to export",
@@ -528,11 +533,11 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
         });
         return;
       }
-      
+
       const worksheet = utils.json_to_sheet(detailedData);
       const workbook = utils.book_new();
       utils.book_append_sheet(workbook, worksheet, "Stock Transfers Detailed");
-      
+
       // Auto-size columns
       const colWidths = [
         { wch: 15 }, // Voucher Number
@@ -606,8 +611,8 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                     <span className="font-medium">{sourceLocationName || "Your Location"}</span>
                   </div>
                 ) : (
-                  <Select 
-                    value={selectedSourceLocation?.toString() || ""} 
+                  <Select
+                    value={selectedSourceLocation?.toString() || ""}
                     onValueChange={(v) => {
                       setSelectedSourceLocation(parseInt(v));
                       setEntries([{ stockItemId: 0, stockItemName: "", quantity: "", availableQty: 0 }]);
@@ -629,8 +634,8 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
               <div className="space-y-2">
                 <Label data-testid="label-dest-location">Destination Location</Label>
-                <Select 
-                  value={selectedDestLocation?.toString() || ""} 
+                <Select
+                  value={selectedDestLocation?.toString() || ""}
                   onValueChange={(v) => setSelectedDestLocation(parseInt(v))}
                 >
                   <SelectTrigger data-testid="select-dest-location">
@@ -655,7 +660,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                   <Label>Items to Transfer</Label>
                   {inventoryLoading && <Skeleton className="h-4 w-24" />}
                 </div>
-                
+
                 <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
@@ -738,17 +743,17 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
 
             <div className="space-y-2">
               <Label data-testid="label-notes">Notes</Label>
-              <Textarea 
-                value={notes} 
-                onChange={(e) => setNotes(e.target.value)} 
-                placeholder="Optional notes for this transfer" 
-                data-testid="input-notes" 
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional notes for this transfer"
+                data-testid="input-notes"
               />
             </div>
 
-            <Button 
-              onClick={handleSubmit} 
-              disabled={createTransferMutation.isPending || !activeSourceLocation || !selectedDestLocation} 
+            <Button
+              onClick={handleSubmit}
+              disabled={createTransferMutation.isPending || !activeSourceLocation || !selectedDestLocation}
               className="w-full"
               data-testid="button-submit-transfer"
             >
@@ -795,18 +800,18 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium mb-1 truncate">{item.name}</div>
-                          <div className="text-xs text-muted-foreground font-mono">
-                            {item.code}
-                          </div>
+                          <div className="text-xs text-muted-foreground font-mono">{item.code}</div>
                         </div>
                         <div className="flex items-center">
-                          <div className={`text-xs font-medium px-2 py-0.5 rounded ${
-                            item.stock === 0 
-                              ? "bg-destructive/10 text-destructive" 
-                              : item.stock < 10
-                              ? "bg-chart-3/10 text-chart-3"
-                              : "bg-chart-2/10 text-chart-2"
-                          }`}>
+                          <div
+                            className={`text-xs font-medium px-2 py-0.5 rounded ${
+                              item.stock === 0
+                                ? "bg-destructive/10 text-destructive"
+                                : item.stock < 10
+                                  ? "bg-chart-3/10 text-chart-3"
+                                  : "bg-chart-2/10 text-chart-2"
+                            }`}
+                          >
                             {item.stock === 0 ? "Out" : `${item.stock.toFixed(0)}`}
                           </div>
                         </div>
@@ -870,7 +875,9 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                         {format(parseISO(voucher.voucherDate), "MMM dd, yyyy")}
                       </TableCell>
                       <TableCell className="font-mono text-sm">{voucher.voucherNumber}</TableCell>
-                      <TableCell className="max-w-xs truncate hidden sm:table-cell">{voucher.description || "-"}</TableCell>
+                      <TableCell className="max-w-xs truncate hidden sm:table-cell">
+                        {voucher.description || "-"}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
@@ -898,8 +905,8 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
               Out of Stock
             </AlertDialogTitle>
             <AlertDialogDescription>
-              <span className="font-medium">{zeroStockItem}</span> has 0 stock available and cannot be added to the transfer.
-              Please select a different item.
+              <span className="font-medium">{zeroStockItem}</span> has 0 stock available and cannot be added to the
+              transfer. Please select a different item.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -936,7 +943,7 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-negative-stock">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleProceedWithNegative}
               className="bg-chart-3 hover:bg-chart-3/90"
               data-testid="button-proceed-negative-stock"
@@ -957,12 +964,10 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Date</p>
-                  <p className="font-medium">
-                    {format(parseISO(viewingTransfer.voucherDate), "MMM dd, yyyy")}
-                  </p>
+                  <p className="font-medium">{format(parseISO(viewingTransfer.voucherDate), "MMM dd, yyyy")}</p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2 py-2">
                 <Badge variant="outline">{viewingTransfer.sourceLocationName}</Badge>
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -980,14 +985,16 @@ export default function StockTransferPage({ posUser }: StockTransferPageProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(Array.isArray(viewingTransfer.items) ? viewingTransfer.items : []).map((item: any, idx: number) => (
-                        <TableRow key={idx}>
-                          <TableCell>{item.stockItemName || `Item ${item.stockItemId}`}</TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatNumber(parseFloat(item.quantity || "0"), 0)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                      {(Array.isArray(viewingTransfer.items) ? viewingTransfer.items : []).map(
+                        (item: any, idx: number) => (
+                          <TableRow key={idx}>
+                            <TableCell>{item.stockItemName || `Item ${item.stockItemId}`}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatNumber(parseFloat(item.quantity || "0"), 0)}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      )}
                     </TableBody>
                   </Table>
                 </div>

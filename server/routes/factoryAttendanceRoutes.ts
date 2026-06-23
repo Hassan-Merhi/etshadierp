@@ -8,11 +8,7 @@ function getFactoryCompanyId(req: any): number | undefined {
   return (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
 }
 
-export function registerFactoryAttendanceRoutes(
-  app: Express,
-  requireAuth: any,
-  db: any
-) {
+export function registerFactoryAttendanceRoutes(app: Express, requireAuth: any, db: any) {
   // GET /api/factory/attendance?date=YYYY-MM-DD&shift=
   // Returns active workers + merged attendance for that date
   app.get("/api/factory/attendance", requireAuth, async (req: any, res: any) => {
@@ -219,18 +215,19 @@ export function registerFactoryAttendanceRoutes(
 
       const workerIds = workers.map((w: any) => w.id);
 
-      const existing = workerIds.length > 0
-        ? await db
-            .select()
-            .from(factoryAttendance)
-            .where(
-              and(
-                eq(factoryAttendance.companyId, companyId),
-                eq(factoryAttendance.attendanceDate, date),
-                inArray(factoryAttendance.workerId, workerIds)
+      const existing =
+        workerIds.length > 0
+          ? await db
+              .select()
+              .from(factoryAttendance)
+              .where(
+                and(
+                  eq(factoryAttendance.companyId, companyId),
+                  eq(factoryAttendance.attendanceDate, date),
+                  inArray(factoryAttendance.workerId, workerIds)
+                )
               )
-            )
-        : [];
+          : [];
 
       const attendanceMap: Record<number, string> = {};
       for (const a of existing) attendanceMap[a.workerId] = a.status;
@@ -247,20 +244,23 @@ export function registerFactoryAttendanceRoutes(
 
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="attendance-${date}.pdf"`
-      );
+      res.setHeader("Content-Disposition", `attachment; filename="attendance-${date}.pdf"`);
       doc.pipe(res);
 
       // Title
       const attLogoPath = require("path").join(process.cwd(), "server", "hmd-logo.png");
       if (require("fs").existsSync(attLogoPath)) {
-        try { doc.image(attLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.4); } catch {}
+        try {
+          doc.image(attLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
+          doc.moveDown(0.4);
+        } catch {}
       }
       doc.fontSize(18).font("Helvetica-Bold").text("Attendance Report", { align: "center" });
       doc.moveDown(0.3);
-      doc.fontSize(11).font("Helvetica").text(`Date: ${date}${shift ? `   Shift: ${shift}` : ""}`, { align: "center" });
+      doc
+        .fontSize(11)
+        .font("Helvetica")
+        .text(`Date: ${date}${shift ? `   Shift: ${shift}` : ""}`, { align: "center" });
       doc.moveDown(0.8);
 
       // Summary
@@ -298,10 +298,13 @@ export function registerFactoryAttendanceRoutes(
         }
 
         const statusColor =
-          row.status === "Present" ? "#15803d" :
-          row.status === "Absent" ? "#b91c1c" :
-          row.status === "Late" ? "#b45309" :
-          "#374151";
+          row.status === "Present"
+            ? "#15803d"
+            : row.status === "Absent"
+              ? "#b91c1c"
+              : row.status === "Late"
+                ? "#b45309"
+                : "#374151";
 
         doc.fillColor("#111827").text(row.fullName || "", colX[0], y, { width: colW[0] });
         doc.text(row.employeeCode || "—", colX[1], y, { width: colW[1] });
@@ -316,7 +319,10 @@ export function registerFactoryAttendanceRoutes(
           doc.addPage();
           doc.fontSize(9).font("Helvetica-Bold");
           const nextHeaderY = doc.y;
-          doc.rect(40, nextHeaderY - 4, 515, 18).fill("#e5e7eb").fillColor("#111827");
+          doc
+            .rect(40, nextHeaderY - 4, 515, 18)
+            .fill("#e5e7eb")
+            .fillColor("#111827");
           headers.forEach((h, hi) => {
             doc.text(h, colX[hi], nextHeaderY, { width: colW[hi] });
           });

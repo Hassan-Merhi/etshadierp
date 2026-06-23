@@ -13,12 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Plus, ArrowLeft, Printer, TruckIcon } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
@@ -32,28 +28,48 @@ function fmt(n: number | null | undefined) {
 
 type LedgerAccount = { id: number; name: string; accountType: string };
 type Transporter = {
-  id: number; name: string; phone?: string; notes?: string;
-  totalCharged: number; totalPaid: number; outstanding: number;
+  id: number;
+  name: string;
+  phone?: string;
+  notes?: string;
+  totalCharged: number;
+  totalPaid: number;
+  outstanding: number;
 };
 type Transaction = {
-  id: number; txType: "charge" | "payment"; amount: string; txDate: string;
-  description?: string; runningBalance: number;
+  id: number;
+  txType: "charge" | "payment";
+  amount: string;
+  txDate: string;
+  description?: string;
+  runningBalance: number;
 };
 type TransporterDetail = Transporter & { transactions: Transaction[] };
 
 // ─────────────────────────────────────────────────────────────
 // ACCOUNT COMBOBOX (simple select for now)
 // ─────────────────────────────────────────────────────────────
-function AccountSelect({ accounts, value, onChange, placeholder, filter }: {
-  accounts: LedgerAccount[]; value: string; onChange: (v: string) => void;
-  placeholder: string; filter?: (a: LedgerAccount) => boolean;
+function AccountSelect({
+  accounts,
+  value,
+  onChange,
+  placeholder,
+  filter,
+}: {
+  accounts: LedgerAccount[];
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  filter?: (a: LedgerAccount) => boolean;
 }) {
   const list = filter ? accounts.filter(filter) : accounts;
   return (
     <Select value={value} onValueChange={onChange}>
-      <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
+      <SelectTrigger>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
       <SelectContent>
-        {list.map(a => (
+        {list.map((a) => (
           <SelectItem key={a.id} value={String(a.id)}>
             {a.name} <span className="text-muted-foreground text-xs ml-1">({a.accountType})</span>
           </SelectItem>
@@ -80,58 +96,88 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
   });
 
   const charge = useMutation({
-    mutationFn: () => apiRequest("POST", `${API}/${transporterId}/charges`, {
-      amount, txDate, description,
-      expenseAccountId: parseInt(expenseAccountId),
-    }),
+    mutationFn: () =>
+      apiRequest("POST", `${API}/${transporterId}/charges`, {
+        amount,
+        txDate,
+        description,
+        expenseAccountId: parseInt(expenseAccountId),
+      }),
     onSuccess: () => {
       toast({ title: "Charge recorded" });
       queryClient.invalidateQueries({ queryKey: [API] });
       queryClient.invalidateQueries({ queryKey: [API, transporterId] });
-      setAmount(""); setDescription(""); onClose();
+      setAmount("");
+      setDescription("");
+      onClose();
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
     <>
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Record Charge</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">Dr Expense Account / Cr Transporter Account</p>
-          <div>
-            <Label>Amount ($) *</Label>
-            <Input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} data-testid="input-charge-amount" />
+      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Charge</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">Dr Expense Account / Cr Transporter Account</p>
+            <div>
+              <Label>Amount ($) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                data-testid="input-charge-amount"
+              />
+            </div>
+            <div>
+              <Label>Date *</Label>
+              <Input
+                type="date"
+                value={txDate}
+                onChange={(e) => setTxDate(e.target.value)}
+                data-testid="input-charge-date"
+              />
+            </div>
+            <div>
+              <Label>Expense Account *</Label>
+              <AccountSelect
+                accounts={accounts}
+                value={expenseAccountId}
+                onChange={setExpenseAccountId}
+                placeholder="Select expense account…"
+                filter={(a) => ["Expense", "Direct Expense", "Indirect Expense"].includes(a.accountType)}
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Container offload BL#12345"
+                data-testid="input-charge-desc"
+              />
+            </div>
           </div>
-          <div>
-            <Label>Date *</Label>
-            <Input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} data-testid="input-charge-date" />
-          </div>
-          <div>
-            <Label>Expense Account *</Label>
-            <AccountSelect
-              accounts={accounts}
-              value={expenseAccountId}
-              onChange={setExpenseAccountId}
-              placeholder="Select expense account…"
-              filter={a => ["Expense", "Direct Expense", "Indirect Expense"].includes(a.accountType)}
-            />
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="e.g. Container offload BL#12345" data-testid="input-charge-desc" />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => wrapAdminAction(() => charge.mutate(), "Record Charge")} disabled={!amount || !expenseAccountId || charge.isPending} data-testid="button-save-charge">
-            {charge.isPending ? "Saving…" : "Record Charge"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    {AdminDialog}
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(() => charge.mutate(), "Record Charge")}
+              disabled={!amount || !expenseAccountId || charge.isPending}
+              data-testid="button-save-charge"
+            >
+              {charge.isPending ? "Saving…" : "Record Charge"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {AdminDialog}
     </>
   );
 }
@@ -139,7 +185,15 @@ function ChargeDialog({ transporterId, open, onClose }: { transporterId: number;
 // ─────────────────────────────────────────────────────────────
 // PAYMENT DIALOG
 // ─────────────────────────────────────────────────────────────
-function PaymentDialog({ transporterId, open, onClose }: { transporterId: number; open: boolean; onClose: () => void }) {
+function PaymentDialog({
+  transporterId,
+  open,
+  onClose,
+}: {
+  transporterId: number;
+  open: boolean;
+  onClose: () => void;
+}) {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
   const { toast } = useToast();
   const [amount, setAmount] = useState("");
@@ -153,58 +207,88 @@ function PaymentDialog({ transporterId, open, onClose }: { transporterId: number
   });
 
   const pay = useMutation({
-    mutationFn: () => apiRequest("POST", `${API}/${transporterId}/payments`, {
-      amount, txDate, description,
-      cashAccountId: parseInt(cashAccountId),
-    }),
+    mutationFn: () =>
+      apiRequest("POST", `${API}/${transporterId}/payments`, {
+        amount,
+        txDate,
+        description,
+        cashAccountId: parseInt(cashAccountId),
+      }),
     onSuccess: () => {
       toast({ title: "Payment recorded" });
       queryClient.invalidateQueries({ queryKey: [API] });
       queryClient.invalidateQueries({ queryKey: [API, transporterId] });
-      setAmount(""); setDescription(""); onClose();
+      setAmount("");
+      setDescription("");
+      onClose();
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
     <>
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Record Payment</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">Dr Transporter Account / Cr Cash</p>
-          <div>
-            <Label>Amount ($) *</Label>
-            <Input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} data-testid="input-payment-amount" />
+      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">Dr Transporter Account / Cr Cash</p>
+            <div>
+              <Label>Amount ($) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                data-testid="input-payment-amount"
+              />
+            </div>
+            <div>
+              <Label>Date *</Label>
+              <Input
+                type="date"
+                value={txDate}
+                onChange={(e) => setTxDate(e.target.value)}
+                data-testid="input-payment-date"
+              />
+            </div>
+            <div>
+              <Label>Cash / Bank Account *</Label>
+              <AccountSelect
+                accounts={accounts}
+                value={cashAccountId}
+                onChange={setCashAccountId}
+                placeholder="Select cash account…"
+                filter={(a) => ["Cash", "Bank"].includes(a.accountType)}
+              />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. Payment for April services"
+                data-testid="input-payment-desc"
+              />
+            </div>
           </div>
-          <div>
-            <Label>Date *</Label>
-            <Input type="date" value={txDate} onChange={e => setTxDate(e.target.value)} data-testid="input-payment-date" />
-          </div>
-          <div>
-            <Label>Cash / Bank Account *</Label>
-            <AccountSelect
-              accounts={accounts}
-              value={cashAccountId}
-              onChange={setCashAccountId}
-              placeholder="Select cash account…"
-              filter={a => ["Cash", "Bank"].includes(a.accountType)}
-            />
-          </div>
-          <div>
-            <Label>Description</Label>
-            <Textarea rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="e.g. Payment for April services" data-testid="input-payment-desc" />
-          </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => wrapAdminAction(() => pay.mutate(), "Record Payment")} disabled={!amount || !cashAccountId || pay.isPending} data-testid="button-save-payment">
-            {pay.isPending ? "Saving…" : "Record Payment"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    {AdminDialog}
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(() => pay.mutate(), "Record Payment")}
+              disabled={!amount || !cashAccountId || pay.isPending}
+              data-testid="button-save-payment"
+            >
+              {pay.isPending ? "Saving…" : "Record Payment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {AdminDialog}
     </>
   );
 }
@@ -222,7 +306,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
 
   const { data, isLoading } = useQuery<TransporterDetail>({
     queryKey: [API, transporterId],
-    queryFn: () => fetch(`${API}/${transporterId}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch(`${API}/${transporterId}`, { credentials: "include" }).then((r) => r.json()),
   });
 
   const deleteTx = useMutation({
@@ -245,7 +329,9 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-transporters"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" onClick={onBack} data-testid="button-back-transporters">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
           <div>
             <h2 className="text-xl font-bold">{data.name}</h2>
             {data.phone && <p className="text-sm text-muted-foreground">{data.phone}</p>}
@@ -267,19 +353,31 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL CHARGED</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">${fmt(data.totalCharged)}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAID</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL CHARGED</CardTitle>
+          </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${data.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`}>${fmt(data.totalPaid)}</div>
+            <div className="text-2xl font-bold">${fmt(data.totalCharged)}</div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">OUTSTANDING</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAID</CardTitle>
+          </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${data.outstanding > 0 ? "text-red-600 dark:text-red-400" : data.outstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+            <div className={`text-2xl font-bold ${data.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+              ${fmt(data.totalPaid)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs text-muted-foreground font-normal">OUTSTANDING</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className={`text-2xl font-bold ${data.outstanding > 0 ? "text-red-600 dark:text-red-400" : data.outstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`}
+            >
               ${fmt(data.outstanding)}
             </div>
             <p className="text-[10px] text-muted-foreground mt-1">positive = you owe them</p>
@@ -296,7 +394,9 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
           </div>
           <div className="table-responsive">
             {data.transactions.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">No transactions yet. Record a charge to get started.</div>
+              <div className="p-8 text-center text-muted-foreground">
+                No transactions yet. Record a charge to get started.
+              </div>
             ) : (
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-30 bg-muted/50">
@@ -311,7 +411,7 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
                   </tr>
                 </thead>
                 <tbody>
-                  {data.transactions.map(tx => (
+                  {data.transactions.map((tx) => (
                     <tr key={tx.id} className="border-b hover:bg-muted/30">
                       <td className="px-3 py-2 tabular-nums">{tx.txDate}</td>
                       <td className="px-3 py-2">
@@ -324,13 +424,29 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
                         {tx.txType === "charge" ? <span>${fmt(Number(tx.amount))}</span> : "—"}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">
-                        {tx.txType === "payment" ? <span className="text-green-600 dark:text-green-400">${fmt(Number(tx.amount))}</span> : "—"}
+                        {tx.txType === "payment" ? (
+                          <span className="text-green-600 dark:text-green-400">${fmt(Number(tx.amount))}</span>
+                        ) : (
+                          "—"
+                        )}
                       </td>
-                      <td className={`px-3 py-2 text-right tabular-nums font-medium ${tx.runningBalance > 0 ? "text-red-600 dark:text-red-400" : tx.runningBalance < 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+                      <td
+                        className={`px-3 py-2 text-right tabular-nums font-medium ${tx.runningBalance > 0 ? "text-red-600 dark:text-red-400" : tx.runningBalance < 0 ? "text-green-600 dark:text-green-400" : ""}`}
+                      >
                         ${fmt(tx.runningBalance)}
                       </td>
                       <td className="px-3 py-2 print:hidden">
-                        <Button variant="ghost" size="icon" onClick={() => wrapAdminAction(() => setPendingDelete(() => () => deleteTx.mutate(tx.id)), "Delete Transaction")} data-testid={`button-delete-tx-${tx.id}`}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            wrapAdminAction(
+                              () => setPendingDelete(() => () => deleteTx.mutate(tx.id)),
+                              "Delete Transaction"
+                            )
+                          }
+                          data-testid={`button-delete-tx-${tx.id}`}
+                        >
                           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                         </Button>
                       </td>
@@ -339,10 +455,18 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
                 </tbody>
                 <tfoot className="sticky bottom-0 z-20 bg-background">
                   <tr className="border-t font-semibold bg-muted/20">
-                    <td className="px-3 py-2" colSpan={3}>TOTALS</td>
+                    <td className="px-3 py-2" colSpan={3}>
+                      TOTALS
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums">${fmt(data.totalCharged)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-green-600 dark:text-green-400">${fmt(data.totalPaid)}</td>
-                    <td className={`px-3 py-2 text-right tabular-nums ${data.outstanding > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>${fmt(data.outstanding)}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-green-600 dark:text-green-400">
+                      ${fmt(data.totalPaid)}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right tabular-nums ${data.outstanding > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}
+                    >
+                      ${fmt(data.outstanding)}
+                    </td>
                     <td className="print:hidden" />
                   </tr>
                 </tfoot>
@@ -356,8 +480,13 @@ function TransporterStatement({ transporterId, onBack }: { transporterId: number
       <PaymentDialog transporterId={transporterId} open={paymentOpen} onClose={() => setPaymentOpen(false)} />
       <DeleteConfirmDialog
         open={!!pendingDelete}
-        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
-        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          pendingDelete?.();
+          setPendingDelete(null);
+        }}
       />
       {AdminDialog}
     </div>
@@ -379,40 +508,68 @@ function AddTransporterDialog({ open, onClose }: { open: boolean; onClose: () =>
     onSuccess: () => {
       toast({ title: "Transporter created" });
       queryClient.invalidateQueries({ queryKey: [API] });
-      setName(""); setPhone(""); setNotes(""); onClose();
+      setName("");
+      setPhone("");
+      setNotes("");
+      onClose();
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   return (
     <>
-    <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Add Transporter</DialogTitle></DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label>Name *</Label>
-            <Input value={name} onChange={e => setName(e.target.value)} placeholder="Transporter name" data-testid="input-transporter-name" />
+      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Transporter</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Name *</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Transporter name"
+                data-testid="input-transporter-name"
+              />
+            </div>
+            <div>
+              <Label>Phone</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+961 xx xxx xxx"
+                data-testid="input-transporter-phone"
+              />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea
+                rows={2}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                data-testid="input-transporter-notes"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A "Transporter Agent" ledger account will be created automatically.
+            </p>
           </div>
-          <div>
-            <Label>Phone</Label>
-            <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="+961 xx xxx xxx" data-testid="input-transporter-phone" />
-          </div>
-          <div>
-            <Label>Notes</Label>
-            <Textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} data-testid="input-transporter-notes" />
-          </div>
-          <p className="text-xs text-muted-foreground">A "Transporter Agent" ledger account will be created automatically.</p>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={() => wrapAdminAction(() => create.mutate(), "Create Transporter")} disabled={!name || create.isPending} data-testid="button-create-transporter">
-            {create.isPending ? "Creating…" : "Create"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    {AdminDialog}
+          <DialogFooter>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => wrapAdminAction(() => create.mutate(), "Create Transporter")}
+              disabled={!name || create.isPending}
+              data-testid="button-create-transporter"
+            >
+              {create.isPending ? "Creating…" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {AdminDialog}
     </>
   );
 }
@@ -456,21 +613,33 @@ export default function FactoryTransporters() {
       {!isLoading && transporters.length > 0 && (
         <div className="grid grid-cols-3 gap-3">
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL TRANSPORTERS</CardTitle></CardHeader>
-            <CardContent><div className="text-2xl font-bold">{transporters.length}</div></CardContent>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL TRANSPORTERS</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{transporters.length}</div>
+            </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAID</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAID</CardTitle>
+            </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${transporters.reduce((s, t) => s + t.totalPaid, 0) > 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+              <div
+                className={`text-2xl font-bold ${transporters.reduce((s, t) => s + t.totalPaid, 0) > 0 ? "text-green-600 dark:text-green-400" : ""}`}
+              >
                 ${fmt(transporters.reduce((s, t) => s + t.totalPaid, 0))}
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL OUTSTANDING</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL OUTSTANDING</CardTitle>
+            </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${transporters.reduce((s, t) => s + t.outstanding, 0) > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+              <div
+                className={`text-2xl font-bold ${transporters.reduce((s, t) => s + t.outstanding, 0) > 0 ? "text-red-600 dark:text-red-400" : ""}`}
+              >
                 ${fmt(transporters.reduce((s, t) => s + t.outstanding, 0))}
               </div>
             </CardContent>
@@ -482,7 +651,11 @@ export default function FactoryTransporters() {
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="p-6 space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            <div className="p-6 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
           ) : transporters.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
               <TruckIcon className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -501,7 +674,7 @@ export default function FactoryTransporters() {
                 </tr>
               </thead>
               <tbody>
-                {transporters.map(t => (
+                {transporters.map((t) => (
                   <tr
                     key={t.id}
                     className="border-b hover-elevate cursor-pointer"
@@ -511,8 +684,14 @@ export default function FactoryTransporters() {
                     <td className="px-4 py-3 font-medium">{t.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">{t.phone || "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums">${fmt(t.totalCharged)}</td>
-                    <td className={`px-4 py-3 text-right tabular-nums ${t.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`}>${fmt(t.totalPaid)}</td>
-                    <td className={`px-4 py-3 text-right tabular-nums font-medium ${t.outstanding > 0 ? "text-red-600 dark:text-red-400" : t.outstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`}>
+                    <td
+                      className={`px-4 py-3 text-right tabular-nums ${t.totalPaid > 0 ? "text-green-600 dark:text-green-400" : ""}`}
+                    >
+                      ${fmt(t.totalPaid)}
+                    </td>
+                    <td
+                      className={`px-4 py-3 text-right tabular-nums font-medium ${t.outstanding > 0 ? "text-red-600 dark:text-red-400" : t.outstanding < 0 ? "text-green-600 dark:text-green-400" : ""}`}
+                    >
                       ${fmt(t.outstanding)}
                     </td>
                   </tr>

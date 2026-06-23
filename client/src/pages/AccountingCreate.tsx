@@ -6,15 +6,7 @@ import { z } from "zod";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Form,
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -26,13 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
@@ -50,13 +36,7 @@ import {
 import { useCompany } from "@/contexts/CompanyContext";
 import { formatNumber } from "@/lib/formatNumber";
 
-type EntityType =
-  | "location"
-  | "ledger"
-  | "employee"
-  | "supplier"
-  | "stockGroup"
-  | "stockItem";
+type EntityType = "location" | "ledger" | "employee" | "supplier" | "stockGroup" | "stockItem";
 
 const entityConfig = {
   location: {
@@ -220,12 +200,7 @@ function EntityFormWrapper({
   switch (entityType) {
     case "location":
       return (
-        <LocationForm
-          form={form}
-          onSubmit={onSubmit}
-          onCancel={handleCancel}
-          isPending={createMutation.isPending}
-        />
+        <LocationForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />
       );
     case "ledger":
       return (
@@ -238,39 +213,19 @@ function EntityFormWrapper({
       );
     case "employee":
       return (
-        <EmployeeForm
-          form={form}
-          onSubmit={onSubmit}
-          onCancel={handleCancel}
-          isPending={createMutation.isPending}
-        />
+        <EmployeeForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />
       );
     case "supplier":
       return (
-        <SupplierForm
-          form={form}
-          onSubmit={onSubmit}
-          onCancel={handleCancel}
-          isPending={createMutation.isPending}
-        />
+        <SupplierForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />
       );
     case "stockGroup":
       return (
-        <StockGroupForm
-          form={form}
-          onSubmit={onSubmit}
-          onCancel={handleCancel}
-          isPending={createMutation.isPending}
-        />
+        <StockGroupForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />
       );
     case "stockItem":
       return (
-        <StockItemForm
-          form={form}
-          onSubmit={onSubmit}
-          onCancel={handleCancel}
-          isPending={createMutation.isPending}
-        />
+        <StockItemForm form={form} onSubmit={onSubmit} onCancel={handleCancel} isPending={createMutation.isPending} />
       );
   }
 }
@@ -417,10 +372,7 @@ function LocationForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Company *</FormLabel>
-                  <Select
-                    onValueChange={(v) => field.onChange(parseInt(v))}
-                    value={field.value?.toString() || ""}
-                  >
+                  <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString() || ""}>
                     <FormControl>
                       <SelectTrigger data-testid="select-company">
                         <SelectValue placeholder="Select company" />
@@ -428,10 +380,7 @@ function LocationForm({
                     </FormControl>
                     <SelectContent>
                       {companies.map((company: any) => (
-                        <SelectItem
-                          key={company.id}
-                          value={company.id.toString()}
-                        >
+                        <SelectItem key={company.id} value={company.id.toString()}>
                           {company.name}
                         </SelectItem>
                       ))}
@@ -449,11 +398,7 @@ function LocationForm({
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Main Warehouse"
-                      data-testid="input-name"
-                    />
+                    <Input {...field} placeholder="Main Warehouse" data-testid="input-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -466,11 +411,7 @@ function LocationForm({
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0 pt-8">
                   <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="checkbox-active"
-                    />
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-active" />
                   </FormControl>
                   <FormLabel className="!mt-0">Active</FormLabel>
                 </FormItem>
@@ -513,13 +454,7 @@ function LedgerAccountForm({
       case "Expense":
         return ["Direct Expense", "Indirect Expense"];
       case "Liability":
-        return [
-          "Current Liability",
-          "Long-term Liability",
-          "Loans Payable",
-          "Output Tax",
-          "Tax Payable",
-        ];
+        return ["Current Liability", "Long-term Liability", "Loans Payable", "Output Tax", "Tax Payable"];
       case "Asset":
         return ["Current Asset", "Fixed Asset", "Input Tax", "Tax Receivable"];
       default:
@@ -536,9 +471,7 @@ function LedgerAccountForm({
 
   // Filter to show only parent accounts (accounts with no parent themselves)
   // Use strict comparison to handle 0, null, undefined correctly
-  const ledgerAccounts = allLedgerAccounts.filter(
-    (acc: any) => acc.parentId === null || acc.parentId === undefined,
-  );
+  const ledgerAccounts = allLedgerAccounts.filter((acc: any) => acc.parentId === null || acc.parentId === undefined);
 
   // Form for creating parent account
   const parentForm = useForm({
@@ -590,10 +523,7 @@ function LedgerAccountForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form noValidate
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
-          className="space-y-6"
-        >
+        <form noValidate onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -602,15 +532,9 @@ function LedgerAccountForm({
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Sales Revenue"
-                      data-testid="input-name"
-                    />
+                    <Input {...field} placeholder="Sales Revenue" data-testid="input-name" />
                   </FormControl>
-                  <FormDescription>
-                    Code will be auto-generated from the name
-                  </FormDescription>
+                  <FormDescription>Code will be auto-generated from the name</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -636,23 +560,13 @@ function LedgerAccountForm({
                       <SelectItem value="Expense">Expense</SelectItem>
                       <SelectItem value="Bank">Bank</SelectItem>
                       <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Indirect Expense">
-                        Indirect Expense
-                      </SelectItem>
-                      <SelectItem value="Direct Expense">
-                        Direct Expense
-                      </SelectItem>
-                      <SelectItem value="Government Taxes">
-                        Government Taxes
-                      </SelectItem>
+                      <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
+                      <SelectItem value="Direct Expense">Direct Expense</SelectItem>
+                      <SelectItem value="Government Taxes">Government Taxes</SelectItem>
                       <SelectItem value="Loans">Loans</SelectItem>
                       <SelectItem value="Duty Agent">Duty Agent</SelectItem>
-                      <SelectItem value="Transporter Agent">
-                        Transporter Agent
-                      </SelectItem>
-                      <SelectItem value="Accounts Payable">
-                        Accounts Payable
-                      </SelectItem>
+                      <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
+                      <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
                       <SelectItem value="Profit">Profit</SelectItem>
                     </SelectContent>
                   </Select>
@@ -696,9 +610,7 @@ function LedgerAccountForm({
                   <FormLabel>Parent Account</FormLabel>
                   <div className="flex gap-2">
                     <Select
-                      onValueChange={(v) =>
-                        field.onChange(v === "none" ? undefined : parseInt(v))
-                      }
+                      onValueChange={(v) => field.onChange(v === "none" ? undefined : parseInt(v))}
                       value={field.value?.toString() || "none"}
                     >
                       <FormControl>
@@ -715,17 +627,9 @@ function LedgerAccountForm({
                         ))}
                       </SelectContent>
                     </Select>
-                    <Dialog
-                      open={isParentDialogOpen}
-                      onOpenChange={setIsParentDialogOpen}
-                    >
+                    <Dialog open={isParentDialogOpen} onOpenChange={setIsParentDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="outline"
-                          data-testid="button-add-parent"
-                        >
+                        <Button type="button" size="icon" variant="outline" data-testid="button-add-parent">
                           <Plus className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
@@ -734,11 +638,7 @@ function LedgerAccountForm({
                           <DialogTitle>Create Parent Account</DialogTitle>
                         </DialogHeader>
                         <Form {...parentForm}>
-                          <form noValidate
-                            onSubmit={parentForm.handleSubmit(
-                              handleCreateParent,
-                            )}
-                            className="space-y-4">
+                          <form noValidate onSubmit={parentForm.handleSubmit(handleCreateParent)} className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <FormField
                                 control={parentForm.control}
@@ -747,15 +647,9 @@ function LedgerAccountForm({
                                   <FormItem>
                                     <FormLabel>Name *</FormLabel>
                                     <FormControl>
-                                      <Input
-                                        {...field}
-                                        placeholder="Purchases"
-                                        data-testid="input-parent-name"
-                                      />
+                                      <Input {...field} placeholder="Purchases" data-testid="input-parent-name" />
                                     </FormControl>
-                                    <FormDescription>
-                                      Code will be auto-generated
-                                    </FormDescription>
+                                    <FormDescription>Code will be auto-generated</FormDescription>
                                     <FormMessage />
                                   </FormItem>
                                 )}
@@ -766,61 +660,28 @@ function LedgerAccountForm({
                                 render={({ field }) => (
                                   <FormItem>
                                     <FormLabel>Account Type *</FormLabel>
-                                    <Select
-                                      onValueChange={field.onChange}
-                                      value={field.value}
-                                    >
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                       <FormControl>
                                         <SelectTrigger data-testid="select-parent-account-type">
                                           <SelectValue placeholder="Select type" />
                                         </SelectTrigger>
                                       </FormControl>
                                       <SelectContent>
-                                        <SelectItem value="Asset">
-                                          Asset
-                                        </SelectItem>
-                                        <SelectItem value="Liability">
-                                          Liability
-                                        </SelectItem>
-                                        <SelectItem value="Equity">
-                                          Equity
-                                        </SelectItem>
-                                        <SelectItem value="Income">
-                                          Income
-                                        </SelectItem>
-                                        <SelectItem value="Expense">
-                                          Expense
-                                        </SelectItem>
-                                        <SelectItem value="Bank">
-                                          Bank
-                                        </SelectItem>
-                                        <SelectItem value="Cash">
-                                          Cash
-                                        </SelectItem>
-                                        <SelectItem value="Indirect Expense">
-                                          Indirect Expense
-                                        </SelectItem>
-                                        <SelectItem value="Direct Expense">
-                                          Direct Expense
-                                        </SelectItem>
-                                        <SelectItem value="Government Taxes">
-                                          Government Taxes
-                                        </SelectItem>
-                                        <SelectItem value="Loans">
-                                          Loans
-                                        </SelectItem>
-                                        <SelectItem value="Duty Agent">
-                                          Duty Agent
-                                        </SelectItem>
-                                        <SelectItem value="Transporter Agent">
-                                          Transporter Agent
-                                        </SelectItem>
-                                        <SelectItem value="Accounts Payable">
-                                          Accounts Payable
-                                        </SelectItem>
-                                        <SelectItem value="Profit">
-                                          Profit
-                                        </SelectItem>
+                                        <SelectItem value="Asset">Asset</SelectItem>
+                                        <SelectItem value="Liability">Liability</SelectItem>
+                                        <SelectItem value="Equity">Equity</SelectItem>
+                                        <SelectItem value="Income">Income</SelectItem>
+                                        <SelectItem value="Expense">Expense</SelectItem>
+                                        <SelectItem value="Bank">Bank</SelectItem>
+                                        <SelectItem value="Cash">Cash</SelectItem>
+                                        <SelectItem value="Indirect Expense">Indirect Expense</SelectItem>
+                                        <SelectItem value="Direct Expense">Direct Expense</SelectItem>
+                                        <SelectItem value="Government Taxes">Government Taxes</SelectItem>
+                                        <SelectItem value="Loans">Loans</SelectItem>
+                                        <SelectItem value="Duty Agent">Duty Agent</SelectItem>
+                                        <SelectItem value="Transporter Agent">Transporter Agent</SelectItem>
+                                        <SelectItem value="Accounts Payable">Accounts Payable</SelectItem>
+                                        <SelectItem value="Profit">Profit</SelectItem>
                                       </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -843,9 +704,7 @@ function LedgerAccountForm({
                                 disabled={createParentMutation.isPending}
                                 data-testid="button-save-parent"
                               >
-                                {createParentMutation.isPending
-                                  ? "Creating..."
-                                  : "Create"}
+                                {createParentMutation.isPending ? "Creating..." : "Create"}
                               </Button>
                             </div>
                           </form>
@@ -908,11 +767,7 @@ function LedgerAccountForm({
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0 pt-8">
                   <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="checkbox-active"
-                    />
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-active" />
                   </FormControl>
                   <FormLabel className="!mt-0">Active</FormLabel>
                 </FormItem>
@@ -942,10 +797,7 @@ function EmployeeForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form noValidate
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
-          className="space-y-6"
-        >
+        <form noValidate onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -954,15 +806,9 @@ function EmployeeForm({
                 <FormItem>
                   <FormLabel>First Name *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="John"
-                      data-testid="input-first-name"
-                    />
+                    <Input {...field} placeholder="John" data-testid="input-first-name" />
                   </FormControl>
-                  <FormDescription>
-                    Code will be auto-generated from name
-                  </FormDescription>
+                  <FormDescription>Code will be auto-generated from name</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -975,11 +821,7 @@ function EmployeeForm({
                 <FormItem>
                   <FormLabel>Last Name *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Doe"
-                      data-testid="input-last-name"
-                    />
+                    <Input {...field} placeholder="Doe" data-testid="input-last-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -993,12 +835,7 @@ function EmployeeForm({
                 <FormItem>
                   <FormLabel>Starting Date *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      type="text"
-                      placeholder="YYYY-MM-DD"
-                      data-testid="input-join-date"
-                    />
+                    <Input {...field} type="text" placeholder="YYYY-MM-DD" data-testid="input-join-date" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1011,23 +848,15 @@ function EmployeeForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Type *</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                    value={field.value}
-                  >
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-employee-type">
                         <SelectValue placeholder="Select employee type" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="Employee">
-                        Employee (Warehouse Staff)
-                      </SelectItem>
-                      <SelectItem value="Worker">
-                        Worker (Shop Floor Staff)
-                      </SelectItem>
+                      <SelectItem value="Employee">Employee (Warehouse Staff)</SelectItem>
+                      <SelectItem value="Worker">Worker (Shop Floor Staff)</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -1061,11 +890,7 @@ function EmployeeForm({
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0 pt-8">
                   <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="checkbox-active"
-                    />
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-active" />
                   </FormControl>
                   <FormLabel className="!mt-0">Active</FormLabel>
                 </FormItem>
@@ -1095,10 +920,7 @@ function SupplierForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form noValidate
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
-          className="space-y-6"
-        >
+        <form noValidate onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -1107,15 +929,9 @@ function SupplierForm({
                 <FormItem>
                   <FormLabel>Legal Name *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="ABC Suppliers Inc."
-                      data-testid="input-legal-name"
-                    />
+                    <Input {...field} placeholder="ABC Suppliers Inc." data-testid="input-legal-name" />
                   </FormControl>
-                  <FormDescription>
-                    Code will be auto-generated from name
-                  </FormDescription>
+                  <FormDescription>Code will be auto-generated from name</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -1147,11 +963,7 @@ function SupplierForm({
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0 pt-8">
                   <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="checkbox-active"
-                    />
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-active" />
                   </FormControl>
                   <FormLabel className="!mt-0">Active</FormLabel>
                 </FormItem>
@@ -1181,10 +993,7 @@ function StockGroupForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form noValidate
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
-          className="space-y-6"
-        >
+        <form noValidate onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -1193,11 +1002,7 @@ function StockGroupForm({
                 <FormItem>
                   <FormLabel>Code *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="GRP001"
-                      data-testid="input-code"
-                    />
+                    <Input {...field} placeholder="GRP001" data-testid="input-code" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1211,11 +1016,7 @@ function StockGroupForm({
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Cotton Bales"
-                      data-testid="input-name"
-                    />
+                    <Input {...field} placeholder="Cotton Bales" data-testid="input-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1228,11 +1029,7 @@ function StockGroupForm({
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0 pt-8">
                   <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="checkbox-active"
-                    />
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-active" />
                   </FormControl>
                   <FormLabel className="!mt-0">Active</FormLabel>
                 </FormItem>
@@ -1269,9 +1066,7 @@ function StockItemForm({
   // Auto-calculate opening value
   useEffect(() => {
     if (openingQty && openingRate) {
-      const value = formatNumber(
-        parseFloat(openingQty) * parseFloat(openingRate),
-      );
+      const value = formatNumber(parseFloat(openingQty) * parseFloat(openingRate));
       form.setValue("openingValue", value);
     }
   }, [openingQty, openingRate]);
@@ -1279,10 +1074,7 @@ function StockItemForm({
   return (
     <Card className="p-4 md:p-6">
       <Form {...form}>
-        <form noValidate
-          onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))}
-          className="space-y-6"
-        >
+        <form noValidate onSubmit={form.handleSubmit((data: any) => onSubmit(data, false))} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -1291,11 +1083,7 @@ function StockItemForm({
                 <FormItem>
                   <FormLabel>Code *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="ITEM001"
-                      data-testid="input-code"
-                    />
+                    <Input {...field} placeholder="ITEM001" data-testid="input-code" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1309,11 +1097,7 @@ function StockItemForm({
                 <FormItem>
                   <FormLabel>Name *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Premium Cotton Bale"
-                      data-testid="input-name"
-                    />
+                    <Input {...field} placeholder="Premium Cotton Bale" data-testid="input-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1327,9 +1111,7 @@ function StockItemForm({
                 <FormItem>
                   <FormLabel>Stock Group</FormLabel>
                   <Select
-                    onValueChange={(v) =>
-                      field.onChange(v ? parseInt(v) : undefined)
-                    }
+                    onValueChange={(v) => field.onChange(v ? parseInt(v) : undefined)}
                     value={field.value?.toString() || ""}
                   >
                     <FormControl>
@@ -1357,11 +1139,7 @@ function StockItemForm({
                 <FormItem>
                   <FormLabel>Unit of Measure *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="Kg, Pcs, Bale"
-                      data-testid="input-uom"
-                    />
+                    <Input {...field} placeholder="Kg, Pcs, Bale" data-testid="input-uom" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1375,13 +1153,7 @@ function StockItemForm({
                 <FormItem>
                   <FormLabel>Opening Quantity</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      type="number"
-                      step="0.001"
-                      placeholder="0.000"
-                      data-testid="input-opening-qty"
-                    />
+                    <Input {...field} type="number" step="0.001" placeholder="0.000" data-testid="input-opening-qty" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1395,13 +1167,7 @@ function StockItemForm({
                 <FormItem>
                   <FormLabel>Opening Rate</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      data-testid="input-opening-rate"
-                    />
+                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-opening-rate" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1415,12 +1181,7 @@ function StockItemForm({
                 <FormItem>
                   <FormLabel>Opening Value (Auto)</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      readOnly
-                      className="bg-muted"
-                      data-testid="input-opening-value"
-                    />
+                    <Input {...field} readOnly className="bg-muted" data-testid="input-opening-value" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1454,13 +1215,7 @@ function StockItemForm({
                 <FormItem>
                   <FormLabel>Selling Price</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      data-testid="input-selling-price"
-                    />
+                    <Input {...field} type="number" step="0.01" placeholder="0.00" data-testid="input-selling-price" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1473,11 +1228,7 @@ function StockItemForm({
               render={({ field }) => (
                 <FormItem className="flex items-center gap-2 space-y-0 pt-8">
                   <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      data-testid="checkbox-active"
-                    />
+                    <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-active" />
                   </FormControl>
                   <FormLabel className="!mt-0">Active</FormLabel>
                 </FormItem>
@@ -1493,22 +1244,10 @@ function StockItemForm({
 }
 
 // Reusable Form Buttons Component
-function FormButtons({
-  onCancel,
-  isPending,
-}: {
-  onCancel: () => void;
-  isPending: boolean;
-}) {
+function FormButtons({ onCancel, isPending }: { onCancel: () => void; isPending: boolean }) {
   return (
     <div className="flex flex-wrap gap-2 justify-end border-t pt-4">
-      <Button
-        type="button"
-        variant="outline"
-        onClick={onCancel}
-        disabled={isPending}
-        data-testid="button-cancel"
-      >
+      <Button type="button" variant="outline" onClick={onCancel} disabled={isPending} data-testid="button-cancel">
         Cancel
       </Button>
       <Button type="submit" disabled={isPending} data-testid="button-save">

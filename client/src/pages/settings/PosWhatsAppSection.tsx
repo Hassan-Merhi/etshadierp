@@ -84,7 +84,11 @@ export function PosWhatsAppSection() {
     queryKey: ["/api/locations"],
   });
 
-  const { data: waChats = [], isLoading: chatsLoading, refetch: refetchChats } = useQuery<WaChat[]>({
+  const {
+    data: waChats = [],
+    isLoading: chatsLoading,
+    refetch: refetchChats,
+  } = useQuery<WaChat[]>({
     queryKey: ["/api/whatsapp/chats/pos"],
     enabled: dialogOpen,
     staleTime: 60_000,
@@ -93,8 +97,7 @@ export function PosWhatsAppSection() {
 
   // ── Mutations ──
   const saveCredsMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("PUT", "/api/whatsapp/settings/pos", { instanceId, apiToken, enabled }),
+    mutationFn: () => apiRequest("PUT", "/api/whatsapp/settings/pos", { instanceId, apiToken, enabled }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/settings/pos"] });
       setCredsDirty(false);
@@ -105,7 +108,15 @@ export function PosWhatsAppSection() {
   });
 
   const saveGroupMutation = useMutation({
-    mutationFn: async ({ id, name, whatsappGroupChatId }: { id: number; name: string; whatsappGroupChatId: string | null }) => {
+    mutationFn: async ({
+      id,
+      name,
+      whatsappGroupChatId,
+    }: {
+      id: number;
+      name: string;
+      whatsappGroupChatId: string | null;
+    }) => {
       const res = await apiRequest("PATCH", `/api/locations/${id}`, { name, whatsappGroupChatId });
       return res.json();
     },
@@ -174,8 +185,8 @@ export function PosWhatsAppSection() {
             <div>
               <CardTitle className="text-base">POS Green API Instance</CardTitle>
               <CardDescription className="mt-0.5">
-                This is a separate API instance used only for POS shift report messages.
-                If left blank, the main WhatsApp API instance will be used as a fallback.
+                This is a separate API instance used only for POS shift report messages. If left blank, the main
+                WhatsApp API instance will be used as a fallback.
               </CardDescription>
             </div>
             {settingsLoading ? (
@@ -201,7 +212,10 @@ export function PosWhatsAppSection() {
                 id="pos-instance-id"
                 placeholder="e.g. 7105123456789"
                 value={instanceId}
-                onChange={(e) => { setInstanceId(e.target.value); setCredsDirty(true); }}
+                onChange={(e) => {
+                  setInstanceId(e.target.value);
+                  setCredsDirty(true);
+                }}
                 data-testid="input-pos-instance-id"
               />
             </div>
@@ -213,7 +227,10 @@ export function PosWhatsAppSection() {
                   type={showToken ? "text" : "password"}
                   placeholder="API token from Green API"
                   value={apiToken}
-                  onChange={(e) => { setApiToken(e.target.value); setCredsDirty(true); }}
+                  onChange={(e) => {
+                    setApiToken(e.target.value);
+                    setCredsDirty(true);
+                  }}
                   className="pr-10"
                   data-testid="input-pos-api-token"
                 />
@@ -234,7 +251,10 @@ export function PosWhatsAppSection() {
               <Switch
                 id="pos-wa-enabled"
                 checked={enabled}
-                onCheckedChange={(v) => { setEnabled(v); setCredsDirty(true); }}
+                onCheckedChange={(v) => {
+                  setEnabled(v);
+                  setCredsDirty(true);
+                }}
                 data-testid="switch-pos-wa-enabled"
               />
               <Label htmlFor="pos-wa-enabled" className="text-sm cursor-pointer">
@@ -247,9 +267,11 @@ export function PosWhatsAppSection() {
               disabled={saveCredsMutation.isPending || !credsDirty}
               data-testid="button-save-pos-creds"
             >
-              {saveCredsMutation.isPending
-                ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                : <Save className="h-3.5 w-3.5 mr-1.5" />}
+              {saveCredsMutation.isPending ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+              ) : (
+                <Save className="h-3.5 w-3.5 mr-1.5" />
+              )}
               Save Credentials
             </Button>
           </div>
@@ -283,13 +305,18 @@ export function PosWhatsAppSection() {
                   data-testid={`row-location-${loc.id}`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className={`h-2 w-2 rounded-full shrink-0 ${chatId ? "bg-green-500" : "bg-muted-foreground/40"}`} />
+                    <div
+                      className={`h-2 w-2 rounded-full shrink-0 ${chatId ? "bg-green-500" : "bg-muted-foreground/40"}`}
+                    />
                     <div className="min-w-0">
                       <p className="font-medium text-sm leading-tight" data-testid={`text-location-name-${loc.id}`}>
                         {loc.name}
                       </p>
                       {chatId ? (
-                        <p className="text-xs text-muted-foreground font-mono truncate mt-0.5" data-testid={`text-chat-id-${loc.id}`}>
+                        <p
+                          className="text-xs text-muted-foreground font-mono truncate mt-0.5"
+                          data-testid={`text-chat-id-${loc.id}`}
+                        >
                           {chatId}
                         </p>
                       ) : (
@@ -304,7 +331,9 @@ export function PosWhatsAppSection() {
                         size="sm"
                         variant="ghost"
                         disabled={saveGroupMutation.isPending}
-                        onClick={() => saveGroupMutation.mutate({ id: loc.id, name: loc.name, whatsappGroupChatId: null })}
+                        onClick={() =>
+                          saveGroupMutation.mutate({ id: loc.id, name: loc.name, whatsappGroupChatId: null })
+                        }
                         data-testid={`button-remove-group-${loc.id}`}
                       >
                         <X className="h-3.5 w-3.5 mr-1" />
@@ -317,7 +346,9 @@ export function PosWhatsAppSection() {
                       onClick={() => openDialog(loc)}
                       data-testid={`button-set-group-${loc.id}`}
                     >
-                      <MessageCircle className={`h-3.5 w-3.5 mr-1.5 ${chatId ? "text-green-600 dark:text-green-400" : ""}`} />
+                      <MessageCircle
+                        className={`h-3.5 w-3.5 mr-1.5 ${chatId ? "text-green-600 dark:text-green-400" : ""}`}
+                      />
                       {chatId ? "Change Group" : "Set Group"}
                     </Button>
                   </div>
@@ -329,12 +360,18 @@ export function PosWhatsAppSection() {
       </div>
 
       {/* ── Group picker dialog ── */}
-      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) setDialogOpen(false); }}>
+      <Dialog
+        open={dialogOpen}
+        onOpenChange={(o) => {
+          if (!o) setDialogOpen(false);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Set WhatsApp Group</DialogTitle>
             <DialogDescription>
-              Choose the group for <strong>{editingLocation?.name}</strong>. Stock reports will be sent here when a shift ends with low stock.
+              Choose the group for <strong>{editingLocation?.name}</strong>. Stock reports will be sent here when a
+              shift ends with low stock.
             </DialogDescription>
           </DialogHeader>
 
@@ -394,7 +431,9 @@ export function PosWhatsAppSection() {
                   >
                     <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="truncate">{chat.name}</span>
-                    {selectedChatId === chat.id && <Check className="h-4 w-4 ml-auto shrink-0 text-green-600 dark:text-green-400" />}
+                    {selectedChatId === chat.id && (
+                      <Check className="h-4 w-4 ml-auto shrink-0 text-green-600 dark:text-green-400" />
+                    )}
                   </button>
                 ))}
               </>
@@ -411,11 +450,7 @@ export function PosWhatsAppSection() {
             <Button variant="outline" onClick={() => setDialogOpen(false)} data-testid="button-cancel-wa-group">
               Cancel
             </Button>
-            <Button
-              onClick={handleSaveGroup}
-              disabled={saveGroupMutation.isPending}
-              data-testid="button-save-wa-group"
-            >
+            <Button onClick={handleSaveGroup} disabled={saveGroupMutation.isPending} data-testid="button-save-wa-group">
               {saveGroupMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
               Save
             </Button>

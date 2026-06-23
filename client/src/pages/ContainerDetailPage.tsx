@@ -12,36 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ArrowLeft, Truck, Edit } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ContainerDetailERP from "./ContainerDetail";
@@ -76,8 +50,7 @@ export default function ContainerDetailPage() {
 
   // ERP containers viewed from the SP list are tagged with ?src=erp — render
   // the standard ERP detail page directly without trying the SP lookup first.
-  const srcErp = typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).get("src") === "erp";
+  const srcErp = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("src") === "erp";
 
   if (!isSupplierPartner || srcErp) {
     return <ContainerDetailERP id={id} forceErp={srcErp} />;
@@ -95,8 +68,7 @@ function SpContainerDetailView() {
 
   const { data: spc, isLoading } = useQuery<any>({
     queryKey: [`/api/sp/containers/${id}`],
-    queryFn: () =>
-      fetch(`/api/sp/containers/${id}`, { credentials: "include" }).then((r) => r.json()),
+    queryFn: () => fetch(`/api/sp/containers/${id}`, { credentials: "include" }).then((r) => r.json()),
     enabled: !!id,
   });
 
@@ -166,7 +138,9 @@ function SpContainerDetailView() {
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-4 w-40" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-          {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
         </div>
       </div>
     );
@@ -189,12 +163,7 @@ function SpContainerDetailView() {
       <div className="border-b px-4 md:px-6 py-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-start gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate("/containers")}
-              data-testid="button-sp-back"
-            >
+            <Button variant="ghost" size="icon" onClick={() => navigate("/containers")} data-testid="button-sp-back">
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
@@ -206,9 +175,7 @@ function SpContainerDetailView() {
             <Badge
               variant="outline"
               className={
-                spc.status === "offloaded"
-                  ? "text-green-600 border-green-600/40"
-                  : "text-blue-600 border-blue-600/40"
+                spc.status === "offloaded" ? "text-green-600 border-green-600/40" : "text-blue-600 border-blue-600/40"
               }
               data-testid={`badge-sp-status-${spc.id}`}
             >
@@ -216,18 +183,11 @@ function SpContainerDetailView() {
             </Badge>
             {spc.status !== "offloaded" && (
               <>
-                <Button
-                  variant="outline"
-                  onClick={openEdit}
-                  data-testid="button-sp-edit"
-                >
+                <Button variant="outline" onClick={openEdit} data-testid="button-sp-edit">
                   <Edit className="h-4 w-4 mr-2" />
                   Edit
                 </Button>
-                <Button
-                  onClick={() => setShowOffloadDialog(true)}
-                  data-testid="button-sp-offload"
-                >
+                <Button onClick={() => setShowOffloadDialog(true)} data-testid="button-sp-offload">
                   <Truck className="h-4 w-4 mr-2" />
                   Offload
                 </Button>
@@ -248,9 +208,7 @@ function SpContainerDetailView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              <p className="text-xl font-semibold tabular-nums">
-                {fmt2(spc.invoiceTotalUsd)}
-              </p>
+              <p className="text-xl font-semibold tabular-nums">{fmt2(spc.invoiceTotalUsd)}</p>
             </CardContent>
           </Card>
 
@@ -261,9 +219,7 @@ function SpContainerDetailView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              <p className="text-xl font-semibold tabular-nums">
-                {parseFloat(spc.discountPct ?? "0").toFixed(2)}%
-              </p>
+              <p className="text-xl font-semibold tabular-nums">{parseFloat(spc.discountPct ?? "0").toFixed(2)}%</p>
             </CardContent>
           </Card>
 
@@ -274,9 +230,7 @@ function SpContainerDetailView() {
               </CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-4">
-              <p className="text-xl font-semibold tabular-nums">
-                {fmt2(baseCostAfterDiscount)}
-              </p>
+              <p className="text-xl font-semibold tabular-nums">{fmt2(baseCostAfterDiscount)}</p>
             </CardContent>
           </Card>
 
@@ -318,9 +272,7 @@ function SpContainerDetailView() {
                   return (
                     <TableRow key={line.id} data-testid={`row-sp-line-${line.id}`}>
                       <TableCell className="font-mono text-sm">{line.articleCode}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {line.description || "—"}
-                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{line.description || "—"}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{qty.toFixed(2)}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{fmt4(unitRate)}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{fmt4(discRate)}</TableCell>
@@ -368,9 +320,7 @@ function SpContainerDetailView() {
                       <TableCell className="text-right text-sm tabular-nums font-medium">
                         {fmt2(charge.amountPaidUsd)}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {charge.prepaidDate ?? "—"}
-                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{charge.prepaidDate ?? "—"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -385,9 +335,7 @@ function SpContainerDetailView() {
             <CardHeader className="px-4 pt-4 pb-2">
               <CardTitle className="text-sm">
                 Offload Summary
-                <span className="ml-2 font-normal text-muted-foreground text-xs">
-                  {spc.offload.offloadDate}
-                </span>
+                <span className="ml-2 font-normal text-muted-foreground text-xs">{spc.offload.offloadDate}</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
@@ -406,9 +354,7 @@ function SpContainerDetailView() {
                         <TableCell className="text-sm capitalize">
                           {charge.chargeType?.replace(/_/g, " ") ?? "—"}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {charge.description || "—"}
-                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{charge.description || "—"}</TableCell>
                         <TableCell className="text-right text-sm tabular-nums font-medium">
                           {fmt2(charge.amountUsd)}
                         </TableCell>
@@ -453,101 +399,167 @@ function SpContainerDetailView() {
           <DialogHeader>
             <DialogTitle>Edit Container</DialogTitle>
             <DialogDescription>
-              Update the container details. The accounting voucher (Dr Goods OTW / Cr OTW Clearing) will be regenerated automatically.
+              Update the container details. The accounting voucher (Dr Goods OTW / Cr OTW Clearing) will be regenerated
+              automatically.
             </DialogDescription>
           </DialogHeader>
           <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(d => editMutation.mutate(d))} className="space-y-4" noValidate>
-              <FormField control={editForm.control} name="supplierId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Supplier</FormLabel>
-                  <Select
-                    value={field.value ? String(field.value) : ""}
-                    onValueChange={(val) => {
-                      const numId = parseInt(val);
-                      field.onChange(numId);
-                      const found = suppliers.find(s => s.id === numId);
-                      if (found) editForm.setValue("supplierName", found.legalName);
-                    }}
-                  >
-                    <FormControl>
-                      <SelectTrigger data-testid="select-edit-supplier">
-                        <SelectValue placeholder="Select supplier…" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {suppliers.map(s => (
-                        <SelectItem key={s.id} value={String(s.id)}>{s.legalName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
+            <form onSubmit={editForm.handleSubmit((d) => editMutation.mutate(d))} className="space-y-4" noValidate>
+              <FormField
+                control={editForm.control}
+                name="supplierId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier</FormLabel>
+                    <Select
+                      value={field.value ? String(field.value) : ""}
+                      onValueChange={(val) => {
+                        const numId = parseInt(val);
+                        field.onChange(numId);
+                        const found = suppliers.find((s) => s.id === numId);
+                        if (found) editForm.setValue("supplierName", found.legalName);
+                      }}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-edit-supplier">
+                          <SelectValue placeholder="Select supplier…" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {suppliers.map((s) => (
+                          <SelectItem key={s.id} value={String(s.id)}>
+                            {s.legalName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-              <FormField control={editForm.control} name="supplierName" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Supplier Name <span className="text-muted-foreground text-xs font-normal">(override)</span></FormLabel>
-                  <FormControl><Input {...field} data-testid="input-edit-supplier-name" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <FormField
+                control={editForm.control}
+                name="supplierName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Supplier Name <span className="text-muted-foreground text-xs font-normal">(override)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-supplier-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="grid grid-cols-2 gap-3">
-                <FormField control={editForm.control} name="invoiceNumber" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Invoice Number</FormLabel>
-                    <FormControl><Input {...field} data-testid="input-edit-invoice-number" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={editForm.control} name="containerNumber" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Container No. <span className="text-muted-foreground text-xs font-normal">(opt.)</span></FormLabel>
-                    <FormControl><Input {...field} placeholder="ABCD1234567" data-testid="input-edit-container-number" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={editForm.control} name="invoiceDate" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Invoice Date</FormLabel>
-                    <FormControl><Input type="date" {...field} data-testid="input-edit-invoice-date" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={editForm.control} name="invoiceTotalUsd" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Invoice Total (USD)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" {...field} data-testid="input-edit-invoice-total" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={editForm.control} name="discountPct" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Discount %</FormLabel>
-                    <FormControl><Input type="number" step="0.01" {...field} data-testid="input-edit-discount-pct" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={editForm.control} name="freightEstimateUsd" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Freight Estimate (USD)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" {...field} data-testid="input-edit-freight-estimate" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField
+                  control={editForm.control}
+                  name="invoiceNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Invoice Number</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-edit-invoice-number" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="containerNumber"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        Container No. <span className="text-muted-foreground text-xs font-normal">(opt.)</span>
+                      </FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="ABCD1234567" data-testid="input-edit-container-number" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="invoiceDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Invoice Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-edit-invoice-date" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="invoiceTotalUsd"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Invoice Total (USD)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} data-testid="input-edit-invoice-total" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="discountPct"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Discount %</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} data-testid="input-edit-discount-pct" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="freightEstimateUsd"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Freight Estimate (USD)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" {...field} data-testid="input-edit-freight-estimate" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
-              <FormField control={editForm.control} name="notes" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes <span className="text-muted-foreground text-xs font-normal">(opt.)</span></FormLabel>
-                  <FormControl><Input {...field} data-testid="input-edit-notes" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <FormField
+                control={editForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Notes <span className="text-muted-foreground text-xs font-normal">(opt.)</span>
+                    </FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-edit-notes" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)} data-testid="button-edit-cancel">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowEditDialog(false)}
+                  data-testid="button-edit-cancel"
+                >
                   Cancel
                 </Button>
                 <Button type="submit" disabled={editMutation.isPending} data-testid="button-edit-submit">

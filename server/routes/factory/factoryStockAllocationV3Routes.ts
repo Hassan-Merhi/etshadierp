@@ -24,7 +24,6 @@ function getUserInfo(req: any) {
 }
 
 export function registerFactoryStockAllocationV3Routes(app: any) {
-
   // ──────────────────────────────────────────────────────────────
   // GET /api/factory/v3/stock-overview
   // Per-article-code FTP: IN_STOCK - v3 expected_to_load - v3 loading
@@ -233,16 +232,19 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
         return res.status(400).json({ message: "proformaId, loadName, and expectedLoadDate are required" });
 
       const user = getUserInfo(req);
-      const [load] = await db.insert(factoryV3Loads).values({
-        companyId,
-        proformaId,
-        loadName,
-        expectedLoadDate,
-        notes: notes || null,
-        status: "expected_to_load",
-        createdBy: user.id,
-        createdByName: user.name,
-      }).returning();
+      const [load] = await db
+        .insert(factoryV3Loads)
+        .values({
+          companyId,
+          proformaId,
+          loadName,
+          expectedLoadDate,
+          notes: notes || null,
+          status: "expected_to_load",
+          createdBy: user.id,
+          createdByName: user.name,
+        })
+        .returning();
 
       res.status(201).json(load);
     } catch (e: any) {
@@ -260,13 +262,16 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [load] = await db.select().from(factoryV3Loads)
+      const [load] = await db
+        .select()
+        .from(factoryV3Loads)
         .where(and(eq(factoryV3Loads.id, id), eq(factoryV3Loads.companyId, companyId)));
       if (!load) return res.status(404).json({ message: "Load not found" });
       if (load.status !== "expected_to_load")
         return res.status(400).json({ message: `Cannot start a load in status: ${load.status}` });
 
-      const [updated] = await db.update(factoryV3Loads)
+      const [updated] = await db
+        .update(factoryV3Loads)
         .set({ status: "loading", startedAt: new Date() })
         .where(eq(factoryV3Loads.id, id))
         .returning();
@@ -290,7 +295,9 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       const { scanCode, bypass } = req.body;
       if (!scanCode) return res.status(400).json({ message: "scanCode is required" });
 
-      const [load] = await db.select().from(factoryV3Loads)
+      const [load] = await db
+        .select()
+        .from(factoryV3Loads)
         .where(and(eq(factoryV3Loads.id, loadId), eq(factoryV3Loads.companyId, companyId)));
       if (!load) return res.status(404).json({ message: "Load not found" });
       if (load.status !== "loading")
@@ -336,7 +343,9 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
 
       // Block if already SOLD/SHIPPED
       if (bale.status === "SOLD" || bale.status === "SHIPPED") {
-        return res.status(400).json({ message: `Bale ${bale.referenceNumber} is already ${bale.status} and cannot be loaded` });
+        return res
+          .status(400)
+          .json({ message: `Bale ${bale.referenceNumber} is already ${bale.status} and cannot be loaded` });
       }
 
       // Warn if already in this v3 load (not removed)
@@ -379,17 +388,20 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       }
 
       const user = getUserInfo(req);
-      const [added] = await db.insert(factoryV3LoadBales).values({
-        loadId,
-        baleId: bale.id,
-        baleReference: bale.referenceNumber || bale.baleCode,
-        articleCode: bale.articleCode,
-        productName: bale.productName,
-        weightKg: bale.weightKg,
-        phase: "scanned",
-        addedBy: user.id,
-        addedByName: user.name,
-      }).returning();
+      const [added] = await db
+        .insert(factoryV3LoadBales)
+        .values({
+          loadId,
+          baleId: bale.id,
+          baleReference: bale.referenceNumber || bale.baleCode,
+          articleCode: bale.articleCode,
+          productName: bale.productName,
+          weightKg: bale.weightKg,
+          phase: "scanned",
+          addedBy: user.id,
+          addedByName: user.name,
+        })
+        .returning();
 
       res.status(201).json({ ...added, baleStatus: bale.status });
     } catch (e: any) {
@@ -409,14 +421,17 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       const lbId = parseId(req.params.baleId);
       if (lbId === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [load] = await db.select().from(factoryV3Loads)
+      const [load] = await db
+        .select()
+        .from(factoryV3Loads)
         .where(and(eq(factoryV3Loads.id, loadId), eq(factoryV3Loads.companyId, companyId)));
       if (!load) return res.status(404).json({ message: "Load not found" });
       if (load.status === "finalized")
         return res.status(400).json({ message: "Cannot remove bales from a finalized load" });
 
       const user = getUserInfo(req);
-      await db.update(factoryV3LoadBales)
+      await db
+        .update(factoryV3LoadBales)
         .set({ removedAt: new Date(), removedBy: user.id, removedByName: user.name })
         .where(and(eq(factoryV3LoadBales.id, lbId), eq(factoryV3LoadBales.loadId, loadId)));
 
@@ -437,7 +452,9 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [load] = await db.select().from(factoryV3Loads)
+      const [load] = await db
+        .select()
+        .from(factoryV3Loads)
         .where(and(eq(factoryV3Loads.id, id), eq(factoryV3Loads.companyId, companyId)));
       if (!load) return res.status(404).json({ message: "Load not found" });
       if (load.status !== "loading")
@@ -461,7 +478,8 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       }
 
       const user = getUserInfo(req);
-      const [updated] = await db.update(factoryV3Loads)
+      const [updated] = await db
+        .update(factoryV3Loads)
         .set({ status: "finalized", finalizedAt: new Date(), finalizedBy: user.id, finalizedByName: user.name })
         .where(eq(factoryV3Loads.id, id))
         .returning();
@@ -482,13 +500,15 @@ export function registerFactoryStockAllocationV3Routes(app: any) {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
 
-      const [load] = await db.select().from(factoryV3Loads)
+      const [load] = await db
+        .select()
+        .from(factoryV3Loads)
         .where(and(eq(factoryV3Loads.id, id), eq(factoryV3Loads.companyId, companyId)));
       if (!load) return res.status(404).json({ message: "Load not found" });
-      if (load.status === "finalized")
-        return res.status(400).json({ message: "Cannot cancel a finalized load" });
+      if (load.status === "finalized") return res.status(400).json({ message: "Cannot cancel a finalized load" });
 
-      const [updated] = await db.update(factoryV3Loads)
+      const [updated] = await db
+        .update(factoryV3Loads)
         .set({ status: "cancelled", cancelledAt: new Date() })
         .where(eq(factoryV3Loads.id, id))
         .returning();

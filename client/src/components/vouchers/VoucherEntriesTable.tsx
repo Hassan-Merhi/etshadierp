@@ -3,25 +3,20 @@ import { UseFormReturn, UseFieldArrayReturn } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Plus, X, Search, Check } from "lucide-react";
 import type { Account } from "@/components/AccountSidebar";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { cn } from "@/lib/utils";
 
 const ENTRY_TYPE_BADGE: Record<string, { label: string; cls: string }> = {
-  bank:            { label: "Bank",     cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300" },
-  ledger:          { label: "Ledger",   cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
-  supplier:        { label: "Supplier", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" },
-  employee:        { label: "Staff",    cls: "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300" },
-  fixedAsset:      { label: "Asset",    cls: "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300" },
-  customer:        { label: "Customer", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" },
-  factorySupplier: { label: "F.Supp",  cls: "bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300" },
+  bank: { label: "Bank", cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300" },
+  ledger: { label: "Ledger", cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
+  supplier: { label: "Supplier", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" },
+  employee: { label: "Staff", cls: "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300" },
+  fixedAsset: { label: "Asset", cls: "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300" },
+  customer: { label: "Customer", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" },
+  factorySupplier: { label: "F.Supp", cls: "bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300" },
 };
 
 export interface VoucherEntry {
@@ -99,7 +94,7 @@ export function VoucherEntriesTable({
       setMobileSearch("");
       setSidebarSearchValue("");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mobileEditOpen, mobileEditIndex]);
 
   const openMobileEdit = (index: number) => {
@@ -183,9 +178,7 @@ export function VoucherEntriesTable({
       const currentName = form.getValues(`entries.${index}.accountName`)?.trim() || "";
 
       if (isFactoryCompany && onAutoCreateAccount && currentName) {
-        const exactMatch = filteredSidebarAccounts.find(
-          (acc) => acc.name.toLowerCase() === currentName.toLowerCase()
-        );
+        const exactMatch = filteredSidebarAccounts.find((acc) => acc.name.toLowerCase() === currentName.toLowerCase());
         if (exactMatch) {
           handleSidebarAccountSelect(exactMatch);
         } else {
@@ -211,8 +204,13 @@ export function VoucherEntriesTable({
         if (onAmountCommit) onAmountCommit(index);
         handleAddRow();
         requestAnimationFrame(() => {
-          const newInput = document.querySelector(`[data-testid="input-account-${entries.length}"]`) as HTMLInputElement;
-          if (newInput) { newInput.focus(); newInput.select(); }
+          const newInput = document.querySelector(
+            `[data-testid="input-account-${entries.length}"]`
+          ) as HTMLInputElement;
+          if (newInput) {
+            newInput.focus();
+            newInput.select();
+          }
         });
       }
     } else if (e.key === "ArrowUp") {
@@ -221,13 +219,19 @@ export function VoucherEntriesTable({
       e.preventDefault();
       if (index > 0) {
         const prevInput = document.querySelector(`[data-testid="input-amount-${index - 1}"]`) as HTMLInputElement;
-        if (prevInput) { prevInput.focus(); prevInput.select(); }
+        if (prevInput) {
+          prevInput.focus();
+          prevInput.select();
+        }
       }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
       if (index < entries.length - 1) {
         const nextInput = document.querySelector(`[data-testid="input-amount-${index + 1}"]`) as HTMLInputElement;
-        if (nextInput) { nextInput.focus(); nextInput.select(); }
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.select();
+        }
       }
     }
   };
@@ -247,7 +251,9 @@ export function VoucherEntriesTable({
     const bal = getEntryBalance(index);
     if (bal == null) return null;
     return (
-      <p className={`text-xs font-mono mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
+      <p
+        className={`text-xs font-mono mt-0.5 ${bal < 0 ? "text-red-500 dark:text-red-400" : bal > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}
+      >
         Balance: {formatAmount(bal)}
       </p>
     );
@@ -272,80 +278,91 @@ export function VoucherEntriesTable({
               const isEmpty = !entry?.accountId || entry.accountId === 0;
               const typeBadge = entry?.accountType ? ENTRY_TYPE_BADGE[entry.accountType] : null;
               return (
-              <tr key={field.id} className={cn("border-t hover-elevate", isEmpty && "bg-muted/20", activeRow === index && !isEmpty && (mode === "payment" ? "bg-amber-50 dark:bg-amber-950/20" : "bg-emerald-50 dark:bg-emerald-950/20"))}>
-                <td className="px-2 py-3 text-center text-xs font-medium text-muted-foreground tabular-nums">
-                  {index + 1}
-                </td>
-                <td className="p-2">
-                  <FormField
-                    control={form.control}
-                    name={`entries.${index}.accountName`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            placeholder="Type to search..."
-                            className="text-sm"
-                            data-testid={`input-account-${index}`}
-                            onChange={(e) => {
-                              field.onChange(e);
-                              setSidebarSearchValue(e.target.value);
-                            }}
-                            onFocus={() => onRowFocus(index, "account")}
-                            onKeyDown={(e) => handleAccountKeyDown(e, index)}
-                            onBlur={() => setTimeout(() => onRowBlur(), 200)}
-                          />
-                        </FormControl>
-                        {!isEmpty && typeBadge && (
-                          <span className={`inline-block text-[10px] font-medium px-1.5 py-0 rounded mt-0.5 ${typeBadge.cls}`}>
-                            {typeBadge.label}
-                          </span>
-                        )}
-                        {renderBalanceLine(index)}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </td>
-                <td className="p-2">
-                  <FormField
-                    control={form.control}
-                    name={`entries.${index}.amount`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormControl>
-                          <Input
-                            {...field}
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            className="font-mono text-right"
-                            data-testid={`input-amount-${index}`}
-                            onKeyDown={(e) => handleAmountKeyDown(e, index)}
-                            onBlur={(e) => handleAmountBlur(e, index)}
-                            onFocus={() => onRowFocus(index, "amount")}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </td>
-                <td className="p-2">
-                  {fields.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => remove(index)}
-                      data-testid={`button-remove-${index}`}
-                    >
-                      <X className="h-4 w-4 text-muted-foreground" />
-                    </Button>
+                <tr
+                  key={field.id}
+                  className={cn(
+                    "border-t hover-elevate",
+                    isEmpty && "bg-muted/20",
+                    activeRow === index &&
+                      !isEmpty &&
+                      (mode === "payment" ? "bg-amber-50 dark:bg-amber-950/20" : "bg-emerald-50 dark:bg-emerald-950/20")
                   )}
-                </td>
-              </tr>
+                >
+                  <td className="px-2 py-3 text-center text-xs font-medium text-muted-foreground tabular-nums">
+                    {index + 1}
+                  </td>
+                  <td className="p-2">
+                    <FormField
+                      control={form.control}
+                      name={`entries.${index}.accountName`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder="Type to search..."
+                              className="text-sm"
+                              data-testid={`input-account-${index}`}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                setSidebarSearchValue(e.target.value);
+                              }}
+                              onFocus={() => onRowFocus(index, "account")}
+                              onKeyDown={(e) => handleAccountKeyDown(e, index)}
+                              onBlur={() => setTimeout(() => onRowBlur(), 200)}
+                            />
+                          </FormControl>
+                          {!isEmpty && typeBadge && (
+                            <span
+                              className={`inline-block text-[10px] font-medium px-1.5 py-0 rounded mt-0.5 ${typeBadge.cls}`}
+                            >
+                              {typeBadge.label}
+                            </span>
+                          )}
+                          {renderBalanceLine(index)}
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </td>
+                  <td className="p-2">
+                    <FormField
+                      control={form.control}
+                      name={`entries.${index}.amount`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              className="font-mono text-right"
+                              data-testid={`input-amount-${index}`}
+                              onKeyDown={(e) => handleAmountKeyDown(e, index)}
+                              onBlur={(e) => handleAmountBlur(e, index)}
+                              onFocus={() => onRowFocus(index, "amount")}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </td>
+                  <td className="p-2">
+                    {fields.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(index)}
+                        data-testid={`button-remove-${index}`}
+                      >
+                        <X className="h-4 w-4 text-muted-foreground" />
+                      </Button>
+                    )}
+                  </td>
+                </tr>
               );
             })}
           </tbody>
@@ -353,20 +370,19 @@ export function VoucherEntriesTable({
             <tr>
               <td></td>
               <td className="p-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddRow}
-                  data-testid="button-add-row"
-                >
+                <Button type="button" variant="outline" size="sm" onClick={handleAddRow} data-testid="button-add-row">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Row
                 </Button>
               </td>
               <td className="p-3 text-right">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Total</div>
-                <div className={cn("text-base font-bold font-mono", total > 0 ? "text-foreground" : "text-muted-foreground")}>
+                <div
+                  className={cn(
+                    "text-base font-bold font-mono",
+                    total > 0 ? "text-foreground" : "text-muted-foreground"
+                  )}
+                >
                   {formatAmount(total)}
                 </div>
               </td>
@@ -406,15 +422,16 @@ export function VoucherEntriesTable({
                 )}
               </div>
               <div className="shrink-0 flex items-center gap-1.5">
-                {amount > 0 && (
-                  <span className="text-sm font-semibold font-mono">{formatAmount(amount)}</span>
-                )}
+                {amount > 0 && <span className="text-sm font-semibold font-mono">{formatAmount(amount)}</span>}
                 {fields.length > 1 && (
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => { e.stopPropagation(); remove(index); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      remove(index);
+                    }}
                     data-testid={`mobile-remove-entry-${index}`}
                   >
                     <X className="h-3.5 w-3.5 text-destructive" />
@@ -448,7 +465,11 @@ export function VoucherEntriesTable({
       <Sheet
         open={mobileEditOpen}
         onOpenChange={(isOpen) => {
-          if (!isOpen) { setMobileEditOpen(false); setMobileSearch(""); setSidebarSearchValue(""); }
+          if (!isOpen) {
+            setMobileEditOpen(false);
+            setMobileSearch("");
+            setSidebarSearchValue("");
+          }
         }}
       >
         <SheetContent side="bottom" className="flex flex-col p-0" style={{ height: "auto", maxHeight: "88vh" }}>
@@ -459,12 +480,7 @@ export function VoucherEntriesTable({
                   ? entries[mobileEditIndex].accountName
                   : "Select Account"}
               </SheetTitle>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleMobileDone}
-                data-testid="button-mobile-entry-done"
-              >
+              <Button variant="default" size="sm" onClick={handleMobileDone} data-testid="button-mobile-entry-done">
                 Done
               </Button>
             </div>
@@ -475,7 +491,10 @@ export function VoucherEntriesTable({
                 ref={mobileSearchInputRef}
                 placeholder="Search accounts..."
                 value={mobileSearch}
-                onChange={(e) => { setMobileSearch(e.target.value); setSidebarSearchValue(e.target.value); }}
+                onChange={(e) => {
+                  setMobileSearch(e.target.value);
+                  setSidebarSearchValue(e.target.value);
+                }}
                 className="pl-9"
                 data-testid="input-mobile-account-search"
               />
@@ -494,9 +513,8 @@ export function VoucherEntriesTable({
                   mobileEditIndex !== null &&
                   entries[mobileEditIndex]?.accountId === account.id &&
                   entries[mobileEditIndex]?.accountType === account.type;
-                const bal = typeof account.balance === "string"
-                  ? parseFloat(account.balance)
-                  : (account.balance ?? null);
+                const bal =
+                  typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
                 return (
                   <button
                     key={`${account.type}-${account.id}`}
@@ -511,9 +529,7 @@ export function VoucherEntriesTable({
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{account.name}</div>
                       {bal != null && (
-                        <div className="text-xs text-muted-foreground font-mono mt-0.5">
-                          {formatAmount(bal)}
-                        </div>
+                        <div className="text-xs text-muted-foreground font-mono mt-0.5">{formatAmount(bal)}</div>
                       )}
                     </div>
                     {isSelected && <Check className="h-4 w-4 text-primary shrink-0" />}

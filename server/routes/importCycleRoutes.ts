@@ -4,33 +4,92 @@ import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "./_helpers";
 import {
-  inventory, stockItems, stockGroups,
-  stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems,
-  bankAccounts, fixedAssets, ledgerAccounts, insertLedgerAccountSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertContainerSchema,
-  insertStockTransferVoucherSchema, insertStockAdjustmentVoucherSchema,
-  updateStockTransferSchema, updateStockAdjustmentSchema,
-  vouchers, voucherEntries, salesItems, suppliers, customers, customerBalances,
-  employees, locations, userLocations, userCompanyRoles, companies,
-  auditLog, users, FEATURE_KEYS, companySettings,
-  purchaseOrders, poLineItems, interCompanyTransfers,
-  insertInterCompanyTransferSchema, insertContainerSaleSchema, containerSales,
-  insertUserPreferencesSchema, userPreferences,
-  insertDraftPosSaleSchema, InsertDraftPosSale,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  fiscalPeriodClosures, wasteDispatches, wasteDispatchItems,
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  inventory,
+  stockItems,
+  stockGroups,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  bankAccounts,
+  fixedAssets,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertContainerSchema,
+  insertStockTransferVoucherSchema,
+  insertStockAdjustmentVoucherSchema,
+  updateStockTransferSchema,
+  updateStockAdjustmentSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  suppliers,
+  customers,
+  customerBalances,
+  employees,
+  locations,
+  userLocations,
+  userCompanyRoles,
+  companies,
+  auditLog,
+  users,
+  FEATURE_KEYS,
+  companySettings,
+  purchaseOrders,
+  poLineItems,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  insertContainerSaleSchema,
+  containerSales,
+  insertUserPreferencesSchema,
+  userPreferences,
+  insertDraftPosSaleSchema,
+  InsertDraftPosSale,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
-  bales, baleProducts, baleProductCategories, storedFiles,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  storedFiles,
   systemSettings,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -46,14 +105,19 @@ const _icCache = new Map<string, { data: any; expiresAt: number }>();
 function _getCached(key: string): any | null {
   const e = _icCache.get(key);
   if (!e) return null;
-  if (Date.now() > e.expiresAt) { _icCache.delete(key); return null; }
+  if (Date.now() > e.expiresAt) {
+    _icCache.delete(key);
+    return null;
+  }
   return e.data;
 }
 function _setCached(key: string, data: any, ttlMs = 30_000): void {
   _icCache.set(key, { data, expiresAt: Date.now() + ttlMs });
   if (_icCache.size > 200) {
     const now = Date.now();
-    for (const [k, v] of _icCache) { if (v.expiresAt < now) _icCache.delete(k); }
+    for (const [k, v] of _icCache) {
+      if (v.expiresAt < now) _icCache.delete(k);
+    }
   }
 }
 
@@ -75,18 +139,14 @@ export function registerImportCycleRoutes(app: Express) {
       const companyEntries = await db
         .select({
           ledgerAccountId: voucherEntries.ledgerAccountId,
-          supplierId:      voucherEntries.supplierId,
-          employeeId:      voucherEntries.employeeId,
-          debitAmount:     voucherEntries.debitAmount,
-          creditAmount:    voucherEntries.creditAmount,
+          supplierId: voucherEntries.supplierId,
+          employeeId: voucherEntries.employeeId,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(and(
-          eq(vouchers.companyId, companyId),
-          eq(vouchers.optional, false),
-          isNull(vouchers.deletedAt),
-        ))
+        .where(and(eq(vouchers.companyId, companyId), eq(vouchers.optional, false), isNull(vouchers.deletedAt)))
         .execute();
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
@@ -117,14 +177,11 @@ export function registerImportCycleRoutes(app: Express) {
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
 
       // Signed net balance for a single account (mirrors getAccountNetBalance from netPositionHelper)
-      const nb = (acc: (typeof companyAccounts)[0]) =>
-        getAccountNetBalance(acc, accountBalances);
+      const nb = (acc: (typeof companyAccounts)[0]) => getAccountNetBalance(acc, accountBalances);
 
       // Sum net balances for accounts matching the given type(s)
       const sumNB = (types: string[]) =>
-        companyAccounts
-          .filter((a) => types.includes(a.accountType || ""))
-          .reduce((s, a) => s + nb(a), 0);
+        companyAccounts.filter((a) => types.includes(a.accountType || "")).reduce((s, a) => s + nb(a), 0);
 
       // 1. Supplier Balance — same pure-debit/credit logic as /api/stats/net-profit
       const parentCompanyId = await storage.getParentCompanyId();
@@ -157,9 +214,9 @@ export function registerImportCycleRoutes(app: Express) {
 
       // 3-5. Duty Agent / Transporter Agent / Loans
       // NOTE: account type is "Loan" (singular) — matches netPositionHelper constants and DB values
-      const dutyAgentBalance        = Math.max(0, -sumNB(["Duty Agent"]));
+      const dutyAgentBalance = Math.max(0, -sumNB(["Duty Agent"]));
       const transporterAgentBalance = Math.max(0, -sumNB(["Transporter Agent"]));
-      const loansBalance            = Math.max(0, -sumNB(["Loan"]));
+      const loansBalance = Math.max(0, -sumNB(["Loan"]));
 
       // 6. Cash (asset — positive debit balance)
       const cashBalance = Math.max(0, sumNB(["Cash"]));
@@ -171,34 +228,38 @@ export function registerImportCycleRoutes(app: Express) {
       const standaloneBankAccountEntries = await db
         .select({
           bankAccountId: voucherEntries.bankAccountId,
-          creditAmount:  voucherEntries.creditAmount,
-          debitAmount:   voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          debitAmount: voucherEntries.debitAmount,
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .innerJoin(bankAccounts, eq(voucherEntries.bankAccountId, bankAccounts.id))
-        .where(and(
-          isNotNull(voucherEntries.bankAccountId),
-          isNull(voucherEntries.ledgerAccountId),
-          isNull(bankAccounts.linkedLedgerId),
-          eq(bankAccounts.companyId, companyId),
-          isNull(bankAccounts.deletedAt),
-          eq(vouchers.companyId, companyId),
-          isNull(vouchers.deletedAt),
-          eq(vouchers.optional, false),
-        ));
+        .where(
+          and(
+            isNotNull(voucherEntries.bankAccountId),
+            isNull(voucherEntries.ledgerAccountId),
+            isNull(bankAccounts.linkedLedgerId),
+            eq(bankAccounts.companyId, companyId),
+            isNull(bankAccounts.deletedAt),
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            eq(vouchers.optional, false)
+          )
+        );
 
       const standaloneBankAccounts = await db
         .select()
         .from(bankAccounts)
-        .where(and(
-          eq(bankAccounts.companyId, companyId),
-          isNull(bankAccounts.deletedAt),
-          isNull(bankAccounts.linkedLedgerId),
-        ));
+        .where(
+          and(
+            eq(bankAccounts.companyId, companyId),
+            isNull(bankAccounts.deletedAt),
+            isNull(bankAccounts.linkedLedgerId)
+          )
+        );
 
       const standaloneBankOpeningBalance = standaloneBankAccounts.reduce((sum, account) => {
-        const raw  = parseFloat(account.openingBalance || "0");
+        const raw = parseFloat(account.openingBalance || "0");
         const side = account.openingBalanceSide || "Dr";
         return sum + (side === "Dr" ? raw : -raw);
       }, 0);
@@ -214,9 +275,7 @@ export function registerImportCycleRoutes(app: Express) {
       if (importChargesParentAcc) {
         const importChargeIds = new Set([
           importChargesParentAcc.id,
-          ...companyAccounts
-            .filter((a) => a.parentId === importChargesParentAcc.id)
-            .map((a) => a.id),
+          ...companyAccounts.filter((a) => a.parentId === importChargesParentAcc.id).map((a) => a.id),
         ]);
         for (const acc of companyAccounts) {
           if (importChargeIds.has(acc.id)) {
@@ -242,17 +301,12 @@ export function registerImportCycleRoutes(app: Express) {
         })
         .from(inventory)
         .innerJoin(locations, eq(inventory.locationId, locations.id))
-        .where(
-          and(
-            eq(inventory.companyId, companyId),
-            isNull(locations.deletedAt)
-          )
-        );
+        .where(and(eq(inventory.companyId, companyId), isNull(locations.deletedAt)));
 
       const stockOnFloorValue = inventoryItems.reduce((sum, item) => {
         const qty = parseFloat(item.quantity || "0");
         const rate = parseFloat(item.averageRate || "0");
-        return sum + (qty * rate);
+        return sum + qty * rate;
       }, 0);
 
       // 12. Cost of Goods Sold (calculated from salesItems for non-optional, non-deleted sales vouchers)
@@ -263,13 +317,7 @@ export function registerImportCycleRoutes(app: Express) {
         })
         .from(salesItems)
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            isNull(vouchers.deletedAt),
-            eq(vouchers.optional, false)
-          )
-        );
+        .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
 
       const cogsBalance = cogsData.reduce((sum, item) => {
         return sum + parseFloat(item.totalCost || "0");
@@ -350,12 +398,7 @@ export function registerImportCycleRoutes(app: Express) {
           remainingBalance: salaryAdvances.remainingBalance,
         })
         .from(salaryAdvances)
-        .where(
-          and(
-            eq(salaryAdvances.companyId, companyId),
-            eq(salaryAdvances.fullyPaid, false)
-          )
-        );
+        .where(and(eq(salaryAdvances.companyId, companyId), eq(salaryAdvances.fullyPaid, false)));
 
       const salaryAdvancesBalance = advancesData.reduce((sum, advance) => {
         return sum + parseFloat(advance.remainingBalance || "0");
@@ -368,12 +411,7 @@ export function registerImportCycleRoutes(app: Express) {
           currentBalance: employees.currentBalance,
         })
         .from(employees)
-        .where(
-          and(
-            eq(employees.companyId, companyId),
-            isNull(employees.deletedAt)
-          )
-        );
+        .where(and(eq(employees.companyId, companyId), isNull(employees.deletedAt)));
 
       const payrollLiabilitiesBalance = employeesData.reduce((sum, emp) => {
         const balance = parseFloat(emp.currentBalance || "0");
@@ -419,7 +457,7 @@ export function registerImportCycleRoutes(app: Express) {
       })();
 
       // 21. Opening Balance Equity - automatically balance opening entries
-      // When opening balances are added without matching entries (e.g., cash opening balance without 
+      // When opening balances are added without matching entries (e.g., cash opening balance without
       // corresponding capital), this creates an imbalance. We calculate the net of all opening balances
       // and treat the difference as implicit equity/capital that should be on the liability side.
       // Calculate net opening balance equity using already-loaded companyAccounts
@@ -429,7 +467,7 @@ export function registerImportCycleRoutes(app: Express) {
       for (const account of companyAccounts) {
         const openingBalanceRaw = parseFloat(account.openingBalance || "0");
         if (openingBalanceRaw === 0) continue;
-        
+
         const openingSide = account.openingBalanceSide || "Dr";
         if (openingSide === "Dr") {
           totalDrOpenings += openingBalanceRaw;
@@ -437,7 +475,7 @@ export function registerImportCycleRoutes(app: Express) {
           totalCrOpenings += openingBalanceRaw;
         }
       }
-      
+
       // Include employee opening balances in the equity offset calculation
       // Employee opening balances are liabilities (money owed to employees) - credit side
       const employeeOpeningBalances = await db
@@ -445,20 +483,15 @@ export function registerImportCycleRoutes(app: Express) {
           openingBalance: employees.openingBalance,
         })
         .from(employees)
-        .where(
-          and(
-            eq(employees.companyId, companyId),
-            isNull(employees.deletedAt)
-          )
-        );
-      
+        .where(and(eq(employees.companyId, companyId), isNull(employees.deletedAt)));
+
       const totalEmployeeOpeningBalance = employeeOpeningBalances.reduce((sum, emp) => {
         return sum + parseFloat(emp.openingBalance || "0");
       }, 0);
-      
+
       // Add employee opening balances to the credit side (they're liabilities)
       totalCrOpenings += totalEmployeeOpeningBalance;
-      
+
       // Opening Balance Equity = Credit side opening balances minus debit side
       // This represents the net capital/equity that balances the opening entries
       // When added to the liability side, it offsets the asset-side opening balances
@@ -473,17 +506,12 @@ export function registerImportCycleRoutes(app: Express) {
           openingValue: stockItems.openingValue,
         })
         .from(stockItems)
-        .where(
-          and(
-            eq(stockItems.companyId, companyId),
-            isNull(stockItems.deletedAt)
-          )
-        );
-      
+        .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)));
+
       const openingStockValue = stockItemsWithOpening.reduce((sum, item) => {
         return sum + parseFloat(item.openingValue || "0");
       }, 0);
-      
+
       // Add opening stock value to the equity offset (it's an asset that needs balancing)
       // This is subtracted from the liability side calculation (negative equity offset)
       openingBalanceEquity -= openingStockValue;
@@ -508,29 +536,29 @@ export function registerImportCycleRoutes(app: Express) {
       //       - Production adds to inventory, Consumption removes from inventory
       //       - These movements are tracked in stockOnFloorValue via the inventory table
       //       - consumptionBalance/productionBalance are for diagnostic display only
-      const netImportCycleBalance = 
-        (stockOtwValue +            // Asset (debit) - containers in transit
-        cashBalance +               // Asset (debit) - cash on hand
-        bankBalance +               // Asset (debit) - bank balances
-        stockOnFloorValue +         // Asset - inventory at cost (includes ALL offload charges capitalized)
-        assetBalance +              // Asset accounts (properties, guarantees, receivables)
+      const netImportCycleBalance =
+        stockOtwValue + // Asset (debit) - containers in transit
+        cashBalance + // Asset (debit) - cash on hand
+        bankBalance + // Asset (debit) - bank balances
+        stockOnFloorValue + // Asset - inventory at cost (includes ALL offload charges capitalized)
+        assetBalance + // Asset accounts (properties, guarantees, receivables)
         // directExpenseBalance is EXCLUDED - already capitalized into stockOnFloorValue
-        indirectExpenseBalance +    // Expense (debit) - operating expenses (includes PAYROLL_DEPOSIT_EXPENSE)
-        payrollExpenseBalance +     // Payroll/Salary expenses (Expense type) - worker salaries in import cycle
-        governmentTaxesBalance +    // Government Taxes (expense)
-        cogsBalance +               // COGS expense (debit) - balances inventory reduction on sales
-        salaryAdvancesBalance) -    // Salary Advances (asset) - recoverable from employees
-        (supplierBalance +          // Liability (what we owe to suppliers)
-        dutyAgentBalance +          // Liability (what we owe to duty agents)
-        transporterAgentBalance +   // Liability (what we owe to transporters)
-        loansBalance +              // Liability (loans/borrowings - includes office charges)
-        liabilityBalance +          // Other Liability accounts
-        profitBalance +             // Profit/Equity (retained earnings)
-        equityTransactionBalance +  // Equity account transactions (capital injections, etc.)
-        apTransactionBalance +      // Accounts Payable transactions
-        incomeBalance +             // Income (sales revenue - credit)
-        payrollLiabilitiesBalance - // Payroll Liabilities (what we owe employees)
-        openingBalanceEquity);      // Opening Balance Equity (implicit capital from opening balances)
+        indirectExpenseBalance + // Expense (debit) - operating expenses (includes PAYROLL_DEPOSIT_EXPENSE)
+        payrollExpenseBalance + // Payroll/Salary expenses (Expense type) - worker salaries in import cycle
+        governmentTaxesBalance + // Government Taxes (expense)
+        cogsBalance + // COGS expense (debit) - balances inventory reduction on sales
+        salaryAdvancesBalance - // Salary Advances (asset) - recoverable from employees
+        (supplierBalance + // Liability (what we owe to suppliers)
+          dutyAgentBalance + // Liability (what we owe to duty agents)
+          transporterAgentBalance + // Liability (what we owe to transporters)
+          loansBalance + // Liability (loans/borrowings - includes office charges)
+          liabilityBalance + // Other Liability accounts
+          profitBalance + // Profit/Equity (retained earnings)
+          equityTransactionBalance + // Equity account transactions (capital injections, etc.)
+          apTransactionBalance + // Accounts Payable transactions
+          incomeBalance + // Income (sales revenue - credit)
+          payrollLiabilitiesBalance - // Payroll Liabilities (what we owe employees)
+          openingBalanceEquity); // Opening Balance Equity (implicit capital from opening balances)
 
       // Auto-adjust: silently keep the import cycle balance at 0 by computing and storing
       // the exact offset needed. This runs on every fetch so no manual action is needed.
@@ -540,7 +568,10 @@ export function registerImportCycleRoutes(app: Express) {
         // Fire-and-forget — don't await so the response is not delayed
         db.insert(systemSettings)
           .values({ key: autoAdjustKey, value: storedEquityAdjustment.toFixed(2) })
-          .onConflictDoUpdate({ target: systemSettings.key, set: { value: storedEquityAdjustment.toFixed(2), updatedAt: new Date() } })
+          .onConflictDoUpdate({
+            target: systemSettings.key,
+            set: { value: storedEquityAdjustment.toFixed(2), updatedAt: new Date() },
+          })
           .catch(() => {});
       }
 
@@ -555,51 +586,76 @@ export function registerImportCycleRoutes(app: Express) {
       if (Math.abs(roundedBalance) <= ROUNDING_THRESHOLD) {
         roundedBalance = 0;
       }
-      
+
       // Calculate precise discrepancy trace
       // Matches the exact formula used for netImportCycleBalance:
       // Assets + Expenses - (Liabilities - OpeningBalanceEquity) = Net
-      const traceAssetTotal = stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance + salaryAdvancesBalance;
+      const traceAssetTotal =
+        stockOtwValue + cashBalance + bankBalance + stockOnFloorValue + assetBalance + salaryAdvancesBalance;
       const traceExpenseTotal = indirectExpenseBalance + payrollExpenseBalance + governmentTaxesBalance + cogsBalance;
       // liabilitiesBeforeEquity is the raw sum, then we subtract openingBalanceEquity
-      const traceLiabilitiesRaw = supplierBalance + dutyAgentBalance + transporterAgentBalance + loansBalance + 
-        liabilityBalance + profitBalance + equityTransactionBalance + apTransactionBalance + incomeBalance + payrollLiabilitiesBalance;
+      const traceLiabilitiesRaw =
+        supplierBalance +
+        dutyAgentBalance +
+        transporterAgentBalance +
+        loansBalance +
+        liabilityBalance +
+        profitBalance +
+        equityTransactionBalance +
+        apTransactionBalance +
+        incomeBalance +
+        payrollLiabilitiesBalance;
       const traceNetLiabilities = traceLiabilitiesRaw - openingBalanceEquity;
-      
+
       // Verify: our trace matches the netImportCycleBalance exactly
       const traceNetBalance = traceAssetTotal + traceExpenseTotal - traceNetLiabilities;
-      
+
       // Create precision trace showing exact calculation
       const precisionTrace = {
         formula: "(Assets + Expenses) - (Liabilities - Opening Equity) = Net Balance",
         calculation: {
-          assetTotal: { 
+          assetTotal: {
             value: traceAssetTotal,
-            breakdown: { stockOtwValue, cashBalance, bankBalance, stockOnFloorValue, assetBalance, salaryAdvancesBalance }
+            breakdown: {
+              stockOtwValue,
+              cashBalance,
+              bankBalance,
+              stockOnFloorValue,
+              assetBalance,
+              salaryAdvancesBalance,
+            },
           },
-          expenseTotal: { 
+          expenseTotal: {
             value: traceExpenseTotal,
-            breakdown: { indirectExpenseBalance, payrollExpenseBalance, governmentTaxesBalance, cogsBalance }
+            breakdown: { indirectExpenseBalance, payrollExpenseBalance, governmentTaxesBalance, cogsBalance },
           },
-          liabilityTotal: { 
+          liabilityTotal: {
             value: traceNetLiabilities,
-            breakdown: { 
-              supplierBalance, dutyAgentBalance, transporterAgentBalance, loansBalance, 
-              liabilityBalance, profitBalance, equityTransactionBalance, apTransactionBalance,
-              incomeBalance, payrollLiabilitiesBalance,
-              openingBalanceEquityOffset: openingBalanceEquity // positive value that reduces liabilities
-            }
+            breakdown: {
+              supplierBalance,
+              dutyAgentBalance,
+              transporterAgentBalance,
+              loansBalance,
+              liabilityBalance,
+              profitBalance,
+              equityTransactionBalance,
+              apTransactionBalance,
+              incomeBalance,
+              payrollLiabilitiesBalance,
+              openingBalanceEquityOffset: openingBalanceEquity, // positive value that reduces liabilities
+            },
           },
         },
         rawNetBalance: netImportCycleBalance,
         storedEquityAdjustment,
         adjustedBalance: adjustedImportCycleBalance,
         finalRoundedBalance: roundedBalance,
-        discrepancyExplanation: storedEquityAdjustment !== 0 
-          ? `An equity adjustment of ${storedEquityAdjustment.toFixed(2)} was applied to zero out the balance.`
-          : Math.abs(netImportCycleBalance) < 50 && netImportCycleBalance !== 0
-            ? `Small discrepancy of ${netImportCycleBalance.toFixed(2)} likely from accumulated rounding in weighted average cost calculations.`
-            : null,
+        discrepancyExplanation:
+          storedEquityAdjustment !== 0
+            ? `An equity adjustment of ${storedEquityAdjustment.toFixed(2)} was applied to zero out the balance.`
+            : Math.abs(netImportCycleBalance) < 50 && netImportCycleBalance !== 0
+              ? `Small discrepancy of ${netImportCycleBalance.toFixed(2)} likely from accumulated rounding in weighted average cost calculations.`
+              : null,
       };
 
       const _result = {
@@ -672,20 +728,11 @@ export function registerImportCycleRoutes(app: Express) {
         })
         .from(inventory)
         .leftJoin(locations, eq(inventory.locationId, locations.id))
-        .where(
-          and(
-            eq(inventory.companyId, companyId),
-            or(
-              isNotNull(locations.deletedAt),
-              isNull(locations.id)
-            )
-          )
-        );
+        .where(and(eq(inventory.companyId, companyId), or(isNotNull(locations.deletedAt), isNull(locations.id))));
 
       if (orphanedInventory.length > 0) {
-        const totalOrphanedValue = orphanedInventory.reduce((sum, inv) => 
-          sum + parseFloat(inv.totalValue || "0"), 0);
-        
+        const totalOrphanedValue = orphanedInventory.reduce((sum, inv) => sum + parseFloat(inv.totalValue || "0"), 0);
+
         if (totalOrphanedValue > 0) {
           issues.push({
             id: "orphaned-inventory",
@@ -693,8 +740,9 @@ export function registerImportCycleRoutes(app: Express) {
             title: "Orphaned Inventory at Deleted Locations",
             description: `You have ${orphanedInventory.length} inventory records worth $${totalOrphanedValue.toFixed(2)} at locations that have been deleted. This inventory is counted as an asset but doesn't exist in any active location.`,
             impact: totalOrphanedValue,
-            howToFix: "Go to Settings > System Tools > View Deleted Items > Locations. Either restore the deleted location(s) and transfer the inventory elsewhere, or permanently delete the location which will also remove the orphaned inventory.",
-            category: "Orphaned Data"
+            howToFix:
+              "Go to Settings > System Tools > View Deleted Items > Locations. Either restore the deleted location(s) and transfer the inventory elsewhere, or permanently delete the location which will also remove the orphaned inventory.",
+            category: "Orphaned Data",
           });
         }
       }
@@ -719,17 +767,20 @@ export function registerImportCycleRoutes(app: Express) {
         );
 
       if (negativeInventory.length > 0) {
-        const totalNegativeValue = negativeInventory.reduce((sum, inv) => 
-          sum + Math.abs(parseFloat(inv.totalValue || "0")), 0);
-        
+        const totalNegativeValue = negativeInventory.reduce(
+          (sum, inv) => sum + Math.abs(parseFloat(inv.totalValue || "0")),
+          0
+        );
+
         issues.push({
           id: "negative-inventory",
           severity: "critical",
           title: "Negative Inventory Quantities",
           description: `You have ${negativeInventory.length} items with negative quantities. This shouldn't happen and indicates a data issue.`,
           impact: totalNegativeValue,
-          howToFix: "Create a Production voucher to add the missing quantity back, or review recent Consumption/Sales vouchers that may have removed more than available.",
-          category: "Data Integrity"
+          howToFix:
+            "Create a Production voucher to add the missing quantity back, or review recent Consumption/Sales vouchers that may have removed more than available.",
+          category: "Data Integrity",
         });
       }
 
@@ -751,17 +802,17 @@ export function registerImportCycleRoutes(app: Express) {
         );
 
       if (staleContainers.length > 0) {
-        const totalStaleValue = staleContainers.reduce((sum, c) => 
-          sum + parseFloat(c.grandTotal || "0"), 0);
-        
+        const totalStaleValue = staleContainers.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
+
         issues.push({
           id: "stale-containers",
           severity: "warning",
           title: "Containers In Transit for Over 90 Days",
           description: `You have ${staleContainers.length} container(s) worth $${totalStaleValue.toFixed(2)} that have been "On The Way" for more than 90 days. These may need to be offloaded or marked as lost.`,
           impact: totalStaleValue,
-          howToFix: "Go to Containers, find the stale containers, and either Offload them to a location if they've arrived, or cancel them if they're lost.",
-          category: "Pending Transactions"
+          howToFix:
+            "Go to Containers, find the stale containers, and either Offload them to a location if they've arrived, or cancel them if they're lost.",
+          category: "Pending Transactions",
         });
       }
 
@@ -776,15 +827,11 @@ export function registerImportCycleRoutes(app: Express) {
         })
         .from(vouchers)
         .leftJoin(voucherEntries, eq(vouchers.id, voucherEntries.voucherId))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            isNull(vouchers.deletedAt),
-            eq(vouchers.optional, false)
-          )
-        )
+        .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)))
         .groupBy(vouchers.id, vouchers.voucherNumber, vouchers.voucherType)
-        .having(sql`ABS(COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS DECIMAL)), 0) - COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)) > 0.01`);
+        .having(
+          sql`ABS(COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS DECIMAL)), 0) - COALESCE(SUM(CAST(${voucherEntries.creditAmount} AS DECIMAL)), 0)) > 0.01`
+        );
 
       if (unbalancedVouchers.length > 0) {
         const totalImbalance = unbalancedVouchers.reduce((sum, v) => {
@@ -794,21 +841,25 @@ export function registerImportCycleRoutes(app: Express) {
         }, 0);
 
         // Create detailed list of unbalanced vouchers
-        const voucherDetails = unbalancedVouchers.slice(0, 10).map(v => {
-          const debits = parseFloat(v.totalDebits || "0");
-          const credits = parseFloat(v.totalCredits || "0");
-          const diff = debits - credits;
-          return `${v.voucherNumber} (${v.voucherType}): DR ${debits.toFixed(2)} - CR ${credits.toFixed(2)} = ${diff.toFixed(2)}`;
-        }).join("; ");
+        const voucherDetails = unbalancedVouchers
+          .slice(0, 10)
+          .map((v) => {
+            const debits = parseFloat(v.totalDebits || "0");
+            const credits = parseFloat(v.totalCredits || "0");
+            const diff = debits - credits;
+            return `${v.voucherNumber} (${v.voucherType}): DR ${debits.toFixed(2)} - CR ${credits.toFixed(2)} = ${diff.toFixed(2)}`;
+          })
+          .join("; ");
 
         issues.push({
           id: "unbalanced-vouchers",
           severity: "critical",
           title: `Unbalanced Voucher Entries (${unbalancedVouchers.length})`,
-          description: `${unbalancedVouchers.length} voucher(s) where debits don't equal credits. Total imbalance: ${totalImbalance.toFixed(2)}. Details: ${voucherDetails}${unbalancedVouchers.length > 10 ? '...' : ''}`,
+          description: `${unbalancedVouchers.length} voucher(s) where debits don't equal credits. Total imbalance: ${totalImbalance.toFixed(2)}. Details: ${voucherDetails}${unbalancedVouchers.length > 10 ? "..." : ""}`,
           impact: totalImbalance,
-          howToFix: "Edit these vouchers in the Daybook to correct the imbalance, ensuring total debits equal total credits.",
-          category: "Data Integrity"
+          howToFix:
+            "Edit these vouchers in the Daybook to correct the imbalance, ensuring total debits equal total credits.",
+          category: "Data Integrity",
         });
       }
 
@@ -820,12 +871,7 @@ export function registerImportCycleRoutes(app: Express) {
           accountType: ledgerAccounts.accountType,
         })
         .from(ledgerAccounts)
-        .where(
-          and(
-            eq(ledgerAccounts.companyId, companyId),
-            isNull(ledgerAccounts.deletedAt)
-          )
-        );
+        .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)));
 
       let totalDrOpenings = 0;
       let totalCrOpenings = 0;
@@ -848,8 +894,9 @@ export function registerImportCycleRoutes(app: Express) {
           title: "Opening Balance Equity Adjustment",
           description: `Your opening debit balances ($${totalDrOpenings.toFixed(2)}) differ from opening credit balances ($${totalCrOpenings.toFixed(2)}) by $${openingImbalance.toFixed(2)}. This is treated as implicit opening equity.`,
           impact: openingImbalance,
-          howToFix: "This is often normal when importing data from another system. If you need to balance it, add an opening balance to an Equity or Capital account to offset the difference.",
-          category: "Opening Balances"
+          howToFix:
+            "This is often normal when importing data from another system. If you need to balance it, add an opening balance to an Equity or Capital account to offset the difference.",
+          category: "Opening Balances",
         });
       }
 
@@ -869,8 +916,7 @@ export function registerImportCycleRoutes(app: Express) {
         );
 
       if (employeesData.length > 0) {
-        const totalOwed = employeesData.reduce((sum, e) => 
-          sum + parseFloat(e.currentBalance || "0"), 0);
+        const totalOwed = employeesData.reduce((sum, e) => sum + parseFloat(e.currentBalance || "0"), 0);
 
         issues.push({
           id: "employee-balances",
@@ -878,8 +924,9 @@ export function registerImportCycleRoutes(app: Express) {
           title: "Outstanding Employee Balances",
           description: `You owe ${employeesData.length} employee(s) a total of $${totalOwed.toFixed(2)}. This is recorded as a liability.`,
           impact: totalOwed,
-          howToFix: "These balances are normal and represent wages owed. Pay employees through Payroll to reduce these liabilities.",
-          category: "Liabilities"
+          howToFix:
+            "These balances are normal and represent wages owed. Pay employees through Payroll to reduce these liabilities.",
+          category: "Liabilities",
         });
       }
 
@@ -928,7 +975,7 @@ export function registerImportCycleRoutes(app: Express) {
             description: `The Loans account "${loanAcct.name}" has been debited more than credited (net: $${netVoucherBalance.toFixed(2)}). This usually means office charges were recorded with the Loans account on the DEBIT side instead of the CREDIT side in the Offload dialog.`,
             impact: Math.abs(netVoucherBalance),
             howToFix: `In the Offload dialog, the Loans/credit account should go in the "Cash Account" field (credit side). An expense or import account should go in the "Office Account" field (debit side). Reversing the direction will fix the import cycle balance.`,
-            category: "Office Charges"
+            category: "Office Charges",
           });
         }
       }
@@ -943,8 +990,8 @@ export function registerImportCycleRoutes(app: Express) {
       });
 
       // Calculate summary
-      const criticalCount = issues.filter(i => i.severity === "critical").length;
-      const warningCount = issues.filter(i => i.severity === "warning").length;
+      const criticalCount = issues.filter((i) => i.severity === "critical").length;
+      const warningCount = issues.filter((i) => i.severity === "warning").length;
       const totalImpact = issues.reduce((sum, i) => sum + i.impact, 0);
 
       res.json({
@@ -954,7 +1001,7 @@ export function registerImportCycleRoutes(app: Express) {
           criticalCount,
           warningCount,
           totalImpact,
-        }
+        },
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

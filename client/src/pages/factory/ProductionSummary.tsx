@@ -4,14 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/formatNumber";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -94,16 +87,10 @@ export default function ProductionSummary() {
   const allRawStock = rawStock || [];
 
   const totalBalesCount = allBales.length;
-  const totalWeightProduced = allBales.reduce(
-    (sum, row) => sum + parseFloat(row.bale.weightKg || "0"),
-    0
-  );
+  const totalWeightProduced = allBales.reduce((sum, row) => sum + parseFloat(row.bale.weightKg || "0"), 0);
   const activeBatches = allBatches.filter((b) => b.status === "ACTIVE");
   const activeBatchCount = activeBatches.length;
-  const rawStockAvailable = allRawStock.reduce(
-    (sum, r) => sum + parseFloat(r.remainingKg || "0"),
-    0
-  );
+  const rawStockAvailable = allRawStock.reduce((sum, r) => sum + parseFloat(r.remainingKg || "0"), 0);
 
   const today = getToday();
   const weekStart = getWeekStart();
@@ -111,24 +98,15 @@ export default function ProductionSummary() {
 
   const todayBales = filterBalesByDate(allBales, today);
   const todayCount = todayBales.length;
-  const todayWeight = todayBales.reduce(
-    (sum, row) => sum + parseFloat(row.bale.weightKg || "0"),
-    0
-  );
+  const todayWeight = todayBales.reduce((sum, row) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
   const weekBales = filterBalesByDate(allBales, weekStart);
   const weekCount = weekBales.length;
-  const weekWeight = weekBales.reduce(
-    (sum, row) => sum + parseFloat(row.bale.weightKg || "0"),
-    0
-  );
+  const weekWeight = weekBales.reduce((sum, row) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
   const monthBales = filterBalesByDate(allBales, monthStart);
   const monthCount = monthBales.length;
-  const monthWeight = monthBales.reduce(
-    (sum, row) => sum + parseFloat(row.bale.weightKg || "0"),
-    0
-  );
+  const monthWeight = monthBales.reduce((sum, row) => sum + parseFloat(row.bale.weightKg || "0"), 0);
 
   return (
     <div className="space-y-6">
@@ -140,9 +118,7 @@ export default function ProductionSummary() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Bales Produced
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Bales Produced</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -154,9 +130,7 @@ export default function ProductionSummary() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Weight Produced
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Weight Produced</CardTitle>
             <Scale className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -168,9 +142,7 @@ export default function ProductionSummary() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Active Batches
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active Batches</CardTitle>
             <Boxes className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -182,9 +154,7 @@ export default function ProductionSummary() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Raw Stock Available
-            </CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Raw Stock Available</CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -282,49 +252,43 @@ export default function ProductionSummary() {
         <CardContent>
           {activeBatches.length > 0 ? (
             <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
-                  <TableHead>Batch</TableHead>
-                  <TableHead className="text-right">Total (kg)</TableHead>
-                  <TableHead className="text-right">Used (kg)</TableHead>
-                  <TableHead className="text-right">Remaining (kg)</TableHead>
-                  <TableHead className="min-w-[150px]">Utilization</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activeBatches.map((batch) => {
-                  const total = parseFloat(batch.totalWeightKg || "0");
-                  const used = parseFloat(batch.usedKg || "0");
-                  const remaining = total - used;
-                  const utilization = total > 0 ? Math.min((used / total) * 100, 100) : 0;
-                  return (
-                    <TableRow key={batch.id} data-testid={`row-batch-util-${batch.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-batch-name-${batch.id}`}>
-                        {batch.name || batch.batchCode}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(total)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(used)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(remaining)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Progress value={utilization} className="h-2 flex-1" />
-                          <Badge variant="secondary" data-testid={`badge-util-${batch.id}`}>
-                            {utilization.toFixed(0)}%
-                          </Badge>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+              <Table>
+                <TableHeader className="sticky top-0 z-30 bg-background">
+                  <TableRow>
+                    <TableHead>Batch</TableHead>
+                    <TableHead className="text-right">Total (kg)</TableHead>
+                    <TableHead className="text-right">Used (kg)</TableHead>
+                    <TableHead className="text-right">Remaining (kg)</TableHead>
+                    <TableHead className="min-w-[150px]">Utilization</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {activeBatches.map((batch) => {
+                    const total = parseFloat(batch.totalWeightKg || "0");
+                    const used = parseFloat(batch.usedKg || "0");
+                    const remaining = total - used;
+                    const utilization = total > 0 ? Math.min((used / total) * 100, 100) : 0;
+                    return (
+                      <TableRow key={batch.id} data-testid={`row-batch-util-${batch.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-batch-name-${batch.id}`}>
+                          {batch.name || batch.batchCode}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{formatNumber(total)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatNumber(used)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatNumber(remaining)}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={utilization} className="h-2 flex-1" />
+                            <Badge variant="secondary" data-testid={`badge-util-${batch.id}`}>
+                              {utilization.toFixed(0)}%
+                            </Badge>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-6" data-testid="text-no-active-batches">
@@ -344,43 +308,41 @@ export default function ProductionSummary() {
         <CardContent>
           {allRawStock.length > 0 ? (
             <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
-                  <TableHead>Container</TableHead>
-                  <TableHead className="text-right">Received (kg)</TableHead>
-                  <TableHead className="text-right">Used (kg)</TableHead>
-                  <TableHead className="text-right">Remaining (kg)</TableHead>
-                  <TableHead className="text-right">Cost/kg</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {allRawStock.map((row) => {
-                  const remaining = parseFloat(row.remainingKg || "0");
-                  return (
-                    <TableRow key={row.id} data-testid={`row-raw-stock-${row.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-container-${row.id}`}>
-                        {row.containerNumber}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(parseFloat(row.receivedKg || "0"))}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(parseFloat(row.usedKg || "0"))}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        <Badge variant={remaining <= 0 ? "secondary" : "default"}>
-                          {formatNumber(remaining)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-muted-foreground">
-                        ${parseFloat(row.costPerKg || "0").toFixed(4)}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+              <Table>
+                <TableHeader className="sticky top-0 z-30 bg-background">
+                  <TableRow>
+                    <TableHead>Container</TableHead>
+                    <TableHead className="text-right">Received (kg)</TableHead>
+                    <TableHead className="text-right">Used (kg)</TableHead>
+                    <TableHead className="text-right">Remaining (kg)</TableHead>
+                    <TableHead className="text-right">Cost/kg</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allRawStock.map((row) => {
+                    const remaining = parseFloat(row.remainingKg || "0");
+                    return (
+                      <TableRow key={row.id} data-testid={`row-raw-stock-${row.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-container-${row.id}`}>
+                          {row.containerNumber}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatNumber(parseFloat(row.receivedKg || "0"))}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatNumber(parseFloat(row.usedKg || "0"))}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          <Badge variant={remaining <= 0 ? "secondary" : "default"}>{formatNumber(remaining)}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-muted-foreground">
+                          ${parseFloat(row.costPerKg || "0").toFixed(4)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground text-center py-6" data-testid="text-no-raw-stock">

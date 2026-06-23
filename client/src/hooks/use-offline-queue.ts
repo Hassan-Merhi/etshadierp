@@ -61,7 +61,7 @@ export function useOfflineQueue() {
         description: "Connection restored. Syncing pending transactions...",
       });
     };
-    
+
     const handleOffline = () => {
       setIsOnline(false);
       toast({
@@ -82,7 +82,7 @@ export function useOfflineQueue() {
 
   // Auto-sync when coming back online
   useEffect(() => {
-    if (isOnline && queue.some(q => q.status === "pending" || q.status === "failed")) {
+    if (isOnline && queue.some((q) => q.status === "pending" || q.status === "failed")) {
       syncQueue();
     }
   }, [isOnline]);
@@ -93,24 +93,27 @@ export function useOfflineQueue() {
   }, []);
 
   // Add a sale to the queue
-  const addToQueue = useCallback((saleData: Omit<QueuedSale, "clientId" | "createdAt" | "retries" | "status">) => {
-    const queuedSale: QueuedSale = {
-      ...saleData,
-      clientId: generateClientId(),
-      createdAt: Date.now(),
-      retries: 0,
-      status: "pending",
-    };
+  const addToQueue = useCallback(
+    (saleData: Omit<QueuedSale, "clientId" | "createdAt" | "retries" | "status">) => {
+      const queuedSale: QueuedSale = {
+        ...saleData,
+        clientId: generateClientId(),
+        createdAt: Date.now(),
+        retries: 0,
+        status: "pending",
+      };
 
-    setQueue(prev => [...prev, queuedSale]);
-    
-    toast({
-      title: "Sale Queued",
-      description: "Sale will be synced when connection is restored.",
-    });
+      setQueue((prev) => [...prev, queuedSale]);
 
-    return queuedSale.clientId;
-  }, [generateClientId, toast]);
+      toast({
+        title: "Sale Queued",
+        description: "Sale will be synced when connection is restored.",
+      });
+
+      return queuedSale.clientId;
+    },
+    [generateClientId, toast]
+  );
 
   // Process a single queued sale
   const processSale = async (sale: QueuedSale): Promise<boolean> => {
@@ -142,8 +145,8 @@ export function useOfflineQueue() {
   // Sync all queued sales
   const syncQueue = useCallback(async () => {
     if (isSyncing || !isOnline) return;
-    
-    const pendingSales = queue.filter(q => q.status === "pending" || q.status === "failed");
+
+    const pendingSales = queue.filter((q) => q.status === "pending" || q.status === "failed");
     if (pendingSales.length === 0) return;
 
     setIsSyncing(true);
@@ -153,32 +156,32 @@ export function useOfflineQueue() {
 
     for (const sale of pendingSales) {
       // Update status to syncing
-      setQueue(prev => prev.map(q => 
-        q.clientId === sale.clientId ? { ...q, status: "syncing" as const } : q
-      ));
+      setQueue((prev) => prev.map((q) => (q.clientId === sale.clientId ? { ...q, status: "syncing" as const } : q)));
 
       const success = await processSale(sale);
 
       if (success) {
         // Remove from queue on success
-        setQueue(prev => prev.filter(q => q.clientId !== sale.clientId));
+        setQueue((prev) => prev.filter((q) => q.clientId !== sale.clientId));
         successCount++;
       } else {
         // Update retry count and status
         const newRetries = sale.retries + 1;
         if (newRetries >= MAX_RETRIES) {
-          setQueue(prev => prev.map(q => 
-            q.clientId === sale.clientId 
-              ? { ...q, status: "failed" as const, retries: newRetries, errorMessage: "Max retries reached" } 
-              : q
-          ));
+          setQueue((prev) =>
+            prev.map((q) =>
+              q.clientId === sale.clientId
+                ? { ...q, status: "failed" as const, retries: newRetries, errorMessage: "Max retries reached" }
+                : q
+            )
+          );
           failCount++;
         } else {
-          setQueue(prev => prev.map(q => 
-            q.clientId === sale.clientId 
-              ? { ...q, status: "pending" as const, retries: newRetries } 
-              : q
-          ));
+          setQueue((prev) =>
+            prev.map((q) =>
+              q.clientId === sale.clientId ? { ...q, status: "pending" as const, retries: newRetries } : q
+            )
+          );
         }
       }
     }
@@ -203,7 +206,7 @@ export function useOfflineQueue() {
 
   // Remove a failed sale from queue
   const removeFromQueue = useCallback((clientId: string) => {
-    setQueue(prev => prev.filter(q => q.clientId !== clientId));
+    setQueue((prev) => prev.filter((q) => q.clientId !== clientId));
   }, []);
 
   // Clear entire queue
@@ -214,18 +217,16 @@ export function useOfflineQueue() {
 
   // Retry a specific failed sale
   const retrySale = useCallback((clientId: string) => {
-    setQueue(prev => prev.map(q => 
-      q.clientId === clientId 
-        ? { ...q, status: "pending" as const, retries: 0 } 
-        : q
-    ));
+    setQueue((prev) =>
+      prev.map((q) => (q.clientId === clientId ? { ...q, status: "pending" as const, retries: 0 } : q))
+    );
   }, []);
 
   return {
     isOnline,
     queue,
-    pendingCount: queue.filter(q => q.status === "pending").length,
-    failedCount: queue.filter(q => q.status === "failed").length,
+    pendingCount: queue.filter((q) => q.status === "pending").length,
+    failedCount: queue.filter((q) => q.status === "failed").length,
     isSyncing,
     addToQueue,
     syncQueue,

@@ -3,17 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { NotebookPen, Save, Check } from "lucide-react";
 
 const NOTES_KEY = "/api/user/notes";
@@ -44,7 +35,9 @@ export function UserNotesPanel() {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const dragState = useRef<{ startMouseX: number; startMouseY: number; startBtnX: number; startBtnY: number } | null>(null);
+  const dragState = useRef<{ startMouseX: number; startMouseY: number; startBtnX: number; startBtnY: number } | null>(
+    null
+  );
   const didDrag = useRef(false);
   const btnRef = useRef<HTMLButtonElement>(null);
 
@@ -73,7 +66,7 @@ export function UserNotesPanel() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => saveMutation.mutate(value), DEBOUNCE_MS);
     },
-    [saveMutation],
+    [saveMutation]
   );
 
   function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -172,11 +165,7 @@ export function UserNotesPanel() {
       </Tooltip>
 
       <Sheet open={open} onOpenChange={handleOpenChange}>
-        <SheetContent
-          side="right"
-          className="flex flex-col w-full sm:max-w-md p-0"
-          data-testid="panel-user-notes"
-        >
+        <SheetContent side="right" className="flex flex-col w-full sm:max-w-md p-0" data-testid="panel-user-notes">
           <SheetHeader className="px-5 pt-5 pb-3 border-b flex-shrink-0">
             <div className="flex items-center justify-between gap-2">
               <SheetTitle className="flex items-center gap-2 text-base">
@@ -184,9 +173,7 @@ export function UserNotesPanel() {
                 My Notes
               </SheetTitle>
               <div className="flex items-center gap-2">
-                {saveMutation.isPending && (
-                  <span className="text-xs text-muted-foreground">Saving…</span>
-                )}
+                {saveMutation.isPending && <span className="text-xs text-muted-foreground">Saving…</span>}
                 {savedRecently && !saveMutation.isPending && (
                   <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
                     <Check className="h-3.5 w-3.5" />
@@ -209,17 +196,13 @@ export function UserNotesPanel() {
               </div>
             </div>
             {data?.updatedAt && !savedRecently && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {formatUpdated(data.updatedAt)}
-              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">{formatUpdated(data.updatedAt)}</p>
             )}
           </SheetHeader>
 
           <div className="flex-1 overflow-hidden p-4">
             {isLoading ? (
-              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-                Loading…
-              </div>
+              <div className="h-full flex items-center justify-center text-sm text-muted-foreground">Loading…</div>
             ) : (
               <Textarea
                 value={displayContent}
@@ -233,9 +216,7 @@ export function UserNotesPanel() {
           </div>
 
           <div className="px-5 pb-4 pt-2 border-t flex-shrink-0">
-            <p className="text-xs text-muted-foreground">
-              Only you can see these notes.
-            </p>
+            <p className="text-xs text-muted-foreground">Only you can see these notes.</p>
           </div>
         </SheetContent>
       </Sheet>

@@ -16,14 +16,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   ShoppingCart,
   Clock,
@@ -104,10 +97,10 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-    
+
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
@@ -197,7 +190,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       setCloseShiftDialog(false);
       setClosingCash("");
       setCloseNotes("");
-      
+
       const variance = parseFloat(data.variance || "0");
       toast({
         title: "Shift Closed",
@@ -222,9 +215,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
           <CardContent className="p-6 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h2 className="text-lg font-medium mb-2">No Location Assigned</h2>
-            <p className="text-muted-foreground">
-              Please contact your administrator to assign you to a location.
-            </p>
+            <p className="text-muted-foreground">Please contact your administrator to assign you to a location.</p>
           </CardContent>
         </Card>
       </div>
@@ -235,10 +226,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
       {/* Header row */}
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <PageHeader
-          title="POS Dashboard"
-          subtitle={`${location?.name || "Loading..."} — ${posUser.username}`}
-        />
+        <PageHeader title="POS Dashboard" subtitle={`${location?.name || "Loading..."} — ${posUser.username}`} />
         {isOnline ? (
           <Badge variant="outline" className="gap-1">
             <Wifi className="h-3 w-3" />
@@ -296,7 +284,9 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
       </div>
 
       {/* Shift Status */}
-      <div className={`rounded-xl border px-5 py-4 ${currentShift ? "border-green-500/40 bg-green-50/20 dark:bg-green-950/10" : "bg-muted/30"}`}>
+      <div
+        className={`rounded-xl border px-5 py-4 ${currentShift ? "border-green-500/40 bg-green-50/20 dark:bg-green-950/10" : "bg-muted/30"}`}
+      >
         <div className="flex items-center gap-2 mb-3">
           <Clock className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-semibold">Shift Status</span>
@@ -308,7 +298,8 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             <div className="space-y-1">
               <Badge variant="default">Active Shift</Badge>
               <p className="text-sm text-muted-foreground">
-                Started {formatDisplayDate(currentShift.openedAt)} at {format(new Date(currentShift.openedAt), "hh:mm a")}
+                Started {formatDisplayDate(currentShift.openedAt)} at{" "}
+                {format(new Date(currentShift.openedAt), "hh:mm a")}
               </p>
               <p className="text-sm">
                 Opening Cash:{" "}
@@ -331,11 +322,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
               <Badge variant="secondary">No Active Shift</Badge>
               <p className="text-sm text-muted-foreground">Start a shift to begin making sales</p>
             </div>
-            <Button
-              onClick={() => setOpenShiftDialog(true)}
-              className="gap-2"
-              data-testid="button-start-shift"
-            >
+            <Button onClick={() => setOpenShiftDialog(true)} className="gap-2" data-testid="button-start-shift">
               <Play className="h-4 w-4" />
               Start Shift
             </Button>
@@ -375,12 +362,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             <History className="h-5 w-5" />
             <span className="text-sm">Shift History</span>
           </Button>
-          <Button
-            variant="outline"
-            className="h-20 flex-col gap-2"
-            disabled
-            data-testid="button-cash-drawer"
-          >
+          <Button variant="outline" className="h-20 flex-col gap-2" disabled data-testid="button-cash-drawer">
             <Wallet className="h-5 w-5" />
             <span className="text-sm">Cash Drawer</span>
           </Button>
@@ -413,20 +395,31 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
                         <TableCell className="text-sm">{formatDisplayDate(shift.openedAt)}</TableCell>
                         <TableCell className="text-sm hidden sm:table-cell text-muted-foreground">
                           {shift.closedAt ? (
-                            <>{format(new Date(shift.openedAt), "hh:mm a")} – {format(new Date(shift.closedAt), "hh:mm a")}</>
+                            <>
+                              {format(new Date(shift.openedAt), "hh:mm a")} –{" "}
+                              {format(new Date(shift.closedAt), "hh:mm a")}
+                            </>
                           ) : (
                             format(new Date(shift.openedAt), "hh:mm a") + " – Active"
                           )}
                         </TableCell>
-                        <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(shift.openingCash))}</TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          {formatAmount(parseFloat(shift.openingCash))}
+                        </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {shift.closingCash ? formatAmount(parseFloat(shift.closingCash)) : "—"}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {shift.salesTotal ? formatAmount(parseFloat(shift.salesTotal)) : "—"}
-                          {shift.salesCount ? <span className="text-muted-foreground text-xs ml-1">({shift.salesCount})</span> : ""}
+                          {shift.salesCount ? (
+                            <span className="text-muted-foreground text-xs ml-1">({shift.salesCount})</span>
+                          ) : (
+                            ""
+                          )}
                         </TableCell>
-                        <TableCell className={`hidden sm:table-cell text-right font-mono text-sm ${variance !== 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}>
+                        <TableCell
+                          className={`hidden sm:table-cell text-right font-mono text-sm ${variance !== 0 ? "text-destructive" : "text-green-600 dark:text-green-400"}`}
+                        >
                           {shift.variance ? formatAmount(variance) : "—"}
                         </TableCell>
                         <TableCell>
@@ -456,9 +449,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Start New Shift</DialogTitle>
-            <DialogDescription>
-              Enter the opening cash amount in your drawer to begin your shift.
-            </DialogDescription>
+            <DialogDescription>Enter the opening cash amount in your drawer to begin your shift.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -480,7 +471,14 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             </Button>
             <Button
               onClick={() => {
-                if (!navigator.onLine) { toast({ title: "Not available offline", description: "Shift operations require a connection", variant: "destructive" }); return; }
+                if (!navigator.onLine) {
+                  toast({
+                    title: "Not available offline",
+                    description: "Shift operations require a connection",
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 openShiftMutation.mutate();
               }}
               disabled={openShiftMutation.isPending}
@@ -497,9 +495,7 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>End Shift</DialogTitle>
-            <DialogDescription>
-              Count your cash drawer and enter the closing amount.
-            </DialogDescription>
+            <DialogDescription>Count your cash drawer and enter the closing amount.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             {currentShift && (
@@ -544,7 +540,14 @@ export default function POSDashboard({ posUser }: POSDashboardProps) {
             <Button
               variant="destructive"
               onClick={() => {
-                if (!navigator.onLine) { toast({ title: "Not available offline", description: "Shift operations require a connection", variant: "destructive" }); return; }
+                if (!navigator.onLine) {
+                  toast({
+                    title: "Not available offline",
+                    description: "Shift operations require a connection",
+                    variant: "destructive",
+                  });
+                  return;
+                }
                 closeShiftMutation.mutate();
               }}
               disabled={closeShiftMutation.isPending || !closingCash}

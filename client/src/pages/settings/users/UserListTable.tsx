@@ -10,13 +10,20 @@ const ERP_PAGE_COUNT = FEATURE_KEYS.length;
 
 function getRoleBadgeClass(role: string): string {
   switch (role?.toLowerCase()) {
-    case "developer": return "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300";
-    case "admin":     return "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300";
-    case "owner":     return "border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-300";
-    case "manager":   return "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300";
-    case "pos":       return "border-emerald-300 bg-emerald-100 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-300";
-    case "view only": return "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-300";
-    default:          return "border-border bg-muted text-muted-foreground";
+    case "developer":
+      return "border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300";
+    case "admin":
+      return "border-blue-300 bg-blue-100 text-blue-700 dark:border-blue-700 dark:bg-blue-950 dark:text-blue-300";
+    case "owner":
+      return "border-violet-300 bg-violet-100 text-violet-700 dark:border-violet-700 dark:bg-violet-950 dark:text-violet-300";
+    case "manager":
+      return "border-amber-300 bg-amber-100 text-amber-700 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300";
+    case "pos":
+      return "border-emerald-300 bg-emerald-100 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-300";
+    case "view only":
+      return "border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-300";
+    default:
+      return "border-border bg-muted text-muted-foreground";
   }
 }
 
@@ -94,28 +101,27 @@ export function UserListTable({ users, isLoading, selectedUserId, onSelectUser }
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-sm">{user.displayName || user.username}</span>
-                {user.displayName && (
-                  <span className="text-xs text-muted-foreground font-mono">{user.username}</span>
-                )}
+                {user.displayName && <span className="text-xs text-muted-foreground font-mono">{user.username}</span>}
                 {user.role && (
-                  <Badge
-                    variant="outline"
-                    className={`text-xs capitalize gap-1 ${getRoleBadgeClass(user.role)}`}
-                  >
+                  <Badge variant="outline" className={`text-xs capitalize gap-1 ${getRoleBadgeClass(user.role)}`}>
                     {privileged && <Shield className="h-3 w-3" />}
                     {user.role}
                   </Badge>
                 )}
               </div>
               <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                <span className={`text-xs ${access.variant === "outline" ? "text-destructive" : "text-muted-foreground"}`}>
+                <span
+                  className={`text-xs ${access.variant === "outline" ? "text-destructive" : "text-muted-foreground"}`}
+                >
                   {access.label}
                 </span>
                 <span className="text-xs text-muted-foreground">·</span>
                 <span className="text-xs text-muted-foreground">{pages}</span>
               </div>
             </div>
-            <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isSelected ? "text-primary rotate-90" : ""}`} />
+            <ChevronRight
+              className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${isSelected ? "text-primary rotate-90" : ""}`}
+            />
           </button>
         );
       })}

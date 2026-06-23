@@ -53,10 +53,10 @@ export interface WaRule {
   sendOnJournal: boolean;
 }
 
-export interface WaChat { 
-  id: string; 
-  name: string; 
-  type: string; 
+export interface WaChat {
+  id: string;
+  name: string;
+  type: string;
 }
 
 export interface AccountDialogsProps {
@@ -140,11 +140,55 @@ export interface AccountTableProps {
   formatAmount: (amt: number) => string;
 }
 
-export const exportLabels: Record<string, {
-  ledger: string; type: string; debit: string; credit: string; runningBalance: string; date: string; notes: string;
-  openingBalance: string; accountStatement: string; language: string;
-}> = {
-  en: { ledger: "Ledger", type: "Type", debit: "Debit", credit: "Credit", runningBalance: "Running Balance", date: "Date", notes: "Notes", openingBalance: "Opening Balance", accountStatement: "Account Statement", language: "English" },
-  fr: { ledger: "Compte", type: "Type", debit: "Débit", credit: "Crédit", runningBalance: "Solde courant", date: "Date", notes: "Notes", openingBalance: "Solde d'ouverture", accountStatement: "Relevé de compte", language: "Français" },
-  ar: { ledger: "الحساب", type: "النوع", debit: "مدين", credit: "دائن", runningBalance: "الرصيد", date: "التاريخ", notes: "ملاحظات", openingBalance: "الرصيد الافتتاحي", accountStatement: "كشف حساب", language: "عربي" },
+export const exportLabels: Record<
+  string,
+  {
+    ledger: string;
+    type: string;
+    debit: string;
+    credit: string;
+    runningBalance: string;
+    date: string;
+    notes: string;
+    openingBalance: string;
+    accountStatement: string;
+    language: string;
+  }
+> = {
+  en: {
+    ledger: "Ledger",
+    type: "Type",
+    debit: "Debit",
+    credit: "Credit",
+    runningBalance: "Running Balance",
+    date: "Date",
+    notes: "Notes",
+    openingBalance: "Opening Balance",
+    accountStatement: "Account Statement",
+    language: "English",
+  },
+  fr: {
+    ledger: "Compte",
+    type: "Type",
+    debit: "Débit",
+    credit: "Crédit",
+    runningBalance: "Solde courant",
+    date: "Date",
+    notes: "Notes",
+    openingBalance: "Solde d'ouverture",
+    accountStatement: "Relevé de compte",
+    language: "Français",
+  },
+  ar: {
+    ledger: "الحساب",
+    type: "النوع",
+    debit: "مدين",
+    credit: "دائن",
+    runningBalance: "الرصيد",
+    date: "التاريخ",
+    notes: "ملاحظات",
+    openingBalance: "الرصيد الافتتاحي",
+    accountStatement: "كشف حساب",
+    language: "عربي",
+  },
 };

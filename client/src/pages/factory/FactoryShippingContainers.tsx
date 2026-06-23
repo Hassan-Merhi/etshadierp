@@ -8,28 +8,42 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Plus, Search, Filter, ChevronDown, ChevronRight,
-  CheckCircle2, XCircle, MessageCircle, Download, Copy, ExternalLink,
-  Upload, Eye, Trash2, RotateCcw, Check, X, Paperclip,
-  RefreshCw, Loader2, SlidersHorizontal,
+  Plus,
+  Search,
+  Filter,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  MessageCircle,
+  Download,
+  Copy,
+  ExternalLink,
+  Upload,
+  Eye,
+  Trash2,
+  RotateCcw,
+  Check,
+  X,
+  Paperclip,
+  RefreshCw,
+  Loader2,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -170,21 +184,21 @@ function fmtDate(d: string | null | undefined): string {
 
 // ─── Column visibility config ──────────────────────────────────────────────────
 const SHIPPING_COLS = [
-  { id: "orderDate",     label: "Order Date" },
-  { id: "status",        label: "Status" },
-  { id: "destination",   label: "Destination" },
-  { id: "eta",           label: "ETA" },
-  { id: "arrived",       label: "Arrived" },
-  { id: "finalized",     label: "Finalized" },
-  { id: "shippingCo",    label: "Shipping Co." },
-  { id: "documents",     label: "Documents" },
+  { id: "orderDate", label: "Order Date" },
+  { id: "status", label: "Status" },
+  { id: "destination", label: "Destination" },
+  { id: "eta", label: "ETA" },
+  { id: "arrived", label: "Arrived" },
+  { id: "finalized", label: "Finalized" },
+  { id: "shippingCo", label: "Shipping Co." },
+  { id: "documents", label: "Documents" },
   { id: "containerCost", label: "Container Cost" },
-  { id: "ciNumber",      label: "CI No." },
-  { id: "note",          label: "Note" },
-  { id: "whatsapp",      label: "WhatsApp" },
-  { id: "done",          label: "Done" },
+  { id: "ciNumber", label: "CI No." },
+  { id: "note", label: "Note" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "done", label: "Done" },
 ] as const;
-type ShippingColId = typeof SHIPPING_COLS[number]["id"];
+type ShippingColId = (typeof SHIPPING_COLS)[number]["id"];
 const DEFAULT_COL_VIS: Record<ShippingColId, boolean> = Object.fromEntries(
   SHIPPING_COLS.map((c) => [c.id, true])
 ) as Record<ShippingColId, boolean>;
@@ -202,9 +216,11 @@ const CTR_LEFT = 130 + 144; // 274
 function DocIndicator({ count, onClick }: { count: number; onClick: () => void }) {
   return (
     <button onClick={onClick} className="flex items-center gap-1.5 group" data-testid="button-open-docs">
-      {count > 0
-        ? <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
-        : <XCircle className="h-4 w-4 text-red-500 shrink-0" />}
+      {count > 0 ? (
+        <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+      ) : (
+        <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+      )}
       <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors underline underline-offset-2">
         {count > 0 ? `${count} file${count !== 1 ? "s" : ""}` : "None"}
       </span>
@@ -215,25 +231,40 @@ function DocIndicator({ count, onClick }: { count: number; onClick: () => void }
 // ─── Inline editable text cell ─────────────────────────────────────────────────
 
 function EditableCellInput({
-  value, placeholder, onSave, testId, saving,
+  value,
+  placeholder,
+  onSave,
+  testId,
+  saving,
 }: {
-  value: string; placeholder?: string; onSave: (v: string) => void; testId?: string; saving?: boolean;
+  value: string;
+  placeholder?: string;
+  onSave: (v: string) => void;
+  testId?: string;
+  saving?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
-  useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
 
   if (!editing) {
     return (
       <span
         className="cursor-pointer hover:underline hover:text-foreground text-sm"
-        onClick={() => { setDraft(value); setEditing(true); }}
+        onClick={() => {
+          setDraft(value);
+          setEditing(true);
+        }}
         data-testid={testId}
       >
-        {saving
-          ? <Loader2 className="h-3 w-3 animate-spin inline" />
-          : (value || <span className="text-muted-foreground italic text-xs">{placeholder || "—"}</span>)}
+        {saving ? (
+          <Loader2 className="h-3 w-3 animate-spin inline" />
+        ) : (
+          value || <span className="text-muted-foreground italic text-xs">{placeholder || "—"}</span>
+        )}
       </span>
     );
   }
@@ -243,9 +274,15 @@ function EditableCellInput({
       className="h-7 text-xs w-36"
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => { onSave(draft); setEditing(false); }}
+      onBlur={() => {
+        onSave(draft);
+        setEditing(false);
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") { onSave(draft); setEditing(false); }
+        if (e.key === "Enter") {
+          onSave(draft);
+          setEditing(false);
+        }
         if (e.key === "Escape") setEditing(false);
       }}
     />
@@ -255,21 +292,32 @@ function EditableCellInput({
 // ─── Inline date cell ──────────────────────────────────────────────────────────
 
 function DateCellInput({
-  value, placeholder, onSave, testId,
+  value,
+  placeholder,
+  onSave,
+  testId,
 }: {
-  value: string; placeholder?: string; onSave: (v: string) => void; testId?: string;
+  value: string;
+  placeholder?: string;
+  onSave: (v: string) => void;
+  testId?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
-  useEffect(() => { if (!editing) setDraft(value); }, [value, editing]);
+  useEffect(() => {
+    if (!editing) setDraft(value);
+  }, [value, editing]);
 
   if (!editing) {
     const display = fmtDate(value);
     return (
       <span
         className="cursor-pointer hover:underline hover:text-foreground text-sm"
-        onClick={() => { setDraft(value); setEditing(true); }}
+        onClick={() => {
+          setDraft(value);
+          setEditing(true);
+        }}
         data-testid={testId}
       >
         {display !== "—" ? display : <span className="text-muted-foreground italic text-xs">{placeholder || "—"}</span>}
@@ -283,9 +331,15 @@ function DateCellInput({
       className="h-7 text-xs w-36"
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => { onSave(draft); setEditing(false); }}
+      onBlur={() => {
+        onSave(draft);
+        setEditing(false);
+      }}
       onKeyDown={(e) => {
-        if (e.key === "Enter") { onSave(draft); setEditing(false); }
+        if (e.key === "Enter") {
+          onSave(draft);
+          setEditing(false);
+        }
         if (e.key === "Escape") setEditing(false);
       }}
     />
@@ -295,7 +349,10 @@ function DateCellInput({
 // ─── Documents Modal ───────────────────────────────────────────────────────────
 
 function DocumentsModal({
-  open, rowId, invoiceNumber, onClose,
+  open,
+  rowId,
+  invoiceNumber,
+  onClose,
 }: {
   open: boolean;
   rowId: number | null;
@@ -362,9 +419,7 @@ function DocumentsModal({
       return { deletedId: docId };
     },
     onSuccess: ({ deletedId }) => {
-      queryClient.setQueryData<ShippingDocument[]>(docsKey, (old = []) =>
-        old.filter((d) => d.id !== deletedId),
-      );
+      queryClient.setQueryData<ShippingDocument[]>(docsKey, (old = []) => old.filter((d) => d.id !== deletedId));
       // Invalidate the main row list to refresh document counts, but NOT docsKey
       queryClient.invalidateQueries({ queryKey: [LIST_KEY], exact: true });
       toast({ title: "Document removed" });
@@ -396,7 +451,7 @@ function DocumentsModal({
           title: isLegacyFile ? "File no longer available" : "File unavailable",
           description: isLegacyFile
             ? "This file was uploaded before database storage was enabled and cannot be retrieved. Please delete it and re-upload."
-            : (msg || `Server returned ${resp.status}`),
+            : msg || `Server returned ${resp.status}`,
           variant: "destructive",
         });
         return;
@@ -418,7 +473,12 @@ function DocumentsModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -451,7 +511,7 @@ function DocumentsModal({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {docs.map((doc) => (
+                  {docs.map((doc) =>
                     doc.isGhost ? (
                       <TableRow key={doc.id} data-testid={`row-doc-${doc.id}`} className="bg-destructive/5">
                         <TableCell colSpan={4} className="py-2">
@@ -462,7 +522,8 @@ function DocumentsModal({
                         </TableCell>
                         <TableCell className="py-2">
                           <Button
-                            size="icon" variant="ghost"
+                            size="icon"
+                            variant="ghost"
                             disabled={deleteMutation.isPending}
                             onClick={() => deleteMutation.mutate(doc.id)}
                             data-testid={`button-remove-doc-${doc.id}`}
@@ -473,7 +534,10 @@ function DocumentsModal({
                       </TableRow>
                     ) : (
                       <TableRow key={doc.id} data-testid={`row-doc-${doc.id}`}>
-                        <TableCell className="text-sm font-medium max-w-[130px] truncate" title={doc.displayName || doc.originalName}>
+                        <TableCell
+                          className="text-sm font-medium max-w-[130px] truncate"
+                          title={doc.displayName || doc.originalName}
+                        >
                           {doc.displayName || doc.originalName || "—"}
                         </TableCell>
                         <TableCell>
@@ -481,15 +545,23 @@ function DocumentsModal({
                             {(doc.fileType || "FILE").split("/").pop()?.toUpperCase() || "FILE"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{fmtSize(doc.fileSize)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                          {fmtSize(doc.fileSize)}
+                        </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{doc.uploadedBy || "—"}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            <Button size="icon" variant="ghost" onClick={() => handleViewDoc(doc)} data-testid={`button-view-doc-${doc.id}`}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleViewDoc(doc)}
+                              data-testid={`button-view-doc-${doc.id}`}
+                            >
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
                             <Button
-                              size="icon" variant="ghost"
+                              size="icon"
+                              variant="ghost"
                               disabled={deleteMutation.isPending}
                               onClick={() => deleteMutation.mutate(doc.id)}
                               data-testid={`button-remove-doc-${doc.id}`}
@@ -500,7 +572,7 @@ function DocumentsModal({
                         </TableCell>
                       </TableRow>
                     )
-                  ))}
+                  )}
                 </TableBody>
               </Table>
             </div>
@@ -511,7 +583,13 @@ function DocumentsModal({
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Upload Document</p>
             <p className="text-xs text-muted-foreground">Max 25 MB per file.</p>
-            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelect} data-testid="input-file-upload" />
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileSelect}
+              data-testid="input-file-upload"
+            />
             {pendingFile ? (
               <div className="space-y-2">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground border rounded-md px-2 py-1.5">
@@ -520,11 +598,26 @@ function DocumentsModal({
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Display Name</Label>
-                  <Input value={newDocName} onChange={(e) => setNewDocName(e.target.value)} placeholder="e.g. Packing List" className="h-8 text-sm" data-testid="input-doc-name" />
+                  <Input
+                    value={newDocName}
+                    onChange={(e) => setNewDocName(e.target.value)}
+                    placeholder="e.g. Packing List"
+                    className="h-8 text-sm"
+                    data-testid="input-doc-name"
+                  />
                 </div>
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={handleUpload} disabled={uploadMutation.isPending} data-testid="button-confirm-upload">
-                    {uploadMutation.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+                  <Button
+                    size="sm"
+                    onClick={handleUpload}
+                    disabled={uploadMutation.isPending}
+                    data-testid="button-confirm-upload"
+                  >
+                    {uploadMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5 mr-1" />
+                    )}
                     Upload Document
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setPendingFile(null)}>
@@ -533,7 +626,12 @@ function DocumentsModal({
                 </div>
               </div>
             ) : (
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} data-testid="button-upload-doc">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                data-testid="button-upload-doc"
+              >
                 <Upload className="h-3.5 w-3.5 mr-1" /> Choose File
               </Button>
             )}
@@ -541,7 +639,9 @@ function DocumentsModal({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -555,7 +655,10 @@ interface WaFileWithChecked extends WaFile {
 }
 
 function WhatsAppModal({
-  open, rowId, onClose, onMarkDone,
+  open,
+  rowId,
+  onClose,
+  onMarkDone,
 }: {
   open: boolean;
   rowId: number | null;
@@ -568,7 +671,11 @@ function WhatsAppModal({
   const [initialised, setInitialised] = useState(false);
 
   const previewUrl = rowId ? `${LIST_KEY}/${rowId}/whatsapp-preview` : null;
-  const { data: preview, isLoading, refetch } = useQuery<WhatsAppPreview>({
+  const {
+    data: preview,
+    isLoading,
+    refetch,
+  } = useQuery<WhatsAppPreview>({
     queryKey: [previewUrl],
     enabled: open && !!rowId && !!previewUrl,
   });
@@ -593,17 +700,19 @@ function WhatsAppModal({
 
   function toggleFile(id: string) {
     setFiles((prev) => {
-      const next = prev.map((f) => f.id === id ? { ...f, checked: !f.checked } : f);
+      const next = prev.map((f) => (f.id === id ? { ...f, checked: !f.checked } : f));
       // Rebuild message body only if we have a preview base
       if (preview) {
-        const checkedNames = next.filter((f) => f.checked).map((f) => `- ${f.name}`).join("\n");
+        const checkedNames = next
+          .filter((f) => f.checked)
+          .map((f) => `- ${f.name}`)
+          .join("\n");
         const base = preview.defaultMessage;
         const docBlock = checkedNames || "- (none selected)";
         // Replace the "Documents attached:" block
-        setMessage(base.replace(
-          /Documents attached:\n[\s\S]*?\n\nThank you\./,
-          `Documents attached:\n${docBlock}\n\nThank you.`,
-        ));
+        setMessage(
+          base.replace(/Documents attached:\n[\s\S]*?\n\nThank you\./, `Documents attached:\n${docBlock}\n\nThank you.`)
+        );
       }
       return next;
     });
@@ -618,16 +727,20 @@ function WhatsAppModal({
   }
 
   function handleDownloadZip() {
-    const selected = files.filter((f) => f.checked && f.available).map((f) => f.id).join(",");
-    if (!selected) { toast({ title: "No files selected", variant: "destructive" }); return; }
+    const selected = files
+      .filter((f) => f.checked && f.available)
+      .map((f) => f.id)
+      .join(",");
+    if (!selected) {
+      toast({ title: "No files selected", variant: "destructive" });
+      return;
+    }
     window.open(`${LIST_KEY}/${rowId}/zip-package?fileIds=${encodeURIComponent(selected)}`, "_blank");
   }
 
   function handleOpenWhatsApp() {
     const phone = (preview?.whatsappContact || "").replace(/\D/g, "");
-    const url = phone
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
-      : "https://web.whatsapp.com";
+    const url = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : "https://web.whatsapp.com";
     window.open(url, "_blank");
     toast({ title: "WhatsApp opened", description: "Attach the downloaded files, paste the message, then send." });
   }
@@ -642,7 +755,12 @@ function WhatsAppModal({
   const p = preview?.row;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -655,112 +773,143 @@ function WhatsAppModal({
           <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading package data…
           </div>
-        ) : p && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 text-sm rounded-md border bg-muted/30 p-3">
-              <div><span className="text-xs text-muted-foreground">Client</span><p className="font-medium">{p.clientName || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Invoice</span><p className="font-mono font-medium">{p.invoiceNumber || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Container</span><p className="font-mono">{p.containerNumber || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Destination</span><p>{p.destination || "—"}</p></div>
-              <div><span className="text-xs text-muted-foreground">Shipping Company</span><p>{p.shippingCompany || "—"}</p></div>
-              <div>
-                <span className="text-xs text-muted-foreground">WhatsApp Contact</span>
-                <p>{preview?.whatsappContact || <span className="text-muted-foreground italic text-xs">Not set</span>}</p>
+        ) : (
+          p && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm rounded-md border bg-muted/30 p-3">
+                <div>
+                  <span className="text-xs text-muted-foreground">Client</span>
+                  <p className="font-medium">{p.clientName || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Invoice</span>
+                  <p className="font-mono font-medium">{p.invoiceNumber || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Container</span>
+                  <p className="font-mono">{p.containerNumber || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Destination</span>
+                  <p>{p.destination || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">Shipping Company</span>
+                  <p>{p.shippingCompany || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-xs text-muted-foreground">WhatsApp Contact</span>
+                  <p>
+                    {preview?.whatsappContact || <span className="text-muted-foreground italic text-xs">Not set</span>}
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <Separator />
+              <Separator />
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Files to Include ({checkedCount} selected)
-                </p>
-                <Button size="sm" variant="ghost" onClick={handleRefresh} data-testid="button-refresh-files">
-                  <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh Files
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Files to Include ({checkedCount} selected)
+                  </p>
+                  <Button size="sm" variant="ghost" onClick={handleRefresh} data-testid="button-refresh-files">
+                    <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh Files
+                  </Button>
+                </div>
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-10 text-xs">Send</TableHead>
+                        <TableHead className="text-xs">File Name</TableHead>
+                        <TableHead className="text-xs">Type</TableHead>
+                        <TableHead className="text-xs">Source</TableHead>
+                        <TableHead className="w-10" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {files.map((f) => (
+                        <TableRow
+                          key={f.id}
+                          data-testid={`row-wa-file-${f.id}`}
+                          className={!f.checked || !f.available ? "opacity-50" : ""}
+                        >
+                          <TableCell>
+                            <Checkbox
+                              checked={f.checked && f.available}
+                              disabled={!f.available}
+                              onCheckedChange={() => f.available && toggleFile(f.id)}
+                              data-testid={`checkbox-file-${f.id}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-sm font-medium">
+                            {f.name}
+                            {!f.available && f.unavailableReason && (
+                              <span className="ml-2 text-xs text-muted-foreground italic">({f.unavailableReason})</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {f.fileType}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">{f.source}</TableCell>
+                          <TableCell>
+                            {f.available && f.fileUrl && (
+                              <Button size="icon" variant="ghost" asChild>
+                                <a href={f.fileUrl} target="_blank" rel="noreferrer">
+                                  <Eye className="h-3.5 w-3.5" />
+                                </a>
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">WhatsApp Message</p>
+                <Textarea
+                  rows={10}
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  className="text-sm font-mono"
+                  data-testid="textarea-wa-message"
+                />
+              </div>
+
+              <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
+                <p className="font-semibold mb-1">How to send:</p>
+                <ol className="list-decimal list-inside space-y-0.5">
+                  <li>Download the ZIP package below.</li>
+                  <li>Click "Open WhatsApp" — the message will pre-fill if a contact is set.</li>
+                  <li>Attach the downloaded files manually in WhatsApp.</li>
+                  <li>Review the message, then click Send.</li>
+                  <li>Come back here and click "I Sent It — Mark as Done".</li>
+                </ol>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={handleDownloadZip} data-testid="button-download-zip">
+                  <Download className="h-3.5 w-3.5 mr-1" /> Download ZIP Package
+                </Button>
+                <Button variant="outline" onClick={handleCopyMessage} data-testid="button-copy-message">
+                  <Copy className="h-3.5 w-3.5 mr-1" /> Copy Message
+                </Button>
+                <Button variant="outline" onClick={handleOpenWhatsApp} data-testid="button-open-whatsapp">
+                  <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open WhatsApp
+                </Button>
+                <Button className="ml-auto" onClick={handleMarkDone} data-testid="button-mark-done-wa">
+                  <Check className="h-3.5 w-3.5 mr-1" /> I Sent It — Mark as Done
                 </Button>
               </div>
-              <div className="border rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10 text-xs">Send</TableHead>
-                      <TableHead className="text-xs">File Name</TableHead>
-                      <TableHead className="text-xs">Type</TableHead>
-                      <TableHead className="text-xs">Source</TableHead>
-                      <TableHead className="w-10" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {files.map((f) => (
-                      <TableRow
-                        key={f.id}
-                        data-testid={`row-wa-file-${f.id}`}
-                        className={(!f.checked || !f.available) ? "opacity-50" : ""}
-                      >
-                        <TableCell>
-                          <Checkbox
-                            checked={f.checked && f.available}
-                            disabled={!f.available}
-                            onCheckedChange={() => f.available && toggleFile(f.id)}
-                            data-testid={`checkbox-file-${f.id}`}
-                          />
-                        </TableCell>
-                        <TableCell className="text-sm font-medium">
-                          {f.name}
-                          {!f.available && f.unavailableReason && (
-                            <span className="ml-2 text-xs text-muted-foreground italic">({f.unavailableReason})</span>
-                          )}
-                        </TableCell>
-                        <TableCell><Badge variant="outline" className="text-xs">{f.fileType}</Badge></TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{f.source}</TableCell>
-                        <TableCell>
-                          {f.available && f.fileUrl && (
-                            <Button size="icon" variant="ghost" asChild>
-                              <a href={f.fileUrl} target="_blank" rel="noreferrer"><Eye className="h-3.5 w-3.5" /></a>
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
             </div>
-
-            <Separator />
-
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">WhatsApp Message</p>
-              <Textarea rows={10} value={message} onChange={(e) => setMessage(e.target.value)} className="text-sm font-mono" data-testid="textarea-wa-message" />
-            </div>
-
-            <div className="rounded-md border border-blue-200 bg-blue-50 dark:bg-blue-950/20 dark:border-blue-800 p-3 text-xs text-blue-800 dark:text-blue-300">
-              <p className="font-semibold mb-1">How to send:</p>
-              <ol className="list-decimal list-inside space-y-0.5">
-                <li>Download the ZIP package below.</li>
-                <li>Click "Open WhatsApp" — the message will pre-fill if a contact is set.</li>
-                <li>Attach the downloaded files manually in WhatsApp.</li>
-                <li>Review the message, then click Send.</li>
-                <li>Come back here and click "I Sent It — Mark as Done".</li>
-              </ol>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={handleDownloadZip} data-testid="button-download-zip">
-                <Download className="h-3.5 w-3.5 mr-1" /> Download ZIP Package
-              </Button>
-              <Button variant="outline" onClick={handleCopyMessage} data-testid="button-copy-message">
-                <Copy className="h-3.5 w-3.5 mr-1" /> Copy Message
-              </Button>
-              <Button variant="outline" onClick={handleOpenWhatsApp} data-testid="button-open-whatsapp">
-                <ExternalLink className="h-3.5 w-3.5 mr-1" /> Open WhatsApp
-              </Button>
-              <Button className="ml-auto" onClick={handleMarkDone} data-testid="button-mark-done-wa">
-                <Check className="h-3.5 w-3.5 mr-1" /> I Sent It — Mark as Done
-              </Button>
-            </div>
-          </div>
+          )
         )}
       </DialogContent>
     </Dialog>
@@ -798,12 +947,13 @@ function ShippingAvailabilityTable() {
   });
 
   const addMutation = useMutation({
-    mutationFn: () => apiRequest("POST", AVAIL_KEY, {
-      date: newRow.date,
-      shippingCompany: newRow.shippingCompany.trim(),
-      availableContainers: parseInt(newRow.availableContainers) || 0,
-      note: newRow.note.trim() || null,
-    }),
+    mutationFn: () =>
+      apiRequest("POST", AVAIL_KEY, {
+        date: newRow.date,
+        shippingCompany: newRow.shippingCompany.trim(),
+        availableContainers: parseInt(newRow.availableContainers) || 0,
+        note: newRow.note.trim() || null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AVAIL_KEY] });
       setNewRow({ date: "", shippingCompany: "", availableContainers: "", note: "" });
@@ -814,12 +964,13 @@ function ShippingAvailabilityTable() {
   });
 
   const saveMutation = useMutation({
-    mutationFn: (row: EditingAvail) => apiRequest("PATCH", `${AVAIL_KEY}/${row.id}`, {
-      date: row.date,
-      shippingCompany: row.shippingCompany.trim(),
-      availableContainers: parseInt(row.availableContainers) || 0,
-      note: row.note.trim() || null,
-    }),
+    mutationFn: (row: EditingAvail) =>
+      apiRequest("PATCH", `${AVAIL_KEY}/${row.id}`, {
+        date: row.date,
+        shippingCompany: row.shippingCompany.trim(),
+        availableContainers: parseInt(row.availableContainers) || 0,
+        note: row.note.trim() || null,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [AVAIL_KEY] });
       setEditing(null);
@@ -838,12 +989,21 @@ function ShippingAvailabilityTable() {
   });
 
   function startEdit(row: AvailRow) {
-    setEditing({ id: row.id, date: row.date, shippingCompany: row.shippingCompany, availableContainers: String(row.availableContainers), note: row.note || "" });
+    setEditing({
+      id: row.id,
+      date: row.date,
+      shippingCompany: row.shippingCompany,
+      availableContainers: String(row.availableContainers),
+      note: row.note || "",
+    });
   }
 
   function handleAddKey(e: React.KeyboardEvent) {
     if (e.key === "Enter") addMutation.mutate();
-    if (e.key === "Escape") { setAdding(false); setNewRow({ date: "", shippingCompany: "", availableContainers: "", note: "" }); }
+    if (e.key === "Escape") {
+      setAdding(false);
+      setNewRow({ date: "", shippingCompany: "", availableContainers: "", note: "" });
+    }
   }
 
   function handleEditKey(e: React.KeyboardEvent) {
@@ -875,7 +1035,8 @@ function ShippingAvailabilityTable() {
             {isLoading ? (
               <TableRow>
                 <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin inline mr-2" />Loading…
+                  <Loader2 className="h-4 w-4 animate-spin inline mr-2" />
+                  Loading…
                 </TableCell>
               </TableRow>
             ) : rows.length === 0 && !adding ? (
@@ -932,25 +1093,45 @@ function ShippingAvailabilityTable() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => saveMutation.mutate(editing)} disabled={saveMutation.isPending} data-testid={`button-avail-save-${row.id}`}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => saveMutation.mutate(editing)}
+                            disabled={saveMutation.isPending}
+                            data-testid={`button-avail-save-${row.id}`}
+                          >
                             <Check className="h-3.5 w-3.5 text-green-600" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => setEditing(null)} data-testid={`button-avail-cancel-${row.id}`}>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditing(null)}
+                            data-testid={`button-avail-cancel-${row.id}`}
+                          >
                             <X className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    <TableRow key={row.id} className="hover-elevate cursor-pointer" onClick={() => startEdit(row)} data-testid={`row-avail-${row.id}`}>
+                    <TableRow
+                      key={row.id}
+                      className="hover-elevate cursor-pointer"
+                      onClick={() => startEdit(row)}
+                      data-testid={`row-avail-${row.id}`}
+                    >
                       <TableCell>{row.date}</TableCell>
                       <TableCell>{row.shippingCompany}</TableCell>
                       <TableCell>{row.availableContainers}</TableCell>
                       <TableCell className="text-muted-foreground">{row.note || "—"}</TableCell>
                       <TableCell>
                         <Button
-                          size="icon" variant="ghost"
-                          onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(row.id); }}
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteMutation.mutate(row.id);
+                          }}
                           disabled={deleteMutation.isPending}
                           data-testid={`button-avail-delete-${row.id}`}
                         >
@@ -1007,10 +1188,24 @@ function ShippingAvailabilityTable() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button size="icon" variant="ghost" onClick={() => addMutation.mutate()} disabled={addMutation.isPending || !newRow.date || !newRow.shippingCompany.trim()} data-testid="button-new-avail-save">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => addMutation.mutate()}
+                          disabled={addMutation.isPending || !newRow.date || !newRow.shippingCompany.trim()}
+                          data-testid="button-new-avail-save"
+                        >
                           <Check className="h-3.5 w-3.5 text-green-600" />
                         </Button>
-                        <Button size="icon" variant="ghost" onClick={() => { setAdding(false); setNewRow({ date: "", shippingCompany: "", availableContainers: "", note: "" }); }} data-testid="button-new-avail-cancel">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setAdding(false);
+                            setNewRow({ date: "", shippingCompany: "", availableContainers: "", note: "" });
+                          }}
+                          data-testid="button-new-avail-cancel"
+                        >
                           <X className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -1056,7 +1251,9 @@ export default function FactoryShippingContainers() {
   function toggleCol(id: ShippingColId) {
     setColVis((prev) => {
       const next = { ...prev, [id]: !prev[id] };
-      try { if (me?.id) localStorage.setItem(`fsc_col_vis_${me.id}`, JSON.stringify(next)); } catch {}
+      try {
+        if (me?.id) localStorage.setItem(`fsc_col_vis_${me.id}`, JSON.stringify(next));
+      } catch {}
       return next;
     });
   }
@@ -1076,7 +1273,9 @@ export default function FactoryShippingContainers() {
     mutationFn: () => apiRequest("POST", `${LIST_KEY}/sync`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
   });
-  useEffect(() => { syncMutation.mutate(); }, []);
+  useEffect(() => {
+    syncMutation.mutate();
+  }, []);
 
   const trackAllMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/factory/shipping-containers/track-now"),
@@ -1096,8 +1295,7 @@ export default function FactoryShippingContainers() {
   // ── Mutations ─────────────────────────────────────────────────────────────────
 
   const patchRowMutation = useMutation({
-    mutationFn: ({ id, patch }: { id: number; patch: object }) =>
-      apiRequest("PATCH", `${LIST_KEY}/${id}`, patch),
+    mutationFn: ({ id, patch }: { id: number; patch: object }) => apiRequest("PATCH", `${LIST_KEY}/${id}`, patch),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [LIST_KEY] }),
     onError: (e: any) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
@@ -1205,29 +1403,33 @@ export default function FactoryShippingContainers() {
   }, [activeRows, trackingMap]);
 
   // ── Filtering ─────────────────────────────────────────────────────────────────
-  const filtered = useMemo(() => allDisplayRows.filter((r) => {
-    if (search) {
-      const q = search.toLowerCase();
-      if (
-        !(r.invoiceNumber || "").toLowerCase().includes(q) &&
-        !(r.clientName || "").toLowerCase().includes(q) &&
-        !(r.containerNumber || "").toLowerCase().includes(q) &&
-        !(r.destination || "").toLowerCase().includes(q) &&
-        !(r.shippingCompany || "").toLowerCase().includes(q)
-      ) return false;
-    }
-    if (filterDocs === "has" && r.documentCount === 0) return false;
-    if (filterDocs === "missing" && r.documentCount > 0) return false;
-    if (filterStatus !== "all" && r.status !== filterStatus) return false;
-    return true;
-  }), [allDisplayRows, search, filterDocs, filterStatus]);
+  const filtered = useMemo(
+    () =>
+      allDisplayRows.filter((r) => {
+        if (search) {
+          const q = search.toLowerCase();
+          if (
+            !(r.invoiceNumber || "").toLowerCase().includes(q) &&
+            !(r.clientName || "").toLowerCase().includes(q) &&
+            !(r.containerNumber || "").toLowerCase().includes(q) &&
+            !(r.destination || "").toLowerCase().includes(q) &&
+            !(r.shippingCompany || "").toLowerCase().includes(q)
+          )
+            return false;
+        }
+        if (filterDocs === "has" && r.documentCount === 0) return false;
+        if (filterDocs === "missing" && r.documentCount > 0) return false;
+        if (filterStatus !== "all" && r.status !== filterStatus) return false;
+        return true;
+      }),
+    [allDisplayRows, search, filterDocs, filterStatus]
+  );
 
   const hasActiveFilters = filterDocs !== "all" || filterStatus !== "all";
 
   return (
     <>
       <div className="space-y-4">
-
         {/* ── Top Controls ── */}
         <div className="flex items-center gap-2 flex-wrap">
           <div className="relative flex-1 min-w-48">
@@ -1246,9 +1448,11 @@ export default function FactoryShippingContainers() {
             disabled={trackAllMutation.isPending}
             data-testid="button-track-all-eta"
           >
-            {trackAllMutation.isPending
-              ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              : <RefreshCw className="h-4 w-4 mr-1" />}
+            {trackAllMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4 mr-1" />
+            )}
             {trackAllMutation.isPending ? "Tracking…" : "Track All ETAs"}
           </Button>
           <Button
@@ -1273,7 +1477,9 @@ export default function FactoryShippingContainers() {
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-52 p-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">Show / Hide Columns</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
+                Show / Hide Columns
+              </p>
               <div className="space-y-0.5">
                 {SHIPPING_COLS.map((col) => (
                   <label
@@ -1281,10 +1487,7 @@ export default function FactoryShippingContainers() {
                     className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer text-sm"
                     data-testid={`col-toggle-${col.id}`}
                   >
-                    <Checkbox
-                      checked={colVis[col.id]}
-                      onCheckedChange={() => toggleCol(col.id)}
-                    />
+                    <Checkbox checked={colVis[col.id]} onCheckedChange={() => toggleCol(col.id)} />
                     {col.label}
                   </label>
                 ))}
@@ -1299,7 +1502,9 @@ export default function FactoryShippingContainers() {
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Documents</p>
               <Select value={filterDocs} onValueChange={(v: any) => setFilterDocs(v)}>
-                <SelectTrigger className="h-8 text-xs w-36" data-testid="select-filter-docs"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs w-36" data-testid="select-filter-docs">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="has">Has Documents</SelectItem>
@@ -1310,7 +1515,9 @@ export default function FactoryShippingContainers() {
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground">Status</p>
               <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="h-8 text-xs w-44" data-testid="select-filter-status"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-8 text-xs w-44" data-testid="select-filter-status">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="LOADING">Loading</SelectItem>
@@ -1321,7 +1528,16 @@ export default function FactoryShippingContainers() {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setFilterDocs("all"); setFilterStatus("all"); }} data-testid="button-clear-filters">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={() => {
+                  setFilterDocs("all");
+                  setFilterStatus("all");
+                }}
+                data-testid="button-clear-filters"
+              >
                 Clear All
               </Button>
             </div>
@@ -1330,21 +1546,35 @@ export default function FactoryShippingContainers() {
 
         {/* ── Legend ── */}
         <div className="flex items-center gap-4 flex-wrap text-xs text-muted-foreground">
-          <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> Has documents</span>
-          <span className="flex items-center gap-1"><XCircle className="h-3.5 w-3.5 text-red-500" /> No documents</span>
+          <span className="flex items-center gap-1">
+            <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> Has documents
+          </span>
+          <span className="flex items-center gap-1">
+            <XCircle className="h-3.5 w-3.5 text-red-500" /> No documents
+          </span>
           <span>Click editable cells (Container #, Destination, ETA, Shipping Co., Note, Arrived) to edit inline.</span>
         </div>
 
         {/* ── Main Table ── */}
         <div className="rounded-md border">
-          <Table className="text-xs" style={{ minWidth: "1100px" }} wrapperClassName="max-h-[calc(100vh-300px)] overflow-auto">
+          <Table
+            className="text-xs"
+            style={{ minWidth: "1100px" }}
+            wrapperClassName="max-h-[calc(100vh-300px)] overflow-auto"
+          >
             <TableHeader>
               <TableRow>
                 {colVis.orderDate && <TableHead className="text-xs w-20 min-w-[80px]">Order Date</TableHead>}
-                <TableHead className={stickyHeadBase} style={{ left: INV_LEFT, minWidth: "130px", width: "130px" }}>Invoice #</TableHead>
-                <TableHead className={stickyHeadBase} style={{ left: CLI_LEFT, minWidth: "144px", width: "144px" }}>Client</TableHead>
+                <TableHead className={stickyHeadBase} style={{ left: INV_LEFT, minWidth: "130px", width: "130px" }}>
+                  Invoice #
+                </TableHead>
+                <TableHead className={stickyHeadBase} style={{ left: CLI_LEFT, minWidth: "144px", width: "144px" }}>
+                  Client
+                </TableHead>
                 {colVis.status && <TableHead className="text-xs w-24 min-w-[96px]">Status</TableHead>}
-                <TableHead className={stickyHeadBase} style={{ left: CTR_LEFT, minWidth: "120px", width: "120px" }}>Container #</TableHead>
+                <TableHead className={stickyHeadBase} style={{ left: CTR_LEFT, minWidth: "120px", width: "120px" }}>
+                  Container #
+                </TableHead>
                 {colVis.destination && <TableHead className="text-xs min-w-[120px]">Destination</TableHead>}
                 {colVis.eta && <TableHead className="text-xs min-w-[100px]">ETA</TableHead>}
                 {colVis.arrived && <TableHead className="text-xs min-w-[90px]">Arrived</TableHead>}
@@ -1374,7 +1604,9 @@ export default function FactoryShippingContainers() {
               ) : (
                 filtered.map((r) => (
                   <TableRow key={r.id} data-testid={`row-record-${r.id}`}>
-                    {colVis.orderDate && <TableCell className="text-xs whitespace-nowrap">{fmtDate(r.orderDate)}</TableCell>}
+                    {colVis.orderDate && (
+                      <TableCell className="text-xs whitespace-nowrap">{fmtDate(r.orderDate)}</TableCell>
+                    )}
 
                     {/* Sticky: Invoice # */}
                     <TableCell className={stickyCellBase} style={{ left: INV_LEFT }}>
@@ -1382,7 +1614,10 @@ export default function FactoryShippingContainers() {
                     </TableCell>
 
                     {/* Sticky: Client */}
-                    <TableCell className={cn(stickyCellBase, "font-medium text-xs max-w-[144px] truncate")} style={{ left: CLI_LEFT }}>
+                    <TableCell
+                      className={cn(stickyCellBase, "font-medium text-xs max-w-[144px] truncate")}
+                      style={{ left: CLI_LEFT }}
+                    >
                       {r.clientName || "—"}
                     </TableCell>
 
@@ -1433,7 +1668,10 @@ export default function FactoryShippingContainers() {
                     {colVis.eta && (
                       <TableCell>
                         {r._trackedEta ? (
-                          <span className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap" title="Auto from tracking">
+                          <span
+                            className="text-xs text-blue-600 dark:text-blue-400 font-medium whitespace-nowrap"
+                            title="Auto from tracking"
+                          >
                             {fmtDate(r._trackedEta)}
                           </span>
                         ) : (
@@ -1452,7 +1690,9 @@ export default function FactoryShippingContainers() {
                         <DateCellInput
                           value={r.containerArrivedDate || ""}
                           placeholder="Not arrived"
-                          onSave={(v) => patchRowMutation.mutate({ id: r.id, patch: { containerArrivedDate: v || null } })}
+                          onSave={(v) =>
+                            patchRowMutation.mutate({ id: r.id, patch: { containerArrivedDate: v || null } })
+                          }
                           testId={`cell-arrived-${r.id}`}
                         />
                       </TableCell>
@@ -1460,9 +1700,13 @@ export default function FactoryShippingContainers() {
 
                     {colVis.finalized && (
                       <TableCell className="whitespace-nowrap">
-                        {r.finalizedDate
-                          ? <span className="text-green-700 dark:text-green-400 font-medium text-xs">{fmtDate(r.finalizedDate)}</span>
-                          : <span className="text-amber-600 dark:text-amber-400 italic text-xs">Not finalized</span>}
+                        {r.finalizedDate ? (
+                          <span className="text-green-700 dark:text-green-400 font-medium text-xs">
+                            {fmtDate(r.finalizedDate)}
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-400 italic text-xs">Not finalized</span>
+                        )}
                       </TableCell>
                     )}
 
@@ -1485,9 +1729,11 @@ export default function FactoryShippingContainers() {
 
                     {colVis.containerCost && (
                       <TableCell className="text-xs whitespace-nowrap font-medium">
-                        {r.grandTotal
-                          ? <span className="text-foreground">${Number(r.grandTotal).toLocaleString()}</span>
-                          : <span className="text-muted-foreground">—</span>}
+                        {r.grandTotal ? (
+                          <span className="text-foreground">${Number(r.grandTotal).toLocaleString()}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                     )}
 
@@ -1569,16 +1815,16 @@ export default function FactoryShippingContainers() {
             <span className="flex items-center gap-2">
               {doneExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               Done / Hidden Containers
-              <Badge variant="outline" className="text-xs">{done.length}</Badge>
+              <Badge variant="outline" className="text-xs">
+                {done.length}
+              </Badge>
             </span>
             <span className="text-xs">Collapse to keep workspace clean</span>
           </button>
 
-          {doneExpanded && (
-            done.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs text-muted-foreground">
-                No done containers yet.
-              </div>
+          {doneExpanded &&
+            (done.length === 0 ? (
+              <div className="px-4 py-6 text-center text-xs text-muted-foreground">No done containers yet.</div>
             ) : (
               <div className="overflow-x-auto">
                 <Table className="text-xs">
@@ -1603,18 +1849,26 @@ export default function FactoryShippingContainers() {
                         <TableCell>{r.destination || "—"}</TableCell>
                         <TableCell className="whitespace-nowrap">{fmtDate(r.doneAt)}</TableCell>
                         <TableCell className="whitespace-nowrap">
-                          {r.whatsappSentAt
-                            ? <span className="text-green-700 dark:text-green-400">{fmtDate(r.whatsappSentAt)}</span>
-                            : <span className="text-muted-foreground italic">—</span>}
+                          {r.whatsappSentAt ? (
+                            <span className="text-green-700 dark:text-green-400">{fmtDate(r.whatsappSentAt)}</span>
+                          ) : (
+                            <span className="text-muted-foreground italic">—</span>
+                          )}
                         </TableCell>
                         <TableCell>{r.doneBy || "—"}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => setDocsRowId(r.id)} data-testid={`button-view-done-${r.id}`}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setDocsRowId(r.id)}
+                              data-testid={`button-view-done-${r.id}`}
+                            >
                               <Eye className="h-3.5 w-3.5 mr-1" /> View
                             </Button>
                             <Button
-                              size="sm" variant="ghost"
+                              size="sm"
+                              variant="ghost"
                               disabled={restoreMutation.isPending}
                               onClick={() => restoreMutation.mutate(r.id)}
                               data-testid={`button-restore-${r.id}`}
@@ -1636,10 +1890,8 @@ export default function FactoryShippingContainers() {
                   </TableBody>
                 </Table>
               </div>
-            )
-          )}
+            ))}
         </div>
-
       </div>
 
       {/* Hidden file input for shipping invoice upload */}
@@ -1668,12 +1920,18 @@ export default function FactoryShippingContainers() {
       />
 
       {/* Confirm delete */}
-      <AlertDialog open={!!pendingDeleteId} onOpenChange={(v) => { if (!v) setPendingDeleteId(null); }}>
+      <AlertDialog
+        open={!!pendingDeleteId}
+        onOpenChange={(v) => {
+          if (!v) setPendingDeleteId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this record?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the shipping container record and all its attached documents. This cannot be undone.
+              This will permanently delete the shipping container record and all its attached documents. This cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1695,7 +1953,12 @@ export default function FactoryShippingContainers() {
       </AlertDialog>
 
       {/* Confirm before marking done */}
-      <AlertDialog open={!!pendingDoneId} onOpenChange={(v) => { if (!v) setPendingDoneId(null); }}>
+      <AlertDialog
+        open={!!pendingDoneId}
+        onOpenChange={(v) => {
+          if (!v) setPendingDoneId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Mark as Done?</AlertDialogTitle>

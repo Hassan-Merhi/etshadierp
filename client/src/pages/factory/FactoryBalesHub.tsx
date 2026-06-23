@@ -9,7 +9,10 @@ export default function FactoryBalesHub() {
 
   const { data: settings } = useQuery<any>({
     queryKey: ["/api/factory/settings"],
-    queryFn: async () => { const r = await fetch("/api/factory/settings"); return r.ok ? r.json() : {}; },
+    queryFn: async () => {
+      const r = await fetch("/api/factory/settings");
+      return r.ok ? r.json() : {};
+    },
     staleTime: 60000,
   });
 
@@ -29,11 +32,17 @@ export default function FactoryBalesHub() {
       <Tabs defaultValue={defaultTab} onValueChange={handleTabChange} className="flex flex-col h-full">
         <div className="border-b px-4 pt-3 flex-shrink-0 flex items-end gap-4 overflow-x-auto">
           <TabsList className="flex-nowrap">
-            <TabsTrigger value="history" data-testid="tab-bales-history">Bales</TabsTrigger>
+            <TabsTrigger value="history" data-testid="tab-bales-history">
+              Bales
+            </TabsTrigger>
             {showBarcode && (
-              <TabsTrigger value="barcode" data-testid="tab-barcode-lookup">Barcode Lookup</TabsTrigger>
+              <TabsTrigger value="barcode" data-testid="tab-barcode-lookup">
+                Barcode Lookup
+              </TabsTrigger>
             )}
-            <TabsTrigger value="products" data-testid="tab-bale-products">Bale Products</TabsTrigger>
+            <TabsTrigger value="products" data-testid="tab-bale-products">
+              Bale Products
+            </TabsTrigger>
           </TabsList>
         </div>
 

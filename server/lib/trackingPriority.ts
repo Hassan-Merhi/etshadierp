@@ -35,12 +35,8 @@ export interface PriorityResult {
  * Computes the tracking priority for a single container.
  * Returns a deterministic result based on current container fields.
  */
-export function getTrackingPriority(
-  container: PriorityInput,
-  now: Date,
-): PriorityResult {
-  const { status, eta, isOverdue, docsReadyNotSent, numberPlate, trackingChangedAt } =
-    container;
+export function getTrackingPriority(container: PriorityInput, now: Date): PriorityResult {
+  const { status, eta, isOverdue, docsReadyNotSent, numberPlate, trackingChangedAt } = container;
 
   const statusLower = status.toLowerCase();
 
@@ -51,18 +47,14 @@ export function getTrackingPriority(
     if (!isNaN(d.getTime())) etaDate = d;
   }
 
-  const daysUntilEta =
-    etaDate !== null
-      ? Math.ceil((etaDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-      : null;
+  const daysUntilEta = etaDate !== null ? Math.ceil((etaDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : null;
 
   const etaPassed = daysUntilEta !== null && daysUntilEta < 0;
   const hasTruck = !!(numberPlate && numberPlate.trim());
 
   // Recently changed tracking status (within 72 hours)
   const recentlyChanged =
-    trackingChangedAt !== null &&
-    now.getTime() - trackingChangedAt.getTime() < 72 * 60 * 60 * 1000;
+    trackingChangedAt !== null && now.getTime() - trackingChangedAt.getTime() < 72 * 60 * 60 * 1000;
 
   // ── HIGH PRIORITY — interval 24h ────────────────────────────────────────────
 
@@ -97,13 +89,7 @@ export function getTrackingPriority(
 
   // ETA within 3 days
   if (daysUntilEta !== null && daysUntilEta >= 0 && daysUntilEta <= 3) {
-    return make(
-      90,
-      "high",
-      24,
-      `ETA in ${daysUntilEta} day${daysUntilEta !== 1 ? "s" : ""}`,
-      now,
-    );
+    return make(90, "high", 24, `ETA in ${daysUntilEta} day${daysUntilEta !== 1 ? "s" : ""}`, now);
   }
 
   // ── MEDIUM PRIORITY — interval 48h ─────────────────────────────────────────
@@ -133,13 +119,7 @@ export function getTrackingPriority(
   // Known ETA but far away
   if (daysUntilEta !== null && daysUntilEta > 14) {
     const intervalHours = daysUntilEta > 21 ? 120 : 96;
-    return make(
-      30,
-      "low",
-      intervalHours,
-      `ETA in ${daysUntilEta} days`,
-      now,
-    );
+    return make(30, "low", intervalHours, `ETA in ${daysUntilEta} days`, now);
   }
 
   // No ETA — check infrequently
@@ -159,15 +139,10 @@ export function getTrackingPriority(
  */
 export function calcPerRunBudget(
   remaining: number,
-  now: Date,
+  now: Date
 ): { remainingDays: number; dailyBudget: number; perRunBudget: number } {
-  const endOfMonth = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
-  );
-  const remainingDays = Math.max(
-    1,
-    Math.ceil((endOfMonth.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
-  );
+  const endOfMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const remainingDays = Math.max(1, Math.ceil((endOfMonth.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
   const dailyBudget = Math.floor(remaining / remainingDays);
   const perRunBudget = Math.max(1, Math.floor(dailyBudget / 4));
   return { remainingDays, dailyBudget, perRunBudget };
@@ -181,21 +156,13 @@ const TIER_LABELS: Record<PriorityTier, string> = {
   low: "Low",
 };
 
-function make(
-  score: number,
-  tier: PriorityTier,
-  intervalHours: number,
-  reason: string,
-  now: Date,
-): PriorityResult {
+function make(score: number, tier: PriorityTier, intervalHours: number, reason: string, now: Date): PriorityResult {
   return {
     priorityScore: score,
     priorityTier: tier,
     priorityLabel: TIER_LABELS[tier],
     minimumIntervalHours: intervalHours,
     reason,
-    nextRecommendedCheckAt: new Date(
-      now.getTime() + intervalHours * 60 * 60 * 1000,
-    ),
+    nextRecommendedCheckAt: new Date(now.getTime() + intervalHours * 60 * 60 * 1000),
   };
 }

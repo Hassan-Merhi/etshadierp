@@ -6,18 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -87,15 +77,21 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const [showFilters, setShowFilters] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerContainer, setDrawerContainer] = useState<EnrichedContainerRow | null>(null);
-  const [importResult, setImportResult] = useState<{ updated: number; skipped: number; notFound: number; errors: string[]; importId: string | null } | null>(null);
+  const [importResult, setImportResult] = useState<{
+    updated: number;
+    skipped: number;
+    notFound: number;
+    errors: string[];
+    importId: string | null;
+  } | null>(null);
   const [waSending, setWaSending] = useState(false);
 
   const [bulkProgress, setBulkProgress] = useState<BulkProgress | null>(null);
   const [showProgressBanner, setShowProgressBanner] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const printRef     = useRef<HTMLDivElement>(null);
-  const queryClient  = useQueryClient();
+  const printRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   // ── Column visibility (per-user, persisted to localStorage) ──────────────────
   const [colVis, setColVis] = useState<Record<OtwColId, boolean>>(DEFAULT_OTW_COL_VIS);
@@ -109,7 +105,9 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   function toggleOtwCol(id: OtwColId) {
     setColVis((prev) => {
       const next = { ...prev, [id]: !prev[id] };
-      try { if (user?.id) localStorage.setItem(`otw_col_vis_${user.id}`, JSON.stringify(next)); } catch {}
+      try {
+        if (user?.id) localStorage.setItem(`otw_col_vis_${user.id}`, JSON.stringify(next));
+      } catch {}
       return next;
     });
   }
@@ -119,9 +117,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   const effectiveRole = user?.currentRole ?? user?.role ?? "";
   const isAllowed = allowedRoles.includes(effectiveRole);
 
-  const queryUrl = allCompanies
-    ? "/api/git/containers?allCompanies=true"
-    : "/api/git/containers";
+  const queryUrl = allCompanies ? "/api/git/containers?allCompanies=true" : "/api/git/containers";
 
   const { data, isLoading, isError, error, refetch } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],
@@ -131,12 +127,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
   const allContainers = data?.containers ?? [];
 
-  const {
-    importMutation,
-    undoImportMutation,
-    bulkEnableMutation,
-    bulkTrackMutation,
-  } = useGITContainersData({
+  const { importMutation, undoImportMutation, bulkEnableMutation, bulkTrackMutation } = useGITContainersData({
     isAllowed,
     allCompanies,
     queryUrl,
@@ -168,24 +159,15 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     sortOrder,
   });
 
-  const {
-    atSea,
-    atPort,
-    leftDar,
-    inTransit,
-    arrived,
-    delayed,
-    offloadOverdue,
-    totalCost,
-    totalTransportDuty
-  } = useContainerSummaryStats({ filteredContainers });
+  const { atSea, atPort, leftDar, inTransit, arrived, delayed, offloadOverdue, totalCost, totalTransportDuty } =
+    useContainerSummaryStats({ filteredContainers });
 
-  const companies   = [...new Set(allContainers.map((c) => c.companyName))].sort();
-  const suppliers   = [...new Set(allContainers.map((c) => c.supplierCode).filter(Boolean))].sort() as string[];
+  const companies = [...new Set(allContainers.map((c) => c.companyName))].sort();
+  const suppliers = [...new Set(allContainers.map((c) => c.supplierCode).filter(Boolean))].sort() as string[];
   const transporters = [...new Set(allContainers.map((c) => c.transporter).filter(Boolean))].sort() as string[];
-  const agents      = [...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[];
-  const trucks      = [...new Set(allContainers.map((c) => c.numberPlate).filter(Boolean))].sort() as string[];
-  const locations   = [...new Set(allContainers.map((c) => c.trackingLocation).filter(Boolean))].sort() as string[];
+  const agents = [...new Set(allContainers.map((c) => c.agent).filter(Boolean))].sort() as string[];
+  const trucks = [...new Set(allContainers.map((c) => c.numberPlate).filter(Boolean))].sort() as string[];
+  const locations = [...new Set(allContainers.map((c) => c.trackingLocation).filter(Boolean))].sort() as string[];
 
   function openDrawer(c: EnrichedContainerRow) {
     setDrawerContainer(c);
@@ -246,15 +228,16 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     }
   }
 
-  if (userLoading) return (
-    <div className="flex-1 flex items-center justify-center p-8">
-      <div className="space-y-3 w-full max-w-sm">
-        <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
+  if (userLoading)
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <div className="space-y-3 w-full max-w-sm">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
       </div>
-    </div>
-  );
+    );
   if (!isAllowed) return <Redirect to="/" />;
 
   if (!user || isLoading) {
@@ -283,7 +266,7 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     );
   }
 
-  const sessionCompanyId = (data?.mode === "single" && data.companyId) ? data.companyId : null;
+  const sessionCompanyId = data?.mode === "single" && data.companyId ? data.companyId : null;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -293,10 +276,15 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
         {/* ── Company Mode ── */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => { setAllCompanies(false); setCompanyFilter("ALL"); }}
+            onClick={() => {
+              setAllCompanies(false);
+              setCompanyFilter("ALL");
+            }}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors",
-              !allCompanies ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover-elevate",
+              !allCompanies
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background border-border text-muted-foreground hover-elevate"
             )}
             data-testid="button-my-company"
           >
@@ -304,10 +292,15 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
             My Company
           </button>
           <button
-            onClick={() => { setAllCompanies(true); setCompanyFilter("ALL"); }}
+            onClick={() => {
+              setAllCompanies(true);
+              setCompanyFilter("ALL");
+            }}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border transition-colors",
-              allCompanies ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover-elevate",
+              allCompanies
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background border-border text-muted-foreground hover-elevate"
             )}
             data-testid="button-all-companies"
           >
@@ -324,16 +317,79 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
         {/* ── Summary Cards ── */}
         <div className="flex flex-wrap gap-2">
-          <SummaryCard label="Active" value={filteredContainers.length} icon={<Package className="h-4 w-4 text-primary" />} accent="bg-primary/10" />
-          {atSea > 0 && <SummaryCard label="At Sea / OTW" value={atSea} icon={<Ship className="h-4 w-4 text-blue-600" />} accent="bg-blue-100 dark:bg-blue-900/30" />}
-          {atPort > 0 && <SummaryCard label="At Port" value={atPort} icon={<Package className="h-4 w-4 text-amber-600" />} accent="bg-amber-100 dark:bg-amber-900/30" />}
-          {leftDar > 0 && <SummaryCard label="Left Dar" value={leftDar} icon={<Truck className="h-4 w-4 text-violet-600" />} accent="bg-violet-100 dark:bg-violet-900/30" />}
-          {inTransit > 0 && <SummaryCard label="In Transit" value={inTransit} icon={<Truck className="h-4 w-4 text-indigo-600" />} accent="bg-indigo-100 dark:bg-indigo-900/30" />}
-          {arrived > 0 && <SummaryCard label="Arrived" value={arrived} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />}
-          {delayed > 0 && <SummaryCard label="Delayed" value={delayed} icon={<Clock className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />}
-          {offloadOverdue > 0 && <SummaryCard label="Offload Overdue" value={offloadOverdue} icon={<AlertTriangle className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />}
-          <SummaryCard label="Container Cost" value={totalCost} icon={<DollarSign className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />
-          <SummaryCard label="Transport + Duty" value={totalTransportDuty} icon={<DollarSign className="h-4 w-4 text-muted-foreground" />} />
+          <SummaryCard
+            label="Active"
+            value={filteredContainers.length}
+            icon={<Package className="h-4 w-4 text-primary" />}
+            accent="bg-primary/10"
+          />
+          {atSea > 0 && (
+            <SummaryCard
+              label="At Sea / OTW"
+              value={atSea}
+              icon={<Ship className="h-4 w-4 text-blue-600" />}
+              accent="bg-blue-100 dark:bg-blue-900/30"
+            />
+          )}
+          {atPort > 0 && (
+            <SummaryCard
+              label="At Port"
+              value={atPort}
+              icon={<Package className="h-4 w-4 text-amber-600" />}
+              accent="bg-amber-100 dark:bg-amber-900/30"
+            />
+          )}
+          {leftDar > 0 && (
+            <SummaryCard
+              label="Left Dar"
+              value={leftDar}
+              icon={<Truck className="h-4 w-4 text-violet-600" />}
+              accent="bg-violet-100 dark:bg-violet-900/30"
+            />
+          )}
+          {inTransit > 0 && (
+            <SummaryCard
+              label="In Transit"
+              value={inTransit}
+              icon={<Truck className="h-4 w-4 text-indigo-600" />}
+              accent="bg-indigo-100 dark:bg-indigo-900/30"
+            />
+          )}
+          {arrived > 0 && (
+            <SummaryCard
+              label="Arrived"
+              value={arrived}
+              icon={<CheckCircle2 className="h-4 w-4 text-green-600" />}
+              accent="bg-green-100 dark:bg-green-900/30"
+            />
+          )}
+          {delayed > 0 && (
+            <SummaryCard
+              label="Delayed"
+              value={delayed}
+              icon={<Clock className="h-4 w-4 text-red-600" />}
+              accent="bg-red-100 dark:bg-red-900/30"
+            />
+          )}
+          {offloadOverdue > 0 && (
+            <SummaryCard
+              label="Offload Overdue"
+              value={offloadOverdue}
+              icon={<AlertTriangle className="h-4 w-4 text-red-600" />}
+              accent="bg-red-100 dark:bg-red-900/30"
+            />
+          )}
+          <SummaryCard
+            label="Container Cost"
+            value={totalCost}
+            icon={<DollarSign className="h-4 w-4 text-green-600" />}
+            accent="bg-green-100 dark:bg-green-900/30"
+          />
+          <SummaryCard
+            label="Transport + Duty"
+            value={totalTransportDuty}
+            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          />
         </div>
 
         {/* ── Search + Filters Toggle ── */}
@@ -348,7 +404,12 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
               data-testid="input-otw-search"
             />
           </div>
-          <Button variant="outline" size="default" onClick={() => setShowFilters((v) => !v)} data-testid="button-otw-filters">
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => setShowFilters((v) => !v)}
+            data-testid="button-otw-filters"
+          >
             <Filter className="h-4 w-4 mr-1" />
             Filters
             <ChevronDown className={cn("h-3.5 w-3.5 ml-1 transition-transform", showFilters && "rotate-180")} />
@@ -360,15 +421,23 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
                 <SlidersHorizontal className="h-4 w-4 mr-1" />
                 Columns
                 {otwHiddenCount > 0 && (
-                  <span className="ml-1 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 leading-none">{otwHiddenCount}</span>
+                  <span className="ml-1 text-xs bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 leading-none">
+                    {otwHiddenCount}
+                  </span>
                 )}
               </Button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-52 p-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">Show / Hide Columns</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 px-1">
+                Show / Hide Columns
+              </p>
               <div className="space-y-0.5">
                 {OTW_COLS.map((col) => (
-                  <label key={col.id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer text-sm" data-testid={`col-toggle-otw-${col.id}`}>
+                  <label
+                    key={col.id}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate cursor-pointer text-sm"
+                    data-testid={`col-toggle-otw-${col.id}`}
+                  >
                     <Checkbox checked={colVis[col.id]} onCheckedChange={() => toggleOtwCol(col.id)} />
                     {col.label}
                   </label>

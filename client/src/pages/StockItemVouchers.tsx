@@ -6,14 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
@@ -75,14 +68,15 @@ export default function StockItemVouchers() {
   const month = parseInt(params.month || "0");
   const [_location, navigate] = useLocation();
   useEscapeToParent();
-  
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => 
-    getDefaultPeriodValue("this_month")
-  );
+
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_month"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
-  
+
   const { data, isLoading } = useQuery<VouchersData>({
-    queryKey: [`/api/stock-items/${stockItemId}/vouchers/${year}/${month}`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }],
+    queryKey: [
+      `/api/stock-items/${stockItemId}/vouchers/${year}/${month}`,
+      { startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
+    ],
     queryFn: async () => {
       const params = new URLSearchParams({
         startDate: periodFilter.fromDate,
@@ -94,12 +88,12 @@ export default function StockItemVouchers() {
     },
     enabled: stockItemId > 0 && year > 0 && month > 0,
   });
-  
+
   const formatNumber = (num: number, decimals = 2) => {
     if (num === 0) return "";
     return num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
-  
+
   const formatDate = (dateStr: string) => {
     try {
       return formatDisplayDate(new Date(dateStr));
@@ -107,42 +101,42 @@ export default function StockItemVouchers() {
       return dateStr;
     }
   };
-  
+
   const getTransactionEditUrl = (txn: Transaction): string | null => {
     if (txn.isOpeningBalance) return null;
-    
+
     const vchType = txn.vchType.toLowerCase();
-    
-    if (vchType === 'purchase import') {
+
+    if (vchType === "purchase import") {
       return txn.poId ? `/purchase-orders/${txn.poId}/edit` : null;
     }
-    
-    if (vchType === 'production' || vchType === 'consumption') {
+
+    if (vchType === "production" || vchType === "consumption") {
       return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
     }
-    
-    if (vchType.startsWith('pos') || vchType.includes('pos')) {
+
+    if (vchType.startsWith("pos") || vchType.includes("pos")) {
       return txn.voucherId ? `/pos/edit/${txn.voucherId}` : null;
     }
-    
-    if (vchType.startsWith('stock transfer')) {
+
+    if (vchType.startsWith("stock transfer")) {
       return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
     }
-    
-    if (vchType === 'sales') {
+
+    if (vchType === "sales") {
       return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
     }
-    
+
     return null;
   };
-  
+
   const handleParticularsClick = (txn: Transaction) => {
     const url = getTransactionEditUrl(txn);
     if (url) {
       navigate(url);
     }
   };
-  
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-3 sm:p-6 space-y-6">
@@ -151,15 +145,15 @@ export default function StockItemVouchers() {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 flex-wrap">
         <div className="flex items-center gap-3 sm:gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => navigate(`/stock-items/${stockItemId}/history`)} 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(`/stock-items/${stockItemId}/history`)}
             data-testid="button-back"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -173,13 +167,9 @@ export default function StockItemVouchers() {
             )}
           </div>
         </div>
-        <PeriodFilter
-          value={periodFilter}
-          onChange={setPeriodFilter}
-          data-testid="period-filter"
-        />
+        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
       </div>
-      
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">
@@ -191,12 +181,24 @@ export default function StockItemVouchers() {
             <Table className="text-sm">
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead rowSpan={2} className="align-bottom border-r w-[80px]">Date</TableHead>
-                  <TableHead rowSpan={2} className="align-bottom border-r">Particulars</TableHead>
-                  <TableHead rowSpan={2} className="align-bottom border-r">Vch Type</TableHead>
-                  <TableHead colSpan={3} className="text-center border-r">Inwards</TableHead>
-                  <TableHead colSpan={3} className="text-center border-r">Outwards</TableHead>
-                  <TableHead colSpan={3} className="text-center">Closing</TableHead>
+                  <TableHead rowSpan={2} className="align-bottom border-r w-[80px]">
+                    Date
+                  </TableHead>
+                  <TableHead rowSpan={2} className="align-bottom border-r">
+                    Particulars
+                  </TableHead>
+                  <TableHead rowSpan={2} className="align-bottom border-r">
+                    Vch Type
+                  </TableHead>
+                  <TableHead colSpan={3} className="text-center border-r">
+                    Inwards
+                  </TableHead>
+                  <TableHead colSpan={3} className="text-center border-r">
+                    Outwards
+                  </TableHead>
+                  <TableHead colSpan={3} className="text-center">
+                    Closing
+                  </TableHead>
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-right w-[60px]">Qty</TableHead>
@@ -212,8 +214,8 @@ export default function StockItemVouchers() {
               </TableHeader>
               <TableBody>
                 {data?.transactions.map((txn, idx) => (
-                  <TableRow 
-                    key={idx} 
+                  <TableRow
+                    key={idx}
                     data-testid={`row-txn-${idx}`}
                     className={txn.isOpeningBalance ? "bg-muted/30 font-medium" : ""}
                   >
@@ -244,12 +246,16 @@ export default function StockItemVouchers() {
                     <TableCell className="text-right tabular-nums border-r">
                       {formatAmount(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatNumber(txn.closingQty, 0)}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {formatNumber(txn.closingQty, 0)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{formatAmount(txn.closingRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{formatAmount(txn.closingValue)}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">
+                      {formatAmount(txn.closingValue)}
+                    </TableCell>
                   </TableRow>
                 ))}
-                
+
                 {data?.transactions.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
@@ -257,16 +263,22 @@ export default function StockItemVouchers() {
                     </TableCell>
                   </TableRow>
                 )}
-                
+
                 {data && data.transactions.length > 0 && (
                   <TableRow className="bg-muted/50 font-bold">
-                    <TableCell colSpan={3} className="border-r">Totals</TableCell>
+                    <TableCell colSpan={3} className="border-r">
+                      Totals
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.inwardQty, 0)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatAmount(data.totals.inwardRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums border-r">{formatAmount(data.totals.inwardValue)}</TableCell>
+                    <TableCell className="text-right tabular-nums border-r">
+                      {formatAmount(data.totals.inwardValue)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.outwardQty, 0)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatAmount(data.totals.outwardRate)}</TableCell>
-                    <TableCell className="text-right tabular-nums border-r">{formatAmount(data.totals.outwardValue)}</TableCell>
+                    <TableCell className="text-right tabular-nums border-r">
+                      {formatAmount(data.totals.outwardValue)}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{formatNumber(data.totals.closingQty, 0)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatAmount(data.totals.closingRate)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatAmount(data.totals.closingValue)}</TableCell>
@@ -278,9 +290,7 @@ export default function StockItemVouchers() {
 
           <div className="md:hidden space-y-2">
             {data?.transactions.length === 0 && (
-              <p className="text-center text-muted-foreground py-8">
-                No transactions found for this month
-              </p>
+              <p className="text-center text-muted-foreground py-8">No transactions found for this month</p>
             )}
             {data?.transactions.map((txn, idx) => (
               <div
@@ -313,14 +323,17 @@ export default function StockItemVouchers() {
                   {(txn.inwardQty > 0 || txn.isOpeningBalance) && (
                     <div>
                       <div className="text-muted-foreground">In</div>
-                      <div className="font-mono">{formatNumber(txn.inwardQty, 0)} @ {formatAmount(txn.inwardRate)}</div>
+                      <div className="font-mono">
+                        {formatNumber(txn.inwardQty, 0)} @ {formatAmount(txn.inwardRate)}
+                      </div>
                     </div>
                   )}
                   {txn.outwardQty > 0 && (
                     <div>
                       <div className="text-muted-foreground">Out</div>
                       <div className="font-mono">
-                        {formatNumber(txn.outwardQty, 0)} @ {formatAmount(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
+                        {formatNumber(txn.outwardQty, 0)} @{" "}
+                        {formatAmount(txn.isPOS && txn.posSellingRate ? txn.posSellingRate : txn.outwardRate)}
                       </div>
                     </div>
                   )}
@@ -332,7 +345,7 @@ export default function StockItemVouchers() {
                 </div>
               </div>
             ))}
-            
+
             {data && data.transactions.length > 0 && (
               <div className="p-3 rounded-md border bg-muted/50 text-sm font-bold">
                 <div className="mb-2">Totals</div>
@@ -340,17 +353,23 @@ export default function StockItemVouchers() {
                   <div>
                     <div className="text-muted-foreground font-normal">Inward</div>
                     <div className="font-mono">{formatNumber(data.totals.inwardQty, 0)}</div>
-                    <div className="font-mono text-muted-foreground font-normal">{formatAmount(data.totals.inwardValue)}</div>
+                    <div className="font-mono text-muted-foreground font-normal">
+                      {formatAmount(data.totals.inwardValue)}
+                    </div>
                   </div>
                   <div>
                     <div className="text-muted-foreground font-normal">Outward</div>
                     <div className="font-mono">{formatNumber(data.totals.outwardQty, 0)}</div>
-                    <div className="font-mono text-muted-foreground font-normal">{formatAmount(data.totals.outwardValue)}</div>
+                    <div className="font-mono text-muted-foreground font-normal">
+                      {formatAmount(data.totals.outwardValue)}
+                    </div>
                   </div>
                   <div>
                     <div className="text-muted-foreground font-normal">Closing</div>
                     <div className="font-mono">{formatNumber(data.totals.closingQty, 0)}</div>
-                    <div className="font-mono text-muted-foreground font-normal">{formatAmount(data.totals.closingValue)}</div>
+                    <div className="font-mono text-muted-foreground font-normal">
+                      {formatAmount(data.totals.closingValue)}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -7,18 +7,29 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Bot, Users, MessageCircle, ArrowLeft, Loader2, Check, X, Settings, GitBranch, Eye, EyeOff, History, FileCode, RotateCcw, GitCommit, Trash2, PlusCircle } from "lucide-react";
+import {
+  Bot,
+  Users,
+  MessageCircle,
+  ArrowLeft,
+  Loader2,
+  Check,
+  X,
+  Settings,
+  GitBranch,
+  Eye,
+  EyeOff,
+  History,
+  FileCode,
+  RotateCcw,
+  GitCommit,
+  Trash2,
+  PlusCircle,
+} from "lucide-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
 
@@ -78,7 +89,10 @@ export default function ChatbotSettings() {
 
   const githubMutation = useMutation({
     mutationFn: async ({ repoUrl, token }: { repoUrl?: string; token?: string }) => {
-      const response = await apiRequest("PATCH", "/api/chatbot/github-settings", { repoUrl: repoUrl || undefined, token: token || undefined });
+      const response = await apiRequest("PATCH", "/api/chatbot/github-settings", {
+        repoUrl: repoUrl || undefined,
+        token: token || undefined,
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -102,16 +116,30 @@ export default function ChatbotSettings() {
     enabled: activeTab === "history" && !!chatStatus?.isAdminOrOwner && viewAllChats,
   });
 
-  const { data: mySessions = [], isLoading: mySessionsLoading, refetch: refetchMySessions } = useQuery<MySession[]>({
+  const {
+    data: mySessions = [],
+    isLoading: mySessionsLoading,
+    refetch: refetchMySessions,
+  } = useQuery<MySession[]>({
     queryKey: ["/api/chatbot/my-sessions"],
     enabled: activeTab === "history",
   });
 
-  const { data: chatStatus } = useQuery<{ enabled: boolean; hasApiKey: boolean; providerName: string; selectedProvider: string; isAdminOrOwner: boolean }>({
+  const { data: chatStatus } = useQuery<{
+    enabled: boolean;
+    hasApiKey: boolean;
+    providerName: string;
+    selectedProvider: string;
+    isAdminOrOwner: boolean;
+  }>({
     queryKey: ["/api/chatbot/status"],
   });
 
-  const { data: patchHistory = [], isLoading: patchHistoryLoading, refetch: refetchPatchHistory } = useQuery<PatchHistoryEntry[]>({
+  const {
+    data: patchHistory = [],
+    isLoading: patchHistoryLoading,
+    refetch: refetchPatchHistory,
+  } = useQuery<PatchHistoryEntry[]>({
     queryKey: ["/api/chatbot/patch-history"],
     enabled: activeTab === "patches" && !!chatStatus?.isAdminOrOwner,
   });
@@ -175,29 +203,37 @@ export default function ChatbotSettings() {
     },
   });
 
-  const groupedHistory = chatHistory.reduce((acc, msg) => {
-    const key = msg.sessionId;
-    if (!acc[key]) {
-      acc[key] = {
-        sessionId: key,
-        username: msg.username || "Unknown",
-        userId: msg.userId,
-        messages: [],
-        lastMessageTime: msg.createdAt,
-      };
-    }
-    acc[key].messages.push(msg);
-    if (new Date(msg.createdAt) > new Date(acc[key].lastMessageTime)) {
-      acc[key].lastMessageTime = msg.createdAt;
-    }
-    return acc;
-  }, {} as Record<string, { sessionId: string; username: string; userId: number; messages: ChatMessage[]; lastMessageTime: string }>);
+  const groupedHistory = chatHistory.reduce(
+    (acc, msg) => {
+      const key = msg.sessionId;
+      if (!acc[key]) {
+        acc[key] = {
+          sessionId: key,
+          username: msg.username || "Unknown",
+          userId: msg.userId,
+          messages: [],
+          lastMessageTime: msg.createdAt,
+        };
+      }
+      acc[key].messages.push(msg);
+      if (new Date(msg.createdAt) > new Date(acc[key].lastMessageTime)) {
+        acc[key].lastMessageTime = msg.createdAt;
+      }
+      return acc;
+    },
+    {} as Record<
+      string,
+      { sessionId: string; username: string; userId: number; messages: ChatMessage[]; lastMessageTime: string }
+    >
+  );
 
   const allSessions = Object.values(groupedHistory).sort(
     (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime()
   );
 
-  const { data: selectedSessionMessages = [], isLoading: sessionMessagesLoading } = useQuery<{ id: number; role: string; message: string; createdAt: string }[]>({
+  const { data: selectedSessionMessages = [], isLoading: sessionMessagesLoading } = useQuery<
+    { id: number; role: string; message: string; createdAt: string }[]
+  >({
     queryKey: [`/api/chatbot/history/${selectedSession}`],
     enabled: !!selectedSession,
   });
@@ -241,8 +277,14 @@ export default function ChatbotSettings() {
             <div className="flex items-center gap-3">
               <Bot className="h-5 w-5 text-orange-500" />
               <p className="text-sm">
-                <span className="font-medium">API Key Missing:</span> The {chatStatus?.providerName || "AI"} API key is not configured. 
-                Please add the {chatStatus?.selectedProvider === "chatgpt" ? "OPENAI_API_KEY" : chatStatus?.selectedProvider === "grok" ? "XAI_API_KEY" : "GEMINI_API_KEY"} secret in the Secrets tab to enable the AI chatbot.
+                <span className="font-medium">API Key Missing:</span> The {chatStatus?.providerName || "AI"} API key is
+                not configured. Please add the{" "}
+                {chatStatus?.selectedProvider === "chatgpt"
+                  ? "OPENAI_API_KEY"
+                  : chatStatus?.selectedProvider === "grok"
+                    ? "XAI_API_KEY"
+                    : "GEMINI_API_KEY"}{" "}
+                secret in the Secrets tab to enable the AI chatbot.
               </p>
             </div>
           </CardContent>
@@ -256,9 +298,7 @@ export default function ChatbotSettings() {
               <Settings className="h-5 w-5" />
               AI Provider
             </CardTitle>
-            <CardDescription>
-              Choose which AI service powers the chatbot
-            </CardDescription>
+            <CardDescription>Choose which AI service powers the chatbot</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
@@ -296,7 +336,8 @@ export default function ChatbotSettings() {
               GitHub Integration
             </CardTitle>
             <CardDescription>
-              Store your repository URL and a GitHub token separately — the token is never returned to the browser and is composed server-side when pushing.
+              Store your repository URL and a GitHub token separately — the token is never returned to the browser and
+              is composed server-side when pushing.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -310,10 +351,15 @@ export default function ChatbotSettings() {
                 {githubSettings?.configured && (
                   <div className="flex items-center gap-2 text-sm flex-wrap">
                     <Check className="h-4 w-4 text-green-500 shrink-0" />
-                    <span className="font-mono text-muted-foreground truncate max-w-sm">
-                      {githubSettings.repoUrl}
-                    </span>
-                    <Badge variant="outline" className={githubSettings.hasToken ? "bg-green-500/10 text-green-600 border-green-500/30" : "bg-orange-500/10 text-orange-600 border-orange-500/30"}>
+                    <span className="font-mono text-muted-foreground truncate max-w-sm">{githubSettings.repoUrl}</span>
+                    <Badge
+                      variant="outline"
+                      className={
+                        githubSettings.hasToken
+                          ? "bg-green-500/10 text-green-600 border-green-500/30"
+                          : "bg-orange-500/10 text-orange-600 border-orange-500/30"
+                      }
+                    >
                       {githubSettings.hasToken ? "Token configured" : "No token"}
                     </Badge>
                   </div>
@@ -324,9 +370,11 @@ export default function ChatbotSettings() {
                   <input
                     type="text"
                     className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
-                    placeholder={githubSettings?.configured ? "Enter new URL to replace…" : "https://github.com/user/repo.git"}
+                    placeholder={
+                      githubSettings?.configured ? "Enter new URL to replace…" : "https://github.com/user/repo.git"
+                    }
                     value={githubRepoUrl}
-                    onChange={e => setGithubRepoUrl(e.target.value)}
+                    onChange={(e) => setGithubRepoUrl(e.target.value)}
                     data-testid="input-github-repo-url"
                   />
                 </div>
@@ -334,7 +382,9 @@ export default function ChatbotSettings() {
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground">
                     Personal Access Token
-                    {githubSettings?.hasToken && <span className="ml-2 text-green-600">(currently set — enter new to replace)</span>}
+                    {githubSettings?.hasToken && (
+                      <span className="ml-2 text-green-600">(currently set — enter new to replace)</span>
+                    )}
                   </label>
                   <div className="relative">
                     <input
@@ -342,13 +392,13 @@ export default function ChatbotSettings() {
                       className="w-full h-9 rounded-md border border-border bg-background px-3 pr-9 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-ring"
                       placeholder={githubSettings?.hasToken ? "Enter new token to replace…" : "ghp_xxxxxxxxxxxx"}
                       value={githubToken}
-                      onChange={e => setGithubToken(e.target.value)}
+                      onChange={(e) => setGithubToken(e.target.value)}
                       data-testid="input-github-token"
                     />
                     <button
                       type="button"
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => setShowToken(v => !v)}
+                      onClick={() => setShowToken((v) => !v)}
                       tabIndex={-1}
                     >
                       {showToken ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
@@ -358,11 +408,17 @@ export default function ChatbotSettings() {
 
                 <Button
                   size="sm"
-                  onClick={() => githubMutation.mutate({ repoUrl: githubRepoUrl || undefined, token: githubToken || undefined })}
+                  onClick={() =>
+                    githubMutation.mutate({ repoUrl: githubRepoUrl || undefined, token: githubToken || undefined })
+                  }
                   disabled={githubMutation.isPending || (!githubRepoUrl.trim() && !githubToken.trim())}
                   data-testid="button-save-github"
                 >
-                  {githubMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Check className="h-3.5 w-3.5 mr-1" />}
+                  {githubMutation.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                  ) : (
+                    <Check className="h-3.5 w-3.5 mr-1" />
+                  )}
                   Save Settings
                 </Button>
               </>
@@ -395,7 +451,8 @@ export default function ChatbotSettings() {
                 User Chatbot Access
               </CardTitle>
               <CardDescription>
-                Enable or disable AI chatbot access for each user. Only users with access enabled can use the floating chat widget.
+                Enable or disable AI chatbot access for each user. Only users with access enabled can use the floating
+                chat widget.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -407,37 +464,37 @@ export default function ChatbotSettings() {
                 <p className="text-center text-muted-foreground py-8">No users found.</p>
               ) : (
                 <div className="table-responsive">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Username</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Chatbot Access</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                        <TableCell className="font-medium">{user.username}</TableCell>
-                        <TableCell>
-                          <Badge variant={user.active ? "default" : "secondary"}>
-                            {user.active ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Switch
-                            checked={user.chatbotEnabled || false}
-                            onCheckedChange={(checked) => 
-                              toggleMutation.mutate({ userId: user.id, enabled: checked })
-                            }
-                            disabled={toggleMutation.isPending}
-                            data-testid={`switch-chatbot-${user.id}`}
-                          />
-                        </TableCell>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Username</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Chatbot Access</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user) => (
+                        <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
+                          <TableCell className="font-medium">{user.username}</TableCell>
+                          <TableCell>
+                            <Badge variant={user.active ? "default" : "secondary"}>
+                              {user.active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Switch
+                              checked={user.chatbotEnabled || false}
+                              onCheckedChange={(checked) =>
+                                toggleMutation.mutate({ userId: user.id, enabled: checked })
+                              }
+                              disabled={toggleMutation.isPending}
+                              data-testid={`switch-chatbot-${user.id}`}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </CardContent>
@@ -451,7 +508,10 @@ export default function ChatbotSettings() {
               <Button
                 size="sm"
                 variant={!viewAllChats ? "default" : "outline"}
-                onClick={() => { setViewAllChats(false); setSelectedSession(null); }}
+                onClick={() => {
+                  setViewAllChats(false);
+                  setSelectedSession(null);
+                }}
                 data-testid="button-my-chats"
               >
                 My Chats
@@ -459,7 +519,10 @@ export default function ChatbotSettings() {
               <Button
                 size="sm"
                 variant={viewAllChats ? "default" : "outline"}
-                onClick={() => { setViewAllChats(true); setSelectedSession(null); }}
+                onClick={() => {
+                  setViewAllChats(true);
+                  setSelectedSession(null);
+                }}
                 data-testid="button-all-chats"
               >
                 <Users className="h-3.5 w-3.5 mr-1.5" />
@@ -498,10 +561,10 @@ export default function ChatbotSettings() {
                       {(viewAllChats ? allSessions : mySessions).map((session) => {
                         const sid = session.sessionId ?? "";
                         const preview = viewAllChats
-                          ? (session as typeof allSessions[0]).username
+                          ? (session as (typeof allSessions)[0]).username
                           : (session as MySession).preview;
                         const msgCount = viewAllChats
-                          ? (session as typeof allSessions[0]).messages.length
+                          ? (session as (typeof allSessions)[0]).messages.length
                           : (session as MySession).messageCount;
                         const lastTime = session.lastMessageTime;
                         return (
@@ -600,9 +663,7 @@ export default function ChatbotSettings() {
                             }`}
                           >
                             <p className="whitespace-pre-wrap break-words">{msg.message}</p>
-                            <p className="text-xs opacity-60 mt-1">
-                              {format(new Date(msg.createdAt), "h:mm a")}
-                            </p>
+                            <p className="text-xs opacity-60 mt-1">{format(new Date(msg.createdAt), "h:mm a")}</p>
                           </div>
                           {msg.role === "user" && (
                             <div className="flex-shrink-0 h-7 w-7 rounded-full bg-muted flex items-center justify-center">
@@ -687,7 +748,10 @@ export default function ChatbotSettings() {
                                 Reverted
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-xs bg-green-500/10 text-green-600 border-green-500/30">
+                              <Badge
+                                variant="outline"
+                                className="text-xs bg-green-500/10 text-green-600 border-green-500/30"
+                              >
                                 <Check className="h-3 w-3 mr-1" />
                                 Applied
                               </Badge>

@@ -1,13 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,9 +19,7 @@ export function VoucherListPanel({ onEdit, formatAmount }: VoucherListPanelProps
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="p-8 text-center text-muted-foreground">
-          Loading vouchers...
-        </CardContent>
+        <CardContent className="p-8 text-center text-muted-foreground">Loading vouchers...</CardContent>
       </Card>
     );
   }
@@ -59,26 +50,16 @@ export function VoucherListPanel({ onEdit, formatAmount }: VoucherListPanelProps
             ) : (
               vouchers.map((voucher) => (
                 <TableRow key={voucher.id}>
-                  <TableCell className="font-medium">
-                    {format(new Date(voucher.voucherDate), "dd MMM yyyy")}
-                  </TableCell>
+                  <TableCell className="font-medium">{format(new Date(voucher.voucherDate), "dd MMM yyyy")}</TableCell>
                   <TableCell>
-                    <Badge variant={voucher.optional ? "outline" : "default"}>
-                      {voucher.voucherType}
-                    </Badge>
+                    <Badge variant={voucher.optional ? "outline" : "default"}>{voucher.voucherType}</Badge>
                   </TableCell>
-                  <TableCell className="max-w-[300px] truncate">
-                    {voucher.description}
-                  </TableCell>
+                  <TableCell className="max-w-[300px] truncate">{voucher.description}</TableCell>
                   <TableCell className="text-right font-mono">
                     {formatAmount(parseFloat(voucher.totalAmount || "0"))}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onEdit(voucher.id)}
-                    >
+                    <Button variant="ghost" size="sm" onClick={() => onEdit(voucher.id)}>
                       <Pencil className="h-4 w-4 mr-2" />
                       Edit
                     </Button>

@@ -1,39 +1,47 @@
 import { useState, useRef, useEffect } from "react";
 import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Plus, Package, Upload, Download, ChevronDown, ChevronRight, LayoutGrid, List, Tags, Pencil, Trash2, X, AlertTriangle, FileSpreadsheet, EyeOff, Eye, AlertCircle, Palette, Search } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Plus,
+  Package,
+  Upload,
+  Download,
+  ChevronDown,
+  ChevronRight,
+  LayoutGrid,
+  List,
+  Tags,
+  Pencil,
+  Trash2,
+  X,
+  AlertTriangle,
+  FileSpreadsheet,
+  EyeOff,
+  Eye,
+  AlertCircle,
+  Palette,
+  Search,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -79,7 +87,17 @@ export default function BaleProducts() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [editingCategory, setEditingCategory] = useState<{ id: number; name: string } | null>(null);
   const [editingProduct, setEditingProduct] = useState<FactoryBaleProduct | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", articleCode: "", weightPerBaleKg: "", categoryId: "", description: "", grade: "", productionPrice: "", sellingPrice: "", labelDesignColor: "" });
+  const [editForm, setEditForm] = useState({
+    name: "",
+    articleCode: "",
+    weightPerBaleKg: "",
+    categoryId: "",
+    description: "",
+    grade: "",
+    productionPrice: "",
+    sellingPrice: "",
+    labelDesignColor: "",
+  });
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -103,8 +121,14 @@ export default function BaleProducts() {
         categoryId: editingProduct.categoryId ? String(editingProduct.categoryId) : "",
         description: editingProduct.description || "",
         grade: "",
-        productionPrice: editingProduct.productionPrice && parseFloat(editingProduct.productionPrice) > 0 ? String(parseFloat(editingProduct.productionPrice)) : "",
-        sellingPrice: editingProduct.sellingPrice && parseFloat(editingProduct.sellingPrice) > 0 ? String(parseFloat(editingProduct.sellingPrice)) : "",
+        productionPrice:
+          editingProduct.productionPrice && parseFloat(editingProduct.productionPrice) > 0
+            ? String(parseFloat(editingProduct.productionPrice))
+            : "",
+        sellingPrice:
+          editingProduct.sellingPrice && parseFloat(editingProduct.sellingPrice) > 0
+            ? String(parseFloat(editingProduct.sellingPrice))
+            : "",
         labelDesignColor: editingProduct.labelDesignColor || "",
       });
     }
@@ -118,11 +142,22 @@ export default function BaleProducts() {
   });
   const { data: factorySettingsData } = useQuery<{ hideAvgCost?: boolean; hideSellingPrice?: boolean }>({
     queryKey: ["/api/factory/settings"],
-    queryFn: async () => { const res = await fetch("/api/factory/settings", { credentials: "include" }); return res.ok ? res.json() : {}; },
+    queryFn: async () => {
+      const res = await fetch("/api/factory/settings", { credentials: "include" });
+      return res.ok ? res.json() : {};
+    },
   });
   const perUserHiddenBP = myAccess?.hiddenCostFields ?? [];
-  const hideAvgRate = perUserHiddenBP.includes("inventory_avg_rate") || perUserHiddenBP.includes("inventory_total_value") || !!factorySettingsData?.hideAvgCost || perUserHiddenBP.includes("hide_export_cost_price");
-  const hideSellingPriceBP = !!factorySettingsData?.hideSellingPrice || perUserHiddenBP.includes("inventory_sell_price") || perUserHiddenBP.includes("inventory_sell_value") || perUserHiddenBP.includes("hide_export_selling_price");
+  const hideAvgRate =
+    perUserHiddenBP.includes("inventory_avg_rate") ||
+    perUserHiddenBP.includes("inventory_total_value") ||
+    !!factorySettingsData?.hideAvgCost ||
+    perUserHiddenBP.includes("hide_export_cost_price");
+  const hideSellingPriceBP =
+    !!factorySettingsData?.hideSellingPrice ||
+    perUserHiddenBP.includes("inventory_sell_price") ||
+    perUserHiddenBP.includes("inventory_sell_value") ||
+    perUserHiddenBP.includes("hide_export_selling_price");
 
   const { data: products, isLoading } = useQuery<FactoryBaleProduct[]>({
     queryKey: ["/api/factory/bale-products"],
@@ -146,17 +181,19 @@ export default function BaleProducts() {
     ?.filter((p) => !showNoColor || !p.labelDesignColor)
     ?.filter((p) => filterCategoryId === null || p.categoryId === filterCategoryId)
     ?.filter((p) => filterWeight === null || String(p.weightPerBaleKg) === filterWeight)
-    ?.filter((p) =>
-      !searchLower ||
-      (p.articleCode ?? "").toLowerCase().includes(searchLower) ||
-      (p.name ?? "").toLowerCase().includes(searchLower)
+    ?.filter(
+      (p) =>
+        !searchLower ||
+        (p.articleCode ?? "").toLowerCase().includes(searchLower) ||
+        (p.name ?? "").toLowerCase().includes(searchLower)
     );
   const hiddenProducts = products?.filter((p) => p.active === false);
 
   const toggleSelectId = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -165,9 +202,17 @@ export default function BaleProducts() {
     const ids = list.map((p) => p.id);
     const allSelected = ids.every((id) => selectedIds.has(id));
     if (allSelected) {
-      setSelectedIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.delete(id)); return next; });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
     } else {
-      setSelectedIds((prev) => { const next = new Set(prev); ids.forEach((id) => next.add(id)); return next; });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(id));
+        return next;
+      });
     }
   };
 
@@ -246,15 +291,22 @@ export default function BaleProducts() {
         cols.articleCode ? `Article Code: "${cols.articleCode}"` : null,
         cols.productionPrice ? `Cost Price: "${cols.productionPrice}"` : null,
         cols.sellingPrice ? `Sell Price: "${cols.sellingPrice}"` : null,
-      ].filter(Boolean).join(", ");
+      ]
+        .filter(Boolean)
+        .join(", ");
 
       const noPriceColsFound = !cols.productionPrice && !cols.sellingPrice;
-      const allSkipped = result.skippedNoArticleCode > 0 && (result.created + result.updated) === 0;
+      const allSkipped = result.skippedNoArticleCode > 0 && result.created + result.updated === 0;
 
       if (allSkipped || !cols.articleCode) {
         toast({
           title: "Import Warning",
-          description: `No products were matched — article code column not found. Your file must have a column named "Article Code". Columns seen: ${Object.keys(result.detectedColumns || {}).filter(k => result.detectedColumns[k]).map((k: string) => `"${result.detectedColumns[k]}"`).join(", ") || "none detected"}`,
+          description: `No products were matched — article code column not found. Your file must have a column named "Article Code". Columns seen: ${
+            Object.keys(result.detectedColumns || {})
+              .filter((k) => result.detectedColumns[k])
+              .map((k: string) => `"${result.detectedColumns[k]}"`)
+              .join(", ") || "none detected"
+          }`,
           variant: "destructive",
         });
       } else if (noPriceColsFound) {
@@ -271,7 +323,8 @@ export default function BaleProducts() {
         if (result.categoriesCreated) parts.push(`${result.categoriesCreated} categories auto-created`);
         toast({
           title: "Import Complete",
-          description: (parts.join(", ") || "0 products processed") + (detectedInfo ? ` | Columns: ${detectedInfo}` : ""),
+          description:
+            (parts.join(", ") || "0 products processed") + (detectedInfo ? ` | Columns: ${detectedInfo}` : ""),
         });
       }
 
@@ -286,8 +339,21 @@ export default function BaleProducts() {
   });
 
   const editProductMutation = useMutation({
-    mutationFn: async (data: { name: string; weightPerBaleKg: number | null; articleCode: string; description: string; categoryId: number | null; labelDesignColor: string | null; productionPrice: string; sellingPrice: string }) => {
-      const response = await modeApiRequest("POST", `/api/factory/bale-products/${editingProduct!.id}/cascade-update`, data);
+    mutationFn: async (data: {
+      name: string;
+      weightPerBaleKg: number | null;
+      articleCode: string;
+      description: string;
+      categoryId: number | null;
+      labelDesignColor: string | null;
+      productionPrice: string;
+      sellingPrice: string;
+    }) => {
+      const response = await modeApiRequest(
+        "POST",
+        `/api/factory/bale-products/${editingProduct!.id}/cascade-update`,
+        data
+      );
       return response.json();
     },
     onSuccess: (result: { product: FactoryBaleProduct; balesUpdated: number }) => {
@@ -307,7 +373,9 @@ export default function BaleProducts() {
 
   const colorUpdateMutation = useMutation({
     mutationFn: async ({ id, labelDesignColor }: { id: number; labelDesignColor: string | null }) => {
-      const response = await modeApiRequest("POST", `/api/factory/bale-products/${id}/cascade-update`, { labelDesignColor });
+      const response = await modeApiRequest("POST", `/api/factory/bale-products/${id}/cascade-update`, {
+        labelDesignColor,
+      });
       return response.json();
     },
     onSuccess: () => {
@@ -345,7 +413,10 @@ export default function BaleProducts() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
       setSelectedIds(new Set());
-      toast({ title: variables.active ? "Products unhidden" : "Products hidden", description: `${variables.ids.length} product(s) updated.` });
+      toast({
+        title: variables.active ? "Products unhidden" : "Products hidden",
+        description: `${variables.ids.length} product(s) updated.`,
+      });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -354,13 +425,16 @@ export default function BaleProducts() {
   });
 
   const handleGradeChange = async (grade: string) => {
-    setEditForm(f => ({ ...f, grade }));
+    setEditForm((f) => ({ ...f, grade }));
     if (!grade) return;
     setIsGeneratingCode(true);
     try {
-      const response = await modeApiRequest("GET", `/api/factory/bale-products/generate-code?grade=${encodeURIComponent(grade)}`);
+      const response = await modeApiRequest(
+        "GET",
+        `/api/factory/bale-products/generate-code?grade=${encodeURIComponent(grade)}`
+      );
       const data = await response.json();
-      if (data.articleCode) setEditForm(f => ({ ...f, articleCode: data.articleCode }));
+      if (data.articleCode) setEditForm((f) => ({ ...f, articleCode: data.articleCode }));
     } catch {
       toast({ title: "Error", description: "Could not generate article code", variant: "destructive" });
     } finally {
@@ -401,20 +475,18 @@ export default function BaleProducts() {
 
       const priceHeader = priceType === "selling" ? "Selling Price" : "Production Price";
       const today = new Date().toISOString().slice(0, 10);
-      const fileName = priceType === "selling"
-        ? "HMD_Order_Selling_Price.xlsx"
-        : "HMD_Order_Production_Price.xlsx";
+      const fileName = priceType === "selling" ? "HMD_Order_Selling_Price.xlsx" : "HMD_Order_Production_Price.xlsx";
 
       // ── Brand colours ────────────────────────────────────────────────
-      const C_NAVY    = "FF00205B";
-      const C_BLUE    = "FF1F3A6B";
-      const C_ACCENT  = "FF2E75B6";
+      const C_NAVY = "FF00205B";
+      const C_BLUE = "FF1F3A6B";
+      const C_ACCENT = "FF2E75B6";
       const C_ALT_ROW = "FFDCE6F1";
-      const C_WHITE   = "FFFFFFFF";
-      const C_BORDER  = "FFBFBFBF";
-      const C_MUTED   = "FF888888";
-      const C_ZERO    = "FFBBBBBB";
-      const C_TOTAL   = "FFE8F0F8";
+      const C_WHITE = "FFFFFFFF";
+      const C_BORDER = "FFBFBFBF";
+      const C_MUTED = "FF888888";
+      const C_ZERO = "FFBBBBBB";
+      const C_TOTAL = "FFE8F0F8";
       const C_TOTAL_LABEL = "FF00205B";
 
       const wb = new (ExcelJS as any).Workbook();
@@ -424,14 +496,14 @@ export default function BaleProducts() {
       // ── Column definitions ──────────────────────────────────────────
       // A=#, B=Article(hidden), C=Name, D=Category, E=Weight, F=Price, G=Bales, H=Total
       ws.columns = [
-        { key: "num",      width: 6   },
-        { key: "article",  width: 18, hidden: true },
-        { key: "name",     width: 42  },
-        { key: "category", width: 22  },
-        { key: "weight",   width: 14  },
-        { key: "price",    width: 16  },
-        { key: "bales",    width: 12  },
-        { key: "total",    width: 18  },
+        { key: "num", width: 6 },
+        { key: "article", width: 18, hidden: true },
+        { key: "name", width: 42 },
+        { key: "category", width: 22 },
+        { key: "weight", width: 14 },
+        { key: "price", width: 16 },
+        { key: "bales", width: 12 },
+        { key: "total", width: 18 },
       ];
 
       // ── Logo ─────────────────────────────────────────────────────────
@@ -440,7 +512,9 @@ export default function BaleProducts() {
         const logoBuffer = await logoRes.arrayBuffer();
         const imageId = wb.addImage({ buffer: logoBuffer, extension: "png" });
         ws.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 72 } });
-      } catch { /* logo fetch failed — skip */ }
+      } catch {
+        /* logo fetch failed — skip */
+      }
 
       // ── Header rows 1-4 ─────────────────────────────────────────────
       const addHeaderRow = (text: string, height: number, font: any) => {
@@ -453,14 +527,10 @@ export default function BaleProducts() {
         return r;
       };
 
-      addHeaderRow("HMD International Group", 24,
-        { bold: true, size: 16, color: { argb: C_NAVY } });
-      addHeaderRow(`Make Your Order – ${priceHeader}`, 20,
-        { bold: true, size: 12, color: { argb: C_ACCENT } });
-      addHeaderRow(`Enter quantities in the "Bales" column`, 16,
-        { size: 10, color: { argb: C_MUTED } });
-      addHeaderRow(`Generated: ${today}`, 16,
-        { size: 10, color: { argb: C_MUTED } });
+      addHeaderRow("HMD International Group", 24, { bold: true, size: 16, color: { argb: C_NAVY } });
+      addHeaderRow(`Make Your Order – ${priceHeader}`, 20, { bold: true, size: 12, color: { argb: C_ACCENT } });
+      addHeaderRow(`Enter quantities in the "Bales" column`, 16, { size: 10, color: { argb: C_MUTED } });
+      addHeaderRow(`Generated: ${today}`, 16, { size: 10, color: { argb: C_MUTED } });
 
       // Row 5 – navy accent spacer
       const spacer = ws.addRow(["", "", "", "", "", "", "", ""]);
@@ -469,17 +539,26 @@ export default function BaleProducts() {
       spacer.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: C_NAVY } };
 
       // ── Table header row 6 ───────────────────────────────────────────
-      const hdrRow = ws.addRow(["#", "Article Code", "Name of Item", "Category", "Weight (kg)", priceHeader, "Bales", "Total"]);
+      const hdrRow = ws.addRow([
+        "#",
+        "Article Code",
+        "Name of Item",
+        "Category",
+        "Weight (kg)",
+        priceHeader,
+        "Bales",
+        "Total",
+      ]);
       hdrRow.height = 22;
       hdrRow.eachCell((cell: any) => {
-        cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C_BLUE } };
-        cell.font      = { bold: true, color: { argb: C_WHITE }, size: 11 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C_BLUE } };
+        cell.font = { bold: true, color: { argb: C_WHITE }, size: 11 };
         cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.border    = {
-          top:    { style: "thin",   color: { argb: C_BLUE } },
+        cell.border = {
+          top: { style: "thin", color: { argb: C_BLUE } },
           bottom: { style: "medium", color: { argb: C_NAVY } },
-          left:   { style: "thin",   color: { argb: C_BLUE } },
-          right:  { style: "thin",   color: { argb: C_BLUE } },
+          left: { style: "thin", color: { argb: C_BLUE } },
+          right: { style: "thin", color: { argb: C_BLUE } },
         };
       });
 
@@ -488,7 +567,7 @@ export default function BaleProducts() {
       activeProducts.forEach((p, i) => {
         const rawPrice = priceType === "selling" ? p.sellingPrice : p.productionPrice;
         const numPrice = rawPrice ? parseFloat(rawPrice) : 0;
-        const categoryName = p.categoryId ? (categoryMap.get(p.categoryId) || "") : "";
+        const categoryName = p.categoryId ? categoryMap.get(p.categoryId) || "" : "";
         const weight = p.weightPerBaleKg != null ? parseFloat(String(p.weightPerBaleKg)) : "";
         const rowNum = DATA_START + i;
 
@@ -499,24 +578,22 @@ export default function BaleProducts() {
           categoryName,
           weight,
           numPrice,
-          "",                             // Bales — blank for user input
+          "", // Bales — blank for user input
           { formula: `=F${rowNum}*G${rowNum}`, result: 0 }, // Total = Price × Bales
         ]);
         row.height = 18;
 
         const isAlt = i % 2 === 1;
-        const rowFill = isAlt
-          ? { type: "pattern", pattern: "solid", fgColor: { argb: C_ALT_ROW } }
-          : undefined;
+        const rowFill = isAlt ? { type: "pattern", pattern: "solid", fgColor: { argb: C_ALT_ROW } } : undefined;
 
         row.eachCell((cell: any, colNum: number) => {
           if (rowFill) cell.fill = rowFill;
           cell.font = { size: 10 };
           cell.border = { bottom: { style: "hair", color: { argb: C_BORDER } } };
-          if (colNum === 1)                 cell.alignment = { horizontal: "center" };
+          if (colNum === 1) cell.alignment = { horizontal: "center" };
           if (colNum === 5 || colNum === 6) cell.alignment = { horizontal: "right" };
-          if (colNum === 7)                 cell.alignment = { horizontal: "center" };
-          if (colNum === 8)                 cell.alignment = { horizontal: "right" };
+          if (colNum === 7) cell.alignment = { horizontal: "center" };
+          if (colNum === 8) cell.alignment = { horizontal: "right" };
         });
 
         const priceCell = row.getCell(6);
@@ -543,25 +620,25 @@ export default function BaleProducts() {
       totalRow.height = 22;
       const totalFill = { type: "pattern", pattern: "solid", fgColor: { argb: C_TOTAL } };
       totalRow.eachCell((cell: any, colNum: number) => {
-        cell.fill   = totalFill;
+        cell.fill = totalFill;
         cell.border = {
-          top:    { style: "medium", color: { argb: C_NAVY } },
+          top: { style: "medium", color: { argb: C_NAVY } },
           bottom: { style: "medium", color: { argb: C_NAVY } },
         };
       });
       const labelCell = totalRow.getCell(3);
-      labelCell.font      = { bold: true, size: 11, color: { argb: C_TOTAL_LABEL } };
+      labelCell.font = { bold: true, size: 11, color: { argb: C_TOTAL_LABEL } };
       labelCell.alignment = { horizontal: "left", vertical: "middle" };
       ws.mergeCells(`C${totalRow.number}:F${totalRow.number}`);
 
       const balesTotal = totalRow.getCell(7);
-      balesTotal.font      = { bold: true, size: 12, color: { argb: C_NAVY } };
-      balesTotal.numFmt    = "#,##0";
+      balesTotal.font = { bold: true, size: 12, color: { argb: C_NAVY } };
+      balesTotal.numFmt = "#,##0";
       balesTotal.alignment = { horizontal: "center", vertical: "middle" };
 
       const grandTotal = totalRow.getCell(8);
-      grandTotal.font      = { bold: true, size: 12, color: { argb: C_NAVY } };
-      grandTotal.numFmt    = "#,##0.00";
+      grandTotal.font = { bold: true, size: 12, color: { argb: C_NAVY } };
+      grandTotal.numFmt = "#,##0.00";
       grandTotal.alignment = { horizontal: "right", vertical: "middle" };
 
       // ── Freeze & auto-filter ─────────────────────────────────────────
@@ -598,14 +675,14 @@ export default function BaleProducts() {
 
       const today = new Date().toISOString().slice(0, 10);
 
-      const C_NAVY    = "FF00205B";
-      const C_BLUE    = "FF1F3A6B";
-      const C_ACCENT  = "FF2E75B6";
+      const C_NAVY = "FF00205B";
+      const C_BLUE = "FF1F3A6B";
+      const C_ACCENT = "FF2E75B6";
       const C_ALT_ROW = "FFDCE6F1";
-      const C_WHITE   = "FFFFFFFF";
-      const C_BORDER  = "FFBFBFBF";
-      const C_MUTED   = "FF888888";
-      const C_TOTAL   = "FFE8F0F8";
+      const C_WHITE = "FFFFFFFF";
+      const C_BORDER = "FFBFBFBF";
+      const C_MUTED = "FF888888";
+      const C_TOTAL = "FFE8F0F8";
 
       const wb = new (ExcelJS as any).Workbook();
       wb.creator = "HMD International Group";
@@ -613,12 +690,12 @@ export default function BaleProducts() {
 
       // A=#, B=Article(hidden), C=Name, D=Category, E=Weight, F=Bales
       ws.columns = [
-        { key: "num",      width: 6   },
-        { key: "article",  width: 18, hidden: true },
-        { key: "name",     width: 48  },
-        { key: "category", width: 22  },
-        { key: "weight",   width: 14  },
-        { key: "bales",    width: 14  },
+        { key: "num", width: 6 },
+        { key: "article", width: 18, hidden: true },
+        { key: "name", width: 48 },
+        { key: "category", width: 22 },
+        { key: "weight", width: 14 },
+        { key: "bales", width: 14 },
       ];
 
       // ── Logo ─────────────────────────────────────────────────────────
@@ -627,7 +704,9 @@ export default function BaleProducts() {
         const logoBuffer = await logoRes.arrayBuffer();
         const imageId = wb.addImage({ buffer: logoBuffer, extension: "png" });
         ws.addImage(imageId, { tl: { col: 0, row: 0 }, ext: { width: 180, height: 72 } });
-      } catch { /* logo fetch failed — skip */ }
+      } catch {
+        /* logo fetch failed — skip */
+      }
 
       const addHeaderRow = (text: string, height: number, font: any) => {
         const r = ws.addRow(["", "", text, "", "", ""]);
@@ -639,14 +718,10 @@ export default function BaleProducts() {
         return r;
       };
 
-      addHeaderRow("HMD International Group", 24,
-        { bold: true, size: 16, color: { argb: C_NAVY } });
-      addHeaderRow("Make Your Order", 20,
-        { bold: true, size: 12, color: { argb: C_ACCENT } });
-      addHeaderRow(`Enter quantities in the "Bales" column`, 16,
-        { size: 10, color: { argb: C_MUTED } });
-      addHeaderRow(`Generated: ${today}`, 16,
-        { size: 10, color: { argb: C_MUTED } });
+      addHeaderRow("HMD International Group", 24, { bold: true, size: 16, color: { argb: C_NAVY } });
+      addHeaderRow("Make Your Order", 20, { bold: true, size: 12, color: { argb: C_ACCENT } });
+      addHeaderRow(`Enter quantities in the "Bales" column`, 16, { size: 10, color: { argb: C_MUTED } });
+      addHeaderRow(`Generated: ${today}`, 16, { size: 10, color: { argb: C_MUTED } });
 
       const spacer = ws.addRow(["", "", "", "", "", ""]);
       spacer.height = 6;
@@ -656,20 +731,20 @@ export default function BaleProducts() {
       const hdrRow = ws.addRow(["#", "Article Code", "Name of Item", "Category", "Weight (kg)", "Bales"]);
       hdrRow.height = 22;
       hdrRow.eachCell((cell: any) => {
-        cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: C_BLUE } };
-        cell.font      = { bold: true, color: { argb: C_WHITE }, size: 11 };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: C_BLUE } };
+        cell.font = { bold: true, color: { argb: C_WHITE }, size: 11 };
         cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.border    = {
-          top:    { style: "thin",   color: { argb: C_BLUE } },
+        cell.border = {
+          top: { style: "thin", color: { argb: C_BLUE } },
           bottom: { style: "medium", color: { argb: C_NAVY } },
-          left:   { style: "thin",   color: { argb: C_BLUE } },
-          right:  { style: "thin",   color: { argb: C_BLUE } },
+          left: { style: "thin", color: { argb: C_BLUE } },
+          right: { style: "thin", color: { argb: C_BLUE } },
         };
       });
 
       const DATA_START = 7;
       activeProducts.forEach((p, i) => {
-        const categoryName = p.categoryId ? (categoryMap.get(p.categoryId) || "") : "";
+        const categoryName = p.categoryId ? categoryMap.get(p.categoryId) || "" : "";
         const weight = p.weightPerBaleKg != null ? parseFloat(String(p.weightPerBaleKg)) : "";
 
         const row = ws.addRow([
@@ -678,22 +753,20 @@ export default function BaleProducts() {
           p.name || "",
           categoryName,
           weight,
-          "",   // Bales — blank for user input
+          "", // Bales — blank for user input
         ]);
         row.height = 18;
 
         const isAlt = i % 2 === 1;
-        const rowFill = isAlt
-          ? { type: "pattern", pattern: "solid", fgColor: { argb: C_ALT_ROW } }
-          : undefined;
+        const rowFill = isAlt ? { type: "pattern", pattern: "solid", fgColor: { argb: C_ALT_ROW } } : undefined;
 
         row.eachCell((cell: any, colNum: number) => {
           if (rowFill) cell.fill = rowFill;
           cell.font = { size: 10 };
           cell.border = { bottom: { style: "hair", color: { argb: C_BORDER } } };
-          if (colNum === 1)  cell.alignment = { horizontal: "center" };
-          if (colNum === 5)  cell.alignment = { horizontal: "right" };
-          if (colNum === 6)  cell.alignment = { horizontal: "center" };
+          if (colNum === 1) cell.alignment = { horizontal: "center" };
+          if (colNum === 5) cell.alignment = { horizontal: "right" };
+          if (colNum === 6) cell.alignment = { horizontal: "center" };
         });
         if (weight !== "") row.getCell(5).numFmt = "#,##0.##";
       });
@@ -701,28 +774,30 @@ export default function BaleProducts() {
       // ── Total row ────────────────────────────────────────────────────
       const lastDataRow = DATA_START + activeProducts.length - 1;
       const totalRow = ws.addRow([
-        "", "",
+        "",
+        "",
         "TOTAL ORDER",
-        "", "",
+        "",
+        "",
         { formula: `=SUM(F${DATA_START}:F${lastDataRow})`, result: 0 },
       ]);
       totalRow.height = 22;
       const totalFill = { type: "pattern", pattern: "solid", fgColor: { argb: C_TOTAL } };
       totalRow.eachCell((cell: any) => {
-        cell.fill   = totalFill;
+        cell.fill = totalFill;
         cell.border = {
-          top:    { style: "medium", color: { argb: C_NAVY } },
+          top: { style: "medium", color: { argb: C_NAVY } },
           bottom: { style: "medium", color: { argb: C_NAVY } },
         };
       });
       ws.mergeCells(`C${totalRow.number}:E${totalRow.number}`);
       const labelCell = totalRow.getCell(3);
-      labelCell.font      = { bold: true, size: 11, color: { argb: C_NAVY } };
+      labelCell.font = { bold: true, size: 11, color: { argb: C_NAVY } };
       labelCell.alignment = { horizontal: "left", vertical: "middle" };
 
       const balesTotal = totalRow.getCell(6);
-      balesTotal.font      = { bold: true, size: 12, color: { argb: C_NAVY } };
-      balesTotal.numFmt    = "#,##0";
+      balesTotal.font = { bold: true, size: 12, color: { argb: C_NAVY } };
+      balesTotal.numFmt = "#,##0";
       balesTotal.alignment = { horizontal: "center", vertical: "middle" };
 
       ws.views = [{ state: "frozen", xSplit: 0, ySplit: 6 }];
@@ -768,14 +843,7 @@ export default function BaleProducts() {
         },
       ];
       const ws = XLSX.utils.json_to_sheet(templateData);
-      ws["!cols"] = [
-        { wch: 15 },
-        { wch: 25 },
-        { wch: 20 },
-        { wch: 16 },
-        { wch: 18 },
-        { wch: 18 },
-      ];
+      ws["!cols"] = [{ wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 16 }, { wch: 18 }, { wch: 18 }];
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Bale Products");
       await XLSX.writeFile(wb, "bale_products_template.xlsx");
@@ -808,25 +876,39 @@ export default function BaleProducts() {
 
       const preview: ImportPreviewRow[] = rows.map((row) => {
         const itemNumber = row.itemNumber || row.item_number || row.ItemNumber;
-        let articleCode = (
-          row["Article Code"] || row.articleCode || row.article_code || row.ArticleCode || ""
-        ).toString().trim();
+        let articleCode = (row["Article Code"] || row.articleCode || row.article_code || row.ArticleCode || "")
+          .toString()
+          .trim();
         if (!articleCode && itemNumber) {
           const num = parseInt(String(itemNumber));
           if (!isNaN(num) && num >= 1 && num <= 99) {
             articleCode = `HMD${String(num).padStart(2, "0")}000`;
           }
         }
-        const rawProdPrice = row["Production Price"] ?? row["production price"] ?? row.productionPrice ?? row.production_price ?? row["Cost Price"] ?? row.costPrice ?? null;
-        const rawSellPrice = row["Selling Price"] ?? row["selling price"] ?? row.sellingPrice ?? row.selling_price ?? null;
+        const rawProdPrice =
+          row["Production Price"] ??
+          row["production price"] ??
+          row.productionPrice ??
+          row.production_price ??
+          row["Cost Price"] ??
+          row.costPrice ??
+          null;
+        const rawSellPrice =
+          row["Selling Price"] ?? row["selling price"] ?? row.sellingPrice ?? row.selling_price ?? null;
         return {
           articleCode: articleCode || "",
-          name: (row["Name"] || row.name || row.Name || row["Product Name"] || row.product_name || "").toString().trim(),
+          name: (row["Name"] || row.name || row.Name || row["Product Name"] || row.product_name || "")
+            .toString()
+            .trim(),
           category: (row.category || row.Category || row.category_name || "").toString().trim(),
           description: (row.description || row.Description || "").toString().trim(),
-          weightPerBaleKg: (row["Weight Per Bale"] || row.weightPerBaleKg || row.weight_per_bale_kg || row.weight || "").toString() || undefined,
-          productionPrice: rawProdPrice !== null && rawProdPrice !== "" ? parseFloat(String(rawProdPrice)) || undefined : undefined,
-          sellingPrice: rawSellPrice !== null && rawSellPrice !== "" ? parseFloat(String(rawSellPrice)) || undefined : undefined,
+          weightPerBaleKg:
+            (row["Weight Per Bale"] || row.weightPerBaleKg || row.weight_per_bale_kg || row.weight || "").toString() ||
+            undefined,
+          productionPrice:
+            rawProdPrice !== null && rawProdPrice !== "" ? parseFloat(String(rawProdPrice)) || undefined : undefined,
+          sellingPrice:
+            rawSellPrice !== null && rawSellPrice !== "" ? parseFloat(String(rawSellPrice)) || undefined : undefined,
           active: row.active === undefined ? true : Boolean(row.active),
         };
       });
@@ -912,17 +994,26 @@ export default function BaleProducts() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuLabel className="text-xs text-muted-foreground">Categories</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => setShowCategories(!showCategories)} data-testid="menu-manage-categories">
+                  <DropdownMenuItem
+                    onClick={() => setShowCategories(!showCategories)}
+                    data-testid="menu-manage-categories"
+                  >
                     <Tags className="h-4 w-4 mr-2" />
                     {showCategories ? "Hide Categories" : "Manage Categories"}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-xs text-muted-foreground">Make Your Order</DropdownMenuLabel>
-                  <DropdownMenuItem onClick={() => handleExportExcel("selling")} data-testid="menu-export-selling-price">
+                  <DropdownMenuItem
+                    onClick={() => handleExportExcel("selling")}
+                    data-testid="menu-export-selling-price"
+                  >
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
                     Selling Price
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportExcel("production")} data-testid="menu-export-production-price">
+                  <DropdownMenuItem
+                    onClick={() => handleExportExcel("production")}
+                    data-testid="menu-export-production-price"
+                  >
                     <FileSpreadsheet className="h-4 w-4 mr-2" />
                     Production Price
                   </DropdownMenuItem>
@@ -1014,7 +1105,9 @@ export default function BaleProducts() {
                             />
                             <Button
                               size="sm"
-                              onClick={() => updateCategoryMutation.mutate({ id: cat.id, name: editingCategory.name.trim() })}
+                              onClick={() =>
+                                updateCategoryMutation.mutate({ id: cat.id, name: editingCategory.name.trim() })
+                              }
                               disabled={!editingCategory.name.trim()}
                               data-testid={`button-save-category-${cat.id}`}
                             >
@@ -1028,17 +1121,24 @@ export default function BaleProducts() {
                           <>
                             <button
                               className="flex items-center gap-2 flex-1 text-left min-w-0"
-                              onClick={() => setExpandedCategories((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(cat.id)) next.delete(cat.id); else next.add(cat.id);
-                                return next;
-                              })}
+                              onClick={() =>
+                                setExpandedCategories((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(cat.id)) next.delete(cat.id);
+                                  else next.add(cat.id);
+                                  return next;
+                                })
+                              }
                               data-testid={`button-expand-category-${cat.id}`}
                             >
-                              {isExpanded
-                                ? <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                                : <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />}
-                              <span className="font-medium" data-testid={`text-category-${cat.id}`}>{cat.name}</span>
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                              )}
+                              <span className="font-medium" data-testid={`text-category-${cat.id}`}>
+                                {cat.name}
+                              </span>
                               {!cat.isActive && <Badge variant="outline">Inactive</Badge>}
                               <span className="text-xs text-muted-foreground ml-1">({catProducts.length})</span>
                             </button>
@@ -1073,29 +1173,61 @@ export default function BaleProducts() {
                             <table className="w-full text-sm">
                               <thead className="sticky top-0 z-30 bg-muted/50">
                                 <tr className="border-b bg-muted/10">
-                                  <th className="text-left px-4 py-1.5 text-xs font-medium text-muted-foreground">Code</th>
-                                  <th className="text-left px-4 py-1.5 text-xs font-medium text-muted-foreground">Name</th>
-                                  {!hideAvgRate && <th className="text-right px-4 py-1.5 text-xs font-medium text-muted-foreground">Prod. Price</th>}
-                                  {!hideSellingPriceBP && <th className="text-right px-4 py-1.5 text-xs font-medium text-muted-foreground">Sell Price</th>}
-                                  <th className="text-right px-4 py-1.5 text-xs font-medium text-muted-foreground">Wt/Bale</th>
+                                  <th className="text-left px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                                    Code
+                                  </th>
+                                  <th className="text-left px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                                    Name
+                                  </th>
+                                  {!hideAvgRate && (
+                                    <th className="text-right px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                                      Prod. Price
+                                    </th>
+                                  )}
+                                  {!hideSellingPriceBP && (
+                                    <th className="text-right px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                                      Sell Price
+                                    </th>
+                                  )}
+                                  <th className="text-right px-4 py-1.5 text-xs font-medium text-muted-foreground">
+                                    Wt/Bale
+                                  </th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {catProducts.map((p) => (
-                                  <tr key={p.id} className="border-b last:border-0 hover-elevate" data-testid={`row-cat-product-${p.id}`}>
-                                    <td className="px-4 py-1.5 font-mono text-xs text-muted-foreground">{p.articleCode}</td>
+                                  <tr
+                                    key={p.id}
+                                    className="border-b last:border-0 hover-elevate"
+                                    data-testid={`row-cat-product-${p.id}`}
+                                  >
+                                    <td className="px-4 py-1.5 font-mono text-xs text-muted-foreground">
+                                      {p.articleCode}
+                                    </td>
                                     <td className="px-4 py-1.5 font-medium">
                                       {p.name}
-                                      {p.active === false && <Badge variant="outline" className="ml-2 text-xs">Hidden</Badge>}
+                                      {p.active === false && (
+                                        <Badge variant="outline" className="ml-2 text-xs">
+                                          Hidden
+                                        </Badge>
+                                      )}
                                     </td>
                                     {!hideAvgRate && (
                                       <td className="px-4 py-1.5 text-right tabular-nums text-xs">
-                                        {parseFloat(p.productionPrice || "0") > 0 ? `$${parseFloat(p.productionPrice!).toFixed(2)}` : <span className="text-muted-foreground">—</span>}
+                                        {parseFloat(p.productionPrice || "0") > 0 ? (
+                                          `$${parseFloat(p.productionPrice!).toFixed(2)}`
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
                                       </td>
                                     )}
                                     {!hideSellingPriceBP && (
                                       <td className="px-4 py-1.5 text-right tabular-nums text-xs">
-                                        {parseFloat(p.sellingPrice || "0") > 0 ? `$${parseFloat(p.sellingPrice!).toFixed(2)}` : <span className="text-muted-foreground">—</span>}
+                                        {parseFloat(p.sellingPrice || "0") > 0 ? (
+                                          `$${parseFloat(p.sellingPrice!).toFixed(2)}`
+                                        ) : (
+                                          <span className="text-muted-foreground">—</span>
+                                        )}
                                       </td>
                                     )}
                                     <td className="px-4 py-1.5 text-right tabular-nums text-xs text-muted-foreground">
@@ -1152,7 +1284,12 @@ export default function BaleProducts() {
                     Unhide ({selectedHiddenIds.length})
                   </Button>
                 )}
-                <Button size="icon" variant="ghost" onClick={() => setSelectedIds(new Set())} data-testid="button-clear-selection">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setSelectedIds(new Set())}
+                  data-testid="button-clear-selection"
+                >
                   <X className="h-4 w-4" />
                 </Button>
               </>
@@ -1163,7 +1300,10 @@ export default function BaleProducts() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
               <Input
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setSelectedIds(new Set()); }}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setSelectedIds(new Set());
+                }}
                 placeholder="Search by name or code..."
                 className="pl-8 w-52 h-8 text-sm"
                 data-testid="input-search-products"
@@ -1171,7 +1311,10 @@ export default function BaleProducts() {
               {searchQuery && (
                 <button
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  onClick={() => { setSearchQuery(""); setSelectedIds(new Set()); }}
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSelectedIds(new Set());
+                  }}
                   data-testid="button-clear-search"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -1181,7 +1324,10 @@ export default function BaleProducts() {
             {categories && categories.length > 0 && (
               <Select
                 value={filterCategoryId === null ? "all" : String(filterCategoryId)}
-                onValueChange={(val) => { setFilterCategoryId(val === "all" ? null : Number(val)); setSelectedIds(new Set()); }}
+                onValueChange={(val) => {
+                  setFilterCategoryId(val === "all" ? null : Number(val));
+                  setSelectedIds(new Set());
+                }}
               >
                 <SelectTrigger className="w-40 h-8 text-sm" data-testid="select-filter-category">
                   <SelectValue placeholder="All categories" />
@@ -1189,7 +1335,9 @@ export default function BaleProducts() {
                 <SelectContent>
                   <SelectItem value="all">All categories</SelectItem>
                   {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                    <SelectItem key={cat.id} value={String(cat.id)}>
+                      {cat.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1197,7 +1345,10 @@ export default function BaleProducts() {
             {distinctWeights.length > 0 && (
               <Select
                 value={filterWeight === null ? "all" : filterWeight}
-                onValueChange={(val) => { setFilterWeight(val === "all" ? null : val); setSelectedIds(new Set()); }}
+                onValueChange={(val) => {
+                  setFilterWeight(val === "all" ? null : val);
+                  setSelectedIds(new Set());
+                }}
               >
                 <SelectTrigger className="w-32 h-8 text-sm" data-testid="select-filter-weight">
                   <SelectValue placeholder="All weights" />
@@ -1205,23 +1356,36 @@ export default function BaleProducts() {
                 <SelectContent>
                   <SelectItem value="all">All weights</SelectItem>
                   {distinctWeights.map((w) => (
-                    <SelectItem key={w} value={w}>{w} kg</SelectItem>
+                    <SelectItem key={w} value={w}>
+                      {w} kg
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
             {(() => {
-              const activeFilterCount = (showZeroPrice && !hideSellingPriceBP ? 1 : 0) + (showNoColor && noColorCount > 0 ? 1 : 0) + (showHidden && hiddenProducts && hiddenProducts.length > 0 ? 1 : 0);
-              const hasAnyFilter = (!hideSellingPriceBP) || (noColorCount > 0) || (hiddenProducts && hiddenProducts.length > 0);
+              const activeFilterCount =
+                (showZeroPrice && !hideSellingPriceBP ? 1 : 0) +
+                (showNoColor && noColorCount > 0 ? 1 : 0) +
+                (showHidden && hiddenProducts && hiddenProducts.length > 0 ? 1 : 0);
+              const hasAnyFilter =
+                !hideSellingPriceBP || noColorCount > 0 || (hiddenProducts && hiddenProducts.length > 0);
               if (!hasAnyFilter) return null;
               return (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="sm" variant={activeFilterCount > 0 ? "default" : "outline"} className="h-8" data-testid="button-filters-dropdown">
+                    <Button
+                      size="sm"
+                      variant={activeFilterCount > 0 ? "default" : "outline"}
+                      className="h-8"
+                      data-testid="button-filters-dropdown"
+                    >
                       <AlertCircle className="h-3.5 w-3.5 mr-1.5" />
                       Filters
                       {activeFilterCount > 0 && (
-                        <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs no-default-active-elevate">{activeFilterCount}</Badge>
+                        <Badge variant="secondary" className="ml-1.5 px-1.5 py-0 text-xs no-default-active-elevate">
+                          {activeFilterCount}
+                        </Badge>
                       )}
                       <ChevronDown className="h-3 w-3 ml-1" />
                     </Button>
@@ -1230,7 +1394,10 @@ export default function BaleProducts() {
                     <DropdownMenuLabel className="text-xs text-muted-foreground">Show in list</DropdownMenuLabel>
                     {!hideSellingPriceBP && (
                       <DropdownMenuItem
-                        onClick={() => { setShowZeroPrice(v => !v); setSelectedIds(new Set()); }}
+                        onClick={() => {
+                          setShowZeroPrice((v) => !v);
+                          setSelectedIds(new Set());
+                        }}
                         data-testid="menu-filter-unpriced"
                         className="flex items-center justify-between"
                       >
@@ -1243,7 +1410,10 @@ export default function BaleProducts() {
                     )}
                     {noColorCount > 0 && (
                       <DropdownMenuItem
-                        onClick={() => { setShowNoColor(v => !v); setSelectedIds(new Set()); }}
+                        onClick={() => {
+                          setShowNoColor((v) => !v);
+                          setSelectedIds(new Set());
+                        }}
                         data-testid="menu-filter-no-color"
                         className="flex items-center justify-between"
                       >
@@ -1256,7 +1426,10 @@ export default function BaleProducts() {
                     )}
                     {hiddenProducts && hiddenProducts.length > 0 && (
                       <DropdownMenuItem
-                        onClick={() => { setShowHidden(!showHidden); setSelectedIds(new Set()); }}
+                        onClick={() => {
+                          setShowHidden(!showHidden);
+                          setSelectedIds(new Set());
+                        }}
                         data-testid="menu-filter-hidden"
                         className="flex items-center justify-between"
                       >
@@ -1287,13 +1460,31 @@ export default function BaleProducts() {
                   <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                     <TableHead className="w-8"></TableHead>
                     <TableHead className="w-8"></TableHead>
-                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Article Code</TableHead>
-                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</TableHead>
-                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</TableHead>
-                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Wt/Bale (kg)</TableHead>
-                    {!hideAvgRate && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Prod. Price</TableHead>}
-                    {!hideSellingPriceBP && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sell Price</TableHead>}
-                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Count</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Article Code
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Name
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Category
+                    </TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Wt/Bale (kg)
+                    </TableHead>
+                    {!hideAvgRate && (
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Prod. Price
+                      </TableHead>
+                    )}
+                    {!hideSellingPriceBP && (
+                      <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        Sell Price
+                      </TableHead>
+                    )}
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Count
+                    </TableHead>
                     <TableHead className="w-[60px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1332,7 +1523,11 @@ export default function BaleProducts() {
                       </TableRow>
                       {expandedGroups.has(group._key) &&
                         group.items.map((product) => (
-                          <TableRow key={product.id} className={`bg-muted/30 ${selectedIds.has(product.id) ? "bg-muted/60" : ""}`} data-testid={`row-product-${product.id}`}>
+                          <TableRow
+                            key={product.id}
+                            className={`bg-muted/30 ${selectedIds.has(product.id) ? "bg-muted/60" : ""}`}
+                            data-testid={`row-product-${product.id}`}
+                          >
                             <TableCell onClick={(e) => e.stopPropagation()}>
                               <Checkbox
                                 checked={selectedIds.has(product.id)}
@@ -1351,7 +1546,9 @@ export default function BaleProducts() {
                                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                     <button
                                       title="No color"
-                                      onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })}
+                                      onClick={() =>
+                                        colorUpdateMutation.mutate({ id: product.id, labelDesignColor: null })
+                                      }
                                       className={`w-5 h-5 rounded-full border border-border flex items-center justify-center transition-all ${!product.labelDesignColor ? "ring-1 ring-offset-1 ring-primary" : "opacity-50 hover:opacity-100"}`}
                                       data-testid={`button-color-none-${product.id}`}
                                     >
@@ -1361,9 +1558,14 @@ export default function BaleProducts() {
                                       <button
                                         key={opt.value}
                                         title={opt.label}
-                                        onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })}
+                                        onClick={() =>
+                                          colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })
+                                        }
                                         className={`w-5 h-5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
-                                        style={{ backgroundColor: opt.color, borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color }}
+                                        style={{
+                                          backgroundColor: opt.color,
+                                          borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color,
+                                        }}
                                         data-testid={`button-color-${opt.value}-${product.id}`}
                                       />
                                     ))}
@@ -1379,12 +1581,16 @@ export default function BaleProducts() {
                             </TableCell>
                             {!hideAvgRate && (
                               <TableCell className="text-right text-sm font-mono text-muted-foreground">
-                                {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
+                                {product.productionPrice && parseFloat(product.productionPrice) > 0
+                                  ? parseFloat(product.productionPrice).toLocaleString()
+                                  : "—"}
                               </TableCell>
                             )}
                             {!hideSellingPriceBP && (
                               <TableCell className="text-right text-sm font-mono text-muted-foreground">
-                                {product.sellingPrice && parseFloat(product.sellingPrice) > 0 ? parseFloat(product.sellingPrice).toLocaleString() : "—"}
+                                {product.sellingPrice && parseFloat(product.sellingPrice) > 0
+                                  ? parseFloat(product.sellingPrice).toLocaleString()
+                                  : "—"}
                               </TableCell>
                             )}
                             <TableCell></TableCell>
@@ -1393,7 +1599,10 @@ export default function BaleProducts() {
                                 <Button
                                   size="icon"
                                   variant="ghost"
-                                  onClick={(e) => { e.stopPropagation(); setEditingProduct(product); }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setEditingProduct(product);
+                                  }}
                                   data-testid={`button-edit-product-${product.id}`}
                                 >
                                   <Pencil className="h-4 w-4" />
@@ -1420,19 +1629,41 @@ export default function BaleProducts() {
                       data-testid="checkbox-select-all"
                     />
                   </TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Article Code</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</TableHead>
-                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</TableHead>
-                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Wt/Bale (kg)</TableHead>
-                  {!hideAvgRate && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Prod. Price</TableHead>}
-                  {!hideSellingPriceBP && <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">Sell Price</TableHead>}
-                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Status</TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Article Code
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Name
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Category
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Wt/Bale (kg)
+                  </TableHead>
+                  {!hideAvgRate && (
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Prod. Price
+                    </TableHead>
+                  )}
+                  {!hideSellingPriceBP && (
+                    <TableHead className="text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Sell Price
+                    </TableHead>
+                  )}
+                  <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Status
+                  </TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {activeProducts.map((product) => (
-                  <TableRow key={product.id} data-testid={`row-product-${product.id}`} className={selectedIds.has(product.id) ? "bg-muted/50" : ""}>
+                  <TableRow
+                    key={product.id}
+                    data-testid={`row-product-${product.id}`}
+                    className={selectedIds.has(product.id) ? "bg-muted/50" : ""}
+                  >
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selectedIds.has(product.id)}
@@ -1458,9 +1689,14 @@ export default function BaleProducts() {
                               <button
                                 key={opt.value}
                                 title={opt.label}
-                                onClick={() => colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })}
+                                onClick={() =>
+                                  colorUpdateMutation.mutate({ id: product.id, labelDesignColor: opt.value })
+                                }
                                 className={`w-5 h-5 rounded-full border transition-all ${product.labelDesignColor === opt.value ? "ring-1 ring-offset-1 ring-primary opacity-100" : "opacity-50 hover:opacity-100"}`}
-                                style={{ backgroundColor: opt.color, borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color }}
+                                style={{
+                                  backgroundColor: opt.color,
+                                  borderColor: opt.color === "#F5F5F5" ? "#ccc" : opt.color,
+                                }}
                                 data-testid={`button-color-${opt.value}-${product.id}`}
                               />
                             ))}
@@ -1474,12 +1710,16 @@ export default function BaleProducts() {
                     <TableCell className="text-right font-mono">{product.weightPerBaleKg || "-"}</TableCell>
                     {!hideAvgRate && (
                       <TableCell className="text-right font-mono">
-                        {product.productionPrice && parseFloat(product.productionPrice) > 0 ? parseFloat(product.productionPrice).toLocaleString() : "—"}
+                        {product.productionPrice && parseFloat(product.productionPrice) > 0
+                          ? parseFloat(product.productionPrice).toLocaleString()
+                          : "—"}
                       </TableCell>
                     )}
                     {!hideSellingPriceBP && (
                       <TableCell className="text-right font-mono">
-                        {product.sellingPrice && parseFloat(product.sellingPrice) > 0 ? parseFloat(product.sellingPrice).toLocaleString() : "—"}
+                        {product.sellingPrice && parseFloat(product.sellingPrice) > 0
+                          ? parseFloat(product.sellingPrice).toLocaleString()
+                          : "—"}
                       </TableCell>
                     )}
                     <TableCell>
@@ -1511,7 +1751,9 @@ export default function BaleProducts() {
             <div className="border-t">
               <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/10">
                 <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hidden Products ({hiddenProducts.length})</span>
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Hidden Products ({hiddenProducts.length})
+                </span>
               </div>
               <Table wrapperClassName="max-h-[400px] overflow-auto">
                 <TableHeader className="sticky top-0 z-30">
@@ -1523,15 +1765,25 @@ export default function BaleProducts() {
                         data-testid="checkbox-select-all-hidden"
                       />
                     </TableHead>
-                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Article Code</TableHead>
-                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</TableHead>
-                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Article Code
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Name
+                    </TableHead>
+                    <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                      Category
+                    </TableHead>
                     <TableHead className="w-[100px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {hiddenProducts.map((product) => (
-                    <TableRow key={product.id} className={selectedIds.has(product.id) ? "bg-muted/50" : ""} data-testid={`row-hidden-product-${product.id}`}>
+                    <TableRow
+                      key={product.id}
+                      className={selectedIds.has(product.id) ? "bg-muted/50" : ""}
+                      data-testid={`row-hidden-product-${product.id}`}
+                    >
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={selectedIds.has(product.id)}
@@ -1587,13 +1839,16 @@ export default function BaleProducts() {
         }}
       />
 
-      <Dialog open={!!editingProduct} onOpenChange={(open) => { if (!open) setEditingProduct(null); }}>
+      <Dialog
+        open={!!editingProduct}
+        onOpenChange={(open) => {
+          if (!open) setEditingProduct(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Product</DialogTitle>
-            <DialogDescription>
-              Update product details. Changes will cascade to related bales.
-            </DialogDescription>
+            <DialogDescription>Update product details. Changes will cascade to related bales.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -1715,18 +1970,22 @@ export default function BaleProducts() {
               </div>
               {editForm.labelDesignColor && (
                 <p className="text-xs text-muted-foreground">
-                  Labels for this product will print with the <span className="font-medium">{designColors.find(o => o.value === editForm.labelDesignColor)?.label}</span> design automatically.
+                  Labels for this product will print with the{" "}
+                  <span className="font-medium">
+                    {designColors.find((o) => o.value === editForm.labelDesignColor)?.label}
+                  </span>{" "}
+                  design automatically.
                 </p>
               )}
               {!editForm.labelDesignColor && (
-                <p className="text-xs text-muted-foreground">
-                  Labels will print with no design banner.
-                </p>
+                <p className="text-xs text-muted-foreground">Labels will print with no design banner.</p>
               )}
             </div>
             <div className="flex items-start gap-2 p-3 rounded-md bg-muted text-sm text-muted-foreground">
               <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>Changes to name, weight, and article code will also update all existing bales using this product.</span>
+              <span>
+                Changes to name, weight, and article code will also update all existing bales using this product.
+              </span>
             </div>
             <div className="flex justify-between gap-2">
               <Button
@@ -1741,7 +2000,11 @@ export default function BaleProducts() {
                 {deleteProductMutation.isPending ? "Deleting..." : "Delete"}
               </Button>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setEditingProduct(null)} data-testid="button-cancel-edit-product">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingProduct(null)}
+                  data-testid="button-cancel-edit-product"
+                >
                   Cancel
                 </Button>
                 <Button
@@ -1762,7 +2025,8 @@ export default function BaleProducts() {
           <DialogHeader>
             <DialogTitle>Import Preview</DialogTitle>
             <DialogDescription>
-              Review the {importPreview.length} product(s) to import. Existing products (by Article Code) will be updated.
+              Review the {importPreview.length} product(s) to import. Existing products (by Article Code) will be
+              updated.
             </DialogDescription>
           </DialogHeader>
 
@@ -1789,7 +2053,9 @@ export default function BaleProducts() {
                   <TableCell>{row.name}</TableCell>
                   <TableCell className="text-muted-foreground">{row.category || "Uncategorized"}</TableCell>
                   <TableCell>{row.weightPerBaleKg || "-"}</TableCell>
-                  <TableCell>{row.productionPrice != null ? Number(row.productionPrice).toLocaleString() : "-"}</TableCell>
+                  <TableCell>
+                    {row.productionPrice != null ? Number(row.productionPrice).toLocaleString() : "-"}
+                  </TableCell>
                   <TableCell>{row.sellingPrice != null ? Number(row.sellingPrice).toLocaleString() : "-"}</TableCell>
                   <TableCell className="text-muted-foreground">{row.description || "-"}</TableCell>
                 </TableRow>
@@ -1798,7 +2064,15 @@ export default function BaleProducts() {
           </Table>
 
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportFile(null); setImportPreview([]); }} data-testid="button-cancel-import">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportDialogOpen(false);
+                setImportFile(null);
+                setImportPreview([]);
+              }}
+              data-testid="button-cancel-import"
+            >
               Cancel
             </Button>
             <Button
@@ -1813,8 +2087,13 @@ export default function BaleProducts() {
       </Dialog>
       <DeleteConfirmDialog
         open={!!pendingDelete}
-        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
-        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          pendingDelete?.();
+          setPendingDelete(null);
+        }}
       />
     </div>
   );

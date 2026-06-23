@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,13 +15,7 @@ interface ConfirmPasswordDialogProps {
   description?: string;
 }
 
-export function ConfirmPasswordDialog({
-  open,
-  onClose,
-  onConfirmed,
-  action,
-  description,
-}: ConfirmPasswordDialogProps) {
+export function ConfirmPasswordDialog({ open, onClose, onConfirmed, action, description }: ConfirmPasswordDialogProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -76,9 +64,7 @@ export function ConfirmPasswordDialog({
             <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div className="text-sm text-amber-800 dark:text-amber-300">
               <p className="font-medium">{action}</p>
-              {description && (
-                <p className="text-xs mt-0.5 opacity-80">{description}</p>
-              )}
+              {description && <p className="text-xs mt-0.5 opacity-80">{description}</p>}
             </div>
           </div>
 
@@ -111,11 +97,7 @@ export function ConfirmPasswordDialog({
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={loading || !password}
-              data-testid="button-submit-confirm-password"
-            >
+            <Button type="submit" disabled={loading || !password} data-testid="button-submit-confirm-password">
               {loading ? "Verifying…" : "Confirm"}
             </Button>
           </DialogFooter>

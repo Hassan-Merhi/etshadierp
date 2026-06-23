@@ -10,9 +10,7 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { formatNumber } from "@/lib/formatNumber";
 
-import {
-  SupplierCategoriesDialog,
-} from "./production-raw-stock/ProductionRawStockHelpers";
+import { SupplierCategoriesDialog } from "./production-raw-stock/ProductionRawStockHelpers";
 import { RawStockTable } from "./production-raw-stock/RawStockTable";
 import { MixBatchList } from "./production-raw-stock/MixBatchList";
 import { KpiCards } from "./production-raw-stock/KpiCards";
@@ -157,9 +155,15 @@ export default function ProductionRawStock() {
     const rs = rawStock || [];
     return {
       totalReceived: rs.reduce((sum, r) => sum + parseFloat(r.receivedKg || "0"), 0),
-      totalReceivedValue: rs.reduce((sum, r) => sum + parseFloat(r.receivedKg || "0") * (parseFloat(r.costPerKgUsd || r.costPerKg || "0")), 0),
+      totalReceivedValue: rs.reduce(
+        (sum, r) => sum + parseFloat(r.receivedKg || "0") * parseFloat(r.costPerKgUsd || r.costPerKg || "0"),
+        0
+      ),
       totalUsed: rs.reduce((sum, r) => sum + parseFloat(r.usedKg || "0"), 0),
-      totalUsedValue: rs.reduce((sum, r) => sum + parseFloat(r.usedKg || "0") * (parseFloat(r.costPerKgUsd || r.costPerKg || "0")), 0),
+      totalUsedValue: rs.reduce(
+        (sum, r) => sum + parseFloat(r.usedKg || "0") * parseFloat(r.costPerKgUsd || r.costPerKg || "0"),
+        0
+      ),
       totalFree: rs.reduce((sum, r) => sum + parseFloat(r.freeKg || "0"), 0),
       totalValue: rs.reduce((sum, r) => sum + parseFloat(r.valueRemainingUsd || r.valueRemaining || "0"), 0),
     };
@@ -174,11 +178,16 @@ export default function ProductionRawStock() {
           </div>
           <div>
             <h1 className="text-lg font-bold leading-tight">Raw Production</h1>
-            <p className="text-xs text-muted-foreground leading-tight">Raw stock inventory and daily mix batch management</p>
+            <p className="text-xs text-muted-foreground leading-tight">
+              Raw stock inventory and daily mix batch management
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={() => setOffloadDialogOpen(true)} className="bg-emerald-600 hover:bg-emerald-600 text-white gap-2">
+          <Button
+            onClick={() => setOffloadDialogOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-600 text-white gap-2"
+          >
             <ArrowDown className="h-4 w-4" /> Offload Container
           </Button>
           <Button variant="outline" onClick={() => setObDialogOpen(true)} className="gap-2">
@@ -196,18 +205,29 @@ export default function ProductionRawStock() {
         <section className="space-y-4">
           <RawStockTable
             rawStock={rawStock || []}
-            onAdjust={(row) => { setAdjIsNewMaterial(false); setAdjustingRow(row); setAdjustDialogOpen(true); }}
-            onDeduct={(row) => { setDeductingRow(row); setDeductDialogOpen(true); }}
-            onAddToBatch={(row) => { 
-                setAddToBatchSource({
-                    supplierId: row.supplierId,
-                    supplierName: row.supplierName,
-                    costPerKg: String(parseFloat(row.costPerKgUsd || row.costPerKg || "0")),
-                    remainingKg: row.freeKg || row.remainingKg || "0"
-                }); 
-                setAddToBatchOpen(true); 
+            onAdjust={(row) => {
+              setAdjIsNewMaterial(false);
+              setAdjustingRow(row);
+              setAdjustDialogOpen(true);
             }}
-            onNewMaterial={() => { setAdjIsNewMaterial(true); setAdjustingRow(null); setAdjustDialogOpen(true); }}
+            onDeduct={(row) => {
+              setDeductingRow(row);
+              setDeductDialogOpen(true);
+            }}
+            onAddToBatch={(row) => {
+              setAddToBatchSource({
+                supplierId: row.supplierId,
+                supplierName: row.supplierName,
+                costPerKg: String(parseFloat(row.costPerKgUsd || row.costPerKg || "0")),
+                remainingKg: row.freeKg || row.remainingKg || "0",
+              });
+              setAddToBatchOpen(true);
+            }}
+            onNewMaterial={() => {
+              setAdjIsNewMaterial(true);
+              setAdjustingRow(null);
+              setAdjustDialogOpen(true);
+            }}
           />
         </section>
 

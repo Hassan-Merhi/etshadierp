@@ -1,17 +1,6 @@
 import { useState } from "react";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -211,12 +200,7 @@ export function StockItemCombobox({
                   }}
                   data-testid={`option-stock-item-${item.id}`}
                 >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value?.id === item.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
+                  <Check className={cn("mr-2 h-4 w-4", value?.id === item.id ? "opacity-100" : "opacity-0")} />
                   {item.name}
                 </CommandItem>
               ))}
@@ -299,9 +283,7 @@ export function AccountCombobox({
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value?.type === account.type && value?.id === account.id
-                        ? "opacity-100"
-                        : "opacity-0"
+                      value?.type === account.type && value?.id === account.id ? "opacity-100" : "opacity-0"
                     )}
                   />
                   {account.name}

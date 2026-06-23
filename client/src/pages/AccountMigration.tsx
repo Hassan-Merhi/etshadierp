@@ -9,17 +9,30 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import {
-  ArrowRight, Building2, BookOpen, AlertTriangle, CheckCircle, BarChart3, FileText,
-  ChevronsUpDown, Check, Wallet, Undo2, X, ChevronDown, ChevronUp,
+  ArrowRight,
+  Building2,
+  BookOpen,
+  AlertTriangle,
+  CheckCircle,
+  BarChart3,
+  FileText,
+  ChevronsUpDown,
+  Check,
+  Wallet,
+  Undo2,
+  X,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Company, LedgerAccount } from "@shared/schema";
@@ -80,9 +93,12 @@ function CompanyBadge({ company }: { company?: Company }) {
     factory_v2: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
     properties: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
   };
-  const label = company.companyType === "erp" ? "ERP"
-    : company.companyType === "factory" || company.companyType === "factory_v2" ? "Factory"
-    : "Properties";
+  const label =
+    company.companyType === "erp"
+      ? "ERP"
+      : company.companyType === "factory" || company.companyType === "factory_v2"
+        ? "Factory"
+        : "Properties";
   return (
     <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${typeColors[company.companyType] ?? typeColors.erp}`}>
       {label}
@@ -105,7 +121,7 @@ function AccountMultiSelect({ accounts, selectedIds, onChange, disabled }: Accou
   const sorted = [...accounts].sort((a, b) => a.name.localeCompare(b.name));
 
   function toggle(id: number) {
-    if (selectedSet.has(id)) onChange(selectedIds.filter(x => x !== id));
+    if (selectedSet.has(id)) onChange(selectedIds.filter((x) => x !== id));
     else onChange([...selectedIds, id]);
   }
 
@@ -135,7 +151,7 @@ function AccountMultiSelect({ accounts, selectedIds, onChange, disabled }: Accou
             <CommandList className="max-h-80">
               <CommandEmpty>No accounts found.</CommandEmpty>
               <CommandGroup>
-                {sorted.map(a => {
+                {sorted.map((a) => {
                   const selected = selectedSet.has(a.id);
                   return (
                     <CommandItem
@@ -144,14 +160,18 @@ function AccountMultiSelect({ accounts, selectedIds, onChange, disabled }: Accou
                       onSelect={() => toggle(a.id)}
                       className="flex items-center gap-2"
                     >
-                      <div className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                        selected ? "bg-primary border-primary" : "border-muted-foreground/40"
-                      )}>
+                      <div
+                        className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+                          selected ? "bg-primary border-primary" : "border-muted-foreground/40"
+                        )}
+                      >
                         {selected && <Check className="h-3 w-3 text-primary-foreground" />}
                       </div>
                       <span className="flex-1 truncate">{a.name}</span>
-                      <Badge variant="secondary" className="text-xs shrink-0">{a.accountType}</Badge>
+                      <Badge variant="secondary" className="text-xs shrink-0">
+                        {a.accountType}
+                      </Badge>
                     </CommandItem>
                   );
                 })}
@@ -164,7 +184,10 @@ function AccountMultiSelect({ accounts, selectedIds, onChange, disabled }: Accou
                 size="sm"
                 variant="ghost"
                 className="text-xs text-muted-foreground"
-                onClick={() => { onChange([]); setOpen(false); }}
+                onClick={() => {
+                  onChange([]);
+                  setOpen(false);
+                }}
               >
                 Clear all
               </Button>
@@ -176,14 +199,11 @@ function AccountMultiSelect({ accounts, selectedIds, onChange, disabled }: Accou
       {/* Selected account chips */}
       {selectedIds.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {selectedIds.map(id => {
-            const acc = accounts.find(a => a.id === id);
+          {selectedIds.map((id) => {
+            const acc = accounts.find((a) => a.id === id);
             if (!acc) return null;
             return (
-              <div
-                key={id}
-                className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-sm max-w-[240px]"
-              >
+              <div key={id} className="flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-sm max-w-[240px]">
                 <span className="font-mono text-xs text-muted-foreground shrink-0">{acc.code}</span>
                 <span className="truncate">{acc.name}</span>
                 <button
@@ -211,21 +231,28 @@ function AccountPreviewRow({ item }: { item: AccountPreviewItem }) {
     <div className="rounded-md border">
       <button
         className="w-full flex items-center justify-between gap-2 p-3 text-left hover-elevate"
-        onClick={() => setExpanded(v => !v)}
+        onClick={() => setExpanded((v) => !v)}
       >
         <div className="flex items-center gap-2 min-w-0">
           <BookOpen className="h-4 w-4 text-muted-foreground shrink-0" />
           <span className="font-medium truncate">{item.account.name}</span>
           <span className="font-mono text-xs text-muted-foreground shrink-0">{item.account.code}</span>
           {item.codeConflict && (
-            <Badge variant="outline" className="text-xs text-amber-700 border-amber-300 dark:text-amber-300 dark:border-amber-700 shrink-0">
+            <Badge
+              variant="outline"
+              className="text-xs text-amber-700 border-amber-300 dark:text-amber-300 dark:border-amber-700 shrink-0"
+            >
               Renamed
             </Badge>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="text-xs text-muted-foreground">{item.entryCount} entries</span>
-          {expanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          {expanded ? (
+            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+          )}
         </div>
       </button>
       {expanded && (
@@ -254,7 +281,9 @@ function AccountPreviewRow({ item }: { item: AccountPreviewItem }) {
           )}
           {item.codeConflict && (
             <p className="text-xs text-amber-700 dark:text-amber-300">
-              Code <span className="font-mono">{item.account.code}</span> conflicts with existing account "{item.codeConflict.name}" — will be renamed to <span className="font-mono">{item.account.code}-MIGRATED</span>
+              Code <span className="font-mono">{item.account.code}</span> conflicts with existing account "
+              {item.codeConflict.name}" — will be renamed to{" "}
+              <span className="font-mono">{item.account.code}-MIGRATED</span>
             </p>
           )}
         </div>
@@ -283,7 +312,7 @@ export default function AccountMigration() {
 
   const { data: srcAccounts = [], isLoading: loadingSrcAccounts } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/admin/account-migration/accounts", srcCompanyId],
-    queryFn: () => fetch(`/api/admin/account-migration/accounts/${srcCompanyId}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/admin/account-migration/accounts/${srcCompanyId}`).then((r) => r.json()),
     enabled: !!srcCompanyId,
   });
 
@@ -345,7 +374,7 @@ export default function AccountMigration() {
     mutationFn: async () => {
       if (!lastResult) throw new Error("Nothing to undo");
       const res = await apiRequest("POST", "/api/admin/account-migration/undo", {
-        accounts: lastResult.accounts.map(a => ({
+        accounts: lastResult.accounts.map((a) => ({
           accountId: a.accountId,
           originalCode: a.originalCode,
         })),
@@ -374,10 +403,11 @@ export default function AccountMigration() {
     },
   });
 
-  const srcCompany  = companies.find(c => c.id === parseInt(srcCompanyId));
-  const destCompany = companies.find(c => c.id === parseInt(destCompanyId));
-  const canPreview  = !!srcCompanyId && !!destCompanyId && selectedAccountIds.length > 0 && srcCompanyId !== destCompanyId;
-  const hasConflicts = preview?.accounts.some(a => a.codeConflict) ?? false;
+  const srcCompany = companies.find((c) => c.id === parseInt(srcCompanyId));
+  const destCompany = companies.find((c) => c.id === parseInt(destCompanyId));
+  const canPreview =
+    !!srcCompanyId && !!destCompanyId && selectedAccountIds.length > 0 && srcCompanyId !== destCompanyId;
+  const hasConflicts = preview?.accounts.some((a) => a.codeConflict) ?? false;
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -388,41 +418,48 @@ export default function AccountMigration() {
 
       {/* Last result banner */}
       {lastResult && (
-        <Card className={undoDone
-          ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20"
-          : "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20"
-        }>
+        <Card
+          className={
+            undoDone
+              ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20"
+              : "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20"
+          }
+        >
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
-              {undoDone
-                ? <Undo2 className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                : <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
-              }
+              {undoDone ? (
+                <Undo2 className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              ) : (
+                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 shrink-0" />
+              )}
               <div className="flex-1 space-y-1">
                 {undoDone ? (
                   <>
                     <p className="font-medium text-amber-800 dark:text-amber-300">Migration undone</p>
                     <p className="text-sm text-amber-700 dark:text-amber-400">
-                      {lastResult.accounts.length} account{lastResult.accounts.length === 1 ? "" : "s"} moved back to original company.
+                      {lastResult.accounts.length} account{lastResult.accounts.length === 1 ? "" : "s"} moved back to
+                      original company.
                     </p>
                   </>
                 ) : (
                   <>
                     <p className="font-medium text-green-800 dark:text-green-300">Migration complete</p>
                     <p className="text-sm text-green-700 dark:text-green-400">
-                      {lastResult.accounts.length} account{lastResult.accounts.length === 1 ? "" : "s"} moved with {lastResult.totalEntries} entries
-                      and {lastResult.movedVoucherCount} exclusive vouchers.
+                      {lastResult.accounts.length} account{lastResult.accounts.length === 1 ? "" : "s"} moved with{" "}
+                      {lastResult.totalEntries} entries and {lastResult.movedVoucherCount} exclusive vouchers.
                       {lastResult.sharedVoucherCount > 0 && (
                         <> {lastResult.sharedVoucherCount} shared vouchers remain in source.</>
                       )}
                     </p>
-                    {lastResult.accounts.some(a => a.wasRenamed) && (
+                    {lastResult.accounts.some((a) => a.wasRenamed) && (
                       <p className="text-xs text-green-700 dark:text-green-400">
-                        {lastResult.accounts.filter(a => a.wasRenamed).map(a => (
-                          <span key={a.accountId}>
-                            "{a.accountName}" code renamed to <span className="font-mono">{a.finalCode}</span>{" "}
-                          </span>
-                        ))}
+                        {lastResult.accounts
+                          .filter((a) => a.wasRenamed)
+                          .map((a) => (
+                            <span key={a.accountId}>
+                              "{a.accountName}" code renamed to <span className="font-mono">{a.finalCode}</span>{" "}
+                            </span>
+                          ))}
                       </p>
                     )}
                     <Button
@@ -447,24 +484,33 @@ export default function AccountMigration() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold">1</span>
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+              1
+            </span>
             Source — pick company and accounts
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <label className="text-sm font-medium mb-1.5 block">Source company</label>
-            {loadingCompanies ? <Skeleton className="h-9 w-full" /> : (
+            {loadingCompanies ? (
+              <Skeleton className="h-9 w-full" />
+            ) : (
               <Select
                 value={srcCompanyId}
-                onValueChange={(v) => { setSrcCompanyId(v); setSelectedAccountIds([]); setPreview(null); setLastResult(null); }}
+                onValueChange={(v) => {
+                  setSrcCompanyId(v);
+                  setSelectedAccountIds([]);
+                  setPreview(null);
+                  setLastResult(null);
+                }}
                 data-testid="select-src-company"
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select company…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {companies.map(c => (
+                  {companies.map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       <span className="flex items-center gap-2">
                         {c.name}
@@ -486,7 +532,10 @@ export default function AccountMigration() {
                 <AccountMultiSelect
                   accounts={srcAccounts}
                   selectedIds={selectedAccountIds}
-                  onChange={(ids) => { setSelectedAccountIds(ids); setPreview(null); }}
+                  onChange={(ids) => {
+                    setSelectedAccountIds(ids);
+                    setPreview(null);
+                  }}
                 />
               )}
             </div>
@@ -498,15 +547,23 @@ export default function AccountMigration() {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold">2</span>
+            <span className="flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs font-bold">
+              2
+            </span>
             Destination company
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {loadingCompanies ? <Skeleton className="h-9 w-full" /> : (
+          {loadingCompanies ? (
+            <Skeleton className="h-9 w-full" />
+          ) : (
             <Select
               value={destCompanyId}
-              onValueChange={(v) => { setDestCompanyId(v); setPreview(null); setLastResult(null); }}
+              onValueChange={(v) => {
+                setDestCompanyId(v);
+                setPreview(null);
+                setLastResult(null);
+              }}
               data-testid="select-dest-company"
             >
               <SelectTrigger>
@@ -514,8 +571,8 @@ export default function AccountMigration() {
               </SelectTrigger>
               <SelectContent>
                 {companies
-                  .filter(c => String(c.id) !== srcCompanyId)
-                  .map(c => (
+                  .filter((c) => String(c.id) !== srcCompanyId)
+                  .map((c) => (
                     <SelectItem key={c.id} value={String(c.id)}>
                       <span className="flex items-center gap-2">
                         {c.name}
@@ -579,7 +636,9 @@ export default function AccountMigration() {
               </div>
               <div className="p-3 rounded-md bg-muted/40 space-y-0.5">
                 <p className="text-xs text-muted-foreground">Net (Dr − Cr)</p>
-                <p className="font-mono font-semibold text-sm">{fmt(preview.grandTotalDebit - preview.grandTotalCredit)}</p>
+                <p className="font-mono font-semibold text-sm">
+                  {fmt(preview.grandTotalDebit - preview.grandTotalCredit)}
+                </p>
               </div>
             </div>
 
@@ -590,7 +649,7 @@ export default function AccountMigration() {
                 Per-account breakdown — click to expand
               </p>
               <div className="space-y-1.5">
-                {preview.accounts.map(item => (
+                {preview.accounts.map((item) => (
                   <AccountPreviewRow key={item.account.id} item={item} />
                 ))}
               </div>
@@ -610,17 +669,17 @@ export default function AccountMigration() {
                 <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                 <div className="text-sm text-amber-800 dark:text-amber-300">
                   <p className="font-medium">Some account codes conflict</p>
-                  <p>Conflicting codes will be automatically renamed by adding <span className="font-mono">-MIGRATED</span> suffix. You can rename them manually afterwards.</p>
+                  <p>
+                    Conflicting codes will be automatically renamed by adding{" "}
+                    <span className="font-mono">-MIGRATED</span> suffix. You can rename them manually afterwards.
+                  </p>
                 </div>
               </div>
             )}
 
-            <Button
-              className="w-full"
-              onClick={() => setConfirmOpen(true)}
-              data-testid="button-execute-migration"
-            >
-              Move {preview.accounts.length} account{preview.accounts.length === 1 ? "" : "s"} to {preview.destCompany?.name}
+            <Button className="w-full" onClick={() => setConfirmOpen(true)} data-testid="button-execute-migration">
+              Move {preview.accounts.length} account{preview.accounts.length === 1 ? "" : "s"} to{" "}
+              {preview.destCompany?.name}
             </Button>
           </CardContent>
         </Card>
@@ -635,21 +694,38 @@ export default function AccountMigration() {
               Confirm account migration
             </DialogTitle>
             <DialogDescription>
-              This operation directly modifies the database. All {preview?.accounts.length} account{(preview?.accounts.length ?? 0) > 1 ? "s" : ""}, their opening balances, and full statement histories will be moved atomically.
+              This operation directly modifies the database. All {preview?.accounts.length} account
+              {(preview?.accounts.length ?? 0) > 1 ? "s" : ""}, their opening balances, and full statement histories
+              will be moved atomically.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="p-3 rounded-md bg-muted/50 text-sm space-y-1">
-              <p><span className="text-muted-foreground">From:</span> <strong>{preview?.srcCompany?.name}</strong></p>
-              <p><span className="text-muted-foreground">To:</span> <strong>{preview?.destCompany?.name}</strong></p>
-              <p><span className="text-muted-foreground">Accounts:</span> <strong>{preview?.accounts.length}</strong></p>
-              <p><span className="text-muted-foreground">Total entries:</span> <strong>{preview?.grandTotalEntries.toLocaleString()}</strong></p>
+              <p>
+                <span className="text-muted-foreground">From:</span> <strong>{preview?.srcCompany?.name}</strong>
+              </p>
+              <p>
+                <span className="text-muted-foreground">To:</span> <strong>{preview?.destCompany?.name}</strong>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Accounts:</span> <strong>{preview?.accounts.length}</strong>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Total entries:</span>{" "}
+                <strong>{preview?.grandTotalEntries.toLocaleString()}</strong>
+              </p>
               {hasConflicts && (
-                <p><span className="text-muted-foreground">Conflicts:</span> <strong>{preview?.accounts.filter(a => a.codeConflict).length} code{(preview?.accounts.filter(a => a.codeConflict).length ?? 0) > 1 ? "s" : ""} will be auto-renamed</strong></p>
+                <p>
+                  <span className="text-muted-foreground">Conflicts:</span>{" "}
+                  <strong>
+                    {preview?.accounts.filter((a) => a.codeConflict).length} code
+                    {(preview?.accounts.filter((a) => a.codeConflict).length ?? 0) > 1 ? "s" : ""} will be auto-renamed
+                  </strong>
+                </p>
               )}
             </div>
             <div className="max-h-36 overflow-y-auto space-y-1">
-              {preview?.accounts.map(a => (
+              {preview?.accounts.map((a) => (
                 <div key={a.account.id} className="flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="font-mono">{a.account.code}</span>
                   <span className="truncate">{a.account.name}</span>
@@ -682,21 +758,35 @@ export default function AccountMigration() {
               Undo migration
             </DialogTitle>
             <DialogDescription>
-              This will move all {lastResult?.accounts.length} account{(lastResult?.accounts.length ?? 0) > 1 ? "s" : ""} back to the original company and restore their codes.
+              This will move all {lastResult?.accounts.length} account
+              {(lastResult?.accounts.length ?? 0) > 1 ? "s" : ""} back to the original company and restore their codes.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="p-3 rounded-md bg-muted/50 text-sm space-y-1">
-              <p><span className="text-muted-foreground">Moving back from:</span> <strong>{companies.find(c => c.id === lastResult?.destCompanyId)?.name}</strong></p>
-              <p><span className="text-muted-foreground">Moving back to:</span> <strong>{companies.find(c => c.id === lastResult?.srcCompanyId)?.name}</strong></p>
-              <p><span className="text-muted-foreground">Accounts:</span> <strong>{lastResult?.accounts.length}</strong></p>
-              <p><span className="text-muted-foreground">Vouchers to restore:</span> <strong>{lastResult?.movedVoucherCount}</strong></p>
+              <p>
+                <span className="text-muted-foreground">Moving back from:</span>{" "}
+                <strong>{companies.find((c) => c.id === lastResult?.destCompanyId)?.name}</strong>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Moving back to:</span>{" "}
+                <strong>{companies.find((c) => c.id === lastResult?.srcCompanyId)?.name}</strong>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Accounts:</span> <strong>{lastResult?.accounts.length}</strong>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Vouchers to restore:</span>{" "}
+                <strong>{lastResult?.movedVoucherCount}</strong>
+              </p>
             </div>
             <div className="max-h-36 overflow-y-auto space-y-1">
-              {lastResult?.accounts.map(a => (
+              {lastResult?.accounts.map((a) => (
                 <div key={a.accountId} className="flex items-center gap-2 text-xs text-muted-foreground">
                   {a.wasRenamed && (
-                    <span className="font-mono">{a.finalCode} → {a.originalCode}</span>
+                    <span className="font-mono">
+                      {a.finalCode} → {a.originalCode}
+                    </span>
                   )}
                   {!a.wasRenamed && <span className="font-mono">{a.originalCode}</span>}
                   <span className="truncate">{a.accountName}</span>

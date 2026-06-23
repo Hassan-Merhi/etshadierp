@@ -10,44 +10,112 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, recalculateOrderTotals,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  recalculateOrderTotals,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  customerOrderBaleRemovals, customerOrderExpectedLines,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
+  customerOrderBaleRemovals,
+  customerOrderExpectedLines,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -69,21 +137,24 @@ export function registerOrderPdfExportRoutes(app: Express) {
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(orderId)) return res.status(400).json({ message: "Invalid order ID" });
 
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
       const [customer] = await db.select().from(customers).where(eq(customers.id, order.customerId));
       const customerName = customer?.legalName || `order_${orderId}`;
 
-      const baleLinks = await db.select().from(customerOrderBales)
+      const baleLinks = await db
+        .select()
+        .from(customerOrderBales)
         .where(eq(customerOrderBales.orderId, orderId))
         .orderBy(customerOrderBales.id);
 
       const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
-      const baleRows: any[] = baleIds.length > 0
-        ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds))
-        : [];
+      const baleRows: any[] =
+        baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
       const baleMap = new Map<number, any>(baleRows.map((b: any) => [b.id, b]));
 
       const ExcelJS = (await import("exceljs")).default;
@@ -105,7 +176,8 @@ export function registerOrderPdfExportRoutes(app: Express) {
         const ldLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(ldLogoPath)) {
           const ldId = workbook.addImage({ buffer: fs.readFileSync(ldLogoPath) as Buffer, extension: "jpeg" });
-          const ldRow = sheet.addRow([]); ldRow.height = 90;
+          const ldRow = sheet.addRow([]);
+          ldRow.height = 90;
           sheet.addImage(ldId, { tl: { col: 2.4, row: 0 }, ext: { width: 300, height: 90 } });
         }
       } catch {}
@@ -208,8 +280,12 @@ export function registerOrderPdfExportRoutes(app: Express) {
         const invProds = await db
           .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name })
           .from(factoryBaleProducts)
-          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, invArticleCodes)));
-        for (const p of invProds) { if (p.articleCode) invNameMap.set(p.articleCode, p.name); }
+          .where(
+            and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, invArticleCodes))
+          );
+        for (const p of invProds) {
+          if (p.articleCode) invNameMap.set(p.articleCode, p.name);
+        }
       }
       const sortedLines = lines.sort((a: any, b: any) => {
         const na = invNameMap.get(a.articleCode) || a.baleName || "";
@@ -223,12 +299,16 @@ export function registerOrderPdfExportRoutes(app: Express) {
       const PDFDocument = (await import("pdfkit")).default;
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${buildExportFilename([order.containerNumber, order.customerName, order.destination], "pdf")}"`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${buildExportFilename([order.containerNumber, order.customerName, order.destination], "pdf")}"`
+      );
       doc.pipe(res);
 
-      const PAGE_W = doc.page.width;   // 595
-      const L = 40, R = PAGE_W - 40;  // left / right margin x
-      const USABLE = R - L;            // 515
+      const PAGE_W = doc.page.width; // 595
+      const L = 40,
+        R = PAGE_W - 40; // left / right margin x
+      const USABLE = R - L; // 515
 
       const fmtN = (val: any) => {
         const n = parseFloat(val);
@@ -240,15 +320,24 @@ export function registerOrderPdfExportRoutes(app: Express) {
       // ── Logo (centred, fixed height so title lands below it) ─────────────────
       const logoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       const LOGO_W = 200;
-      const LOGO_H = 87;   // ≈ 200 × (96/220) — matches actual HMD logo aspect ratio
+      const LOGO_H = 87; // ≈ 200 × (96/220) — matches actual HMD logo aspect ratio
       const LOGO_TOP = 30;
       if (fs.existsSync(logoPath)) {
-        try { doc.image(logoPath, (PAGE_W - LOGO_W) / 2, LOGO_TOP, { width: LOGO_W, height: LOGO_H, fit: [LOGO_W, LOGO_H] }); } catch {}
+        try {
+          doc.image(logoPath, (PAGE_W - LOGO_W) / 2, LOGO_TOP, {
+            width: LOGO_W,
+            height: LOGO_H,
+            fit: [LOGO_W, LOGO_H],
+          });
+        } catch {}
       }
       const afterLogo = LOGO_TOP + LOGO_H + 10;
 
       // ── Title ─────────────────────────────────────────────────────────────────
-      doc.fontSize(14).font("Helvetica-Bold").fillColor("#000000")
+      doc
+        .fontSize(14)
+        .font("Helvetica-Bold")
+        .fillColor("#000000")
         .text("INVOICE", L, afterLogo, { width: USABLE, align: "center" });
 
       // ── Divider ───────────────────────────────────────────────────────────────
@@ -259,7 +348,11 @@ export function registerOrderPdfExportRoutes(app: Express) {
       // ── Meta block ───────────────────────────────────────────────────────────
       const metaY = divY + 12;
       const dateStr = order.orderDate
-        ? new Date(order.orderDate + "T00:00:00").toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+        ? new Date(order.orderDate + "T00:00:00").toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+          })
         : "-";
       const metaItems: [string, string][] = [
         ["Invoice No.", invoiceLabel],
@@ -270,8 +363,7 @@ export function registerOrderPdfExportRoutes(app: Express) {
       let mY = metaY;
       doc.font("Helvetica").fontSize(9).fillColor("#000000");
       for (const [label, value] of metaItems) {
-        doc.font("Helvetica-Bold").text(`${label}  `, L, mY, { continued: true })
-          .font("Helvetica").text(value);
+        doc.font("Helvetica-Bold").text(`${label}  `, L, mY, { continued: true }).font("Helvetica").text(value);
         mY = doc.y + 2;
       }
 
@@ -280,15 +372,15 @@ export function registerOrderPdfExportRoutes(app: Express) {
       // ── Column layout ─────────────────────────────────────────────────────────
       let colX: number[], colW: number[], colHdr: string[], colAlign: Array<"left" | "right" | "center">;
       if (hideSellingPdf) {
-        colX     = [40,  62,  132, 382, 428, 476];
-        colW     = [22,  70,  250,  46,  48,  79];
-        colHdr   = ["#", "Code", "Product", "Qty", "Wt/Bale", "Total Wt"];
-        colAlign = ["center","center","left","center","center","center"];
+        colX = [40, 62, 132, 382, 428, 476];
+        colW = [22, 70, 250, 46, 48, 79];
+        colHdr = ["#", "Code", "Product", "Qty", "Wt/Bale", "Total Wt"];
+        colAlign = ["center", "center", "left", "center", "center", "center"];
       } else {
-        colX     = [40,  62,  132, 310, 356, 402, 450, 503];
-        colW     = [22,  70,  178,  46,  46,  48,  53,  52];
-        colHdr   = ["#", "Code", "Product", "Qty", "Wt/Bale", "Total Wt", "Price/Bale", "Total"];
-        colAlign = ["center","center","left","center","center","center","center","center"];
+        colX = [40, 62, 132, 310, 356, 402, 450, 503];
+        colW = [22, 70, 178, 46, 46, 48, 53, 52];
+        colHdr = ["#", "Code", "Product", "Qty", "Wt/Bale", "Total Wt", "Price/Bale", "Total"];
+        colAlign = ["center", "center", "left", "center", "center", "center", "center", "center"];
       }
 
       // ── Table header row ──────────────────────────────────────────────────────
@@ -304,7 +396,9 @@ export function registerOrderPdfExportRoutes(app: Express) {
       // ── Table rows ────────────────────────────────────────────────────────────
       const ROW_H = 14;
       let y = tblTop + HDR_H;
-      let totalQty = 0, totalWt = 0, totalAmt = 0;
+      let totalQty = 0,
+        totalWt = 0,
+        totalAmt = 0;
 
       for (let idx = 0; idx < sortedLines.length; idx++) {
         const line = sortedLines[idx] as any;
@@ -328,7 +422,16 @@ export function registerOrderPdfExportRoutes(app: Express) {
         const productName = invNameMap.get(line.articleCode) || line.baleName || "";
         const vals = hideSellingPdf
           ? [String(idx + 1), line.articleCode || "", productName, fmtN(qty), fmtN(wtBale), fmtN(totWt)]
-          : [String(idx + 1), line.articleCode || "", productName, fmtN(qty), fmtN(wtBale), fmtN(totWt), fmtM(price), fmtM(totPrice)];
+          : [
+              String(idx + 1),
+              line.articleCode || "",
+              productName,
+              fmtN(qty),
+              fmtN(wtBale),
+              fmtN(totWt),
+              fmtM(price),
+              fmtM(totPrice),
+            ];
         vals.forEach((v, i) => {
           doc.text(v, colX[i] + 2, y + 3, { width: colW[i] - 4, align: colAlign[i], lineBreak: false });
         });
@@ -362,7 +465,8 @@ export function registerOrderPdfExportRoutes(app: Express) {
           y = doc.y + 4;
           doc.font("Helvetica").fontSize(8);
           for (const ch of [...freightCharges, ...otherCharges]) {
-            doc.text(ch.name || ch.chargeType, L + 10, y, { continued: true })
+            doc
+              .text(ch.name || ch.chargeType, L + 10, y, { continued: true })
               .text(fmtM(ch.amount), { align: "right", width: USABLE - 10 });
             y = doc.y + 2;
           }
@@ -370,9 +474,7 @@ export function registerOrderPdfExportRoutes(app: Express) {
         }
 
         // Summary box
-        const summaryRows: [string, string, boolean][] = [
-          ["Subtotal (Bales)", fmtM(order.subtotalBales), false],
-        ];
+        const summaryRows: [string, string, boolean][] = [["Subtotal (Bales)", fmtM(order.subtotalBales), false]];
         const freight = parseFloat(order.freightAmount || "0");
         if (freight > 0) summaryRows.push(["Freight", fmtM(freight), false]);
         const otherTotal = parseFloat(order.otherChargesTotal || "0");
@@ -387,18 +489,24 @@ export function registerOrderPdfExportRoutes(app: Express) {
         const boxX = R - BOX_W;
         doc.font("Helvetica").fontSize(9);
         for (const [label, value, isGrand] of summaryRows) {
-          if (y + 18 > doc.page.height - 40) { doc.addPage(); y = 40; }
+          if (y + 18 > doc.page.height - 40) {
+            doc.addPage();
+            y = 40;
+          }
           if (isGrand) {
             doc.rect(boxX, y, BOX_W, 18).fill("#1F3864");
             doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(10);
-            doc.text(label, boxX + 8, y + 4, { continued: true })
-              .text(value, { align: "right", width: BOX_W - 16 });
+            doc.text(label, boxX + 8, y + 4, { continued: true }).text(value, { align: "right", width: BOX_W - 16 });
             doc.fillColor("#000000").font("Helvetica").fontSize(9);
           } else {
-            doc.moveTo(boxX, y + 16).lineTo(R, y + 16).lineWidth(0.3).strokeColor("#cccccc").stroke();
+            doc
+              .moveTo(boxX, y + 16)
+              .lineTo(R, y + 16)
+              .lineWidth(0.3)
+              .strokeColor("#cccccc")
+              .stroke();
             doc.lineWidth(1).strokeColor("#000000");
-            doc.text(label, boxX + 8, y + 4, { continued: true })
-              .text(value, { align: "right", width: BOX_W - 16 });
+            doc.text(label, boxX + 8, y + 4, { continued: true }).text(value, { align: "right", width: BOX_W - 16 });
           }
           y += 18;
         }
@@ -497,12 +605,23 @@ export function registerOrderPdfExportRoutes(app: Express) {
         const prods = await db
           .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name })
           .from(factoryBaleProducts)
-          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, missingCodes)));
-        for (const p of prods) { if (p.articleCode) productNameMap.set(p.articleCode, p.name); }
+          .where(
+            and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, missingCodes))
+          );
+        for (const p of prods) {
+          if (p.articleCode) productNameMap.set(p.articleCode, p.name);
+        }
       }
 
       // Build rows: proforma items first, then extra (NOT REQUESTED) items
-      type LoadRow = { articleCode: string; productName: string; requested: number; loaded: number; diff: number; status: string };
+      type LoadRow = {
+        articleCode: string;
+        productName: string;
+        requested: number;
+        loaded: number;
+        diff: number;
+        status: string;
+      };
       const rows: LoadRow[] = [];
 
       // Process proforma items
@@ -547,29 +666,29 @@ export function registerOrderPdfExportRoutes(app: Express) {
       const COL = 7; // now 7 columns (#, ArticleCode, Product, Requested, Loaded, Diff, Status)
 
       sheet.columns = [
-        { key: "c1", width: 6  },  // #
-        { key: "c2", width: 16 },  // Article Code
-        { key: "c3", width: 32 },  // Product
-        { key: "c4", width: 13 },  // Requested
-        { key: "c5", width: 13 },  // Loaded
-        { key: "c6", width: 11 },  // Diff
-        { key: "c7", width: 20 },  // Status
+        { key: "c1", width: 6 }, // #
+        { key: "c2", width: 16 }, // Article Code
+        { key: "c3", width: 32 }, // Product
+        { key: "c4", width: 13 }, // Requested
+        { key: "c5", width: 13 }, // Loaded
+        { key: "c6", width: 11 }, // Diff
+        { key: "c7", width: 20 }, // Status
       ];
 
-      const DARK_BLUE   = "FF1F3864";
-      const WHITE       = "FFFFFFFF";
-      const LIGHT_GRAY  = "FFF5F5F5";
-      const GREEN_BG    = "FFE8F5E9";
-      const RED_BG      = "FFFDECEA";
-      const ORANGE_BG   = "FFFFF3E0";
-      const YELLOW_BG   = "FFFFFDE7";
+      const DARK_BLUE = "FF1F3864";
+      const WHITE = "FFFFFFFF";
+      const LIGHT_GRAY = "FFF5F5F5";
+      const GREEN_BG = "FFE8F5E9";
+      const RED_BG = "FFFDECEA";
+      const ORANGE_BG = "FFFFF3E0";
+      const YELLOW_BG = "FFFFFDE7";
 
       const statusStyle: Record<string, { bg: string; fg: string }> = {
-        "LOADED":        { bg: GREEN_BG,  fg: "FF2E7D32" },
-        "OVERLOADED":    { bg: RED_BG,    fg: "FFC62828" },
-        "LESS LOADED":   { bg: ORANGE_BG, fg: "FFE65100" },
+        LOADED: { bg: GREEN_BG, fg: "FF2E7D32" },
+        OVERLOADED: { bg: RED_BG, fg: "FFC62828" },
+        "LESS LOADED": { bg: ORANGE_BG, fg: "FFE65100" },
         "NOT REQUESTED": { bg: YELLOW_BG, fg: "FFF57F17" },
-        "NOT LOADED":    { bg: "FFEEEEEE", fg: "FF555555" },
+        "NOT LOADED": { bg: "FFEEEEEE", fg: "FF555555" },
       };
 
       const setFill = (cell: any, argb: string) => {
@@ -603,13 +722,15 @@ export function registerOrderPdfExportRoutes(app: Express) {
       sheet.addRow([]);
 
       const invoiceNum = order.invoiceNumber || `INV-${String(orderId).padStart(6, "0")}`;
-      const dateStr = order.orderDate ? new Date(order.orderDate).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" }) : "-";
+      const dateStr = order.orderDate
+        ? new Date(order.orderDate).toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "2-digit" })
+        : "-";
 
       const details = [
         ["Invoice No.", invoiceNum],
-        ["Customer",    order.customerName || "-"],
-        ["Date",        dateStr],
-        ["Container",   order.containerNumber || "-"],
+        ["Customer", order.customerName || "-"],
+        ["Date", dateStr],
+        ["Container", order.containerNumber || "-"],
       ];
       for (const [label, value] of details) {
         const dr = sheet.addRow(["", "", "", "", label, "", value]);
@@ -629,16 +750,31 @@ export function registerOrderPdfExportRoutes(app: Express) {
         cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
+        cell.border = {
+          top: { style: "thin", color: { argb: WHITE } },
+          bottom: { style: "thin", color: { argb: WHITE } },
+          left: { style: "thin", color: { argb: WHITE } },
+          right: { style: "thin", color: { argb: WHITE } },
+        };
       });
 
       // Data rows
       rows.forEach((row, idx) => {
         const style = statusStyle[row.status] || { bg: LIGHT_GRAY, fg: "FF000000" };
-        const diffLabel = row.diff === 0 ? "0" : (row.diff > 0 ? `+${row.diff}` : `${row.diff}`);
-        const dr = sheet.addRow([idx + 1, row.articleCode, row.productName, row.requested, row.loaded, diffLabel, row.status]);
+        const diffLabel = row.diff === 0 ? "0" : row.diff > 0 ? `+${row.diff}` : `${row.diff}`;
+        const dr = sheet.addRow([
+          idx + 1,
+          row.articleCode,
+          row.productName,
+          row.requested,
+          row.loaded,
+          diffLabel,
+          row.status,
+        ]);
         dr.height = 20;
-        dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
+        dr.eachCell((cell: any) => {
+          cell.font = { size: 11 };
+        });
         if (idx % 2 === 1) dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
         // Status cell: always coloured
         const statusCell = dr.getCell(7);
@@ -668,7 +804,15 @@ export function registerOrderPdfExportRoutes(app: Express) {
       const totalLoaded = rows.reduce((s, r) => s + r.loaded, 0);
       const totalRequested = rows.reduce((s, r) => s + r.requested, 0);
       const totalDiff = totalLoaded - totalRequested;
-      const totRow = sheet.addRow(["", "", "Totals", totalRequested, totalLoaded, totalDiff === 0 ? "0" : (totalDiff > 0 ? `+${totalDiff}` : `${totalDiff}`), ""]);
+      const totRow = sheet.addRow([
+        "",
+        "",
+        "Totals",
+        totalRequested,
+        totalLoaded,
+        totalDiff === 0 ? "0" : totalDiff > 0 ? `+${totalDiff}` : `${totalDiff}`,
+        "",
+      ]);
       totRow.height = 22;
       totRow.eachCell((cell: any) => {
         cell.font = { bold: true, size: 11, color: { argb: WHITE } };
@@ -682,7 +826,7 @@ export function registerOrderPdfExportRoutes(app: Express) {
       sheet.addRow([]);
       const legendHdr = sheet.addRow(["Legend"]);
       legendHdr.getCell(1).font = { bold: true, size: 11 };
-      const legend: [string, typeof statusStyle[string]][] = [
+      const legend: [string, (typeof statusStyle)[string]][] = [
         ["LOADED — exact quantity matched", statusStyle["LOADED"]],
         ["OVERLOADED — more than requested", statusStyle["OVERLOADED"]],
         ["LESS LOADED — fewer than requested", statusStyle["LESS LOADED"]],
@@ -700,10 +844,10 @@ export function registerOrderPdfExportRoutes(app: Express) {
       // ── Second sheet: individual Bale References ──
       const refSheet = workbook.addWorksheet("Bale References");
       refSheet.columns = [
-        { key: "num",  width: 6  },  // #
-        { key: "ref",  width: 22 },  // Reference Number
-        { key: "code", width: 16 },  // Article Code
-        { key: "prod", width: 32 },  // Product Name
+        { key: "num", width: 6 }, // #
+        { key: "ref", width: 22 }, // Reference Number
+        { key: "code", width: 16 }, // Article Code
+        { key: "prod", width: 32 }, // Product Name
       ];
 
       const refHdr = refSheet.addRow(["#", "Reference Number", "Article Code", "Product"]);
@@ -712,7 +856,12 @@ export function registerOrderPdfExportRoutes(app: Express) {
         cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
+        cell.border = {
+          top: { style: "thin", color: { argb: WHITE } },
+          bottom: { style: "thin", color: { argb: WHITE } },
+          left: { style: "thin", color: { argb: WHITE } },
+          right: { style: "thin", color: { argb: WHITE } },
+        };
       });
 
       // Build per-bale rows sorted by article code then reference number
@@ -720,7 +869,8 @@ export function registerOrderPdfExportRoutes(app: Express) {
         .map((link) => {
           const code = link.productArticleCode || link.baleArticleCode || link.orderBaleArticleCode || "";
           const refNum = link.baleReferenceNumber || link.baleCode || `BALE-${link.baleId}`;
-          const prodName = productNameMap.get(code) || link.productName || link.baleProductName || link.baleName || code;
+          const prodName =
+            productNameMap.get(code) || link.productName || link.baleProductName || link.baleName || code;
           return { code, refNum, prodName };
         })
         .filter((r) => r.refNum)
@@ -729,7 +879,9 @@ export function registerOrderPdfExportRoutes(app: Express) {
       baleRefRows.forEach((r, idx) => {
         const dr = refSheet.addRow([idx + 1, r.refNum, r.code, r.prodName]);
         dr.height = 20;
-        dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
+        dr.eachCell((cell: any) => {
+          cell.font = { size: 11 };
+        });
         if (idx % 2 === 1) dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
         dr.getCell(1).alignment = { horizontal: "center" };
         dr.eachCell((cell: any) => {
@@ -744,7 +896,10 @@ export function registerOrderPdfExportRoutes(app: Express) {
 
       const fileDateStr = getClientDate(req);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="${buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx")}"`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${buildExportFilename([order.containerNumber, order.customerName, order.destination], "xlsx")}"`
+      );
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: any) {

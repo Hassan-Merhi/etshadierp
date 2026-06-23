@@ -23,11 +23,11 @@ export interface ActivityTimelineProps {
 }
 
 const TONE: Record<NonNullable<ActivityTimelineItem["tone"]>, string> = {
-  default:     "bg-muted text-muted-foreground",
-  success:     "bg-success-soft text-success-soft-foreground",
-  warning:     "bg-warning-soft text-warning-soft-foreground",
+  default: "bg-muted text-muted-foreground",
+  success: "bg-success-soft text-success-soft-foreground",
+  warning: "bg-warning-soft text-warning-soft-foreground",
   destructive: "bg-destructive-soft text-destructive",
-  info:        "bg-info-soft text-info-soft-foreground",
+  info: "bg-info-soft text-info-soft-foreground",
 };
 
 /**
@@ -58,11 +58,7 @@ export function ActivityTimeline({
         const Icon = item.icon;
         const tone = item.tone ?? "default";
         return (
-          <li
-            key={item.id}
-            className="flex items-start gap-3"
-            data-testid={`timeline-item-${item.id}`}
-          >
+          <li key={item.id} className="flex items-start gap-3" data-testid={`timeline-item-${item.id}`}>
             <div className={cn("flex h-8 w-8 items-center justify-center rounded-md shrink-0 mt-0.5", TONE[tone])}>
               {Icon ? <Icon className="h-4 w-4" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}
             </div>
@@ -70,14 +66,10 @@ export function ActivityTimeline({
               <div className="flex items-baseline justify-between gap-2 flex-wrap">
                 <div className="text-sm font-medium leading-tight min-w-0">{item.title}</div>
                 {item.timestamp && (
-                  <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
-                    {item.timestamp}
-                  </span>
+                  <span className="text-xs text-muted-foreground shrink-0 tabular-nums">{item.timestamp}</span>
                 )}
               </div>
-              {item.description && (
-                <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>
-              )}
+              {item.description && <p className="mt-0.5 text-xs text-muted-foreground">{item.description}</p>}
               {item.meta && <div className="mt-1">{item.meta}</div>}
             </div>
           </li>

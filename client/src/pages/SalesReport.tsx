@@ -11,28 +11,22 @@ import { useDateJump } from "@/hooks/use-date-jump";
 
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileSpreadsheet, FileText, TrendingUp, TrendingDown, ChevronRight, ChevronDown, Download, Building2, GitCompare, GitMerge } from "lucide-react";
+import {
+  FileSpreadsheet,
+  FileText,
+  TrendingUp,
+  TrendingDown,
+  ChevronRight,
+  ChevronDown,
+  Download,
+  Building2,
+  GitCompare,
+  GitMerge,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -77,8 +71,8 @@ interface SalesReportItem {
 }
 
 interface DailySummary {
-  date: string;       // compound key used for grouping (may have "-credit" suffix)
-  dateKey: string;    // clean date key for API queries (no suffix)
+  date: string; // compound key used for grouping (may have "-credit" suffix)
+  dateKey: string; // clean date key for API queries (no suffix)
   displayDate: string;
   totalSales: number;
   totalCost: number;
@@ -95,20 +89,21 @@ interface DailySummary {
 type GroupingType = "daily" | "monthly" | "yearly";
 type ProfitFilter = "all" | "positive" | "negative";
 
-
 // Format number with commas, remove .00 if whole - handles string inputs
 const formatNumericValue = (value: string | number): string => {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '0';
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "0";
   return formatNumber(num);
 };
 
 // For backwards compatibility
 const formatSmartNumber = (value: string | number | null | undefined) => {
-  if (value == null) return '0';
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '0';
-  return num % 1 === 0 ? num.toLocaleString('en-US') : num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (value == null) return "0";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "0";
+  return num % 1 === 0
+    ? num.toLocaleString("en-US")
+    : num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 export default function SalesReport() {
@@ -181,10 +176,8 @@ export default function SalesReport() {
   });
 
   // Resolve selected group names (for multi-company query)
-  const selectedStockGroupNames = useMemo(() =>
-    stockGroups
-      .filter((g: any) => selectedStockGroups.includes(String(g.id)))
-      .map((g: any) => g.name as string),
+  const selectedStockGroupNames = useMemo(
+    () => stockGroups.filter((g: any) => selectedStockGroups.includes(String(g.id))).map((g: any) => g.name as string),
     [stockGroups, selectedStockGroups]
   );
 
@@ -207,8 +200,8 @@ export default function SalesReport() {
   }
 
   const multiCompanyQueryString = multiCompanyParams.toString();
-  const multiCompanyQueryKey = multiCompanyQueryString 
-    ? `/api/dashboard/sales-report-all?${multiCompanyQueryString}` 
+  const multiCompanyQueryKey = multiCompanyQueryString
+    ? `/api/dashboard/sales-report-all?${multiCompanyQueryString}`
     : "/api/dashboard/sales-report-all";
 
   // Fetch sales report data (single company)
@@ -238,12 +231,13 @@ export default function SalesReport() {
   }, [selectedStockGroups, stockItems]);
 
   // Apply location and group filters client-side
-  const localFilteredData = useMemo(() =>
-    salesData.filter(item => {
-      if (selectedLocations.length > 0 && !selectedLocations.includes(String(item.locationId))) return false;
-      if (selectedGroupItemIds && !selectedGroupItemIds.has(item.stockItemId)) return false;
-      return true;
-    }),
+  const localFilteredData = useMemo(
+    () =>
+      salesData.filter((item) => {
+        if (selectedLocations.length > 0 && !selectedLocations.includes(String(item.locationId))) return false;
+        if (selectedGroupItemIds && !selectedGroupItemIds.has(item.stockItemId)) return false;
+        return true;
+      }),
     [salesData, selectedLocations, selectedGroupItemIds]
   );
 
@@ -278,18 +272,18 @@ export default function SalesReport() {
 
     const isCredit = item.isCreditSale === true;
     // In merge view combine credit + cash; otherwise keep them separate
-    const groupKey = (!mergeView && isCredit) ? `${dateKey}-credit` : dateKey;
+    const groupKey = !mergeView && isCredit ? `${dateKey}-credit` : dateKey;
 
     // Filter by search term
     if (searchTerm) {
       const searchLower = (searchTerm || "").toLowerCase();
-      const matches = 
+      const matches =
         (item.stockItemName || "").toLowerCase().includes(searchLower) ||
         (item.locationName && (item.locationName || "").toLowerCase().includes(searchLower));
       if (!matches) return acc;
     }
 
-    const existing = acc.find(g => g.date === groupKey);
+    const existing = acc.find((g) => g.date === groupKey);
     const totalSales = parseFloat(item.totalSales);
     const totalCost = parseFloat(item.totalCost);
     const totalConfiguredCost = item.totalConfiguredCost;
@@ -336,7 +330,7 @@ export default function SalesReport() {
   groupedData.sort((a, b) => b.date.localeCompare(a.date));
 
   // Apply profit filter — always based on cost profit (the real P&L metric)
-  const filteredGroupedData = groupedData.filter(group => {
+  const filteredGroupedData = groupedData.filter((group) => {
     if (profitFilter === "all") return true;
     if (profitFilter === "positive") return group.costProfit >= 0;
     if (profitFilter === "negative") return group.costProfit < 0;
@@ -437,7 +431,7 @@ export default function SalesReport() {
     const currencyCols = [5, 6, 7, 8, 9, 10, 11, 13];
     const percentCols = [12, 14];
     const profitCols = [8, 11, 12, 13, 14];
-    
+
     worksheet.columns = [
       { header: "Location", key: "location", width: 15 },
       { header: "Item Code", key: "itemCode", width: 15 },
@@ -532,13 +526,24 @@ export default function SalesReport() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
-          <Button variant="outline" size="sm" onClick={() => navigate("/sales-report/comparison")} data-testid="button-compare-companies">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/sales-report/comparison")}
+            data-testid="button-compare-companies"
+          >
             <GitCompare className="w-4 h-4 mr-2" />
             Compare
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2" disabled={groupedData.length === 0} data-testid="button-export-dropdown">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={groupedData.length === 0}
+                data-testid="button-export-dropdown"
+              >
                 <Download className="w-4 h-4" />
                 Export
                 <ChevronDown className="w-4 h-4" />
@@ -573,32 +578,50 @@ export default function SalesReport() {
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
               <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-muted-foreground text-xs">Total Sales</span>
-              <span className="font-semibold font-mono text-sm" data-testid="text-total-sales">{formatAmount(totals.totalSales)}</span>
+              <span className="font-semibold font-mono text-sm" data-testid="text-total-sales">
+                {formatAmount(totals.totalSales)}
+              </span>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
               <span className="text-muted-foreground text-xs">Cost Price</span>
-              <span className="font-semibold font-mono text-sm" data-testid="text-total-cost">{formatAmount(totals.totalCost)}</span>
+              <span className="font-semibold font-mono text-sm" data-testid="text-total-cost">
+                {formatAmount(totals.totalCost)}
+              </span>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
-              {totals.costProfit >= 0
-                ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
+              {totals.costProfit >= 0 ? (
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+              ) : (
+                <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+              )}
               <span className="text-muted-foreground text-xs">Cost Profit</span>
-              <span className={`font-semibold font-mono text-sm ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-cost-profit">
-                {totals.costProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.costProfit))}
+              <span
+                className={`font-semibold font-mono text-sm ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                data-testid="text-cost-profit"
+              >
+                {totals.costProfit < 0 ? "-" : ""}
+                {formatAmount(Math.abs(totals.costProfit))}
               </span>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
               <span className="text-muted-foreground text-xs">Hassan's Price</span>
-              <span className="font-semibold font-mono text-sm" data-testid="text-configured-cost">{formatAmount(totals.totalConfiguredCost)}</span>
+              <span className="font-semibold font-mono text-sm" data-testid="text-configured-cost">
+                {formatAmount(totals.totalConfiguredCost)}
+              </span>
             </div>
             <div className="flex items-center gap-1.5 rounded-lg border bg-muted/40 px-3 py-1.5 text-sm">
-              {totals.configuredProfit >= 0
-                ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                : <TrendingDown className="h-3.5 w-3.5 text-red-500" />}
+              {totals.configuredProfit >= 0 ? (
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+              ) : (
+                <TrendingDown className="h-3.5 w-3.5 text-red-500" />
+              )}
               <span className="text-muted-foreground text-xs">Hassan's Profit</span>
-              <span className={`font-semibold font-mono text-sm ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-configured-profit">
-                {totals.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.configuredProfit))}
+              <span
+                className={`font-semibold font-mono text-sm ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                data-testid="text-configured-profit"
+              >
+                {totals.configuredProfit < 0 ? "-" : ""}
+                {formatAmount(Math.abs(totals.configuredProfit))}
               </span>
             </div>
           </>
@@ -644,14 +667,24 @@ export default function SalesReport() {
             </PopoverTrigger>
             <PopoverContent className="w-52 p-2" align="start">
               <div className="space-y-1">
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer" onClick={() => setSelectedCompanies([])} data-testid="option-all-companies">
+                <div
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                  onClick={() => setSelectedCompanies([])}
+                  data-testid="option-all-companies"
+                >
                   <Checkbox checked={selectedCompanies.length === 0} className="h-4 w-4 pointer-events-none" />
                   <span className="text-sm font-medium">All Companies</span>
                 </div>
                 <div className="border-t my-1" />
                 {companyFilterOptions.map(([code, name]) => (
-                  <div key={code} className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
-                    onClick={() => setSelectedCompanies(prev => prev.includes(code) ? prev.filter(c => c !== code) : [...prev, code])}
+                  <div
+                    key={code}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                    onClick={() =>
+                      setSelectedCompanies((prev) =>
+                        prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+                      )
+                    }
                     data-testid={`option-company-${code}`}
                   >
                     <Checkbox checked={selectedCompanies.includes(code)} className="h-4 w-4 pointer-events-none" />
@@ -693,7 +726,7 @@ export default function SalesReport() {
         <Button
           variant={mergeView ? "default" : "outline"}
           size="sm"
-          onClick={() => setMergeView(v => !v)}
+          onClick={() => setMergeView((v) => !v)}
           className="gap-1.5"
           data-testid="button-merge-view"
         >
@@ -704,7 +737,13 @@ export default function SalesReport() {
         {/* Locations multi-select */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-location-filter" disabled={isMultiCompanyMode}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              data-testid="button-location-filter"
+              disabled={isMultiCompanyMode}
+            >
               {selectedLocations.length === 0
                 ? "All Locations"
                 : `${selectedLocations.length} Location${selectedLocations.length !== 1 ? "s" : ""}`}
@@ -713,14 +752,25 @@ export default function SalesReport() {
           </PopoverTrigger>
           <PopoverContent className="w-52 p-2" align="start">
             <div className="space-y-1">
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer" onClick={() => setSelectedLocations([])}>
+              <div
+                className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                onClick={() => setSelectedLocations([])}
+              >
                 <Checkbox checked={selectedLocations.length === 0} className="h-4 w-4" />
                 <span className="text-sm font-medium">All Locations</span>
               </div>
               <div className="border-t my-1" />
               {locations.map((loc: any) => (
-                <div key={loc.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
-                  onClick={() => setSelectedLocations(prev => prev.includes(String(loc.id)) ? prev.filter(l => l !== String(loc.id)) : [...prev, String(loc.id)])}
+                <div
+                  key={loc.id}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                  onClick={() =>
+                    setSelectedLocations((prev) =>
+                      prev.includes(String(loc.id))
+                        ? prev.filter((l) => l !== String(loc.id))
+                        : [...prev, String(loc.id)]
+                    )
+                  }
                   data-testid={`option-location-${loc.id}`}
                 >
                   <Checkbox checked={selectedLocations.includes(String(loc.id))} className="h-4 w-4" />
@@ -743,14 +793,23 @@ export default function SalesReport() {
           </PopoverTrigger>
           <PopoverContent className="w-52 p-2" align="start">
             <div className="space-y-1">
-              <div className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer" onClick={() => setSelectedStockGroups([])}>
+              <div
+                className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                onClick={() => setSelectedStockGroups([])}
+              >
                 <Checkbox checked={selectedStockGroups.length === 0} className="h-4 w-4" />
                 <span className="text-sm font-medium">All Groups</span>
               </div>
               <div className="border-t my-1" />
               {stockGroups.map((g: any) => (
-                <div key={g.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
-                  onClick={() => setSelectedStockGroups(prev => prev.includes(String(g.id)) ? prev.filter(x => x !== String(g.id)) : [...prev, String(g.id)])}
+                <div
+                  key={g.id}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded hover-elevate cursor-pointer"
+                  onClick={() =>
+                    setSelectedStockGroups((prev) =>
+                      prev.includes(String(g.id)) ? prev.filter((x) => x !== String(g.id)) : [...prev, String(g.id)]
+                    )
+                  }
                   data-testid={`option-group-${g.id}`}
                 >
                   <Checkbox checked={selectedStockGroups.includes(String(g.id))} className="h-4 w-4" />
@@ -782,107 +841,176 @@ export default function SalesReport() {
       <div>
         <p className="text-xs text-muted-foreground mb-3">
           Sales by {grouping.charAt(0).toUpperCase() + grouping.slice(1)}
-          {filteredGroupedData.length > 0 && ` · ${filteredGroupedData.length} row${filteredGroupedData.length !== 1 ? "s" : ""}`}
+          {filteredGroupedData.length > 0 &&
+            ` · ${filteredGroupedData.length} row${filteredGroupedData.length !== 1 ? "s" : ""}`}
           {" · "}Click any row to drill in
         </p>
         <div className="border rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Items</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right">Qty</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right">Total Sales</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Cost Price</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Cost Profit</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Hassan's Price</TableHead>
-                <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Hassan's Profit</TableHead>
-                <TableHead className="text-xs h-9 w-8"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                [...Array(6)].map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-10 ml-auto" /></TableCell>
-                    <TableCell><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                    <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                    <TableCell></TableCell>
-                  </TableRow>
-                ))
-              ) : filteredGroupedData.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9}>
-                    <div className="flex flex-col items-center gap-2 py-10 text-center">
-                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                        <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                      <p className="text-sm font-medium">No sales found</p>
-                      <p className="text-xs text-muted-foreground">Try adjusting your date range or filters</p>
-                    </div>
-                  </TableCell>
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">Items</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right">Qty</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right">Total Sales</TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">
+                    Cost Price
+                  </TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">
+                    Cost Profit
+                  </TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">
+                    Hassan's Price
+                  </TableHead>
+                  <TableHead className="text-xs h-9 font-semibold text-right hidden sm:table-cell">
+                    Hassan's Profit
+                  </TableHead>
+                  <TableHead className="text-xs h-9 w-8"></TableHead>
                 </TableRow>
-              ) : (
-                <>
-                  {filteredGroupedData.map((group) => (
-                    <TableRow
-                      key={group.date}
-                      data-testid={`row-sale-${group.date}`}
-                      className={`cursor-pointer hover:bg-muted/40${selectedRowDate === group.date ? " bg-muted/40" : ""}`}
-                      onClick={() => handleRowClick(group)}
-                    >
-                      <TableCell className="font-medium py-3">
-                        <div className="flex items-center gap-2">
-                          {group.displayDate}
-                          {group.hasMixedSales ? (
-                            <Badge variant="secondary" className="text-xs no-default-active-elevate bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300">Credit + Cash</Badge>
-                          ) : group.isCreditSale ? (
-                            <Badge variant="secondary" className="text-xs no-default-active-elevate bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">Credit</Badge>
-                          ) : null}
-                        </div>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  [...Array(6)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <Skeleton className="h-4 w-24" />
                       </TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatNumber(group.itemCount, 0)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(group.totalQty, 0)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(group.totalSales)}</TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground hidden sm:table-cell">{formatAmount(group.totalCost)}</TableCell>
-                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold hidden sm:table-cell ${group.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                        {group.costProfit < 0 ? "-" : ""}{formatAmount(Math.abs(group.costProfit))}
+                      <TableCell className="hidden sm:table-cell">
+                        <Skeleton className="h-4 w-8 ml-auto" />
                       </TableCell>
-                      <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground hidden sm:table-cell">{formatAmount(group.totalConfiguredCost)}</TableCell>
-                      <TableCell className={`py-3 text-right font-mono text-sm font-semibold hidden sm:table-cell ${group.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                        {group.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(group.configuredProfit))}
+                      <TableCell>
+                        <Skeleton className="h-4 w-10 ml-auto" />
                       </TableCell>
-                      <TableCell className="py-3">
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      <TableCell>
+                        <Skeleton className="h-4 w-20 ml-auto" />
                       </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Skeleton className="h-4 w-20 ml-auto" />
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Skeleton className="h-4 w-16 ml-auto" />
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Skeleton className="h-4 w-20 ml-auto" />
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        <Skeleton className="h-4 w-16 ml-auto" />
+                      </TableCell>
+                      <TableCell></TableCell>
                     </TableRow>
-                  ))}
-                  {/* Totals Row */}
-                  <TableRow className="bg-muted/40 hover:bg-muted/40 font-semibold">
-                    <TableCell className="py-3 text-xs uppercase tracking-wide text-muted-foreground">Total</TableCell>
-                    <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatNumber(localFilteredData.length, 0)}</TableCell>
-                    <TableCell className="py-3 text-right font-mono text-sm">{formatNumber(totals.totalQty, 0)}</TableCell>
-                    <TableCell className="py-3 text-right font-mono text-sm">{formatAmount(totals.totalSales)}</TableCell>
-                    <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatAmount(totals.totalCost)}</TableCell>
-                    <TableCell className={`py-3 text-right font-mono text-sm hidden sm:table-cell ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                      {totals.costProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.costProfit))}
+                  ))
+                ) : filteredGroupedData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9}>
+                      <div className="flex flex-col items-center gap-2 py-10 text-center">
+                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                          <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <p className="text-sm font-medium">No sales found</p>
+                        <p className="text-xs text-muted-foreground">Try adjusting your date range or filters</p>
+                      </div>
                     </TableCell>
-                    <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">{formatAmount(totals.totalConfiguredCost)}</TableCell>
-                    <TableCell className={`py-3 text-right font-mono text-sm hidden sm:table-cell ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                      {totals.configuredProfit < 0 ? "-" : ""}{formatAmount(Math.abs(totals.configuredProfit))}
-                    </TableCell>
-                    <TableCell></TableCell>
                   </TableRow>
-                </>
-              )}
-            </TableBody>
-          </Table>
+                ) : (
+                  <>
+                    {filteredGroupedData.map((group) => (
+                      <TableRow
+                        key={group.date}
+                        data-testid={`row-sale-${group.date}`}
+                        className={`cursor-pointer hover:bg-muted/40${selectedRowDate === group.date ? " bg-muted/40" : ""}`}
+                        onClick={() => handleRowClick(group)}
+                      >
+                        <TableCell className="font-medium py-3">
+                          <div className="flex items-center gap-2">
+                            {group.displayDate}
+                            {group.hasMixedSales ? (
+                              <Badge
+                                variant="secondary"
+                                className="text-xs no-default-active-elevate bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300"
+                              >
+                                Credit + Cash
+                              </Badge>
+                            ) : group.isCreditSale ? (
+                              <Badge
+                                variant="secondary"
+                                className="text-xs no-default-active-elevate bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                              >
+                                Credit
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">
+                          {formatNumber(group.itemCount, 0)}
+                        </TableCell>
+                        <TableCell className="py-3 text-right font-mono text-sm">
+                          {formatNumber(group.totalQty, 0)}
+                        </TableCell>
+                        <TableCell className="py-3 text-right font-mono text-sm">
+                          {formatAmount(group.totalSales)}
+                        </TableCell>
+                        <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground hidden sm:table-cell">
+                          {formatAmount(group.totalCost)}
+                        </TableCell>
+                        <TableCell
+                          className={`py-3 text-right font-mono text-sm font-semibold hidden sm:table-cell ${group.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                        >
+                          {group.costProfit < 0 ? "-" : ""}
+                          {formatAmount(Math.abs(group.costProfit))}
+                        </TableCell>
+                        <TableCell className="py-3 text-right font-mono text-sm text-muted-foreground hidden sm:table-cell">
+                          {formatAmount(group.totalConfiguredCost)}
+                        </TableCell>
+                        <TableCell
+                          className={`py-3 text-right font-mono text-sm font-semibold hidden sm:table-cell ${group.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                        >
+                          {group.configuredProfit < 0 ? "-" : ""}
+                          {formatAmount(Math.abs(group.configuredProfit))}
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {/* Totals Row */}
+                    <TableRow className="bg-muted/40 hover:bg-muted/40 font-semibold">
+                      <TableCell className="py-3 text-xs uppercase tracking-wide text-muted-foreground">
+                        Total
+                      </TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">
+                        {formatNumber(localFilteredData.length, 0)}
+                      </TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm">
+                        {formatNumber(totals.totalQty, 0)}
+                      </TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm">
+                        {formatAmount(totals.totalSales)}
+                      </TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">
+                        {formatAmount(totals.totalCost)}
+                      </TableCell>
+                      <TableCell
+                        className={`py-3 text-right font-mono text-sm hidden sm:table-cell ${totals.costProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                      >
+                        {totals.costProfit < 0 ? "-" : ""}
+                        {formatAmount(Math.abs(totals.costProfit))}
+                      </TableCell>
+                      <TableCell className="py-3 text-right font-mono text-sm hidden sm:table-cell">
+                        {formatAmount(totals.totalConfiguredCost)}
+                      </TableCell>
+                      <TableCell
+                        className={`py-3 text-right font-mono text-sm hidden sm:table-cell ${totals.configuredProfit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}
+                      >
+                        {totals.configuredProfit < 0 ? "-" : ""}
+                        {formatAmount(Math.abs(totals.configuredProfit))}
+                      </TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </>
+                )}
+              </TableBody>
+            </Table>
           </div>
         </div>
       </div>

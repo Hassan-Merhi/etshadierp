@@ -1,22 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2, FileText, TrendingDown, TrendingUp, Loader2, Building2 } from "lucide-react";
@@ -30,12 +18,12 @@ function fmt2(v: any) {
 }
 
 const CHARGE_TYPES = [
-  { value: "prepaid_used",    label: "Prepaid Used" },
-  { value: "paid_now",        label: "Paid Now (Cash/Bank)" },
-  { value: "unpaid_payable",  label: "Unpaid Payable (Accrual)" },
+  { value: "prepaid_used", label: "Prepaid Used" },
+  { value: "paid_now", label: "Paid Now (Cash/Bank)" },
+  { value: "unpaid_payable", label: "Unpaid Payable (Accrual)" },
   { value: "invoice_freight", label: "Invoice Freight (Cost Clearing)" },
-  { value: "other",           label: "Other (Any Account)" },
-  { value: "parent_agent",    label: "Agent via HADI L'SHI" },
+  { value: "other", label: "Other (Any Account)" },
+  { value: "parent_agent", label: "Agent via HADI L'SHI" },
 ];
 
 interface ChargeLine {
@@ -101,19 +89,28 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
   const prepaidExpAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_prepaid_expenses");
   const hadiIcAcct = (statusData?.spAccounts || []).find((a: any) => a.subType === "sp_hadi_intercompany");
 
-  const activeCharges = chargeLines.filter(c => parseFloat(c.amountUsd || "0") > 0);
-  const agentCharges = activeCharges.filter(c => c.chargeType === "parent_agent");
+  const activeCharges = chargeLines.filter((c) => parseFloat(c.amountUsd || "0") > 0);
+  const agentCharges = activeCharges.filter((c) => c.chargeType === "parent_agent");
   const totalAgentCharges = agentCharges.reduce((s, c) => s + parseFloat(c.amountUsd || "0"), 0);
 
-  const addCharge = () => setChargeLines(prev => [
-    ...prev,
-    { chargeType: "paid_now", description: "", amountUsd: "", prepaidChargeId: "", creditBankAccountId: "", creditLedgerAccountId: "", parentAgentAccountId: "" },
-  ]);
+  const addCharge = () =>
+    setChargeLines((prev) => [
+      ...prev,
+      {
+        chargeType: "paid_now",
+        description: "",
+        amountUsd: "",
+        prepaidChargeId: "",
+        creditBankAccountId: "",
+        creditLedgerAccountId: "",
+        parentAgentAccountId: "",
+      },
+    ]);
 
-  const removeCharge = (idx: number) => setChargeLines(prev => prev.filter((_, i) => i !== idx));
+  const removeCharge = (idx: number) => setChargeLines((prev) => prev.filter((_, i) => i !== idx));
 
   const updateCharge = (idx: number, key: keyof ChargeLine, value: string) =>
-    setChargeLines(prev => prev.map((c, i) => i === idx ? { ...c, [key]: value } : c));
+    setChargeLines((prev) => prev.map((c, i) => (i === idx ? { ...c, [key]: value } : c)));
 
   const offloadMutation = useMutation({
     mutationFn: () => {
@@ -125,7 +122,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
         containerId: container.id,
         offloadDate,
         locationId: selectedLocationId,
-        chargeLines: chargeLines.filter(c => parseFloat(c.amountUsd || "0") > 0),
+        chargeLines: chargeLines.filter((c) => parseFloat(c.amountUsd || "0") > 0),
       });
     },
     onSuccess: () => {
@@ -141,14 +138,22 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
   });
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!offloadMutation.isPending) { onOpenChange(v); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!offloadMutation.isPending) {
+          onOpenChange(v);
+        }
+      }}
+    >
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Offload Container</DialogTitle>
           <DialogDescription>
             {container.supplierName}
             {container.containerNumber ? ` · ${container.containerNumber}` : ""}
-            {" · "}{container.invoiceNumber}
+            {" · "}
+            {container.invoiceNumber}
           </DialogDescription>
         </DialogHeader>
 
@@ -162,7 +167,9 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
               </SelectTrigger>
               <SelectContent>
                 {(locationsList as any[]).map((l: any) => (
-                  <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                  <SelectItem key={l.id} value={String(l.id)}>
+                    {l.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -176,7 +183,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                 id="sp-offload-date"
                 type="date"
                 value={offloadDate}
-                onChange={e => setOffloadDate(e.target.value)}
+                onChange={(e) => setOffloadDate(e.target.value)}
                 className="mt-1"
                 data-testid="input-sp-offload-date"
               />
@@ -209,17 +216,22 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
             )}
 
             {chargeLines.map((charge, idx) => (
-              <div key={idx} className="grid grid-cols-12 gap-2 items-start p-3 border border-border rounded-md bg-muted/20">
+              <div
+                key={idx}
+                className="grid grid-cols-12 gap-2 items-start p-3 border border-border rounded-md bg-muted/20"
+              >
                 {/* Charge type */}
                 <div className="col-span-4">
                   <Label className="text-xs">Type</Label>
-                  <Select value={charge.chargeType} onValueChange={v => updateCharge(idx, "chargeType", v)}>
+                  <Select value={charge.chargeType} onValueChange={(v) => updateCharge(idx, "chargeType", v)}>
                     <SelectTrigger className="h-8 text-xs mt-1" data-testid={`select-sp-charge-type-${idx}`}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CHARGE_TYPES.map(t => (
-                        <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                      {CHARGE_TYPES.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -230,7 +242,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                   <Label className="text-xs">Description</Label>
                   <Input
                     value={charge.description}
-                    onChange={e => updateCharge(idx, "description", e.target.value)}
+                    onChange={(e) => updateCharge(idx, "description", e.target.value)}
                     placeholder="e.g., Port fees"
                     className="h-8 text-xs mt-1"
                     data-testid={`input-sp-charge-desc-${idx}`}
@@ -244,7 +256,7 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     type="number"
                     step="0.01"
                     value={charge.amountUsd}
-                    onChange={e => updateCharge(idx, "amountUsd", e.target.value)}
+                    onChange={(e) => updateCharge(idx, "amountUsd", e.target.value)}
                     placeholder="0.00"
                     className="h-8 text-xs mt-1"
                     data-testid={`input-sp-charge-amount-${idx}`}
@@ -253,12 +265,13 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
 
                 {/* Credit account picker — varies by type */}
                 <div className="col-span-2">
-                  <Label className="text-xs">
-                    {charge.chargeType === "parent_agent" ? "Agent" : "Credit Account"}
-                  </Label>
+                  <Label className="text-xs">{charge.chargeType === "parent_agent" ? "Agent" : "Credit Account"}</Label>
                   <div className="mt-1">
                     {charge.chargeType === "prepaid_used" ? (
-                      <Select value={charge.prepaidChargeId} onValueChange={v => updateCharge(idx, "prepaidChargeId", v)}>
+                      <Select
+                        value={charge.prepaidChargeId}
+                        onValueChange={(v) => updateCharge(idx, "prepaidChargeId", v)}
+                      >
                         <SelectTrigger className="h-8 text-xs" data-testid={`select-sp-charge-prepaid-${idx}`}>
                           <SelectValue placeholder="Select prepaid" />
                         </SelectTrigger>
@@ -271,29 +284,42 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                         </SelectContent>
                       </Select>
                     ) : charge.chargeType === "paid_now" ? (
-                      <Select value={charge.creditBankAccountId} onValueChange={v => updateCharge(idx, "creditBankAccountId", v)}>
+                      <Select
+                        value={charge.creditBankAccountId}
+                        onValueChange={(v) => updateCharge(idx, "creditBankAccountId", v)}
+                      >
                         <SelectTrigger className="h-8 text-xs" data-testid={`select-sp-charge-bank-${idx}`}>
                           <SelectValue placeholder="Select bank" />
                         </SelectTrigger>
                         <SelectContent>
                           {(statusData?.bankAccounts || []).map((b: any) => (
-                            <SelectItem key={b.id} value={String(b.id)}>{b.bankName}</SelectItem>
+                            <SelectItem key={b.id} value={String(b.id)}>
+                              {b.bankName}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : charge.chargeType === "unpaid_payable" || charge.chargeType === "other" ? (
-                      <Select value={charge.creditLedgerAccountId} onValueChange={v => updateCharge(idx, "creditLedgerAccountId", v)}>
+                      <Select
+                        value={charge.creditLedgerAccountId}
+                        onValueChange={(v) => updateCharge(idx, "creditLedgerAccountId", v)}
+                      >
                         <SelectTrigger className="h-8 text-xs" data-testid={`select-sp-charge-ledger-${idx}`}>
                           <SelectValue placeholder="Select account" />
                         </SelectTrigger>
                         <SelectContent>
                           {(ledgerAccounts as any[]).map((a: any) => (
-                            <SelectItem key={a.id} value={String(a.id)}>{a.code} — {a.name}</SelectItem>
+                            <SelectItem key={a.id} value={String(a.id)}>
+                              {a.code} — {a.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     ) : charge.chargeType === "parent_agent" ? (
-                      <Select value={charge.parentAgentAccountId} onValueChange={v => updateCharge(idx, "parentAgentAccountId", v)}>
+                      <Select
+                        value={charge.parentAgentAccountId}
+                        onValueChange={(v) => updateCharge(idx, "parentAgentAccountId", v)}
+                      >
                         <SelectTrigger className="h-8 text-xs" data-testid={`select-sp-charge-agent-${idx}`}>
                           <SelectValue placeholder="Select agent" />
                         </SelectTrigger>
@@ -307,7 +333,9 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                       </Select>
                     ) : (
                       <div className="h-8 flex items-center px-1">
-                        <Badge variant="secondary" className="text-xs">Auto → Cost Clearing</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          Auto → Cost Clearing
+                        </Badge>
                       </div>
                     )}
                   </div>
@@ -369,7 +397,9 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
             <div className="space-y-1">
               <div className="flex items-center gap-1.5">
                 <TrendingDown className="h-3.5 w-3.5 text-muted-foreground" />
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Voucher A — Goods OTW Reversal (SP Test Co)</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Voucher A — Goods OTW Reversal (SP Test Co)
+                </p>
               </div>
               <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
                 <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
@@ -379,7 +409,9 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                 <div className="grid grid-cols-3 text-xs py-0.5">
                   <span className="col-span-2 font-medium">
                     {otwClrAcct?.name ?? "Goods OTW Clearing"}{" "}
-                    <Badge variant="secondary" className="text-xs ml-1">Dr</Badge>
+                    <Badge variant="secondary" className="text-xs ml-1">
+                      Dr
+                    </Badge>
                   </span>
                   <span className="text-right tabular-nums font-semibold">{fmt2(invoiceTotal)}</span>
                 </div>
@@ -394,7 +426,9 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
             <div className="space-y-1">
               <div className="flex items-center gap-1.5">
                 <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Voucher B — Stock Creation (SP Test Co)</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Voucher B — Stock Creation (SP Test Co)
+                </p>
               </div>
               <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1">
                 <div className="grid grid-cols-3 text-xs text-muted-foreground font-medium pb-1 border-b border-border/40">
@@ -404,12 +438,16 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                 <div className="grid grid-cols-3 text-xs py-0.5">
                   <span className="col-span-2 font-medium">
                     {stockAcct?.name ?? "SP Stock on Floor"}{" "}
-                    <Badge variant="secondary" className="text-xs ml-1">Dr</Badge>
+                    <Badge variant="secondary" className="text-xs ml-1">
+                      Dr
+                    </Badge>
                   </span>
                   <span className="text-right tabular-nums font-semibold">{fmt2(totalFinalCost)}</span>
                 </div>
                 <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground">
-                  <span className="col-span-2 pl-4">{costClrAcct?.name ?? "SP Cost Clearing"} — base supplier cost (Cr)</span>
+                  <span className="col-span-2 pl-4">
+                    {costClrAcct?.name ?? "SP Cost Clearing"} — base supplier cost (Cr)
+                  </span>
                   <span className="text-right tabular-nums">{fmt2(totalBaseCost)}</span>
                 </div>
                 {activeCharges.map((c, idx) => {
@@ -427,7 +465,9 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     creditLabel = a ? `${a.name}` : "Ledger Account";
                   } else if (c.chargeType === "parent_agent") {
                     creditLabel = prepaidExpAcct?.name ?? "Prepaid Expenses";
-                    const agent = (parentAgents as any[]).find((x: any) => String(x.ledger_account_id) === c.parentAgentAccountId);
+                    const agent = (parentAgents as any[]).find(
+                      (x: any) => String(x.ledger_account_id) === c.parentAgentAccountId
+                    );
                     if (agent) creditLabel += ` (via ${agent.account_name})`;
                   } else {
                     creditLabel = `${costClrAcct?.name ?? "Cost Clearing"} — freight`;
@@ -465,22 +505,30 @@ export function SpOffloadDialog({ open, onOpenChange, container, onSuccess }: Sp
                     <span className="text-right">Dr / Cr</span>
                   </div>
                   {agentCharges.map((c, idx) => {
-                    const agent = (parentAgents as any[]).find((x: any) => String(x.ledger_account_id) === c.parentAgentAccountId);
+                    const agent = (parentAgents as any[]).find(
+                      (x: any) => String(x.ledger_account_id) === c.parentAgentAccountId
+                    );
                     return (
                       <div key={idx} className="grid grid-cols-3 text-xs py-0.5">
                         <span className="col-span-2 font-medium">
                           {agent?.account_name ?? "Agent Account"}{" "}
-                          <Badge variant="secondary" className="text-xs ml-1">Dr</Badge>
+                          <Badge variant="secondary" className="text-xs ml-1">
+                            Dr
+                          </Badge>
                           {c.description ? <span className="text-muted-foreground ml-1">— {c.description}</span> : null}
                         </span>
-                        <span className="text-right tabular-nums font-semibold">{fmt2(parseFloat(c.amountUsd || "0"))}</span>
+                        <span className="text-right tabular-nums font-semibold">
+                          {fmt2(parseFloat(c.amountUsd || "0"))}
+                        </span>
                       </div>
                     );
                   })}
                   <div className="grid grid-cols-3 text-xs py-0.5 text-muted-foreground border-t border-border/40 pt-1 mt-1">
                     <span className="col-span-2 pl-4">
                       {hadiIcAcct?.name ?? "SP Test Co — Intercompany"} (Cr)
-                      <Badge variant="outline" className="text-xs ml-1">excluded from Net Position</Badge>
+                      <Badge variant="outline" className="text-xs ml-1">
+                        excluded from Net Position
+                      </Badge>
                     </span>
                     <span className="text-right tabular-nums">{fmt2(totalAgentCharges)}</span>
                   </div>

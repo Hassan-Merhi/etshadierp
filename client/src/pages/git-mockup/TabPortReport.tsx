@@ -11,9 +11,7 @@ import { PORT_BUCKETS as BUCKETS } from "./types";
 export function TabPortReport() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
 
-  const queryUrl = companyMode === "all"
-    ? "/api/git/containers?allCompanies=true"
-    : "/api/git/containers";
+  const queryUrl = companyMode === "all" ? "/api/git/containers?allCompanies=true" : "/api/git/containers";
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],
@@ -26,45 +24,63 @@ export function TabPortReport() {
   const modeSelector = (
     <div className="flex items-center gap-2 mb-3">
       <span className="text-xs text-muted-foreground">Viewing:</span>
-      <Button size="sm" variant={companyMode === "session" ? "default" : "outline"} onClick={() => setCompanyMode("session")} data-testid="btn-port-mode-session">My Company</Button>
-      <Button size="sm" variant={companyMode === "all" ? "default" : "outline"} onClick={() => setCompanyMode("all")} data-testid="btn-port-mode-all">All Accessible Companies</Button>
+      <Button
+        size="sm"
+        variant={companyMode === "session" ? "default" : "outline"}
+        onClick={() => setCompanyMode("session")}
+        data-testid="btn-port-mode-session"
+      >
+        My Company
+      </Button>
+      <Button
+        size="sm"
+        variant={companyMode === "all" ? "default" : "outline"}
+        onClick={() => setCompanyMode("all")}
+        data-testid="btn-port-mode-all"
+      >
+        All Accessible Companies
+      </Button>
     </div>
   );
 
-  if (isLoading) return (
-    <div className="space-y-3">
-      {modeSelector}
-      {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-md" />)}
-    </div>
-  );
+  if (isLoading)
+    return (
+      <div className="space-y-3">
+        {modeSelector}
+        {[...Array(3)].map((_, i) => (
+          <Skeleton key={i} className="h-24 w-full rounded-md" />
+        ))}
+      </div>
+    );
 
-  if (isError) return (
-    <div className="space-y-3">
-      {modeSelector}
-      <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm">
-        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-        <div>
-          <div className="font-semibold">Failed to load container data</div>
-          <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+  if (isError)
+    return (
+      <div className="space-y-3">
+        {modeSelector}
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Failed to load container data</div>
+            <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
 
-  const bucketed = BUCKETS.map(b => ({
+  const bucketed = BUCKETS.map((b) => ({
     ...b,
-    rows: allContainers.filter(r => b.statuses.includes(r.status)),
+    rows: allContainers.filter((r) => b.statuses.includes(r.status)),
   }));
 
   const totalCount = allContainers.length;
-  const totalCost  = allContainers.reduce((s, r) => s + parseNum(r.grandTotal), 0);
+  const totalCost = allContainers.reduce((s, r) => s + parseNum(r.grandTotal), 0);
 
   return (
     <div className="space-y-4">
       {modeSelector}
 
       <div className="flex gap-4 flex-wrap p-3 rounded-md border bg-muted/30 text-sm">
-        {bucketed.map(b => (
+        {bucketed.map((b) => (
           <div key={b.key} className="flex items-center gap-1.5">
             <span className="text-muted-foreground text-xs">{b.label}:</span>
             <span className="text-sm font-bold">{b.rows.length}</span>
@@ -86,9 +102,9 @@ export function TabPortReport() {
         <div className="py-10 text-center text-muted-foreground text-sm">No active containers found.</div>
       )}
 
-      {bucketed.map(b => {
+      {bucketed.map((b) => {
         const bucketTotal = b.rows.reduce((s, r) => s + parseNum(r.grandTotal), 0);
-        const companies   = [...new Set(b.rows.map(r => r.companyName))];
+        const companies = [...new Set(b.rows.map((r) => r.companyName))];
         return (
           <div key={b.key} className="rounded-md border overflow-hidden">
             <div className={cn("flex items-center justify-between px-3 py-1.5", b.headerBg, b.headerText)}>
@@ -122,8 +138,8 @@ export function TabPortReport() {
                     </tr>
                   </thead>
                   <tbody>
-                    {companies.map(company => {
-                      const compRows = b.rows.filter(r => r.companyName === company);
+                    {companies.map((company) => {
+                      const compRows = b.rows.filter((r) => r.companyName === company);
                       return compRows.map((r, idx) => (
                         <tr
                           key={r.id}
@@ -148,19 +164,25 @@ export function TabPortReport() {
                             {r.daysDelayed ? <span className="ml-1 text-[10px]">+{r.daysDelayed}d</span> : null}
                           </td>
                           <td className="py-0.5 px-2 text-center">
-                            {r.docReceived
-                              ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-                              : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
+                            {r.docReceived ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />
+                            )}
                           </td>
                           <td className="py-0.5 px-2 text-center">
-                            {r.docsSentDate
-                              ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-                              : r.docReceived
-                                ? <span className="text-amber-700 text-[10px] font-medium">READY</span>
-                                : "—"}
+                            {r.docsSentDate ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
+                            ) : r.docReceived ? (
+                              <span className="text-amber-700 text-[10px] font-medium">READY</span>
+                            ) : (
+                              "—"
+                            )}
                           </td>
                           <td className="py-0.5 px-2">{r.agent ?? "—"}</td>
-                          <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">{r.trackingDescription ?? "—"}</td>
+                          <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">
+                            {r.trackingDescription ?? "—"}
+                          </td>
                         </tr>
                       ));
                     })}

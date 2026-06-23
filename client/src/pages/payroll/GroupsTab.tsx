@@ -4,21 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Users, HardHat, ChevronRight, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -46,7 +33,9 @@ export function GroupsTab() {
   const [newWorkerGroupName, setNewWorkerGroupName] = useState("");
   const [newWorkerGroupDescription, setNewWorkerGroupDescription] = useState("");
   const [createWorkerGroupDialogOpen, setCreateWorkerGroupDialogOpen] = useState(false);
-  const [selectedWorkerGroupForMembers, setSelectedWorkerGroupForMembers] = useState<WorkerGroupWithMembers | null>(null);
+  const [selectedWorkerGroupForMembers, setSelectedWorkerGroupForMembers] = useState<WorkerGroupWithMembers | null>(
+    null
+  );
   const [workerGroupMembersDialogOpen, setWorkerGroupMembersDialogOpen] = useState(false);
 
   const { data: workerGroups = [] } = useQuery<WorkerGroupWithMembers[]>({
@@ -57,7 +46,7 @@ export function GroupsTab() {
   const { data: workerStaff = [] } = useQuery<Employee[]>({
     queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
     enabled: !!selectedCompany,
-    select: (data: any[]) => data.filter(e => e.employeeType === "Worker"),
+    select: (data: any[]) => data.filter((e) => e.employeeType === "Worker"),
   });
 
   const createWorkerGroupMutation = useMutation({
@@ -115,7 +104,11 @@ export function GroupsTab() {
       toast({ title: "Success", description: "Worker removed from group" });
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to remove worker from group", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove worker from group",
+        variant: "destructive",
+      });
     },
   });
 
@@ -138,9 +131,9 @@ export function GroupsTab() {
           return (
             <Card key={group.id} className="overflow-hidden">
               <CardHeader className="py-4 px-6 flex flex-row items-center justify-between space-y-0 bg-muted/30">
-                <div 
-                  className="flex items-center gap-3 cursor-pointer" 
-                  onClick={() => setWorkerGroupsExpanded(prev => ({ ...prev, [group.id]: !isExpanded }))}
+                <div
+                  className="flex items-center gap-3 cursor-pointer"
+                  onClick={() => setWorkerGroupsExpanded((prev) => ({ ...prev, [group.id]: !isExpanded }))}
                 >
                   {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   <Users className="h-5 w-5 text-primary" />
@@ -217,7 +210,9 @@ export function GroupsTab() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-muted-foreground hover:text-destructive"
-                                onClick={() => removeWorkerFromWorkerGroupMutation.mutate({ groupId: group.id, workerId: member.id })}
+                                onClick={() =>
+                                  removeWorkerFromWorkerGroupMutation.mutate({ groupId: group.id, workerId: member.id })
+                                }
                                 data-testid={`button-remove-member-${member.id}`}
                               >
                                 Remove
@@ -278,7 +273,11 @@ export function GroupsTab() {
             </div>
           </div>
           <div className="flex justify-end gap-3 mt-4">
-            <Button variant="outline" onClick={() => setCreateWorkerGroupDialogOpen(false)} data-testid="button-cancel-group">
+            <Button
+              variant="outline"
+              onClick={() => setCreateWorkerGroupDialogOpen(false)}
+              data-testid="button-cancel-group"
+            >
               Cancel
             </Button>
             <Button

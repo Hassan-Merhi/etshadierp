@@ -6,43 +6,110 @@ import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, checkFactoryAdmin,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  checkFactoryAdmin,
 } from "./_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -276,13 +343,21 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       let supplierNameForDesc = "";
       if (container.supplierId) {
-        const [sup] = await db.select({ name: factorySuppliers.name }).from(factorySuppliers).where(eq(factorySuppliers.id, container.supplierId));
+        const [sup] = await db
+          .select({ name: factorySuppliers.name })
+          .from(factorySuppliers)
+          .where(eq(factorySuppliers.id, container.supplierId));
         supplierNameForDesc = sup?.name || "";
       }
       const kgForDesc = parseFloat(container.totalKg || "0");
       const rateForDesc = parseFloat(container.ratePerKg || "0");
       const ccyForDesc = container.currencyCode || "USD";
-      const descParts = [container.containerNumber, supplierNameForDesc, kgForDesc > 0 ? `${kgForDesc.toLocaleString()} kg` : null, rateForDesc > 0 ? `${rateForDesc} ${ccyForDesc}/kg` : null].filter(Boolean);
+      const descParts = [
+        container.containerNumber,
+        supplierNameForDesc,
+        kgForDesc > 0 ? `${kgForDesc.toLocaleString()} kg` : null,
+        rateForDesc > 0 ? `${rateForDesc} ${ccyForDesc}/kg` : null,
+      ].filter(Boolean);
 
       await writeDaybookEntry(db, {
         companyId,
@@ -300,17 +375,20 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (goodsValue > 0 && container.supplierId) {
         const importCostAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_IMPORT_COST", "Factory Import Cost");
         const importVoucherNum = `FACTORY-IMPORT-${container.id}-${Date.now()}`;
-        const [importVoucher] = await db.insert(vouchers).values({
-          companyId,
-          voucherType: "Journal",
-          voucherNumber: importVoucherNum,
-          voucherDate: container.arrivalDate || today,
-          description: `Goods import - container ${container.containerNumber}`,
-          totalAmount: String(goodsValue),
-          currency: container.currencyCode || "USD",
-          exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
-          sourceModule: "FACTORY",
-        }).returning();
+        const [importVoucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: importVoucherNum,
+            voucherDate: container.arrivalDate || today,
+            description: `Goods import - container ${container.containerNumber}`,
+            totalAmount: String(goodsValue),
+            currency: container.currencyCode || "USD",
+            exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+            sourceModule: "FACTORY",
+          })
+          .returning();
         await db.insert(voucherEntries).values({
           voucherId: importVoucher.id,
           ledgerAccountId: importCostAccId,
@@ -340,19 +418,21 @@ export function registerFactoryContainersRoutes(app: Express) {
       const freightOwnAcctId = (container as any).freightOwnAccountId ?? null;
       if (freightAmt > 0 && container.freightAccountId) {
         const freightVoucherNum = `FACTORY-FREIGHT-${container.id}`;
-        const [freightVoucher] = await db.insert(vouchers).values({
-          companyId,
-          voucherType: freightPaidBy === "own" ? "Payment" : "Journal",
-          voucherNumber: freightVoucherNum,
-          voucherDate: container.arrivalDate || today,
-          description: `Freight on container ${container.containerNumber}`,
-          totalAmount: String(freightAmt),
-          currency: freightCcy,
-          exchangeRate: freightCcy === (container.currencyCode || "USD")
-            ? String(parseFloat(container.fxRateToUsd || "1"))
-            : "1",
-          sourceModule: "FACTORY",
-        }).returning();
+        const [freightVoucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherType: freightPaidBy === "own" ? "Payment" : "Journal",
+            voucherNumber: freightVoucherNum,
+            voucherDate: container.arrivalDate || today,
+            description: `Freight on container ${container.containerNumber}`,
+            totalAmount: String(freightAmt),
+            currency: freightCcy,
+            exchangeRate:
+              freightCcy === (container.currencyCode || "USD") ? String(parseFloat(container.fxRateToUsd || "1")) : "1",
+            sourceModule: "FACTORY",
+          })
+          .returning();
         // Dr Freight Expense
         await db.insert(voucherEntries).values({
           voucherId: freightVoucher.id,
@@ -400,13 +480,13 @@ export function registerFactoryContainersRoutes(app: Express) {
       const b = req.body;
 
       // Helper: coerce empty-string / undefined to null for numeric/integer columns
-      const dec = (v: any) => (v === "" || v === undefined || v === null) ? null : String(v);
+      const dec = (v: any) => (v === "" || v === undefined || v === null ? null : String(v));
       const int = (v: any) => {
         if (v === "" || v === undefined || v === null) return null;
         const n = parseInt(v);
         return isNaN(n) ? null : n;
       };
-      const str = (v: any) => (v === "" || v === undefined) ? null : String(v);
+      const str = (v: any) => (v === "" || v === undefined ? null : String(v));
 
       // Build a strict whitelist — only valid factoryContainers columns
       const updateData: Record<string, any> = {
@@ -414,69 +494,73 @@ export function registerFactoryContainersRoutes(app: Express) {
       };
 
       if (b.containerNumber !== undefined) updateData.containerNumber = String(b.containerNumber || "");
-      if (b.supplierId     !== undefined) updateData.supplierId     = int(b.supplierId);
-      if (b.origin         !== undefined) updateData.origin         = str(b.origin);
-      if (b.totalKg        !== undefined) updateData.totalKg        = dec(b.totalKg);
-      if (b.ratePerKg      !== undefined) updateData.ratePerKg      = dec(b.ratePerKg);
-      if (b.arrivalDate    !== undefined) updateData.arrivalDate    = str(b.arrivalDate);
-      if (b.destination    !== undefined) updateData.destination    = str(b.destination);
-      if (b.notes          !== undefined) updateData.notes          = str(b.notes);
-      if (b.status         !== undefined) updateData.status         = String(b.status || "PENDING");
-      if (b.currencyCode   !== undefined) updateData.currencyCode   = String(b.currencyCode || "USD");
-      if (b.fxRateSource   !== undefined) updateData.fxRateSource   = String(b.fxRateSource || "auto");
-      if (b.fxRateToUsd    !== undefined) updateData.fxRateToUsd    = dec(b.fxRateToUsd) ?? "1";
+      if (b.supplierId !== undefined) updateData.supplierId = int(b.supplierId);
+      if (b.origin !== undefined) updateData.origin = str(b.origin);
+      if (b.totalKg !== undefined) updateData.totalKg = dec(b.totalKg);
+      if (b.ratePerKg !== undefined) updateData.ratePerKg = dec(b.ratePerKg);
+      if (b.arrivalDate !== undefined) updateData.arrivalDate = str(b.arrivalDate);
+      if (b.destination !== undefined) updateData.destination = str(b.destination);
+      if (b.notes !== undefined) updateData.notes = str(b.notes);
+      if (b.status !== undefined) updateData.status = String(b.status || "PENDING");
+      if (b.currencyCode !== undefined) updateData.currencyCode = String(b.currencyCode || "USD");
+      if (b.fxRateSource !== undefined) updateData.fxRateSource = String(b.fxRateSource || "auto");
+      if (b.fxRateToUsd !== undefined) updateData.fxRateToUsd = dec(b.fxRateToUsd) ?? "1";
       // Freight
-      if (b.freight              !== undefined) updateData.freight              = dec(b.freight) ?? "0";
-      if (b.freightCurrencyCode  !== undefined) updateData.freightCurrencyCode  = str(b.freightCurrencyCode);
-      if (b.freightAccountId     !== undefined) updateData.freightAccountId     = int(b.freightAccountId);
-      if (b.freightSupplierId    !== undefined) updateData.freightSupplierId    = int(b.freightSupplierId);
-      if (b.freightPaidBy        !== undefined) updateData.freightPaidBy        = String(b.freightPaidBy || "supplier");
-      if (b.freightOwnAccountId  !== undefined) updateData.freightOwnAccountId  = b.freightOwnAccountId === null ? null : int(b.freightOwnAccountId);
+      if (b.freight !== undefined) updateData.freight = dec(b.freight) ?? "0";
+      if (b.freightCurrencyCode !== undefined) updateData.freightCurrencyCode = str(b.freightCurrencyCode);
+      if (b.freightAccountId !== undefined) updateData.freightAccountId = int(b.freightAccountId);
+      if (b.freightSupplierId !== undefined) updateData.freightSupplierId = int(b.freightSupplierId);
+      if (b.freightPaidBy !== undefined) updateData.freightPaidBy = String(b.freightPaidBy || "supplier");
+      if (b.freightOwnAccountId !== undefined)
+        updateData.freightOwnAccountId = b.freightOwnAccountId === null ? null : int(b.freightOwnAccountId);
       // Other charges
-      if (b.otherCharges             !== undefined) updateData.otherCharges             = dec(b.otherCharges) ?? "0";
-      if (b.otherChargesCurrencyCode !== undefined) updateData.otherChargesCurrencyCode = str(b.otherChargesCurrencyCode);
-      if (b.otherChargesAccountId    !== undefined) updateData.otherChargesAccountId    = int(b.otherChargesAccountId);
-      if (b.otherChargesSupplierId   !== undefined) updateData.otherChargesSupplierId   = int(b.otherChargesSupplierId);
+      if (b.otherCharges !== undefined) updateData.otherCharges = dec(b.otherCharges) ?? "0";
+      if (b.otherChargesCurrencyCode !== undefined)
+        updateData.otherChargesCurrencyCode = str(b.otherChargesCurrencyCode);
+      if (b.otherChargesAccountId !== undefined) updateData.otherChargesAccountId = int(b.otherChargesAccountId);
+      if (b.otherChargesSupplierId !== undefined) updateData.otherChargesSupplierId = int(b.otherChargesSupplierId);
       // Commission
-      if (b.commissionAmount       !== undefined) updateData.commissionAmount       = dec(b.commissionAmount) ?? "0";
+      if (b.commissionAmount !== undefined) updateData.commissionAmount = dec(b.commissionAmount) ?? "0";
       if (b.commissionCurrencyCode !== undefined) updateData.commissionCurrencyCode = str(b.commissionCurrencyCode);
-      if (b.commissionAccountId    !== undefined) updateData.commissionAccountId    = int(b.commissionAccountId);
-      if (b.commissionSupplierId   !== undefined) updateData.commissionSupplierId   = int(b.commissionSupplierId);
-      if (b.commissionNotes        !== undefined) updateData.commissionNotes        = str(b.commissionNotes);
+      if (b.commissionAccountId !== undefined) updateData.commissionAccountId = int(b.commissionAccountId);
+      if (b.commissionSupplierId !== undefined) updateData.commissionSupplierId = int(b.commissionSupplierId);
+      if (b.commissionNotes !== undefined) updateData.commissionNotes = str(b.commissionNotes);
       // Duty
-      if (b.dutyAmount    !== undefined) updateData.dutyAmount    = dec(b.dutyAmount);
+      if (b.dutyAmount !== undefined) updateData.dutyAmount = dec(b.dutyAmount);
       if (b.dutyAccountId !== undefined) updateData.dutyAccountId = int(b.dutyAccountId);
-      if (b.dutyStatus    !== undefined) updateData.dutyStatus    = String(b.dutyStatus || "NONE");
-      if (b.dutyNotes     !== undefined) updateData.dutyNotes     = str(b.dutyNotes);
+      if (b.dutyStatus !== undefined) updateData.dutyStatus = String(b.dutyStatus || "NONE");
+      if (b.dutyNotes !== undefined) updateData.dutyNotes = str(b.dutyNotes);
 
       // FX rate computation (same logic as before)
       const needsFxCalc = updateData.currencyCode || updateData.ratePerKg || updateData.fxRateSource;
       if (needsFxCalc) {
-        const [existing] = await db.select().from(factoryContainers)
+        const [existing] = await db
+          .select()
+          .from(factoryContainers)
           .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId)));
         if (!existing) return res.status(404).json({ message: "Container not found" });
 
         const currencyCode = updateData.currencyCode || existing.currencyCode || "USD";
         const fxRateSource = updateData.fxRateSource || existing.fxRateSource || "auto";
-        const importDate   = updateData.arrivalDate   || existing.arrivalDate   || getClientDate(req);
+        const importDate = updateData.arrivalDate || existing.arrivalDate || getClientDate(req);
 
         if (fxRateSource === "auto") {
           try {
             const fxRate = await getOrFetchFxRateToUsd(companyId, currencyCode, importDate);
-            updateData.fxRateToUsd       = fxRate;
+            updateData.fxRateToUsd = fxRate;
             updateData.fxRateToUsdImport = fxRate;
-            updateData.fxRateDateImport  = importDate;
-            updateData.fxRateSource      = "auto";
+            updateData.fxRateDateImport = importDate;
+            updateData.fxRateSource = "auto";
             const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
             const fxRateNum = parseFloat(fxRate);
             updateData.ratePerKgUsd = String(currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum);
           } catch {}
         } else {
           const fxRateNum = parseFloat(updateData.fxRateToUsd || existing.fxRateToUsd || "1");
-          const ratePerKg = parseFloat(updateData.ratePerKg   || existing.ratePerKg   || "0");
+          const ratePerKg = parseFloat(updateData.ratePerKg || existing.ratePerKg || "0");
           updateData.fxRateToUsdImport = String(fxRateNum);
-          updateData.fxRateDateImport  = importDate;
-          updateData.fxRateSource      = "manual";
+          updateData.fxRateDateImport = importDate;
+          updateData.fxRateSource = "manual";
           updateData.ratePerKgUsd = String(currencyCode === "USD" ? ratePerKg : ratePerKg * fxRateNum);
         }
       }
@@ -496,14 +580,19 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       // ── Sync freight voucher ───────────────────────────────────────────────
       // Find any existing freight voucher for this container (stable or timestamped number)
-      const [existingFV] = await db.select().from(vouchers)
-        .where(and(
-          eq(vouchers.companyId, companyId),
-          or(
-            eq(vouchers.voucherNumber, `FACTORY-FREIGHT-${id}`),
-            ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${id}-%`)
+      const [existingFV] = await db
+        .select()
+        .from(vouchers)
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            or(
+              eq(vouchers.voucherNumber, `FACTORY-FREIGHT-${id}`),
+              ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${id}-%`)
+            )
           )
-        )).limit(1);
+        )
+        .limit(1);
 
       const newFreightAmt = parseFloat(updated.freight || "0");
       const newFreightAcctId = updated.freightAccountId ?? null;
@@ -514,61 +603,84 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (newFreightAmt > 0 && newFreightAcctId) {
         if (existingFV) {
           // Update existing voucher amount
-          await db.update(vouchers)
-            .set({ totalAmount: String(newFreightAmt), voucherType: newFreightPaidBy === "own" ? "Payment" : "Journal" })
+          await db
+            .update(vouchers)
+            .set({
+              totalAmount: String(newFreightAmt),
+              voucherType: newFreightPaidBy === "own" ? "Payment" : "Journal",
+            })
             .where(eq(vouchers.id, existingFV.id));
           // Update entries
-          const fEntries = await db.select().from(voucherEntries)
-            .where(eq(voucherEntries.voucherId, existingFV.id));
+          const fEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existingFV.id));
           for (const fe of fEntries) {
             if (parseFloat(fe.debitAmount || "0") > 0) {
               // Dr Freight Expense — update amount and account
-              await db.update(voucherEntries)
+              await db
+                .update(voucherEntries)
                 .set({ debitAmount: String(newFreightAmt), ledgerAccountId: newFreightAcctId })
                 .where(eq(voucherEntries.id, fe.id));
             } else if (newFreightPaidBy === "own" && newFreightOwnAcctId) {
               // Cr Own account
-              await db.update(voucherEntries)
-                .set({ creditAmount: String(newFreightAmt), ledgerAccountId: newFreightOwnAcctId, factorySupplierId: null })
+              await db
+                .update(voucherEntries)
+                .set({
+                  creditAmount: String(newFreightAmt),
+                  ledgerAccountId: newFreightOwnAcctId,
+                  factorySupplierId: null,
+                })
                 .where(eq(voucherEntries.id, fe.id));
             } else if (newFreightPaidBy === "supplier" && updated.supplierId) {
               // Cr Supplier
-              await db.update(voucherEntries)
-                .set({ creditAmount: String(newFreightAmt), factorySupplierId: updated.supplierId, ledgerAccountId: null })
+              await db
+                .update(voucherEntries)
+                .set({
+                  creditAmount: String(newFreightAmt),
+                  factorySupplierId: updated.supplierId,
+                  ledgerAccountId: null,
+                })
                 .where(eq(voucherEntries.id, fe.id));
             }
           }
         } else {
           // Create new freight voucher
           const today = getClientDate(req);
-          const [newFV] = await db.insert(vouchers).values({
-            companyId,
-            voucherType: newFreightPaidBy === "own" ? "Payment" : "Journal",
-            voucherNumber: `FACTORY-FREIGHT-${id}`,
-            voucherDate: updated.arrivalDate || today,
-            description: `Freight on container ${updated.containerNumber}`,
-            totalAmount: String(newFreightAmt),
-            currency: freightCcy,
-            sourceModule: "FACTORY",
-          }).returning();
+          const [newFV] = await db
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: newFreightPaidBy === "own" ? "Payment" : "Journal",
+              voucherNumber: `FACTORY-FREIGHT-${id}`,
+              voucherDate: updated.arrivalDate || today,
+              description: `Freight on container ${updated.containerNumber}`,
+              totalAmount: String(newFreightAmt),
+              currency: freightCcy,
+              sourceModule: "FACTORY",
+            })
+            .returning();
           await db.insert(voucherEntries).values({
-            voucherId: newFV.id, companyId,
+            voucherId: newFV.id,
+            companyId,
             ledgerAccountId: newFreightAcctId,
-            debitAmount: String(newFreightAmt), creditAmount: "0",
+            debitAmount: String(newFreightAmt),
+            creditAmount: "0",
             narration: `Freight expense - container ${updated.containerNumber}`,
           });
           if (newFreightPaidBy === "own" && newFreightOwnAcctId) {
             await db.insert(voucherEntries).values({
-              voucherId: newFV.id, companyId,
+              voucherId: newFV.id,
+              companyId,
               ledgerAccountId: newFreightOwnAcctId,
-              debitAmount: "0", creditAmount: String(newFreightAmt),
+              debitAmount: "0",
+              creditAmount: String(newFreightAmt),
               narration: `Freight paid via own account - container ${updated.containerNumber}`,
             });
           } else if (updated.supplierId) {
             await db.insert(voucherEntries).values({
-              voucherId: newFV.id, companyId,
+              voucherId: newFV.id,
+              companyId,
               factorySupplierId: updated.supplierId,
-              debitAmount: "0", creditAmount: String(newFreightAmt),
+              debitAmount: "0",
+              creditAmount: String(newFreightAmt),
               narration: `Freight payable to supplier - container ${updated.containerNumber}`,
             });
           }
@@ -601,18 +713,28 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { ids } = req.body as { ids: number[] };
-      if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "No container IDs provided" });
+      if (!Array.isArray(ids) || ids.length === 0)
+        return res.status(400).json({ message: "No container IDs provided" });
 
       // Verify all containers belong to this company
-      const owned = await db.select({ id: factoryContainers.id }).from(factoryContainers)
-        .where(and(inArray(factoryContainers.id, ids), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)));
+      const owned = await db
+        .select({ id: factoryContainers.id })
+        .from(factoryContainers)
+        .where(
+          and(
+            inArray(factoryContainers.id, ids),
+            eq(factoryContainers.companyId, companyId),
+            isNull(factoryContainers.deletedAt)
+          )
+        );
       const ownedIds = owned.map((c: any) => c.id);
       if (ownedIds.length === 0) return res.status(404).json({ message: "No containers found" });
 
       // Soft-delete: hide containers from main listings while preserving all child rows
       // (raw stock, vouchers, daybook, etc.) so they can be restored from Settings → Deleted Items.
       // Permanent deletion (with the original cascade) is performed from the admin trash UI.
-      await db.update(factoryContainers)
+      await db
+        .update(factoryContainers)
         .set({ deletedAt: new Date(), updatedAt: new Date() })
         .where(and(inArray(factoryContainers.id, ownedIds), eq(factoryContainers.companyId, companyId)));
 
@@ -622,12 +744,19 @@ export function registerFactoryContainersRoutes(app: Express) {
       // eslint-disable-next-line no-unreachable
       await db.transaction(async (tx: any) => {
         // 1. Gather commission record IDs and raw stock IDs before deleting (needed for daybook cleanup)
-        const commRows = await tx.select({ id: factoryContainerCommissions.id })
+        const commRows = await tx
+          .select({ id: factoryContainerCommissions.id })
           .from(factoryContainerCommissions)
-          .where(and(eq(factoryContainerCommissions.companyId, companyId), inArray(factoryContainerCommissions.containerId, ownedIds)));
+          .where(
+            and(
+              eq(factoryContainerCommissions.companyId, companyId),
+              inArray(factoryContainerCommissions.containerId, ownedIds)
+            )
+          );
         const commIds = commRows.map((r: any) => r.id);
 
-        const rsRows = await tx.select({ id: factoryRawStock.id })
+        const rsRows = await tx
+          .select({ id: factoryRawStock.id })
           .from(factoryRawStock)
           .where(and(eq(factoryRawStock.companyId, companyId), inArray(factoryRawStock.containerId, ownedIds)));
         const rsIds = rsRows.map((r: any) => r.id);
@@ -635,39 +764,62 @@ export function registerFactoryContainersRoutes(app: Express) {
         // 2. Delete daybook entries linked to these containers
         //    a. OFFLOAD_RAW_STOCK / COMMISSION linked by referenceId = raw stock or commission ids
         if (rsIds.length > 0) {
-          await tx.delete(factoryDaybookEntries).where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
-            inArray(factoryDaybookEntries.referenceId, rsIds)
-          ));
+          await tx
+            .delete(factoryDaybookEntries)
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+                inArray(factoryDaybookEntries.referenceId, rsIds)
+              )
+            );
         }
         if (commIds.length > 0) {
-          await tx.delete(factoryDaybookEntries).where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "COMMISSION"),
-            inArray(factoryDaybookEntries.referenceId, commIds)
-          ));
+          await tx
+            .delete(factoryDaybookEntries)
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "COMMISSION"),
+                inArray(factoryDaybookEntries.referenceId, commIds)
+              )
+            );
         }
         //    b. FREIGHT / OTHER_CHARGE / DUTY / CONTAINER_IMPORT / PURCHASE linked by referenceId = containerId
-        await tx.delete(factoryDaybookEntries).where(and(
-          eq(factoryDaybookEntries.companyId, companyId),
-          inArray(factoryDaybookEntries.txType, ["FREIGHT", "OTHER_CHARGE", "DUTY", "CONTAINER_IMPORT", "PURCHASE"]),
-          inArray(factoryDaybookEntries.referenceId, ownedIds)
-        ));
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              inArray(factoryDaybookEntries.txType, [
+                "FREIGHT",
+                "OTHER_CHARGE",
+                "DUTY",
+                "CONTAINER_IMPORT",
+                "PURCHASE",
+              ]),
+              inArray(factoryDaybookEntries.referenceId, ownedIds)
+            )
+          );
 
         // 3. Delete accounting vouchers for these containers
         //    Patterns: FACTORY-IMPORT-{id}-*, FACTORY-COMM-{id}-*, FACTORY-FREIGHT-{id}-*, FACTORY-OC-{id}-*
         for (const cid of ownedIds) {
-          const containerVouchers = await tx.select({ id: vouchers.id }).from(vouchers).where(and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.sourceModule, "FACTORY"),
-            or(
-              ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${cid}-%`),
-              ilike(vouchers.voucherNumber, `FACTORY-COMM-${cid}-%`),
-              ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${cid}-%`),
-              ilike(vouchers.voucherNumber, `FACTORY-OC-${cid}-%`)
-            )
-          ));
+          const containerVouchers = await tx
+            .select({ id: vouchers.id })
+            .from(vouchers)
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                eq(vouchers.sourceModule, "FACTORY"),
+                or(
+                  ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${cid}-%`),
+                  ilike(vouchers.voucherNumber, `FACTORY-COMM-${cid}-%`),
+                  ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${cid}-%`),
+                  ilike(vouchers.voucherNumber, `FACTORY-OC-${cid}-%`)
+                )
+              )
+            );
           if (containerVouchers.length > 0) {
             const vIds = containerVouchers.map((v: any) => v.id);
             await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
@@ -676,43 +828,54 @@ export function registerFactoryContainersRoutes(app: Express) {
         }
 
         // 4. Delete FX allocations and transfer records referencing these containers
-        await tx.delete(factoryFxAllocations).where(and(
-          eq(factoryFxAllocations.companyId, companyId),
-          inArray(factoryFxAllocations.containerId, ownedIds)
-        ));
+        await tx
+          .delete(factoryFxAllocations)
+          .where(
+            and(eq(factoryFxAllocations.companyId, companyId), inArray(factoryFxAllocations.containerId, ownedIds))
+          );
 
         // 5. Delete mix batch sources
         await tx.delete(factoryMixBatchSources).where(inArray(factoryMixBatchSources.containerId, ownedIds));
 
         // 6. Delete offload additional charges
-        await tx.delete(factoryOffloadAdditionalCharges).where(and(
-          eq(factoryOffloadAdditionalCharges.companyId, companyId),
-          inArray(factoryOffloadAdditionalCharges.containerId, ownedIds)
-        ));
+        await tx
+          .delete(factoryOffloadAdditionalCharges)
+          .where(
+            and(
+              eq(factoryOffloadAdditionalCharges.companyId, companyId),
+              inArray(factoryOffloadAdditionalCharges.containerId, ownedIds)
+            )
+          );
 
         // 7. Delete pre-registered other charges (container-level charges, not offload)
-        await tx.delete(factoryContainerOtherCharges).where(and(
-          eq(factoryContainerOtherCharges.companyId, companyId),
-          inArray(factoryContainerOtherCharges.containerId, ownedIds)
-        ));
+        await tx
+          .delete(factoryContainerOtherCharges)
+          .where(
+            and(
+              eq(factoryContainerOtherCharges.companyId, companyId),
+              inArray(factoryContainerOtherCharges.containerId, ownedIds)
+            )
+          );
 
         // 8. Delete commission records
-        await tx.delete(factoryContainerCommissions).where(and(
-          eq(factoryContainerCommissions.companyId, companyId),
-          inArray(factoryContainerCommissions.containerId, ownedIds)
-        ));
+        await tx
+          .delete(factoryContainerCommissions)
+          .where(
+            and(
+              eq(factoryContainerCommissions.companyId, companyId),
+              inArray(factoryContainerCommissions.containerId, ownedIds)
+            )
+          );
 
         // 9. Delete raw stock records
-        await tx.delete(factoryRawStock).where(and(
-          eq(factoryRawStock.companyId, companyId),
-          inArray(factoryRawStock.containerId, ownedIds)
-        ));
+        await tx
+          .delete(factoryRawStock)
+          .where(and(eq(factoryRawStock.companyId, companyId), inArray(factoryRawStock.containerId, ownedIds)));
 
         // 10. Finally delete the containers themselves
-        await tx.delete(factoryContainers).where(and(
-          inArray(factoryContainers.id, ownedIds),
-          eq(factoryContainers.companyId, companyId)
-        ));
+        await tx
+          .delete(factoryContainers)
+          .where(and(inArray(factoryContainers.id, ownedIds), eq(factoryContainers.companyId, companyId)));
       });
 
       res.json({ deleted: ownedIds.length, ids: ownedIds });
@@ -734,54 +897,90 @@ export function registerFactoryContainersRoutes(app: Express) {
       let updatedId: number | null = null;
       await db.transaction(async (tx: any) => {
         // Soft-delete the container
-        const [updated] = await tx.update(factoryContainers)
+        const [updated] = await tx
+          .update(factoryContainers)
           .set({ deletedAt: new Date(), updatedAt: new Date() })
-          .where(and(eq(factoryContainers.id, id), eq(factoryContainers.companyId, companyId), isNull(factoryContainers.deletedAt)))
+          .where(
+            and(
+              eq(factoryContainers.id, id),
+              eq(factoryContainers.companyId, companyId),
+              isNull(factoryContainers.deletedAt)
+            )
+          )
           .returning({ id: factoryContainers.id });
         if (!updated) return;
         updatedId = updated.id;
 
         // 1. Collect child IDs for daybook cleanup
-        const rsRows = await tx.select({ id: factoryRawStock.id }).from(factoryRawStock)
+        const rsRows = await tx
+          .select({ id: factoryRawStock.id })
+          .from(factoryRawStock)
           .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, id)));
         const rsIds = rsRows.map((r: any) => r.id);
 
-        const commRows = await tx.select({ id: factoryContainerCommissions.id }).from(factoryContainerCommissions)
-          .where(and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, id)));
+        const commRows = await tx
+          .select({ id: factoryContainerCommissions.id })
+          .from(factoryContainerCommissions)
+          .where(
+            and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, id))
+          );
         const commIds = commRows.map((r: any) => r.id);
 
         // 2. Delete daybook entries linked to this container
         if (rsIds.length > 0) {
-          await tx.delete(factoryDaybookEntries).where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
-            inArray(factoryDaybookEntries.referenceId, rsIds)
-          ));
+          await tx
+            .delete(factoryDaybookEntries)
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+                inArray(factoryDaybookEntries.referenceId, rsIds)
+              )
+            );
         }
         if (commIds.length > 0) {
-          await tx.delete(factoryDaybookEntries).where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "COMMISSION"),
-            inArray(factoryDaybookEntries.referenceId, commIds)
-          ));
+          await tx
+            .delete(factoryDaybookEntries)
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "COMMISSION"),
+                inArray(factoryDaybookEntries.referenceId, commIds)
+              )
+            );
         }
-        await tx.delete(factoryDaybookEntries).where(and(
-          eq(factoryDaybookEntries.companyId, companyId),
-          inArray(factoryDaybookEntries.txType, ["FREIGHT", "OTHER_CHARGE", "DUTY", "CONTAINER_IMPORT", "PURCHASE"]),
-          eq(factoryDaybookEntries.referenceId, id)
-        ));
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              inArray(factoryDaybookEntries.txType, [
+                "FREIGHT",
+                "OTHER_CHARGE",
+                "DUTY",
+                "CONTAINER_IMPORT",
+                "PURCHASE",
+              ]),
+              eq(factoryDaybookEntries.referenceId, id)
+            )
+          );
 
         // 3. Delete accounting vouchers and their entries
-        const containerVouchers = await tx.select({ id: vouchers.id }).from(vouchers).where(and(
-          eq(vouchers.companyId, companyId),
-          eq(vouchers.sourceModule, "FACTORY"),
-          or(
-            ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${id}-%`),
-            ilike(vouchers.voucherNumber, `FACTORY-COMM-${id}-%`),
-            ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${id}-%`),
-            ilike(vouchers.voucherNumber, `FACTORY-OC-${id}-%`)
-          )
-        ));
+        const containerVouchers = await tx
+          .select({ id: vouchers.id })
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.sourceModule, "FACTORY"),
+              or(
+                ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${id}-%`),
+                ilike(vouchers.voucherNumber, `FACTORY-COMM-${id}-%`),
+                ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${id}-%`),
+                ilike(vouchers.voucherNumber, `FACTORY-OC-${id}-%`)
+              )
+            )
+          );
         if (containerVouchers.length > 0) {
           const vIds = containerVouchers.map((v: any) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
@@ -812,36 +1011,50 @@ export function registerFactoryContainersRoutes(app: Express) {
       let skipped = 0;
 
       for (const container of allContainers) {
-        if (!container.supplierId) { skipped++; continue; }
+        if (!container.supplierId) {
+          skipped++;
+          continue;
+        }
         const goodsValue = parseFloat(container.ratePerKg || "0") * parseFloat(container.totalKg || "0");
-        if (goodsValue <= 0) { skipped++; continue; }
+        if (goodsValue <= 0) {
+          skipped++;
+          continue;
+        }
 
         // Skip if an import voucher already exists for this container
         const existing = await db
           .select({ id: vouchers.id })
           .from(vouchers)
-          .where(and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.sourceModule, "FACTORY"),
-            ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${container.id}-%`)
-          ))
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.sourceModule, "FACTORY"),
+              ilike(vouchers.voucherNumber, `FACTORY-IMPORT-${container.id}-%`)
+            )
+          )
           .limit(1);
-        if (existing.length > 0) { skipped++; continue; }
+        if (existing.length > 0) {
+          skipped++;
+          continue;
+        }
 
         const today = getClientDate(req);
         const importCostAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_IMPORT_COST", "Factory Import Cost");
         const importVoucherNum = `FACTORY-IMPORT-${container.id}-${Date.now()}`;
-        const [importVoucher] = await db.insert(vouchers).values({
-          companyId,
-          voucherType: "Journal",
-          voucherNumber: importVoucherNum,
-          voucherDate: container.arrivalDate || today,
-          description: `Goods import - container ${container.containerNumber}`,
-          totalAmount: String(goodsValue),
-          currency: container.currencyCode || "USD",
-          exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
-          sourceModule: "FACTORY",
-        }).returning();
+        const [importVoucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: importVoucherNum,
+            voucherDate: container.arrivalDate || today,
+            description: `Goods import - container ${container.containerNumber}`,
+            totalAmount: String(goodsValue),
+            currency: container.currencyCode || "USD",
+            exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+            sourceModule: "FACTORY",
+          })
+          .returning();
         await db.insert(voucherEntries).values({
           voucherId: importVoucher.id,
           ledgerAccountId: importCostAccId,
@@ -875,10 +1088,12 @@ export function registerFactoryContainersRoutes(app: Express) {
       const charges = await db
         .select()
         .from(factoryContainerOtherCharges)
-        .where(and(
-          eq(factoryContainerOtherCharges.containerId, containerId),
-          eq(factoryContainerOtherCharges.companyId, companyId)
-        ))
+        .where(
+          and(
+            eq(factoryContainerOtherCharges.containerId, containerId),
+            eq(factoryContainerOtherCharges.companyId, companyId)
+          )
+        )
         .orderBy(factoryContainerOtherCharges.createdAt);
       res.json(charges);
     } catch (error: any) {
@@ -892,28 +1107,37 @@ export function registerFactoryContainersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const containerId = parseId(req.params.id);
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
-      const { charges, isCreate } = req.body as { charges: { description: string; amount: string; currencyCode?: string; ledgerAccountId?: number | null }[]; isCreate?: boolean };
+      const { charges, isCreate } = req.body as {
+        charges: { description: string; amount: string; currencyCode?: string; ledgerAccountId?: number | null }[];
+        isCreate?: boolean;
+      };
 
       // Void any previously created other-charge vouchers for this container (to avoid duplicates on edit)
       const ocPrefix = `FACTORY-OC-${containerId}-%`;
       const existingVouchers = await db
         .select({ id: vouchers.id })
         .from(vouchers)
-        .where(and(
-          eq(vouchers.companyId, companyId),
-          eq(vouchers.sourceModule, "FACTORY"),
-          ilike(vouchers.voucherNumber, ocPrefix)
-        ));
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            eq(vouchers.sourceModule, "FACTORY"),
+            ilike(vouchers.voucherNumber, ocPrefix)
+          )
+        );
       if (existingVouchers.length > 0) {
-        const vIds = existingVouchers.map(v => v.id);
+        const vIds = existingVouchers.map((v) => v.id);
         await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
         await db.delete(vouchers).where(inArray(vouchers.id, vIds));
       }
 
-      await db.delete(factoryContainerOtherCharges).where(and(
-        eq(factoryContainerOtherCharges.containerId, containerId),
-        eq(factoryContainerOtherCharges.companyId, companyId)
-      ));
+      await db
+        .delete(factoryContainerOtherCharges)
+        .where(
+          and(
+            eq(factoryContainerOtherCharges.containerId, containerId),
+            eq(factoryContainerOtherCharges.companyId, companyId)
+          )
+        );
 
       let newCharges: any[] = [];
       if (charges && charges.length > 0) {
@@ -924,21 +1148,35 @@ export function registerFactoryContainersRoutes(app: Express) {
               const code = ("OC_" + c.description.toUpperCase().replace(/[^A-Z0-9]/g, "_")).slice(0, 50);
               ledgerAccountId = await getOrCreateLedgerAccount(companyId, code, c.description);
             }
-            return { companyId, containerId, description: c.description, amount: c.amount, currencyCode: c.currencyCode || "USD", ledgerAccountId };
+            return {
+              companyId,
+              containerId,
+              description: c.description,
+              amount: c.amount,
+              currencyCode: c.currencyCode || "USD",
+              ledgerAccountId,
+            };
           })
         );
         newCharges = await db.insert(factoryContainerOtherCharges).values(resolvedCharges).returning();
       }
 
       const total = charges?.reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0) ?? 0;
-      await db.update(factoryContainers)
+      await db
+        .update(factoryContainers)
         .set({ otherCharges: total.toFixed(2) })
         .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
 
       // Double-entry for each other charge: Dr Factory Charges Payable / Cr chosen account
       if (newCharges.length > 0) {
         const [container] = await db
-          .select({ supplierId: factoryContainers.supplierId, containerNumber: factoryContainers.containerNumber, currencyCode: factoryContainers.currencyCode, fxRateToUsd: factoryContainers.fxRateToUsd, arrivalDate: factoryContainers.arrivalDate })
+          .select({
+            supplierId: factoryContainers.supplierId,
+            containerNumber: factoryContainers.containerNumber,
+            currencyCode: factoryContainers.currencyCode,
+            fxRateToUsd: factoryContainers.fxRateToUsd,
+            arrivalDate: factoryContainers.arrivalDate,
+          })
           .from(factoryContainers)
           .where(and(eq(factoryContainers.id, containerId), eq(factoryContainers.companyId, companyId)));
 
@@ -959,19 +1197,26 @@ export function registerFactoryContainersRoutes(app: Express) {
               chargeFxRate = await getOrFetchFxRateToUsd(companyId, chargeCcy, voucherDate);
             }
             const ocVoucherNum = `FACTORY-OC-${containerId}-${charge.id}-${Date.now()}`;
-            const [ocVoucher] = await db.insert(vouchers).values({
-              companyId,
-              voucherType: "Journal",
-              voucherNumber: ocVoucherNum,
-              voucherDate,
-              description: `${charge.description} - container ${container.containerNumber}`,
-              totalAmount: String(chargeAmt),
-              currency: chargeCcy,
-              exchangeRate: chargeFxRate,
-              sourceModule: "FACTORY",
-            }).returning();
+            const [ocVoucher] = await db
+              .insert(vouchers)
+              .values({
+                companyId,
+                voucherType: "Journal",
+                voucherNumber: ocVoucherNum,
+                voucherDate,
+                description: `${charge.description} - container ${container.containerNumber}`,
+                totalAmount: String(chargeAmt),
+                currency: chargeCcy,
+                exchangeRate: chargeFxRate,
+                sourceModule: "FACTORY",
+              })
+              .returning();
             // Dr Factory Charges Payable
-            const payableAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+            const payableAccId = await getOrCreateLedgerAccount(
+              companyId,
+              "FACTORY_CHARGES_PAYABLE",
+              "Factory Charges Payable"
+            );
             await db.insert(voucherEntries).values({
               voucherId: ocVoucher.id,
               ledgerAccountId: payableAccId,
@@ -1022,13 +1267,15 @@ export function registerFactoryContainersRoutes(app: Express) {
           otherChargesSupplierId: factoryContainers.otherChargesSupplierId,
         })
         .from(factoryContainers)
-        .where(and(
-          eq(factoryContainers.companyId, companyId),
-          sql`${factoryContainers.otherCharges}::numeric > 0`,
-          sql`${factoryContainers.otherChargesSupplierId} IS NOT NULL`,
-          sql`(other_charges_currency_code IS NULL OR other_charges_currency_code != 'USD')`,
-          ne(factoryContainers.currencyCode, "USD")
-        ))
+        .where(
+          and(
+            eq(factoryContainers.companyId, companyId),
+            sql`${factoryContainers.otherCharges}::numeric > 0`,
+            sql`${factoryContainers.otherChargesSupplierId} IS NOT NULL`,
+            sql`(other_charges_currency_code IS NULL OR other_charges_currency_code != 'USD')`,
+            ne(factoryContainers.currencyCode, "USD")
+          )
+        )
         .orderBy(factoryContainers.containerNumber);
 
       // Also find multi-row charges in factoryContainerOtherCharges table with non-USD currency
@@ -1043,12 +1290,17 @@ export function registerFactoryContainersRoutes(app: Express) {
         })
         .from(factoryContainerOtherCharges)
         .leftJoin(factoryContainers, eq(factoryContainers.id, factoryContainerOtherCharges.containerId))
-        .where(and(
-          eq(factoryContainerOtherCharges.companyId, companyId),
-          ne(factoryContainerOtherCharges.currencyCode, "USD")
-        ));
+        .where(
+          and(
+            eq(factoryContainerOtherCharges.companyId, companyId),
+            ne(factoryContainerOtherCharges.currencyCode, "USD")
+          )
+        );
 
-      const grouped = new Map<number, { containerId: number; containerNumber: string; currentCurrency: string; amount: string; charges: any[] }>();
+      const grouped = new Map<
+        number,
+        { containerId: number; containerNumber: string; currentCurrency: string; amount: string; charges: any[] }
+      >();
 
       for (const row of nonUsdContainerCharges as any[]) {
         grouped.set(row.id, {
@@ -1056,7 +1308,9 @@ export function registerFactoryContainersRoutes(app: Express) {
           containerNumber: row.containerNumber,
           currentCurrency: row.currencyCode,
           amount: row.otherCharges,
-          charges: [{ description: "Container Other Charges", amount: row.otherCharges, currencyCode: row.currencyCode }],
+          charges: [
+            { description: "Container Other Charges", amount: row.otherCharges, currencyCode: row.currencyCode },
+          ],
         });
       }
       for (const row of nonUsdTableCharges as any[]) {
@@ -1099,7 +1353,9 @@ export function registerFactoryContainersRoutes(app: Express) {
 
       for (const containerId of containerIds) {
         // 1. Set other_charges_currency_code = "USD" on the container
-        await db.execute(sql`UPDATE factory_containers SET other_charges_currency_code = 'USD' WHERE id = ${containerId} AND company_id = ${companyId}`);
+        await db.execute(
+          sql`UPDATE factory_containers SET other_charges_currency_code = 'USD' WHERE id = ${containerId} AND company_id = ${companyId}`
+        );
 
         // 2. Fix the factory daybook OTHER_CHARGE entry for this container
         //    (change currency from EUR/other to USD, set amount_usd = amount_currency, fx_rate = 1)
@@ -1110,44 +1366,52 @@ export function registerFactoryContainersRoutes(app: Express) {
             fxRateToUsd: "1",
             amountUsd: sql`${factoryDaybookEntries.amountCurrency}`,
           })
-          .where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "OTHER_CHARGE"),
-            eq(factoryDaybookEntries.referenceId, containerId),
-            ne(factoryDaybookEntries.currencyCode, "USD")
-          ));
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "OTHER_CHARGE"),
+              eq(factoryDaybookEntries.referenceId, containerId),
+              ne(factoryDaybookEntries.currencyCode, "USD")
+            )
+          );
 
         // 3. Also fix multi-row charges in factoryContainerOtherCharges if any exist
         const tableCharges = await db
           .select()
           .from(factoryContainerOtherCharges)
-          .where(and(
-            eq(factoryContainerOtherCharges.containerId, containerId),
-            eq(factoryContainerOtherCharges.companyId, companyId),
-            ne(factoryContainerOtherCharges.currencyCode, "USD")
-          ));
+          .where(
+            and(
+              eq(factoryContainerOtherCharges.containerId, containerId),
+              eq(factoryContainerOtherCharges.companyId, companyId),
+              ne(factoryContainerOtherCharges.currencyCode, "USD")
+            )
+          );
 
         if (tableCharges.length > 0) {
           await db
             .update(factoryContainerOtherCharges)
             .set({ currencyCode: "USD" })
-            .where(and(
-              eq(factoryContainerOtherCharges.containerId, containerId),
-              eq(factoryContainerOtherCharges.companyId, companyId)
-            ));
+            .where(
+              and(
+                eq(factoryContainerOtherCharges.containerId, containerId),
+                eq(factoryContainerOtherCharges.companyId, companyId)
+              )
+            );
 
           // Void and re-post FACTORY-OC vouchers in USD
           const ocPrefix = `FACTORY-OC-${containerId}-%`;
           const existingVouchers = await db
             .select({ id: vouchers.id })
             .from(vouchers)
-            .where(and(
-              eq(vouchers.companyId, companyId),
-              eq(vouchers.sourceModule, "FACTORY"),
-              ilike(vouchers.voucherNumber, ocPrefix)
-            ));
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                eq(vouchers.sourceModule, "FACTORY"),
+                ilike(vouchers.voucherNumber, ocPrefix)
+              )
+            );
           if (existingVouchers.length > 0) {
-            const vIds = existingVouchers.map(v => v.id);
+            const vIds = existingVouchers.map((v) => v.id);
             await db.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
             await db.delete(vouchers).where(inArray(vouchers.id, vIds));
           }
@@ -1160,18 +1424,43 @@ export function registerFactoryContainersRoutes(app: Express) {
           if (container) {
             const today = getClientDate(req);
             const voucherDate = container.arrivalDate || today;
-            const payableAccId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+            const payableAccId = await getOrCreateLedgerAccount(
+              companyId,
+              "FACTORY_CHARGES_PAYABLE",
+              "Factory Charges Payable"
+            );
             for (const charge of tableCharges) {
               const chargeAmt = parseFloat(charge.amount || "0");
               if (chargeAmt <= 0 || !charge.ledgerAccountId) continue;
               const ocVoucherNum = `FACTORY-OC-${containerId}-${charge.id}-${Date.now()}`;
-              const [ocVoucher] = await db.insert(vouchers).values({
-                companyId, voucherType: "Journal", voucherNumber: ocVoucherNum,
-                voucherDate, description: `${charge.description} - container ${container.containerNumber}`,
-                totalAmount: String(chargeAmt), currency: "USD", exchangeRate: "1", sourceModule: "FACTORY",
-              }).returning();
-              await db.insert(voucherEntries).values({ voucherId: ocVoucher.id, ledgerAccountId: payableAccId, debitAmount: String(chargeAmt), creditAmount: "0", narration: `${charge.description} payable` });
-              await db.insert(voucherEntries).values({ voucherId: ocVoucher.id, ledgerAccountId: charge.ledgerAccountId, debitAmount: "0", creditAmount: String(chargeAmt), narration: `${charge.description}` });
+              const [ocVoucher] = await db
+                .insert(vouchers)
+                .values({
+                  companyId,
+                  voucherType: "Journal",
+                  voucherNumber: ocVoucherNum,
+                  voucherDate,
+                  description: `${charge.description} - container ${container.containerNumber}`,
+                  totalAmount: String(chargeAmt),
+                  currency: "USD",
+                  exchangeRate: "1",
+                  sourceModule: "FACTORY",
+                })
+                .returning();
+              await db.insert(voucherEntries).values({
+                voucherId: ocVoucher.id,
+                ledgerAccountId: payableAccId,
+                debitAmount: String(chargeAmt),
+                creditAmount: "0",
+                narration: `${charge.description} payable`,
+              });
+              await db.insert(voucherEntries).values({
+                voucherId: ocVoucher.id,
+                ledgerAccountId: charge.ledgerAccountId,
+                debitAmount: "0",
+                creditAmount: String(chargeAmt),
+                narration: `${charge.description}`,
+              });
             }
           }
         }
@@ -1203,10 +1492,7 @@ export function registerFactoryContainersRoutes(app: Express) {
       const VALID_STATUSES = ["PENDING", "IN_TRANSIT", "AVAILABLE", "OFFLOADED"];
       const VALID_CURRENCIES = ["USD", "EUR", "AUD", "LBP", "GBP", "XOF", "XAF", "CFA"];
 
-      const allSuppliers = await db
-        .select()
-        .from(factorySuppliers)
-        .where(eq(factorySuppliers.companyId, companyId));
+      const allSuppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
 
       const supplierMap = new Map<string, number>();
       allSuppliers.forEach((s: any) => supplierMap.set(s.name.toLowerCase().trim(), s.id));
@@ -1225,7 +1511,9 @@ export function registerFactoryContainersRoutes(app: Express) {
 
           const status = (row.status || "PENDING").toUpperCase();
           if (!VALID_STATUSES.includes(status)) {
-            errors.push(`Row ${rowNum} (${row.containerNumber}): Invalid status "${row.status}". Must be one of: ${VALID_STATUSES.join(", ")}`);
+            errors.push(
+              `Row ${rowNum} (${row.containerNumber}): Invalid status "${row.status}". Must be one of: ${VALID_STATUSES.join(", ")}`
+            );
             continue;
           }
 
@@ -1270,11 +1558,14 @@ export function registerFactoryContainersRoutes(app: Express) {
               if (supplierMap.has(key)) {
                 supplierId = supplierMap.get(key)!;
               } else {
-                const [newSupplier] = await tx.insert(factorySuppliers).values({
-                  companyId,
-                  name: row.supplierName.trim(),
-                  isActive: true,
-                }).returning();
+                const [newSupplier] = await tx
+                  .insert(factorySuppliers)
+                  .values({
+                    companyId,
+                    name: row.supplierName.trim(),
+                    isActive: true,
+                  })
+                  .returning();
                 supplierMap.set(key, newSupplier.id);
                 supplierId = newSupplier.id;
               }
@@ -1285,27 +1576,35 @@ export function registerFactoryContainersRoutes(app: Express) {
             const commAmt = row.commissionAmount ? String(parseFloat(row.commissionAmount) || 0) : "0";
             const commCcy = (row.commissionCurrencyCode || "USD").toUpperCase();
 
-            const [container] = await tx.insert(factoryContainers).values({
-              companyId,
-              containerNumber: row.containerNumber.trim(),
-              supplierId,
-              origin: row.origin || null,
-              totalKg: totalKg ? String(totalKg) : null,
-              ratePerKg: ratePerKg ? String(ratePerKg) : null,
-              currencyCode,
-              fxRateToUsd: String(fxRate),
-              fxRateToUsdImport: String(fxRate),
-              fxRateSource: fxSource,
-              fxRateDateImport: importDate,
-              ratePerKgUsd: String(ratePerKgUsd),
-              arrivalDate: row.arrivalDate || null,
-              notes: row.notes || null,
-              status,
-              commissionAmount: commAmt,
-              commissionCurrencyCode: commCcy,
-            }).returning();
+            const [container] = await tx
+              .insert(factoryContainers)
+              .values({
+                companyId,
+                containerNumber: row.containerNumber.trim(),
+                supplierId,
+                origin: row.origin || null,
+                totalKg: totalKg ? String(totalKg) : null,
+                ratePerKg: ratePerKg ? String(ratePerKg) : null,
+                currencyCode,
+                fxRateToUsd: String(fxRate),
+                fxRateToUsdImport: String(fxRate),
+                fxRateSource: fxSource,
+                fxRateDateImport: importDate,
+                ratePerKgUsd: String(ratePerKgUsd),
+                arrivalDate: row.arrivalDate || null,
+                notes: row.notes || null,
+                status,
+                commissionAmount: commAmt,
+                commissionCurrencyCode: commCcy,
+              })
+              .returning();
 
-            const excelDescParts = [container.containerNumber, row.supplierName?.trim() || null, totalKg > 0 ? `${totalKg.toLocaleString()} kg` : null, ratePerKg > 0 ? `${ratePerKg} ${currencyCode}/kg` : null].filter(Boolean);
+            const excelDescParts = [
+              container.containerNumber,
+              row.supplierName?.trim() || null,
+              totalKg > 0 ? `${totalKg.toLocaleString()} kg` : null,
+              ratePerKg > 0 ? `${ratePerKg} ${currencyCode}/kg` : null,
+            ].filter(Boolean);
             await writeDaybookEntry(tx, {
               companyId,
               txDate: container.arrivalDate || importDate,

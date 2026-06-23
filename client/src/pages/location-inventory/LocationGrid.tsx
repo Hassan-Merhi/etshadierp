@@ -84,7 +84,10 @@ export function LocationGrid({
                 {!posUser && openRenameDialog && (
                   <button
                     className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                    onClick={(e) => { e.stopPropagation(); openRenameDialog(loc, e); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openRenameDialog(loc, e);
+                    }}
                     data-testid={`button-rename-${loc.id}`}
                   >
                     <Pencil className="h-3.5 w-3.5" />
@@ -93,7 +96,10 @@ export function LocationGrid({
                 {!posUser && openWaGroupDialog && (
                   <button
                     className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                    onClick={(e) => { e.stopPropagation(); openWaGroupDialog(loc, e); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openWaGroupDialog(loc, e);
+                    }}
                     data-testid={`button-wa-${loc.id}`}
                   >
                     <MessageCircle className="h-3.5 w-3.5" />

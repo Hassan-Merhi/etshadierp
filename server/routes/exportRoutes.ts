@@ -4,9 +4,7 @@ import { requireAuth, requireRole } from "../auth";
 import { fetchAllCompanies } from "../services/exportDataService";
 import { sendExportEmail } from "../services/emailService";
 import { buildFullExportZip } from "../helpers/buildFullExportZip";
-import {
-  createJob, getJob, addStep, finishJob, failJob,
-} from "../services/exportJobManager";
+import { createJob, getJob, addStep, finishJob, failJob } from "../services/exportJobManager";
 import { retryAsync, isEmailConfigError } from "../helpers/retryAsync";
 import { createExportRun, updateExportRun, finishExportRun } from "../helpers/exportRunTracker";
 
@@ -32,10 +30,9 @@ export function registerExportRoutes(app: Express) {
       return res.status(400).json({ message: "Valid email required" });
     }
     try {
-      const result = await pool.query(
-        `INSERT INTO export_recipients (email, active) VALUES ($1, true) RETURNING *`,
-        [email.trim().toLowerCase()]
-      );
+      const result = await pool.query(`INSERT INTO export_recipients (email, active) VALUES ($1, true) RETURNING *`, [
+        email.trim().toLowerCase(),
+      ]);
       res.json(result.rows[0]);
     } catch (err: any) {
       if (err.message?.includes("unique") || err.message?.includes("duplicate")) {
@@ -62,7 +59,13 @@ export function registerExportRoutes(app: Express) {
         `SELECT id, gmail_user, schedule_enabled, last_run_at, schedule_hour, schedule_timezone FROM export_settings WHERE id = 1`
       );
       if (!result.rows || result.rows.length === 0) {
-        return res.json({ gmailUser: "", scheduleEnabled: false, lastRunAt: null, scheduleHour: 18, scheduleTimezone: "America/New_York" });
+        return res.json({
+          gmailUser: "",
+          scheduleEnabled: false,
+          lastRunAt: null,
+          scheduleHour: 18,
+          scheduleTimezone: "America/New_York",
+        });
       }
       const row = result.rows[0];
       res.json({
@@ -84,26 +87,38 @@ export function registerExportRoutes(app: Express) {
       if (!existing.rows || existing.rows.length === 0) {
         await pool.query(
           `INSERT INTO export_settings (id, gmail_user, gmail_app_password, schedule_enabled, schedule_hour, schedule_timezone) VALUES (1, $1, $2, $3, $4, $5)`,
-          [gmailUser || "", gmailAppPassword || "", scheduleEnabled ?? false, scheduleHour ?? 18, scheduleTimezone || "America/New_York"]
+          [
+            gmailUser || "",
+            gmailAppPassword || "",
+            scheduleEnabled ?? false,
+            scheduleHour ?? 18,
+            scheduleTimezone || "America/New_York",
+          ]
         );
       } else {
         const setParts: string[] = [];
         const params: any[] = [];
         let idx = 1;
-        if (gmailUser !== undefined) { setParts.push(`gmail_user = $${idx++}`); params.push(gmailUser); }
+        if (gmailUser !== undefined) {
+          setParts.push(`gmail_user = $${idx++}`);
+          params.push(gmailUser);
+        }
         if (gmailAppPassword !== undefined && gmailAppPassword !== "") {
           setParts.push(`gmail_app_password = $${idx++}`);
           params.push(gmailAppPassword);
         }
         setParts.push(`schedule_enabled = $${idx++}`);
         params.push(scheduleEnabled ?? false);
-        if (scheduleHour !== undefined) { setParts.push(`schedule_hour = $${idx++}`); params.push(scheduleHour); }
-        if (scheduleTimezone !== undefined) { setParts.push(`schedule_timezone = $${idx++}`); params.push(scheduleTimezone); }
+        if (scheduleHour !== undefined) {
+          setParts.push(`schedule_hour = $${idx++}`);
+          params.push(scheduleHour);
+        }
+        if (scheduleTimezone !== undefined) {
+          setParts.push(`schedule_timezone = $${idx++}`);
+          params.push(scheduleTimezone);
+        }
         params.push(1);
-        await pool.query(
-          `UPDATE export_settings SET ${setParts.join(", ")} WHERE id = $${idx}`,
-          params
-        );
+        await pool.query(`UPDATE export_settings SET ${setParts.join(", ")} WHERE id = $${idx}`, params);
       }
       res.json({ success: true });
     } catch (err: any) {
@@ -125,7 +140,7 @@ export function registerExportRoutes(app: Express) {
     // Run async without blocking the response
     (async () => {
       const runType = mode === "email" ? "manual_email" : "manual_download";
-      const runId   = await createExportRun(runType);
+      const runId = await createExportRun(runType);
 
       try {
         addStep(job, "Fetching company list...", "info");
@@ -137,12 +152,11 @@ export function registerExportRoutes(app: Express) {
         }
         addStep(job, `Found ${companies.length} company/companies to export`, "success");
 
-        const { zip: zipBuf, names, skipped } = await buildFullExportZip(
-          companies,
-          fromDate,
-          toDate,
-          (msg, level) => addStep(job, msg, level ?? "info"),
-        );
+        const {
+          zip: zipBuf,
+          names,
+          skipped,
+        } = await buildFullExportZip(companies, fromDate, toDate, (msg, level) => addStep(job, msg, level ?? "info"));
 
         if (names.length === 0) {
           const msg = "ZIP is empty — no companies exported successfully. Nothing will be sent or downloaded.";
@@ -155,16 +169,16 @@ export function registerExportRoutes(app: Express) {
           addStep(job, `Skipped ${skipped.length} companies: ${skipped.join(", ")}`, "warning");
         }
 
-        const dateLabel   = new Date().toISOString().substring(0, 10);
-        const sizeMB      = (zipBuf.length / 1024 / 1024).toFixed(1);
+        const dateLabel = new Date().toISOString().substring(0, 10);
+        const sizeMB = (zipBuf.length / 1024 / 1024).toFixed(1);
         const zipSizeBytes = zipBuf.length;
         addStep(job, `ZIP archive ready — ${sizeMB} MB, ${names.length} companies`, "success");
 
         await updateExportRun(runId, {
-          companiesCount:    companies.length,
+          companiesCount: companies.length,
           companyFilesCount: names.length,
           zipSizeBytes,
-          skippedCompanies:  skipped.join(", ") || null,
+          skippedCompanies: skipped.join(", ") || null,
         });
 
         if (mode === "email") {
@@ -173,13 +187,13 @@ export function registerExportRoutes(app: Express) {
           let emailAttempts = 0;
 
           const emailRes = await retryAsync({
-            label:       "ManualEmail",
-            attempts:    3,
-            delayMs:     30 * 1000,
-            fn:          () => sendExportEmail(zipBuf, dateLabel, names),
-            isSuccess:   r => r.success,
-            shouldRetry: r => !r.error || !isEmailConfigError(r.error),
-            onAttempt:   n => {
+            label: "ManualEmail",
+            attempts: 3,
+            delayMs: 30 * 1000,
+            fn: () => sendExportEmail(zipBuf, dateLabel, names),
+            isSuccess: (r) => r.success,
+            shouldRetry: (r) => !r.error || !isEmailConfigError(r.error),
+            onAttempt: (n) => {
               emailAttempts = n;
               if (n > 1) addStep(job, `Retry attempt ${n}/3...`, "info");
             },
@@ -189,17 +203,17 @@ export function registerExportRoutes(app: Express) {
             addStep(job, `Email sent successfully to all recipients (attempt ${emailRes.attempts})`, "success");
             finishJob(job);
             await finishExportRun(runId, {
-              status:        "success",
-              emailSuccess:  true,
+              status: "success",
+              emailSuccess: true,
               emailAttempts: emailRes.attempts,
             });
           } else {
             const errMsg = emailRes.result.error || "Email send failed";
             failJob(job, errMsg);
             await finishExportRun(runId, {
-              status:        "failed",
-              emailSuccess:  false,
-              emailError:    errMsg,
+              status: "failed",
+              emailSuccess: false,
+              emailError: errMsg,
               emailAttempts: emailRes.attempts,
             });
           }
@@ -210,7 +224,9 @@ export function registerExportRoutes(app: Express) {
         }
       } catch (err: any) {
         failJob(job, err.message || "Unexpected error");
-        await finishExportRun(runId, { status: "failed", skippedReason: err.message || "Unexpected error" }).catch(() => {});
+        await finishExportRun(runId, { status: "failed", skippedReason: err.message || "Unexpected error" }).catch(
+          () => {}
+        );
       }
     })();
   });
@@ -280,20 +296,34 @@ export function registerExportRoutes(app: Express) {
   app.get("/api/export/backup-status", guard, async (_req: Request, res: Response) => {
     try {
       // Latest run
-      const latestQ = await pool.query(`
+      const latestQ = await pool
+        .query(
+          `
         SELECT * FROM daily_export_runs ORDER BY created_at DESC LIMIT 1
-      `).catch(() => ({ rows: [] as any[] }));
+      `
+        )
+        .catch(() => ({ rows: [] as any[] }));
 
       // Recent runs — full detail for all 10 so UI can render each independently
-      const recentQ = await pool.query(`
+      const recentQ = await pool
+        .query(
+          `
         SELECT * FROM daily_export_runs ORDER BY created_at DESC LIMIT 10
-      `).catch(() => ({ rows: [] as any[] }));
+      `
+        )
+        .catch(() => ({ rows: [] as any[] }));
 
       // Readiness data
-      const esQ  = await pool.query(`SELECT gmail_user, gmail_app_password, schedule_enabled FROM export_settings WHERE id = 1`).catch(() => ({ rows: [] as any[] }));
-      const rcQ  = await pool.query(`SELECT COUNT(*)::int AS cnt FROM export_recipients WHERE active = true`).catch(() => ({ rows: [{ cnt: 0 }] }));
-      const wsQ  = await pool.query(`SELECT enabled, daily_auto_send, daily_recipient_id FROM whatsapp_settings WHERE id = 1`).catch(() => ({ rows: [] as any[] }));
-      const coQ  = await pool.query(`SELECT COUNT(*)::int AS cnt FROM companies`).catch(() => ({ rows: [{ cnt: 0 }] }));
+      const esQ = await pool
+        .query(`SELECT gmail_user, gmail_app_password, schedule_enabled FROM export_settings WHERE id = 1`)
+        .catch(() => ({ rows: [] as any[] }));
+      const rcQ = await pool
+        .query(`SELECT COUNT(*)::int AS cnt FROM export_recipients WHERE active = true`)
+        .catch(() => ({ rows: [{ cnt: 0 }] }));
+      const wsQ = await pool
+        .query(`SELECT enabled, daily_auto_send, daily_recipient_id FROM whatsapp_settings WHERE id = 1`)
+        .catch(() => ({ rows: [] as any[] }));
+      const coQ = await pool.query(`SELECT COUNT(*)::int AS cnt FROM companies`).catch(() => ({ rows: [{ cnt: 0 }] }));
 
       const es = esQ.rows[0] ?? {};
       const ws = wsQ.rows[0] ?? {};
@@ -302,73 +332,74 @@ export function registerExportRoutes(app: Express) {
 
       let waRecipientActive = false;
       if (ws.daily_recipient_id) {
-        const rrQ = await pool.query(
-          `SELECT active FROM whatsapp_recipients WHERE id = $1`,
-          [ws.daily_recipient_id],
-        ).catch(() => ({ rows: [] as any[] }));
+        const rrQ = await pool
+          .query(`SELECT active FROM whatsapp_recipients WHERE id = $1`, [ws.daily_recipient_id])
+          .catch(() => ({ rows: [] as any[] }));
         waRecipientActive = rrQ.rows[0]?.active === true;
       }
 
       const issues: string[] = [];
-      if (!es.schedule_enabled)                     issues.push("Email schedule is disabled.");
-      if (!es.gmail_user || !es.gmail_app_password)  issues.push("Gmail credentials are missing.");
-      if (recipientCount === 0)                       issues.push("No email recipients configured.");
-      if (!ws.enabled)                                issues.push("WhatsApp is disabled.");
-      if (ws.enabled && !ws.daily_auto_send)          issues.push("WhatsApp daily auto-send is off.");
-      if (ws.enabled && !ws.daily_recipient_id)       issues.push("No WhatsApp daily recipient selected.");
+      if (!es.schedule_enabled) issues.push("Email schedule is disabled.");
+      if (!es.gmail_user || !es.gmail_app_password) issues.push("Gmail credentials are missing.");
+      if (recipientCount === 0) issues.push("No email recipients configured.");
+      if (!ws.enabled) issues.push("WhatsApp is disabled.");
+      if (ws.enabled && !ws.daily_auto_send) issues.push("WhatsApp daily auto-send is off.");
+      if (ws.enabled && !ws.daily_recipient_id) issues.push("No WhatsApp daily recipient selected.");
       else if (ws.enabled && ws.daily_recipient_id && !waRecipientActive)
-                                                      issues.push("Selected WhatsApp recipient is inactive or missing.");
-      if (companiesCount === 0)                       issues.push("No companies found.");
+        issues.push("Selected WhatsApp recipient is inactive or missing.");
+      if (companiesCount === 0) issues.push("No companies found.");
 
       const row = latestQ.rows[0];
       res.json({
-        latestRun: row ? {
-          id:                 row.id,
-          runType:            row.run_type,
-          status:             row.status,
-          startedAt:          row.started_at,
-          finishedAt:         row.finished_at,
-          zipSizeBytes:       row.zip_size_bytes,
-          companiesCount:     row.companies_count,
-          companyFilesCount:  row.company_files_count,
-          skippedCompanies:   row.skipped_companies,
-          emailAttempted:     row.email_attempted,
-          emailSuccess:       row.email_success,
-          emailError:         row.email_error,
-          emailAttempts:      row.email_attempts,
-          whatsappAttempted:  row.whatsapp_attempted,
-          whatsappSuccess:    row.whatsapp_success,
-          whatsappError:      row.whatsapp_error,
-          whatsappAttempts:   row.whatsapp_attempts,
-          skippedReason:      row.skipped_reason,
-        } : null,
+        latestRun: row
+          ? {
+              id: row.id,
+              runType: row.run_type,
+              status: row.status,
+              startedAt: row.started_at,
+              finishedAt: row.finished_at,
+              zipSizeBytes: row.zip_size_bytes,
+              companiesCount: row.companies_count,
+              companyFilesCount: row.company_files_count,
+              skippedCompanies: row.skipped_companies,
+              emailAttempted: row.email_attempted,
+              emailSuccess: row.email_success,
+              emailError: row.email_error,
+              emailAttempts: row.email_attempts,
+              whatsappAttempted: row.whatsapp_attempted,
+              whatsappSuccess: row.whatsapp_success,
+              whatsappError: row.whatsapp_error,
+              whatsappAttempts: row.whatsapp_attempts,
+              skippedReason: row.skipped_reason,
+            }
+          : null,
         recentRuns: recentQ.rows.map((r: any) => ({
-          id:                r.id,
-          runType:           r.run_type,
-          status:            r.status,
-          startedAt:         r.started_at,
-          finishedAt:        r.finished_at,
-          zipSizeBytes:      r.zip_size_bytes,
-          companiesCount:    r.companies_count,
+          id: r.id,
+          runType: r.run_type,
+          status: r.status,
+          startedAt: r.started_at,
+          finishedAt: r.finished_at,
+          zipSizeBytes: r.zip_size_bytes,
+          companiesCount: r.companies_count,
           companyFilesCount: r.company_files_count,
-          skippedCompanies:  r.skipped_companies,
-          skippedReason:     r.skipped_reason,
-          emailAttempted:    r.email_attempted,
-          emailSuccess:      r.email_success,
-          emailError:        r.email_error,
-          emailAttempts:     r.email_attempts,
+          skippedCompanies: r.skipped_companies,
+          skippedReason: r.skipped_reason,
+          emailAttempted: r.email_attempted,
+          emailSuccess: r.email_success,
+          emailError: r.email_error,
+          emailAttempts: r.email_attempts,
           whatsappAttempted: r.whatsapp_attempted,
-          whatsappSuccess:   r.whatsapp_success,
-          whatsappError:     r.whatsapp_error,
-          whatsappAttempts:  r.whatsapp_attempts,
+          whatsappSuccess: r.whatsapp_success,
+          whatsappError: r.whatsapp_error,
+          whatsappAttempts: r.whatsapp_attempts,
         })),
         readiness: {
-          emailScheduleEnabled:        !!es.schedule_enabled,
-          gmailConfigured:             !!(es.gmail_user && es.gmail_app_password),
-          emailRecipientCount:         recipientCount,
-          whatsappEnabled:             !!ws.enabled,
-          whatsappDailyAutoSend:       !!ws.daily_auto_send,
-          whatsappDailyRecipientId:    ws.daily_recipient_id ?? null,
+          emailScheduleEnabled: !!es.schedule_enabled,
+          gmailConfigured: !!(es.gmail_user && es.gmail_app_password),
+          emailRecipientCount: recipientCount,
+          whatsappEnabled: !!ws.enabled,
+          whatsappDailyAutoSend: !!ws.daily_auto_send,
+          whatsappDailyRecipientId: ws.daily_recipient_id ?? null,
           whatsappDailyRecipientActive: waRecipientActive,
           companiesCount,
         },

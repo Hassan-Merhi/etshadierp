@@ -8,20 +8,16 @@ import { sql } from "drizzle-orm";
  */
 export async function autoReallocateLoansAccounts(
   companyId: number,
-  ledgerAccountIds: (number | null | undefined)[],
+  ledgerAccountIds: (number | null | undefined)[]
 ): Promise<void> {
-  const ids = [
-    ...new Set(
-      ledgerAccountIds.filter((id): id is number => typeof id === "number" && id > 0),
-    ),
-  ];
+  const ids = [...new Set(ledgerAccountIds.filter((id): id is number => typeof id === "number" && id > 0))];
   if (!ids.length) return;
 
   const result = await db.execute(
     sql`SELECT id FROM ledger_accounts
         WHERE id = ANY(ARRAY[${sql.raw(ids.join(","))}]::integer[])
           AND account_type = 'Loans'
-          AND deleted_at IS NULL`,
+          AND deleted_at IS NULL`
   );
 
   for (const row of result.rows as { id: number }[]) {

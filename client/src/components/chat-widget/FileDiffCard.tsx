@@ -38,7 +38,7 @@ export function CodeBlock({ code, lang }: { code: string; lang: string }) {
           {isPreviewable && (
             <button
               className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-0.5 rounded hover:bg-muted"
-              onClick={() => setShowPreview(v => !v)}
+              onClick={() => setShowPreview((v) => !v)}
               type="button"
             >
               {showPreview ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
@@ -85,9 +85,10 @@ export function computeLineDiff(original: string, modified: string): DiffLine[] 
   const newLines = modified.split("\n");
   const MAX = 400;
   if (oldLines.length > MAX || newLines.length > MAX) {
-    return newLines.map(line => ({ type: "add" as const, line }));
+    return newLines.map((line) => ({ type: "add" as const, line }));
   }
-  const m = oldLines.length, n = newLines.length;
+  const m = oldLines.length,
+    n = newLines.length;
   const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
@@ -96,14 +97,19 @@ export function computeLineDiff(original: string, modified: string): DiffLine[] 
     }
   }
   const result: DiffLine[] = [];
-  let i = m, j = n;
+  let i = m,
+    j = n;
   while (i > 0 || j > 0) {
     if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
-      result.unshift({ type: "same", line: oldLines[i - 1] }); i--; j--;
+      result.unshift({ type: "same", line: oldLines[i - 1] });
+      i--;
+      j--;
     } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      result.unshift({ type: "add", line: newLines[j - 1] }); j--;
+      result.unshift({ type: "add", line: newLines[j - 1] });
+      j--;
     } else {
-      result.unshift({ type: "remove", line: oldLines[i - 1] }); i--;
+      result.unshift({ type: "remove", line: oldLines[i - 1] });
+      i--;
     }
   }
   return result;
@@ -127,7 +133,16 @@ export interface FileDiffCardProps {
   pushResult: PushResult | null;
 }
 
-export function FileDiffCard({ draft, onApply, onCancel, isApplying, isApplied, onGitPush, isPushing, pushResult }: FileDiffCardProps) {
+export function FileDiffCard({
+  draft,
+  onApply,
+  onCancel,
+  isApplying,
+  isApplied,
+  onGitPush,
+  isPushing,
+  pushResult,
+}: FileDiffCardProps) {
   const [showFullDiff, setShowFullDiff] = useState(false);
 
   const diffLines = computeLineDiff(draft.originalContent, draft.newContent);
@@ -141,8 +156,8 @@ export function FileDiffCard({ draft, onApply, onCancel, isApplying, isApplied, 
     }
   });
 
-  const added = diffLines.filter(l => l.type === "add").length;
-  const removed = diffLines.filter(l => l.type === "remove").length;
+  const added = diffLines.filter((l) => l.type === "add").length;
+  const removed = diffLines.filter((l) => l.type === "remove").length;
   const hasChanges = added > 0 || removed > 0;
 
   type Segment = { isSkip: true; count: number } | { isSkip: false; item: DiffLine & { idx: number } };
@@ -169,8 +184,18 @@ export function FileDiffCard({ draft, onApply, onCancel, isApplying, isApplied, 
           <span className="text-xs font-mono text-foreground truncate max-w-[220px]">{draft.filePath}</span>
         </div>
         <div className="flex items-center gap-2 text-xs shrink-0">
-          {added > 0 && <span className="text-green-600 dark:text-green-400 flex items-center gap-0.5"><Plus className="h-3 w-3" />{added}</span>}
-          {removed > 0 && <span className="text-red-500 dark:text-red-400 flex items-center gap-0.5"><Minus className="h-3 w-3" />{removed}</span>}
+          {added > 0 && (
+            <span className="text-green-600 dark:text-green-400 flex items-center gap-0.5">
+              <Plus className="h-3 w-3" />
+              {added}
+            </span>
+          )}
+          {removed > 0 && (
+            <span className="text-red-500 dark:text-red-400 flex items-center gap-0.5">
+              <Minus className="h-3 w-3" />
+              {removed}
+            </span>
+          )}
         </div>
       </div>
 
@@ -180,57 +205,60 @@ export function FileDiffCard({ draft, onApply, onCancel, isApplying, isApplied, 
 
       {hasChanges ? (
         <div className="overflow-hidden">
-          <pre className={cn(
-            "overflow-x-auto text-xs font-mono leading-5 overflow-y-auto transition-all",
-            showFullDiff ? "max-h-[480px]" : "max-h-64",
-          )}>
-            {segments.length === 0 ? (
-              diffLines.map((dl, idx) => (
-                <div
-                  key={idx}
-                  className={cn(
-                    "px-3 py-px whitespace-pre",
-                    dl.type === "add" && "bg-green-950/40 dark:bg-green-900/30 text-green-300",
-                    dl.type === "remove" && "bg-red-950/40 dark:bg-red-900/30 text-red-300",
-                    dl.type === "same" && "text-muted-foreground",
-                  )}
-                >
-                  <span className="select-none opacity-50 mr-2 w-3 inline-block">
-                    {dl.type === "add" ? "+" : dl.type === "remove" ? "-" : " "}
-                  </span>
-                  {dl.line}
-                </div>
-              ))
-            ) : (
-              segments.map((seg, si) =>
-                seg.isSkip ? (
-                  <div key={`skip-${si}`} className="px-3 py-0.5 text-muted-foreground/50 bg-muted/20 text-xs select-none">
-                    ... {seg.count} unchanged {seg.count === 1 ? "line" : "lines"} ...
-                  </div>
-                ) : (
+          <pre
+            className={cn(
+              "overflow-x-auto text-xs font-mono leading-5 overflow-y-auto transition-all",
+              showFullDiff ? "max-h-[480px]" : "max-h-64"
+            )}
+          >
+            {segments.length === 0
+              ? diffLines.map((dl, idx) => (
                   <div
-                    key={seg.item.idx}
+                    key={idx}
                     className={cn(
                       "px-3 py-px whitespace-pre",
-                      seg.item.type === "add" && "bg-green-950/40 dark:bg-green-900/30 text-green-300",
-                      seg.item.type === "remove" && "bg-red-950/40 dark:bg-red-900/30 text-red-300",
-                      seg.item.type === "same" && "text-muted-foreground",
+                      dl.type === "add" && "bg-green-950/40 dark:bg-green-900/30 text-green-300",
+                      dl.type === "remove" && "bg-red-950/40 dark:bg-red-900/30 text-red-300",
+                      dl.type === "same" && "text-muted-foreground"
                     )}
                   >
                     <span className="select-none opacity-50 mr-2 w-3 inline-block">
-                      {seg.item.type === "add" ? "+" : seg.item.type === "remove" ? "-" : " "}
+                      {dl.type === "add" ? "+" : dl.type === "remove" ? "-" : " "}
                     </span>
-                    {seg.item.line}
+                    {dl.line}
                   </div>
-                ),
-              )
-            )}
+                ))
+              : segments.map((seg, si) =>
+                  seg.isSkip ? (
+                    <div
+                      key={`skip-${si}`}
+                      className="px-3 py-0.5 text-muted-foreground/50 bg-muted/20 text-xs select-none"
+                    >
+                      ... {seg.count} unchanged {seg.count === 1 ? "line" : "lines"} ...
+                    </div>
+                  ) : (
+                    <div
+                      key={seg.item.idx}
+                      className={cn(
+                        "px-3 py-px whitespace-pre",
+                        seg.item.type === "add" && "bg-green-950/40 dark:bg-green-900/30 text-green-300",
+                        seg.item.type === "remove" && "bg-red-950/40 dark:bg-red-900/30 text-red-300",
+                        seg.item.type === "same" && "text-muted-foreground"
+                      )}
+                    >
+                      <span className="select-none opacity-50 mr-2 w-3 inline-block">
+                        {seg.item.type === "add" ? "+" : seg.item.type === "remove" ? "-" : " "}
+                      </span>
+                      {seg.item.line}
+                    </div>
+                  )
+                )}
           </pre>
           {diffLines.length > 20 && (
             <button
               type="button"
               className="w-full text-xs text-muted-foreground py-1 bg-muted/20 border-t border-border hover:bg-muted/40 transition-colors"
-              onClick={() => setShowFullDiff(v => !v)}
+              onClick={() => setShowFullDiff((v) => !v)}
             >
               {showFullDiff ? "Collapse diff" : `Show full diff (${diffLines.length} lines)`}
             </button>

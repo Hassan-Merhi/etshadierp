@@ -9,12 +9,19 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  AlertTriangle, CheckCircle2, Eye, PlayCircle, RotateCcw,
-  ShieldAlert, Info, Package, DollarSign, BarChart3, History,
+  AlertTriangle,
+  CheckCircle2,
+  Eye,
+  PlayCircle,
+  RotateCcw,
+  ShieldAlert,
+  Info,
+  Package,
+  DollarSign,
+  BarChart3,
+  History,
 } from "lucide-react";
 
 type Company = { id: number; code: string; name: string; company_type: string };
@@ -35,7 +42,7 @@ function PreviewPanel({ sourceId, targetId }: { sourceId: number; targetId: numb
     queryFn: () =>
       fetch(`/api/sp/migration/preview?sourceCompanyId=${sourceId}&targetCompanyId=${targetId}`, {
         credentials: "include",
-      }).then(r => r.json()),
+      }).then((r) => r.json()),
     enabled: !!sourceId && !!targetId && sourceId !== targetId,
   });
 
@@ -69,14 +76,18 @@ function PreviewPanel({ sourceId, targetId }: { sourceId: number; targetId: numb
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground mb-1">Source (read-only)</p>
             <p className="font-semibold">{data.sourceCompany.name}</p>
-            <Badge variant="secondary" className="mt-1 text-xs">{data.sourceCompany.type}</Badge>
+            <Badge variant="secondary" className="mt-1 text-xs">
+              {data.sourceCompany.type}
+            </Badge>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-4 pb-3">
             <p className="text-xs text-muted-foreground mb-1">Target</p>
             <p className="font-semibold">{data.targetCompany.name}</p>
-            <Badge variant="secondary" className="mt-1 text-xs">{data.targetCompany.type}</Badge>
+            <Badge variant="secondary" className="mt-1 text-xs">
+              {data.targetCompany.type}
+            </Badge>
           </CardContent>
         </Card>
       </div>
@@ -86,7 +97,11 @@ function PreviewPanel({ sourceId, targetId }: { sourceId: number; targetId: numb
         {[
           { label: "Items", value: data.totals.itemCount, icon: Package },
           { label: "Total Qty", value: data.totals.totalQty.toLocaleString(), icon: BarChart3 },
-          { label: "Total Value (USD)", value: `$${Number(data.totals.totalValueUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, icon: DollarSign },
+          {
+            label: "Total Value (USD)",
+            value: `$${Number(data.totals.totalValueUsd).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            icon: DollarSign,
+          },
           { label: "Will Copy", value: data.totals.willBeCopied, icon: CheckCircle2 },
         ].map(({ label, value, icon: Icon }) => (
           <Card key={label}>
@@ -134,12 +149,21 @@ function PreviewPanel({ sourceId, targetId }: { sourceId: number; targetId: numb
                   <TableCell className="text-xs">{item.name}</TableCell>
                   <TableCell className="text-right text-xs">{Number(item.quantity).toLocaleString()}</TableCell>
                   <TableCell className="text-right text-xs">${Number(item.averageCostUsd).toFixed(4)}</TableCell>
-                  <TableCell className="text-right text-xs font-medium">${Number(item.totalValueUsd).toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-right text-xs font-medium">
+                    ${Number(item.totalValueUsd).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </TableCell>
                   <TableCell>
-                    {item.aliasExists
-                      ? <Badge variant="secondary" className="text-xs gap-1"><CheckCircle2 className="h-3 w-3 text-green-500" />Mapped</Badge>
-                      : <Badge variant="outline" className="text-xs gap-1"><AlertTriangle className="h-3 w-3 text-amber-500" />New</Badge>
-                    }
+                    {item.aliasExists ? (
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        Mapped
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <AlertTriangle className="h-3 w-3 text-amber-500" />
+                        New
+                      </Badge>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -154,12 +178,17 @@ function PreviewPanel({ sourceId, targetId }: { sourceId: number; targetId: numb
         <div className="grid grid-cols-2 gap-1">
           {data.spAccountsStatus?.map((acct: any) => (
             <div key={acct.subType} className="flex items-center gap-1.5 text-xs">
-              {acct.exists
-                ? <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
-                : <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
-              }
+              {acct.exists ? (
+                <CheckCircle2 className="h-3 w-3 text-green-500 shrink-0" />
+              ) : (
+                <AlertTriangle className="h-3 w-3 text-amber-500 shrink-0" />
+              )}
               <span className={acct.exists ? "text-muted-foreground" : ""}>{acct.name}</span>
-              {!acct.exists && <Badge variant="outline" className="text-xs ml-auto">will create</Badge>}
+              {!acct.exists && (
+                <Badge variant="outline" className="text-xs ml-auto">
+                  will create
+                </Badge>
+              )}
             </div>
           ))}
         </div>
@@ -168,7 +197,9 @@ function PreviewPanel({ sourceId, targetId }: { sourceId: number; targetId: numb
       {/* Source balances */}
       {data.balanceAccounts?.filter((b: any) => Math.abs(b.balance) > 0.01).length > 0 && (
         <div>
-          <p className="text-sm font-medium mb-2">Source Account Balances (approximate — manual verification required)</p>
+          <p className="text-sm font-medium mb-2">
+            Source Account Balances (approximate — manual verification required)
+          </p>
           <div className="rounded-md border overflow-auto max-h-48">
             <Table>
               <TableHeader>
@@ -187,7 +218,9 @@ function PreviewPanel({ sourceId, targetId }: { sourceId: number; targetId: numb
                       <TableCell className="font-mono text-xs">{b.code}</TableCell>
                       <TableCell className="text-xs">{b.name}</TableCell>
                       <TableCell className="text-xs">{b.accountType}</TableCell>
-                      <TableCell className={`text-right text-xs font-medium ${b.balance < 0 ? "text-destructive" : ""}`}>
+                      <TableCell
+                        className={`text-right text-xs font-medium ${b.balance < 0 ? "text-destructive" : ""}`}
+                      >
                         {b.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </TableCell>
                     </TableRow>
@@ -204,13 +237,17 @@ function PreviewPanel({ sourceId, targetId }: { sourceId: number; targetId: numb
 // ── Rehearsal form ────────────────────────────────────────────────────────────
 
 function RehearsalPanel({
-  sourceId, targetId, sourceName,
+  sourceId,
+  targetId,
+  sourceName,
   onSuccess,
 }: {
-  sourceId: number; targetId: number; sourceName: string;
+  sourceId: number;
+  targetId: number;
+  sourceName: string;
   onSuccess: (runId: string) => void;
 }) {
-  const [nameConfirm, setNameConfirm]   = useState("");
+  const [nameConfirm, setNameConfirm] = useState("");
   const [actionConfirm, setActionConfirm] = useState("");
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -220,15 +257,18 @@ function RehearsalPanel({
   const mutation = useMutation({
     mutationFn: () =>
       apiRequest("POST", "/api/sp/migration/rehearsal", {
-        sourceCompanyId:   sourceId,
-        targetCompanyId:   targetId,
+        sourceCompanyId: sourceId,
+        targetCompanyId: targetId,
         companyNameConfirm: nameConfirm.trim(),
-        confirmation:      actionConfirm,
+        confirmation: actionConfirm,
       }),
     onSuccess: async (res) => {
       const data = await res.json();
       if (data.success) {
-        toast({ title: "Rehearsal copy complete", description: `Run ID: ${data.runId} — ${data.rowsCreated} rows created` });
+        toast({
+          title: "Rehearsal copy complete",
+          description: `Run ID: ${data.runId} — ${data.rowsCreated} rows created`,
+        });
         qc.invalidateQueries({ queryKey: ["/api/sp/migration/runs"] });
         onSuccess(data.runId);
       } else {
@@ -249,10 +289,16 @@ function RehearsalPanel({
           Safety Confirmation Required
         </div>
         <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5 mt-2">
-          <li>Source company <strong>{sourceName}</strong> will remain read-only — never modified</li>
+          <li>
+            Source company <strong>{sourceName}</strong> will remain read-only — never modified
+          </li>
           <li>Opening stock rows will be created only in the target SP company</li>
-          <li>This is a <strong>rehearsal</strong> — you can roll it back afterwards</li>
-          <li>Final production migration (cutover) is <strong>permanently disabled</strong></li>
+          <li>
+            This is a <strong>rehearsal</strong> — you can roll it back afterwards
+          </li>
+          <li>
+            Final production migration (cutover) is <strong>permanently disabled</strong>
+          </li>
         </ul>
       </div>
 
@@ -265,7 +311,7 @@ function RehearsalPanel({
             id="name-confirm"
             data-testid="input-source-name-confirm"
             value={nameConfirm}
-            onChange={e => setNameConfirm(e.target.value)}
+            onChange={(e) => setNameConfirm(e.target.value)}
             placeholder={sourceName}
             className={nameConfirm && nameConfirm.trim() !== sourceName ? "border-destructive" : ""}
           />
@@ -279,7 +325,7 @@ function RehearsalPanel({
             id="action-confirm"
             data-testid="input-action-confirm"
             value={actionConfirm}
-            onChange={e => setActionConfirm(e.target.value)}
+            onChange={(e) => setActionConfirm(e.target.value)}
             placeholder="REHEARSE"
             className={actionConfirm && actionConfirm !== "REHEARSE" ? "border-destructive" : ""}
           />
@@ -313,8 +359,7 @@ function RunHistoryPanel() {
   const qc = useQueryClient();
 
   const rollback = useMutation({
-    mutationFn: (runId: string) =>
-      apiRequest("POST", "/api/sp/migration/rollback", { runId }),
+    mutationFn: (runId: string) => apiRequest("POST", "/api/sp/migration/rollback", { runId }),
     onSuccess: async (res) => {
       const d = await res.json();
       toast({ title: "Rollback complete", description: `${d.rowsDeleted} rows removed from target company` });
@@ -328,9 +373,9 @@ function RunHistoryPanel() {
   if (!data?.runs?.length) return <p className="text-sm text-muted-foreground p-4">No rehearsal runs yet.</p>;
 
   const statusColor = (s: string) => {
-    if (s === "completed")    return "text-green-600 dark:text-green-400";
-    if (s === "rolled_back")  return "text-muted-foreground";
-    if (s === "failed")       return "text-destructive";
+    if (s === "completed") return "text-green-600 dark:text-green-400";
+    if (s === "rolled_back") return "text-muted-foreground";
+    if (s === "failed") return "text-destructive";
     return "text-amber-500";
   };
 
@@ -392,17 +437,15 @@ export default function SpMigrationRehearsal() {
 
   const { data: companies = [] } = useCompanies();
   const erpCompanies = companies.filter((c: Company) => c.company_type === "erp");
-  const spCompanies  = companies.filter((c: Company) => c.company_type === "supplier_partner");
+  const spCompanies = companies.filter((c: Company) => c.company_type === "supplier_partner");
 
   const sourceComp = companies.find((c: Company) => c.id === sourceId);
   const targetComp = companies.find((c: Company) => c.id === targetId);
 
   // Default selections
   useEffect(() => {
-    if (!sourceId && erpCompanies.length)
-      setSourceId(erpCompanies[0].id);
-    if (!targetId && spCompanies.length)
-      setTargetId(spCompanies[0].id);
+    if (!sourceId && erpCompanies.length) setSourceId(erpCompanies[0].id);
+    if (!targetId && spCompanies.length) setTargetId(spCompanies[0].id);
   }, [erpCompanies.length, spCompanies.length]);
 
   const bothSelected = !!sourceId && !!targetId && sourceId !== targetId;
@@ -420,22 +463,27 @@ export default function SpMigrationRehearsal() {
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Preview and rehearse copying ERP company data into a supplier_partner company for testing.
-            Source data is never modified.
+            Preview and rehearse copying ERP company data into a supplier_partner company for testing. Source data is
+            never modified.
           </p>
         </div>
 
         {/* Hard guard banner — Phase 5 cutover disabled */}
         <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-2 flex items-center gap-2 text-xs text-destructive">
           <ShieldAlert className="h-4 w-4 shrink-0" />
-          <span><strong>Final production migration (cutover) is permanently disabled.</strong> Phase 5 does not exist in this build.</span>
+          <span>
+            <strong>Final production migration (cutover) is permanently disabled.</strong> Phase 5 does not exist in
+            this build.
+          </span>
         </div>
 
         {/* Company selectors */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm">Select Companies</CardTitle>
-            <CardDescription className="text-xs">Source must be an ERP company. Target must be a supplier_partner company.</CardDescription>
+            <CardDescription className="text-xs">
+              Source must be an ERP company. Target must be a supplier_partner company.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
@@ -443,7 +491,7 @@ export default function SpMigrationRehearsal() {
                 <Label className="text-xs text-muted-foreground">Source ERP Company (read-only)</Label>
                 <Select
                   value={String(sourceId || "")}
-                  onValueChange={v => setSourceId(parseInt(v, 10))}
+                  onValueChange={(v) => setSourceId(parseInt(v, 10))}
                   data-testid="select-source-company"
                 >
                   <SelectTrigger data-testid="select-source-company">
@@ -460,10 +508,7 @@ export default function SpMigrationRehearsal() {
               </div>
               <div className="grid gap-1.5">
                 <Label className="text-xs text-muted-foreground">Target SP Company</Label>
-                <Select
-                  value={String(targetId || "")}
-                  onValueChange={v => setTargetId(parseInt(v, 10))}
-                >
+                <Select value={String(targetId || "")} onValueChange={(v) => setTargetId(parseInt(v, 10))}>
                   <SelectTrigger data-testid="select-target-company">
                     <SelectValue placeholder="Select target…" />
                   </SelectTrigger>
@@ -485,13 +530,16 @@ export default function SpMigrationRehearsal() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full grid grid-cols-3">
               <TabsTrigger value="preview" data-testid="tab-preview">
-                <Eye className="h-3.5 w-3.5 mr-1.5" />Preview
+                <Eye className="h-3.5 w-3.5 mr-1.5" />
+                Preview
               </TabsTrigger>
               <TabsTrigger value="rehearsal" data-testid="tab-rehearsal">
-                <PlayCircle className="h-3.5 w-3.5 mr-1.5" />Rehearsal Copy
+                <PlayCircle className="h-3.5 w-3.5 mr-1.5" />
+                Rehearsal Copy
               </TabsTrigger>
               <TabsTrigger value="history" data-testid="tab-history">
-                <History className="h-3.5 w-3.5 mr-1.5" />Run History
+                <History className="h-3.5 w-3.5 mr-1.5" />
+                Run History
               </TabsTrigger>
             </TabsList>
 
@@ -504,8 +552,8 @@ export default function SpMigrationRehearsal() {
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm">Rehearsal Copy</CardTitle>
                   <CardDescription className="text-xs">
-                    Copies opening stock from <strong>{sourceComp?.name}</strong> into <strong>{targetComp?.name}</strong>.
-                    You can roll this back from the Run History tab.
+                    Copies opening stock from <strong>{sourceComp?.name}</strong> into{" "}
+                    <strong>{targetComp?.name}</strong>. You can roll this back from the Run History tab.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -541,11 +589,22 @@ export default function SpMigrationRehearsal() {
           </CardHeader>
           <CardContent>
             <ul className="text-xs text-muted-foreground space-y-1.5 list-disc list-inside">
-              <li>Opening stock costs use the source inventory <strong>average_rate</strong>. Verify these match your agreed supplier unit costs before going live.</li>
-              <li>Goods-OTW containers (ERP purchase orders in transit) cannot be auto-migrated. Recreate them manually in the SP Containers screen.</li>
-              <li>Cash, bank, and prepaid balances shown in Preview are approximate. Verify and enter them manually in the SP Setup screen.</li>
+              <li>
+                Opening stock costs use the source inventory <strong>average_rate</strong>. Verify these match your
+                agreed supplier unit costs before going live.
+              </li>
+              <li>
+                Goods-OTW containers (ERP purchase orders in transit) cannot be auto-migrated. Recreate them manually in
+                the SP Containers screen.
+              </li>
+              <li>
+                Cash, bank, and prepaid balances shown in Preview are approximate. Verify and enter them manually in the
+                SP Setup screen.
+              </li>
               <li>Accrued duties, prepaid charges, and freight deposits must be added manually after rehearsal.</li>
-              <li>After a rehearsal copy, review the opening stock values in SP Opening Stock before running any sales.</li>
+              <li>
+                After a rehearsal copy, review the opening stock values in SP Opening Stock before running any sales.
+              </li>
             </ul>
           </CardContent>
         </Card>

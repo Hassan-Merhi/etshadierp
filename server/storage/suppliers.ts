@@ -8,7 +8,9 @@ export async function getAllSuppliers(search?: string, limit?: number): Promise<
   if (search) {
     conditions.push(ilike(schema.suppliers.legalName, `%${search}%`));
   }
-  let query = db.select().from(schema.suppliers)
+  let query = db
+    .select()
+    .from(schema.suppliers)
     .where(conditions.length === 1 ? conditions[0] : and(...conditions))
     .orderBy(asc(schema.suppliers.legalName)) as any;
   if (limit) {
@@ -28,21 +30,18 @@ export async function getSupplierById(id: number): Promise<Supplier | undefined>
 }
 
 export async function createSupplier(supplier: InsertSupplier): Promise<Supplier> {
-  const [created] = await db.insert(schema.suppliers).values(supplier as any).returning();
+  const [created] = await db
+    .insert(schema.suppliers)
+    .values(supplier as any)
+    .returning();
   return created;
 }
 
 export async function updateSupplier(id: number, updates: Partial<InsertSupplier>): Promise<Supplier> {
-  const [updated] = await db
-    .update(schema.suppliers)
-    .set(updates)
-    .where(eq(schema.suppliers.id, id))
-    .returning();
+  const [updated] = await db.update(schema.suppliers).set(updates).where(eq(schema.suppliers.id, id)).returning();
   return updated;
 }
 
 export async function deleteSupplier(id: number): Promise<void> {
-  await db.update(schema.suppliers)
-    .set({ deletedAt: new Date(), active: false })
-    .where(eq(schema.suppliers.id, id));
+  await db.update(schema.suppliers).set({ deletedAt: new Date(), active: false }).where(eq(schema.suppliers.id, id));
 }

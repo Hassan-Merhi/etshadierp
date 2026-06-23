@@ -37,7 +37,7 @@ export function AccountsPanel({
   renderHierarchicalAccounts,
   renderNetProfitAccountsList,
   calculateTotal,
-  formatSmartCurrency
+  formatSmartCurrency,
 }: AccountsPanelProps) {
   if (activeSection === "assets") {
     return (
@@ -64,9 +64,7 @@ export function AccountsPanel({
               ))}
             </div>
           ) : assetAccounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No asset accounts found
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-8">No asset accounts found</p>
           ) : (
             <div className="table-responsive">
               <Table>
@@ -76,13 +74,13 @@ export function AccountsPanel({
                     <TableHead className="text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {renderHierarchicalAccounts(assetAccounts)}
-                </TableBody>
+                <TableBody>{renderHierarchicalAccounts(assetAccounts)}</TableBody>
                 <TableFooter>
                   <TableRow>
                     <TableCell className="font-semibold">Total</TableCell>
-                    <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(assetAccounts))}</TableCell>
+                    <TableCell className="text-right font-bold font-mono">
+                      {formatSmartCurrency(calculateTotal(assetAccounts))}
+                    </TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>
@@ -118,9 +116,7 @@ export function AccountsPanel({
               ))}
             </div>
           ) : liabilityAccounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No liability accounts found
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-8">No liability accounts found</p>
           ) : (
             <div className="table-responsive">
               <Table>
@@ -130,13 +126,13 @@ export function AccountsPanel({
                     <TableHead className="text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {renderHierarchicalAccounts(liabilityAccounts)}
-                </TableBody>
+                <TableBody>{renderHierarchicalAccounts(liabilityAccounts)}</TableBody>
                 <TableFooter>
                   <TableRow>
                     <TableCell className="font-semibold">Total</TableCell>
-                    <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(liabilityAccounts))}</TableCell>
+                    <TableCell className="text-right font-bold font-mono">
+                      {formatSmartCurrency(calculateTotal(liabilityAccounts))}
+                    </TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>
@@ -172,9 +168,7 @@ export function AccountsPanel({
               ))}
             </div>
           ) : cashAccounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No cash accounts found
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-8">No cash accounts found</p>
           ) : (
             <div className="table-responsive">
               <Table>
@@ -184,13 +178,13 @@ export function AccountsPanel({
                     <TableHead className="text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {renderHierarchicalAccounts(cashAccounts)}
-                </TableBody>
+                <TableBody>{renderHierarchicalAccounts(cashAccounts)}</TableBody>
                 <TableFooter>
                   <TableRow>
                     <TableCell className="font-semibold">Total Cash</TableCell>
-                    <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(cashAccounts))}</TableCell>
+                    <TableCell className="text-right font-bold font-mono">
+                      {formatSmartCurrency(calculateTotal(cashAccounts))}
+                    </TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>
@@ -226,9 +220,7 @@ export function AccountsPanel({
               ))}
             </div>
           ) : loansBanksAccounts.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              No loan or bank accounts found
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-8">No loan or bank accounts found</p>
           ) : (
             <div className="table-responsive">
               <Table>
@@ -238,13 +230,13 @@ export function AccountsPanel({
                     <TableHead className="text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
-                <TableBody>
-                  {renderHierarchicalAccounts(loansBanksAccounts)}
-                </TableBody>
+                <TableBody>{renderHierarchicalAccounts(loansBanksAccounts)}</TableBody>
                 <TableFooter>
                   <TableRow>
                     <TableCell className="font-semibold">Total Balance</TableCell>
-                    <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(loansBanksAccounts))}</TableCell>
+                    <TableCell className="text-right font-bold font-mono">
+                      {formatSmartCurrency(calculateTotal(loansBanksAccounts))}
+                    </TableCell>
                   </TableRow>
                 </TableFooter>
               </Table>
@@ -269,7 +261,10 @@ export function AccountsPanel({
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Total</p>
             <p className="text-2xl font-bold font-mono tabular-nums">
               {netProfitData
-                ? formatSmartCurrency((netProfitData.leftPane.directExpenses.total ?? 0) + (netProfitData.leftPane.indirectExpenses.total ?? 0))
+                ? formatSmartCurrency(
+                    (netProfitData.leftPane.directExpenses.total ?? 0) +
+                      (netProfitData.leftPane.indirectExpenses.total ?? 0)
+                  )
                 : formatSmartCurrency(calculateTotal(expenseAccounts))}
             </p>
           </div>
@@ -298,15 +293,18 @@ export function AccountsPanel({
               <TableFooter>
                 <TableRow>
                   <TableCell className="font-semibold">Total</TableCell>
-                  <TableCell className="text-right font-bold font-mono">{formatSmartCurrency((netProfitData.leftPane.directExpenses.total ?? 0) + (netProfitData.leftPane.indirectExpenses.total ?? 0))}</TableCell>
+                  <TableCell className="text-right font-bold font-mono">
+                    {formatSmartCurrency(
+                      (netProfitData.leftPane.directExpenses.total ?? 0) +
+                        (netProfitData.leftPane.indirectExpenses.total ?? 0)
+                    )}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
           </div>
         ) : expenseAccounts.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            No expense accounts found
-          </p>
+          <p className="text-sm text-muted-foreground text-center py-8">No expense accounts found</p>
         ) : (
           <div className="table-responsive">
             <Table>
@@ -316,13 +314,13 @@ export function AccountsPanel({
                   <TableHead className="text-right">Balance</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {renderHierarchicalAccounts(expenseAccounts)}
-              </TableBody>
+              <TableBody>{renderHierarchicalAccounts(expenseAccounts)}</TableBody>
               <TableFooter>
                 <TableRow>
                   <TableCell className="font-semibold">Total</TableCell>
-                  <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(expenseAccounts))}</TableCell>
+                  <TableCell className="text-right font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(expenseAccounts))}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
@@ -366,21 +364,19 @@ export function AccountsPanel({
                   <TableHead className="text-right">Balance</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {renderNetProfitAccountsList(netProfitData.leftPane.directExpenses.accounts)}
-              </TableBody>
+              <TableBody>{renderNetProfitAccountsList(netProfitData.leftPane.directExpenses.accounts)}</TableBody>
               <TableFooter>
                 <TableRow>
                   <TableCell className="font-semibold">Total</TableCell>
-                  <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(netProfitData.leftPane.directExpenses.total ?? 0)}</TableCell>
+                  <TableCell className="text-right font-bold font-mono">
+                    {formatSmartCurrency(netProfitData.leftPane.directExpenses.total ?? 0)}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
           </div>
         ) : directExpenseAccounts.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            No direct expense accounts found
-          </p>
+          <p className="text-sm text-muted-foreground text-center py-8">No direct expense accounts found</p>
         ) : (
           <div className="table-responsive">
             <Table>
@@ -390,13 +386,13 @@ export function AccountsPanel({
                   <TableHead className="text-right">Balance</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {renderHierarchicalAccounts(directExpenseAccounts)}
-              </TableBody>
+              <TableBody>{renderHierarchicalAccounts(directExpenseAccounts)}</TableBody>
               <TableFooter>
                 <TableRow>
                   <TableCell className="font-semibold">Total</TableCell>
-                  <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(directExpenseAccounts))}</TableCell>
+                  <TableCell className="text-right font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(directExpenseAccounts))}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
@@ -440,21 +436,19 @@ export function AccountsPanel({
                   <TableHead className="text-right">Balance</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {renderNetProfitAccountsList(netProfitData.leftPane.indirectExpenses.accounts)}
-              </TableBody>
+              <TableBody>{renderNetProfitAccountsList(netProfitData.leftPane.indirectExpenses.accounts)}</TableBody>
               <TableFooter>
                 <TableRow>
                   <TableCell className="font-semibold">Total</TableCell>
-                  <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(netProfitData.leftPane.indirectExpenses.total ?? 0)}</TableCell>
+                  <TableCell className="text-right font-bold font-mono">
+                    {formatSmartCurrency(netProfitData.leftPane.indirectExpenses.total ?? 0)}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
           </div>
         ) : indirectExpenseAccounts.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            No indirect expense accounts found
-          </p>
+          <p className="text-sm text-muted-foreground text-center py-8">No indirect expense accounts found</p>
         ) : (
           <div className="table-responsive">
             <Table>
@@ -464,13 +458,13 @@ export function AccountsPanel({
                   <TableHead className="text-right">Balance</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {renderHierarchicalAccounts(indirectExpenseAccounts)}
-              </TableBody>
+              <TableBody>{renderHierarchicalAccounts(indirectExpenseAccounts)}</TableBody>
               <TableFooter>
                 <TableRow>
                   <TableCell className="font-semibold">Total</TableCell>
-                  <TableCell className="text-right font-bold font-mono">{formatSmartCurrency(calculateTotal(indirectExpenseAccounts))}</TableCell>
+                  <TableCell className="text-right font-bold font-mono">
+                    {formatSmartCurrency(calculateTotal(indirectExpenseAccounts))}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>

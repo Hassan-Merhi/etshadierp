@@ -1,17 +1,22 @@
-import { Search, Container, Building2, ChevronDown, ChevronRight, ArrowDown, PlusCircle, RotateCcw, Pencil, Trash2 } from "lucide-react";
+import {
+  Search,
+  Container,
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  ArrowDown,
+  PlusCircle,
+  RotateCcw,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip, TooltipContent, TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatNumber } from "@/lib/formatNumber";
 import type { FactorySupplier } from "@shared/schema";
 import { ContainerStatusBadge } from "./ContainerBadges";
@@ -57,7 +62,7 @@ export function ContainerListView({
   onNavigateOffload,
 }: ContainerListViewProps) {
   const toggleSupplier = (key: string) => {
-    setExpandedSuppliers(prev => {
+    setExpandedSuppliers((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
@@ -74,14 +79,16 @@ export function ContainerListView({
     const additionalAmt = parseFloat(c.additionalChargesSum || "0");
     let chargesByCcy: { currencyCode: string; amount: number }[] = [];
     try {
-      const raw = typeof c.preRegisteredChargesByCurrency === "string"
-        ? JSON.parse(c.preRegisteredChargesByCurrency)
-        : (c.preRegisteredChargesByCurrency || []);
+      const raw =
+        typeof c.preRegisteredChargesByCurrency === "string"
+          ? JSON.parse(c.preRegisteredChargesByCurrency)
+          : c.preRegisteredChargesByCurrency || [];
       chargesByCcy = Array.isArray(raw)
         ? raw.map((x: any) => ({ currencyCode: x.currencyCode || "USD", amount: parseFloat(x.amount || "0") }))
         : [];
     } catch {}
-    const hasCharges = freightAmt > 0 || legacyOtherAmt > 0 || chargesByCcy.some(x => x.amount > 0) || additionalAmt > 0;
+    const hasCharges =
+      freightAmt > 0 || legacyOtherAmt > 0 || chargesByCcy.some((x) => x.amount > 0) || additionalAmt > 0;
     if (!hasCharges) return <span className="text-muted-foreground">—</span>;
     const ccyTotals = new Map<string, number>();
     if (freightSameCcy && freightAmt > 0) ccyTotals.set(freightCcy, (ccyTotals.get(freightCcy) || 0) + freightAmt);
@@ -94,15 +101,23 @@ export function ContainerListView({
       <div className="space-y-0.5">
         <div className="font-mono text-sm">
           {Array.from(ccyTotals.entries()).map(([cc, amt]) => (
-            <div key={cc}>{cc} {formatNumber(amt)}</div>
+            <div key={cc}>
+              {cc} {formatNumber(amt)}
+            </div>
           ))}
           {!freightSameCcy && freightAmt > 0 && (
-            <div>{freightCcy} {formatNumber(freightAmt)}</div>
+            <div>
+              {freightCcy} {formatNumber(freightAmt)}
+            </div>
           )}
         </div>
         <div className="text-xs text-muted-foreground space-y-0">
-          {freightAmt > 0 && <div>Freight: {freightCcy} {formatNumber(freightAmt)}</div>}
-          {(legacyOtherAmt > 0 || chargesByCcy.some(x => x.amount > 0)) && (
+          {freightAmt > 0 && (
+            <div>
+              Freight: {freightCcy} {formatNumber(freightAmt)}
+            </div>
+          )}
+          {(legacyOtherAmt > 0 || chargesByCcy.some((x) => x.amount > 0)) && (
             <div>
               Other:{" "}
               {(() => {
@@ -115,7 +130,11 @@ export function ContainerListView({
               })()}
             </div>
           )}
-          {additionalAmt > 0 && <div>Additional: {ccy} {formatNumber(additionalAmt)}</div>}
+          {additionalAmt > 0 && (
+            <div>
+              Additional: {ccy} {formatNumber(additionalAmt)}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -139,7 +158,8 @@ export function ContainerListView({
         <div className="flex items-center gap-2">
           <Container className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-semibold">
-            Containers ({filteredContainers?.length || 0}{filteredContainers?.length !== containers?.length ? ` of ${containers?.length}` : ""})
+            Containers ({filteredContainers?.length || 0}
+            {filteredContainers?.length !== containers?.length ? ` of ${containers?.length}` : ""})
           </span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -177,20 +197,32 @@ export function ContainerListView({
               <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
                 <TableHead className="w-10 py-2">
                   <Checkbox
-                    checked={filteredContainers.length > 0 && filteredContainers.every(c => selectedIds.has(c.id))}
+                    checked={filteredContainers.length > 0 && filteredContainers.every((c) => selectedIds.has(c.id))}
                     onCheckedChange={(checked) => {
-                      if (checked) setSelectedIds(() => new Set(filteredContainers.map(c => c.id)));
+                      if (checked) setSelectedIds(() => new Set(filteredContainers.map((c) => c.id)));
                       else setSelectedIds(() => new Set());
                     }}
                     data-testid="checkbox-select-all"
                   />
                 </TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Container #</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Commission</TableHead>
-                <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Weight (kg)</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Total Value</TableHead>
-                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Status</TableHead>
-                <TableHead className="w-24 text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Actions</TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  Container #
+                </TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  Commission
+                </TableHead>
+                <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  Weight (kg)
+                </TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  Total Value
+                </TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  Status
+                </TableHead>
+                <TableHead className="w-24 text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -207,7 +239,8 @@ export function ContainerListView({
                   const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
                   const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
                   const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
-                  const totalInCcy = baseValue + (freightSameCcy ? freightAmt : 0) + legacyOtherAmt + preRegisteredAmt + additionalAmt;
+                  const totalInCcy =
+                    baseValue + (freightSameCcy ? freightAmt : 0) + legacyOtherAmt + preRegisteredAmt + additionalAmt;
                   groupTotals.set(ccy, (groupTotals.get(ccy) || 0) + totalInCcy);
                 }
                 return [
@@ -218,15 +251,19 @@ export function ContainerListView({
                     data-testid={`row-supplier-group-${supplierKey}`}
                   >
                     <TableCell className="w-10 py-2.5">
-                      {isExpanded
-                        ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      )}
                     </TableCell>
                     <TableCell colSpan={2} className="py-2.5">
                       <div className="flex items-center gap-2">
                         <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         <span className="text-sm font-semibold">{supplierName}</span>
-                        <Badge variant="secondary" className="text-xs">{count} container{count !== 1 ? "s" : ""}</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {count} container{count !== 1 ? "s" : ""}
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell className="text-right font-mono font-semibold text-sm py-2.5">
@@ -237,105 +274,153 @@ export function ContainerListView({
                     </TableCell>
                     <TableCell className="font-mono font-semibold text-sm py-2.5">
                       {Array.from(groupTotals.entries()).map(([cc, amt]) => (
-                        <div key={cc}>{cc} {formatNumber(amt)}</div>
+                        <div key={cc}>
+                          {cc} {formatNumber(amt)}
+                        </div>
                       ))}
                     </TableCell>
                     <TableCell colSpan={2} className="py-2.5" />
                   </TableRow>,
-                  ...(isExpanded ? groupContainers.map((c) => {
-                    const commAmt = parseFloat((c as any).commissionAmount || "0");
-                    const commCcy = (c as any).commissionCurrencyCode || "USD";
-                    const ccy = (c as any).currencyCode || "USD";
-                    const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
-                    const freightAmt = parseFloat((c as any).freight || "0");
-                    const freightCcy = (c as any).freightCurrencyCode || ccy;
-                    const freightSameCcy = freightCcy === ccy;
-                    const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
-                    const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
-                    const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
-                    const totalValue = baseValue + (freightSameCcy ? freightAmt : 0) + legacyOtherAmt + preRegisteredAmt + additionalAmt;
-                    return (
-                      <TableRow key={c.id} data-testid={`row-factory-container-${c.id}`} className={selectedIds.has(c.id) ? "bg-muted/50" : ""}>
-                        <TableCell className="w-10 pl-6">
-                          <Checkbox
-                            checked={selectedIds.has(c.id)}
-                            onCheckedChange={(checked) => {
-                              setSelectedIds(prev => {
-                                const next = new Set(prev);
-                                if (checked) next.add(c.id);
-                                else next.delete(c.id);
-                                return next;
-                              });
-                            }}
-                            data-testid={`checkbox-container-${c.id}`}
-                          />
-                        </TableCell>
-                        <TableCell className="font-semibold font-mono">
-                          <button
-                            className="hover:underline text-left cursor-pointer text-foreground"
-                            onClick={() => onView(c)}
-                            data-testid={`button-view-container-${c.id}`}
+                  ...(isExpanded
+                    ? groupContainers.map((c) => {
+                        const commAmt = parseFloat((c as any).commissionAmount || "0");
+                        const commCcy = (c as any).commissionCurrencyCode || "USD";
+                        const ccy = (c as any).currencyCode || "USD";
+                        const baseValue = parseFloat(c.totalKg || "0") * parseFloat(c.ratePerKg || "0");
+                        const freightAmt = parseFloat((c as any).freight || "0");
+                        const freightCcy = (c as any).freightCurrencyCode || ccy;
+                        const freightSameCcy = freightCcy === ccy;
+                        const legacyOtherAmt = parseFloat((c as any).otherCharges || "0");
+                        const preRegisteredAmt = parseFloat((c as any).preRegisteredChargesSum || "0");
+                        const additionalAmt = parseFloat((c as any).additionalChargesSum || "0");
+                        const totalValue =
+                          baseValue +
+                          (freightSameCcy ? freightAmt : 0) +
+                          legacyOtherAmt +
+                          preRegisteredAmt +
+                          additionalAmt;
+                        return (
+                          <TableRow
+                            key={c.id}
+                            data-testid={`row-factory-container-${c.id}`}
+                            className={selectedIds.has(c.id) ? "bg-muted/50" : ""}
                           >
-                            {c.containerNumber}
-                          </button>
-                        </TableCell>
-                        <TableCell className="font-mono">
-                          {commAmt > 0 ? `${commCcy} ${formatNumber(commAmt)}` : <span className="text-muted-foreground">—</span>}
-                        </TableCell>
-                        <TableCell className="text-right font-mono" data-testid={`text-weight-${c.id}`}>
-                          {parseFloat(c.totalKg || "0") > 0
-                            ? formatNumber(parseFloat(c.totalKg || "0"))
-                            : <span className="text-muted-foreground">—</span>}
-                        </TableCell>
-                        <TableCell className="font-mono font-semibold">
-                          {totalValue > 0 ? `${ccy} ${formatNumber(totalValue)}` : <span className="text-muted-foreground">—</span>}
-                        </TableCell>
-                        <TableCell>
-                          <ContainerStatusBadge status={c.status} />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-1">
-                            {c.status !== "OFFLOADED" && c.status !== "PARTIALLY_RECEIVED" && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button variant="ghost" size="icon" onClick={onNavigateOffload} data-testid={`button-offload-container-${c.id}`}>
-                                    <ArrowDown className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Offload to Production</TooltipContent>
-                              </Tooltip>
-                            )}
-                            {(c.status === "OFFLOADED" || c.status === "PARTIALLY_RECEIVED") && (
-                              <>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => onPostOffload(c)} data-testid={`button-post-offload-charges-${c.id}`}>
-                                      <PlusCircle className="h-4 w-4 text-blue-500" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Add Post-Offload Charges</TooltipContent>
-                                </Tooltip>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button variant="ghost" size="icon" onClick={() => onReverseOffload(c)} data-testid={`button-reverse-offload-${c.id}`}>
-                                      <RotateCcw className="h-4 w-4 text-amber-500" />
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Reverse Offload</TooltipContent>
-                                </Tooltip>
-                              </>
-                            )}
-                            <Button variant="ghost" size="icon" onClick={() => onEdit(c)} data-testid={`button-edit-container-${c.id}`}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => onDelete(c.id)} data-testid={`button-delete-container-${c.id}`}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  }) : []),
+                            <TableCell className="w-10 pl-6">
+                              <Checkbox
+                                checked={selectedIds.has(c.id)}
+                                onCheckedChange={(checked) => {
+                                  setSelectedIds((prev) => {
+                                    const next = new Set(prev);
+                                    if (checked) next.add(c.id);
+                                    else next.delete(c.id);
+                                    return next;
+                                  });
+                                }}
+                                data-testid={`checkbox-container-${c.id}`}
+                              />
+                            </TableCell>
+                            <TableCell className="font-semibold font-mono">
+                              <button
+                                className="hover:underline text-left cursor-pointer text-foreground"
+                                onClick={() => onView(c)}
+                                data-testid={`button-view-container-${c.id}`}
+                              >
+                                {c.containerNumber}
+                              </button>
+                            </TableCell>
+                            <TableCell className="font-mono">
+                              {commAmt > 0 ? (
+                                `${commCcy} ${formatNumber(commAmt)}`
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono" data-testid={`text-weight-${c.id}`}>
+                              {parseFloat(c.totalKg || "0") > 0 ? (
+                                formatNumber(parseFloat(c.totalKg || "0"))
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-mono font-semibold">
+                              {totalValue > 0 ? (
+                                `${ccy} ${formatNumber(totalValue)}`
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <ContainerStatusBadge status={c.status} />
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {c.status !== "OFFLOADED" && c.status !== "PARTIALLY_RECEIVED" && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={onNavigateOffload}
+                                        data-testid={`button-offload-container-${c.id}`}
+                                      >
+                                        <ArrowDown className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Offload to Production</TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {(c.status === "OFFLOADED" || c.status === "PARTIALLY_RECEIVED") && (
+                                  <>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => onPostOffload(c)}
+                                          data-testid={`button-post-offload-charges-${c.id}`}
+                                        >
+                                          <PlusCircle className="h-4 w-4 text-blue-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Add Post-Offload Charges</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => onReverseOffload(c)}
+                                          data-testid={`button-reverse-offload-${c.id}`}
+                                        >
+                                          <RotateCcw className="h-4 w-4 text-amber-500" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Reverse Offload</TooltipContent>
+                                    </Tooltip>
+                                  </>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => onEdit(c)}
+                                  data-testid={`button-edit-container-${c.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => onDelete(c.id)}
+                                  data-testid={`button-delete-container-${c.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    : []),
                 ];
               })}
             </TableBody>

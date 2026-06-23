@@ -11,7 +11,7 @@ export function registerRentalRoutes(
   module: RentalModule,
   urlPrefix: string,
   incomeAccountName: string,
-  shopExpenseAccountName: string = "Rent Expense - Shops",
+  shopExpenseAccountName: string = "Rent Expense - Shops"
 ) {
   registerRentalUnitsContractsRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);
   registerRentalPaymentsAccrualRoutes(app, module, urlPrefix, incomeAccountName, shopExpenseAccountName);

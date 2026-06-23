@@ -23,24 +23,42 @@ import {
 } from "@shared/schema";
 
 export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db: any) {
-
-  async function writeDaybookEntry(dbOrTx: any, opts: {
-    companyId: number; txDate: string; txType: string;
-    referenceId?: number; referenceTable?: string; description: string;
-    metaJson?: string; currencyCode?: string; amountCurrency?: number;
-    fxRateToUsd?: number; amountUsd?: number; createdBy?: number;
-    effectiveDate?: string | null;
-  }) {
+  async function writeDaybookEntry(
+    dbOrTx: any,
+    opts: {
+      companyId: number;
+      txDate: string;
+      txType: string;
+      referenceId?: number;
+      referenceTable?: string;
+      description: string;
+      metaJson?: string;
+      currencyCode?: string;
+      amountCurrency?: number;
+      fxRateToUsd?: number;
+      amountUsd?: number;
+      createdBy?: number;
+      effectiveDate?: string | null;
+    }
+  ) {
     const currency = opts.currencyCode || "USD";
     const fxRate = opts.fxRateToUsd || 1;
     const amtCurrency = opts.amountCurrency || 0;
-    const amtUsd = opts.amountUsd !== undefined ? opts.amountUsd : (currency === "USD" ? amtCurrency : amtCurrency * fxRate);
+    const amtUsd =
+      opts.amountUsd !== undefined ? opts.amountUsd : currency === "USD" ? amtCurrency : amtCurrency * fxRate;
     await dbOrTx.insert(factoryDaybookEntries).values({
-      companyId: opts.companyId, txDate: opts.txDate, txType: opts.txType,
-      referenceId: opts.referenceId || null, referenceTable: opts.referenceTable || null,
-      description: opts.description, metaJson: opts.metaJson || null,
-      currencyCode: currency, amountCurrency: String(amtCurrency),
-      fxRateToUsd: String(fxRate), amountUsd: String(amtUsd), createdBy: opts.createdBy || null,
+      companyId: opts.companyId,
+      txDate: opts.txDate,
+      txType: opts.txType,
+      referenceId: opts.referenceId || null,
+      referenceTable: opts.referenceTable || null,
+      description: opts.description,
+      metaJson: opts.metaJson || null,
+      currencyCode: currency,
+      amountCurrency: String(amtCurrency),
+      fxRateToUsd: String(fxRate),
+      amountUsd: String(amtUsd),
+      createdBy: opts.createdBy || null,
       effectiveDate: opts.effectiveDate || null,
     });
   }
@@ -71,16 +89,16 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
   function computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
     const start = new Date(startStr + "T00:00:00");
-    const end   = new Date(endStr   + "T00:00:00");
+    const end = new Date(endStr + "T00:00:00");
     let total = 0;
     let cur = new Date(start.getFullYear(), start.getMonth(), 1);
     while (cur <= end) {
-      const year  = cur.getFullYear();
+      const year = cur.getFullYear();
       const month = cur.getMonth();
-      const monthLastDay    = new Date(year, month + 1, 0);
+      const monthLastDay = new Date(year, month + 1, 0);
       const daysInThisMonth = monthLastDay.getDate();
       const segStart = new Date(Math.max(cur.getTime(), start.getTime()));
-      const segEnd   = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
+      const segEnd = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
       const daysInSeg = Math.floor((segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       total += salary * (daysInSeg / daysInThisMonth);
       cur = new Date(year, month + 1, 1);
@@ -127,12 +145,14 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       const balesInRange = await db
         .select()
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          inArray(factoryBales.status, ["IN_STOCK", "FINALIZED", "SOLD"]),
-          gte(factoryBales.createdAt, new Date(startDate)),
-          lte(factoryBales.createdAt, new Date(endDate + "T23:59:59.999Z")),
-        ));
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            inArray(factoryBales.status, ["IN_STOCK", "FINALIZED", "SOLD"]),
+            gte(factoryBales.createdAt, new Date(startDate)),
+            lte(factoryBales.createdAt, new Date(endDate + "T23:59:59.999Z"))
+          )
+        );
 
       const balesByWorker = new Map<number, any[]>();
       for (const bale of balesInRange) {
@@ -256,27 +276,30 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         const advances = Math.min(advancesRemaining, grossPay);
         const netSalary = grossPay - deductions - advances;
 
-        const [record] = await db.insert(factoryPayrolls).values({
-          companyId,
-          workerId: worker.id,
-          periodStart: startDate,
-          periodEnd: endDate,
-          baseSalary: String(basePay.toFixed(2)),
-          baleEarnings: String(baleEarnings.toFixed(2)),
-          kgEarnings: String(kgEarnings.toFixed(2)),
-          overtimePay: String(overtimePay.toFixed(2)),
-          bonuses: String(bonuses.toFixed(2)),
-          deductions: String(deductions.toFixed(2)),
-          advances: String(advances.toFixed(2)),
-          netSalary: String(netSalary.toFixed(2)),
-          balesCount,
-          kgProcessed: String(kgProcessed.toFixed(3)),
-          overtimeHours: String(overtimeHours.toFixed(2)),
-          totalWorkingDays,
-          presentDays: String(presentDays.toFixed(1)),
-          absentDays: String(absentDays.toFixed(1)),
-          status: "DRAFT",
-        }).returning();
+        const [record] = await db
+          .insert(factoryPayrolls)
+          .values({
+            companyId,
+            workerId: worker.id,
+            periodStart: startDate,
+            periodEnd: endDate,
+            baseSalary: String(basePay.toFixed(2)),
+            baleEarnings: String(baleEarnings.toFixed(2)),
+            kgEarnings: String(kgEarnings.toFixed(2)),
+            overtimePay: String(overtimePay.toFixed(2)),
+            bonuses: String(bonuses.toFixed(2)),
+            deductions: String(deductions.toFixed(2)),
+            advances: String(advances.toFixed(2)),
+            netSalary: String(netSalary.toFixed(2)),
+            balesCount,
+            kgProcessed: String(kgProcessed.toFixed(3)),
+            overtimeHours: String(overtimeHours.toFixed(2)),
+            totalWorkingDays,
+            presentDays: String(presentDays.toFixed(1)),
+            absentDays: String(absentDays.toFixed(1)),
+            status: "DRAFT",
+          })
+          .returning();
 
         // Settle advances: reduce remaining balances, create repayment records
         if (advances > 0) {
@@ -286,7 +309,8 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
             const bal = parseFloat(adv.remainingBalance || "0");
             const reduce = Math.min(bal, toSettle);
             const newBal = bal - reduce;
-            await db.update(factoryWorkerAdvances)
+            await db
+              .update(factoryWorkerAdvances)
               .set({
                 remainingBalance: newBal.toFixed(2),
                 fullyPaid: newBal <= 0,
@@ -427,27 +451,40 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
     try {
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const { bonuses, deductions, advances, overtimeHours, overtimePay, notes, status, paymentSource, paymentDate, paymentReference, effectiveDate } = req.body;
+      const {
+        bonuses,
+        deductions,
+        advances,
+        overtimeHours,
+        overtimePay,
+        notes,
+        status,
+        paymentSource,
+        paymentDate,
+        paymentReference,
+        effectiveDate,
+      } = req.body;
 
-      const [existing] = await db
-        .select()
-        .from(factoryPayrolls)
-        .where(eq(factoryPayrolls.id, id));
+      const [existing] = await db.select().from(factoryPayrolls).where(eq(factoryPayrolls.id, id));
 
       if (!existing) {
         return res.status(404).json({ message: "Payroll record not found" });
       }
 
       const updatedBonuses = bonuses !== undefined ? parseFloat(bonuses) : parseFloat(existing.bonuses || "0");
-      const updatedDeductions = deductions !== undefined ? parseFloat(deductions) : parseFloat(existing.deductions || "0");
+      const updatedDeductions =
+        deductions !== undefined ? parseFloat(deductions) : parseFloat(existing.deductions || "0");
       const updatedAdvances = advances !== undefined ? parseFloat(advances) : parseFloat(existing.advances || "0");
-      const updatedOvertimeHours = overtimeHours !== undefined ? parseFloat(overtimeHours) : parseFloat(existing.overtimeHours || "0");
-      const updatedOvertimePay = overtimePay !== undefined ? parseFloat(overtimePay) : parseFloat(existing.overtimePay || "0");
+      const updatedOvertimeHours =
+        overtimeHours !== undefined ? parseFloat(overtimeHours) : parseFloat(existing.overtimeHours || "0");
+      const updatedOvertimePay =
+        overtimePay !== undefined ? parseFloat(overtimePay) : parseFloat(existing.overtimePay || "0");
 
       const base = parseFloat(existing.baseSalary || "0");
       const baleEarn = parseFloat(existing.baleEarnings || "0");
       const kgEarn = parseFloat(existing.kgEarnings || "0");
-      const netSalary = base + baleEarn + kgEarn + updatedOvertimePay + updatedBonuses - updatedDeductions - updatedAdvances;
+      const netSalary =
+        base + baleEarn + kgEarn + updatedOvertimePay + updatedBonuses - updatedDeductions - updatedAdvances;
 
       const updateData: any = {
         bonuses: String(updatedBonuses.toFixed(2)),
@@ -465,14 +502,10 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         updateData.approvedAt = new Date();
       }
 
-      const [updated] = await db
-        .update(factoryPayrolls)
-        .set(updateData)
-        .where(eq(factoryPayrolls.id, id))
-        .returning();
+      const [updated] = await db.update(factoryPayrolls).set(updateData).where(eq(factoryPayrolls.id, id)).returning();
 
       if (status && status !== existing.status) {
-        const entryDate = (status === "PAID" && paymentDate) ? paymentDate : getClientDate(req);
+        const entryDate = status === "PAID" && paymentDate ? paymentDate : getClientDate(req);
 
         if (status === "PAID") {
           const source = paymentSource || "Cash";
@@ -513,7 +546,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
   app.post("/api/factory/payroll/:id/undo", requireAuth, async (req: any, res: any) => {
     try {
       if (!checkFactoryAdmin(req, res)) return;
-      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
+      const companyId = req.query.companyId
+        ? parseOptionalId(req.query.companyId)
+        : (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -530,37 +565,46 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         // 1. Reverse repayments tied to this payroll -> restore advance balances
         const advDeducted = parseFloat(existing.advances || "0");
         if (advDeducted > 0) {
-          const repayments = await tx.select()
+          const repayments = await tx
+            .select()
             .from(factoryAdvanceRepayments)
-            .where(and(
-              eq(factoryAdvanceRepayments.companyId, companyId),
-              eq(factoryAdvanceRepayments.workerId, existing.workerId),
-              eq(factoryAdvanceRepayments.payrollId, id),
-            ));
+            .where(
+              and(
+                eq(factoryAdvanceRepayments.companyId, companyId),
+                eq(factoryAdvanceRepayments.workerId, existing.workerId),
+                eq(factoryAdvanceRepayments.payrollId, id)
+              )
+            );
           for (const rep of repayments) {
-            const [adv] = await tx.select().from(factoryWorkerAdvances)
+            const [adv] = await tx
+              .select()
+              .from(factoryWorkerAdvances)
               .where(eq(factoryWorkerAdvances.id, rep.advanceId));
             if (!adv) continue;
             const curr = parseFloat(adv.remainingBalance || "0");
             const repAmt = parseFloat(rep.amount || "0");
             const newBal = curr + repAmt;
-            await tx.update(factoryWorkerAdvances).set({
-              remainingBalance: newBal.toFixed(2),
-              fullyPaid: false,
-            }).where(eq(factoryWorkerAdvances.id, adv.id));
+            await tx
+              .update(factoryWorkerAdvances)
+              .set({
+                remainingBalance: newBal.toFixed(2),
+                fullyPaid: false,
+              })
+              .where(eq(factoryWorkerAdvances.id, adv.id));
           }
-          await tx.delete(factoryAdvanceRepayments)
-            .where(eq(factoryAdvanceRepayments.payrollId, id));
+          await tx.delete(factoryAdvanceRepayments).where(eq(factoryAdvanceRepayments.payrollId, id));
         }
 
         // 2. Delete all accounting/daybook entries linked to this payroll
-        await tx.delete(factoryDaybookEntries).where(
-          and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.referenceId, id),
-            eq(factoryDaybookEntries.referenceTable, "factory_payrolls"),
-          )
-        );
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.referenceId, id),
+              eq(factoryDaybookEntries.referenceTable, "factory_payrolls")
+            )
+          );
 
         // 2b. Delete the mark-paid voucher (PAYMENT-PAY-{id}-*) and its entries.
         // These are created by the mark-paid endpoint: DR Payroll Payable / CR Cash.
@@ -571,10 +615,7 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
           .select({ id: vouchers.id })
           .from(vouchers)
           .where(
-            and(
-              eq(vouchers.companyId, companyId),
-              sql`${vouchers.voucherNumber} LIKE ${'PAYMENT-PAY-' + id + '-%'}`,
-            )
+            and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${"PAYMENT-PAY-" + id + "-%"}`)
           );
         if (paymentVouchers.length > 0) {
           const vIds = paymentVouchers.map((v: any) => v.id);
@@ -584,13 +625,16 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
         // 3. If PAID → revert to DRAFT. If DRAFT → delete entirely.
         if (existing.status === "PAID") {
-          await tx.update(factoryPayrolls).set({
-            status: "DRAFT",
-            paidAt: null,
-            paymentSource: null,
-            paymentReference: null,
-            approvedAt: null,
-          }).where(eq(factoryPayrolls.id, id));
+          await tx
+            .update(factoryPayrolls)
+            .set({
+              status: "DRAFT",
+              paidAt: null,
+              paymentSource: null,
+              paymentReference: null,
+              approvedAt: null,
+            })
+            .where(eq(factoryPayrolls.id, id));
         } else {
           await tx.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
         }
@@ -605,7 +649,9 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
   app.delete("/api/factory/payroll/:id", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.query.companyId ? parseOptionalId(req.query.companyId) : ((req.session as any).factoryCompanyId || (req.session as any).currentCompanyId);
+      const companyId = req.query.companyId
+        ? parseOptionalId(req.query.companyId)
+        : (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseId(req.params.id);
@@ -617,43 +663,53 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         .where(and(eq(factoryPayrolls.id, id), eq(factoryPayrolls.companyId, companyId)));
 
       if (!existing) return res.status(404).json({ message: "Payroll record not found" });
-      if (existing.status !== "DRAFT") return res.status(400).json({ message: "Only draft payroll records can be deleted" });
+      if (existing.status !== "DRAFT")
+        return res.status(400).json({ message: "Only draft payroll records can be deleted" });
 
       await db.transaction(async (tx: any) => {
         // Restore advance balances that were settled at generate time
         const advDeducted = parseFloat(existing.advances || "0");
         if (advDeducted > 0) {
-          const repayments = await tx.select()
+          const repayments = await tx
+            .select()
             .from(factoryAdvanceRepayments)
-            .where(and(
-              eq(factoryAdvanceRepayments.companyId, companyId),
-              eq(factoryAdvanceRepayments.workerId, existing.workerId),
-              eq(factoryAdvanceRepayments.payrollId, id),
-            ));
+            .where(
+              and(
+                eq(factoryAdvanceRepayments.companyId, companyId),
+                eq(factoryAdvanceRepayments.workerId, existing.workerId),
+                eq(factoryAdvanceRepayments.payrollId, id)
+              )
+            );
           for (const rep of repayments) {
-            const [adv] = await tx.select().from(factoryWorkerAdvances)
+            const [adv] = await tx
+              .select()
+              .from(factoryWorkerAdvances)
               .where(eq(factoryWorkerAdvances.id, rep.advanceId));
             if (!adv) continue;
             const curr = parseFloat(adv.remainingBalance || "0");
             const repAmt = parseFloat(rep.amount || "0");
             const newBal = curr + repAmt;
-            await tx.update(factoryWorkerAdvances).set({
-              remainingBalance: newBal.toFixed(2),
-              fullyPaid: false,
-            }).where(eq(factoryWorkerAdvances.id, adv.id));
+            await tx
+              .update(factoryWorkerAdvances)
+              .set({
+                remainingBalance: newBal.toFixed(2),
+                fullyPaid: false,
+              })
+              .where(eq(factoryWorkerAdvances.id, adv.id));
           }
-          await tx.delete(factoryAdvanceRepayments)
-            .where(eq(factoryAdvanceRepayments.payrollId, id));
+          await tx.delete(factoryAdvanceRepayments).where(eq(factoryAdvanceRepayments.payrollId, id));
         }
 
         // Delete any daybook entries referencing this payroll
-        await tx.delete(factoryDaybookEntries).where(
-          and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.referenceId, id),
-            eq(factoryDaybookEntries.referenceTable, "factory_payrolls"),
-          )
-        );
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.referenceId, id),
+              eq(factoryDaybookEntries.referenceTable, "factory_payrolls")
+            )
+          );
 
         await tx.delete(factoryPayrolls).where(eq(factoryPayrolls.id, id));
       });
@@ -694,11 +750,13 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         })
         .from(factoryPayrolls)
         .leftJoin(factoryWorkers, eq(factoryPayrolls.workerId, factoryWorkers.id))
-        .where(and(
-          eq(factoryPayrolls.companyId, companyId),
-          gte(factoryPayrolls.periodStart, startDate),
-          lte(factoryPayrolls.periodEnd, endDate),
-        ))
+        .where(
+          and(
+            eq(factoryPayrolls.companyId, companyId),
+            gte(factoryPayrolls.periodStart, startDate),
+            lte(factoryPayrolls.periodEnd, endDate)
+          )
+        )
         .orderBy(factoryWorkers.fullName);
 
       const doc = new PDFDocument({ margin: 30, size: "A4", layout: "landscape" });
@@ -709,7 +767,10 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
 
       const hmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(hmdLogoPath)) {
-        try { doc.image(hmdLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.5); } catch {}
+        try {
+          doc.image(hmdLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
+          doc.moveDown(0.5);
+        } catch {}
       }
       doc.fontSize(12).font("Helvetica").text("Factory Payroll Report", { align: "center" });
       doc.fontSize(10).text(`Period: ${startDate} to ${endDate}`, { align: "center" });
@@ -729,7 +790,10 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       });
 
       y += 15;
-      doc.moveTo(startX, y).lineTo(startX + colWidths.reduce((a, b) => a + b, 0), y).stroke();
+      doc
+        .moveTo(startX, y)
+        .lineTo(startX + colWidths.reduce((a, b) => a + b, 0), y)
+        .stroke();
       y += 5;
 
       doc.font("Helvetica").fontSize(7);
@@ -788,14 +852,24 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
       }
 
       y += 5;
-      doc.moveTo(startX, y).lineTo(startX + colWidths.reduce((a, b) => a + b, 0), y).stroke();
+      doc
+        .moveTo(startX, y)
+        .lineTo(startX + colWidths.reduce((a, b) => a + b, 0), y)
+        .stroke();
       y += 5;
 
       doc.font("Helvetica-Bold").fontSize(8);
       const totalValues = [
-        "", "TOTALS", "", "",
-        totals.base.toFixed(2), totals.bale.toFixed(2), totals.kg.toFixed(2),
-        totals.ot.toFixed(2), totals.bonus.toFixed(2), totals.deduct.toFixed(2),
+        "",
+        "TOTALS",
+        "",
+        "",
+        totals.base.toFixed(2),
+        totals.bale.toFixed(2),
+        totals.kg.toFixed(2),
+        totals.ot.toFixed(2),
+        totals.bonus.toFixed(2),
+        totals.deduct.toFixed(2),
         totals.net.toFixed(2),
       ];
       x = startX;
@@ -828,21 +902,30 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         })
         .from(factoryPayrolls)
         .leftJoin(factoryWorkers, eq(factoryPayrolls.workerId, factoryWorkers.id))
-        .where(and(
-          eq(factoryPayrolls.companyId, companyId),
-          gte(factoryPayrolls.periodStart, startDate),
-          lte(factoryPayrolls.periodEnd, endDate),
-        ))
+        .where(
+          and(
+            eq(factoryPayrolls.companyId, companyId),
+            gte(factoryPayrolls.periodStart, startDate),
+            lte(factoryPayrolls.periodEnd, endDate)
+          )
+        )
         .orderBy(factoryWorkers.fullName);
 
       const workbook = new ExcelJS.Workbook();
       const xlogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       let xlogoId: number | null = null;
-      try { if (fs.existsSync(xlogoPath)) { const buf = fs.readFileSync(xlogoPath); xlogoId = workbook.addImage({ buffer: buf as Buffer, extension: "jpeg" }); } } catch {}
+      try {
+        if (fs.existsSync(xlogoPath)) {
+          const buf = fs.readFileSync(xlogoPath);
+          xlogoId = workbook.addImage({ buffer: buf as Buffer, extension: "jpeg" });
+        }
+      } catch {}
 
       function addSheetHeader(sheet: ExcelJS.Worksheet, title: string, numCols: number, logoCenterCol: number = 0) {
-        const logoRow = sheet.addRow([]); logoRow.height = 90;
-        if (xlogoId !== null) sheet.addImage(xlogoId, { tl: { col: logoCenterCol, row: 0 }, ext: { width: 300, height: 90 } });
+        const logoRow = sheet.addRow([]);
+        logoRow.height = 90;
+        if (xlogoId !== null)
+          sheet.addImage(xlogoId, { tl: { col: logoCenterCol, row: 0 }, ext: { width: 300, height: 90 } });
         const rName = sheet.addRow(["HMD INTERNATIONAL GROUP"]);
         rName.getCell(1).font = { bold: true, size: 16, color: { argb: "FF1F3864" } };
         rName.getCell(1).alignment = { horizontal: "center" };
@@ -880,10 +963,32 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         { key: "status", width: 12 },
       ];
       addSheetHeader(summarySheet, "Payroll Summary", SUMMARY_COLS, 6.5);
-      const headerRow = summarySheet.addRow(["Employee Code", "Name", "Position", "Salary Type", "Working Days", "Present Days", "Absent Days", "Base Salary", "Bale Earnings", "KG Earnings", "Overtime Pay", "Bonuses", "Deductions", "Advances", "Net Salary", "Bales Count", "KG Processed", "Status"]);
+      const headerRow = summarySheet.addRow([
+        "Employee Code",
+        "Name",
+        "Position",
+        "Salary Type",
+        "Working Days",
+        "Present Days",
+        "Absent Days",
+        "Base Salary",
+        "Bale Earnings",
+        "KG Earnings",
+        "Overtime Pay",
+        "Bonuses",
+        "Deductions",
+        "Advances",
+        "Net Salary",
+        "Bales Count",
+        "KG Processed",
+        "Status",
+      ]);
       headerRow.font = { bold: true };
       headerRow.alignment = { horizontal: "center" };
-      headerRow.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } }; cell.font = { bold: true, color: { argb: "FFFFFFFF" } }; });
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      });
 
       for (const row of payrollData) {
         const p = row.payroll;
@@ -910,7 +1015,19 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         });
       }
 
-      ["base", "bale", "kg", "ot", "bonus", "deduct", "advance", "net", "kgProcessed", "presentDays", "absentDays"].forEach((key) => {
+      [
+        "base",
+        "bale",
+        "kg",
+        "ot",
+        "bonus",
+        "deduct",
+        "advance",
+        "net",
+        "kgProcessed",
+        "presentDays",
+        "absentDays",
+      ].forEach((key) => {
         const col = summarySheet.getColumn(key);
         col.numFmt = "#,##0.0";
       });
@@ -932,10 +1049,26 @@ export function registerFactoryPayrollRoutes(app: Express, requireAuth: any, db:
         { key: "paymentMethod", width: 16 },
       ];
       addSheetHeader(detailsSheet, "Worker Details", DETAILS_COLS, 3.5);
-      const detailsHeaderRow = detailsSheet.addRow(["Employee Code", "Full Name", "Position", "Department", "Salary Type", "Base Salary", "Per Bale Rate", "Per KG Rate", "Overtime Rate", "Phone", "Date Joined", "Payment Method"]);
+      const detailsHeaderRow = detailsSheet.addRow([
+        "Employee Code",
+        "Full Name",
+        "Position",
+        "Department",
+        "Salary Type",
+        "Base Salary",
+        "Per Bale Rate",
+        "Per KG Rate",
+        "Overtime Rate",
+        "Phone",
+        "Date Joined",
+        "Payment Method",
+      ]);
       detailsHeaderRow.font = { bold: true };
       detailsHeaderRow.alignment = { horizontal: "center" };
-      detailsHeaderRow.eachCell((cell) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } }; cell.font = { bold: true, color: { argb: "FFFFFFFF" } }; });
+      detailsHeaderRow.eachCell((cell) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F3864" } };
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      });
 
       const seenWorkers = new Set<number>();
       for (const row of payrollData) {

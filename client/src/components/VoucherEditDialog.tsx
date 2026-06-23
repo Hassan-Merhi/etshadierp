@@ -12,21 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -123,23 +110,23 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
   const [showOptionalWarning, setShowOptionalWarning] = useState(false);
 
   // Fetch reference data
-  const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({ 
+  const { data: ledgerAccounts = [] } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts"],
     enabled: open,
   });
-  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({ 
+  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
     queryKey: ["/api/bank-accounts"],
     enabled: open,
   });
-  const { data: suppliers = [] } = useQuery<Supplier[]>({ 
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
     enabled: open,
   });
-  const { data: employees = [] } = useQuery<Employee[]>({ 
+  const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ["/api/employees"],
     enabled: open,
   });
-  const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({ 
+  const { data: fixedAssets = [] } = useQuery<FixedAsset[]>({
     queryKey: ["/api/fixed-assets"],
     enabled: open,
   });
@@ -182,36 +169,37 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
   useEffect(() => {
     if (voucherData && open) {
       const voucherDate = new Date(voucherData.voucherDate);
-      
+
       form.reset({
         voucherNumber: voucherData.voucherNumber || "",
         voucherType: voucherData.voucherType || "Journal",
         voucherDate: voucherDate,
         description: voucherData.description || "",
         optional: voucherData.optional || false,
-        entries: voucherData.entries && voucherData.entries.length > 0
-          ? voucherData.entries.map((entry: any) => ({
-              ledgerAccountId: entry.ledgerAccountId || null,
-              bankAccountId: entry.bankAccountId || null,
-              fixedAssetId: entry.fixedAssetId || null,
-              supplierId: entry.supplierId || null,
-              employeeId: entry.employeeId || null,
-              debitAmount: entry.debitAmount || "0",
-              creditAmount: entry.creditAmount || "0",
-              narration: entry.narration || "",
-            }))
-          : [
-              {
-                ledgerAccountId: null,
-                bankAccountId: null,
-                fixedAssetId: null,
-                supplierId: null,
-                employeeId: null,
-                debitAmount: "0",
-                creditAmount: "0",
-                narration: "",
-              },
-            ],
+        entries:
+          voucherData.entries && voucherData.entries.length > 0
+            ? voucherData.entries.map((entry: any) => ({
+                ledgerAccountId: entry.ledgerAccountId || null,
+                bankAccountId: entry.bankAccountId || null,
+                fixedAssetId: entry.fixedAssetId || null,
+                supplierId: entry.supplierId || null,
+                employeeId: entry.employeeId || null,
+                debitAmount: entry.debitAmount || "0",
+                creditAmount: entry.creditAmount || "0",
+                narration: entry.narration || "",
+              }))
+            : [
+                {
+                  ledgerAccountId: null,
+                  bankAccountId: null,
+                  fixedAssetId: null,
+                  supplierId: null,
+                  employeeId: null,
+                  debitAmount: "0",
+                  creditAmount: "0",
+                  narration: "",
+                },
+              ],
       });
     }
   }, [voucherData, open, form]);
@@ -227,7 +215,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
         optional: data.optional,
       };
 
-      const entriesPayload = data.entries.map(entry => ({
+      const entriesPayload = data.entries.map((entry) => ({
         ledgerAccountId: entry.ledgerAccountId,
         bankAccountId: entry.bankAccountId,
         fixedAssetId: entry.fixedAssetId,
@@ -288,23 +276,23 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
 
   const getAccountName = (entry: VoucherEntry) => {
     if (entry.ledgerAccountId) {
-      const account = ledgerAccounts.find(a => a.id === entry.ledgerAccountId);
+      const account = ledgerAccounts.find((a) => a.id === entry.ledgerAccountId);
       return account ? account.name : "";
     }
     if (entry.bankAccountId) {
-      const account = bankAccounts.find(a => a.id === entry.bankAccountId);
+      const account = bankAccounts.find((a) => a.id === entry.bankAccountId);
       return account ? account.bankName : "";
     }
     if (entry.supplierId) {
-      const supplier = suppliers.find(s => s.id === entry.supplierId);
+      const supplier = suppliers.find((s) => s.id === entry.supplierId);
       return supplier ? supplier.legalName : "";
     }
     if (entry.employeeId) {
-      const employee = employees.find(e => e.id === entry.employeeId);
+      const employee = employees.find((e) => e.id === entry.employeeId);
       return employee ? `${employee.firstName} ${employee.lastName}` : "";
     }
     if (entry.fixedAssetId) {
-      const asset = fixedAssets.find(a => a.id === entry.fixedAssetId);
+      const asset = fixedAssets.find((a) => a.id === entry.fixedAssetId);
       return asset ? asset.assetName : "";
     }
     return "";
@@ -391,12 +379,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                           </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
+                          <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                         </PopoverContent>
                       </Popover>
                       <FormMessage />
@@ -432,9 +415,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel className="font-medium">
-                        Mark as Optional (non-posting)
-                      </FormLabel>
+                      <FormLabel className="font-medium">Mark as Optional (non-posting)</FormLabel>
                     </div>
                   </FormItem>
                 )}
@@ -471,7 +452,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                   <table className="w-full text-sm">
                     <thead className="border-b sticky top-0 z-30">
                       <tr>
-                        {(form.watch("voucherType") === "Consumption" || form.watch("voucherType") === "Production") ? (
+                        {form.watch("voucherType") === "Consumption" || form.watch("voucherType") === "Production" ? (
                           <>
                             <th className="text-left py-2 px-2 w-[40%]">Item Name</th>
                             <th className="text-right py-2 px-2 w-[15%]">Qty</th>
@@ -481,7 +462,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                         ) : (
                           <>
                             <th className="text-left py-2 px-2 w-[60%]">Account</th>
-                            {(form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt") ? (
+                            {form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt" ? (
                               <th className="text-right py-2 px-2 w-[35%]">Amount</th>
                             ) : (
                               <>
@@ -501,7 +482,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                         const voucherType = form.watch("voucherType");
                         const debitAmount = parseFloat(form.watch(`entries.${index}.debitAmount`) || "0");
                         const creditAmount = parseFloat(form.watch(`entries.${index}.creditAmount`) || "0");
-                        
+
                         if (voucherType === "Payment" || voucherType === "Receipt") {
                           // Hide entries where both amounts are 0 (empty/removed entries)
                           if (debitAmount === 0 && creditAmount === 0) {
@@ -516,11 +497,13 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             return null;
                           }
                         }
-                        
+
                         const isConsumptionOrProduction = voucherType === "Consumption" || voucherType === "Production";
-                        
+
                         // For Consumption/Production, parse narration to extract item name, qty, and rate
-                        let itemName = "", qty = 0, rate = 0;
+                        let itemName = "",
+                          qty = 0,
+                          rate = 0;
                         if (isConsumptionOrProduction) {
                           const narration = form.watch(`entries.${index}.narration`) || "";
                           // Parse pattern: "Consumption of -1.000 x ITEM NAME @ $98.62"
@@ -531,197 +514,220 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                             rate = parseFloat(match[3]);
                           }
                         }
-                        
-                        return (
-                        <tr key={field.id} className="border-b">
-                          {isConsumptionOrProduction ? (
-                            <>
-                              <td className="py-2 px-2">{itemName || "-"}</td>
-                              <td className="py-2 px-2 text-right font-mono">{qty.toFixed(3)}</td>
-                              <td className="py-2 px-2 text-right font-mono">{formatAmount(rate)}</td>
-                              <td className="py-2 px-2 text-right font-mono">{formatAmount(qty * rate)}</td>
-                            </>
-                          ) : (
-                            <>
-                              <td className="py-2 px-2">
-                                <div className="space-y-1">
-                                  <Select
-                                    value={
-                                      form.watch(`entries.${index}.ledgerAccountId`)?.toString() ||
-                                      form.watch(`entries.${index}.bankAccountId`)?.toString() ||
-                                      form.watch(`entries.${index}.supplierId`)?.toString() ||
-                                      form.watch(`entries.${index}.employeeId`)?.toString() ||
-                                      form.watch(`entries.${index}.fixedAssetId`)?.toString() ||
-                                      ""
-                                    }
-                                    onValueChange={(value) => {
-                                      const [type, id] = value.split("-");
-                                      form.setValue(`entries.${index}.ledgerAccountId`, null);
-                                      form.setValue(`entries.${index}.bankAccountId`, null);
-                                      form.setValue(`entries.${index}.supplierId`, null);
-                                      form.setValue(`entries.${index}.employeeId`, null);
-                                      form.setValue(`entries.${index}.fixedAssetId`, null);
 
-                                      if (type === "ledger") form.setValue(`entries.${index}.ledgerAccountId`, parseInt(id));
-                                      if (type === "bank") form.setValue(`entries.${index}.bankAccountId`, parseInt(id));
-                                      if (type === "supplier") form.setValue(`entries.${index}.supplierId`, parseInt(id));
-                                      if (type === "employee") form.setValue(`entries.${index}.employeeId`, parseInt(id));
-                                      if (type === "asset") form.setValue(`entries.${index}.fixedAssetId`, parseInt(id));
-                                    }}
-                                  >
-                                    <SelectTrigger data-testid={`select-account-${index}`}>
-                                      <SelectValue placeholder="Select account" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <div className="text-xs font-semibold px-2 py-1 text-muted-foreground">Ledger Accounts</div>
-                                      {ledgerAccounts.map((acc) => (
-                                        <SelectItem key={`ledger-${acc.id}`} value={`ledger-${acc.id}`}>
-                                          {acc.code} - {acc.name}
-                                        </SelectItem>
-                                      ))}
-                                      <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">Bank Accounts</div>
-                                      {bankAccounts.map((acc) => (
-                                        <SelectItem key={`bank-${acc.id}`} value={`bank-${acc.id}`}>
-                                          {acc.accountNumber} - {acc.bankName}
-                                        </SelectItem>
-                                      ))}
-                                      <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">Suppliers</div>
-                                      {suppliers.map((sup) => (
-                                        <SelectItem key={`supplier-${sup.id}`} value={`supplier-${sup.id}`}>
-                                          {sup.code} - {sup.name}
-                                        </SelectItem>
-                                      ))}
-                                      <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">Employees</div>
-                                      {employees.map((emp) => (
-                                        <SelectItem key={`employee-${emp.id}`} value={`employee-${emp.id}`}>
-                                          {emp.code} - {emp.firstName} {emp.lastName}
-                                        </SelectItem>
-                                      ))}
-                                      <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">Fixed Assets</div>
-                                      {fixedAssets.map((asset) => (
-                                        <SelectItem key={`asset-${asset.id}`} value={`asset-${asset.id}`}>
-                                          {asset.assetCode} - {asset.assetName}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              </td>
-                              {(form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt") ? (
+                        return (
+                          <tr key={field.id} className="border-b">
+                            {isConsumptionOrProduction ? (
+                              <>
+                                <td className="py-2 px-2">{itemName || "-"}</td>
+                                <td className="py-2 px-2 text-right font-mono">{qty.toFixed(3)}</td>
+                                <td className="py-2 px-2 text-right font-mono">{formatAmount(rate)}</td>
+                                <td className="py-2 px-2 text-right font-mono">{formatAmount(qty * rate)}</td>
+                              </>
+                            ) : (
+                              <>
                                 <td className="py-2 px-2">
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={
-                                      parseFloat(form.watch(`entries.${index}.debitAmount`) || "0") > 0
-                                        ? form.watch(`entries.${index}.debitAmount`)
-                                        : form.watch(`entries.${index}.creditAmount`) || ""
-                                    }
-                                    onChange={(e) => {
-                                      const voucherType = form.watch("voucherType");
-                                      if (voucherType === "Payment") {
-                                        form.setValue(`entries.${index}.debitAmount`, e.target.value);
-                                        form.setValue(`entries.${index}.creditAmount`, "0");
-                                      } else {
-                                        form.setValue(`entries.${index}.creditAmount`, e.target.value);
-                                        form.setValue(`entries.${index}.debitAmount`, "0");
+                                  <div className="space-y-1">
+                                    <Select
+                                      value={
+                                        form.watch(`entries.${index}.ledgerAccountId`)?.toString() ||
+                                        form.watch(`entries.${index}.bankAccountId`)?.toString() ||
+                                        form.watch(`entries.${index}.supplierId`)?.toString() ||
+                                        form.watch(`entries.${index}.employeeId`)?.toString() ||
+                                        form.watch(`entries.${index}.fixedAssetId`)?.toString() ||
+                                        ""
                                       }
-                                    }}
-                                    className="text-right"
-                                    data-testid={`input-amount-${index}`}
-                                  />
+                                      onValueChange={(value) => {
+                                        const [type, id] = value.split("-");
+                                        form.setValue(`entries.${index}.ledgerAccountId`, null);
+                                        form.setValue(`entries.${index}.bankAccountId`, null);
+                                        form.setValue(`entries.${index}.supplierId`, null);
+                                        form.setValue(`entries.${index}.employeeId`, null);
+                                        form.setValue(`entries.${index}.fixedAssetId`, null);
+
+                                        if (type === "ledger")
+                                          form.setValue(`entries.${index}.ledgerAccountId`, parseInt(id));
+                                        if (type === "bank")
+                                          form.setValue(`entries.${index}.bankAccountId`, parseInt(id));
+                                        if (type === "supplier")
+                                          form.setValue(`entries.${index}.supplierId`, parseInt(id));
+                                        if (type === "employee")
+                                          form.setValue(`entries.${index}.employeeId`, parseInt(id));
+                                        if (type === "asset")
+                                          form.setValue(`entries.${index}.fixedAssetId`, parseInt(id));
+                                      }}
+                                    >
+                                      <SelectTrigger data-testid={`select-account-${index}`}>
+                                        <SelectValue placeholder="Select account" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <div className="text-xs font-semibold px-2 py-1 text-muted-foreground">
+                                          Ledger Accounts
+                                        </div>
+                                        {ledgerAccounts.map((acc) => (
+                                          <SelectItem key={`ledger-${acc.id}`} value={`ledger-${acc.id}`}>
+                                            {acc.code} - {acc.name}
+                                          </SelectItem>
+                                        ))}
+                                        <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">
+                                          Bank Accounts
+                                        </div>
+                                        {bankAccounts.map((acc) => (
+                                          <SelectItem key={`bank-${acc.id}`} value={`bank-${acc.id}`}>
+                                            {acc.accountNumber} - {acc.bankName}
+                                          </SelectItem>
+                                        ))}
+                                        <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">
+                                          Suppliers
+                                        </div>
+                                        {suppliers.map((sup) => (
+                                          <SelectItem key={`supplier-${sup.id}`} value={`supplier-${sup.id}`}>
+                                            {sup.code} - {sup.name}
+                                          </SelectItem>
+                                        ))}
+                                        <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">
+                                          Employees
+                                        </div>
+                                        {employees.map((emp) => (
+                                          <SelectItem key={`employee-${emp.id}`} value={`employee-${emp.id}`}>
+                                            {emp.code} - {emp.firstName} {emp.lastName}
+                                          </SelectItem>
+                                        ))}
+                                        <div className="text-xs font-semibold px-2 py-1 text-muted-foreground mt-2">
+                                          Fixed Assets
+                                        </div>
+                                        {fixedAssets.map((asset) => (
+                                          <SelectItem key={`asset-${asset.id}`} value={`asset-${asset.id}`}>
+                                            {asset.assetCode} - {asset.assetName}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
                                 </td>
-                              ) : (
-                                <>
+                                {form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt" ? (
                                   <td className="py-2 px-2">
                                     <Input
                                       type="number"
                                       step="0.01"
-                                      {...form.register(`entries.${index}.debitAmount`)}
-                                      className="text-right"
-                                      data-testid={`input-debit-${index}`}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Tab") {
-                                          e.preventDefault();
-                                          const creditInput = document.querySelector(`[data-testid="input-credit-${index}"]`) as HTMLInputElement;
-                                          if (creditInput) creditInput.focus();
+                                      value={
+                                        parseFloat(form.watch(`entries.${index}.debitAmount`) || "0") > 0
+                                          ? form.watch(`entries.${index}.debitAmount`)
+                                          : form.watch(`entries.${index}.creditAmount`) || ""
+                                      }
+                                      onChange={(e) => {
+                                        const voucherType = form.watch("voucherType");
+                                        if (voucherType === "Payment") {
+                                          form.setValue(`entries.${index}.debitAmount`, e.target.value);
+                                          form.setValue(`entries.${index}.creditAmount`, "0");
+                                        } else {
+                                          form.setValue(`entries.${index}.creditAmount`, e.target.value);
+                                          form.setValue(`entries.${index}.debitAmount`, "0");
                                         }
                                       }}
-                                    />
-                                  </td>
-                                  <td className="py-2 px-2">
-                                    <Input
-                                      type="number"
-                                      step="0.01"
-                                      {...form.register(`entries.${index}.creditAmount`)}
                                       className="text-right"
-                                      data-testid={`input-credit-${index}`}
-                                      onKeyDown={(e) => {
-                                        if (e.key === "Tab") {
-                                          e.preventDefault();
-                                          const narrationInput = document.querySelector(`[data-testid="input-narration-${index}"]`) as HTMLInputElement;
-                                          if (narrationInput) narrationInput.focus();
-                                        }
-                                      }}
+                                      data-testid={`input-amount-${index}`}
                                     />
                                   </td>
-                                  <td className="py-2 px-2">
-                                    <Input
-                                      {...form.register(`entries.${index}.narration`)}
-                                      data-testid={`input-narration-${index}`}
-                                    />
-                                  </td>
-                                </>
-                              )}
-                            </>
-                          )}
-                          <td className="py-2 px-2 text-center">
-                            {fields.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => remove(index)}
-                                data-testid={`button-remove-entry-${index}`}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
+                                ) : (
+                                  <>
+                                    <td className="py-2 px-2">
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        {...form.register(`entries.${index}.debitAmount`)}
+                                        className="text-right"
+                                        data-testid={`input-debit-${index}`}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Tab") {
+                                            e.preventDefault();
+                                            const creditInput = document.querySelector(
+                                              `[data-testid="input-credit-${index}"]`
+                                            ) as HTMLInputElement;
+                                            if (creditInput) creditInput.focus();
+                                          }
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="py-2 px-2">
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        {...form.register(`entries.${index}.creditAmount`)}
+                                        className="text-right"
+                                        data-testid={`input-credit-${index}`}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Tab") {
+                                            e.preventDefault();
+                                            const narrationInput = document.querySelector(
+                                              `[data-testid="input-narration-${index}"]`
+                                            ) as HTMLInputElement;
+                                            if (narrationInput) narrationInput.focus();
+                                          }
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="py-2 px-2">
+                                      <Input
+                                        {...form.register(`entries.${index}.narration`)}
+                                        data-testid={`input-narration-${index}`}
+                                      />
+                                    </td>
+                                  </>
+                                )}
+                              </>
                             )}
-                          </td>
-                        </tr>
+                            <td className="py-2 px-2 text-center">
+                              {fields.length > 1 && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => remove(index)}
+                                  data-testid={`button-remove-entry-${index}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
                         );
                       })}
                     </tbody>
                     <tfoot className="border-t-2 font-semibold">
                       <tr>
-                        {(form.watch("voucherType") === "Consumption" || form.watch("voucherType") === "Production") ? (
+                        {form.watch("voucherType") === "Consumption" || form.watch("voucherType") === "Production" ? (
                           <>
                             <td className="py-2 px-2 text-right">Total:</td>
                             <td className="py-2 px-2 text-right font-mono">
-                              {fields.reduce((sum, _, index) => {
-                                const narration = form.watch(`entries.${index}.narration`) || "";
-                                const match = narration.match(/of\s+([-\d.]+)\s+x/);
-                                return sum + (match ? Math.abs(parseFloat(match[1])) : 0);
-                              }, 0).toFixed(3)}
+                              {fields
+                                .reduce((sum, _, index) => {
+                                  const narration = form.watch(`entries.${index}.narration`) || "";
+                                  const match = narration.match(/of\s+([-\d.]+)\s+x/);
+                                  return sum + (match ? Math.abs(parseFloat(match[1])) : 0);
+                                }, 0)
+                                .toFixed(3)}
                             </td>
                             <td className="py-2 px-2"></td>
                             <td className="py-2 px-2 text-right font-mono">
-                              {formatAmount(fields.reduce((sum, _, index) => {
-                                const narration = form.watch(`entries.${index}.narration`) || "";
-                                const match = narration.match(/of\s+([-\d.]+)\s+x\s+.+?\s+@\s+\$?([\d.]+)/);
-                                if (match) {
-                                  const qty = Math.abs(parseFloat(match[1]));
-                                  const rate = parseFloat(match[2]);
-                                  return sum + (qty * rate);
-                                }
-                                return sum;
-                              }, 0))}
+                              {formatAmount(
+                                fields.reduce((sum, _, index) => {
+                                  const narration = form.watch(`entries.${index}.narration`) || "";
+                                  const match = narration.match(/of\s+([-\d.]+)\s+x\s+.+?\s+@\s+\$?([\d.]+)/);
+                                  if (match) {
+                                    const qty = Math.abs(parseFloat(match[1]));
+                                    const rate = parseFloat(match[2]);
+                                    return sum + qty * rate;
+                                  }
+                                  return sum;
+                                }, 0)
+                              )}
                             </td>
                           </>
                         ) : (
                           <>
                             <td className="py-2 px-2 text-right">Total:</td>
-                            {(form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt") ? (
+                            {form.watch("voucherType") === "Payment" || form.watch("voucherType") === "Receipt" ? (
                               <>
                                 <td className="py-2 px-2 text-right font-mono" data-testid="text-total-amount">
                                   {formatAmount(Math.max(totalDebits, totalCredits))}
@@ -749,9 +755,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
                                       Optional – not posted to ledgers
                                     </div>
                                   )}
-                                  {isBalanced && (
-                                    <div className="text-sm text-muted-foreground">Balanced</div>
-                                  )}
+                                  {isBalanced && <div className="text-sm text-muted-foreground">Balanced</div>}
                                 </td>
                               </>
                             )}
@@ -764,12 +768,7 @@ export function VoucherEditDialog({ voucherId, open, onOpenChange }: VoucherEdit
               </div>
 
               <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  data-testid="button-cancel"
-                >
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
                   Cancel
                 </Button>
                 <Button

@@ -11,21 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -37,8 +24,23 @@ import {
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  ShoppingCart, Printer, Plus, Trash2, Search, Package, History,
-  X, Check, MapPin, Wallet, User, ChevronRight, CreditCard, Banknote, AlertCircle, Pencil,
+  ShoppingCart,
+  Printer,
+  Plus,
+  Trash2,
+  Search,
+  Package,
+  History,
+  X,
+  Check,
+  MapPin,
+  Wallet,
+  User,
+  ChevronRight,
+  CreditCard,
+  Banknote,
+  AlertCircle,
+  Pencil,
 } from "lucide-react";
 
 interface CartRow {
@@ -91,10 +93,10 @@ function formatNum(v: string | number) {
 
 const COLUMNS = [
   { key: "productName", label: "Description", width: "flex-1" },
-  { key: "quantity",    label: "Qty",         width: "w-20"   },
-  { key: "unitPrice",   label: "Price",        width: "w-28"   },
-  { key: "amount",      label: "Amount",       width: "w-28"   },
-  { key: "delete",      label: "",             width: "w-10"   },
+  { key: "quantity", label: "Qty", width: "w-20" },
+  { key: "unitPrice", label: "Price", width: "w-28" },
+  { key: "amount", label: "Amount", width: "w-28" },
+  { key: "delete", label: "", width: "w-10" },
 ];
 
 export default function FactoryPOS() {
@@ -110,32 +112,32 @@ export default function FactoryPOS() {
     return p ? parseInt(p) : null;
   })();
 
-  const [locationId, setLocationId]     = useState<string>("");
+  const [locationId, setLocationId] = useState<string>("");
   const [customerName, setCustomerName] = useState("");
-  const [paymentType, setPaymentType]   = useState<"CASH" | "CREDIT">("CASH");
+  const [paymentType, setPaymentType] = useState<"CASH" | "CREDIT">("CASH");
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-  const [notes, setNotes]               = useState("");
-  const [txDate, setTxDate]             = useState(getAppDate());
+  const [notes, setNotes] = useState("");
+  const [txDate, setTxDate] = useState(getAppDate());
   const [currencyCode, setCurrencyCode] = useState("USD");
   const [cashAccountId, setCashAccountId] = useState<string>("");
-  const [rows, setRows]                 = useState<CartRow[]>([emptyRow("1")]);
-  const [expenseRows, setExpenseRows]   = useState<ExpenseRow[]>([]);
-  const [search, setSearch]             = useState("");
+  const [rows, setRows] = useState<CartRow[]>([emptyRow("1")]);
+  const [expenseRows, setExpenseRows] = useState<ExpenseRow[]>([]);
+  const [search, setSearch] = useState("");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const searchRef   = useRef<HTMLInputElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const itemListRef = useRef<HTMLDivElement>(null);
-  const [savedSale, setSavedSale]       = useState<any>(null);
+  const [savedSale, setSavedSale] = useState<any>(null);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
-  const [voidId, setVoidId]             = useState<number | null>(null);
-  const [showHistory, setShowHistory]   = useState(false);
-  const [editLoaded, setEditLoaded]     = useState(false);
+  const [voidId, setVoidId] = useState<number | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [editLoaded, setEditLoaded] = useState(false);
 
   // Mobile state
   const [mobileRowEditOpen, setMobileRowEditOpen] = useState(false);
-  const [mobileRowEditIdx, setMobileRowEditIdx]   = useState<number | null>(null);
-  const [mobileBrowseOpen, setMobileBrowseOpen]   = useState(false);
+  const [mobileRowEditIdx, setMobileRowEditIdx] = useState<number | null>(null);
+  const [mobileBrowseOpen, setMobileBrowseOpen] = useState(false);
   const [mobileBrowseSearch, setMobileBrowseSearch] = useState("");
-  const [mobileRowTarget, setMobileRowTarget]     = useState<number | null>(null);
+  const [mobileRowTarget, setMobileRowTarget] = useState<number | null>(null);
 
   // Queries
   const { data: locations } = useQuery<any[]>({ queryKey: ["/api/locations"] });
@@ -183,50 +185,56 @@ export default function FactoryPOS() {
     setCurrencyCode(editSaleData.currencyCode || "USD");
     setCashAccountId(editSaleData.cashAccountId ? String(editSaleData.cashAccountId) : "");
     if (editSaleData.items && editSaleData.items.length > 0) {
-      setRows(editSaleData.items.map((it: any) => ({
-        id: String(it.id),
-        productId: it.productId || null,
-        productName: it.productName,
-        articleCode: it.articleCode || "",
-        availableQty: 9999,
-        quantity: parseInt(it.quantity) || 1,
-        unitPrice: parseFloat(it.unitPrice) || 0,
-        weightPerBale: 0,
-      })));
+      setRows(
+        editSaleData.items.map((it: any) => ({
+          id: String(it.id),
+          productId: it.productId || null,
+          productName: it.productName,
+          articleCode: it.articleCode || "",
+          availableQty: 9999,
+          quantity: parseInt(it.quantity) || 1,
+          unitPrice: parseFloat(it.unitPrice) || 0,
+          weightPerBale: 0,
+        }))
+      );
     }
     if (editSaleData.expensesJson) {
       try {
         const expArr = JSON.parse(editSaleData.expensesJson);
-        setExpenseRows(expArr.map((e: any) => ({
-          id: String(Date.now() + Math.random()),
-          accountId: String(e.accountId),
-          description: e.description || "",
-          amount: String(e.amount),
-        })));
-      } catch { /* ignore */ }
+        setExpenseRows(
+          expArr.map((e: any) => ({
+            id: String(Date.now() + Math.random()),
+            accountId: String(e.accountId),
+            description: e.description || "",
+            amount: String(e.amount),
+          }))
+        );
+      } catch {
+        /* ignore */
+      }
     }
     setEditLoaded(true);
   }, [editSaleData, editLoaded]);
 
   const normSearch = (s: string) => (s || "").toLowerCase().replace(/[\s.\-_]/g, "");
 
-  const filteredInventory = (inventory || []).filter(item => {
+  const filteredInventory = (inventory || []).filter((item) => {
     if (!search) return true;
     const s = normSearch(search);
     return (
       normSearch(item.productName).includes(s) ||
       normSearch(item.articleCode).includes(s) ||
-      (item.referenceNumbers || []).some(r => normSearch(r).includes(s))
+      (item.referenceNumbers || []).some((r) => normSearch(r).includes(s))
     );
   });
 
-  const mobileFilteredInventory = (inventory || []).filter(item => {
+  const mobileFilteredInventory = (inventory || []).filter((item) => {
     if (!mobileBrowseSearch) return true;
     const s = normSearch(mobileBrowseSearch);
     return (
       normSearch(item.productName).includes(s) ||
       normSearch(item.articleCode).includes(s) ||
-      (item.referenceNumbers || []).some(r => normSearch(r).includes(s))
+      (item.referenceNumbers || []).some((r) => normSearch(r).includes(s))
     );
   });
 
@@ -242,17 +250,18 @@ export default function FactoryPOS() {
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setHighlightedIndex(prev => Math.min(prev + 1, filteredInventory.length - 1));
+      setHighlightedIndex((prev) => Math.min(prev + 1, filteredInventory.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setHighlightedIndex(prev => Math.max(prev - 1, 0));
+      setHighlightedIndex((prev) => Math.max(prev - 1, 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
       const searchNorm = normSearch(search);
       // Prefer an exact articleCode or reference-number match (barcode scanner sends full code + Enter)
-      const exactMatch = filteredInventory.find(item =>
-        normSearch(item.articleCode) === searchNorm ||
-        (item.referenceNumbers || []).some(r => normSearch(r) === searchNorm)
+      const exactMatch = filteredInventory.find(
+        (item) =>
+          normSearch(item.articleCode) === searchNorm ||
+          (item.referenceNumbers || []).some((r) => normSearch(r) === searchNorm)
       );
       const item = exactMatch ?? filteredInventory[highlightedIndex] ?? filteredInventory[0];
       if (item) {
@@ -270,15 +279,15 @@ export default function FactoryPOS() {
 
   // ---- Row helpers ----
   const addOrIncrementProduct = (item: InventoryItem) => {
-    setRows(prev => {
-      const existingIdx = prev.findIndex(r => r.productId === item.productId);
+    setRows((prev) => {
+      const existingIdx = prev.findIndex((r) => r.productId === item.productId);
       if (existingIdx !== -1) {
         const existing = prev[existingIdx];
         if (existing.quantity >= item.quantity) {
           toast({ title: "Not enough stock", description: `Only ${item.quantity} available`, variant: "destructive" });
           return prev;
         }
-        return prev.map((r, i) => i === existingIdx ? { ...r, quantity: r.quantity + 1 } : r);
+        return prev.map((r, i) => (i === existingIdx ? { ...r, quantity: r.quantity + 1 } : r));
       }
       // Add new row before trailing empty row if one exists
       const newRow: CartRow = {
@@ -301,10 +310,10 @@ export default function FactoryPOS() {
 
   const addProductFromMobile = (item: InventoryItem) => {
     const targetIdx = mobileRowTarget ?? (rows.length > 0 ? rows.length - 1 : 0);
-    setRows(prev => {
-      const existingIdx = prev.findIndex(r => r.productId === item.productId);
+    setRows((prev) => {
+      const existingIdx = prev.findIndex((r) => r.productId === item.productId);
       if (existingIdx !== -1) {
-        return prev.map((r, i) => i === existingIdx ? { ...r, quantity: r.quantity + 1 } : r);
+        return prev.map((r, i) => (i === existingIdx ? { ...r, quantity: r.quantity + 1 } : r));
       }
       const newRow: CartRow = {
         id: String(Date.now()),
@@ -322,36 +331,44 @@ export default function FactoryPOS() {
     });
     setMobileBrowseOpen(false);
     setMobileBrowseSearch("");
-    setMobileRowEditIdx(rows.findIndex(r => r.productId === item.productId) !== -1
-      ? rows.findIndex(r => r.productId === item.productId)
-      : targetIdx);
+    setMobileRowEditIdx(
+      rows.findIndex((r) => r.productId === item.productId) !== -1
+        ? rows.findIndex((r) => r.productId === item.productId)
+        : targetIdx
+    );
     setMobileRowEditOpen(true);
   };
 
   const updateRow = (idx: number, field: "quantity" | "unitPrice", value: string) => {
-    setRows(prev => prev.map((r, i) => {
-      if (i !== idx) return r;
-      if (field === "quantity") {
-        const qty = parseInt(value) || 1;
-        if (r.availableQty > 0 && qty > r.availableQty) {
-          toast({ title: "Not enough stock", description: `Only ${r.availableQty} available`, variant: "destructive" });
-          return r;
+    setRows((prev) =>
+      prev.map((r, i) => {
+        if (i !== idx) return r;
+        if (field === "quantity") {
+          const qty = parseInt(value) || 1;
+          if (r.availableQty > 0 && qty > r.availableQty) {
+            toast({
+              title: "Not enough stock",
+              description: `Only ${r.availableQty} available`,
+              variant: "destructive",
+            });
+            return r;
+          }
+          return { ...r, quantity: Math.max(1, qty) };
         }
-        return { ...r, quantity: Math.max(1, qty) };
-      }
-      return { ...r, unitPrice: parseFloat(value) || 0 };
-    }));
+        return { ...r, unitPrice: parseFloat(value) || 0 };
+      })
+    );
   };
 
   const deleteRow = (idx: number) => {
-    setRows(prev => {
+    setRows((prev) => {
       const next = prev.filter((_, i) => i !== idx);
       if (next.length === 0) return [emptyRow()];
       return next;
     });
   };
 
-  const validRows = rows.filter(r => r.productId && r.quantity > 0);
+  const validRows = rows.filter((r) => r.productId && r.quantity > 0);
   const total = validRows.reduce((s, r) => s + r.quantity * r.unitPrice, 0);
   const totalQty = validRows.reduce((s, r) => s + r.quantity, 0);
   const totalWeight = validRows.reduce((s, r) => s + r.quantity * r.weightPerBale, 0);
@@ -360,10 +377,11 @@ export default function FactoryPOS() {
   const ccPrefix = currencyCode !== "USD" ? `${currencyCode} ` : "$";
 
   // Expense row helpers
-  const addExpenseRow = () => setExpenseRows(prev => [...prev, { id: String(Date.now()), accountId: "", description: "", amount: "" }]);
-  const removeExpenseRow = (idx: number) => setExpenseRows(prev => prev.filter((_, i) => i !== idx));
+  const addExpenseRow = () =>
+    setExpenseRows((prev) => [...prev, { id: String(Date.now()), accountId: "", description: "", amount: "" }]);
+  const removeExpenseRow = (idx: number) => setExpenseRows((prev) => prev.filter((_, i) => i !== idx));
   const updateExpenseRow = (idx: number, field: keyof ExpenseRow, value: string) =>
-    setExpenseRows(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e));
+    setExpenseRows((prev) => prev.map((e, i) => (i === idx ? { ...e, [field]: value } : e)));
 
   // ---- Print ----
   const fmtPrint = (n: number, prefix = "") => {
@@ -390,8 +408,11 @@ export default function FactoryPOS() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/pos/sales"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/location-inventory", locationId] });
       const snapshotExpenses = expenseRows
-        .map(e => ({ ...e, accountName: (ledgerAccounts || []).find((a: any) => String(a.id) === e.accountId)?.name || e.accountId }))
-        .filter(e => parseFloat(e.amount) > 0 && e.accountId);
+        .map((e) => ({
+          ...e,
+          accountName: (ledgerAccounts || []).find((a: any) => String(a.id) === e.accountId)?.name || e.accountId,
+        }))
+        .filter((e) => parseFloat(e.amount) > 0 && e.accountId);
       setSavedSale({
         ...data,
         cartRows: validRows,
@@ -454,7 +475,7 @@ export default function FactoryPOS() {
   const handleSubmit = () => {
     if (!locationId) return toast({ title: "Select a location", variant: "destructive" });
     if (validRows.length === 0) return toast({ title: "No items in sale", variant: "destructive" });
-    const validExpenses = expenseRows.filter(e => parseFloat(e.amount) > 0 && e.accountId);
+    const validExpenses = expenseRows.filter((e) => parseFloat(e.amount) > 0 && e.accountId);
     if (totalExpenseAmount > total) return toast({ title: "Deductions exceed sales total", variant: "destructive" });
     if (paymentType === "CREDIT" && !selectedCustomerId) {
       return toast({ title: "Select a customer for credit sale", variant: "destructive" });
@@ -469,14 +490,14 @@ export default function FactoryPOS() {
       txDate,
       currencyCode,
       cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
-      items: validRows.map(r => ({
+      items: validRows.map((r) => ({
         productId: r.productId,
         productName: r.productName,
         articleCode: r.articleCode,
         quantity: r.quantity,
         unitPrice: String(r.unitPrice),
       })),
-      expenses: validExpenses.map(e => ({
+      expenses: validExpenses.map((e) => ({
         accountId: e.accountId,
         description: e.description,
         amount: e.amount,
@@ -497,12 +518,7 @@ export default function FactoryPOS() {
       <PageHeader title={editSaleId ? `Editing ${editSaleData?.saleNumber || "Sale"}` : "Factory POS"}>
         <div className="flex flex-wrap gap-1 sm:gap-2">
           {editSaleId ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/factory/pos")}
-              data-testid="button-new-sale"
-            >
+            <Button variant="outline" size="sm" onClick={() => navigate("/factory/pos")} data-testid="button-new-sale">
               <Plus className="h-4 w-4 sm:mr-1" />
               <span className="hidden sm:inline">New Sale</span>
             </Button>
@@ -510,7 +526,7 @@ export default function FactoryPOS() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowHistory(h => !h)}
+              onClick={() => setShowHistory((h) => !h)}
               data-testid="button-toggle-history"
             >
               <History className="h-4 w-4 sm:mr-1" />
@@ -524,10 +540,18 @@ export default function FactoryPOS() {
             className="gap-1 sm:gap-2"
             data-testid="button-complete-sale"
           >
-            {(saleMutation.isPending || editMutation.isPending) ? "..." : (
-              editSaleId
-                ? <><span className="hidden sm:inline">Update</span><Pencil className="h-4 w-4" /></>
-                : <><span className="hidden sm:inline">Save</span><Check className="h-4 w-4" /></>
+            {saleMutation.isPending || editMutation.isPending ? (
+              "..."
+            ) : editSaleId ? (
+              <>
+                <span className="hidden sm:inline">Update</span>
+                <Pencil className="h-4 w-4" />
+              </>
+            ) : (
+              <>
+                <span className="hidden sm:inline">Save</span>
+                <Check className="h-4 w-4" />
+              </>
             )}
           </Button>
         </div>
@@ -544,7 +568,9 @@ export default function FactoryPOS() {
             </SelectTrigger>
             <SelectContent>
               {(locations || []).map((l: any) => (
-                <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                <SelectItem key={l.id} value={String(l.id)}>
+                  {l.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -555,7 +581,7 @@ export default function FactoryPOS() {
           <Input
             type="date"
             value={txDate}
-            onChange={e => setTxDate(e.target.value)}
+            onChange={(e) => setTxDate(e.target.value)}
             className="w-full sm:w-36"
             data-testid="input-sale-date"
           />
@@ -585,7 +611,9 @@ export default function FactoryPOS() {
             </SelectTrigger>
             <SelectContent>
               {cashAccounts.map((a: any) => (
-                <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                <SelectItem key={a.id} value={String(a.id)}>
+                  {a.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -596,7 +624,10 @@ export default function FactoryPOS() {
           <Button
             variant={paymentType === "CASH" ? "default" : "outline"}
             size="sm"
-            onClick={() => { setPaymentType("CASH"); setSelectedCustomerId(""); }}
+            onClick={() => {
+              setPaymentType("CASH");
+              setSelectedCustomerId("");
+            }}
             data-testid="button-payment-type-cash"
             className="gap-1"
           >
@@ -622,7 +653,7 @@ export default function FactoryPOS() {
             <Input
               placeholder="Customer name (optional)"
               value={customerName}
-              onChange={e => setCustomerName(e.target.value)}
+              onChange={(e) => setCustomerName(e.target.value)}
               className="w-full sm:w-44"
               data-testid="input-customer-name"
             />
@@ -650,7 +681,7 @@ export default function FactoryPOS() {
           <Textarea
             placeholder="Notes (optional)"
             value={notes}
-            onChange={e => setNotes(e.target.value)}
+            onChange={(e) => setNotes(e.target.value)}
             className="resize-none h-9"
             data-testid="input-notes"
           />
@@ -665,7 +696,10 @@ export default function FactoryPOS() {
             <div
               key={row.id}
               className="rounded-md border bg-card px-3 py-2.5 flex items-center gap-2 hover-elevate active-elevate-2 cursor-pointer"
-              onClick={() => { setMobileRowEditIdx(idx); setMobileRowEditOpen(true); }}
+              onClick={() => {
+                setMobileRowEditIdx(idx);
+                setMobileRowEditOpen(true);
+              }}
               data-testid={`mobile-row-card-${idx}`}
             >
               <div className="flex-1 min-w-0">
@@ -674,15 +708,22 @@ export default function FactoryPOS() {
                   <span className="text-sm font-medium truncate">{row.productName}</span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-2">
-                  Qty: {row.quantity} · Price: {ccPrefix}{formatNum(row.unitPrice)}
+                  Qty: {row.quantity} · Price: {ccPrefix}
+                  {formatNum(row.unitPrice)}
                 </div>
               </div>
               <div className="shrink-0 flex items-center gap-1.5">
-                <span className="text-sm font-semibold font-mono">{ccPrefix}{formatNum(row.quantity * row.unitPrice)}</span>
+                <span className="text-sm font-semibold font-mono">
+                  {ccPrefix}
+                  {formatNum(row.quantity * row.unitPrice)}
+                </span>
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={(e) => { e.stopPropagation(); deleteRow(idx); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteRow(idx);
+                  }}
                   data-testid={`mobile-delete-row-${idx}`}
                 >
                   <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -714,11 +755,20 @@ export default function FactoryPOS() {
           <div className="text-right">
             {totalExpenseAmount > 0 ? (
               <>
-                <div className="text-xs text-muted-foreground line-through font-mono">{ccPrefix}{formatNum(total)}</div>
-                <div className="text-base font-semibold font-mono" data-testid="text-grand-total-mobile">{ccPrefix}{formatNum(netTotal)}</div>
+                <div className="text-xs text-muted-foreground line-through font-mono">
+                  {ccPrefix}
+                  {formatNum(total)}
+                </div>
+                <div className="text-base font-semibold font-mono" data-testid="text-grand-total-mobile">
+                  {ccPrefix}
+                  {formatNum(netTotal)}
+                </div>
               </>
             ) : (
-              <span className="text-base font-semibold font-mono" data-testid="text-grand-total-mobile">{ccPrefix}{formatNum(total)}</span>
+              <span className="text-base font-semibold font-mono" data-testid="text-grand-total-mobile">
+                {ccPrefix}
+                {formatNum(total)}
+              </span>
             )}
           </div>
         </div>
@@ -732,9 +782,14 @@ export default function FactoryPOS() {
             <div className="min-w-[400px]">
               {/* Header */}
               <div className="flex bg-muted/30 border-b border-muted sticky top-0 z-30">
-                <div className="w-10 flex items-center justify-center border-r border-muted h-10 text-xs text-muted-foreground">#</div>
-                {COLUMNS.map(col => (
-                  <div key={col.key} className={`${col.width} flex items-center px-3 border-r border-muted h-10 text-xs text-muted-foreground`}>
+                <div className="w-10 flex items-center justify-center border-r border-muted h-10 text-xs text-muted-foreground">
+                  #
+                </div>
+                {COLUMNS.map((col) => (
+                  <div
+                    key={col.key}
+                    className={`${col.width} flex items-center px-3 border-r border-muted h-10 text-xs text-muted-foreground`}
+                  >
                     {col.label}
                   </div>
                 ))}
@@ -747,7 +802,7 @@ export default function FactoryPOS() {
                     <div className="w-10 flex items-center justify-center border-r border-muted/50 h-10 text-xs text-muted-foreground">
                       {row.productId ? idx + 1 : ""}
                     </div>
-                    {COLUMNS.map(col => (
+                    {COLUMNS.map((col) => (
                       <div
                         key={col.key}
                         className={`${col.width} border-r h-10 ${col.key === "amount" ? "bg-muted/30" : ""}`}
@@ -774,7 +829,9 @@ export default function FactoryPOS() {
                             {row.productId ? (
                               <div className="min-w-0">
                                 <div className="truncate">{row.productName}</div>
-                                {row.articleCode && <div className="text-xs text-muted-foreground truncate">{row.articleCode}</div>}
+                                {row.articleCode && (
+                                  <div className="text-xs text-muted-foreground truncate">{row.articleCode}</div>
+                                )}
                               </div>
                             ) : (
                               <span className="text-muted-foreground/50 text-xs">Click a product →</span>
@@ -782,15 +839,15 @@ export default function FactoryPOS() {
                           </div>
                         ) : (
                           <input
-                            ref={el => { inputRefs.current[`${idx}-${col.key}`] = el; }}
+                            ref={(el) => {
+                              inputRefs.current[`${idx}-${col.key}`] = el;
+                            }}
                             type="number"
                             inputMode="decimal"
-                            value={
-                              !row.productId ? "" :
-                              col.key === "quantity" ? row.quantity :
-                              row.unitPrice
+                            value={!row.productId ? "" : col.key === "quantity" ? row.quantity : row.unitPrice}
+                            onChange={(e) =>
+                              row.productId && updateRow(idx, col.key as "quantity" | "unitPrice", e.target.value)
                             }
-                            onChange={e => row.productId && updateRow(idx, col.key as "quantity" | "unitPrice", e.target.value)}
                             readOnly={!row.productId}
                             className={`w-full h-full px-3 bg-transparent outline-none focus:bg-accent/20 text-sm font-mono text-right ${!row.productId ? "cursor-default" : ""}`}
                             data-testid={`input-${col.key}-${idx}`}
@@ -812,18 +869,23 @@ export default function FactoryPOS() {
                 <span className="text-muted-foreground">Items:</span>
                 <span className="font-mono">{validRows.length}</span>
                 <span className="text-muted-foreground ml-2">Qty:</span>
-                <span className="font-mono" data-testid="text-total-qty">{totalQty}</span>
+                <span className="font-mono" data-testid="text-total-qty">
+                  {totalQty}
+                </span>
                 {totalWeight > 0 && (
                   <>
                     <span className="text-muted-foreground ml-2">Wt:</span>
-                    <span className="font-mono" data-testid="text-total-weight">{formatNum(totalWeight)} kg</span>
+                    <span className="font-mono" data-testid="text-total-weight">
+                      {formatNum(totalWeight)} kg
+                    </span>
                   </>
                 )}
               </div>
               <div className="flex items-center justify-between sm:justify-start gap-2">
                 <span className="text-lg font-medium">Total:</span>
                 <span className="text-2xl font-semibold font-mono" data-testid="text-grand-total">
-                  {ccPrefix}{formatNum(total)}
+                  {ccPrefix}
+                  {formatNum(total)}
                 </span>
               </div>
             </div>
@@ -832,20 +894,22 @@ export default function FactoryPOS() {
             <div className="sm:max-w-lg ml-auto space-y-2">
               {expenseRows.map((exp, idx) => (
                 <div key={exp.id} className="flex gap-2 items-center">
-                  <Select value={exp.accountId} onValueChange={v => updateExpenseRow(idx, "accountId", v)}>
+                  <Select value={exp.accountId} onValueChange={(v) => updateExpenseRow(idx, "accountId", v)}>
                     <SelectTrigger className="flex-1 min-w-0" data-testid={`select-expense-account-${idx}`}>
                       <SelectValue placeholder="Expense account" />
                     </SelectTrigger>
                     <SelectContent>
                       {(ledgerAccounts || []).map((a: any) => (
-                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Input
                     placeholder="Description"
                     value={exp.description}
-                    onChange={e => updateExpenseRow(idx, "description", e.target.value)}
+                    onChange={(e) => updateExpenseRow(idx, "description", e.target.value)}
                     className="w-28 shrink-0"
                     data-testid={`input-expense-description-${idx}`}
                   />
@@ -854,64 +918,93 @@ export default function FactoryPOS() {
                     inputMode="decimal"
                     placeholder="Amount"
                     value={exp.amount}
-                    onChange={e => updateExpenseRow(idx, "amount", e.target.value)}
+                    onChange={(e) => updateExpenseRow(idx, "amount", e.target.value)}
                     className="w-24 shrink-0 text-right font-mono"
                     data-testid={`input-expense-amount-${idx}`}
                   />
-                  <Button variant="ghost" size="icon" onClick={() => removeExpenseRow(idx)} data-testid={`button-remove-expense-${idx}`}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => removeExpenseRow(idx)}
+                    data-testid={`button-remove-expense-${idx}`}
+                  >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
               ))}
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <Button variant="ghost" size="sm" onClick={addExpenseRow} className="text-muted-foreground" data-testid="button-add-deduction">
-                  <Plus className="h-3.5 w-3.5 mr-1" />Add Deduction
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={addExpenseRow}
+                  className="text-muted-foreground"
+                  data-testid="button-add-deduction"
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  Add Deduction
                 </Button>
                 {totalExpenseAmount > 0 && (
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <span>Deductions:</span>
-                      <span className="font-mono text-destructive">-{ccPrefix}{formatNum(totalExpenseAmount)}</span>
+                      <span className="font-mono text-destructive">
+                        -{ccPrefix}
+                        {formatNum(totalExpenseAmount)}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-base font-medium">Net Cash:</span>
                       <span className="text-xl font-semibold font-mono" data-testid="text-net-total">
-                        {ccPrefix}{formatNum(netTotal)}
+                        {ccPrefix}
+                        {formatNum(netTotal)}
                       </span>
                     </div>
                   </div>
                 )}
-                {paymentType === "CREDIT" && (() => {
-                  const custObj = (allCustomers || []).find((c: any) => String(c.id) === selectedCustomerId);
-                  const prevBal = custObj ? parseFloat(custObj.balance || "0") : 0;
-                  const prevBalSide = custObj?.balanceSide || "Dr";
-                  const prevNet = prevBalSide === "Dr" ? prevBal : -prevBal;
-                  const afterSale = prevNet + total;
-                  return (
-                    <div className="mt-2 rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm" data-testid="credit-sale-summary">
-                      <div className="flex items-center gap-1.5 font-medium text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                        <CreditCard className="h-3.5 w-3.5" />
-                        Credit Sale Summary
-                      </div>
-                      {custObj && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Previous balance</span>
-                          <span className="font-mono">{prevNet >= 0 ? "Dr " : "Cr "}{ccPrefix}{formatNum(Math.abs(prevNet))}</span>
+                {paymentType === "CREDIT" &&
+                  (() => {
+                    const custObj = (allCustomers || []).find((c: any) => String(c.id) === selectedCustomerId);
+                    const prevBal = custObj ? parseFloat(custObj.balance || "0") : 0;
+                    const prevBalSide = custObj?.balanceSide || "Dr";
+                    const prevNet = prevBalSide === "Dr" ? prevBal : -prevBal;
+                    const afterSale = prevNet + total;
+                    return (
+                      <div
+                        className="mt-2 rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm"
+                        data-testid="credit-sale-summary"
+                      >
+                        <div className="flex items-center gap-1.5 font-medium text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                          <CreditCard className="h-3.5 w-3.5" />
+                          Credit Sale Summary
                         </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">This sale (Dr)</span>
-                        <span className="font-mono">+{ccPrefix}{formatNum(total)}</span>
+                        {custObj && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Previous balance</span>
+                            <span className="font-mono">
+                              {prevNet >= 0 ? "Dr " : "Cr "}
+                              {ccPrefix}
+                              {formatNum(Math.abs(prevNet))}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">This sale (Dr)</span>
+                          <span className="font-mono">
+                            +{ccPrefix}
+                            {formatNum(total)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-semibold border-t border-border pt-1.5">
+                          <span>Balance after sale</span>
+                          <span className="font-mono" data-testid="text-balance-after-sale">
+                            {afterSale >= 0 ? "Dr " : "Cr "}
+                            {ccPrefix}
+                            {formatNum(Math.abs(afterSale))}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex justify-between font-semibold border-t border-border pt-1.5">
-                        <span>Balance after sale</span>
-                        <span className="font-mono" data-testid="text-balance-after-sale">
-                          {afterSale >= 0 ? "Dr " : "Cr "}{ccPrefix}{formatNum(Math.abs(afterSale))}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
               </div>
             </div>
           </div>
@@ -921,16 +1014,14 @@ export default function FactoryPOS() {
         <Card className="hidden lg:flex w-96 flex-col sticky top-4 max-h-[calc(100vh-8rem)] self-start">
           <div className="p-4 border-b">
             <h3 className="text-sm font-medium mb-2">Products</h3>
-            <p className="text-xs text-muted-foreground mb-3">
-              Type or scan a barcode — ↑↓ to navigate, Enter to add
-            </p>
+            <p className="text-xs text-muted-foreground mb-3">Type or scan a barcode — ↑↓ to navigate, Enter to add</p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 ref={searchRef}
                 placeholder="Scan barcode or search..."
                 value={search}
-                onChange={e => {
+                onChange={(e) => {
                   setSearch(e.target.value);
                   setHighlightedIndex(0);
                 }}
@@ -954,13 +1045,13 @@ export default function FactoryPOS() {
             ) : (
               <div className="space-y-1" ref={itemListRef}>
                 {filteredInventory.map((item, idx) => {
-                  const inCart = rows.find(r => r.productId === item.productId);
+                  const inCart = rows.find((r) => r.productId === item.productId);
                   const price = parseFloat(item.sellingPrice || "0");
                   const isHighlighted = idx === highlightedIndex;
                   return (
                     <button
                       key={item.productId}
-                      onMouseDown={e => {
+                      onMouseDown={(e) => {
                         // Use mouseDown so focus stays on the search input while clicking
                         e.preventDefault();
                         addOrIncrementProduct(item);
@@ -979,12 +1070,19 @@ export default function FactoryPOS() {
                         <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
                           {item.articleCode && <span className="font-mono">{item.articleCode}</span>}
                           <span>Stock: {item.quantity}</span>
-                          {price > 0 && <span className="font-semibold">{ccPrefix}{formatNum(price)}</span>}
+                          {price > 0 && (
+                            <span className="font-semibold">
+                              {ccPrefix}
+                              {formatNum(price)}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div className="shrink-0 flex items-center gap-1.5">
                         {inCart && (
-                          <Badge variant="outline" className="text-xs">×{inCart.quantity}</Badge>
+                          <Badge variant="outline" className="text-xs">
+                            ×{inCart.quantity}
+                          </Badge>
                         )}
                         {isHighlighted ? (
                           <Check className="h-4 w-4 text-muted-foreground" />
@@ -1035,7 +1133,10 @@ export default function FactoryPOS() {
                         <TableCell className="font-mono text-sm">{sale.saleNumber}</TableCell>
                         <TableCell className="text-sm">{sale.txDate}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{sale.customerName || "—"}</TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums">{pfx}{formatNum(sale.totalAmount)}</TableCell>
+                        <TableCell className="text-right font-semibold tabular-nums">
+                          {pfx}
+                          {formatNum(sale.totalAmount)}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={sale.status === "VOIDED" ? "secondary" : "outline"}>{sale.status}</Badge>
                         </TableCell>
@@ -1072,14 +1173,15 @@ export default function FactoryPOS() {
               <Input
                 placeholder="Scan barcode or search..."
                 value={mobileBrowseSearch}
-                onChange={e => setMobileBrowseSearch(e.target.value)}
-                onKeyDown={e => {
+                onChange={(e) => setMobileBrowseSearch(e.target.value)}
+                onKeyDown={(e) => {
                   if (e.key === "Enter" && mobileFilteredInventory.length > 0) {
                     e.preventDefault();
                     const searchNorm = normSearch(mobileBrowseSearch);
-                    const exactMatch = mobileFilteredInventory.find(item =>
-                      normSearch(item.articleCode) === searchNorm ||
-                      (item.referenceNumbers || []).some(r => normSearch(r) === searchNorm)
+                    const exactMatch = mobileFilteredInventory.find(
+                      (item) =>
+                        normSearch(item.articleCode) === searchNorm ||
+                        (item.referenceNumbers || []).some((r) => normSearch(r) === searchNorm)
                     );
                     addProductFromMobile(exactMatch ?? mobileFilteredInventory[0]);
                   }
@@ -1095,7 +1197,7 @@ export default function FactoryPOS() {
             ) : mobileFilteredInventory.length === 0 ? (
               <div className="text-center text-muted-foreground text-sm py-8">No products in stock</div>
             ) : (
-              mobileFilteredInventory.map(item => {
+              mobileFilteredInventory.map((item) => {
                 const price = parseFloat(item.sellingPrice || "0");
                 return (
                   <button
@@ -1106,7 +1208,8 @@ export default function FactoryPOS() {
                     <div className="min-w-0">
                       <div className="text-sm font-medium truncate">{item.productName}</div>
                       <div className="text-xs text-muted-foreground">
-                        Stock: {item.quantity}{price > 0 ? ` · ${ccPrefix}${formatNum(price)}` : ""}
+                        Stock: {item.quantity}
+                        {price > 0 ? ` · ${ccPrefix}${formatNum(price)}` : ""}
                       </div>
                     </div>
                     <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -1134,7 +1237,7 @@ export default function FactoryPOS() {
                     type="number"
                     inputMode="decimal"
                     value={mobileRow.quantity}
-                    onChange={e => updateRow(mobileRowEditIdx, "quantity", e.target.value)}
+                    onChange={(e) => updateRow(mobileRowEditIdx, "quantity", e.target.value)}
                     className="text-right font-mono h-12 text-lg"
                     style={{ fontSize: "18px" }}
                   />
@@ -1145,7 +1248,7 @@ export default function FactoryPOS() {
                     type="number"
                     inputMode="decimal"
                     value={mobileRow.unitPrice}
-                    onChange={e => updateRow(mobileRowEditIdx, "unitPrice", e.target.value)}
+                    onChange={(e) => updateRow(mobileRowEditIdx, "unitPrice", e.target.value)}
                     className="text-right font-mono h-12 text-lg"
                     placeholder="0"
                     style={{ fontSize: "18px" }}
@@ -1153,23 +1256,27 @@ export default function FactoryPOS() {
                 </div>
                 <div className="rounded-md bg-muted/30 border px-3 py-2.5 flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Amount</span>
-                  <span className="text-lg font-semibold font-mono">{ccPrefix}{formatNum(mobileRow.quantity * mobileRow.unitPrice)}</span>
+                  <span className="text-lg font-semibold font-mono">
+                    {ccPrefix}
+                    {formatNum(mobileRow.quantity * mobileRow.unitPrice)}
+                  </span>
                 </div>
                 <div className="flex gap-2 pt-1 pb-2">
                   <Button
                     variant="destructive"
                     size="sm"
                     className="flex-1"
-                    onClick={() => { deleteRow(mobileRowEditIdx); setMobileRowEditOpen(false); }}
+                    onClick={() => {
+                      deleteRow(mobileRowEditIdx);
+                      setMobileRowEditOpen(false);
+                    }}
                   >
-                    <Trash2 className="h-4 w-4 mr-1.5" />Remove
+                    <Trash2 className="h-4 w-4 mr-1.5" />
+                    Remove
                   </Button>
-                  <Button
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => setMobileRowEditOpen(false)}
-                  >
-                    <Check className="h-4 w-4 mr-1.5" />Done
+                  <Button size="sm" className="flex-1" onClick={() => setMobileRowEditOpen(false)}>
+                    <Check className="h-4 w-4 mr-1.5" />
+                    Done
                   </Button>
                 </div>
               </div>
@@ -1181,7 +1288,10 @@ export default function FactoryPOS() {
       {/* ── MOBILE: FAB ── */}
       <button
         className="md:hidden fixed bottom-20 right-4 z-40 h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-        onClick={() => { setMobileRowTarget(rows.length); setMobileBrowseOpen(true); }}
+        onClick={() => {
+          setMobileRowTarget(rows.length);
+          setMobileBrowseOpen(true);
+        }}
         data-testid="button-mobile-fab-add"
         aria-label="Add product"
       >
@@ -1191,7 +1301,10 @@ export default function FactoryPOS() {
       {/* ── MOBILE: Sticky save bar ── */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t px-3 py-2 flex items-center gap-2">
         <div className="flex-1 min-w-0">
-          <div className="text-xs text-muted-foreground">{validRows.length} items · Qty {totalQty}{totalWeight > 0 ? ` · ${formatNum(totalWeight)} kg` : ""}</div>
+          <div className="text-xs text-muted-foreground">
+            {validRows.length} items · Qty {totalQty}
+            {totalWeight > 0 ? ` · ${formatNum(totalWeight)} kg` : ""}
+          </div>
           <div className="text-base font-semibold font-mono leading-tight" data-testid="text-sticky-total">
             {totalExpenseAmount > 0 ? `${ccPrefix}${formatNum(netTotal)} (net)` : `${ccPrefix}${formatNum(total)}`}
           </div>
@@ -1202,7 +1315,14 @@ export default function FactoryPOS() {
           className="shrink-0 h-10 px-5"
           data-testid="button-mobile-sticky-save"
         >
-          {saleMutation.isPending ? "..." : <><Check className="h-4 w-4 mr-1.5" />Save</>}
+          {saleMutation.isPending ? (
+            "..."
+          ) : (
+            <>
+              <Check className="h-4 w-4 mr-1.5" />
+              Save
+            </>
+          )}
         </Button>
       </div>
 
@@ -1211,26 +1331,45 @@ export default function FactoryPOS() {
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Print Invoice</AlertDialogTitle>
-            <AlertDialogDescription>
-              Sale recorded successfully. Print the invoice?
-            </AlertDialogDescription>
+            <AlertDialogDescription>Sale recorded successfully. Print the invoice?</AlertDialogDescription>
           </AlertDialogHeader>
 
           {/* Hidden Print Template */}
           <div className="hidden">
             <div
               ref={printRef}
-              style={{ fontFamily: "Arial, Helvetica, sans-serif", fontSize: "8pt", padding: "8px", backgroundColor: "white", color: "black", width: "100%", fontWeight: "normal", fontVariantNumeric: "tabular-nums" }}
+              style={{
+                fontFamily: "Arial, Helvetica, sans-serif",
+                fontSize: "8pt",
+                padding: "8px",
+                backgroundColor: "white",
+                color: "black",
+                width: "100%",
+                fontWeight: "normal",
+                fontVariantNumeric: "tabular-nums",
+              }}
             >
-              <style dangerouslySetInnerHTML={{ __html: `
+              <style
+                dangerouslySetInnerHTML={{
+                  __html: `
                 @media print {
                   body { font-family: Arial, Helvetica, sans-serif !important; }
                   * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; }
                 }
-              `}} />
+              `,
+                }}
+              />
 
               {/* Title */}
-              <div style={{ textAlign: "center", fontWeight: "900", fontSize: "13pt", letterSpacing: "1px", marginBottom: "4px" }}>
+              <div
+                style={{
+                  textAlign: "center",
+                  fontWeight: "900",
+                  fontSize: "13pt",
+                  letterSpacing: "1px",
+                  marginBottom: "4px",
+                }}
+              >
                 FACTORY POS INVOICE
               </div>
 
@@ -1242,14 +1381,33 @@ export default function FactoryPOS() {
               )}
 
               {/* Date / User row */}
-              <div style={{ fontSize: "8pt", fontWeight: "700", display: "flex", justifyContent: "space-between", borderTop: "1.5px solid black", borderBottom: "1.5px solid black", padding: "3px 0", marginBottom: "4px" }}>
+              <div
+                style={{
+                  fontSize: "8pt",
+                  fontWeight: "700",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderTop: "1.5px solid black",
+                  borderBottom: "1.5px solid black",
+                  padding: "3px 0",
+                  marginBottom: "4px",
+                }}
+              >
                 <span>Date: {savedSale?.txDate}</span>
                 <span>User: {printUserName}</span>
               </div>
 
               {/* Customer info */}
               {savedSale?.customerName && (
-                <div style={{ fontSize: "8pt", fontWeight: "700", marginBottom: "4px", padding: "3px", border: "1.5px solid black" }}>
+                <div
+                  style={{
+                    fontSize: "8pt",
+                    fontWeight: "700",
+                    marginBottom: "4px",
+                    padding: "3px",
+                    border: "1.5px solid black",
+                  }}
+                >
                   <div style={{ fontWeight: "900" }}>Customer</div>
                   <div>{savedSale.customerName}</div>
                 </div>
@@ -1260,19 +1418,92 @@ export default function FactoryPOS() {
                 const printRows: CartRow[] = savedSale?.cartRows ?? [];
                 const hasPrintWeight = printRows.some((r: CartRow) => r.weightPerBale > 0);
                 const printTotalQty = printRows.reduce((s: number, r: CartRow) => s + r.quantity, 0);
-                const printTotalWeight = printRows.reduce((s: number, r: CartRow) => s + r.quantity * r.weightPerBale, 0);
+                const printTotalWeight = printRows.reduce(
+                  (s: number, r: CartRow) => s + r.quantity * r.weightPerBale,
+                  0
+                );
                 const printExpenses: any[] = savedSale?.expenses ?? [];
                 const printNetTotal: number = savedSale?.netTotal ?? savedSale?.total ?? 0;
                 return (
                   <>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.5pt", marginBottom: "0", fontVariantNumeric: "tabular-nums", border: "1px solid #999" }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "7.5pt",
+                        marginBottom: "0",
+                        fontVariantNumeric: "tabular-nums",
+                        border: "1px solid #999",
+                      }}
+                    >
                       <thead>
                         <tr>
-                          <th style={{ textAlign: "left", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>Description</th>
-                          <th style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "8%" }}>Qty</th>
-                          {hasPrintWeight && <th style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "12%" }}>Wt (kg)</th>}
-                          <th style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "14%" }}>Rate</th>
-                          <th style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee", width: "16%" }}>Amt</th>
+                          <th
+                            style={{
+                              textAlign: "left",
+                              padding: "2px 5px",
+                              fontWeight: "900",
+                              fontSize: "7pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            Description
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "center",
+                              padding: "2px 5px",
+                              fontWeight: "900",
+                              fontSize: "7pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                              width: "8%",
+                            }}
+                          >
+                            Qty
+                          </th>
+                          {hasPrintWeight && (
+                            <th
+                              style={{
+                                textAlign: "center",
+                                padding: "2px 5px",
+                                fontWeight: "900",
+                                fontSize: "7pt",
+                                border: "1px solid #999",
+                                backgroundColor: "#eeeeee",
+                                width: "12%",
+                              }}
+                            >
+                              Wt (kg)
+                            </th>
+                          )}
+                          <th
+                            style={{
+                              textAlign: "center",
+                              padding: "2px 5px",
+                              fontWeight: "900",
+                              fontSize: "7pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                              width: "14%",
+                            }}
+                          >
+                            Rate
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "center",
+                              padding: "2px 5px",
+                              fontWeight: "900",
+                              fontSize: "7pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                              width: "16%",
+                            }}
+                          >
+                            Amt
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1281,39 +1512,157 @@ export default function FactoryPOS() {
                           const rowWeight = row.quantity * row.weightPerBale;
                           return (
                             <tr key={idx} style={{ backgroundColor: rowBg }}>
-                              <td style={{ padding: "2px 5px", verticalAlign: "top", fontWeight: "600", lineHeight: "1.2", fontSize: "7pt", border: "1px solid #c8c8c8" }}>
+                              <td
+                                style={{
+                                  padding: "2px 5px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  lineHeight: "1.2",
+                                  fontSize: "7pt",
+                                  border: "1px solid #c8c8c8",
+                                }}
+                              >
                                 {row.productName}
-                                {row.articleCode ? <span style={{ color: "#666", fontSize: "6.5pt" }}> ({row.articleCode})</span> : null}
+                                {row.articleCode ? (
+                                  <span style={{ color: "#666", fontSize: "6.5pt" }}> ({row.articleCode})</span>
+                                ) : null}
                               </td>
-                              <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrint(row.quantity)}</td>
-                              {hasPrintWeight && <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{rowWeight > 0 ? fmtPrint(rowWeight) : "—"}</td>}
-                              <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrintAmt(row.unitPrice)}</td>
-                              <td style={{ textAlign: "center", padding: "2px 5px", verticalAlign: "top", fontWeight: "600", fontSize: "7pt", border: "1px solid #c8c8c8" }}>{fmtPrintAmt(row.quantity * row.unitPrice)}</td>
+                              <td
+                                style={{
+                                  textAlign: "center",
+                                  padding: "2px 5px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  fontSize: "7pt",
+                                  border: "1px solid #c8c8c8",
+                                }}
+                              >
+                                {fmtPrint(row.quantity)}
+                              </td>
+                              {hasPrintWeight && (
+                                <td
+                                  style={{
+                                    textAlign: "center",
+                                    padding: "2px 5px",
+                                    verticalAlign: "top",
+                                    fontWeight: "600",
+                                    fontSize: "7pt",
+                                    border: "1px solid #c8c8c8",
+                                  }}
+                                >
+                                  {rowWeight > 0 ? fmtPrint(rowWeight) : "—"}
+                                </td>
+                              )}
+                              <td
+                                style={{
+                                  textAlign: "center",
+                                  padding: "2px 5px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  fontSize: "7pt",
+                                  border: "1px solid #c8c8c8",
+                                }}
+                              >
+                                {fmtPrintAmt(row.unitPrice)}
+                              </td>
+                              <td
+                                style={{
+                                  textAlign: "center",
+                                  padding: "2px 5px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  fontSize: "7pt",
+                                  border: "1px solid #c8c8c8",
+                                }}
+                              >
+                                {fmtPrintAmt(row.quantity * row.unitPrice)}
+                              </td>
                             </tr>
                           );
                         })}
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td style={{ padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>TOTAL</td>
-                          <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>{fmtPrint(printTotalQty)}</td>
-                          {hasPrintWeight && <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>{fmtPrint(printTotalWeight)}</td>}
+                          <td
+                            style={{
+                              padding: "2px 5px",
+                              fontWeight: "900",
+                              fontSize: "7pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            TOTAL
+                          </td>
+                          <td
+                            style={{
+                              textAlign: "center",
+                              padding: "2px 5px",
+                              fontWeight: "900",
+                              fontSize: "7pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            {fmtPrint(printTotalQty)}
+                          </td>
+                          {hasPrintWeight && (
+                            <td
+                              style={{
+                                textAlign: "center",
+                                padding: "2px 5px",
+                                fontWeight: "900",
+                                fontSize: "7pt",
+                                border: "1px solid #999",
+                                backgroundColor: "#eeeeee",
+                              }}
+                            >
+                              {fmtPrint(printTotalWeight)}
+                            </td>
+                          )}
                           <td style={{ padding: "2px 5px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
-                          <td style={{ textAlign: "center", padding: "2px 5px", fontWeight: "900", fontSize: "7pt", border: "1px solid #999", backgroundColor: "#eeeeee" }}>{fmtPrintAmt(savedSale?.total ?? 0)}</td>
+                          <td
+                            style={{
+                              textAlign: "center",
+                              padding: "2px 5px",
+                              fontWeight: "900",
+                              fontSize: "7pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            {fmtPrintAmt(savedSale?.total ?? 0)}
+                          </td>
                         </tr>
                       </tfoot>
                     </table>
 
                     {/* Expense deductions on receipt */}
                     {printExpenses.length > 0 && (
-                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "7.5pt", marginTop: "3px", fontVariantNumeric: "tabular-nums" }}>
+                      <table
+                        style={{
+                          width: "100%",
+                          borderCollapse: "collapse",
+                          fontSize: "7.5pt",
+                          marginTop: "3px",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
                         <tbody>
                           {printExpenses.map((exp: any, idx: number) => (
                             <tr key={idx}>
                               <td style={{ padding: "2px 5px", fontSize: "7pt", fontWeight: "600", color: "#333" }}>
                                 {exp.description || exp.accountName || "Deduction"}
                               </td>
-                              <td style={{ textAlign: "right", padding: "2px 5px", fontSize: "7pt", fontWeight: "700", color: "#c00" }}>
+                              <td
+                                style={{
+                                  textAlign: "right",
+                                  padding: "2px 5px",
+                                  fontSize: "7pt",
+                                  fontWeight: "700",
+                                  color: "#c00",
+                                }}
+                              >
                                 -{fmtPrintAmt(parseFloat(exp.amount))}
                               </td>
                             </tr>
@@ -1325,27 +1674,77 @@ export default function FactoryPOS() {
                     {/* Total Paid / Net Cash */}
                     {savedSale?.paymentType === "CREDIT" ? (
                       <>
-                        <div style={{ fontSize: "11pt", fontWeight: "900", marginTop: "4px", paddingTop: "4px", borderTop: "1.5px solid #333", display: "flex", justifyContent: "space-between", color: "#a00" }}>
+                        <div
+                          style={{
+                            fontSize: "11pt",
+                            fontWeight: "900",
+                            marginTop: "4px",
+                            paddingTop: "4px",
+                            borderTop: "1.5px solid #333",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            color: "#a00",
+                          }}
+                        >
                           <span>BALANCE DUE:</span>
                           <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
                         </div>
-                        <div style={{ textAlign: "center", fontSize: "7.5pt", fontWeight: "700", marginTop: "3px", color: "#a00" }}>
+                        <div
+                          style={{
+                            textAlign: "center",
+                            fontSize: "7.5pt",
+                            fontWeight: "700",
+                            marginTop: "3px",
+                            color: "#a00",
+                          }}
+                        >
                           *** CREDIT SALE ***
                         </div>
                       </>
                     ) : printExpenses.length > 0 ? (
                       <>
-                        <div style={{ fontSize: "9pt", fontWeight: "700", marginTop: "4px", paddingTop: "4px", borderTop: "1px solid #ccc", display: "flex", justifyContent: "space-between", color: "#555" }}>
+                        <div
+                          style={{
+                            fontSize: "9pt",
+                            fontWeight: "700",
+                            marginTop: "4px",
+                            paddingTop: "4px",
+                            borderTop: "1px solid #ccc",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            color: "#555",
+                          }}
+                        >
                           <span>SALES TOTAL:</span>
                           <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
                         </div>
-                        <div style={{ fontSize: "11pt", fontWeight: "900", marginTop: "3px", paddingTop: "3px", borderTop: "1.5px solid #333", display: "flex", justifyContent: "space-between" }}>
+                        <div
+                          style={{
+                            fontSize: "11pt",
+                            fontWeight: "900",
+                            marginTop: "3px",
+                            paddingTop: "3px",
+                            borderTop: "1.5px solid #333",
+                            display: "flex",
+                            justifyContent: "space-between",
+                          }}
+                        >
                           <span>NET CASH RECEIVED:</span>
                           <span>{fmtPrintAmt(printNetTotal)}</span>
                         </div>
                       </>
                     ) : (
-                      <div style={{ fontSize: "11pt", fontWeight: "900", marginTop: "5px", paddingTop: "5px", borderTop: "1.5px solid #333", display: "flex", justifyContent: "space-between" }}>
+                      <div
+                        style={{
+                          fontSize: "11pt",
+                          fontWeight: "900",
+                          marginTop: "5px",
+                          paddingTop: "5px",
+                          borderTop: "1.5px solid #333",
+                          display: "flex",
+                          justifyContent: "space-between",
+                        }}
+                      >
                         <span>TOTAL PAID:</span>
                         <span>{fmtPrintAmt(savedSale?.total ?? 0)}</span>
                       </div>
@@ -1356,13 +1755,31 @@ export default function FactoryPOS() {
 
               {/* Notes */}
               {savedSale?.notes && (
-                <div dir="auto" style={{ fontSize: "8pt", fontWeight: "600", marginTop: "5px", padding: "3px", border: "1.5px solid black" }}>
+                <div
+                  dir="auto"
+                  style={{
+                    fontSize: "8pt",
+                    fontWeight: "600",
+                    marginTop: "5px",
+                    padding: "3px",
+                    border: "1.5px solid black",
+                  }}
+                >
                   <span style={{ fontWeight: "900" }}>Note:</span> {savedSale.notes}
                 </div>
               )}
 
               {/* Footer */}
-              <div style={{ textAlign: "center", fontSize: "7.5pt", fontWeight: "700", marginTop: "6px", paddingTop: "4px", borderTop: "1.5px solid black" }}>
+              <div
+                style={{
+                  textAlign: "center",
+                  fontSize: "7.5pt",
+                  fontWeight: "700",
+                  marginTop: "6px",
+                  paddingTop: "4px",
+                  borderTop: "1.5px solid black",
+                }}
+              >
                 <div>Thank you for your business!</div>
               </div>
             </div>
@@ -1390,7 +1807,9 @@ export default function FactoryPOS() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <Button variant="outline" onClick={() => setVoidId(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setVoidId(null)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               onClick={() => voidId !== null && voidMutation.mutate(voidId)}

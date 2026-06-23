@@ -21,11 +21,7 @@ type DbOrTx = typeof db;
  *
  * Call after EVERY mutation that touches proformas, lines, or loadings.
  */
-export async function syncProformaReservations(
-  tx: DbOrTx,
-  companyId: number,
-  proformaId: number,
-): Promise<void> {
+export async function syncProformaReservations(tx: DbOrTx, companyId: number, proformaId: number): Promise<void> {
   // 1. Check proforma existence and active status
   const [proforma] = await tx
     .select({ isActive: customerProformas.isActive })
@@ -37,10 +33,7 @@ export async function syncProformaReservations(
     await tx
       .delete(proformaStockReservations)
       .where(
-        and(
-          eq(proformaStockReservations.companyId, companyId),
-          eq(proformaStockReservations.proformaId, proformaId),
-        ),
+        and(eq(proformaStockReservations.companyId, companyId), eq(proformaStockReservations.proformaId, proformaId))
       );
     return;
   }
@@ -56,10 +49,7 @@ export async function syncProformaReservations(
     await tx
       .delete(proformaStockReservations)
       .where(
-        and(
-          eq(proformaStockReservations.companyId, companyId),
-          eq(proformaStockReservations.proformaId, proformaId),
-        ),
+        and(eq(proformaStockReservations.companyId, companyId), eq(proformaStockReservations.proformaId, proformaId))
       );
     return;
   }
@@ -74,13 +64,13 @@ export async function syncProformaReservations(
         WHERE co.company_id        = ${companyId}
           AND co.proforma_id_used  = ${proformaId}
           AND co.status IN ('LOADING', 'PENDING_VERIFICATION')
-        GROUP BY fb.article_code`,
+        GROUP BY fb.article_code`
   );
   const loadedMap = new Map<string, number>(
     ((loadedRaw as any).rows ?? (loadedRaw as unknown as any[])).map((r: any) => [
       r.articleCode as string,
       Number(r.loaded),
-    ]),
+    ])
   );
 
   // 4. Upsert reservations for every current line
@@ -88,7 +78,7 @@ export async function syncProformaReservations(
   for (const line of lines) {
     if (!line.articleCode) continue;
     currentCodes.add(line.articleCode);
-    const loaded     = loadedMap.get(line.articleCode) ?? 0;
+    const loaded = loadedMap.get(line.articleCode) ?? 0;
     const reservedQty = Math.max(0, (Number(line.quantity) ?? 0) - loaded);
 
     await tx.execute(
@@ -97,7 +87,7 @@ export async function syncProformaReservations(
           VALUES
             (${companyId}, ${proformaId}, ${line.articleCode}, ${reservedQty})
           ON CONFLICT (company_id, proforma_id, article_code)
-          DO UPDATE SET reserved_qty = ${reservedQty}`,
+          DO UPDATE SET reserved_qty = ${reservedQty}`
     );
   }
 
@@ -107,12 +97,15 @@ export async function syncProformaReservations(
   // bound parameter in a valid IN-list.
   if (currentCodes.size > 0) {
     const codeArr = Array.from(currentCodes);
-    const notInList = sql.join(codeArr.map((c) => sql`${c}`), sql`, `);
+    const notInList = sql.join(
+      codeArr.map((c) => sql`${c}`),
+      sql`, `
+    );
     await tx.execute(
       sql`DELETE FROM proforma_stock_reservations
           WHERE company_id  = ${companyId}
             AND proforma_id = ${proformaId}
-            AND article_code NOT IN (${notInList})`,
+            AND article_code NOT IN (${notInList})`
     );
   }
 }
@@ -136,21 +129,27 @@ export async function isFactoryV2Company(companyId: number): Promise<boolean> {
  * Intended for use in proforma line creation guards (factory_v2 only).
  */
 export async function computeFreeToPromise(companyId: number, articleCode: string): Promise<number> {
-  const [inStockRow] = (await db.execute(
-    sql`SELECT COUNT(*)::int AS count
+  const [inStockRow] =
+    (
+      (await db.execute(
+        sql`SELECT COUNT(*)::int AS count
         FROM factory_bales
         WHERE company_id = ${companyId}
           AND article_code = ${articleCode}
-          AND status = 'IN_STOCK'`,
-  ) as any).rows ?? [];
+          AND status = 'IN_STOCK'`
+      )) as any
+    ).rows ?? [];
   const inStock = Number(inStockRow?.count ?? 0);
 
-  const [reservedRow] = (await db.execute(
-    sql`SELECT COALESCE(SUM(reserved_qty),0)::int AS total
+  const [reservedRow] =
+    (
+      (await db.execute(
+        sql`SELECT COALESCE(SUM(reserved_qty),0)::int AS total
         FROM proforma_stock_reservations
         WHERE company_id = ${companyId}
-          AND article_code = ${articleCode}`,
-  ) as any).rows ?? [];
+          AND article_code = ${articleCode}`
+      )) as any
+    ).rows ?? [];
   const reservedNotYetLoaded = Number(reservedRow?.total ?? 0);
 
   return Math.max(0, inStock - reservedNotYetLoaded);

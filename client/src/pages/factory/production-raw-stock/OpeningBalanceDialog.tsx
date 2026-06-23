@@ -1,7 +1,14 @@
 import { useState, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -74,11 +81,13 @@ export function OpeningBalanceDialog({
       fxRateToUsd: obFxRate,
       notes: obNotes || undefined,
       txDate: obTxDate || undefined,
-      ...(commAmt > 0 ? {
-        commissionAmount: obCommissionAmount,
-        commissionCurrencyCode: obCommissionCurrency,
-        commissionFxRateToUsd: obCommissionFxRate,
-      } : {}),
+      ...(commAmt > 0
+        ? {
+            commissionAmount: obCommissionAmount,
+            commissionCurrencyCode: obCommissionCurrency,
+            commissionFxRateToUsd: obCommissionFxRate,
+          }
+        : {}),
     });
   };
 
@@ -160,33 +169,63 @@ export function OpeningBalanceDialog({
 
           <div className="space-y-2">
             <Label>Operation Date</Label>
-            <Input type="date" value={obTxDate} onChange={e => setObTxDate(e.target.value)} />
+            <Input type="date" value={obTxDate} onChange={(e) => setObTxDate(e.target.value)} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Weight (KG)</Label>
-              <Input type="number" step="0.001" value={obReceivedKg} onChange={e => setObReceivedKg(e.target.value)} placeholder="0.000" />
+              <Input
+                type="number"
+                step="0.001"
+                value={obReceivedKg}
+                onChange={(e) => setObReceivedKg(e.target.value)}
+                placeholder="0.000"
+              />
             </div>
             <div className="space-y-2">
               <Label>Cost per KG</Label>
-              <Input type="number" step="0.0001" value={obCostPerKg} onChange={e => setObCostPerKg(e.target.value)} placeholder="0.0000" />
+              <Input
+                type="number"
+                step="0.0001"
+                value={obCostPerKg}
+                onChange={(e) => setObCostPerKg(e.target.value)}
+                placeholder="0.0000"
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Currency</Label>
-              <Select value={obCurrency} onValueChange={v => { setObCurrency(v); if (v === "USD") setObFxRate("1"); }}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={obCurrency}
+                onValueChange={(v) => {
+                  setObCurrency(v);
+                  if (v === "USD") setObFxRate("1");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {["USD", "EUR", "AUD", "LBP", "GBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {["USD", "EUR", "AUD", "LBP", "GBP"].map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>FX Rate to USD</Label>
-              <Input type="number" step="0.0001" value={obFxRate} onChange={e => setObFxRate(e.target.value)} disabled={obCurrency === "USD"} />
+              <Input
+                type="number"
+                step="0.0001"
+                value={obFxRate}
+                onChange={(e) => setObFxRate(e.target.value)}
+                disabled={obCurrency === "USD"}
+              />
             </div>
           </div>
 
@@ -196,14 +235,32 @@ export function OpeningBalanceDialog({
             <div className="grid grid-cols-2 gap-4 mt-2">
               <div className="space-y-1">
                 <Label className="text-xs">Amount</Label>
-                <Input type="number" step="0.01" value={obCommissionAmount} onChange={e => setObCommissionAmount(e.target.value)} placeholder="0.00" />
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={obCommissionAmount}
+                  onChange={(e) => setObCommissionAmount(e.target.value)}
+                  placeholder="0.00"
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Currency</Label>
-                <Select value={obCommissionCurrency} onValueChange={v => { setObCommissionCurrency(v); if (v === "USD") setObCommissionFxRate("1"); }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={obCommissionCurrency}
+                  onValueChange={(v) => {
+                    setObCommissionCurrency(v);
+                    if (v === "USD") setObCommissionFxRate("1");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {["USD", "EUR", "AUD", "LBP", "GBP"].map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {["USD", "EUR", "AUD", "LBP", "GBP"].map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -212,7 +269,7 @@ export function OpeningBalanceDialog({
 
           <div className="space-y-2">
             <Label>Notes (optional)</Label>
-            <Input value={obNotes} onChange={e => setObNotes(e.target.value)} placeholder="e.g. Opening stock..." />
+            <Input value={obNotes} onChange={(e) => setObNotes(e.target.value)} placeholder="e.g. Opening stock..." />
           </div>
 
           {obKg > 0 && obRate >= 0 && (
@@ -234,7 +291,9 @@ export function OpeningBalanceDialog({
           )}
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => wrapAdminAction(handleSubmit, "Add Opening Balance")}
               disabled={openingBalanceMutation.isPending || !obSupplierName.trim()}

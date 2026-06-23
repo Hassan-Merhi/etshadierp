@@ -1,7 +1,26 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as XLSX from "@/lib/excelHelper";
-import { ChevronDown, ChevronRight, Download, Search, RotateCcw, List, AlignJustify, FileDown, MoreVertical, CalendarRange, MessageCircle, Loader2, History, Users, Package, MapPin, Tag, Layers } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Download,
+  Search,
+  RotateCcw,
+  List,
+  AlignJustify,
+  FileDown,
+  MoreVertical,
+  CalendarRange,
+  MessageCircle,
+  Loader2,
+  History,
+  Users,
+  Package,
+  MapPin,
+  Tag,
+  Layers,
+} from "lucide-react";
 import ProductionPlannerDialog from "./factory/ProductionPlannerDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +41,17 @@ import { apiRequest } from "@/lib/queryClient";
 import type { Location } from "@shared/schema";
 
 const STATUS_OPTIONS = [
-  "PENDING_PRESSING","LABEL_PRINTED","PRESSED","FINALIZED","IN_STOCK",
-  "RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","DISPATCHED","DELETED",
+  "PENDING_PRESSING",
+  "LABEL_PRINTED",
+  "PRESSED",
+  "FINALIZED",
+  "IN_STOCK",
+  "RESERVED",
+  "RESERVED_FOR_ORDER",
+  "SOLD",
+  "REPACKED",
+  "DISPATCHED",
+  "DELETED",
 ];
 
 const STATUS_COLORS: Record<string, string> = {
@@ -87,7 +115,9 @@ function buildWorkerMatrix(filteredGroups: GroupRow[]): WorkerMatrix {
   for (const g of filteredGroups) {
     for (const b of g.bales) {
       const productLabel = b.productName
-        ? (b.articleCode ? `${b.productName} (${b.articleCode})` : b.productName)
+        ? b.articleCode
+          ? `${b.productName} (${b.articleCode})`
+          : b.productName
         : "—";
       const workerKey = b.workerName || "Unassigned";
 
@@ -142,8 +172,8 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const { formatDisplayDate } = useDateFormat();
   const { toast } = useToast();
   const qc = useQueryClient();
-  const today = new Date().toLocaleDateString('en-CA');
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA');
+  const today = new Date().toLocaleDateString("en-CA");
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
 
   const [useDateFilter, setUseDateFilter] = useState(true);
   const [fromDate, setFromDate] = useState(today);
@@ -178,7 +208,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
   const { data: rawGroups, isLoading } = useQuery<GroupRow[]>({
     queryKey: ["/api/factory/bales/stock-entry-history", params.toString()],
-    queryFn: () => fetch(`/api/factory/bales/stock-entry-history?${params.toString()}`).then(r => r.json()),
+    queryFn: () => fetch(`/api/factory/bales/stock-entry-history?${params.toString()}`).then((r) => r.json()),
   });
   const groups: GroupRow[] = Array.isArray(rawGroups) ? rawGroups : [];
 
@@ -187,14 +217,17 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   const { data: locations = [] } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
   const { data: categories = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/worker-categories"],
-    queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch("/api/factory/worker-categories", { credentials: "include" }).then((r) => r.json()),
   });
 
   // Fetch production plan targets when viewing a single day
   const planDate = useDateFilter && fromDate === toDate ? fromDate : null;
   const { data: workerTargets = {} } = useQuery<Record<number, { targetBales: number; workerCount: number }>>({
     queryKey: ["/api/factory/production-planner", planDate, "worker-targets"],
-    queryFn: () => fetch(`/api/factory/production-planner/${planDate}/worker-targets`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () =>
+      fetch(`/api/factory/production-planner/${planDate}/worker-targets`, { credentials: "include" }).then((r) =>
+        r.json()
+      ),
     enabled: !!planDate,
   });
 
@@ -213,13 +246,14 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
   const filteredGroups = useMemo(() => {
     if (!selectedCategoryWorkerIds || workerIdFilter !== "all") return groups;
-    return groups.filter((g) =>
-      g.workerId !== null && selectedCategoryWorkerIds.includes(g.workerId)
-    );
+    return groups.filter((g) => g.workerId !== null && selectedCategoryWorkerIds.includes(g.workerId));
   }, [groups, selectedCategoryWorkerIds, workerIdFilter]);
 
   const totalBales = useMemo(() => filteredGroups.reduce((s, g) => s + g.baleCount, 0), [filteredGroups]);
-  const totalWeight = useMemo(() => filteredGroups.reduce((s, g) => s + parseFloat(g.totalWeight || "0"), 0), [filteredGroups]);
+  const totalWeight = useMemo(
+    () => filteredGroups.reduce((s, g) => s + parseFloat(g.totalWeight || "0"), 0),
+    [filteredGroups]
+  );
 
   // Condensed view: group by worker
   interface WorkerCondensed {
@@ -235,7 +269,14 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     for (const g of filteredGroups) {
       const key = g.workerId != null ? String(g.workerId) : "unassigned";
       if (!map.has(key)) {
-        map.set(key, { workerKey: key, workerId: g.workerId, workerName: g.workerName, totalBales: 0, totalWeight: 0, groups: [] });
+        map.set(key, {
+          workerKey: key,
+          workerId: g.workerId,
+          workerName: g.workerName,
+          totalBales: 0,
+          totalWeight: 0,
+          groups: [],
+        });
       }
       const wg = map.get(key)!;
       wg.totalBales += g.baleCount;
@@ -260,7 +301,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   }, [filteredGroups, workerTargets, workers]);
 
   // Detailed view: flat list of all bales
-  const allBales = useMemo(() => filteredGroups.flatMap(g => g.bales), [filteredGroups]);
+  const allBales = useMemo(() => filteredGroups.flatMap((g) => g.bales), [filteredGroups]);
 
   const bulkAssignMutation = useMutation({
     mutationFn: async ({ baleIds, workerId }: { baleIds: number[]; workerId: number }) => {
@@ -281,7 +322,10 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       const res = await apiRequest("POST", "/api/factory/bales/send-worker-pdf-whatsapp", {
         date: useDateFilter ? fromDate : today,
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Send failed"); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message || "Send failed");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -298,7 +342,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
   }
 
   function toggleExpand(key: string) {
-    setExpandedKeys(prev => {
+    setExpandedKeys((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
@@ -322,17 +366,19 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     if (!iso) return "—";
     try {
       return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-    } catch { return "—"; }
+    } catch {
+      return "—";
+    }
   }
 
   async function exportExcel() {
     const wb = XLSX.utils.book_new();
 
-    const summaryRows = filteredGroups.map(g => ({
+    const summaryRows = filteredGroups.map((g) => ({
       "Stock Entry Date": g.stockEntryDate,
-      "Location": g.locationName,
-      "Worker": g.workerName || "Unassigned",
-      "Product": g.productName || "—",
+      Location: g.locationName,
+      Worker: g.workerName || "Unassigned",
+      Product: g.productName || "—",
       "Article Code": g.articleCode || "—",
       "Bale Count": g.baleCount,
       "Total Weight (kg)": parseFloat(g.totalWeight || "0"),
@@ -343,16 +389,16 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     const ws1 = XLSX.utils.json_to_sheet(summaryRows);
     XLSX.utils.book_append_sheet(wb, ws1, "Summary");
 
-    const detailRows = filteredGroups.flatMap(g =>
-      g.bales.map(b => ({
+    const detailRows = filteredGroups.flatMap((g) =>
+      g.bales.map((b) => ({
         "Stock Entry Date": b.stockEntryDate,
-        "Location": b.locationName,
-        "Worker": b.workerName || "Unassigned",
-        "Product": b.productName || "—",
+        Location: b.locationName,
+        Worker: b.workerName || "Unassigned",
+        Product: b.productName || "—",
         "Article Code": b.articleCode || "—",
         "Reference Number": b.referenceNumber,
         "Weight (kg)": parseFloat(b.weightKg || "0"),
-        "Status": b.status,
+        Status: b.status,
         "Finalized At": b.finalizedAt ? new Date(b.finalizedAt).toLocaleString() : "—",
       }))
     );
@@ -368,16 +414,16 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     const matrixHeader = ["Bale / Product", ...matrix.workers, "Total"];
     XLSX.utils.sheet_add_aoa(ws3, [matrixHeader], { origin: "A4" });
 
-    const matrixData = matrix.rows.map(row => [
+    const matrixData = matrix.rows.map((row) => [
       row.productLabel,
-      ...matrix.workers.map(w => row.counts[w] || 0),
+      ...matrix.workers.map((w) => row.counts[w] || 0),
       row.total,
     ]);
     if (matrixData.length > 0) {
       XLSX.utils.sheet_add_aoa(ws3, matrixData, { origin: "A5" });
     }
 
-    const totalsRow = ["TOTAL", ...matrix.workers.map(w => matrix.workerTotals[w] || 0), matrix.grandTotal];
+    const totalsRow = ["TOTAL", ...matrix.workers.map((w) => matrix.workerTotals[w] || 0), matrix.grandTotal];
     XLSX.utils.sheet_add_aoa(ws3, [totalsRow], { origin: { r: 4 + matrix.rows.length, c: 0 } });
 
     const colWidths = [{ wch: 36 }, ...matrix.workers.map(() => ({ wch: 14 })), { wch: 10 }];
@@ -399,20 +445,38 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
     // Palette of vivid accent colors for worker columns (cycles if more workers than colors)
     const palette = [
-      "#2563eb","#16a34a","#dc2626","#9333ea","#ea580c","#0891b2","#be185d","#65a30d","#7c3aed","#b45309",
-      "#0284c7","#15803d","#e11d48","#7e22ce","#c2410c","#0e7490","#9d174d","#4d7c0f","#6d28d9","#92400e",
+      "#2563eb",
+      "#16a34a",
+      "#dc2626",
+      "#9333ea",
+      "#ea580c",
+      "#0891b2",
+      "#be185d",
+      "#65a30d",
+      "#7c3aed",
+      "#b45309",
+      "#0284c7",
+      "#15803d",
+      "#e11d48",
+      "#7e22ce",
+      "#c2410c",
+      "#0e7490",
+      "#9d174d",
+      "#4d7c0f",
+      "#6d28d9",
+      "#92400e",
     ];
     const colColor = (i: number) => palette[i % palette.length];
 
     // Worker header — split on the last space so two short lines fit the narrow column
-    const headerCells = cols.map((w, i) => {
-      const c = colColor(i);
-      const lastSpace = w.lastIndexOf(" ");
-      const label = lastSpace > 0
-        ? `${w.slice(0, lastSpace)}<br/>${w.slice(lastSpace + 1)}`
-        : w;
-      return `<th class="wc" style="background:${c};">${label}</th>`;
-    }).join("");
+    const headerCells = cols
+      .map((w, i) => {
+        const c = colColor(i);
+        const lastSpace = w.lastIndexOf(" ");
+        const label = lastSpace > 0 ? `${w.slice(0, lastSpace)}<br/>${w.slice(lastSpace + 1)}` : w;
+        return `<th class="wc" style="background:${c};">${label}</th>`;
+      })
+      .join("");
 
     // Split "Product Name (CODE)" into two stacked lines to keep the cell narrow
     const prodHtml = (label: string) => {
@@ -421,27 +485,34 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       return label;
     };
 
-    const dataRows = rows.map((row, idx) => {
-      const rowBg = idx % 2 === 0 ? "#ffffff" : "#f1f5f9";
-      const cells = cols.map((w, i) => {
-        const v = row.counts[w] || 0;
-        const accent = colColor(i);
-        const style = v > 0
-          ? `style="color:${accent};font-weight:700;background:${rowBg};"`
-          : `style="background:${rowBg};color:#cbd5e1;"`;
-        return `<td class="num" ${style}>${v > 0 ? v : "&middot;"}</td>`;
-      }).join("");
-      return `<tr>
+    const dataRows = rows
+      .map((row, idx) => {
+        const rowBg = idx % 2 === 0 ? "#ffffff" : "#f1f5f9";
+        const cells = cols
+          .map((w, i) => {
+            const v = row.counts[w] || 0;
+            const accent = colColor(i);
+            const style =
+              v > 0
+                ? `style="color:${accent};font-weight:700;background:${rowBg};"`
+                : `style="background:${rowBg};color:#cbd5e1;"`;
+            return `<td class="num" ${style}>${v > 0 ? v : "&middot;"}</td>`;
+          })
+          .join("");
+        return `<tr>
         <td class="prod" style="background:${rowBg};">${prodHtml(row.productLabel)}</td>
         ${cells}
         <td class="num total-col" style="background:${idx % 2 === 0 ? "#e0f2fe" : "#bae6fd"};">${row.total}</td>
       </tr>`;
-    }).join("");
+      })
+      .join("");
 
-    const totalCells = cols.map((w, i) => {
-      const c = colColor(i);
-      return `<td class="num" style="background:${c};color:#fff;">${workerTotals[w] || 0}</td>`;
-    }).join("");
+    const totalCells = cols
+      .map((w, i) => {
+        const c = colColor(i);
+        return `<td class="num" style="background:${c};color:#fff;">${workerTotals[w] || 0}</td>`;
+      })
+      .join("");
 
     // Column widths: product = 12%, total = 7%, workers share the remaining 81%
     const workerColPct = Math.max(2, Math.floor(81 / Math.max(cols.length, 1)));
@@ -523,7 +594,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     if (filteredGroups.length === 0) return;
 
     // Collect all bales across all groups
-    const allBales: BaleDetail[] = filteredGroups.flatMap(g => g.bales);
+    const allBales: BaleDetail[] = filteredGroups.flatMap((g) => g.bales);
 
     // Group bales by worker
     const byWorker = new Map<string, BaleDetail[]>();
@@ -539,9 +610,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     // Build detail rows (grouped by worker, bales sorted by product)
     let detailRowsHtml = "";
     for (const worker of sortedWorkers) {
-      const bales = byWorker.get(worker)!.sort((a, b) =>
-        (a.productName || "").localeCompare(b.productName || "")
-      );
+      const bales = byWorker.get(worker)!.sort((a, b) => (a.productName || "").localeCompare(b.productName || ""));
       const workerBaleCount = bales.length;
       const workerTotalKg = bales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
 
@@ -549,7 +618,9 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         const isFirst = idx === 0;
         const isLast = idx === bales.length - 1;
         const productLabel = b.productName
-          ? (b.articleCode ? `${b.productName} (${b.articleCode})` : b.productName)
+          ? b.articleCode
+            ? `${b.productName} (${b.articleCode})`
+            : b.productName
           : "—";
         const evenOdd = idx % 2 === 0 ? "#fff" : "#f8fafc";
         detailRowsHtml += `<tr style="background:${evenOdd};">
@@ -564,7 +635,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
 
     // Summary — sorted by bale count descending
     const summaryRows = sortedWorkers
-      .map(w => {
+      .map((w) => {
         const bales = byWorker.get(w)!;
         const count = bales.length;
         const totalKg = bales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
@@ -575,12 +646,16 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
     const grandBales = summaryRows.reduce((s, r) => s + r.count, 0);
     const grandKg = summaryRows.reduce((s, r) => s + r.totalKg, 0);
 
-    const summaryRowsHtml = summaryRows.map((r, idx) => `
+    const summaryRowsHtml = summaryRows
+      .map(
+        (r, idx) => `
       <tr style="background:${idx % 2 === 0 ? "#fff" : "#f8fafc"};">
         <td class="sum-worker">${r.worker}</td>
         <td class="sum-num">${r.count}</td>
         <td class="sum-num">${r.totalKg.toFixed(0)}</td>
-      </tr>`).join("");
+      </tr>`
+      )
+      .join("");
 
     const html = `<!DOCTYPE html>
 <html>
@@ -749,9 +824,11 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                 disabled={filteredGroups.length === 0 || sendWorkerPdfWaMutation.isPending}
                 data-testid="button-send-worker-pdf-whatsapp"
               >
-                {sendWorkerPdfWaMutation.isPending
-                  ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                  : <MessageCircle className="w-3 h-3 mr-2" />}
+                {sendWorkerPdfWaMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                ) : (
+                  <MessageCircle className="w-3 h-3 mr-2" />
+                )}
                 Send Worker PDF to WhatsApp
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -771,69 +848,102 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-              <Layers className="h-3 w-3" />Category
+              <Layers className="h-3 w-3" />
+              Category
             </div>
-            <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setWorkerIdFilter("all"); }}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-category"><SelectValue placeholder="All categories" /></SelectTrigger>
+            <Select
+              value={categoryFilter}
+              onValueChange={(v) => {
+                setCategoryFilter(v);
+                setWorkerIdFilter("all");
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs" data-testid="select-category">
+                <SelectValue placeholder="All categories" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {categories.map((c: any) => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-              <Users className="h-3 w-3" />Worker
+              <Users className="h-3 w-3" />
+              Worker
             </div>
             <Select value={workerIdFilter} onValueChange={setWorkerIdFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-worker"><SelectValue placeholder="All workers" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-worker">
+                <SelectValue placeholder="All workers" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Workers</SelectItem>
                 {filteredWorkers.map((w: any) => (
-                  <SelectItem key={w.id} value={String(w.id)}>{w.fullName}</SelectItem>
+                  <SelectItem key={w.id} value={String(w.id)}>
+                    {w.fullName}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-              <Package className="h-3 w-3" />Product
+              <Package className="h-3 w-3" />
+              Product
             </div>
             <Select value={productIdFilter} onValueChange={setProductIdFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-product"><SelectValue placeholder="All products" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-product">
+                <SelectValue placeholder="All products" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Products</SelectItem>
                 {products.map((p: any) => (
-                  <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                  <SelectItem key={p.id} value={String(p.id)}>
+                    {p.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-              <MapPin className="h-3 w-3" />Location
+              <MapPin className="h-3 w-3" />
+              Location
             </div>
             <Select value={locationIdFilter} onValueChange={setLocationIdFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-location"><SelectValue placeholder="All locations" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-location">
+                <SelectValue placeholder="All locations" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Locations</SelectItem>
                 {locations.map((l: any) => (
-                  <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                  <SelectItem key={l.id} value={String(l.id)}>
+                    {l.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
             <div className="flex items-center gap-1 text-xs text-muted-foreground font-medium">
-              <Tag className="h-3 w-3" />Status
+              <Tag className="h-3 w-3" />
+              Status
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-8 text-xs" data-testid="select-status"><SelectValue placeholder="All statuses" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs" data-testid="select-status">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {STATUS_OPTIONS.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -845,7 +955,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         <Button
           variant={useDateFilter ? "default" : "ghost"}
           size="sm"
-          onClick={() => setUseDateFilter(v => !v)}
+          onClick={() => setUseDateFilter((v) => !v)}
           data-testid="button-toggle-date-filter"
           className="toggle-elevate shrink-0 h-7 px-2.5 text-xs"
         >
@@ -857,7 +967,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             <Input
               type="date"
               value={fromDate}
-              onChange={e => setFromDate(e.target.value)}
+              onChange={(e) => setFromDate(e.target.value)}
               data-testid="input-from-date"
               className="w-34 h-7 text-xs shrink-0"
             />
@@ -865,7 +975,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             <Input
               type="date"
               value={toDate}
-              onChange={e => setToDate(e.target.value)}
+              onChange={(e) => setToDate(e.target.value)}
               data-testid="input-to-date"
               className="w-34 h-7 text-xs shrink-0"
             />
@@ -877,7 +987,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             className="pl-8 h-7 text-xs"
             placeholder="Search by reference number…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             data-testid="input-search"
           />
         </div>
@@ -885,10 +995,12 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
           <Checkbox
             id="include-unassigned"
             checked={includeUnassigned}
-            onCheckedChange={v => setIncludeUnassigned(!!v)}
+            onCheckedChange={(v) => setIncludeUnassigned(!!v)}
             data-testid="checkbox-include-unassigned"
           />
-          <Label htmlFor="include-unassigned" className="text-xs cursor-pointer whitespace-nowrap">Include Unassigned</Label>
+          <Label htmlFor="include-unassigned" className="text-xs cursor-pointer whitespace-nowrap">
+            Include Unassigned
+          </Label>
         </div>
       </div>
 
@@ -896,7 +1008,9 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-slate-500/10 border-slate-500/20">
           <span className="text-xs font-semibold text-slate-500">Groups</span>
-          <span className="text-sm font-bold tabular-nums text-slate-600 dark:text-slate-300">{filteredGroups.length}</span>
+          <span className="text-sm font-bold tabular-nums text-slate-600 dark:text-slate-300">
+            {filteredGroups.length}
+          </span>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-emerald-500/10 border-emerald-500/20">
           <span className="text-xs font-semibold text-emerald-500">Bales</span>
@@ -904,7 +1018,9 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-sky-500/10 border-sky-500/20">
           <span className="text-xs font-semibold text-sky-500">Weight</span>
-          <span className="text-sm font-bold tabular-nums text-sky-600 dark:text-sky-400">{totalWeight.toFixed(2)}</span>
+          <span className="text-sm font-bold tabular-nums text-sky-600 dark:text-sky-400">
+            {totalWeight.toFixed(2)}
+          </span>
           <span className="text-xs text-sky-600/70 dark:text-sky-400/70">kg</span>
         </div>
       </div>
@@ -916,22 +1032,40 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
             <thead className="sticky top-0 z-30 bg-muted border-b-2 border-border/60">
               <tr className="text-left">
                 <th className="px-3 py-2.5 w-6"></th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">No. Workers</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
+                  No. Workers
+                </th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Worker</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Target</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Shortage</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Bales</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Total kg</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
+                  Target
+                </th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
+                  Shortage
+                </th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
+                  Bales
+                </th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
+                  Total kg
+                </th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+                <tr>
+                  <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                    Loading…
+                  </td>
+                </tr>
               )}
               {!isLoading && workerGroups.length === 0 && (
-                <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No stock entry records found for the selected filters.</td></tr>
+                <tr>
+                  <td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">
+                    No stock entry records found for the selected filters.
+                  </td>
+                </tr>
               )}
-              {workerGroups.map(wg => {
+              {workerGroups.map((wg) => {
                 const wExpanded = expandedKeys.has(wg.workerKey);
                 const plan = wg.workerId != null ? workerTargets[wg.workerId] : undefined;
                 const target = plan?.targetBales ?? 0;
@@ -959,10 +1093,16 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                     </td>
                     <td className="px-3 py-2 text-right font-semibold">
                       {plan && target > 0 ? (
-                        <span className={diff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                        <span
+                          className={
+                            diff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                          }
+                        >
                           {diff >= 0 ? `+${diff}` : diff}
                         </span>
-                      ) : <span className="text-xs text-muted-foreground">—</span>}
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold">{wg.totalBales}</td>
                     <td className="px-3 py-2 text-right font-semibold">{wg.totalWeight.toFixed(2)}</td>
@@ -986,7 +1126,7 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                             </tr>
                           </thead>
                           <tbody>
-                            {wg.groups.map(g => {
+                            {wg.groups.map((g) => {
                               const gKey = groupKey(g);
                               const gExpanded = expandedKeys.has(gKey + "-bales");
                               return [
@@ -997,34 +1137,49 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                   data-testid={`row-group-${gKey}`}
                                 >
                                   <td className="px-8 py-1.5 text-muted-foreground">
-                                    {gExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                    {gExpanded ? (
+                                      <ChevronDown className="w-3 h-3" />
+                                    ) : (
+                                      <ChevronRight className="w-3 h-3" />
+                                    )}
                                   </td>
                                   <td className="px-3 py-1.5">{formatDisplayDate(g.stockEntryDate)}</td>
                                   <td className="px-3 py-1.5">{g.locationName}</td>
                                   <td className="px-3 py-1.5">
                                     {g.productName || "—"}
-                                    {g.articleCode && <span className="ml-1 text-muted-foreground">({g.articleCode})</span>}
+                                    {g.articleCode && (
+                                      <span className="ml-1 text-muted-foreground">({g.articleCode})</span>
+                                    )}
                                   </td>
                                   <td className="px-3 py-1.5 text-right font-medium">{g.baleCount}</td>
-                                  <td className="px-3 py-1.5 text-right">{parseFloat(g.totalWeight || "0").toFixed(2)}</td>
-                                  <td className="px-3 py-1.5 text-right">{parseFloat(g.avgWeight || "0").toFixed(2)}</td>
-                                  <td className="px-3 py-1.5" onClick={e => e.stopPropagation()}>
+                                  <td className="px-3 py-1.5 text-right">
+                                    {parseFloat(g.totalWeight || "0").toFixed(2)}
+                                  </td>
+                                  <td className="px-3 py-1.5 text-right">
+                                    {parseFloat(g.avgWeight || "0").toFixed(2)}
+                                  </td>
+                                  <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
                                     <Select
                                       value={g.workerId ? String(g.workerId) : ""}
                                       onValueChange={(v) => {
-                                        const baleIds = g.bales.map(b => b.id);
+                                        const baleIds = g.bales.map((b) => b.id);
                                         bulkAssignMutation.mutate({ baleIds, workerId: parseInt(v) });
                                       }}
                                     >
-                                      <SelectTrigger className="h-6 w-36 text-xs" data-testid={`select-assign-worker-${gKey}`}>
+                                      <SelectTrigger
+                                        className="h-6 w-36 text-xs"
+                                        data-testid={`select-assign-worker-${gKey}`}
+                                      >
                                         <SelectValue placeholder="Reassign…" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        {workers.filter((w: any) => w.active).map((w: any) => (
-                                          <SelectItem key={w.id} value={String(w.id)}>
-                                            {w.fullName || w.full_name || w.name}
-                                          </SelectItem>
-                                        ))}
+                                        {workers
+                                          .filter((w: any) => w.active)
+                                          .map((w: any) => (
+                                            <SelectItem key={w.id} value={String(w.id)}>
+                                              {w.fullName || w.full_name || w.name}
+                                            </SelectItem>
+                                          ))}
                                       </SelectContent>
                                     </Select>
                                   </td>
@@ -1043,16 +1198,31 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {g.bales.map(b => (
-                                            <tr key={b.id} className="border-t border-border/30" data-testid={`row-bale-${b.id}`}>
+                                          {g.bales.map((b) => (
+                                            <tr
+                                              key={b.id}
+                                              className="border-t border-border/30"
+                                              data-testid={`row-bale-${b.id}`}
+                                            >
                                               <td className="py-1 pr-4 font-mono">{b.referenceNumber}</td>
-                                              <td className="py-1 pr-4 text-right">{parseFloat(b.weightKg || "0").toFixed(2)}</td>
+                                              <td className="py-1 pr-4 text-right">
+                                                {parseFloat(b.weightKg || "0").toFixed(2)}
+                                              </td>
                                               <td className="py-1 pr-4">
-                                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}>
+                                                <span
+                                                  className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}
+                                                >
                                                   {b.status}
                                                 </span>
                                               </td>
-                                              <td className="py-1">{b.finalizedAt ? new Date(b.finalizedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                                              <td className="py-1">
+                                                {b.finalizedAt
+                                                  ? new Date(b.finalizedAt).toLocaleTimeString([], {
+                                                      hour: "2-digit",
+                                                      minute: "2-digit",
+                                                    })
+                                                  : "—"}
+                                              </td>
                                             </tr>
                                           ))}
                                         </tbody>
@@ -1086,17 +1256,27 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Worker</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Product</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Article</th>
-                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">Weight (kg)</th>
+                <th className="px-3 py-2.5 text-right text-xs font-semibold text-muted-foreground tracking-wide">
+                  Weight (kg)
+                </th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Status</th>
                 <th className="px-3 py-2.5 text-xs font-semibold text-muted-foreground tracking-wide">Finalized At</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
-                <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">Loading…</td></tr>
+                <tr>
+                  <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
+                    Loading…
+                  </td>
+                </tr>
               )}
               {!isLoading && allBales.length === 0 && (
-                <tr><td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">No bales found for the selected filters.</td></tr>
+                <tr>
+                  <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
+                    No bales found for the selected filters.
+                  </td>
+                </tr>
               )}
               {allBales.map((b, idx) => (
                 <tr
@@ -1114,7 +1294,9 @@ export default function StockEntryHistory({ onActiveDateChange }: StockEntryHist
                   <td className="px-3 py-1.5 text-muted-foreground text-xs">{b.articleCode || "—"}</td>
                   <td className="px-3 py-1.5 text-right">{parseFloat(b.weightKg || "0").toFixed(2)}</td>
                   <td className="px-3 py-1.5">
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}>
+                    <span
+                      className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${STATUS_COLORS[b.status] || "bg-muted text-muted-foreground"}`}
+                    >
                       {b.status}
                     </span>
                   </td>

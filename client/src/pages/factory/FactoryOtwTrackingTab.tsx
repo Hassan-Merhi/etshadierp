@@ -7,20 +7,38 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Tooltip, TooltipContent, TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Radio, RefreshCw, Loader2, CheckCircle, XCircle, AlertTriangle,
-  Minus, AlertCircle, Settings2, MapPin, Activity, Search, X, Package,
-  Pencil, ArrowUp, ArrowDown, ChevronsUpDown, Ship, Truck, CheckCircle2,
-  DollarSign, Clock, Filter, ChevronDown, Scale,
+  Radio,
+  RefreshCw,
+  Loader2,
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  Minus,
+  AlertCircle,
+  Settings2,
+  MapPin,
+  Activity,
+  Search,
+  X,
+  Package,
+  Pencil,
+  ArrowUp,
+  ArrowDown,
+  ChevronsUpDown,
+  Ship,
+  Truck,
+  CheckCircle2,
+  DollarSign,
+  Clock,
+  Filter,
+  ChevronDown,
+  Scale,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -29,9 +47,13 @@ import type { FactoryContainer } from "@shared/schema";
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 const NOTES_KEY = "factory-otw-row-notes";
-const DOCS_KEY  = "factory-otw-row-docs";
+const DOCS_KEY = "factory-otw-row-docs";
 function loadMap<T>(key: string): Record<string, T> {
-  try { return JSON.parse(localStorage.getItem(key) ?? "{}"); } catch { return {}; }
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? "{}");
+  } catch {
+    return {};
+  }
 }
 function saveMap(key: string, map: Record<string, any>) {
   localStorage.setItem(key, JSON.stringify(map));
@@ -50,8 +72,17 @@ const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED"]);
 
 // ── Currency helpers ────────────────────────────────────────────────────────
 const CCY_SYMBOLS: Record<string, string> = {
-  USD: "$", EUR: "€", GBP: "£", AUD: "A$", CAD: "C$",
-  CHF: "CHF", JPY: "¥", CNY: "¥", AED: "AED", SAR: "SAR", LBP: "LL",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  AUD: "A$",
+  CAD: "C$",
+  CHF: "CHF",
+  JPY: "¥",
+  CNY: "¥",
+  AED: "AED",
+  SAR: "SAR",
+  LBP: "LL",
 };
 function ccySym(code: string | null | undefined): string {
   if (!code) return "$";
@@ -65,7 +96,7 @@ function fmtAmt(symbol: string, amount: number): string {
   if (amount === 0) return "—";
   return `${symbol} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
-const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function fmtDate(d: string | null | undefined): string {
   if (!d) return "—";
   const plain = d.slice(0, 10);
@@ -77,9 +108,7 @@ function fmtDate(d: string | null | undefined): string {
 function containerCost(c: ContainerWithSupplier): { symbol: string; amount: number } {
   const ccy = c.currencyCode || "USD";
   const symbol = ccySym(ccy);
-  const amount = num(c.finalPayableAmount) > 0
-    ? num(c.finalPayableAmount)
-    : num(c.ratePerKg) * num(c.totalKg);
+  const amount = num(c.finalPayableAmount) > 0 ? num(c.finalPayableAmount) : num(c.ratePerKg) * num(c.totalKg);
   return { symbol, amount };
 }
 function calcDelayDays(c: ContainerWithSupplier): number {
@@ -89,7 +118,8 @@ function calcDelayDays(c: ContainerWithSupplier): number {
   if (parts.length < 3 || parts.some(isNaN)) return 0;
   const [y, m, day] = parts;
   const eta = new Date(y, m - 1, day);
-  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const diff = Math.floor((today.getTime() - eta.getTime()) / 86400000);
   return diff > 0 ? diff : 0;
 }
@@ -98,7 +128,12 @@ function isOverdue(c: ContainerWithSupplier): boolean {
 }
 
 // ── Summary Card (mirrors ERP SummaryCard) ───────────────────────────────────
-function SummaryCard({ label, value, icon, accent }: {
+function SummaryCard({
+  label,
+  value,
+  icon,
+  accent,
+}: {
   label: string;
   value: string | number;
   icon: React.ReactNode;
@@ -119,26 +154,43 @@ function SummaryCard({ label, value, icon, accent }: {
 
 // ── Status badge ─────────────────────────────────────────────────────────────
 const CONTAINER_STATUS_LABELS: Record<string, string> = {
-  PENDING:            "Pending",
-  IN_TRANSIT:         "In Transit",
-  ARRIVED:            "Arrived",
-  OFFLOADED:          "Offloaded",
+  PENDING: "Pending",
+  IN_TRANSIT: "In Transit",
+  ARRIVED: "Arrived",
+  OFFLOADED: "Offloaded",
   PARTIALLY_RECEIVED: "Partial",
-  RECEIVED:           "Received",
+  RECEIVED: "Received",
 };
 function ContainerStatusBadge({ status }: { status: string }) {
   const label = CONTAINER_STATUS_LABELS[status] ?? status;
   if (status === "OFFLOADED")
-    return <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{label}</Badge>;
+    return (
+      <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{label}</Badge>
+    );
   if (status === "IN_TRANSIT")
-    return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{label}</Badge>;
+    return (
+      <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{label}</Badge>
+    );
   if (status === "ARRIVED")
-    return <Badge className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">{label}</Badge>;
-  return <Badge variant="secondary" className="text-xs">{label}</Badge>;
+    return (
+      <Badge className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">
+        {label}
+      </Badge>
+    );
+  return (
+    <Badge variant="secondary" className="text-xs">
+      {label}
+    </Badge>
+  );
 }
 
 // ── Inline ETA cell ──────────────────────────────────────────────────────────
-function EtaCell({ containerId, arrivalDate, overdue, onSave }: {
+function EtaCell({
+  containerId,
+  arrivalDate,
+  overdue,
+  onSave,
+}: {
   containerId: number;
   arrivalDate: string | null | undefined;
   overdue: boolean;
@@ -180,7 +232,7 @@ function EtaCell({ containerId, arrivalDate, overdue, onSave }: {
     <span
       className={cn(
         "text-xs cursor-pointer rounded px-1 py-0.5 hover-elevate block font-medium",
-        overdue ? "text-red-600 dark:text-red-400" : (arrivalDate ? "text-foreground" : "text-muted-foreground italic"),
+        overdue ? "text-red-600 dark:text-red-400" : arrivalDate ? "text-foreground" : "text-muted-foreground italic"
       )}
       onClick={startEdit}
       data-testid={`text-eta-${containerId}`}
@@ -192,7 +244,11 @@ function EtaCell({ containerId, arrivalDate, overdue, onSave }: {
 }
 
 // ── Inline notes cell ────────────────────────────────────────────────────────
-function NotesCell({ containerId, notes, onSave }: {
+function NotesCell({
+  containerId,
+  notes,
+  onSave,
+}: {
   containerId: number;
   notes: Record<string, string>;
   onSave: (id: number, val: string) => void;
@@ -249,7 +305,12 @@ interface TrackingEvent {
   status: string | null;
   provider: string | null;
 }
-function EventTimelineSheet({ containerId, containerNumber, open, onClose }: {
+function EventTimelineSheet({
+  containerId,
+  containerNumber,
+  open,
+  onClose,
+}: {
   containerId: number | null;
   containerNumber: string;
   open: boolean;
@@ -266,7 +327,12 @@ function EventTimelineSheet({ containerId, containerNumber, open, onClose }: {
   });
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <SheetContent className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
         <SheetHeader className="px-6 py-4 border-b shrink-0">
           <SheetTitle className="flex items-center gap-2 text-base">
@@ -302,17 +368,22 @@ function EventTimelineSheet({ containerId, containerNumber, open, onClose }: {
                   return (
                     <li key={ev.id} className="ml-4 pb-6 last:pb-0">
                       <span className="absolute -left-1.5 flex h-3 w-3 items-center justify-center rounded-full border bg-background ring-2 ring-background">
-                        <span className={`h-1.5 w-1.5 rounded-full ${idx === 0 ? "bg-blue-500" : "bg-muted-foreground/40"}`} />
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full ${idx === 0 ? "bg-blue-500" : "bg-muted-foreground/40"}`}
+                        />
                       </span>
                       <div className="flex flex-col gap-0.5">
                         <p className="text-sm font-medium leading-snug">{ev.description ?? ev.status ?? "—"}</p>
                         {ev.location && (
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <MapPin className="h-3 w-3 shrink-0" />{ev.location}
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            {ev.location}
                           </p>
                         )}
                         <p className="text-xs text-muted-foreground/70 mt-0.5">
-                          {dt ? `${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : "—"}
+                          {dt
+                            ? `${dt.toLocaleDateString()} ${dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+                            : "—"}
                           {ev.provider && <span className="ml-2 opacity-60">via {ev.provider}</span>}
                         </p>
                       </div>
@@ -329,7 +400,11 @@ function EventTimelineSheet({ containerId, containerNumber, open, onClose }: {
 }
 
 // ── Tracking Settings Sheet ──────────────────────────────────────────────────
-function TrackingSettingsSheet({ container, open, onClose }: {
+function TrackingSettingsSheet({
+  container,
+  open,
+  onClose,
+}: {
   container: ContainerWithSupplier | null;
   open: boolean;
   onClose: () => void;
@@ -369,20 +444,29 @@ function TrackingSettingsSheet({ container, open, onClose }: {
   });
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <SheetContent className="w-full sm:max-w-sm flex flex-col gap-0 p-0">
         <SheetHeader className="px-6 py-4 border-b shrink-0">
           <SheetTitle className="flex items-center gap-2 text-base">
             <Settings2 className="h-4 w-4 text-muted-foreground" />
             Tracking Settings
-            {container && <span className="font-mono text-muted-foreground font-normal text-sm">{container.containerNumber}</span>}
+            {container && (
+              <span className="font-mono text-muted-foreground font-normal text-sm">{container.containerNumber}</span>
+            )}
           </SheetTitle>
         </SheetHeader>
         <div className="flex-1 px-6 py-5 space-y-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Enable Tracking</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Allow this container to be tracked via carrier APIs</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Allow this container to be tracked via carrier APIs
+              </p>
             </div>
             <Switch checked={enabled} onCheckedChange={setEnabled} data-testid="switch-tracking-enabled" />
           </div>
@@ -390,14 +474,25 @@ function TrackingSettingsSheet({ container, open, onClose }: {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Auto Update</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Let the scheduler check this container automatically</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Let the scheduler check this container automatically
+              </p>
             </div>
-            <Switch checked={autoUpdate} onCheckedChange={setAutoUpdate} disabled={!enabled} data-testid="switch-auto-update" />
+            <Switch
+              checked={autoUpdate}
+              onCheckedChange={setAutoUpdate}
+              disabled={!enabled}
+              data-testid="switch-auto-update"
+            />
           </div>
           <Separator />
           <div className="space-y-2">
-            <Label htmlFor="carrier-hint-tab" className="text-sm font-medium">Carrier Hint</Label>
-            <p className="text-xs text-muted-foreground">Optional — helps the system find the right carrier faster (e.g. MAERSK, CMA)</p>
+            <Label htmlFor="carrier-hint-tab" className="text-sm font-medium">
+              Carrier Hint
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Optional — helps the system find the right carrier faster (e.g. MAERSK, CMA)
+            </p>
             <Input
               id="carrier-hint-tab"
               value={carrierHint}
@@ -409,7 +504,12 @@ function TrackingSettingsSheet({ container, open, onClose }: {
           </div>
         </div>
         <div className="px-6 pb-6 shrink-0">
-          <Button className="w-full" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-tracking-settings-tab">
+          <Button
+            className="w-full"
+            onClick={() => saveMutation.mutate()}
+            disabled={saveMutation.isPending}
+            data-testid="button-save-tracking-settings-tab"
+          >
             {saveMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Save Settings
           </Button>
@@ -429,8 +529,8 @@ interface ProgressStep {
 function ProgressStepIcon({ status }: { status: ProgressStep["status"] }) {
   if (status === "running") return <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />;
   if (status === "success") return <CheckCircle className="h-3.5 w-3.5 text-green-500" />;
-  if (status === "fail")    return <XCircle className="h-3.5 w-3.5 text-destructive" />;
-  if (status === "skip")    return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
+  if (status === "fail") return <XCircle className="h-3.5 w-3.5 text-destructive" />;
+  if (status === "skip") return <Minus className="h-3.5 w-3.5 text-muted-foreground" />;
   return <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />;
 }
 function TrackNowProgressLog({ containerId }: { containerId: number }) {
@@ -443,16 +543,25 @@ function TrackNowProgressLog({ containerId }: { containerId: number }) {
           const res = await factoryApiRequest("GET", `/api/factory/container-tracking/${containerId}/progress`);
           const data: ProgressStep[] = res.ok ? await res.json() : [];
           if (!cancelled) setSteps(data ?? []);
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         await new Promise((r) => setTimeout(r, 1500));
       }
     };
     poll();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [containerId]);
 
   if (steps.length === 0) {
-    return <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Starting…</div>;
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="h-3 w-3 animate-spin" />
+        Starting…
+      </div>
+    );
   }
   return (
     <div className="flex flex-col gap-0.5 max-w-[140px]">
@@ -470,20 +579,20 @@ function TrackNowProgressLog({ containerId }: { containerId: number }) {
 export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = {}) {
   const { toast } = useToast();
   const tqClient = useTQClient();
-  const [trackingNowId, setTrackingNowId]         = useState<number | null>(null);
-  const [timelineId, setTimelineId]               = useState<number | null>(null);
+  const [trackingNowId, setTrackingNowId] = useState<number | null>(null);
+  const [timelineId, setTimelineId] = useState<number | null>(null);
   const [settingsContainer, setSettingsContainer] = useState<ContainerWithSupplier | null>(null);
-  const [supplierFilter, setSupplierFilter]       = useState<string>("all");
-  const [freightFilter, setFreightFilter]         = useState<string>("all");
-  const [weightFilter, setWeightFilter]           = useState<string>("all");
-  const [docsFilter, setDocsFilter]               = useState<string>("all");
-  const [delayedFilter, setDelayedFilter]         = useState<string>("all");
-  const [sortOrder, setSortOrder]                 = useState<string>("DEFAULT");
-  const [search, setSearch]                       = useState("");
-  const [showFilters, setShowFilters]             = useState(false);
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [freightFilter, setFreightFilter] = useState<string>("all");
+  const [weightFilter, setWeightFilter] = useState<string>("all");
+  const [docsFilter, setDocsFilter] = useState<string>("all");
+  const [delayedFilter, setDelayedFilter] = useState<string>("all");
+  const [sortOrder, setSortOrder] = useState<string>("DEFAULT");
+  const [search, setSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
   const [notes, setNotes] = useState<Record<string, string>>(() => loadMap<string>(NOTES_KEY));
-  const [docs,  setDocs]  = useState<Record<string, boolean>>(() => loadMap<boolean>(DOCS_KEY));
+  const [docs, setDocs] = useState<Record<string, boolean>>(() => loadMap<boolean>(DOCS_KEY));
 
   const { data: containers, isLoading } = useQuery<ContainerWithSupplier[]>({
     queryKey: ["/api/factory/containers"],
@@ -493,26 +602,26 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
 
   // Supplier list for filter
   const suppliers = Array.from(
-    new Map(otwContainers.map((c) => [String(c.supplierId ?? "none"), (c as any).supplierName || "No Supplier"])).entries()
+    new Map(
+      otwContainers.map((c) => [String(c.supplierId ?? "none"), (c as any).supplierName || "No Supplier"])
+    ).entries()
   ).sort((a, b) => a[1].localeCompare(b[1]));
 
   // Apply filters + sort
   let filtered = otwContainers.filter((c) => {
     if (supplierFilter !== "all" && String(c.supplierId ?? "none") !== supplierFilter) return false;
     if (freightFilter === "has_freight" && !(num(c.freight) > 0)) return false;
-    if (freightFilter === "no_freight"  && num(c.freight) > 0)    return false;
+    if (freightFilter === "no_freight" && num(c.freight) > 0) return false;
     if (weightFilter === "has_weight" && !(num(c.totalKg) > 0)) return false;
-    if (weightFilter === "no_weight"  && num(c.totalKg) > 0)    return false;
-    if (docsFilter === "received"     && !docs[String(c.id)])  return false;
+    if (weightFilter === "no_weight" && num(c.totalKg) > 0) return false;
+    if (docsFilter === "received" && !docs[String(c.id)]) return false;
     if (docsFilter === "not_received" && !!docs[String(c.id)]) return false;
-    if (delayedFilter === "delayed"  && calcDelayDays(c) === 0) return false;
-    if (delayedFilter === "overdue"  && !isOverdue(c))          return false;
+    if (delayedFilter === "delayed" && calcDelayDays(c) === 0) return false;
+    if (delayedFilter === "overdue" && !isOverdue(c)) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
-      if (
-        !c.containerNumber?.toLowerCase().includes(q) &&
-        !(c as any).supplierName?.toLowerCase().includes(q)
-      ) return false;
+      if (!c.containerNumber?.toLowerCase().includes(q) && !(c as any).supplierName?.toLowerCase().includes(q))
+        return false;
     }
     return true;
   });
@@ -520,8 +629,8 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   // Sort
   filtered = [...filtered].sort((a, b) => {
     if (sortOrder === "ETA_ASC" || sortOrder === "ETA_DESC") {
-      const da = a.arrivalDate ? new Date(a.arrivalDate).getTime() : (sortOrder === "ETA_ASC" ? Infinity : -Infinity);
-      const db = b.arrivalDate ? new Date(b.arrivalDate).getTime() : (sortOrder === "ETA_ASC" ? Infinity : -Infinity);
+      const da = a.arrivalDate ? new Date(a.arrivalDate).getTime() : sortOrder === "ETA_ASC" ? Infinity : -Infinity;
+      const db = b.arrivalDate ? new Date(b.arrivalDate).getTime() : sortOrder === "ETA_ASC" ? Infinity : -Infinity;
       if (da !== db) return sortOrder === "ETA_ASC" ? da - db : db - da;
     }
     const sa = ((a as any).supplierName || "").toLowerCase();
@@ -530,10 +639,10 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   });
 
   // Summary stats
-  const pending   = otwContainers.filter((c) => c.status === "PENDING").length;
+  const pending = otwContainers.filter((c) => c.status === "PENDING").length;
   const inTransit = otwContainers.filter((c) => c.status === "IN_TRANSIT").length;
-  const arrived   = otwContainers.filter((c) => c.status === "ARRIVED").length;
-  const delayed   = otwContainers.filter((c) => calcDelayDays(c) > 0).length;
+  const arrived = otwContainers.filter((c) => c.status === "ARRIVED").length;
+  const delayed = otwContainers.filter((c) => calcDelayDays(c) > 0).length;
   const withErrors = otwContainers.filter((c) => !!(c as any).trackingError).length;
   const today = new Date().toDateString();
   const checkedToday = otwContainers.filter((c) => {
@@ -568,19 +677,39 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
   const timelineContainer = otwContainers.find((c) => c.id === timelineId) ?? null;
   const trackingEnabledCount = otwContainers.filter((c) => (c as any).trackingEnabled !== false).length;
 
-  const hasActiveFilters = search || supplierFilter !== "all" || freightFilter !== "all" || weightFilter !== "all" || docsFilter !== "all" || delayedFilter !== "all" || sortOrder !== "DEFAULT";
+  const hasActiveFilters =
+    search ||
+    supplierFilter !== "all" ||
+    freightFilter !== "all" ||
+    weightFilter !== "all" ||
+    docsFilter !== "all" ||
+    delayedFilter !== "all" ||
+    sortOrder !== "DEFAULT";
 
   function saveNote(id: number, val: string) {
-    setNotes((prev) => { const next = { ...prev, [String(id)]: val }; saveMap(NOTES_KEY, next); return next; });
+    setNotes((prev) => {
+      const next = { ...prev, [String(id)]: val };
+      saveMap(NOTES_KEY, next);
+      return next;
+    });
   }
   function toggleDoc(id: number, checked: boolean) {
-    setDocs((prev) => { const next = { ...prev, [String(id)]: checked }; saveMap(DOCS_KEY, next); return next; });
+    setDocs((prev) => {
+      const next = { ...prev, [String(id)]: checked };
+      saveMap(DOCS_KEY, next);
+      return next;
+    });
   }
 
   const etaMutation = useMutation({
     mutationFn: async ({ id, arrivalDate }: { id: number; arrivalDate: string | null }) => {
-      const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, { arrivalDate: arrivalDate || null });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed to update ETA"); }
+      const res = await factoryApiRequest("PATCH", `/api/factory/containers/${id}`, {
+        arrivalDate: arrivalDate || null,
+      });
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message || "Failed to update ETA");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -595,7 +724,13 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     etaMutation.mutate({ id, arrivalDate: val });
   }
   function clearFilters() {
-    setSearch(""); setSupplierFilter("all"); setFreightFilter("all"); setWeightFilter("all"); setDocsFilter("all"); setDelayedFilter("all"); setSortOrder("DEFAULT");
+    setSearch("");
+    setSupplierFilter("all");
+    setFreightFilter("all");
+    setWeightFilter("all");
+    setDocsFilter("all");
+    setDelayedFilter("all");
+    setSortOrder("DEFAULT");
   }
 
   const trackNowMutation = useMutation({
@@ -635,7 +770,10 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       return fc.trackingEnabled !== false && /^[A-Z]{4}\d{7}$/.test((c.containerNumber || "").trim().toUpperCase());
     });
     if (eligible.length === 0) {
-      toast({ title: "No eligible containers", description: "All containers have tracking disabled or invalid numbers." });
+      toast({
+        title: "No eligible containers",
+        description: "All containers have tracking disabled or invalid numbers.",
+      });
       return;
     }
     setBulkTracking(true);
@@ -645,7 +783,9 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
       const c = eligible[i];
       try {
         await factoryApiRequest("POST", `/api/factory/container-tracking/${c.id}/track-now`, {});
-      } catch { /* ignore dispatch errors */ }
+      } catch {
+        /* ignore dispatch errors */
+      }
       setBulkProgress({ done: i + 1, total: eligible.length });
     }
     setBulkTracking(false);
@@ -669,7 +809,9 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
     return (
       <div className="space-y-4 p-4">
         <div className="flex flex-wrap gap-2">
-          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-16 w-36 rounded-lg border bg-muted animate-pulse" />)}
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-16 w-36 rounded-lg border bg-muted animate-pulse" />
+          ))}
         </div>
         <div className="h-48 rounded-lg border bg-muted animate-pulse" />
       </div>
@@ -687,13 +829,38 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
 
   return (
     <div className="flex flex-col gap-4 p-4">
-
       {/* ── Summary Cards (ERP-style) ── */}
       <div className="flex flex-wrap gap-2">
-        <SummaryCard label="Active" value={otwContainers.length} icon={<Package className="h-4 w-4 text-primary" />} accent="bg-primary/10" />
-        {inTransit > 0 && <SummaryCard label="In Transit" value={inTransit} icon={<Truck className="h-4 w-4 text-indigo-600" />} accent="bg-indigo-100 dark:bg-indigo-900/30" />}
-        {arrived > 0 && <SummaryCard label="Arrived" value={arrived} icon={<CheckCircle2 className="h-4 w-4 text-green-600" />} accent="bg-green-100 dark:bg-green-900/30" />}
-        {delayed > 0 && <SummaryCard label="Delayed" value={delayed} icon={<Clock className="h-4 w-4 text-red-600" />} accent="bg-red-100 dark:bg-red-900/30" />}
+        <SummaryCard
+          label="Active"
+          value={otwContainers.length}
+          icon={<Package className="h-4 w-4 text-primary" />}
+          accent="bg-primary/10"
+        />
+        {inTransit > 0 && (
+          <SummaryCard
+            label="In Transit"
+            value={inTransit}
+            icon={<Truck className="h-4 w-4 text-indigo-600" />}
+            accent="bg-indigo-100 dark:bg-indigo-900/30"
+          />
+        )}
+        {arrived > 0 && (
+          <SummaryCard
+            label="Arrived"
+            value={arrived}
+            icon={<CheckCircle2 className="h-4 w-4 text-green-600" />}
+            accent="bg-green-100 dark:bg-green-900/30"
+          />
+        )}
+        {delayed > 0 && (
+          <SummaryCard
+            label="Delayed"
+            value={delayed}
+            icon={<Clock className="h-4 w-4 text-red-600" />}
+            accent="bg-red-100 dark:bg-red-900/30"
+          />
+        )}
         {totalWeight > 0 && (
           <SummaryCard
             label="Total Weight (KG)"
@@ -734,11 +901,7 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
             data-testid="input-otw-search"
           />
         </div>
-        <Button
-          variant="outline"
-          onClick={() => setShowFilters((v) => !v)}
-          data-testid="button-otw-filters"
-        >
+        <Button variant="outline" onClick={() => setShowFilters((v) => !v)} data-testid="button-otw-filters">
           <Filter className="h-4 w-4 mr-1" />
           Filters
           <ChevronDown className={cn("h-3.5 w-3.5 ml-1 transition-transform", showFilters && "rotate-180")} />
@@ -749,11 +912,15 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           disabled={bulkTracking || otwContainers.length === 0}
           data-testid="button-track-all-now"
         >
+          {bulkTracking ? (
+            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-1.5" />
+          )}
           {bulkTracking
-            ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            : <RefreshCw className="h-4 w-4 mr-1.5" />}
-          {bulkTracking
-            ? bulkProgress ? `Tracking… ${bulkProgress.done}/${bulkProgress.total}` : "Tracking…"
+            ? bulkProgress
+              ? `Tracking… ${bulkProgress.done}/${bulkProgress.total}`
+              : "Tracking…"
             : `Track All${trackingEnabledCount > 0 ? ` (${trackingEnabledCount})` : ""}`}
         </Button>
       </div>
@@ -770,7 +937,9 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
               <SelectContent>
                 <SelectItem value="all">All suppliers</SelectItem>
                 {suppliers.map(([key, name]) => (
-                  <SelectItem key={key} value={key}>{name}</SelectItem>
+                  <SelectItem key={key} value={key}>
+                    {name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -841,7 +1010,13 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
             </Select>
           </div>
           <div className="flex items-end">
-            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={clearFilters} data-testid="button-clear-filters">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={clearFilters}
+              data-testid="button-clear-filters"
+            >
               Clear All
             </Button>
           </div>
@@ -894,25 +1069,25 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
           </TableHeader>
           <TableBody>
             {filtered.map((c, idx) => {
-              const fc         = c as any;
-              const cost       = containerCost(c);
-              const frSym      = ccySym(c.freightCurrencyCode || c.currencyCode);
-              const commSym    = ccySym(c.commissionCurrencyCode || "USD");
-              const dutySym    = ccySym(c.currencyCode);
-              const docDone    = !!docs[String(c.id)];
+              const fc = c as any;
+              const cost = containerCost(c);
+              const frSym = ccySym(c.freightCurrencyCode || c.currencyCode);
+              const commSym = ccySym(c.commissionCurrencyCode || "USD");
+              const dutySym = ccySym(c.currencyCode);
+              const docDone = !!docs[String(c.id)];
               const isTracking = trackingNowId === c.id;
-              const hasError   = !!fc.trackingError;
-              const isEnabled  = fc.trackingEnabled !== false;
+              const hasError = !!fc.trackingError;
+              const isEnabled = fc.trackingEnabled !== false;
               const isValidNum = /^[A-Z]{4}\d{7}$/.test((c.containerNumber || "").trim().toUpperCase());
-              const delayDays  = calcDelayDays(c);
-              const overdue    = isOverdue(c);
-              const location   = fc.trackingLastLocation || c.destination || null;
+              const delayDays = calcDelayDays(c);
+              const overdue = isOverdue(c);
+              const location = fc.trackingLastLocation || c.destination || null;
 
               const rowBg = overdue
                 ? "bg-red-50/50 dark:bg-red-950/20"
                 : hasError
-                ? "bg-amber-50/50 dark:bg-amber-950/20"
-                : "";
+                  ? "bg-amber-50/50 dark:bg-amber-950/20"
+                  : "";
 
               return (
                 <TableRow
@@ -945,34 +1120,38 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                         </span>
                       )}
                       {!isTracking && !hasError && fc.trackingProvider && (
-                        <span className="text-xs text-muted-foreground font-normal">
-                          via {fc.trackingProvider}
-                        </span>
+                        <span className="text-xs text-muted-foreground font-normal">via {fc.trackingProvider}</span>
                       )}
                       {(fc.trackingDetectedCarrier || fc.trackingCarrierHint) && (
                         <span className="text-xs text-muted-foreground font-normal">
-                          {fc.trackingCarrierHint
-                            ? <>hint: <span className="font-medium">{fc.trackingCarrierHint}</span></>
-                            : <>carrier: {fc.trackingDetectedCarrier}</>}
+                          {fc.trackingCarrierHint ? (
+                            <>
+                              hint: <span className="font-medium">{fc.trackingCarrierHint}</span>
+                            </>
+                          ) : (
+                            <>carrier: {fc.trackingDetectedCarrier}</>
+                          )}
                         </span>
                       )}
                       {fc.trackingLastCheckedAt && (
                         <span className="text-xs text-muted-foreground font-normal">
-                          {new Date(fc.trackingLastCheckedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                          {new Date(fc.trackingLastCheckedAt).toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
                         </span>
                       )}
                       {!isValidNum && (
                         <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                          <AlertTriangle className="h-3 w-3" />Invalid format
+                          <AlertTriangle className="h-3 w-3" />
+                          Invalid format
                         </span>
                       )}
                     </div>
                   </TableCell>
 
                   {/* Supplier */}
-                  <TableCell>
-                    {fc.supplierName ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
+                  <TableCell>{fc.supplierName ?? <span className="text-muted-foreground">—</span>}</TableCell>
 
                   {/* ETA */}
                   <TableCell onClick={(e) => e.stopPropagation()}>
@@ -981,41 +1160,59 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
 
                   {/* Cost */}
                   <TableCell className="text-right font-medium">
-                    {cost.amount > 0 ? fmtAmt(cost.symbol, cost.amount) : <span className="text-muted-foreground">—</span>}
+                    {cost.amount > 0 ? (
+                      fmtAmt(cost.symbol, cost.amount)
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
 
                   {/* Freight */}
                   <TableCell className="text-right text-muted-foreground">
-                    {num(c.freight) > 0 ? fmtAmt(frSym, num(c.freight)) : <span className="text-muted-foreground">—</span>}
+                    {num(c.freight) > 0 ? (
+                      fmtAmt(frSym, num(c.freight))
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
 
                   {/* Commission */}
                   <TableCell className="text-right text-muted-foreground">
-                    {num(c.commissionAmount) > 0 ? fmtAmt(commSym, num(c.commissionAmount)) : <span className="text-muted-foreground">—</span>}
+                    {num(c.commissionAmount) > 0 ? (
+                      fmtAmt(commSym, num(c.commissionAmount))
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
 
                   {/* Duty */}
                   <TableCell className="text-right text-muted-foreground">
-                    {num(c.dutyAmount) > 0 ? fmtAmt(dutySym, num(c.dutyAmount)) : <span className="text-muted-foreground">—</span>}
+                    {num(c.dutyAmount) > 0 ? (
+                      fmtAmt(dutySym, num(c.dutyAmount))
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
 
                   {/* Location */}
-                  <TableCell>
-                    {location ?? <span className="text-muted-foreground">—</span>}
-                  </TableCell>
+                  <TableCell>{location ?? <span className="text-muted-foreground">—</span>}</TableCell>
 
                   {/* Weight */}
                   <TableCell className="text-muted-foreground">
-                    {c.totalKg
-                      ? Number(c.totalKg).toLocaleString(undefined, { maximumFractionDigits: 0 })
-                      : <span>—</span>}
+                    {c.totalKg ? (
+                      Number(c.totalKg).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                    ) : (
+                      <span>—</span>
+                    )}
                   </TableCell>
 
                   {/* Delayed */}
                   <TableCell>
-                    {delayDays > 0
-                      ? <span className="text-red-600 dark:text-red-400 font-medium">-{delayDays}d</span>
-                      : <span className="text-muted-foreground">—</span>}
+                    {delayDays > 0 ? (
+                      <span className="text-red-600 dark:text-red-400 font-medium">-{delayDays}d</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
 
                   {/* Docs */}
@@ -1039,7 +1236,12 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                       {onEdit && (
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => onEdit(c)} data-testid={`button-otw-edit-${c.id}`}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onEdit(c)}
+                              data-testid={`button-otw-edit-${c.id}`}
+                            >
                               <Pencil className="h-3.5 w-3.5" />
                             </Button>
                           </TooltipTrigger>
@@ -1048,7 +1250,12 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                       )}
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={() => setSettingsContainer(c)} data-testid={`button-otw-settings-${c.id}`}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSettingsContainer(c)}
+                            data-testid={`button-otw-settings-${c.id}`}
+                          >
                             <Settings2 className="h-3.5 w-3.5" />
                           </Button>
                         </TooltipTrigger>
@@ -1063,7 +1270,11 @@ export default function FactoryOtwTrackingTab({ onEdit }: OtwTrackingTabProps = 
                             onClick={() => trackNowMutation.mutate(c.id)}
                             data-testid={`button-otw-track-now-${c.id}`}
                           >
-                            {isTracking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                            {isTracking ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-3.5 w-3.5" />
+                            )}
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>

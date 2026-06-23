@@ -1,82 +1,116 @@
-  import { useState, useEffect, useRef } from "react";
-  import { useConnectivity } from "@/contexts/ConnectivityContext";
-  import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
-  import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
-  import { useForm } from "react-hook-form";
-  import { zodResolver } from "@hookform/resolvers/zod";
-  import { z } from "zod";
-  import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-  import { Button } from "@/components/ui/button";
-  import { Input } from "@/components/ui/input";
-  import { Label } from "@/components/ui/label";
-  import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-  } from "@/components/ui/dialog";
-  import { Alert, AlertDescription } from "@/components/ui/alert";
-  import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-  } from "@/components/ui/alert-dialog";
-  import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-  } from "@/components/ui/form";
-  import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-  } from "@/components/ui/select";
-  import { Checkbox } from "@/components/ui/checkbox";
-  import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from "@/components/ui/table";
-  import { Badge } from "@/components/ui/badge";
-  import { Skeleton } from "@/components/ui/skeleton";
-  import { Switch } from "@/components/ui/switch";
-  
-  import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect, useRef } from "react";
+import { useConnectivity } from "@/contexts/ConnectivityContext";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+
+import { useToast } from "@/hooks/use-toast";
 import { StockItemAutocomplete } from "@/components/StockItemAutocomplete";
-  import { useMutation, useQuery } from "@tanstack/react-query";
-  import { queryClient, apiRequest } from "@/lib/queryClient";
-  import { useAppMode } from "@/contexts/AppModeContext";
-  import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
-  import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, TrendingDown, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers, FileSpreadsheet, FileDown, RotateCcw, Search } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  Plus,
+  Edit,
+  Building2,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  CalendarRange,
+  Settings2,
+  Wrench,
+  MapPin,
+  ChevronRight,
+  Bot,
+  MessageCircle,
+  RefreshCw,
+  Calculator,
+  Loader2,
+  Shield,
+  AlertTriangle,
+  PieChart,
+  Key,
+  Lock,
+  Package,
+  Eye,
+  History,
+  Clock,
+  Upload,
+  Download,
+  Database,
+  TrendingUp,
+  TrendingDown,
+  ShoppingCart,
+  Check,
+  X,
+  Copy,
+  ExternalLink,
+  ArrowLeftRight,
+  WifiOff,
+  Wifi,
+  CheckCircle2,
+  Printer,
+  Layers,
+  FileSpreadsheet,
+  FileDown,
+  RotateCcw,
+  Search,
+} from "lucide-react";
 import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
-  import { Link } from "wouter";
-  import { useDateFormat } from "@/contexts/DateFormatContext";
-  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, FEATURE_PAGE_INFO, type FeatureKey } from "@shared/schema";
-  import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
-  import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
+import { Link } from "wouter";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import {
+  insertUserSchema,
+  insertCompanySchema,
+  insertUserCompanyRoleSchema,
+  FEATURE_KEYS,
+  FEATURE_PAGE_INFO,
+  type FeatureKey,
+} from "@shared/schema";
+import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
+import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
 import { BulkRenameTab } from "./BulkRenameTab";
-  import { useCompany } from "@/contexts/CompanyContext";
-  import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
-  import { formatNumber } from "@/lib/formatNumber";
-  
+import { useCompany } from "@/contexts/CompanyContext";
+import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
+import { formatNumber } from "@/lib/formatNumber";
+
 interface SilentImportRow {
   rawCode: string;
   rawName: string;
@@ -86,40 +120,39 @@ interface SilentImportRow {
   change: number;
   newQty: number;
   rate: number;
-  status: 'ok' | 'not_found' | 'to_zero';
+  status: "ok" | "not_found" | "to_zero";
 }
 
-  const userFormSchema = insertUserSchema;
-  const companyFormSchema = insertCompanySchema;
-  const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
-    (data) => {
-      // If role is POS, assignedLocationId must be present
-      if (data.role === "POS" && !data.assignedLocationId) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "POS roles require an assigned location",
-      path: ["assignedLocationId"],
+const userFormSchema = insertUserSchema;
+const companyFormSchema = insertCompanySchema;
+const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+  (data) => {
+    // If role is POS, assignedLocationId must be present
+    if (data.role === "POS" && !data.assignedLocationId) {
+      return false;
     }
-  );
-  
-  type UserFormData = z.infer<typeof userFormSchema>;
-  type CompanyFormData = z.infer<typeof companyFormSchema>;
-  type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+    return true;
+  },
+  {
+    message: "POS roles require an assigned location",
+    path: ["assignedLocationId"],
+  }
+);
 
+type UserFormData = z.infer<typeof userFormSchema>;
+type CompanyFormData = z.infer<typeof companyFormSchema>;
+type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export function DataToolsTab() {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
   const appMode = useAppMode();
   const modeApiRequest = getApiRequest(appMode);
-  
+
   // Separate location selection for each import operation
   const [costPriceLocationId, setCostPriceLocationId] = useState<string>("");
   const [stockLocationId, setStockLocationId] = useState<string>("");
-  
+
   // Cost price import state
   const [costPriceImportOpen, setCostPriceImportOpen] = useState(false);
   const [costPriceFile, setCostPriceFile] = useState<File | null>(null);
@@ -131,7 +164,9 @@ export function DataToolsTab() {
   // Stock import state
   const [stockImportOpen, setStockImportOpen] = useState(false);
   const [stockFile, setStockFile] = useState<File | null>(null);
-  const [stockPreview, setStockPreview] = useState<Array<{ Item_barcode: string; stockGroupCode?: string; quantity: string; rate: string; value: string }>>([]);
+  const [stockPreview, setStockPreview] = useState<
+    Array<{ Item_barcode: string; stockGroupCode?: string; quantity: string; rate: string; value: string }>
+  >([]);
   const [stockErrors, setStockErrors] = useState<string[]>([]);
   const [isImportingStock, setIsImportingStock] = useState(false);
   const [stockImportComplete, setStockImportComplete] = useState(false);
@@ -143,7 +178,9 @@ export function DataToolsTab() {
   const [silentProdOpen, setSilentProdOpen] = useState(false);
   const [silentProdType, setSilentProdType] = useState<"Production" | "Consumption">("Production");
   const [silentProdLocId, setSilentProdLocId] = useState("");
-  const [silentProdItems, setSilentProdItems] = useState<{ stockItemId: string; stockItemName: string; quantity: string; rate: string; currentQty: number }[]>([{ stockItemId: "", stockItemName: "", quantity: "", rate: "", currentQty: 0 }]);
+  const [silentProdItems, setSilentProdItems] = useState<
+    { stockItemId: string; stockItemName: string; quantity: string; rate: string; currentQty: number }[]
+  >([{ stockItemId: "", stockItemName: "", quantity: "", rate: "", currentQty: 0 }]);
   const [silentProdSearchTerm, setSilentProdSearchTerm] = useState("");
   const [silentProdApplying, setSilentProdApplying] = useState(false);
   const [silentProdDone, setSilentProdDone] = useState(0);
@@ -172,7 +209,6 @@ export function DataToolsTab() {
   // Bulk rename dialog state
   const [bulkRenameOpen, setBulkRenameOpen] = useState(false);
 
-
   // Fetch locations for the current company
   const { data: locations = [] } = useQuery<any[]>({
     queryKey: ["/api/locations", selectedCompany?.id],
@@ -186,9 +222,14 @@ export function DataToolsTab() {
   });
 
   // Fetch location inventory for silent prod (manual + import modes)
-  const { data: silentLocInventory = [], isLoading: silentLocInventoryLoading } = useQuery<{
-    stockItemId: number; stockItemName: string; stockItemCode: string; quantity: string
-  }[]>({
+  const { data: silentLocInventory = [], isLoading: silentLocInventoryLoading } = useQuery<
+    {
+      stockItemId: number;
+      stockItemName: string;
+      stockItemCode: string;
+      quantity: string;
+    }[]
+  >({
     queryKey: ["/api/inventory-by-location", silentProdLocId],
     queryFn: async () => {
       if (!silentProdLocId) return [];
@@ -260,8 +301,8 @@ export function DataToolsTab() {
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["barcode", "costPrice"];
-      const missingCols = requiredCols.filter(col => !columns.includes(col));
-      
+      const missingCols = requiredCols.filter((col) => !columns.includes(col));
+
       if (missingCols.length > 0) {
         toast({
           title: "Missing Required Columns",
@@ -368,8 +409,8 @@ export function DataToolsTab() {
       const headerRow = utils.sheet_to_json<string[]>(worksheet, { header: 1 })[0] || [];
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const requiredCols = ["Item_barcode", "quantity", "rate", "value"];
-      const missingCols = requiredCols.filter(col => !columns.includes(col));
-      
+      const missingCols = requiredCols.filter((col) => !columns.includes(col));
+
       if (missingCols.length > 0) {
         toast({
           title: "Missing Required Columns",
@@ -380,7 +421,13 @@ export function DataToolsTab() {
       }
 
       const errors: string[] = [];
-      const rows: Array<{ Item_barcode: string; stockGroupCode?: string; quantity: string; rate: string; value: string }> = [];
+      const rows: Array<{
+        Item_barcode: string;
+        stockGroupCode?: string;
+        quantity: string;
+        rate: string;
+        value: string;
+      }> = [];
 
       jsonData.forEach((row: any, index: number) => {
         const rowNumber = index + 2;
@@ -481,28 +528,61 @@ export function DataToolsTab() {
     try {
       const wb = await readFile(file);
       const ws = wb.getWorksheet(1);
-      if (!ws) { toast({ title: "Error", description: "Could not read worksheet", variant: "destructive" }); return; }
-      const rows = utils.sheet_to_json<{ Code?: any; Name?: any; "Qty Change"?: any; "Item Name"?: any; Change?: any; Rate?: any }>(ws);
+      if (!ws) {
+        toast({ title: "Error", description: "Could not read worksheet", variant: "destructive" });
+        return;
+      }
+      const rows = utils.sheet_to_json<{
+        Code?: any;
+        Name?: any;
+        "Qty Change"?: any;
+        "Item Name"?: any;
+        Change?: any;
+        Rate?: any;
+      }>(ws);
 
       const preview: SilentImportRow[] = rows
-        .filter(row => row.Code !== undefined || row.Name !== undefined || row["Item Name"] !== undefined)
-        .map(row => {
+        .filter((row) => row.Code !== undefined || row.Name !== undefined || row["Item Name"] !== undefined)
+        .map((row) => {
           const code = String(row.Code ?? "").trim();
           const name = String(row.Name ?? row["Item Name"] ?? "").trim();
           const change = parseFloat(String(row["Qty Change"] ?? row.Change ?? "0")) || 0;
           const rate = parseFloat(String(row.Rate ?? "0")) || 0;
 
-          let matched: any = code ? (allStockItems as any[]).find((s: any) => s.code?.toLowerCase() === code.toLowerCase()) : undefined;
-          if (!matched && name) matched = (allStockItems as any[]).find((s: any) => s.name.toLowerCase() === name.toLowerCase());
+          let matched: any = code
+            ? (allStockItems as any[]).find((s: any) => s.code?.toLowerCase() === code.toLowerCase())
+            : undefined;
+          if (!matched && name)
+            matched = (allStockItems as any[]).find((s: any) => s.name.toLowerCase() === name.toLowerCase());
 
           if (!matched) {
-            return { rawCode: code, rawName: name, stockItemId: null, stockItemName: name || code || "Unknown", currentQty: 0, change, newQty: Math.max(0, change), rate, status: "not_found" as const };
+            return {
+              rawCode: code,
+              rawName: name,
+              stockItemId: null,
+              stockItemName: name || code || "Unknown",
+              currentQty: 0,
+              change,
+              newQty: Math.max(0, change),
+              rate,
+              status: "not_found" as const,
+            };
           }
 
           const currentQty = getCurrentQty(matched.id);
           const newQty = currentQty + change;
           const status: SilentImportRow["status"] = newQty <= 0 ? "to_zero" : "ok";
-          return { rawCode: code, rawName: name, stockItemId: matched.id, stockItemName: matched.name, currentQty, change, newQty: Math.max(0, newQty), rate, status };
+          return {
+            rawCode: code,
+            rawName: name,
+            stockItemId: matched.id,
+            stockItemName: matched.name,
+            currentQty,
+            change,
+            newQty: Math.max(0, newQty),
+            rate,
+            status,
+          };
         });
 
       setSilentImportPreview(preview);
@@ -518,7 +598,7 @@ export function DataToolsTab() {
     const ws = wb.addWorksheet("Adjustment");
     ws.addRow(["Item Name", "Qty"]);
     ws.getRow(1).font = { bold: true };
-    for (const row of silentImportPreview.filter(r => r.status !== "not_found")) {
+    for (const row of silentImportPreview.filter((r) => r.status !== "not_found")) {
       ws.addRow([row.stockItemName, row.newQty]);
     }
     ws.getColumn(1).width = 36;
@@ -533,16 +613,29 @@ export function DataToolsTab() {
     doc.setFontSize(14);
     doc.text("Silent Adjustment Preview", 14, 18);
     doc.setFontSize(10);
-    doc.text(`Location: ${(locations as any[]).find((l: any) => String(l.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`, 14, 25);
-    const rows = silentImportPreview.filter(r => r.status !== "not_found").map((r, i) => [i + 1, r.stockItemName, r.newQty]);
-    autoTable(doc, { startY: 30, head: [["#", "Item Name", "New Qty"]], body: rows, styles: { fontSize: 9 }, headStyles: { fillColor: [30, 30, 30] }, columnStyles: { 0: { cellWidth: 12 }, 2: { cellWidth: 22, halign: "right" } } });
+    doc.text(
+      `Location: ${(locations as any[]).find((l: any) => String(l.id) === silentProdLocId)?.name || ""}   Date: ${new Date().toLocaleDateString()}`,
+      14,
+      25
+    );
+    const rows = silentImportPreview
+      .filter((r) => r.status !== "not_found")
+      .map((r, i) => [i + 1, r.stockItemName, r.newQty]);
+    autoTable(doc, {
+      startY: 30,
+      head: [["#", "Item Name", "New Qty"]],
+      body: rows,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [30, 30, 30] },
+      columnStyles: { 0: { cellWidth: 12 }, 2: { cellWidth: 22, halign: "right" } },
+    });
     doc.save("silent_adjustment_preview.pdf");
   };
 
   const applySilentImport = async () => {
-    const valid = silentImportPreview.filter(r => r.stockItemId !== null && r.status !== "not_found");
-    const productions = valid.filter(r => r.change > 0);
-    const consumptions = valid.filter(r => r.change < 0);
+    const valid = silentImportPreview.filter((r) => r.stockItemId !== null && r.status !== "not_found");
+    const productions = valid.filter((r) => r.change > 0);
+    const consumptions = valid.filter((r) => r.change < 0);
     if (valid.length === 0) return;
     setSilentProdApplying(true);
     try {
@@ -551,7 +644,11 @@ export function DataToolsTab() {
         const res = await apiRequest("POST", "/api/inventory/silent-production", {
           locationId: silentProdLocId,
           type: "Production",
-          items: productions.map(r => ({ stockItemId: String(r.stockItemId), quantity: String(Math.abs(r.change)), rate: String(r.rate) })),
+          items: productions.map((r) => ({
+            stockItemId: String(r.stockItemId),
+            quantity: String(Math.abs(r.change)),
+            rate: String(r.rate),
+          })),
         });
         const d = await res.json();
         totalApplied += d.applied || productions.length;
@@ -560,7 +657,11 @@ export function DataToolsTab() {
         const res = await apiRequest("POST", "/api/inventory/silent-production", {
           locationId: silentProdLocId,
           type: "Consumption",
-          items: consumptions.map(r => ({ stockItemId: String(r.stockItemId), quantity: String(Math.abs(r.change)), rate: "0" })),
+          items: consumptions.map((r) => ({
+            stockItemId: String(r.stockItemId),
+            quantity: String(Math.abs(r.change)),
+            rate: "0",
+          })),
         });
         const d = await res.json();
         totalApplied += d.applied || consumptions.length;
@@ -584,9 +685,7 @@ export function DataToolsTab() {
           <Database className="h-5 w-5" />
           <h2 className="text-2xl font-semibold">Data Tools</h2>
         </div>
-        <p className="text-muted-foreground">
-          Please select a company to access data tools.
-        </p>
+        <p className="text-muted-foreground">Please select a company to access data tools.</p>
       </div>
     );
   }
@@ -597,9 +696,7 @@ export function DataToolsTab() {
         <Database className="h-5 w-5" />
         <h2 className="text-2xl font-semibold">Data Tools</h2>
       </div>
-      <p className="text-muted-foreground">
-        Administrative utilities for bulk data operations and maintenance tasks.
-      </p>
+      <p className="text-muted-foreground">Administrative utilities for bulk data operations and maintenance tasks.</p>
 
       {appMode === "factory" && (
         <Card>
@@ -634,9 +731,7 @@ export function DataToolsTab() {
               <Package className="h-4 w-4" />
               Import Stock
             </CardTitle>
-            <CardDescription>
-              Bulk import inventory quantities from Excel file
-            </CardDescription>
+            <CardDescription>Bulk import inventory quantities from Excel file</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -647,7 +742,9 @@ export function DataToolsTab() {
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc: any) => (
-                    <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                    <SelectItem key={loc.id} value={String(loc.id)}>
+                      {loc.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -672,9 +769,7 @@ export function DataToolsTab() {
               <Calculator className="h-4 w-4" />
               Fix Cost Prices
             </CardTitle>
-            <CardDescription>
-              Recalculate sales cost prices based on inventory records
-            </CardDescription>
+            <CardDescription>Recalculate sales cost prices based on inventory records</CardDescription>
           </CardHeader>
           <CardContent>
             <Button
@@ -697,15 +792,22 @@ export function DataToolsTab() {
               <ArrowLeftRight className="h-4 w-4" />
               Silent Stock Transfer
             </CardTitle>
-            <CardDescription>
-              Move stock between locations via Excel upload — no daybook entry created
-            </CardDescription>
+            <CardDescription>Move stock between locations via Excel upload — no daybook entry created</CardDescription>
           </CardHeader>
           <CardContent>
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => { setSilentStep("setup"); setSilentValidItems([]); setSilentWarnItems([]); setSilentErrorLines([]); setSilentParseError(""); setSilentFile(null); setSilentAppliedCount(0); setSilentTransferOpen(true); }}
+              onClick={() => {
+                setSilentStep("setup");
+                setSilentValidItems([]);
+                setSilentWarnItems([]);
+                setSilentErrorLines([]);
+                setSilentParseError("");
+                setSilentFile(null);
+                setSilentAppliedCount(0);
+                setSilentTransferOpen(true);
+              }}
               data-testid="button-open-silent-transfer"
             >
               <ArrowLeftRight className="h-4 w-4 mr-2" />
@@ -730,7 +832,16 @@ export function DataToolsTab() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => { setSilentProdType("Production"); setSilentProdLocId(""); setSilentProdItems([{ stockItemId: "", stockItemName: "", quantity: "", rate: "", currentQty: 0 }]); setSilentProdSearchTerm(""); setSilentProdDone(0); setSilentImportMode(false); setSilentImportPreview([]); setSilentProdOpen(true); }}
+                onClick={() => {
+                  setSilentProdType("Production");
+                  setSilentProdLocId("");
+                  setSilentProdItems([{ stockItemId: "", stockItemName: "", quantity: "", rate: "", currentQty: 0 }]);
+                  setSilentProdSearchTerm("");
+                  setSilentProdDone(0);
+                  setSilentImportMode(false);
+                  setSilentImportPreview([]);
+                  setSilentProdOpen(true);
+                }}
                 data-testid="button-open-silent-production"
               >
                 <Package className="h-4 w-4 mr-2" />
@@ -741,40 +852,42 @@ export function DataToolsTab() {
         )}
 
         {/* Bulk Rename Stock Items — Admin/Owner/Developer */}
-        {appMode !== "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && selectedCompany && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Edit className="h-4 w-4" />
-                Bulk Rename Stock Items
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Find and replace text across multiple stock item names at once.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setBulkRenameOpen(true)}
-                data-testid="button-open-bulk-rename"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Open Bulk Rename
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        {appMode !== "factory" &&
+          ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") &&
+          selectedCompany && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Edit className="h-4 w-4" />
+                  Bulk Rename Stock Items
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Find and replace text across multiple stock item names at once.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setBulkRenameOpen(true)}
+                  data-testid="button-open-bulk-rename"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Open Bulk Rename
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
         {/* Merge Stock Items — Single card, dialog with tabs */}
-        {appMode !== "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && selectedCompany && (
-          <MergeStockItemsLauncher />
-        )}
+        {appMode !== "factory" &&
+          ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") &&
+          selectedCompany && <MergeStockItemsLauncher />}
 
         {/* Reconcile OTW Names */}
-        {appMode !== "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && selectedCompany && (
-          <ReconcileOTWNamesCard />
-        )}
+        {appMode !== "factory" &&
+          ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") &&
+          selectedCompany && <ReconcileOTWNamesCard />}
 
         {/* Merge Bale Products — factory mode, Admin/Owner/Developer */}
         {appMode === "factory" && ["Admin", "Owner", "Developer"].includes(dtCurrentUser?.role || "") && (
@@ -785,7 +898,8 @@ export function DataToolsTab() {
                 Merge Bale Products
               </CardTitle>
               <CardDescription>
-                Combine duplicate bale product entries — all bales from the selected items move to the one you keep, and the duplicates are deactivated
+                Combine duplicate bale product entries — all bales from the selected items move to the one you keep, and
+                the duplicates are deactivated
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -802,7 +916,15 @@ export function DataToolsTab() {
 
       {/* Silent Production / Consumption Dialog */}
       {dtCurrentUser?.role === "Developer" && appMode !== "factory" && (
-        <Dialog open={silentProdOpen} onOpenChange={(o) => { if (!silentProdApplying) { if (!o) setSilentProdSearchTerm(""); setSilentProdOpen(o); } }}>
+        <Dialog
+          open={silentProdOpen}
+          onOpenChange={(o) => {
+            if (!silentProdApplying) {
+              if (!o) setSilentProdSearchTerm("");
+              setSilentProdOpen(o);
+            }
+          }}
+        >
           <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Silent Production / Consumption</DialogTitle>
@@ -817,7 +939,13 @@ export function DataToolsTab() {
                   <Check className="h-5 w-5" />
                   <p className="font-semibold">Applied {silentProdDone} item(s) silently</p>
                 </div>
-                <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-close">Close</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setSilentProdOpen(false)}
+                  data-testid="button-silent-prod-close"
+                >
+                  Close
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
@@ -826,7 +954,10 @@ export function DataToolsTab() {
                   <Button
                     variant={!silentImportMode ? "default" : "outline"}
                     size="sm"
-                    onClick={() => { setSilentImportMode(false); setSilentImportPreview([]); }}
+                    onClick={() => {
+                      setSilentImportMode(false);
+                      setSilentImportPreview([]);
+                    }}
                     data-testid="button-mode-manual"
                   >
                     Manual Entry
@@ -834,7 +965,9 @@ export function DataToolsTab() {
                   <Button
                     variant={silentImportMode ? "default" : "outline"}
                     size="sm"
-                    onClick={() => { setSilentImportMode(true); }}
+                    onClick={() => {
+                      setSilentImportMode(true);
+                    }}
                     data-testid="button-mode-import"
                   >
                     <FileSpreadsheet className="h-3.5 w-3.5 mr-1" />
@@ -851,7 +984,9 @@ export function DataToolsTab() {
                     </SelectTrigger>
                     <SelectContent>
                       {(locations as any[]).map((loc: any) => (
-                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                        <SelectItem key={loc.id} value={String(loc.id)}>
+                          {loc.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -861,8 +996,22 @@ export function DataToolsTab() {
                   <>
                     {/* Type toggle — manual mode only */}
                     <div className="flex gap-2">
-                      <Button variant={silentProdType === "Production" ? "default" : "outline"} size="sm" onClick={() => setSilentProdType("Production")} data-testid="button-type-production">Production (+)</Button>
-                      <Button variant={silentProdType === "Consumption" ? "default" : "outline"} size="sm" onClick={() => setSilentProdType("Consumption")} data-testid="button-type-consumption">Consumption (−)</Button>
+                      <Button
+                        variant={silentProdType === "Production" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSilentProdType("Production")}
+                        data-testid="button-type-production"
+                      >
+                        Production (+)
+                      </Button>
+                      <Button
+                        variant={silentProdType === "Consumption" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSilentProdType("Consumption")}
+                        data-testid="button-type-consumption"
+                      >
+                        Consumption (−)
+                      </Button>
                     </div>
 
                     {/* Items table — stock-transfer style with search */}
@@ -890,17 +1039,21 @@ export function DataToolsTab() {
                               if (!term) {
                                 return (
                                   <div className="text-center text-sm text-muted-foreground py-4">
-                                    {silentLocInventoryLoading ? "Loading items…" : "Type above to search items at this location"}
+                                    {silentLocInventoryLoading
+                                      ? "Loading items…"
+                                      : "Type above to search items at this location"}
                                   </div>
                                 );
                               }
-                              const filtered = (allStockItems as any[]).filter((si: any) =>
-                                si.name.toLowerCase().includes(term) ||
-                                (si.code && si.code.toLowerCase().includes(term))
+                              const filtered = (allStockItems as any[]).filter(
+                                (si: any) =>
+                                  si.name.toLowerCase().includes(term) ||
+                                  (si.code && si.code.toLowerCase().includes(term))
                               );
-                              if (filtered.length === 0) return (
-                                <div className="text-center text-sm text-muted-foreground py-4">No items found</div>
-                              );
+                              if (filtered.length === 0)
+                                return (
+                                  <div className="text-center text-sm text-muted-foreground py-4">No items found</div>
+                                );
                               return filtered.map((si: any) => {
                                 const locRow = silentLocInventory.find((inv: any) => inv.stockItemId === si.id);
                                 const currentQty = locRow ? parseFloat(locRow.quantity || "0") : 0;
@@ -910,11 +1063,19 @@ export function DataToolsTab() {
                                     className="w-full text-left px-2 py-1.5 rounded-md hover-elevate active-elevate-2 flex items-center justify-between gap-2"
                                     onClick={() => {
                                       // Add to rows if not already present
-                                      const existingIdx = silentProdItems.findIndex(r => String(r.stockItemId) === String(si.id));
+                                      const existingIdx = silentProdItems.findIndex(
+                                        (r) => String(r.stockItemId) === String(si.id)
+                                      );
                                       if (existingIdx < 0) {
-                                        setSilentProdItems(prev => [
+                                        setSilentProdItems((prev) => [
                                           ...prev,
-                                          { stockItemId: String(si.id), stockItemName: si.name, quantity: "", rate: "", currentQty }
+                                          {
+                                            stockItemId: String(si.id),
+                                            stockItemName: si.name,
+                                            quantity: "",
+                                            rate: "",
+                                            currentQty,
+                                          },
                                         ]);
                                       }
                                       setSilentProdSearchTerm("");
@@ -923,15 +1084,19 @@ export function DataToolsTab() {
                                   >
                                     <div className="flex-1 min-w-0">
                                       <div className="text-sm font-medium truncate">{si.name}</div>
-                                      {si.code && <div className="text-xs text-muted-foreground font-mono">{si.code}</div>}
+                                      {si.code && (
+                                        <div className="text-xs text-muted-foreground font-mono">{si.code}</div>
+                                      )}
                                     </div>
-                                    <div className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                                      currentQty === 0
-                                        ? "bg-destructive/10 text-destructive"
-                                        : currentQty < 10
-                                        ? "bg-chart-3/10 text-chart-3"
-                                        : "bg-chart-2/10 text-chart-2"
-                                    }`}>
+                                    <div
+                                      className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                                        currentQty === 0
+                                          ? "bg-destructive/10 text-destructive"
+                                          : currentQty < 10
+                                            ? "bg-chart-3/10 text-chart-3"
+                                            : "bg-chart-2/10 text-chart-2"
+                                      }`}
+                                    >
                                       {currentQty.toFixed(0)}
                                     </div>
                                   </button>
@@ -960,7 +1125,10 @@ export function DataToolsTab() {
                                 />
                               </div>
                               <div className="col-span-2">
-                                <div className="text-right text-sm text-muted-foreground font-mono" data-testid={`text-current-qty-${idx}`}>
+                                <div
+                                  className="text-right text-sm text-muted-foreground font-mono"
+                                  data-testid={`text-current-qty-${idx}`}
+                                >
                                   {item.stockItemId ? (item.currentQty || 0).toFixed(0) : "-"}
                                 </div>
                                 <div className="text-right text-xs text-muted-foreground">Current</div>
@@ -972,21 +1140,36 @@ export function DataToolsTab() {
                                   step="0.001"
                                   placeholder={silentProdType === "Production" ? "+Qty" : "−Qty"}
                                   value={item.quantity}
-                                  onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, quantity: e.target.value } : r))}
+                                  onChange={(e) =>
+                                    setSilentProdItems((prev) =>
+                                      prev.map((r, i) => (i === idx ? { ...r, quantity: e.target.value } : r))
+                                    )
+                                  }
                                   data-testid={`input-silent-prod-qty-${idx}`}
                                   className="text-right"
                                 />
                               </div>
                               <div className="col-span-2">
-                                <div className={`text-right text-sm font-mono font-semibold ${
-                                  newQty < 0 ? "text-destructive" : "text-foreground"
-                                }`} data-testid={`text-new-qty-${idx}`}>
+                                <div
+                                  className={`text-right text-sm font-mono font-semibold ${
+                                    newQty < 0 ? "text-destructive" : "text-foreground"
+                                  }`}
+                                  data-testid={`text-new-qty-${idx}`}
+                                >
                                   {item.stockItemId && item.quantity ? newQty.toFixed(0) : "-"}
                                 </div>
                                 <div className="text-right text-xs text-muted-foreground">New</div>
                               </div>
                               <div className="col-span-1 flex justify-center">
-                                <Button size="icon" variant="ghost" onClick={() => setSilentProdItems(prev => prev.filter((_, i) => i !== idx))} disabled={silentProdItems.length === 1} data-testid={`button-remove-prod-row-${idx}`}><X className="h-4 w-4" /></Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  onClick={() => setSilentProdItems((prev) => prev.filter((_, i) => i !== idx))}
+                                  disabled={silentProdItems.length === 1}
+                                  data-testid={`button-remove-prod-row-${idx}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
                               </div>
                             </div>
                           );
@@ -994,43 +1177,99 @@ export function DataToolsTab() {
                       </div>
 
                       {/* Rate input shown for Production only */}
-                      {silentProdType === "Production" && silentProdItems.some(r => r.stockItemId) && (
+                      {silentProdType === "Production" && silentProdItems.some((r) => r.stockItemId) && (
                         <div className="space-y-1">
-                          {silentProdItems.map((item, idx) => (
-                            item.stockItemId && (
-                              <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                                <div className="col-span-5 text-sm text-muted-foreground truncate" data-testid={`text-rate-item-${idx}`}>{item.stockItemName}</div>
-                                <div className="col-span-3 col-start-6">
-                                  <Input type="number" placeholder="Rate" value={item.rate} onChange={(e) => setSilentProdItems(prev => prev.map((r, i) => i === idx ? { ...r, rate: e.target.value } : r))} data-testid={`input-silent-prod-rate-${idx}`} />
+                          {silentProdItems.map(
+                            (item, idx) =>
+                              item.stockItemId && (
+                                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                                  <div
+                                    className="col-span-5 text-sm text-muted-foreground truncate"
+                                    data-testid={`text-rate-item-${idx}`}
+                                  >
+                                    {item.stockItemName}
+                                  </div>
+                                  <div className="col-span-3 col-start-6">
+                                    <Input
+                                      type="number"
+                                      placeholder="Rate"
+                                      value={item.rate}
+                                      onChange={(e) =>
+                                        setSilentProdItems((prev) =>
+                                          prev.map((r, i) => (i === idx ? { ...r, rate: e.target.value } : r))
+                                        )
+                                      }
+                                      data-testid={`input-silent-prod-rate-${idx}`}
+                                    />
+                                  </div>
                                 </div>
-                              </div>
-                            )
-                          ))}
+                              )
+                          )}
                         </div>
                       )}
 
-                      <Button variant="outline" size="sm" onClick={() => setSilentProdItems(prev => [...prev, { stockItemId: "", stockItemName: "", quantity: "", rate: "", currentQty: 0 }])} data-testid="button-add-prod-row">
-                        <Plus className="h-4 w-4 mr-1" />Add Item
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setSilentProdItems((prev) => [
+                            ...prev,
+                            { stockItemId: "", stockItemName: "", quantity: "", rate: "", currentQty: 0 },
+                          ])
+                        }
+                        data-testid="button-add-prod-row"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Item
                       </Button>
                     </div>
 
                     <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-prod-cancel">Cancel</Button>
                       <Button
-                        disabled={!silentProdLocId || silentProdItems.every(r => !r.stockItemId || !r.quantity) || silentProdApplying}
+                        variant="outline"
+                        onClick={() => setSilentProdOpen(false)}
+                        data-testid="button-silent-prod-cancel"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        disabled={
+                          !silentProdLocId ||
+                          silentProdItems.every((r) => !r.stockItemId || !r.quantity) ||
+                          silentProdApplying
+                        }
                         onClick={async () => {
-                          const validItems = silentProdItems.filter(r => r.stockItemId && r.quantity);
+                          const validItems = silentProdItems.filter((r) => r.stockItemId && r.quantity);
                           if (!silentProdLocId || validItems.length === 0) return;
                           setSilentProdApplying(true);
                           try {
-                            const res = await apiRequest("POST", "/api/inventory/silent-production", { locationId: silentProdLocId, type: silentProdType, items: validItems.map(r => ({ stockItemId: r.stockItemId, quantity: r.quantity, rate: r.rate || "0" })) });
+                            const res = await apiRequest("POST", "/api/inventory/silent-production", {
+                              locationId: silentProdLocId,
+                              type: silentProdType,
+                              items: validItems.map((r) => ({
+                                stockItemId: r.stockItemId,
+                                quantity: r.quantity,
+                                rate: r.rate || "0",
+                              })),
+                            });
                             const data = await res.json();
                             setSilentProdDone(data.applied || validItems.length);
-                          } catch (err: any) { console.error("Silent production error:", err); } finally { setSilentProdApplying(false); }
+                          } catch (err: any) {
+                            console.error("Silent production error:", err);
+                          } finally {
+                            setSilentProdApplying(false);
+                          }
                         }}
                         data-testid="button-silent-prod-apply"
                       >
-                        {silentProdApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</> : `Apply ${silentProdType}`}
+                        {silentProdApplying ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Applying...
+                          </>
+                        ) : (
+                          `Apply ${silentProdType}`
+                        )}
                       </Button>
                     </div>
                   </>
@@ -1038,25 +1277,56 @@ export function DataToolsTab() {
                   /* Import from Excel mode */
                   <div className="space-y-3">
                     <p className="text-sm text-muted-foreground">
-                      Upload an Excel file with <strong>Code</strong>, <strong>Name</strong>, <strong>Qty Change</strong>, <strong>Rate</strong> columns.
-                      Positive qty = Production (+), Negative qty = Consumption (−). Both can be in the same file.
+                      Upload an Excel file with <strong>Code</strong>, <strong>Name</strong>,{" "}
+                      <strong>Qty Change</strong>, <strong>Rate</strong> columns. Positive qty = Production (+),
+                      Negative qty = Consumption (−). Both can be in the same file.
                     </p>
 
                     {silentImportPreview.length === 0 ? (
                       <div className="space-y-3">
-                        <Button variant="outline" size="sm" onClick={downloadSilentTemplate} data-testid="button-download-silent-template">
-                          <FileDown className="h-4 w-4 mr-1" />Download Template
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={downloadSilentTemplate}
+                          data-testid="button-download-silent-template"
+                        >
+                          <FileDown className="h-4 w-4 mr-1" />
+                          Download Template
                         </Button>
                         <label
                           className="flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-md p-8 cursor-pointer hover-elevate text-muted-foreground"
                           data-testid="label-silent-import-dropzone"
-                          onDragOver={e => e.preventDefault()}
-                          onDrop={e => { e.preventDefault(); if (!silentProdLocId) { toast({ title: "Select a location first", variant: "destructive" }); return; } const f = e.dataTransfer.files[0]; if (f) handleSilentImportFile(f); }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (!silentProdLocId) {
+                              toast({ title: "Select a location first", variant: "destructive" });
+                              return;
+                            }
+                            const f = e.dataTransfer.files[0];
+                            if (f) handleSilentImportFile(f);
+                          }}
                         >
-                          <input ref={silentImportFileRef} type="file" accept=".xlsx,.xls" className="hidden" data-testid="input-silent-import-file"
-                            onChange={e => { if (!silentProdLocId) { toast({ title: "Select a location first", variant: "destructive" }); return; } const f = e.target.files?.[0]; if (f) handleSilentImportFile(f); e.target.value = ""; }} />
+                          <input
+                            ref={silentImportFileRef}
+                            type="file"
+                            accept=".xlsx,.xls"
+                            className="hidden"
+                            data-testid="input-silent-import-file"
+                            onChange={(e) => {
+                              if (!silentProdLocId) {
+                                toast({ title: "Select a location first", variant: "destructive" });
+                                return;
+                              }
+                              const f = e.target.files?.[0];
+                              if (f) handleSilentImportFile(f);
+                              e.target.value = "";
+                            }}
+                          />
                           <Upload className="h-8 w-8 opacity-40" />
-                          <span className="text-sm font-medium">{silentImportLoading ? "Parsing…" : "Click or drag & drop Excel file"}</span>
+                          <span className="text-sm font-medium">
+                            {silentImportLoading ? "Parsing…" : "Click or drag & drop Excel file"}
+                          </span>
                           <span className="text-xs">.xlsx / .xls — select a location first</span>
                         </label>
                       </div>
@@ -1064,14 +1334,50 @@ export function DataToolsTab() {
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex gap-3 text-xs font-medium">
-                            <span className="text-emerald-600 dark:text-emerald-400">{silentImportPreview.filter(r => r.change > 0 && r.status !== 'not_found').length} production</span>
-                            <span className="text-destructive">{silentImportPreview.filter(r => r.change < 0 && r.status !== 'not_found').length} consumption</span>
-                            {silentImportPreview.filter(r => r.status === 'not_found').length > 0 && <span className="text-muted-foreground">{silentImportPreview.filter(r => r.status === 'not_found').length} unmatched</span>}
+                            <span className="text-emerald-600 dark:text-emerald-400">
+                              {silentImportPreview.filter((r) => r.change > 0 && r.status !== "not_found").length}{" "}
+                              production
+                            </span>
+                            <span className="text-destructive">
+                              {silentImportPreview.filter((r) => r.change < 0 && r.status !== "not_found").length}{" "}
+                              consumption
+                            </span>
+                            {silentImportPreview.filter((r) => r.status === "not_found").length > 0 && (
+                              <span className="text-muted-foreground">
+                                {silentImportPreview.filter((r) => r.status === "not_found").length} unmatched
+                              </span>
+                            )}
                           </div>
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={exportSilentExcel} data-testid="button-export-silent-excel"><FileDown className="h-3 w-3 mr-1" />Excel</Button>
-                            <Button variant="outline" size="sm" onClick={exportSilentPDF} data-testid="button-export-silent-pdf"><FileDown className="h-3 w-3 mr-1" />PDF</Button>
-                            <Button variant="ghost" size="sm" onClick={() => { setSilentImportPreview([]); if (silentImportFileRef.current) silentImportFileRef.current.value = ""; }} data-testid="button-clear-silent-import">Clear</Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={exportSilentExcel}
+                              data-testid="button-export-silent-excel"
+                            >
+                              <FileDown className="h-3 w-3 mr-1" />
+                              Excel
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={exportSilentPDF}
+                              data-testid="button-export-silent-pdf"
+                            >
+                              <FileDown className="h-3 w-3 mr-1" />
+                              PDF
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSilentImportPreview([]);
+                                if (silentImportFileRef.current) silentImportFileRef.current.value = "";
+                              }}
+                              data-testid="button-clear-silent-import"
+                            >
+                              Clear
+                            </Button>
                           </div>
                         </div>
 
@@ -1088,20 +1394,38 @@ export function DataToolsTab() {
                               </thead>
                               <tbody>
                                 {silentImportPreview.map((row, idx) => (
-                                  <tr key={idx} className={`border-t ${row.status === 'not_found' ? 'opacity-50' : ''}`}>
+                                  <tr
+                                    key={idx}
+                                    className={`border-t ${row.status === "not_found" ? "opacity-50" : ""}`}
+                                  >
                                     <td className="p-2">
                                       <p className="font-medium truncate max-w-[220px]">{row.stockItemName}</p>
-                                      {row.status === 'not_found' && <p className="text-xs text-destructive">Not found — skipped</p>}
-                                      {row.status === 'to_zero' && <p className="text-xs text-amber-600 dark:text-amber-400">Will reach 0</p>}
+                                      {row.status === "not_found" && (
+                                        <p className="text-xs text-destructive">Not found — skipped</p>
+                                      )}
+                                      {row.status === "to_zero" && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400">Will reach 0</p>
+                                      )}
                                     </td>
-                                    <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(row.currentQty, 0)}</td>
-                                    <td className={`p-2 text-right font-mono font-semibold ${row.change > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                                    <td className="p-2 text-right font-mono text-muted-foreground">
+                                      {formatNumber(row.currentQty, 0)}
+                                    </td>
+                                    <td
+                                      className={`p-2 text-right font-mono font-semibold ${row.change > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
+                                    >
                                       <span className="inline-flex items-center gap-0.5 justify-end">
-                                        {row.change > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                                        {row.change > 0 ? "+" : ""}{formatNumber(row.change, 0)}
+                                        {row.change > 0 ? (
+                                          <TrendingUp className="h-3 w-3" />
+                                        ) : (
+                                          <TrendingDown className="h-3 w-3" />
+                                        )}
+                                        {row.change > 0 ? "+" : ""}
+                                        {formatNumber(row.change, 0)}
                                       </span>
                                     </td>
-                                    <td className="p-2 text-right font-mono font-semibold">{row.status !== 'not_found' ? formatNumber(row.newQty, 0) : "—"}</td>
+                                    <td className="p-2 text-right font-mono font-semibold">
+                                      {row.status !== "not_found" ? formatNumber(row.newQty, 0) : "—"}
+                                    </td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -1110,13 +1434,30 @@ export function DataToolsTab() {
                         </div>
 
                         <div className="flex gap-2">
-                          <Button variant="outline" onClick={() => setSilentProdOpen(false)} data-testid="button-silent-import-cancel">Cancel</Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => setSilentProdOpen(false)}
+                            data-testid="button-silent-import-cancel"
+                          >
+                            Cancel
+                          </Button>
                           <Button
                             onClick={applySilentImport}
-                            disabled={silentProdApplying || silentImportPreview.every(r => r.status === 'not_found') || !silentProdLocId}
+                            disabled={
+                              silentProdApplying ||
+                              silentImportPreview.every((r) => r.status === "not_found") ||
+                              !silentProdLocId
+                            }
                             data-testid="button-silent-import-apply"
                           >
-                            {silentProdApplying ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying…</> : "Apply Adjustments"}
+                            {silentProdApplying ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Applying…
+                              </>
+                            ) : (
+                              "Apply Adjustments"
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -1130,7 +1471,12 @@ export function DataToolsTab() {
       )}
 
       {/* Silent Transfer Dialog */}
-      <Dialog open={silentTransferOpen} onOpenChange={(o) => { if (!isSilentParsing && !isSilentApplying) setSilentTransferOpen(o); }}>
+      <Dialog
+        open={silentTransferOpen}
+        onOpenChange={(o) => {
+          if (!isSilentParsing && !isSilentApplying) setSilentTransferOpen(o);
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Silent Stock Transfer</DialogTitle>
@@ -1151,7 +1497,9 @@ export function DataToolsTab() {
                     </SelectTrigger>
                     <SelectContent>
                       {(locations as any[]).map((loc: any) => (
-                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                        <SelectItem key={loc.id} value={String(loc.id)}>
+                          {loc.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -1163,9 +1511,13 @@ export function DataToolsTab() {
                       <SelectValue placeholder="To location..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(locations as any[]).filter((l: any) => String(l.id) !== silentSrcId).map((loc: any) => (
-                        <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
-                      ))}
+                      {(locations as any[])
+                        .filter((l: any) => String(l.id) !== silentSrcId)
+                        .map((loc: any) => (
+                          <SelectItem key={loc.id} value={String(loc.id)}>
+                            {loc.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1195,7 +1547,8 @@ export function DataToolsTab() {
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Template columns: <strong>Barcode</strong> (item code), <strong>Quantity</strong> — duplicate barcodes are detected automatically.
+                Template columns: <strong>Barcode</strong> (item code), <strong>Quantity</strong> — duplicate barcodes
+                are detected automatically.
               </p>
 
               {silentParseError && (
@@ -1206,7 +1559,9 @@ export function DataToolsTab() {
               )}
 
               <DialogFooter>
-                <Button variant="outline" onClick={() => setSilentTransferOpen(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setSilentTransferOpen(false)}>
+                  Cancel
+                </Button>
                 <Button
                   onClick={async () => {
                     if (!silentSrcId || !silentDstId || !silentFile) return;
@@ -1238,199 +1593,226 @@ export function DataToolsTab() {
                   disabled={!silentSrcId || !silentDstId || !silentFile || isSilentParsing}
                   data-testid="button-silent-transfer-parse"
                 >
-                  {isSilentParsing
-                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Validating...</>
-                    : "Validate File"}
+                  {isSilentParsing ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Validating...
+                    </>
+                  ) : (
+                    "Validate File"
+                  )}
                 </Button>
               </DialogFooter>
             </div>
           )}
 
           {/* STEP 2 — Validation results */}
-          {silentStep === "validation" && (() => {
-            const applyItems = silentIncludeWarnings
-              ? [...silentValidItems, ...silentWarnItems]
-              : silentValidItems;
-            return (
-              <div className="space-y-4">
-                {/* Summary row */}
-                <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-medium px-2 py-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {silentValidItems.length} valid
-                  </span>
-                  {silentWarnItems.length > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs font-medium px-2 py-1">
-                      <AlertTriangle className="h-3 w-3" />
-                      {silentWarnItems.length} insufficient stock
+          {silentStep === "validation" &&
+            (() => {
+              const applyItems = silentIncludeWarnings ? [...silentValidItems, ...silentWarnItems] : silentValidItems;
+              return (
+                <div className="space-y-4">
+                  {/* Summary row */}
+                  <div className="flex flex-wrap gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 text-xs font-medium px-2 py-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {silentValidItems.length} valid
                     </span>
-                  )}
-                  {silentErrorLines.length > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 text-xs font-medium px-2 py-1">
-                      <AlertTriangle className="h-3 w-3" />
-                      {silentErrorLines.length} error{silentErrorLines.length !== 1 ? "s" : ""} (excluded)
-                    </span>
-                  )}
-                </div>
+                    {silentWarnItems.length > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 text-xs font-medium px-2 py-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        {silentWarnItems.length} insufficient stock
+                      </span>
+                    )}
+                    {silentErrorLines.length > 0 && (
+                      <span className="inline-flex items-center gap-1 rounded-md bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 text-xs font-medium px-2 py-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        {silentErrorLines.length} error{silentErrorLines.length !== 1 ? "s" : ""} (excluded)
+                      </span>
+                    )}
+                  </div>
 
-                <div className="max-h-[380px] overflow-y-auto space-y-3 pr-1">
-
-                  {/* Error rows */}
-                  {silentErrorLines.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-destructive mb-1">Errors — excluded from transfer</p>
-                      <div className="rounded-md border border-destructive/30 overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs py-2 w-14">Row</TableHead>
-                              <TableHead className="text-xs py-2">Barcode</TableHead>
-                              <TableHead className="text-xs py-2">Reason</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {silentErrorLines.map((e: any, i: number) => (
-                              <TableRow key={i} className="bg-red-50/60 dark:bg-red-950/20">
-                                <TableCell className="text-xs py-1.5 text-muted-foreground">{e.rowNum}</TableCell>
-                                <TableCell className="text-xs py-1.5 font-mono">{e.barcode || "—"}</TableCell>
-                                <TableCell className="text-xs py-1.5 text-destructive">{e.reason}</TableCell>
+                  <div className="max-h-[380px] overflow-y-auto space-y-3 pr-1">
+                    {/* Error rows */}
+                    {silentErrorLines.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-destructive mb-1">Errors — excluded from transfer</p>
+                        <div className="rounded-md border border-destructive/30 overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs py-2 w-14">Row</TableHead>
+                                <TableHead className="text-xs py-2">Barcode</TableHead>
+                                <TableHead className="text-xs py-2">Reason</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {silentErrorLines.map((e: any, i: number) => (
+                                <TableRow key={i} className="bg-red-50/60 dark:bg-red-950/20">
+                                  <TableCell className="text-xs py-1.5 text-muted-foreground">{e.rowNum}</TableCell>
+                                  <TableCell className="text-xs py-1.5 font-mono">{e.barcode || "—"}</TableCell>
+                                  <TableCell className="text-xs py-1.5 text-destructive">{e.reason}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Warning rows — insufficient stock */}
-                  {silentWarnItems.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">
-                          Insufficient Stock — will go negative
+                    {/* Warning rows — insufficient stock */}
+                    {silentWarnItems.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">
+                            Insufficient Stock — will go negative
+                          </p>
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={silentIncludeWarnings}
+                              onChange={(e) => setSilentIncludeWarnings(e.target.checked)}
+                              data-testid="checkbox-include-warnings"
+                              className="h-3.5 w-3.5 rounded"
+                            />
+                            <span className="text-xs text-muted-foreground">Include anyway</span>
+                          </label>
+                        </div>
+                        <div
+                          className={`rounded-md border overflow-hidden transition-opacity ${silentIncludeWarnings ? "border-yellow-300 dark:border-yellow-700/50 opacity-100" : "border-muted opacity-60"}`}
+                        >
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs py-2">Item</TableHead>
+                                <TableHead className="text-right text-xs py-2">Qty</TableHead>
+                                <TableHead className="text-right text-xs py-2">Available</TableHead>
+                                <TableHead className="text-xs py-2">Issue</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {silentWarnItems.map((item: any, i: number) => (
+                                <TableRow
+                                  key={i}
+                                  className={silentIncludeWarnings ? "bg-yellow-50/60 dark:bg-yellow-950/20" : ""}
+                                >
+                                  <TableCell className="py-1.5">
+                                    <div className="text-xs font-medium">{item.stockItemName}</div>
+                                    <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs py-1.5">
+                                    {formatNumber(item.quantity)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs py-1.5 text-destructive font-medium">
+                                    {formatNumber(item.currentStock)}
+                                  </TableCell>
+                                  <TableCell className="text-xs py-1.5 text-yellow-700 dark:text-yellow-400">
+                                    {item.warnReason}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Valid items */}
+                    {silentValidItems.length > 0 && (
+                      <div>
+                        <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">
+                          Valid — ready to transfer
                         </p>
-                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={silentIncludeWarnings}
-                            onChange={(e) => setSilentIncludeWarnings(e.target.checked)}
-                            data-testid="checkbox-include-warnings"
-                            className="h-3.5 w-3.5 rounded"
-                          />
-                          <span className="text-xs text-muted-foreground">Include anyway</span>
-                        </label>
-                      </div>
-                      <div className={`rounded-md border overflow-hidden transition-opacity ${silentIncludeWarnings ? "border-yellow-300 dark:border-yellow-700/50 opacity-100" : "border-muted opacity-60"}`}>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs py-2">Item</TableHead>
-                              <TableHead className="text-right text-xs py-2">Qty</TableHead>
-                              <TableHead className="text-right text-xs py-2">Available</TableHead>
-                              <TableHead className="text-xs py-2">Issue</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {silentWarnItems.map((item: any, i: number) => (
-                              <TableRow key={i} className={silentIncludeWarnings ? "bg-yellow-50/60 dark:bg-yellow-950/20" : ""}>
-                                <TableCell className="py-1.5">
-                                  <div className="text-xs font-medium">{item.stockItemName}</div>
-                                  <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
-                                </TableCell>
-                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.quantity)}</TableCell>
-                                <TableCell className="text-right text-xs py-1.5 text-destructive font-medium">{formatNumber(item.currentStock)}</TableCell>
-                                <TableCell className="text-xs py-1.5 text-yellow-700 dark:text-yellow-400">{item.warnReason}</TableCell>
+                        <div className="rounded-md border border-green-200 dark:border-green-800/40 overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs py-2">Item</TableHead>
+                                <TableHead className="text-right text-xs py-2">Qty</TableHead>
+                                <TableHead className="text-right text-xs py-2">Stock</TableHead>
+                                <TableHead className="text-right text-xs py-2">After</TableHead>
+                                <TableHead className="text-right text-xs py-2">Rate</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {silentValidItems.map((item: any, i: number) => (
+                                <TableRow key={i} className="bg-green-50/40 dark:bg-green-950/10">
+                                  <TableCell className="py-1.5">
+                                    <div className="text-xs font-medium">{item.stockItemName}</div>
+                                    <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs py-1.5">
+                                    {formatNumber(item.quantity)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs py-1.5">
+                                    {formatNumber(item.currentStock)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs py-1.5 text-green-700 dark:text-green-400 font-medium">
+                                    {formatNumber(item.afterTransfer)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs py-1.5 text-muted-foreground">
+                                    {formatNumber(item.averageRate, 2)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Valid items */}
-                  {silentValidItems.length > 0 && (
-                    <div>
-                      <p className="text-xs font-semibold text-green-700 dark:text-green-400 mb-1">
-                        Valid — ready to transfer
+                    {silentValidItems.length === 0 && silentWarnItems.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-6">
+                        No transferable items found in the file.
                       </p>
-                      <div className="rounded-md border border-green-200 dark:border-green-800/40 overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="text-xs py-2">Item</TableHead>
-                              <TableHead className="text-right text-xs py-2">Qty</TableHead>
-                              <TableHead className="text-right text-xs py-2">Stock</TableHead>
-                              <TableHead className="text-right text-xs py-2">After</TableHead>
-                              <TableHead className="text-right text-xs py-2">Rate</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {silentValidItems.map((item: any, i: number) => (
-                              <TableRow key={i} className="bg-green-50/40 dark:bg-green-950/10">
-                                <TableCell className="py-1.5">
-                                  <div className="text-xs font-medium">{item.stockItemName}</div>
-                                  <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>
-                                </TableCell>
-                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.quantity)}</TableCell>
-                                <TableCell className="text-right text-xs py-1.5">{formatNumber(item.currentStock)}</TableCell>
-                                <TableCell className="text-right text-xs py-1.5 text-green-700 dark:text-green-400 font-medium">
-                                  {formatNumber(item.afterTransfer)}
-                                </TableCell>
-                                <TableCell className="text-right text-xs py-1.5 text-muted-foreground">{formatNumber(item.averageRate, 2)}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  {silentValidItems.length === 0 && silentWarnItems.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-6">
-                      No transferable items found in the file.
-                    </p>
-                  )}
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setSilentStep("setup")} disabled={isSilentApplying}>
+                      Back
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        if (applyItems.length === 0) return;
+                        setIsSilentApplying(true);
+                        try {
+                          const res = await apiRequest("POST", "/api/inventory/silent-transfer/apply", {
+                            sourceLocationId: parseInt(silentSrcId),
+                            destinationLocationId: parseInt(silentDstId),
+                            items: applyItems,
+                          });
+                          const data = await res.json();
+                          if (!res.ok) throw new Error(data.message);
+                          queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
+                          queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
+                          setSilentAppliedCount(applyItems.length);
+                          setSilentStep("done");
+                        } catch (err: any) {
+                          setSilentParseError(err.message);
+                          setSilentStep("setup");
+                        } finally {
+                          setIsSilentApplying(false);
+                        }
+                      }}
+                      disabled={applyItems.length === 0 || isSilentApplying}
+                      data-testid="button-silent-transfer-apply"
+                    >
+                      {isSilentApplying ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Applying...
+                        </>
+                      ) : applyItems.length === 0 ? (
+                        "No items to transfer"
+                      ) : (
+                        `Apply Transfer (${applyItems.length} item${applyItems.length !== 1 ? "s" : ""})`
+                      )}
+                    </Button>
+                  </DialogFooter>
                 </div>
-
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setSilentStep("setup")} disabled={isSilentApplying}>Back</Button>
-                  <Button
-                    onClick={async () => {
-                      if (applyItems.length === 0) return;
-                      setIsSilentApplying(true);
-                      try {
-                        const res = await apiRequest("POST", "/api/inventory/silent-transfer/apply", {
-                          sourceLocationId: parseInt(silentSrcId),
-                          destinationLocationId: parseInt(silentDstId),
-                          items: applyItems,
-                        });
-                        const data = await res.json();
-                        if (!res.ok) throw new Error(data.message);
-                        queryClient.invalidateQueries({ queryKey: ["/api/inventory-by-location"] });
-                        queryClient.invalidateQueries({ queryKey: ["/api/location-summary"] });
-                        setSilentAppliedCount(applyItems.length);
-                        setSilentStep("done");
-                      } catch (err: any) {
-                        setSilentParseError(err.message);
-                        setSilentStep("setup");
-                      } finally {
-                        setIsSilentApplying(false);
-                      }
-                    }}
-                    disabled={applyItems.length === 0 || isSilentApplying}
-                    data-testid="button-silent-transfer-apply"
-                  >
-                    {isSilentApplying
-                      ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Applying...</>
-                      : applyItems.length === 0
-                        ? "No items to transfer"
-                        : `Apply Transfer (${applyItems.length} item${applyItems.length !== 1 ? "s" : ""})`}
-                  </Button>
-                </DialogFooter>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
           {/* STEP 3 — Done */}
           {silentStep === "done" && (
@@ -1439,7 +1821,8 @@ export function DataToolsTab() {
               <div className="text-center">
                 <p className="font-semibold text-lg">Transfer Complete</p>
                 <p className="text-sm text-muted-foreground">
-                  {silentAppliedCount} item{silentAppliedCount !== 1 ? "s" : ""} moved silently. No daybook entry was created.
+                  {silentAppliedCount} item{silentAppliedCount !== 1 ? "s" : ""} moved silently. No daybook entry was
+                  created.
                 </p>
               </div>
               <Button
@@ -1456,7 +1839,9 @@ export function DataToolsTab() {
                   setSilentAppliedCount(0);
                 }}
                 data-testid="button-silent-transfer-close"
-              >Close</Button>
+              >
+                Close
+              </Button>
             </div>
           )}
         </DialogContent>
@@ -1467,12 +1852,15 @@ export function DataToolsTab() {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Import Stock from Excel</DialogTitle>
-            <DialogDescription>
-              Upload an Excel file with Item_barcode, quantity, rate, value columns
-            </DialogDescription>
+            <DialogDescription>Upload an Excel file with Item_barcode, quantity, rate, value columns</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            <Button variant="outline" onClick={downloadStockTemplate} size="sm" data-testid="button-download-stock-template">
+            <Button
+              variant="outline"
+              onClick={downloadStockTemplate}
+              size="sm"
+              data-testid="button-download-stock-template"
+            >
               <Download className="h-4 w-4 mr-2" />
               Download Template
             </Button>
@@ -1494,7 +1882,11 @@ export function DataToolsTab() {
                 <AlertDescription>
                   <div className="font-semibold mb-2">{stockErrors.length} validation error(s):</div>
                   <ul className="list-disc list-inside space-y-1">
-                    {stockErrors.slice(0, 5).map((err, i) => <li key={i} className="text-sm">{err}</li>)}
+                    {stockErrors.slice(0, 5).map((err, i) => (
+                      <li key={i} className="text-sm">
+                        {err}
+                      </li>
+                    ))}
                   </ul>
                 </AlertDescription>
               </Alert>
@@ -1512,10 +1904,14 @@ export function DataToolsTab() {
               </Alert>
             )}
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={handleStockDialogClose} disabled={isImportingStock}>Close</Button>
+              <Button variant="outline" onClick={handleStockDialogClose} disabled={isImportingStock}>
+                Close
+              </Button>
               <Button
                 onClick={handleStockImport}
-                disabled={stockPreview.length === 0 || stockErrors.length > 0 || isImportingStock || stockImportComplete}
+                disabled={
+                  stockPreview.length === 0 || stockErrors.length > 0 || isImportingStock || stockImportComplete
+                }
                 data-testid="button-submit-stock-import"
               >
                 {isImportingStock ? "Importing..." : "Import Stock"}
@@ -1530,9 +1926,7 @@ export function DataToolsTab() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Bulk Rename Stock Items</DialogTitle>
-            <DialogDescription>
-              Find and replace text across multiple stock item names.
-            </DialogDescription>
+            <DialogDescription>Find and replace text across multiple stock item names.</DialogDescription>
           </DialogHeader>
           <BulkRenameTab />
         </DialogContent>
@@ -1544,31 +1938,37 @@ export function DataToolsTab() {
 // ── Merge Stock Items Card ────────────────────────────────────────────────────
 
 interface MergePreviewResult {
-  keptItem:      { id: number; code: string; name: string; uom: string };
+  keptItem: { id: number; code: string; name: string; uom: string };
   duplicateItem: { id: number; code: string; name: string; uom: string };
   uomMismatch: boolean;
   inventoryImpact: Array<{
     locationId: number;
     locationName: string;
-    keptQty: number;   keptValue: number;   keptRate: number;
-    dupQty: number;    dupValue: number;    dupRate: number;
-    combinedQty: number; combinedValue: number; combinedRate: number;
+    keptQty: number;
+    keptValue: number;
+    keptRate: number;
+    dupQty: number;
+    dupValue: number;
+    dupRate: number;
+    combinedQty: number;
+    combinedValue: number;
+    combinedRate: number;
     action: "combine" | "reassign" | "no_change";
   }>;
   totalValueBefore: number;
-  totalValueAfter:  number;
+  totalValueAfter: number;
   warnings: string[];
 }
 
 function MergeStockItemsCard() {
   const { toast } = useToast();
   const [keptItem, setKeptItem] = useState<{ id: number; name: string } | null>(null);
-  const [dupItem,  setDupItem]  = useState<{ id: number; name: string } | null>(null);
-  const [preview,  setPreview]  = useState<MergePreviewResult | null>(null);
+  const [dupItem, setDupItem] = useState<{ id: number; name: string } | null>(null);
+  const [preview, setPreview] = useState<MergePreviewResult | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [confirmText, setConfirmText] = useState("");
-  const [isMerging,   setIsMerging]   = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
 
   const { data: allStockItems = [] } = useQuery<{ id: number; name: string; code: string }[]>({
     queryKey: ["/api/stock-items"],
@@ -1631,7 +2031,8 @@ function MergeStockItemsCard() {
           Merge Duplicate Stock Items
         </CardTitle>
         <CardDescription>
-          Combine two stock items into one. Inventory quantities and values are preserved exactly to the cent. Historical transaction rows are not rewritten in this phase.
+          Combine two stock items into one. Inventory quantities and values are preserved exactly to the cent.
+          Historical transaction rows are not rewritten in this phase.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -1640,7 +2041,12 @@ function MergeStockItemsCard() {
             <Label>Item to keep</Label>
             <StockItemAutocomplete
               value={keptItem}
-              onChange={(id, name) => { setKeptItem({ id, name }); setPreview(null); setPreviewError(null); setConfirmText(""); }}
+              onChange={(id, name) => {
+                setKeptItem({ id, name });
+                setPreview(null);
+                setPreviewError(null);
+                setConfirmText("");
+              }}
               stockItems={allStockItems}
               placeholder="Search item to keep..."
               testId="merge-keep-item"
@@ -1650,7 +2056,12 @@ function MergeStockItemsCard() {
             <Label>Duplicate to merge away</Label>
             <StockItemAutocomplete
               value={dupItem}
-              onChange={(id, name) => { setDupItem({ id, name }); setPreview(null); setPreviewError(null); setConfirmText(""); }}
+              onChange={(id, name) => {
+                setDupItem({ id, name });
+                setPreview(null);
+                setPreviewError(null);
+                setConfirmText("");
+              }}
               stockItems={allStockItems}
               placeholder="Search duplicate item..."
               testId="merge-dup-item"
@@ -1664,9 +2075,7 @@ function MergeStockItemsCard() {
           disabled={!keptItem || !dupItem || isLoadingPreview}
           data-testid="button-merge-preview"
         >
-          {isLoadingPreview
-            ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            : <Eye className="h-4 w-4 mr-2" />}
+          {isLoadingPreview ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Eye className="h-4 w-4 mr-2" />}
           Preview Merge
         </Button>
 
@@ -1683,7 +2092,8 @@ function MergeStockItemsCard() {
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  UOM mismatch — kept item is <strong>{preview.keptItem.uom}</strong>, duplicate is <strong>{preview.duplicateItem.uom}</strong>. This merge is blocked in Phase 1.
+                  UOM mismatch — kept item is <strong>{preview.keptItem.uom}</strong>, duplicate is{" "}
+                  <strong>{preview.duplicateItem.uom}</strong>. This merge is blocked in Phase 1.
                 </AlertDescription>
               </Alert>
             )}
@@ -1712,7 +2122,9 @@ function MergeStockItemsCard() {
                       <TableCell>{row.locationName}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatNumber(row.keptQty, 3)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatNumber(row.dupQty, 3)}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{formatNumber(row.combinedQty, 3)}</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {formatNumber(row.combinedQty, 3)}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">{formatNumber(row.combinedRate, 2)}</TableCell>
                       <TableCell className="text-right tabular-nums">{formatNumber(row.combinedValue, 2)}</TableCell>
                     </TableRow>
@@ -1722,8 +2134,14 @@ function MergeStockItemsCard() {
             </div>
 
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-              <span>Total value before: <strong className="text-foreground tabular-nums">{formatNumber(preview.totalValueBefore, 2)}</strong></span>
-              <span>Total value after: <strong className="text-foreground tabular-nums">{formatNumber(preview.totalValueAfter, 2)}</strong></span>
+              <span>
+                Total value before:{" "}
+                <strong className="text-foreground tabular-nums">{formatNumber(preview.totalValueBefore, 2)}</strong>
+              </span>
+              <span>
+                Total value after:{" "}
+                <strong className="text-foreground tabular-nums">{formatNumber(preview.totalValueAfter, 2)}</strong>
+              </span>
             </div>
 
             {!preview.uomMismatch && (
@@ -1807,11 +2225,12 @@ function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
       const rows = utils.sheet_to_json<{ old_code?: any; keep_code?: any }>(ws);
       const parsed: BulkMergePairRow[] = [];
       for (const row of rows) {
-        const oldCode  = String(row.old_code  ?? row.Old_Code  ?? row.OLD_CODE  ?? "").trim();
+        const oldCode = String(row.old_code ?? row.Old_Code ?? row.OLD_CODE ?? "").trim();
         const keepCode = String(row.keep_code ?? row.Keep_Code ?? row.KEEP_CODE ?? "").trim();
         if (oldCode && keepCode) parsed.push({ oldCode, keepCode });
       }
-      if (parsed.length === 0) throw new Error("No valid rows found. Check that the file has old_code and keep_code columns.");
+      if (parsed.length === 0)
+        throw new Error("No valid rows found. Check that the file has old_code and keep_code columns.");
       setParsedRows(parsed);
     } catch (err: any) {
       setParseError(err.message);
@@ -1829,7 +2248,7 @@ function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
       setResults(data.results ?? []);
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      const succeeded = (data.results as BulkMergeResult[]).filter(r => r.status === "success").length;
+      const succeeded = (data.results as BulkMergeResult[]).filter((r) => r.status === "success").length;
       toast({ title: `Bulk merge done — ${succeeded} of ${data.results.length} merged` });
     } catch (err: any) {
       toast({ title: "Bulk merge failed", description: err.message, variant: "destructive" });
@@ -1846,135 +2265,148 @@ function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  const succeeded = results?.filter(r => r.status === "success").length ?? 0;
-  const skipped   = results?.filter(r => r.status === "skipped").length ?? 0;
-  const errored   = results?.filter(r => r.status === "error").length ?? 0;
+  const succeeded = results?.filter((r) => r.status === "success").length ?? 0;
+  const skipped = results?.filter((r) => r.status === "skipped").length ?? 0;
+  const errored = results?.filter((r) => r.status === "error").length ?? 0;
 
   const bulkContent = (
     <div className="space-y-4">
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={downloadTemplate} data-testid="button-bulk-merge-template">
-            <FileDown className="h-4 w-4 mr-2" />
-            Download Template
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} data-testid="button-bulk-merge-upload">
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Excel File
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={handleFileChange}
-            data-testid="input-bulk-merge-file"
-          />
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={downloadTemplate} data-testid="button-bulk-merge-template">
+          <FileDown className="h-4 w-4 mr-2" />
+          Download Template
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => fileInputRef.current?.click()}
+          data-testid="button-bulk-merge-upload"
+        >
+          <Upload className="h-4 w-4 mr-2" />
+          Upload Excel File
+        </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls"
+          className="hidden"
+          onChange={handleFileChange}
+          data-testid="input-bulk-merge-file"
+        />
+      </div>
+
+      {fileName && <p className="text-sm text-muted-foreground">File: {fileName}</p>}
+
+      {parseError && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{parseError}</AlertDescription>
+        </Alert>
+      )}
+
+      {parsedRows.length > 0 && !results && (
+        <div className="space-y-3">
+          <p className="text-sm font-medium">
+            {parsedRows.length} pair{parsedRows.length !== 1 ? "s" : ""} ready to merge
+          </p>
+          <div className="border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-8">#</TableHead>
+                  <TableHead>Old code (to remove)</TableHead>
+                  <TableHead>Keep code</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {parsedRows.slice(0, 20).map((row, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-muted-foreground tabular-nums">{i + 1}</TableCell>
+                    <TableCell className="font-mono text-sm">{row.oldCode}</TableCell>
+                    <TableCell className="font-mono text-sm">{row.keepCode}</TableCell>
+                  </TableRow>
+                ))}
+                {parsedRows.length > 20 && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-sm text-muted-foreground">
+                      …and {parsedRows.length - 20} more rows
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleRun} disabled={isRunning} data-testid="button-bulk-merge-run">
+              {isRunning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {isRunning ? "Merging…" : `Merge ${parsedRows.length} pair${parsedRows.length !== 1 ? "s" : ""}`}
+            </Button>
+            <Button variant="outline" onClick={reset} disabled={isRunning} data-testid="button-bulk-merge-reset">
+              Clear
+            </Button>
+          </div>
         </div>
+      )}
 
-        {fileName && <p className="text-sm text-muted-foreground">File: {fileName}</p>}
+      {results && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-3 text-sm">
+            <span className="flex items-center gap-1.5">
+              <Check className="h-4 w-4 text-green-600" />
+              <span>
+                <strong>{succeeded}</strong> merged
+              </span>
+            </span>
+            <span className="flex items-center gap-1.5">
+              <X className="h-4 w-4 text-yellow-600" />
+              <span>
+                <strong>{skipped}</strong> skipped
+              </span>
+            </span>
+            {errored > 0 && (
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="h-4 w-4 text-destructive" />
+                <span>
+                  <strong>{errored}</strong> error{errored !== 1 ? "s" : ""}
+                </span>
+              </span>
+            )}
+          </div>
 
-        {parseError && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{parseError}</AlertDescription>
-          </Alert>
-        )}
-
-        {parsedRows.length > 0 && !results && (
-          <div className="space-y-3">
-            <p className="text-sm font-medium">{parsedRows.length} pair{parsedRows.length !== 1 ? "s" : ""} ready to merge</p>
+          {(skipped > 0 || errored > 0) && (
             <div className="border rounded-md overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-8">#</TableHead>
-                    <TableHead>Old code (to remove)</TableHead>
+                    <TableHead>Old code</TableHead>
                     <TableHead>Keep code</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Reason</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {parsedRows.slice(0, 20).map((row, i) => (
-                    <TableRow key={i}>
-                      <TableCell className="text-muted-foreground tabular-nums">{i + 1}</TableCell>
-                      <TableCell className="font-mono text-sm">{row.oldCode}</TableCell>
-                      <TableCell className="font-mono text-sm">{row.keepCode}</TableCell>
-                    </TableRow>
-                  ))}
-                  {parsedRows.length > 20 && (
-                    <TableRow>
-                      <TableCell colSpan={3} className="text-center text-sm text-muted-foreground">
-                        …and {parsedRows.length - 20} more rows
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={handleRun} disabled={isRunning} data-testid="button-bulk-merge-run">
-                {isRunning && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                {isRunning ? "Merging…" : `Merge ${parsedRows.length} pair${parsedRows.length !== 1 ? "s" : ""}`}
-              </Button>
-              <Button variant="outline" onClick={reset} disabled={isRunning} data-testid="button-bulk-merge-reset">
-                Clear
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {results && (
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-3 text-sm">
-              <span className="flex items-center gap-1.5">
-                <Check className="h-4 w-4 text-green-600" />
-                <span><strong>{succeeded}</strong> merged</span>
-              </span>
-              <span className="flex items-center gap-1.5">
-                <X className="h-4 w-4 text-yellow-600" />
-                <span><strong>{skipped}</strong> skipped</span>
-              </span>
-              {errored > 0 && (
-                <span className="flex items-center gap-1.5">
-                  <AlertTriangle className="h-4 w-4 text-destructive" />
-                  <span><strong>{errored}</strong> error{errored !== 1 ? "s" : ""}</span>
-                </span>
-              )}
-            </div>
-
-            {(skipped > 0 || errored > 0) && (
-              <div className="border rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Old code</TableHead>
-                      <TableHead>Keep code</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Reason</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {results.filter(r => r.status !== "success").map((r, i) => (
+                  {results
+                    .filter((r) => r.status !== "success")
+                    .map((r, i) => (
                       <TableRow key={i}>
                         <TableCell className="font-mono text-sm">{r.oldCode}</TableCell>
                         <TableCell className="font-mono text-sm">{r.keepCode}</TableCell>
                         <TableCell>
-                          <Badge variant={r.status === "error" ? "destructive" : "secondary"}>
-                            {r.status}
-                          </Badge>
+                          <Badge variant={r.status === "error" ? "destructive" : "secondary"}>{r.status}</Badge>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{r.reason ?? "—"}</TableCell>
                       </TableRow>
                     ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
 
-            <Button variant="outline" size="sm" onClick={reset} data-testid="button-bulk-merge-done">
-              Start another batch
-            </Button>
-          </div>
-        )}
+          <Button variant="outline" size="sm" onClick={reset} data-testid="button-bulk-merge-done">
+            Start another batch
+          </Button>
+        </div>
+      )}
     </div>
   );
 
@@ -1988,12 +2420,11 @@ function BulkMergeStockItemsCard({ embedded }: { embedded?: boolean }) {
           Bulk Merge via Excel
         </CardTitle>
         <CardDescription>
-          Upload a two-column Excel file (old_code → keep_code) to merge many duplicate items at once. Each pair runs the same safe merge logic as the single-item merge above.
+          Upload a two-column Excel file (old_code → keep_code) to merge many duplicate items at once. Each pair runs
+          the same safe merge logic as the single-item merge above.
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {bulkContent}
-      </CardContent>
+      <CardContent className="space-y-4">{bulkContent}</CardContent>
     </Card>
   );
 }
@@ -2085,12 +2516,14 @@ function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
         <>
           {historicalLogs.length > 0 && logs.length === 0 && (
             <p className="text-xs text-muted-foreground mb-3">
-              These merges were done before history tracking was added. They were reconstructed from alias records — no snapshot is available so they cannot be unmerged automatically.
+              These merges were done before history tracking was added. They were reconstructed from alias records — no
+              snapshot is available so they cannot be unmerged automatically.
             </p>
           )}
           {historicalLogs.length > 0 && logs.length > 0 && (
             <p className="text-xs text-muted-foreground mb-3">
-              Entries marked <span className="font-medium">Historical</span> were done before history tracking was added and cannot be unmerged automatically.
+              Entries marked <span className="font-medium">Historical</span> were done before history tracking was added
+              and cannot be unmerged automatically.
             </p>
           )}
           <Table>
@@ -2116,7 +2549,9 @@ function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
                   <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                     {new Date(log.mergedAt).toLocaleDateString()}
                     {log.source === "historical" && (
-                      <Badge variant="outline" className="ml-2 text-[10px]">Historical</Badge>
+                      <Badge variant="outline" className="ml-2 text-[10px]">
+                        Historical
+                      </Badge>
                     )}
                   </TableCell>
                   <TableCell>
@@ -2151,77 +2586,110 @@ function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
     </>
   );
 
-  if (embedded) return (
-    <>
-      {historyContent}
-      {/* Unmerge confirmation dialog */}
-      <AlertDialog open={!!unmergeTarget} onOpenChange={(open) => { if (!open) setUnmergeTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unmerge this item?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  This will restore <strong>{unmergeTarget?.mergedItemName}</strong> as a separate active item and revert inventory quantities back to the pre-merge state.
-                </p>
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    Any selling prices that were deleted during the merge (because the kept item already had a price for that location) cannot be recovered automatically. You may need to re-enter them manually.
-                  </AlertDescription>
-                </Alert>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isUnmerging} data-testid="button-unmerge-cancel">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleUnmerge}
-              disabled={isUnmerging}
-              data-testid="button-unmerge-confirm"
-            >
-              {isUnmerging ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Unmerging…</> : "Yes, unmerge it"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+  if (embedded)
+    return (
+      <>
+        {historyContent}
+        {/* Unmerge confirmation dialog */}
+        <AlertDialog
+          open={!!unmergeTarget}
+          onOpenChange={(open) => {
+            if (!open) setUnmergeTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unmerge this item?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <p>
+                    This will restore <strong>{unmergeTarget?.mergedItemName}</strong> as a separate active item and
+                    revert inventory quantities back to the pre-merge state.
+                  </p>
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Any selling prices that were deleted during the merge (because the kept item already had a price
+                      for that location) cannot be recovered automatically. You may need to re-enter them manually.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isUnmerging} data-testid="button-unmerge-cancel">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={handleUnmerge} disabled={isUnmerging} data-testid="button-unmerge-confirm">
+                {isUnmerging ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Unmerging…
+                  </>
+                ) : (
+                  "Yes, unmerge it"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      {/* Historical restore confirmation dialog */}
-      <AlertDialog open={!!historicalRestoreTarget} onOpenChange={(open) => { if (!open) setHistoricalRestoreTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Restore this item?</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3">
-                <p>
-                  This will restore <strong>{historicalRestoreTarget?.mergedItemName}</strong> ({historicalRestoreTarget?.mergedItemCode}) as a separate active item.
-                </p>
-                <p className="text-sm">
-                  The item will reappear in your stock list with its original name and code. Its code alias (which was redirecting scans to <strong>{historicalRestoreTarget?.keptItemName}</strong>) will be removed.
-                </p>
-                <Alert>
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    Because this merge happened before history tracking was added, inventory quantities <strong>cannot be restored automatically</strong>. The item will come back with zero stock. You will need to manually adjust quantities between <strong>{historicalRestoreTarget?.mergedItemName}</strong> and <strong>{historicalRestoreTarget?.keptItemName}</strong>.
-                  </AlertDescription>
-                </Alert>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isHistoricalRestoring} data-testid="button-hist-restore-cancel">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleHistoricalRestore}
-              disabled={isHistoricalRestoring}
-              data-testid="button-hist-restore-confirm"
-            >
-              {isHistoricalRestoring ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Restoring…</> : "Yes, restore it"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
-  );
+        {/* Historical restore confirmation dialog */}
+        <AlertDialog
+          open={!!historicalRestoreTarget}
+          onOpenChange={(open) => {
+            if (!open) setHistoricalRestoreTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Restore this item?</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <p>
+                    This will restore <strong>{historicalRestoreTarget?.mergedItemName}</strong> (
+                    {historicalRestoreTarget?.mergedItemCode}) as a separate active item.
+                  </p>
+                  <p className="text-sm">
+                    The item will reappear in your stock list with its original name and code. Its code alias (which was
+                    redirecting scans to <strong>{historicalRestoreTarget?.keptItemName}</strong>) will be removed.
+                  </p>
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription>
+                      Because this merge happened before history tracking was added, inventory quantities{" "}
+                      <strong>cannot be restored automatically</strong>. The item will come back with zero stock. You
+                      will need to manually adjust quantities between{" "}
+                      <strong>{historicalRestoreTarget?.mergedItemName}</strong> and{" "}
+                      <strong>{historicalRestoreTarget?.keptItemName}</strong>.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isHistoricalRestoring} data-testid="button-hist-restore-cancel">
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleHistoricalRestore}
+                disabled={isHistoricalRestoring}
+                data-testid="button-hist-restore-confirm"
+              >
+                {isHistoricalRestoring ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Restoring…
+                  </>
+                ) : (
+                  "Yes, restore it"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
+    );
 
   return (
     <Card>
@@ -2231,75 +2699,106 @@ function MergeHistoryCard({ embedded }: { embedded?: boolean }) {
           Merge History
         </CardTitle>
         <CardDescription>
-          View recent item merges and reverse them if needed. Inventory quantities and values are restored exactly from the pre-merge snapshot. Location prices deleted during merge cannot be recovered.
+          View recent item merges and reverse them if needed. Inventory quantities and values are restored exactly from
+          the pre-merge snapshot. Location prices deleted during merge cannot be recovered.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        {historyContent}
-      </CardContent>
+      <CardContent>{historyContent}</CardContent>
 
       {/* Unmerge confirmation dialog */}
-      <AlertDialog open={!!unmergeTarget} onOpenChange={(open) => { if (!open) setUnmergeTarget(null); }}>
+      <AlertDialog
+        open={!!unmergeTarget}
+        onOpenChange={(open) => {
+          if (!open) setUnmergeTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Unmerge this item?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>
-                  This will restore <strong>{unmergeTarget?.mergedItemName}</strong> as a separate active item and revert inventory quantities back to the pre-merge state.
+                  This will restore <strong>{unmergeTarget?.mergedItemName}</strong> as a separate active item and
+                  revert inventory quantities back to the pre-merge state.
                 </p>
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    Any selling prices that were deleted during the merge (because the kept item already had a price for that location) cannot be recovered automatically. You may need to re-enter them manually.
+                    Any selling prices that were deleted during the merge (because the kept item already had a price for
+                    that location) cannot be recovered automatically. You may need to re-enter them manually.
                   </AlertDescription>
                 </Alert>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isUnmerging} data-testid="button-unmerge-cancel">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleUnmerge}
-              disabled={isUnmerging}
-              data-testid="button-unmerge-confirm"
-            >
-              {isUnmerging ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Unmerging…</> : "Yes, unmerge it"}
+            <AlertDialogCancel disabled={isUnmerging} data-testid="button-unmerge-cancel">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleUnmerge} disabled={isUnmerging} data-testid="button-unmerge-confirm">
+              {isUnmerging ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Unmerging…
+                </>
+              ) : (
+                "Yes, unmerge it"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* Historical restore confirmation dialog */}
-      <AlertDialog open={!!historicalRestoreTarget} onOpenChange={(open) => { if (!open) setHistoricalRestoreTarget(null); }}>
+      <AlertDialog
+        open={!!historicalRestoreTarget}
+        onOpenChange={(open) => {
+          if (!open) setHistoricalRestoreTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Restore this item?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-3">
                 <p>
-                  This will restore <strong>{historicalRestoreTarget?.mergedItemName}</strong> ({historicalRestoreTarget?.mergedItemCode}) as a separate active item.
+                  This will restore <strong>{historicalRestoreTarget?.mergedItemName}</strong> (
+                  {historicalRestoreTarget?.mergedItemCode}) as a separate active item.
                 </p>
                 <p className="text-sm">
-                  The item will reappear in your stock list with its original name and code. Its code alias (which was redirecting scans to <strong>{historicalRestoreTarget?.keptItemName}</strong>) will be removed.
+                  The item will reappear in your stock list with its original name and code. Its code alias (which was
+                  redirecting scans to <strong>{historicalRestoreTarget?.keptItemName}</strong>) will be removed.
                 </p>
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    Because this merge happened before history tracking was added, inventory quantities <strong>cannot be restored automatically</strong>. The item will come back with zero stock. You will need to manually adjust quantities between <strong>{historicalRestoreTarget?.mergedItemName}</strong> and <strong>{historicalRestoreTarget?.keptItemName}</strong>.
+                    Because this merge happened before history tracking was added, inventory quantities{" "}
+                    <strong>cannot be restored automatically</strong>. The item will come back with zero stock. You will
+                    need to manually adjust quantities between{" "}
+                    <strong>{historicalRestoreTarget?.mergedItemName}</strong> and{" "}
+                    <strong>{historicalRestoreTarget?.keptItemName}</strong>.
                   </AlertDescription>
                 </Alert>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isHistoricalRestoring} data-testid="button-hist-restore-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isHistoricalRestoring} data-testid="button-hist-restore-cancel">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleHistoricalRestore}
               disabled={isHistoricalRestoring}
               data-testid="button-hist-restore-confirm"
             >
-              {isHistoricalRestoring ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Restoring…</> : "Yes, restore it"}
+              {isHistoricalRestoring ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Restoring…
+                </>
+              ) : (
+                "Yes, restore it"
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -2326,9 +2825,7 @@ function ReconcileOTWNamesCard() {
       queryClient.invalidateQueries({ queryKey: ["/api/containers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
       toast({
-        title: data.fixed > 0
-          ? `Fixed ${data.fixed} OTW line item(s)`
-          : "All OTW names are already up to date",
+        title: data.fixed > 0 ? `Fixed ${data.fixed} OTW line item(s)` : "All OTW names are already up to date",
       });
     } catch (err: any) {
       toast({ title: "Reconcile failed", description: err.message, variant: "destructive" });
@@ -2345,8 +2842,8 @@ function ReconcileOTWNamesCard() {
           Reconcile OTW Names
         </CardTitle>
         <CardDescription className="text-xs">
-          Re-points any On-The-Way container lines that still reference a merged or deleted item to
-          the correct kept item, so OTW shows the current name.
+          Re-points any On-The-Way container lines that still reference a merged or deleted item to the correct kept
+          item, so OTW shows the current name.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -2366,9 +2863,7 @@ function ReconcileOTWNamesCard() {
           disabled={running}
           data-testid="button-reconcile-otw-names"
         >
-          {running
-            ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            : <RotateCcw className="h-4 w-4 mr-2" />}
+          {running ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RotateCcw className="h-4 w-4 mr-2" />}
           {running ? "Reconciling…" : "Run Reconcile"}
         </Button>
       </CardContent>
@@ -2398,7 +2893,10 @@ function MergeStockItemsLauncher() {
           <Button
             variant="outline"
             className="w-full"
-            onClick={() => { setTab("single"); setOpen(true); }}
+            onClick={() => {
+              setTab("single");
+              setOpen(true);
+            }}
             data-testid="button-open-merge-launcher"
           >
             <ArrowLeftRight className="h-4 w-4 mr-2" />
@@ -2418,9 +2916,15 @@ function MergeStockItemsLauncher() {
 
           <Tabs value={tab} onValueChange={setTab} className="mt-2">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="single" data-testid="tab-merge-single">Single Item</TabsTrigger>
-              <TabsTrigger value="bulk" data-testid="tab-merge-bulk">Bulk via Excel</TabsTrigger>
-              <TabsTrigger value="history" data-testid="tab-merge-history">History</TabsTrigger>
+              <TabsTrigger value="single" data-testid="tab-merge-single">
+                Single Item
+              </TabsTrigger>
+              <TabsTrigger value="bulk" data-testid="tab-merge-bulk">
+                Bulk via Excel
+              </TabsTrigger>
+              <TabsTrigger value="history" data-testid="tab-merge-history">
+                History
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="single" className="mt-4">
               <MergeStockItemsCard embedded />
@@ -2439,4 +2943,3 @@ function MergeStockItemsLauncher() {
 }
 
 // ── Edit Log helpers ──────────────────────────────────────────────────────────
-

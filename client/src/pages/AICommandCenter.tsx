@@ -9,9 +9,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
-  Bot, Play, CheckCircle2, XCircle, Clock, Loader2, ChevronRight,
-  Upload, Zap, AlertTriangle, CheckCheck, Ban, RotateCcw, Eye,
-  ShieldCheck, ShieldX, History, ListTodo, Lightbulb,
+  Bot,
+  Play,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Loader2,
+  ChevronRight,
+  Upload,
+  Zap,
+  AlertTriangle,
+  CheckCheck,
+  Ban,
+  RotateCcw,
+  Eye,
+  ShieldCheck,
+  ShieldX,
+  History,
+  ListTodo,
+  Lightbulb,
 } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -19,39 +35,39 @@ type StepStatus = "pending" | "running" | "completed" | "failed" | "waiting_appr
 type TaskStatus = "planned" | "running" | "waiting_for_approval" | "completed" | "failed" | "cancelled";
 
 interface PlanStep {
-  id:              string;
-  name:            string;
-  tool:            string;
-  params:          Record<string, any>;
+  id: string;
+  name: string;
+  tool: string;
+  params: Record<string, any>;
   requiresApproval: boolean;
-  status:          StepStatus;
-  result?:         any;
-  error?:          string;
-  approvalId?:     number;
-  startedAt?:      string;
-  completedAt?:    string;
+  status: StepStatus;
+  result?: any;
+  error?: string;
+  approvalId?: number;
+  startedAt?: string;
+  completedAt?: string;
 }
 
 interface Approval {
-  id:          number;
-  taskId:      number;
-  actionType:  string;
+  id: number;
+  taskId: number;
+  actionType: string;
   actionLabel: string;
   previewJson: any;
   payloadJson: any;
-  status:      string;
-  createdAt:   string;
+  status: string;
+  createdAt: string;
 }
 
 interface AgentTask {
-  id:              number;
-  taskType:        string;
+  id: number;
+  taskType: string;
   userInstruction: string;
-  status:          TaskStatus;
-  planJson:        { taskType: string; description: string; steps: PlanStep[] } | null;
-  errorMessage:    string | null;
-  createdAt:       string;
-  updatedAt:       string;
+  status: TaskStatus;
+  planJson: { taskType: string; description: string; steps: PlanStep[] } | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface AgentTaskDetail extends AgentTask {
@@ -59,22 +75,25 @@ interface AgentTaskDetail extends AgentTask {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const STATUS_CONFIG: Record<TaskStatus, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }> = {
-  planned:              { label: "Planned",            variant: "secondary",   icon: <ListTodo className="h-3 w-3" /> },
-  running:              { label: "Running",             variant: "default",     icon: <Loader2 className="h-3 w-3 animate-spin" /> },
-  waiting_for_approval: { label: "Needs Approval",     variant: "default",     icon: <ShieldCheck className="h-3 w-3" /> },
-  completed:            { label: "Completed",           variant: "secondary",   icon: <CheckCheck className="h-3 w-3" /> },
-  failed:               { label: "Failed",              variant: "destructive", icon: <XCircle className="h-3 w-3" /> },
-  cancelled:            { label: "Cancelled",           variant: "outline",     icon: <Ban className="h-3 w-3" /> },
+const STATUS_CONFIG: Record<
+  TaskStatus,
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ReactNode }
+> = {
+  planned: { label: "Planned", variant: "secondary", icon: <ListTodo className="h-3 w-3" /> },
+  running: { label: "Running", variant: "default", icon: <Loader2 className="h-3 w-3 animate-spin" /> },
+  waiting_for_approval: { label: "Needs Approval", variant: "default", icon: <ShieldCheck className="h-3 w-3" /> },
+  completed: { label: "Completed", variant: "secondary", icon: <CheckCheck className="h-3 w-3" /> },
+  failed: { label: "Failed", variant: "destructive", icon: <XCircle className="h-3 w-3" /> },
+  cancelled: { label: "Cancelled", variant: "outline", icon: <Ban className="h-3 w-3" /> },
 };
 
 const STEP_ICON: Record<StepStatus, React.ReactNode> = {
-  pending:          <Clock className="h-4 w-4 text-muted-foreground" />,
-  running:          <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />,
-  completed:        <CheckCircle2 className="h-4 w-4 text-green-500" />,
-  failed:           <XCircle className="h-4 w-4 text-red-500" />,
+  pending: <Clock className="h-4 w-4 text-muted-foreground" />,
+  running: <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />,
+  completed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+  failed: <XCircle className="h-4 w-4 text-red-500" />,
   waiting_approval: <ShieldCheck className="h-4 w-4 text-amber-500" />,
-  skipped:          <ChevronRight className="h-4 w-4 text-muted-foreground" />,
+  skipped: <ChevronRight className="h-4 w-4 text-muted-foreground" />,
 };
 
 function timeAgo(iso: string) {
@@ -86,7 +105,7 @@ function timeAgo(iso: string) {
 }
 
 function formatTaskType(t: string) {
-  return t.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  return t.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -99,7 +118,7 @@ function StepRow({ step }: { step: PlanStep }) {
     <div className="group">
       <div
         className="flex items-start gap-3 py-2.5 px-3 rounded-md hover-elevate cursor-default"
-        onClick={() => hasResult && setOpen(o => !o)}
+        onClick={() => hasResult && setOpen((o) => !o)}
         data-testid={`step-row-${step.id}`}
       >
         <div className="mt-0.5 shrink-0">{STEP_ICON[step.status]}</div>
@@ -117,10 +136,11 @@ function StepRow({ step }: { step: PlanStep }) {
 
       {open && hasResult && (
         <div className="mx-3 mb-2 rounded-md bg-muted/50 p-2.5 text-xs font-mono overflow-auto max-h-48">
-          {step.error
-            ? <span className="text-red-500">{step.error}</span>
-            : <pre className="whitespace-pre-wrap break-words">{JSON.stringify(step.result, null, 2)}</pre>
-          }
+          {step.error ? (
+            <span className="text-red-500">{step.error}</span>
+          ) : (
+            <pre className="whitespace-pre-wrap break-words">{JSON.stringify(step.result, null, 2)}</pre>
+          )}
         </div>
       )}
     </div>
@@ -136,9 +156,9 @@ function ApprovalCard({
 }: {
   approval: Approval;
   onApprove: (id: number) => void;
-  onReject:  (id: number) => void;
+  onReject: (id: number) => void;
   approvePending: boolean;
-  rejectPending:  boolean;
+  rejectPending: boolean;
 }) {
   const [showFull, setShowFull] = useState(false);
   const preview = approval.previewJson;
@@ -162,7 +182,7 @@ function ApprovalCard({
               variant="ghost"
               size="sm"
               className="text-xs h-7 px-2 gap-1.5 text-muted-foreground"
-              onClick={() => setShowFull(o => !o)}
+              onClick={() => setShowFull((o) => !o)}
               data-testid={`button-toggle-preview-${approval.id}`}
             >
               <Eye className="h-3 w-3" />
@@ -185,7 +205,11 @@ function ApprovalCard({
             data-testid={`button-approve-${approval.id}`}
             className="gap-1.5"
           >
-            {approvePending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+            {approvePending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <ShieldCheck className="h-3.5 w-3.5" />
+            )}
             Approve
           </Button>
           <Button
@@ -208,12 +232,12 @@ function ApprovalCard({
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AICommandCenter() {
   const { toast } = useToast();
-  const fileRef   = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  const [instruction,  setInstruction]  = useState("");
+  const [instruction, setInstruction] = useState("");
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [activeTaskId, setActiveTaskId] = useState<number | null>(null);
-  const [tab,          setTab]          = useState("task");
+  const [tab, setTab] = useState("task");
 
   // ── Queries ─────────────────────────────────────────────────────────────
   const tasksQuery = useQuery<AgentTask[]>({
@@ -221,8 +245,8 @@ export default function AICommandCenter() {
   });
 
   const taskDetailQuery = useQuery<AgentTaskDetail>({
-    queryKey:        ["/api/ai-agent/tasks", activeTaskId],
-    enabled:         !!activeTaskId,
+    queryKey: ["/api/ai-agent/tasks", activeTaskId],
+    enabled: !!activeTaskId,
     refetchInterval: (q) => {
       const s = (q.state.data as AgentTaskDetail | undefined)?.status;
       return s === "running" || s === "waiting_for_approval" ? 2000 : false;
@@ -238,22 +262,20 @@ export default function AICommandCenter() {
 
   // ── Mutations ────────────────────────────────────────────────────────────
   const createTask = useMutation({
-    mutationFn: (data: { instruction: string }) =>
-      apiRequest("POST", "/api/ai-agent/tasks", data),
+    mutationFn: (data: { instruction: string }) => apiRequest("POST", "/api/ai-agent/tasks", data),
     onSuccess: (task: any) => {
       setActiveTaskId(task.id);
       setInstruction("");
       setUploadedFile(null);
       setTab("task");
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
-      toast({ title: "Task created", description: `Plan ready — ${(task.plan?.steps?.length ?? 0)} step(s) generated` });
+      toast({ title: "Task created", description: `Plan ready — ${task.plan?.steps?.length ?? 0} step(s) generated` });
     },
     onError: (e: any) => toast({ title: "Failed to create task", description: e.message, variant: "destructive" }),
   });
 
   const runTask = useMutation({
-    mutationFn: (taskId: number) =>
-      apiRequest("POST", `/api/ai-agent/tasks/${taskId}/run`, {}),
+    mutationFn: (taskId: number) => apiRequest("POST", `/api/ai-agent/tasks/${taskId}/run`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks", activeTaskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
@@ -262,8 +284,7 @@ export default function AICommandCenter() {
   });
 
   const cancelTask = useMutation({
-    mutationFn: (taskId: number) =>
-      apiRequest("DELETE", `/api/ai-agent/tasks/${taskId}`),
+    mutationFn: (taskId: number) => apiRequest("DELETE", `/api/ai-agent/tasks/${taskId}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks", activeTaskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
@@ -271,8 +292,7 @@ export default function AICommandCenter() {
   });
 
   const approveAction = useMutation({
-    mutationFn: (approvalId: number) =>
-      apiRequest("POST", `/api/ai-agent/approvals/${approvalId}/approve`, {}),
+    mutationFn: (approvalId: number) => apiRequest("POST", `/api/ai-agent/approvals/${approvalId}/approve`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks", activeTaskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
@@ -282,8 +302,7 @@ export default function AICommandCenter() {
   });
 
   const rejectAction = useMutation({
-    mutationFn: (approvalId: number) =>
-      apiRequest("POST", `/api/ai-agent/approvals/${approvalId}/reject`, {}),
+    mutationFn: (approvalId: number) => apiRequest("POST", `/api/ai-agent/approvals/${approvalId}/reject`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks", activeTaskId] });
       queryClient.invalidateQueries({ queryKey: ["/api/ai-agent/tasks"] });
@@ -302,14 +321,14 @@ export default function AICommandCenter() {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit();
   };
 
-  const plan        = activeTask?.planJson;
-  const steps       = plan?.steps ?? [];
-  const approvals   = (activeTask?.approvals ?? []).filter(a => a.status === "pending");
-  const allTasks    = tasksQuery.data ?? [];
-  const statusCfg   = activeTask ? STATUS_CONFIG[activeTask.status] : null;
+  const plan = activeTask?.planJson;
+  const steps = plan?.steps ?? [];
+  const approvals = (activeTask?.approvals ?? []).filter((a) => a.status === "pending");
+  const allTasks = tasksQuery.data ?? [];
+  const statusCfg = activeTask ? STATUS_CONFIG[activeTask.status] : null;
 
-  const completedSteps = steps.filter(s => s.status === "completed").length;
-  const progress       = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
+  const completedSteps = steps.filter((s) => s.status === "completed").length;
+  const progress = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -327,10 +346,8 @@ export default function AICommandCenter() {
       {/* Body */}
       <div className="flex-1 overflow-auto">
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-0 h-full divide-y lg:divide-y-0 lg:divide-x">
-
           {/* ── Left panel — instruction + quick tips ── */}
           <div className="lg:col-span-2 p-5 flex flex-col gap-4 bg-muted/20">
-
             {/* Instruction box */}
             <Card>
               <CardHeader className="pb-2">
@@ -343,7 +360,7 @@ export default function AICommandCenter() {
                 <Textarea
                   placeholder={`Describe what you want the AI to do…\ne.g. Find all items with low stock and prepare a list\ne.g. Check if supplier ACME has unpaid balances\n\n${typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌘+Return" : "Ctrl+Enter"} to submit`}
                   value={instruction}
-                  onChange={e => setInstruction(e.target.value)}
+                  onChange={(e) => setInstruction(e.target.value)}
                   onKeyDown={handleKeyDown}
                   rows={5}
                   data-testid="textarea-instruction"
@@ -357,16 +374,17 @@ export default function AICommandCenter() {
                   data-testid="area-file-upload"
                 >
                   <Upload className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                  {uploadedFile
-                    ? <p className="text-xs text-foreground font-medium truncate">{uploadedFile.name}</p>
-                    : <p className="text-xs text-muted-foreground">Attach an Excel file (optional)</p>
-                  }
+                  {uploadedFile ? (
+                    <p className="text-xs text-foreground font-medium truncate">{uploadedFile.name}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Attach an Excel file (optional)</p>
+                  )}
                   <input
                     ref={fileRef}
                     type="file"
                     accept=".xlsx,.xls,.csv"
                     className="hidden"
-                    onChange={e => setUploadedFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => setUploadedFile(e.target.files?.[0] ?? null)}
                     data-testid="input-file-upload"
                   />
                 </div>
@@ -377,10 +395,15 @@ export default function AICommandCenter() {
                   disabled={!instruction.trim() || createTask.isPending}
                   data-testid="button-submit-instruction"
                 >
-                  {createTask.isPending
-                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating plan…</>
-                    : <><Bot className="h-4 w-4" /> Generate Plan</>
-                  }
+                  {createTask.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Generating plan…
+                    </>
+                  ) : (
+                    <>
+                      <Bot className="h-4 w-4" /> Generate Plan
+                    </>
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -402,7 +425,7 @@ export default function AICommandCenter() {
                     "Get today's sales summary and top items",
                     "Prepare a payment voucher draft for $5,000",
                     "Check pricing health — any items selling below cost?",
-                  ].map(ex => (
+                  ].map((ex) => (
                     <button
                       key={ex}
                       className="w-full text-left text-xs text-muted-foreground py-1.5 px-2.5 rounded-md hover-elevate transition-colors leading-tight"
@@ -458,10 +481,13 @@ export default function AICommandCenter() {
                     <CardHeader className="pb-3 flex flex-row items-start justify-between gap-3 flex-wrap">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                          <Badge variant="secondary" className="text-xs">{formatTaskType(activeTask.taskType)}</Badge>
+                          <Badge variant="secondary" className="text-xs">
+                            {formatTaskType(activeTask.taskType)}
+                          </Badge>
                           {statusCfg && (
                             <Badge variant={statusCfg.variant} className="text-xs gap-1">
-                              {statusCfg.icon}{statusCfg.label}
+                              {statusCfg.icon}
+                              {statusCfg.label}
                             </Badge>
                           )}
                         </div>
@@ -482,10 +508,11 @@ export default function AICommandCenter() {
                             data-testid="button-run-task"
                             className="gap-1.5"
                           >
-                            {runTask.isPending
-                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              : <Play className="h-3.5 w-3.5" />
-                            }
+                            {runTask.isPending ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Play className="h-3.5 w-3.5" />
+                            )}
                             Run
                           </Button>
                         )}
@@ -507,7 +534,9 @@ export default function AICommandCenter() {
                     {steps.length > 0 && (
                       <div className="px-6 pb-2">
                         <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-muted-foreground">{completedSteps} / {steps.length} steps</span>
+                          <span className="text-xs text-muted-foreground">
+                            {completedSteps} / {steps.length} steps
+                          </span>
                           <span className="text-xs text-muted-foreground">{progress}%</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-muted overflow-hidden">
@@ -523,7 +552,7 @@ export default function AICommandCenter() {
                     {steps.length > 0 && (
                       <CardContent className="pt-2">
                         <div className="space-y-0.5">
-                          {steps.map(step => (
+                          {steps.map((step) => (
                             <StepRow key={step.id} step={step} />
                           ))}
                         </div>
@@ -547,7 +576,9 @@ export default function AICommandCenter() {
                   <div className="flex items-center justify-between rounded-md bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/40 px-4 py-3">
                     <div className="flex items-center gap-2">
                       <CheckCheck className="h-4 w-4 text-green-600" />
-                      <span className="text-sm font-medium text-green-800 dark:text-green-300">Task completed successfully</span>
+                      <span className="text-sm font-medium text-green-800 dark:text-green-300">
+                        Task completed successfully
+                      </span>
                     </div>
                     <Button
                       size="sm"
@@ -572,12 +603,12 @@ export default function AICommandCenter() {
                     <p className="text-xs mt-1">When the AI prepares a draft action, it will appear here</p>
                   </div>
                 )}
-                {approvals.map(approval => (
+                {approvals.map((approval) => (
                   <ApprovalCard
                     key={approval.id}
                     approval={approval}
-                    onApprove={id => approveAction.mutate(id)}
-                    onReject={id => rejectAction.mutate(id)}
+                    onApprove={(id) => approveAction.mutate(id)}
+                    onReject={(id) => rejectAction.mutate(id)}
                     approvePending={approveAction.isPending}
                     rejectPending={rejectAction.isPending}
                   />
@@ -599,7 +630,7 @@ export default function AICommandCenter() {
                 )}
                 {allTasks.length > 0 && (
                   <div className="space-y-1.5">
-                    {allTasks.map(task => {
+                    {allTasks.map((task) => {
                       const cfg = STATUS_CONFIG[task.status];
                       const isActive = task.id === activeTaskId;
                       return (
@@ -608,7 +639,10 @@ export default function AICommandCenter() {
                           className={`w-full text-left rounded-md px-3 py-2.5 hover-elevate transition-colors flex items-start gap-3 ${
                             isActive ? "bg-primary/5 ring-1 ring-primary/20" : ""
                           }`}
-                          onClick={() => { setActiveTaskId(task.id); setTab("task"); }}
+                          onClick={() => {
+                            setActiveTaskId(task.id);
+                            setTab("task");
+                          }}
                           data-testid={`button-task-history-${task.id}`}
                         >
                           <div className="mt-0.5 shrink-0">{cfg.icon}</div>
@@ -635,8 +669,9 @@ export default function AICommandCenter() {
             <div className="flex items-start gap-2 text-muted-foreground/60">
               <ShieldCheck className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <p className="text-xs leading-relaxed">
-                The AI never posts vouchers, stock adjustments, purchase orders, or price changes without your explicit approval.
-                All write actions appear as draft previews in the <strong>Approvals</strong> tab before anything is recorded.
+                The AI never posts vouchers, stock adjustments, purchase orders, or price changes without your explicit
+                approval. All write actions appear as draft previews in the <strong>Approvals</strong> tab before
+                anything is recorded.
               </p>
             </div>
           </div>

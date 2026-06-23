@@ -9,14 +9,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 
@@ -53,14 +54,18 @@ interface RepaymentRecord {
   lastName: string;
 }
 
-interface CashAccount { id: number; name: string; code: string; }
+interface CashAccount {
+  id: number;
+  name: string;
+  code: string;
+}
 
 function fmt(val: string | number | null | undefined) {
   const n = parseFloat(String(val || 0));
   return isNaN(n) ? "0.00" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const today = () => new Date().toLocaleDateString('en-CA');
+const today = () => new Date().toLocaleDateString("en-CA");
 
 export default function FactoryEmployeeAdvancesTab() {
   const { toast } = useToast();
@@ -70,7 +75,13 @@ export default function FactoryEmployeeAdvancesTab() {
   const [repayOpen, setRepayOpen] = useState<AdvanceRecord | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<AdvanceRecord | null>(null);
 
-  const [addForm, setAddForm] = useState({ employeeId: "", advanceDate: today(), amount: "", cashAccountId: "", notes: "" });
+  const [addForm, setAddForm] = useState({
+    employeeId: "",
+    advanceDate: today(),
+    amount: "",
+    cashAccountId: "",
+    notes: "",
+  });
   const [repayForm, setRepayForm] = useState({ repaymentDate: today(), amount: "", cashAccountId: "", notes: "" });
 
   const { data: employees = [] } = useQuery<Employee[]>({
@@ -128,7 +139,10 @@ export default function FactoryEmployeeAdvancesTab() {
           notes: addForm.notes || null,
         }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -154,7 +168,10 @@ export default function FactoryEmployeeAdvancesTab() {
           notes: repayForm.notes || null,
         }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -170,7 +187,10 @@ export default function FactoryEmployeeAdvancesTab() {
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/factory/employee-advances/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
     },
     onSuccess: () => {
       toast({ title: "Advance deleted" });
@@ -180,13 +200,13 @@ export default function FactoryEmployeeAdvancesTab() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const totalOutstanding = useMemo(() =>
-    advances.filter((a) => !a.fullyPaid).reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0)
-  , [advances]);
+  const totalOutstanding = useMemo(
+    () => advances.filter((a) => !a.fullyPaid).reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0),
+    [advances]
+  );
 
   return (
     <div className="space-y-5">
-
       {/* Filter + actions row */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={empFilter} onValueChange={setEmpFilter}>
@@ -196,7 +216,9 @@ export default function FactoryEmployeeAdvancesTab() {
           <SelectContent>
             <SelectItem value="all">All Employees</SelectItem>
             {employees.map((e) => (
-              <SelectItem key={e.id} value={String(e.id)}>{e.firstName} {e.lastName}</SelectItem>
+              <SelectItem key={e.id} value={String(e.id)}>
+                {e.firstName} {e.lastName}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -240,12 +262,24 @@ export default function FactoryEmployeeAdvancesTab() {
             {isLoading ? (
               [...Array(4)].map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-28" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-20" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-16 ml-auto" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-16 ml-auto" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-5 w-16 rounded-full" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-24" />
+                  </TableCell>
                   <TableCell></TableCell>
                 </TableRow>
               ))
@@ -258,46 +292,76 @@ export default function FactoryEmployeeAdvancesTab() {
                     </div>
                     <p className="text-sm font-medium">No advances found</p>
                     <p className="text-xs text-muted-foreground">
-                      {statusFilter !== "all" || empFilter !== "all" ? "Try adjusting your filters" : "Add an advance to get started"}
+                      {statusFilter !== "all" || empFilter !== "all"
+                        ? "Try adjusting your filters"
+                        : "Add an advance to get started"}
                     </p>
                   </div>
                 </TableCell>
               </TableRow>
-            ) : advances.map((adv) => (
-              <TableRow key={adv.id} className="hover:bg-muted/40" data-testid={`row-advance-${adv.id}`}>
-                <TableCell className="font-medium py-3">{adv.firstName} {adv.lastName}</TableCell>
-                <TableCell className="py-3 text-sm text-muted-foreground">{adv.advanceDate}</TableCell>
-                <TableCell className="py-3 text-right font-mono text-sm">${fmt(adv.amount)}</TableCell>
-                <TableCell className="py-3 text-right font-mono text-sm">
-                  {adv.fullyPaid
-                    ? <span className="text-muted-foreground/40">—</span>
-                    : <span className="text-amber-600 dark:text-amber-400">${fmt(adv.remainingBalance)}</span>}
-                </TableCell>
-                <TableCell className="py-3">
-                  <Badge
-                    variant="secondary"
-                    className={`text-xs no-default-active-elevate ${adv.fullyPaid
-                      ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
-                      : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"}`}
-                  >
-                    {adv.fullyPaid ? "Paid" : "Open"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="py-3 text-sm text-muted-foreground max-w-32 truncate">{adv.notes || "—"}</TableCell>
-                <TableCell className="py-3">
-                  <div className="flex gap-1 justify-end">
-                    {!adv.fullyPaid && (
-                      <Button size="sm" variant="outline" onClick={() => { setRepayOpen(adv); setRepayForm({ repaymentDate: today(), amount: adv.remainingBalance, cashAccountId: "", notes: "" }); }} data-testid={`button-repay-${adv.id}`}>
-                        <RotateCcw className="h-3 w-3 mr-1" /> Repay
-                      </Button>
+            ) : (
+              advances.map((adv) => (
+                <TableRow key={adv.id} className="hover:bg-muted/40" data-testid={`row-advance-${adv.id}`}>
+                  <TableCell className="font-medium py-3">
+                    {adv.firstName} {adv.lastName}
+                  </TableCell>
+                  <TableCell className="py-3 text-sm text-muted-foreground">{adv.advanceDate}</TableCell>
+                  <TableCell className="py-3 text-right font-mono text-sm">${fmt(adv.amount)}</TableCell>
+                  <TableCell className="py-3 text-right font-mono text-sm">
+                    {adv.fullyPaid ? (
+                      <span className="text-muted-foreground/40">—</span>
+                    ) : (
+                      <span className="text-amber-600 dark:text-amber-400">${fmt(adv.remainingBalance)}</span>
                     )}
-                    <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(adv)} data-testid={`button-delete-advance-${adv.id}`}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <Badge
+                      variant="secondary"
+                      className={`text-xs no-default-active-elevate ${
+                        adv.fullyPaid
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300"
+                          : "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
+                      }`}
+                    >
+                      {adv.fullyPaid ? "Paid" : "Open"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="py-3 text-sm text-muted-foreground max-w-32 truncate">
+                    {adv.notes || "—"}
+                  </TableCell>
+                  <TableCell className="py-3">
+                    <div className="flex gap-1 justify-end">
+                      {!adv.fullyPaid && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setRepayOpen(adv);
+                            setRepayForm({
+                              repaymentDate: today(),
+                              amount: adv.remainingBalance,
+                              cashAccountId: "",
+                              notes: "",
+                            });
+                          }}
+                          data-testid={`button-repay-${adv.id}`}
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" /> Repay
+                        </Button>
+                      )}
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setDeleteConfirm(adv)}
+                        data-testid={`button-delete-advance-${adv.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
@@ -317,7 +381,9 @@ export default function FactoryEmployeeAdvancesTab() {
                 </SelectTrigger>
                 <SelectContent>
                   {employees.map((e) => (
-                    <SelectItem key={e.id} value={String(e.id)}>{e.firstName} {e.lastName}</SelectItem>
+                    <SelectItem key={e.id} value={String(e.id)}>
+                      {e.firstName} {e.lastName}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -325,34 +391,62 @@ export default function FactoryEmployeeAdvancesTab() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Date</Label>
-                <Input type="date" value={addForm.advanceDate} onChange={(e) => setAddForm((f) => ({ ...f, advanceDate: e.target.value }))} data-testid="input-advance-date" />
+                <Input
+                  type="date"
+                  value={addForm.advanceDate}
+                  onChange={(e) => setAddForm((f) => ({ ...f, advanceDate: e.target.value }))}
+                  data-testid="input-advance-date"
+                />
               </div>
               <div>
                 <Label>Amount</Label>
-                <Input type="number" placeholder="0.00" value={addForm.amount} onChange={(e) => setAddForm((f) => ({ ...f, amount: e.target.value }))} data-testid="input-advance-amount" />
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={addForm.amount}
+                  onChange={(e) => setAddForm((f) => ({ ...f, amount: e.target.value }))}
+                  data-testid="input-advance-amount"
+                />
               </div>
             </div>
             <div>
               <Label>Cash Account (optional)</Label>
-              <Select value={addForm.cashAccountId} onValueChange={(v) => setAddForm((f) => ({ ...f, cashAccountId: v }))}>
+              <Select
+                value={addForm.cashAccountId}
+                onValueChange={(v) => setAddForm((f) => ({ ...f, cashAccountId: v }))}
+              >
                 <SelectTrigger data-testid="select-cash-account">
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Notes</Label>
-              <Textarea placeholder="Optional notes..." value={addForm.notes} onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))} rows={2} data-testid="input-advance-notes" />
+              <Textarea
+                placeholder="Optional notes..."
+                value={addForm.notes}
+                onChange={(e) => setAddForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                data-testid="input-advance-notes"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
-            <Button onClick={() => addMutation.mutate()} disabled={addMutation.isPending || !addForm.employeeId || !addForm.amount} data-testid="button-confirm-add-advance">
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => addMutation.mutate()}
+              disabled={addMutation.isPending || !addForm.employeeId || !addForm.amount}
+              data-testid="button-confirm-add-advance"
+            >
               {addMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Save Advance
             </Button>
@@ -372,34 +466,62 @@ export default function FactoryEmployeeAdvancesTab() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Date</Label>
-                <Input type="date" value={repayForm.repaymentDate} onChange={(e) => setRepayForm((f) => ({ ...f, repaymentDate: e.target.value }))} data-testid="input-repay-date" />
+                <Input
+                  type="date"
+                  value={repayForm.repaymentDate}
+                  onChange={(e) => setRepayForm((f) => ({ ...f, repaymentDate: e.target.value }))}
+                  data-testid="input-repay-date"
+                />
               </div>
               <div>
                 <Label>Amount</Label>
-                <Input type="number" placeholder="0.00" value={repayForm.amount} onChange={(e) => setRepayForm((f) => ({ ...f, amount: e.target.value }))} data-testid="input-repay-amount" />
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={repayForm.amount}
+                  onChange={(e) => setRepayForm((f) => ({ ...f, amount: e.target.value }))}
+                  data-testid="input-repay-amount"
+                />
               </div>
             </div>
             <div>
               <Label>Cash Account (optional)</Label>
-              <Select value={repayForm.cashAccountId} onValueChange={(v) => setRepayForm((f) => ({ ...f, cashAccountId: v }))}>
+              <Select
+                value={repayForm.cashAccountId}
+                onValueChange={(v) => setRepayForm((f) => ({ ...f, cashAccountId: v }))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Notes</Label>
-              <Textarea placeholder="Optional notes..." value={repayForm.notes} onChange={(e) => setRepayForm((f) => ({ ...f, notes: e.target.value }))} rows={2} data-testid="input-repay-notes" />
+              <Textarea
+                placeholder="Optional notes..."
+                value={repayForm.notes}
+                onChange={(e) => setRepayForm((f) => ({ ...f, notes: e.target.value }))}
+                rows={2}
+                data-testid="input-repay-notes"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRepayOpen(null)}>Cancel</Button>
-            <Button onClick={() => repayMutation.mutate()} disabled={repayMutation.isPending || !repayForm.amount} data-testid="button-confirm-repay">
+            <Button variant="outline" onClick={() => setRepayOpen(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => repayMutation.mutate()}
+              disabled={repayMutation.isPending || !repayForm.amount}
+              data-testid="button-confirm-repay"
+            >
               {repayMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Record Repayment
             </Button>
@@ -412,12 +534,20 @@ export default function FactoryEmployeeAdvancesTab() {
           <DialogHeader>
             <DialogTitle>Delete Advance</DialogTitle>
             <DialogDescription>
-              This will permanently delete the advance of {deleteConfirm && fmt(deleteConfirm.amount)} for {deleteConfirm?.firstName} {deleteConfirm?.lastName} along with all repayments. This cannot be undone.
+              This will permanently delete the advance of {deleteConfirm && fmt(deleteConfirm.amount)} for{" "}
+              {deleteConfirm?.firstName} {deleteConfirm?.lastName} along with all repayments. This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id)} disabled={deleteMutation.isPending} data-testid="button-confirm-delete-advance">
+            <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-advance"
+            >
               {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Delete
             </Button>

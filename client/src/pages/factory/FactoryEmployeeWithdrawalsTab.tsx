@@ -10,14 +10,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
@@ -30,14 +31,18 @@ interface Employee {
   currentBalance: string;
 }
 
-interface CashAccount { id: number; name: string; code: string; }
+interface CashAccount {
+  id: number;
+  name: string;
+  code: string;
+}
 
 function fmt(v: string | number | null | undefined) {
   const n = parseFloat(String(v || 0));
   return isNaN(n) ? "0.00" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const today = () => new Date().toLocaleDateString('en-CA');
+const today = () => new Date().toLocaleDateString("en-CA");
 
 export default function FactoryEmployeeWithdrawalsTab() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -92,7 +97,10 @@ export default function FactoryEmployeeWithdrawalsTab() {
           notes: singleForm.notes || undefined,
         }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -121,11 +129,17 @@ export default function FactoryEmployeeWithdrawalsTab() {
           notes: bulkForm.notes || undefined,
         }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: "Bulk withdrawal recorded", description: `${data.results?.length ?? 0} employees — Total: ${fmt(data.totalAmount)}` });
+      toast({
+        title: "Bulk withdrawal recorded",
+        description: `${data.results?.length ?? 0} employees — Total: ${fmt(data.totalAmount)}`,
+      });
       setBulkOpen(false);
       setBulkAmounts({});
       setBulkForm({ date: today(), cashAccountId: "", notes: "" });
@@ -134,8 +148,8 @@ export default function FactoryEmployeeWithdrawalsTab() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const bulkTotal = useMemo(() =>
-    Object.values(bulkAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0),
+  const bulkTotal = useMemo(
+    () => Object.values(bulkAmounts).reduce((s, v) => s + (parseFloat(v) || 0), 0),
     [bulkAmounts]
   );
 
@@ -191,16 +205,23 @@ export default function FactoryEmployeeWithdrawalsTab() {
                     const bal = parseFloat(emp.currentBalance || "0");
                     return (
                       <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`}>
-                        <TableCell className="font-medium">{emp.firstName} {emp.lastName}</TableCell>
+                        <TableCell className="font-medium">
+                          {emp.firstName} {emp.lastName}
+                        </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{emp.code || "—"}</TableCell>
-                        <TableCell className={`text-right font-mono ${bal < 0 ? "text-red-600 dark:text-red-400" : ""}`}>
+                        <TableCell
+                          className={`text-right font-mono ${bal < 0 ? "text-red-600 dark:text-red-400" : ""}`}
+                        >
                           {fmt(emp.currentBalance)}
                         </TableCell>
                         <TableCell>
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => { setSingleForm((f) => ({ ...f, employeeId: String(emp.id) })); setSingleOpen(true); }}
+                            onClick={() => {
+                              setSingleForm((f) => ({ ...f, employeeId: String(emp.id) }));
+                              setSingleOpen(true);
+                            }}
                             data-testid={`button-withdraw-${emp.id}`}
                           >
                             <ArrowDownCircle className="h-3 w-3 mr-1" /> Withdraw
@@ -219,12 +240,23 @@ export default function FactoryEmployeeWithdrawalsTab() {
                   <Card key={emp.id} data-testid={`card-employee-${emp.id}`}>
                     <CardContent className="p-3 flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-medium text-sm">{emp.firstName} {emp.lastName}</p>
-                        <p className={`text-sm font-mono ${bal < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
+                        <p className="font-medium text-sm">
+                          {emp.firstName} {emp.lastName}
+                        </p>
+                        <p
+                          className={`text-sm font-mono ${bal < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}
+                        >
                           {fmt(emp.currentBalance)}
                         </p>
                       </div>
-                      <Button size="sm" variant="outline" onClick={() => { setSingleForm((f) => ({ ...f, employeeId: String(emp.id) })); setSingleOpen(true); }}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSingleForm((f) => ({ ...f, employeeId: String(emp.id) }));
+                          setSingleOpen(true);
+                        }}
+                      >
                         <ArrowDownCircle className="h-3 w-3 mr-1" /> Withdraw
                       </Button>
                     </CardContent>
@@ -237,7 +269,12 @@ export default function FactoryEmployeeWithdrawalsTab() {
       )}
 
       {/* Single Withdrawal Dialog */}
-      <Dialog open={singleOpen} onOpenChange={(o) => { if (!o) setSingleOpen(false); }}>
+      <Dialog
+        open={singleOpen}
+        onOpenChange={(o) => {
+          if (!o) setSingleOpen(false);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Withdraw — Single Employee</DialogTitle>
@@ -246,7 +283,10 @@ export default function FactoryEmployeeWithdrawalsTab() {
           <div className="space-y-3">
             <div>
               <Label>Employee</Label>
-              <Select value={singleForm.employeeId} onValueChange={(v) => setSingleForm((f) => ({ ...f, employeeId: v }))}>
+              <Select
+                value={singleForm.employeeId}
+                onValueChange={(v) => setSingleForm((f) => ({ ...f, employeeId: v }))}
+              >
                 <SelectTrigger data-testid="select-single-employee">
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
@@ -261,43 +301,74 @@ export default function FactoryEmployeeWithdrawalsTab() {
               </Select>
               {selectedEmp && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Current balance: <span className={parseFloat(selectedEmp.currentBalance || "0") < 0 ? "text-red-500" : ""}>{fmt(selectedEmp.currentBalance)}</span>
+                  Current balance:{" "}
+                  <span className={parseFloat(selectedEmp.currentBalance || "0") < 0 ? "text-red-500" : ""}>
+                    {fmt(selectedEmp.currentBalance)}
+                  </span>
                 </p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Date</Label>
-                <Input type="date" value={singleForm.date} onChange={(e) => setSingleForm((f) => ({ ...f, date: e.target.value }))} data-testid="input-withdraw-date" />
+                <Input
+                  type="date"
+                  value={singleForm.date}
+                  onChange={(e) => setSingleForm((f) => ({ ...f, date: e.target.value }))}
+                  data-testid="input-withdraw-date"
+                />
               </div>
               <div>
                 <Label>Amount</Label>
-                <Input type="number" placeholder="0.00" min="0" step="0.01" value={singleForm.amount} onChange={(e) => setSingleForm((f) => ({ ...f, amount: e.target.value }))} data-testid="input-withdraw-amount" />
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  min="0"
+                  step="0.01"
+                  value={singleForm.amount}
+                  onChange={(e) => setSingleForm((f) => ({ ...f, amount: e.target.value }))}
+                  data-testid="input-withdraw-amount"
+                />
               </div>
             </div>
             <div>
               <Label>Cash Account</Label>
-              <Select value={singleForm.cashAccountId} onValueChange={(v) => setSingleForm((f) => ({ ...f, cashAccountId: v }))}>
+              <Select
+                value={singleForm.cashAccountId}
+                onValueChange={(v) => setSingleForm((f) => ({ ...f, cashAccountId: v }))}
+              >
                 <SelectTrigger data-testid="select-cash-account">
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <Label>Notes (optional)</Label>
-              <Textarea placeholder="Optional notes…" rows={2} value={singleForm.notes} onChange={(e) => setSingleForm((f) => ({ ...f, notes: e.target.value }))} data-testid="input-withdraw-notes" />
+              <Textarea
+                placeholder="Optional notes…"
+                rows={2}
+                value={singleForm.notes}
+                onChange={(e) => setSingleForm((f) => ({ ...f, notes: e.target.value }))}
+                data-testid="input-withdraw-notes"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSingleOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setSingleOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => wrapAdminAction(() => singleMutation.mutate(), "Record Withdrawal")}
-              disabled={singleMutation.isPending || !singleForm.employeeId || !singleForm.amount || !singleForm.cashAccountId}
+              disabled={
+                singleMutation.isPending || !singleForm.employeeId || !singleForm.amount || !singleForm.cashAccountId
+              }
               data-testid="button-confirm-single-withdraw"
             >
               {singleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
@@ -308,7 +379,12 @@ export default function FactoryEmployeeWithdrawalsTab() {
       </Dialog>
 
       {/* Bulk Withdrawal Dialog */}
-      <Dialog open={bulkOpen} onOpenChange={(o) => { if (!o) setBulkOpen(false); }}>
+      <Dialog
+        open={bulkOpen}
+        onOpenChange={(o) => {
+          if (!o) setBulkOpen(false);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Bulk Withdrawal — All Employees</DialogTitle>
@@ -318,17 +394,27 @@ export default function FactoryEmployeeWithdrawalsTab() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Date</Label>
-                <Input type="date" value={bulkForm.date} onChange={(e) => setBulkForm((f) => ({ ...f, date: e.target.value }))} data-testid="input-bulk-date" />
+                <Input
+                  type="date"
+                  value={bulkForm.date}
+                  onChange={(e) => setBulkForm((f) => ({ ...f, date: e.target.value }))}
+                  data-testid="input-bulk-date"
+                />
               </div>
               <div>
                 <Label>Cash Account</Label>
-                <Select value={bulkForm.cashAccountId} onValueChange={(v) => setBulkForm((f) => ({ ...f, cashAccountId: v }))}>
+                <Select
+                  value={bulkForm.cashAccountId}
+                  onValueChange={(v) => setBulkForm((f) => ({ ...f, cashAccountId: v }))}
+                >
                   <SelectTrigger data-testid="select-bulk-cash-account">
                     <SelectValue placeholder="Select account" />
                   </SelectTrigger>
                   <SelectContent>
                     {cashAccounts.map((a) => (
-                      <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      <SelectItem key={a.id} value={String(a.id)}>
+                        {a.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -336,7 +422,13 @@ export default function FactoryEmployeeWithdrawalsTab() {
             </div>
             <div>
               <Label>Notes (optional)</Label>
-              <Textarea placeholder="Optional notes for all entries…" rows={2} value={bulkForm.notes} onChange={(e) => setBulkForm((f) => ({ ...f, notes: e.target.value }))} data-testid="input-bulk-notes" />
+              <Textarea
+                placeholder="Optional notes for all entries…"
+                rows={2}
+                value={bulkForm.notes}
+                onChange={(e) => setBulkForm((f) => ({ ...f, notes: e.target.value }))}
+                data-testid="input-bulk-notes"
+              />
             </div>
             <Separator />
             <div className="space-y-2">
@@ -347,7 +439,9 @@ export default function FactoryEmployeeWithdrawalsTab() {
               {employees.map((emp) => (
                 <div key={emp.id} className="flex items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{emp.firstName} {emp.lastName}</p>
+                    <p className="text-sm font-medium truncate">
+                      {emp.firstName} {emp.lastName}
+                    </p>
                     <p className="text-xs text-muted-foreground">Balance: {fmt(emp.currentBalance)}</p>
                   </div>
                   <Input
@@ -365,7 +459,9 @@ export default function FactoryEmployeeWithdrawalsTab() {
             </div>
           </div>
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setBulkOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setBulkOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => wrapAdminAction(() => bulkMutation.mutate(), "Record Bulk Withdrawal")}
               disabled={bulkMutation.isPending || !bulkForm.cashAccountId || bulkTotal <= 0}

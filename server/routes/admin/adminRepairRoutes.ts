@@ -4,55 +4,140 @@ import { db, pool } from "../../db";
 import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { sqlArray } from "../../lib/sqlArray";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "../_helpers";
+import {
+  upload,
+  logAudit,
+  getCurrentExchangeRate,
+  calculateHistoricalLocationInventory,
+  syncEmployeeBalancesFromEntries,
+} from "../_helpers";
 import { computeRawBalance } from "./userManagementRoutes";
 import {
-  factoryCategories, factoryBaleProducts, factoryContainers, factoryRawStock,
-  factoryRawMaterialAdjustments, factoryMixBatches, factoryBales,
-  customerProformas, customerProformaLines, customerOrders, customerOrderLines,
-  customerOrderBales, customerOrderCharges, proformaStockReservations,
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockTransferRevisionItems, stockGroupLocationArchiveItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, insertVoucherSchema, insertVoucherEntrySchema,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryRawMaterialAdjustments,
+  factoryMixBatches,
+  factoryBales,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  proformaStockReservations,
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockTransferRevisionItems,
+  stockGroupLocationArchiveItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  insertVoucherSchema,
+  insertVoucherEntrySchema,
   insertSalesItemSchema,
-  suppliers, customers, customerBalances, locations, employees, userLocations,
-  auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
-  ledgerAccounts, insertLedgerAccountSchema, 
-  companies, users, userCompanyRoles, companySettings,
-  FEATURE_KEYS, fiscalPeriodClosures,
-  wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
-  bales, baleProducts, baleProductCategories, baleTransfers,
-  insertBaleSchema, insertBaleTransferSchema,
-  
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  suppliers,
+  customers,
+  customerBalances,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  companies,
+  users,
+  userCompanyRoles,
+  companySettings,
+  FEATURE_KEYS,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  insertWasteDispatchSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  baleTransfers,
+  insertBaleSchema,
+  insertBaleTransferSchema,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, 
-  pendingBarcodes, insertPendingBarcodeSchema,
-  storedFiles, fileFolders, spreadsheets, liveSpreadsheets,
-  agentAccounts, insertAgentAccountSchema,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  storedFiles,
+  fileFolders,
+  spreadsheets,
+  liveSpreadsheets,
+  agentAccounts,
+  insertAgentAccountSchema,
   freightAccounts,
   snapshotPinnedAccounts,
-  salaryAdvances, salaryAdvanceDeductions,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
-  employeeGroupMembers, employeeBaleRates, employeeBalePctRates,
-  erpWorkerDocs, erpPayrollRunItems,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
+  employeeGroupMembers,
+  employeeBaleRates,
+  employeeBalePctRates,
+  erpWorkerDocs,
+  erpPayrollRunItems,
   chatMessages,
   propertyPayments,
   factoryTransporterTransactions,
-  
   systemSettings,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -61,8 +146,6 @@ import { adjustInventory, reverseInventoryByExactValue } from "../../inventoryHe
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../../netPositionHelper";
 import path from "path";
 import fs from "fs";
-
-
 
 export function registerAdminRepairRoutes(app: Express) {
   app.post("/api/admin/recalculate-equity-adjustment", requireAuth, requireRole("Admin"), async (req, res) => {
@@ -78,20 +161,19 @@ export function registerAdminRepairRoutes(app: Express) {
 
       // Get current equity adjustment for the "previous" value in the response
       const settingKey = `equity_adjustment_${companyId}`;
-      const existingAdjustment = await db
-        .select()
-        .from(systemSettings)
-        .where(eq(systemSettings.key, settingKey));
-      const currentAdjustment = existingAdjustment.length > 0
-        ? parseFloat(existingAdjustment[0].value || "0")
-        : 0;
+      const existingAdjustment = await db.select().from(systemSettings).where(eq(systemSettings.key, settingKey));
+      const currentAdjustment = existingAdjustment.length > 0 ? parseFloat(existingAdjustment[0].value || "0") : 0;
 
       const newAdjustment = -rawBalance;
 
       // Atomic upsert — avoids race conditions and duplicate key errors
-      await db.insert(systemSettings)
+      await db
+        .insert(systemSettings)
         .values({ key: settingKey, value: newAdjustment.toFixed(2) })
-        .onConflictDoUpdate({ target: systemSettings.key, set: { value: newAdjustment.toFixed(2), updatedAt: new Date() } });
+        .onConflictDoUpdate({
+          target: systemSettings.key,
+          set: { value: newAdjustment.toFixed(2), updatedAt: new Date() },
+        });
 
       res.json({
         success: true,
@@ -116,7 +198,13 @@ export function registerAdminRepairRoutes(app: Express) {
       // computeRawBalance is defined at module scope above — shared with single-company endpoint.
       // Kept as a placeholder comment for readability only.
 
-      const results: Array<{ companyId: number; companyName: string; rawBalance: number; newAdjustment: number | null; skipped: boolean }> = [];
+      const results: Array<{
+        companyId: number;
+        companyName: string;
+        rawBalance: number;
+        newAdjustment: number | null;
+        skipped: boolean;
+      }> = [];
 
       for (const company of allCompanies) {
         const rawBalance = await computeRawBalance(company.id);
@@ -125,16 +213,20 @@ export function registerAdminRepairRoutes(app: Express) {
 
         if (!skipped) {
           const settingKey = `equity_adjustment_${company.id}`;
-          await db.insert(systemSettings)
+          await db
+            .insert(systemSettings)
             .values({ key: settingKey, value: newAdjustment!.toFixed(2) })
-            .onConflictDoUpdate({ target: systemSettings.key, set: { value: newAdjustment!.toFixed(2), updatedAt: new Date() } });
+            .onConflictDoUpdate({
+              target: systemSettings.key,
+              set: { value: newAdjustment!.toFixed(2), updatedAt: new Date() },
+            });
         }
 
         results.push({ companyId: company.id, companyName: company.name, rawBalance, newAdjustment, skipped });
       }
 
-      const adjustedCount = results.filter(r => !r.skipped).length;
-      const skippedCount  = results.filter(r =>  r.skipped).length;
+      const adjustedCount = results.filter((r) => !r.skipped).length;
+      const skippedCount = results.filter((r) => r.skipped).length;
 
       res.json({
         success: true,
@@ -170,27 +262,17 @@ export function registerAdminRepairRoutes(app: Express) {
         })
         .from(salesItems)
         .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            isNotNull(vouchers.deletedAt)
-          )
-        );
+        .where(and(eq(vouchers.companyId, companyId), isNotNull(vouchers.deletedAt)));
 
       // Also find completely orphaned salesItems (no voucher at all) - these are dangerous orphans
       // Get all salesItem voucherIds that don't have corresponding vouchers
-      const allSalesItemVoucherIds = await db
-        .selectDistinct({ voucherId: salesItems.voucherId })
-        .from(salesItems);
-      
-      const existingVoucherIds = new Set(
-        (await db.select({ id: vouchers.id }).from(vouchers))
-          .map(v => v.id)
-      );
-      
+      const allSalesItemVoucherIds = await db.selectDistinct({ voucherId: salesItems.voucherId }).from(salesItems);
+
+      const existingVoucherIds = new Set((await db.select({ id: vouchers.id }).from(vouchers)).map((v) => v.id));
+
       const trulyOrphanedVoucherIds = allSalesItemVoucherIds
-        .filter(item => !existingVoucherIds.has(item.voucherId))
-        .map(item => item.voucherId);
+        .filter((item) => !existingVoucherIds.has(item.voucherId))
+        .map((item) => item.voucherId);
 
       let trulyOrphanedSalesItems: typeof orphanedSalesItemsForCompany = [];
       if (trulyOrphanedVoucherIds.length > 0) {
@@ -234,21 +316,14 @@ export function registerAdminRepairRoutes(app: Express) {
         })
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            isNotNull(vouchers.deletedAt)
-          )
-        );
+        .where(and(eq(vouchers.companyId, companyId), isNotNull(vouchers.deletedAt)));
 
       // Also find completely orphaned entries (no voucher at all)
-      const allEntryVoucherIds = await db
-        .selectDistinct({ voucherId: voucherEntries.voucherId })
-        .from(voucherEntries);
-      
+      const allEntryVoucherIds = await db.selectDistinct({ voucherId: voucherEntries.voucherId }).from(voucherEntries);
+
       const trulyOrphanedEntryVoucherIds = allEntryVoucherIds
-        .filter(item => item.voucherId && !existingVoucherIds.has(item.voucherId))
-        .map(item => item.voucherId);
+        .filter((item) => item.voucherId && !existingVoucherIds.has(item.voucherId))
+        .map((item) => item.voucherId);
 
       let trulyOrphanedEntries: typeof orphanedEntriesForCompany = [];
       if (trulyOrphanedEntryVoucherIds.length > 0) {
@@ -268,7 +343,7 @@ export function registerAdminRepairRoutes(app: Express) {
       if (allOrphanedEntries.length > 0) {
         const totalDebits = allOrphanedEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0);
         const totalCredits = allOrphanedEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0);
-        
+
         results.push({
           type: "orphaned_voucher_entries",
           count: allOrphanedEntries.length,
@@ -293,12 +368,7 @@ export function registerAdminRepairRoutes(app: Express) {
           quantity: inventory.quantity,
         })
         .from(inventory)
-        .where(
-          and(
-            eq(inventory.companyId, companyId),
-            sql`CAST(${inventory.quantity} AS DECIMAL) < 0`
-          )
-        );
+        .where(and(eq(inventory.companyId, companyId), sql`CAST(${inventory.quantity} AS DECIMAL) < 0`));
 
       if (negativeInventory.length > 0) {
         results.push({
@@ -386,7 +456,8 @@ export function registerAdminRepairRoutes(app: Express) {
         count: vouchersWithTotals.length,
         totalImpact,
         vouchers: vouchersWithTotals,
-        explanation: "These vouchers have a locationId that points to a deleted or non-existent location. They are orphaned and can be safely deleted.",
+        explanation:
+          "These vouchers have a locationId that points to a deleted or non-existent location. They are orphaned and can be safely deleted.",
       });
     } catch (error: any) {
       console.error("Orphaned POS sales check error:", error);
@@ -426,7 +497,7 @@ export function registerAdminRepairRoutes(app: Express) {
         return res.json({ message: "No orphaned POS sales found", deleted: 0 });
       }
 
-      const voucherIds = orphanedVouchers.map(v => v.id);
+      const voucherIds = orphanedVouchers.map((v) => v.id);
 
       // Use batch deletes with inArray for efficiency
       // Delete sales items first (foreign key constraint)
@@ -446,7 +517,7 @@ export function registerAdminRepairRoutes(app: Express) {
         deleted: deletedVouchers,
         deletedEntries,
         deletedSalesItems,
-        voucherNumbers: orphanedVouchers.map(v => v.voucherNumber),
+        voucherNumbers: orphanedVouchers.map((v) => v.voucherNumber),
       });
     } catch (error: any) {
       console.error("Delete orphaned POS sales error:", error);
@@ -456,7 +527,6 @@ export function registerAdminRepairRoutes(app: Express) {
 
   // Role Feature Permissions API
   // Get all role permissions for the current company
-
 
   app.post("/api/admin/rebuild-inventory", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
@@ -560,15 +630,9 @@ export function registerAdminRepairRoutes(app: Express) {
             }
           }
         } else {
-          const pos = await db
-            .select()
-            .from(purchaseOrders)
-            .where(eq(purchaseOrders.containerId, offload.containerId));
+          const pos = await db.select().from(purchaseOrders).where(eq(purchaseOrders.containerId, offload.containerId));
           for (const po of pos) {
-            const lineItems = await db
-              .select()
-              .from(poLineItems)
-              .where(eq(poLineItems.poId, po.id));
+            const lineItems = await db.select().from(poLineItems).where(eq(poLineItems.poId, po.id));
             for (const li of lineItems) {
               const qty = parseFloat(li.quantity || "0");
               const val = parseFloat(li.lineTotal || "0");
@@ -588,13 +652,7 @@ export function registerAdminRepairRoutes(app: Express) {
         })
         .from(stockTransferVouchers)
         .innerJoin(vouchers, eq(vouchers.id, stockTransferVouchers.voucherId))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            isNull(vouchers.deletedAt),
-            eq(vouchers.optional, false)
-          )
-        );
+        .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
 
       for (const transfer of activeTransfers) {
         const items = await db
@@ -624,13 +682,7 @@ export function registerAdminRepairRoutes(app: Express) {
         })
         .from(stockAdjustmentVouchers)
         .innerJoin(vouchers, eq(vouchers.id, stockAdjustmentVouchers.voucherId))
-        .where(
-          and(
-            eq(vouchers.companyId, companyId),
-            isNull(vouchers.deletedAt),
-            eq(vouchers.optional, false)
-          )
-        );
+        .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), eq(vouchers.optional, false)));
 
       for (const adj of activeAdjustments) {
         const items = await db
@@ -671,10 +723,7 @@ export function registerAdminRepairRoutes(app: Express) {
 
       for (const sale of activeSalesVouchers) {
         if (!sale.locationId) continue;
-        const items = await db
-          .select()
-          .from(salesItems)
-          .where(eq(salesItems.voucherId, sale.vId));
+        const items = await db.select().from(salesItems).where(eq(salesItems.voucherId, sale.vId));
 
         for (const item of items) {
           const qty = parseFloat(item.quantity || "0");
@@ -694,20 +743,14 @@ export function registerAdminRepairRoutes(app: Express) {
         .where(
           and(
             eq(vouchers.companyId, companyId),
-            or(
-              eq(vouchers.voucherType, "Credit Note"),
-              eq(vouchers.voucherType, "Debit Note")
-            ),
+            or(eq(vouchers.voucherType, "Credit Note"), eq(vouchers.voucherType, "Debit Note")),
             isNull(vouchers.deletedAt),
             eq(vouchers.optional, false)
           )
         );
 
       for (const note of activeCreditDebitVouchers) {
-        const items = await db
-          .select()
-          .from(creditNoteItems)
-          .where(eq(creditNoteItems.voucherId, note.vId));
+        const items = await db.select().from(creditNoteItems).where(eq(creditNoteItems.voucherId, note.vId));
 
         for (const item of items) {
           const qty = parseFloat(item.quantity || "0");
@@ -722,10 +765,7 @@ export function registerAdminRepairRoutes(app: Express) {
         }
       }
 
-      const currentInventory = await db
-        .select()
-        .from(inventory)
-        .where(eq(inventory.companyId, companyId));
+      const currentInventory = await db.select().from(inventory).where(eq(inventory.companyId, companyId));
 
       const currentMap = new Map<string, { id: number; quantity: number; totalValue: number }>();
       for (const inv of currentInventory) {
@@ -804,8 +844,14 @@ export function registerAdminRepairRoutes(app: Express) {
         });
       }
 
-      const companyLocations = await db.select({ id: locations.id, name: locations.name }).from(locations).where(eq(locations.companyId, companyId));
-      const companyStockItems = await db.select({ id: stockItems.id, name: stockItems.name, code: stockItems.code }).from(stockItems).where(eq(stockItems.companyId, companyId));
+      const companyLocations = await db
+        .select({ id: locations.id, name: locations.name })
+        .from(locations)
+        .where(eq(locations.companyId, companyId));
+      const companyStockItems = await db
+        .select({ id: stockItems.id, name: stockItems.name, code: stockItems.code })
+        .from(stockItems)
+        .where(eq(stockItems.companyId, companyId));
       const locationMap = new Map(companyLocations.map((l) => [l.id, l.name]));
       const stockItemMap = new Map(companyStockItems.map((s) => [s.id, { name: s.name, code: s.code }]));
 
@@ -848,10 +894,7 @@ export function registerAdminRepairRoutes(app: Express) {
 
       const { search, locationId, stockGroupId } = req.query;
 
-      const conditions = [
-        eq(inventory.companyId, companyId),
-        sql`CAST(${inventory.quantity} AS numeric) < 0`,
-      ];
+      const conditions = [eq(inventory.companyId, companyId), sql`CAST(${inventory.quantity} AS numeric) < 0`];
 
       if (locationId) {
         conditions.push(eq(inventory.locationId, parseInt(locationId as string)));
@@ -882,15 +925,16 @@ export function registerAdminRepairRoutes(app: Express) {
 
       if (stockGroupId) {
         const gid = parseInt(stockGroupId as string);
-        filtered = filtered.filter(r => r.groupId === gid);
+        filtered = filtered.filter((r) => r.groupId === gid);
       }
 
       if (search) {
         const s = (search as string).toLowerCase();
-        filtered = filtered.filter(r =>
-          r.code.toLowerCase().includes(s) ||
-          r.name.toLowerCase().includes(s) ||
-          r.locationName.toLowerCase().includes(s)
+        filtered = filtered.filter(
+          (r) =>
+            r.code.toLowerCase().includes(s) ||
+            r.name.toLowerCase().includes(s) ||
+            r.locationName.toLowerCase().includes(s)
         );
       }
 
@@ -987,7 +1031,6 @@ export function registerAdminRepairRoutes(app: Express) {
   // ==========================================
   // ERP User Page Access
   // ==========================================
-
 
   app.get("/api/admin/repair-inventory-values/preview", requireAuth, requireRole("Admin"), async (req, res) => {
     try {
@@ -1128,7 +1171,9 @@ export function registerAdminRepairRoutes(app: Express) {
           newValue,
         });
 
-        console.log(`[InventoryRepair] Corrected row id=${row.id} loc=${row.location_id} item=${row.stock_item_id}: qty=${qty} rate=${oldRate}->${newRate} value=${oldValue}->${newValue}`);
+        console.log(
+          `[InventoryRepair] Corrected row id=${row.id} loc=${row.location_id} item=${row.stock_item_id}: qty=${qty} rate=${oldRate}->${newRate} value=${oldValue}->${newValue}`
+        );
       }
 
       res.json({
@@ -1145,7 +1190,6 @@ export function registerAdminRepairRoutes(app: Express) {
   // ============================================================
   // NET PROFIT EXCEL EXPORT
   // ============================================================
-
 
   app.post("/api/admin/fix-orphaned-bales", requireAuth, requireRole("Admin", "Owner"), async (_req, res) => {
     try {

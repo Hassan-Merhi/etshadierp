@@ -6,20 +6,19 @@
  */
 
 import { db } from "../db";
-import { containers, companies, userCompanyRoles, suppliers, purchaseOrders, containerCharges } from "../../shared/schema";
+import {
+  containers,
+  companies,
+  userCompanyRoles,
+  suppliers,
+  purchaseOrders,
+  containerCharges,
+} from "../../shared/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 // ── Status constants ──────────────────────────────────────────────────────────
 
-export const ACTIVE_STATUSES = [
-  "OTW",
-  "Sea",
-  "At Port",
-  "Left Dar",
-  "At Border",
-  "In Transit",
-  "Arrived",
-] as const;
+export const ACTIVE_STATUSES = ["OTW", "Sea", "At Port", "Left Dar", "At Border", "In Transit", "Arrived"] as const;
 
 export type ActiveStatus = (typeof ACTIVE_STATUSES)[number];
 
@@ -43,10 +42,7 @@ const DEFAULT_OFFLOAD_DAYS = 14;
  * - Admin / Developer: all companies that have at least one active container.
  * - Owner: companies from user_company_roles only.
  */
-export async function getAccessibleCompanyIds(
-  userId: string,
-  role: string,
-): Promise<number[]> {
+export async function getAccessibleCompanyIds(userId: string, role: string): Promise<number[]> {
   const isAdminOrDev = role === "Admin" || role === "Developer";
 
   if (isAdminOrDev) {
@@ -76,16 +72,13 @@ export async function resolveGitCompanyScope(
   userId: string,
   role: string,
   query: Record<string, string | string[] | undefined>,
-  sessionCompanyId: number | undefined,
+  sessionCompanyId: number | undefined
 ): Promise<
-  | { mode: "all"; companyIds: number[] }
-  | { mode: "single"; companyId: number }
-  | { error: string; status: number }
+  { mode: "all"; companyIds: number[] } | { mode: "single"; companyId: number } | { error: string; status: number }
 > {
   const isAdminOrDev = role === "Admin" || role === "Developer";
   const wantsAll = query.allCompanies === "true";
-  const rawId =
-    typeof query.companyId === "string" ? query.companyId : undefined;
+  const rawId = typeof query.companyId === "string" ? query.companyId : undefined;
   const requestedId = rawId ? parseInt(rawId, 10) : undefined;
 
   if (wantsAll) {
@@ -98,12 +91,7 @@ export async function resolveGitCompanyScope(
       const access = await db
         .select({ id: userCompanyRoles.id })
         .from(userCompanyRoles)
-        .where(
-          and(
-            eq(userCompanyRoles.userId, userId),
-            eq(userCompanyRoles.companyId, requestedId),
-          ),
-        )
+        .where(and(eq(userCompanyRoles.userId, userId), eq(userCompanyRoles.companyId, requestedId)))
         .limit(1);
       if (access.length === 0) {
         return { error: "Access denied to this company", status: 403 };
@@ -124,10 +112,7 @@ export async function resolveGitCompanyScope(
  * Adds the transporter SLA days to borderDate.
  * Returns null if borderDate is absent or invalid.
  */
-export function calcMaxOffloadDate(
-  borderDate: string | null,
-  transporter: string | null,
-): string | null {
+export function calcMaxOffloadDate(borderDate: string | null, transporter: string | null): string | null {
   if (!borderDate) return null;
   const d = new Date(borderDate);
   if (isNaN(d.getTime())) return null;
@@ -144,10 +129,7 @@ export function calcMaxOffloadDate(
  *   - ETA is unknown
  *   - container arrived today or hasn't arrived yet
  */
-export function calcDaysDelayed(
-  eta: string | null,
-  numberPlate: string | null,
-): number | null {
+export function calcDaysDelayed(eta: string | null, numberPlate: string | null): number | null {
   if (numberPlate && numberPlate.trim()) return null;
   if (!eta) return null;
   const today = new Date();
@@ -162,20 +144,14 @@ export function calcDaysDelayed(
 /**
  * True when documents are received from the agent but not yet sent onward.
  */
-export function calcDocsReadyNotSent(
-  docReceived: boolean | null,
-  docsSentDate: string | null,
-): boolean {
+export function calcDocsReadyNotSent(docReceived: boolean | null, docsSentDate: string | null): boolean {
   return docReceived === true && !docsSentDate;
 }
 
 /**
  * True when maxOffloadDate has passed and the container is still active.
  */
-export function calcIsOverdue(
-  maxOffloadDate: string | null,
-  status: string,
-): boolean {
+export function calcIsOverdue(maxOffloadDate: string | null, status: string): boolean {
   if (!maxOffloadDate || INACTIVE_SET.has(status)) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -252,13 +228,11 @@ export type EnrichedContainer = RawContainerRow & {
  */
 export async function fetchActiveContainers(
   companyIds: number[],
-  opts: { includeOffloaded?: boolean } = {},
+  opts: { includeOffloaded?: boolean } = {}
 ): Promise<RawContainerRow[]> {
   if (companyIds.length === 0) return [];
 
-  const statusFilter = opts.includeOffloaded
-    ? [...ACTIVE_STATUSES, ...INACTIVE_STATUSES]
-    : [...ACTIVE_STATUSES];
+  const statusFilter = opts.includeOffloaded ? [...ACTIVE_STATUSES, ...INACTIVE_STATUSES] : [...ACTIVE_STATUSES];
 
   return db
     .select({
@@ -315,12 +289,7 @@ export async function fetchActiveContainers(
     })
     .from(containers)
     .leftJoin(suppliers, eq(containers.supplierId, suppliers.id))
-    .where(
-      and(
-        inArray(containers.companyId, companyIds),
-        inArray(containers.status, statusFilter),
-      ),
-    )
+    .where(and(inArray(containers.companyId, companyIds), inArray(containers.status, statusFilter)))
     .orderBy(containers.containerNumber);
 }
 
@@ -328,9 +297,7 @@ export async function fetchActiveContainers(
  * Returns a map of companyId → name for the given IDs.
  * SELECT-only.
  */
-export async function loadCompanyNames(
-  ids: number[],
-): Promise<Record<number, string>> {
+export async function loadCompanyNames(ids: number[]): Promise<Record<number, string>> {
   if (ids.length === 0) return {};
   const rows = await db
     .select({ id: companies.id, name: companies.name })
@@ -342,10 +309,7 @@ export async function loadCompanyNames(
 /**
  * Attaches computed fields and company name to each raw container row.
  */
-export function enrichContainers(
-  rows: RawContainerRow[],
-  nameMap: Record<number, string>,
-): EnrichedContainer[] {
+export function enrichContainers(rows: RawContainerRow[], nameMap: Record<number, string>): EnrichedContainer[] {
   return rows.map((r) => {
     const maxOffloadDate = calcMaxOffloadDate(r.borderDate, r.transporter);
     return {
@@ -373,10 +337,7 @@ export interface GitFilterQuery {
   overdue?: string;
 }
 
-export function applyGitFilters(
-  rows: EnrichedContainer[],
-  f: GitFilterQuery,
-): EnrichedContainer[] {
+export function applyGitFilters(rows: EnrichedContainer[], f: GitFilterQuery): EnrichedContainer[] {
   let out = rows;
 
   if (f.status) {
@@ -393,9 +354,7 @@ export function applyGitFilters(
   }
   if (f.location) {
     const l = f.location.toLowerCase();
-    out = out.filter((r) =>
-      (r.trackingLocation ?? "").toLowerCase().includes(l),
-    );
+    out = out.filter((r) => (r.trackingLocation ?? "").toLowerCase().includes(l));
   }
 
   const term = f.search || f.q;
@@ -406,7 +365,7 @@ export function applyGitFilters(
         r.containerNumber.toLowerCase().includes(s) ||
         (r.shopName ?? "").toLowerCase().includes(s) ||
         (r.agent ?? "").toLowerCase().includes(s) ||
-        (r.transporter ?? "").toLowerCase().includes(s),
+        (r.transporter ?? "").toLowerCase().includes(s)
     );
   }
 
@@ -443,8 +402,7 @@ export function buildSummary(rows: EnrichedContainer[]): GitSummary {
   return {
     total: rows.length,
     byStatus,
-    delayed: rows.filter((r) => r.daysDelayed !== null && r.daysDelayed > 0)
-      .length,
+    delayed: rows.filter((r) => r.daysDelayed !== null && r.daysDelayed > 0).length,
     overdue: rows.filter((r) => r.isOverdue).length,
     docsReadyNotSent: rows.filter((r) => r.docsReadyNotSent).length,
     withTruck: rows.filter((r) => !!(r.numberPlate ?? "").trim()).length,

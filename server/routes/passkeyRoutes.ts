@@ -109,14 +109,10 @@ export function registerPasskeyRoutes(app: Express) {
 
       let allowCredentials: { id: Buffer; type: "public-key" }[] = [];
       if (username) {
-        const userRow = await db.execute(
-          sql`SELECT id FROM users WHERE username = ${username} LIMIT 1`
-        );
+        const userRow = await db.execute(sql`SELECT id FROM users WHERE username = ${username} LIMIT 1`);
         if ((userRow.rows as any[]).length > 0) {
           const uid = (userRow.rows as any[])[0].id;
-          const creds = await db.execute(
-            sql`SELECT credential_id FROM passkey_credentials WHERE user_id = ${uid}`
-          );
+          const creds = await db.execute(sql`SELECT credential_id FROM passkey_credentials WHERE user_id = ${uid}`);
           allowCredentials = (creds.rows as any[]).map((r: any) => ({
             id: isoBase64URL.toBuffer(r.credential_id),
             type: "public-key" as const,

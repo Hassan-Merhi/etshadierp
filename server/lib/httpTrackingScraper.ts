@@ -33,7 +33,7 @@ const BROWSER_UA =
 
 const BASE_HEADERS: Record<string, string> = {
   "User-Agent": BROWSER_UA,
-  "Accept": "application/json, text/plain, */*",
+  Accept: "application/json, text/plain, */*",
   "Accept-Language": "en-US,en;q=0.9",
   "Cache-Control": "no-cache",
 };
@@ -71,7 +71,7 @@ function toShipment(
   status: string | null,
   location: string | null,
   eta: string | null,
-  events: Array<{ date: string; status: string; location?: string; description?: string }>,
+  events: Array<{ date: string; status: string; location?: string; description?: string }>
 ): ParcelsAppShipment {
   return {
     trackingId: containerNumber,
@@ -92,7 +92,12 @@ async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
     const ctrl = abort(TIMEOUT_MS);
     const resp = await fetch("https://www.msc.com/api/feature/tools/tracing/get-trace-results", {
       method: "POST",
-      headers: { ...BASE_HEADERS, "Content-Type": "application/json", "Origin": "https://www.msc.com", "Referer": "https://www.msc.com/en/track-a-shipment" },
+      headers: {
+        ...BASE_HEADERS,
+        "Content-Type": "application/json",
+        Origin: "https://www.msc.com",
+        Referer: "https://www.msc.com/en/track-a-shipment",
+      },
       body: JSON.stringify({ tracing_reference: containerNumber, language: "eng" }),
       signal: ctrl.signal,
     });
@@ -117,11 +122,7 @@ async function tryMsc(containerNumber: string): Promise<HttpScraperResult> {
     if (!etaRaw) {
       const etaActivity = activities.find((a: any) => {
         const desc = ((a.ActivityDescription ?? a.description ?? "") as string).toLowerCase();
-        return (
-          desc.includes("estimated time of arrival") ||
-          desc.includes("estimated arrival") ||
-          desc === "eta"
-        );
+        return desc.includes("estimated time of arrival") || desc.includes("estimated arrival") || desc === "eta";
       });
       if (etaActivity) {
         etaRaw = etaActivity.ActivityDate ?? etaActivity.date ?? null;
@@ -141,7 +142,13 @@ async function tryHapag(containerNumber: string): Promise<HttpScraperResult> {
     const ctrl = abort(TIMEOUT_MS);
     const resp = await fetch(
       `https://www.hapag-lloyd.com/api/containertraceback/${encodeURIComponent(containerNumber)}?requestorType=website`,
-      { headers: { ...BASE_HEADERS, "Referer": "https://www.hapag-lloyd.com/en/online-business/track/track-by-container-id.html" }, signal: ctrl.signal },
+      {
+        headers: {
+          ...BASE_HEADERS,
+          Referer: "https://www.hapag-lloyd.com/en/online-business/track/track-by-container-id.html",
+        },
+        signal: ctrl.signal,
+      }
     );
     if (!resp.ok) return { success: false, shipment: null, error: `Hapag HTTP ${resp.status}` };
     const data: any = await resp.json();
@@ -168,7 +175,10 @@ async function tryCosco(containerNumber: string): Promise<HttpScraperResult> {
     const ctrl = abort(TIMEOUT_MS);
     const resp = await fetch(
       `https://elines.coscoshipping.com/ebusiness/cargoTracking?condition.cargoTrackNo=${encodeURIComponent(containerNumber)}`,
-      { headers: { ...BASE_HEADERS, "Referer": "https://elines.coscoshipping.com/ebusiness/cargoTracking" }, signal: ctrl.signal },
+      {
+        headers: { ...BASE_HEADERS, Referer: "https://elines.coscoshipping.com/ebusiness/cargoTracking" },
+        signal: ctrl.signal,
+      }
     );
     if (!resp.ok) return { success: false, shipment: null, error: `COSCO HTTP ${resp.status}` };
     const data: any = await resp.json();
@@ -196,7 +206,10 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
     const ctrl = abort(TIMEOUT_MS);
     const resp = await fetch(
       `https://www.evergreen-line.com/ese/jsp/ct_tracking_info.jsp?lang=en&q=${encodeURIComponent(containerNumber)}&sType=CT`,
-      { headers: { ...BASE_HEADERS, "Referer": "https://www.evergreen-line.com/ese/jsp/cargotracking.jsp" }, signal: ctrl.signal },
+      {
+        headers: { ...BASE_HEADERS, Referer: "https://www.evergreen-line.com/ese/jsp/cargotracking.jsp" },
+        signal: ctrl.signal,
+      }
     );
     if (!resp.ok) return { success: false, shipment: null, error: `Evergreen HTTP ${resp.status}` };
     const data: any = await resp.json();
@@ -221,22 +234,19 @@ async function tryEvergreen(containerNumber: string): Promise<HttpScraperResult>
 async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult> {
   try {
     const ctrl = abort(15_000);
-    const resp = await fetch(
-      `https://www.maersk.com/tracking/${encodeURIComponent(containerNumber)}`,
-      {
-        headers: {
-          ...BASE_HEADERS,
-          "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
-          "Accept-Language": "en-US,en;q=0.9",
-          "Sec-Fetch-Dest": "document",
-          "Sec-Fetch-Mode": "navigate",
-          "Sec-Fetch-Site": "none",
-          "Upgrade-Insecure-Requests": "1",
-        },
-        signal: ctrl.signal,
-        redirect: "follow",
+    const resp = await fetch(`https://www.maersk.com/tracking/${encodeURIComponent(containerNumber)}`, {
+      headers: {
+        ...BASE_HEADERS,
+        Accept: "text/html,application/xhtml+xml,*/*;q=0.9",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Upgrade-Insecure-Requests": "1",
       },
-    );
+      signal: ctrl.signal,
+      redirect: "follow",
+    });
     if (!resp.ok) return { success: false, shipment: null, error: `Maersk page HTTP ${resp.status}` };
     const html = await resp.text();
 
@@ -264,7 +274,9 @@ async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult
             };
           }
         }
-      } catch { /* parse error — continue */ }
+      } catch {
+        /* parse error — continue */
+      }
     }
 
     // application/json script tags (some Next.js versions)
@@ -284,11 +296,17 @@ async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult
             rawResponse: { source: "maersk_json_script" },
           };
         }
-      } catch { /* next */ }
+      } catch {
+        /* next */
+      }
     }
 
     const isBlocked = /captcha|datadome|challenge|cloudflare|blocked/i.test(html.slice(0, 2000));
-    return { success: false, shipment: null, error: isBlocked ? "Maersk page: bot challenge" : "Maersk page: no tracking data in HTML" };
+    return {
+      success: false,
+      shipment: null,
+      error: isBlocked ? "Maersk page: bot challenge" : "Maersk page: no tracking data in HTML",
+    };
   } catch (err: any) {
     return { success: false, shipment: null, error: `Maersk page: ${err?.message ?? "error"}` };
   }
@@ -299,10 +317,10 @@ async function tryMaerskHtml(containerNumber: string): Promise<HttpScraperResult
 async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> {
   try {
     const ctrl = abort(TIMEOUT_MS);
-    const resp = await fetch(
-      `https://parcelsapp.com/en/tracking/${encodeURIComponent(containerNumber)}`,
-      { headers: { ...BASE_HEADERS, "Accept": "text/html,application/xhtml+xml,*/*" }, signal: ctrl.signal },
-    );
+    const resp = await fetch(`https://parcelsapp.com/en/tracking/${encodeURIComponent(containerNumber)}`, {
+      headers: { ...BASE_HEADERS, Accept: "text/html,application/xhtml+xml,*/*" },
+      signal: ctrl.signal,
+    });
     if (!resp.ok) return { success: false, shipment: null, error: `Page HTML ${resp.status}` };
     const html = await resp.text();
 
@@ -313,7 +331,9 @@ async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> 
         const parsed = JSON.parse(nuxt2[1]);
         const shipment = extractFromNuxt(parsed, containerNumber);
         if (shipment) return { success: true, shipment, rawResponse: parsed };
-      } catch { /* continue */ }
+      } catch {
+        /* continue */
+      }
     }
 
     // Nuxt 3: <script type="application/json">
@@ -322,7 +342,9 @@ async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> 
         const parsed = JSON.parse(m[1]);
         const shipment = extractFromNuxt(parsed, containerNumber);
         if (shipment) return { success: true, shipment, rawResponse: parsed };
-      } catch { /* next */ }
+      } catch {
+        /* next */
+      }
     }
 
     return { success: false, shipment: null, error: "No embedded tracking data in page" };
@@ -333,9 +355,11 @@ async function tryPageHtml(containerNumber: string): Promise<HttpScraperResult> 
 
 function extractFromNuxt(payload: any, containerNumber: string): ParcelsAppShipment | null {
   if (!payload || typeof payload !== "object") return null;
-  const candidates: any[] = payload?.shipments ?? payload?.parcels ?? payload?.data?.shipments ?? payload?.data?.parcels ?? [];
+  const candidates: any[] =
+    payload?.shipments ?? payload?.parcels ?? payload?.data?.shipments ?? payload?.data?.parcels ?? [];
   if (candidates.length) {
-    const match = candidates.find((s: any) => s?.trackingId === containerNumber || s?.id === containerNumber) ?? candidates[0];
+    const match =
+      candidates.find((s: any) => s?.trackingId === containerNumber || s?.id === containerNumber) ?? candidates[0];
     if (match?.trackingId || match?.id) return match as ParcelsAppShipment;
   }
   for (const key of ["data", "state", "fetch", "nuxt", "payload"]) {

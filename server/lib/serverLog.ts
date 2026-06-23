@@ -19,9 +19,7 @@ const isProd = process.env.NODE_ENV === "production";
 
 function emit(level: "DEBUG" | "INFO" | "WARN" | "ERROR", source: string, parts: unknown[]) {
   if (level === "DEBUG" && isProd) return;
-  const message = parts
-    .map((p) => (typeof p === "string" ? p : safeStringify(p)))
-    .join(" ");
+  const message = parts.map((p) => (typeof p === "string" ? p : safeStringify(p))).join(" ");
   expressLog(`[${level}] ${message}`, source);
 }
 

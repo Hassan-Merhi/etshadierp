@@ -8,9 +8,9 @@ import OffloadItemSearch from "@/pages/OffloadItemSearch";
 import { GradesCategoriesManager } from "@/components/GradesCategoriesManager";
 
 const TABS = [
-  { value: "items",   label: "Items",          icon: Package },
-  { value: "query",   label: "Query",          icon: Search },
-  { value: "offload", label: "Offload Search",  icon: Truck },
+  { value: "items", label: "Items", icon: Package },
+  { value: "query", label: "Query", icon: Search },
+  { value: "offload", label: "Offload Search", icon: Truck },
 ];
 
 export default function StockHub() {

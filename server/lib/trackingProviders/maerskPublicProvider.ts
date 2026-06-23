@@ -16,10 +16,10 @@ const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
   "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
-const PUBLIC_BASE     = "https://www.maersk.com/api/tracking";
-const PUBLIC_PAGE     = "https://www.maersk.com/tracking";
-const TIMEOUT_MS      = 12_000;
-const RATE_LIMIT_MS   = 6 * 60 * 60 * 1_000;   // 6 hours
+const PUBLIC_BASE = "https://www.maersk.com/api/tracking";
+const PUBLIC_PAGE = "https://www.maersk.com/tracking";
+const TIMEOUT_MS = 12_000;
+const RATE_LIMIT_MS = 6 * 60 * 60 * 1_000; // 6 hours
 
 const _lastAttempt = new Map<string, number>();
 
@@ -69,10 +69,10 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     const pageRes = await fetch(`${PUBLIC_PAGE}/${encodeURIComponent(containerNumber)}`, {
       headers: {
         "User-Agent": BROWSER_UA,
-        "Accept": "text/html,application/xhtml+xml,*/*;q=0.9",
+        Accept: "text/html,application/xhtml+xml,*/*;q=0.9",
         "Accept-Language": "en-US,en;q=0.9",
         "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
+        Pragma: "no-cache",
         "Sec-Fetch-Dest": "document",
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "none",
@@ -87,11 +87,13 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     // Collect all Set-Cookie values as a single Cookie header string
     const raw = pageRes.headers.get("set-cookie") ?? "";
     sessionCookies = raw
-      .split(/,(?=[^;]+?=)/)     // split multiple cookies (not expires commas)
+      .split(/,(?=[^;]+?=)/) // split multiple cookies (not expires commas)
       .map((c) => c.split(";")[0].trim())
       .filter(Boolean)
       .join("; ");
-    console.log(`[MaerskPublic] ${containerNumber}: prefetch done — ${sessionCookies ? "cookies acquired" : "no cookies"}`);
+    console.log(
+      `[MaerskPublic] ${containerNumber}: prefetch done — ${sessionCookies ? "cookies acquired" : "no cookies"}`
+    );
   } catch {
     // Non-fatal — we still try the API without cookies
   }
@@ -101,16 +103,16 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
     const url = `${PUBLIC_BASE}/${encodeURIComponent(containerNumber)}`;
     const res = await fetch(url, {
       headers: {
-        "Accept": "application/json, */*;q=0.8",
+        Accept: "application/json, */*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
         "User-Agent": BROWSER_UA,
-        "Referer": `${PUBLIC_PAGE}/${encodeURIComponent(containerNumber)}`,
-        "Origin": "https://www.maersk.com",
+        Referer: `${PUBLIC_PAGE}/${encodeURIComponent(containerNumber)}`,
+        Origin: "https://www.maersk.com",
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
         "Sec-Fetch-Site": "same-origin",
         "Cache-Control": "no-cache",
-        ...(sessionCookies ? { "Cookie": sessionCookies } : {}),
+        ...(sessionCookies ? { Cookie: sessionCookies } : {}),
       },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: "follow",
@@ -180,11 +182,7 @@ function deepScanForEta(obj: unknown, depth = 0): { path: string; value: string 
   return null;
 }
 
-function parseResponse(
-  containerNumber: string,
-  data: unknown,
-  base: CarrierTrackResult,
-): CarrierTrackResult {
+function parseResponse(containerNumber: string, data: unknown, base: CarrierTrackResult): CarrierTrackResult {
   if (!data || typeof data !== "object") {
     return { ...base, noData: true, error: "empty_response" };
   }
@@ -192,34 +190,26 @@ function parseResponse(
   const d = data as Record<string, any>;
 
   // Maersk may wrap in various shapes
-  const entry: any =
-    (Array.isArray(d) ? d[0] : null) ??
-    d.containers?.[0] ??
-    d.shipment ??
-    d.trackingData ??
-    d;
+  const entry: any = (Array.isArray(d) ? d[0] : null) ?? d.containers?.[0] ?? d.shipment ?? d.trackingData ?? d;
 
   if (!entry) return { ...base, noData: true, error: "no_entry" };
 
-  const rawEvents: unknown[] =
-    entry.events ??
-    entry.containers?.[0]?.events ??
-    entry.milestones ??
-    d.events ??
-    [];
+  const rawEvents: unknown[] = entry.events ?? entry.containers?.[0]?.events ?? entry.milestones ?? d.events ?? [];
 
   const events: TrackingEvent[] = (Array.isArray(rawEvents) ? rawEvents : [])
-    .map((e: any): TrackingEvent => ({
-      date: parseDate(e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null),
-      status: e.transportEventTypeCode ?? e.activityName ?? e.eventCode ?? e.status ?? null,
-      location:
-        e.location?.portName ??
-        e.location?.locationName ??
-        e.portName ??
-        e.locationName ??
-        (typeof e.location === "string" ? e.location : null),
-      description: e.description ?? e.eventDescription ?? e.activityName ?? null,
-    }))
+    .map(
+      (e: any): TrackingEvent => ({
+        date: parseDate(e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null),
+        status: e.transportEventTypeCode ?? e.activityName ?? e.eventCode ?? e.status ?? null,
+        location:
+          e.location?.portName ??
+          e.location?.locationName ??
+          e.portName ??
+          e.locationName ??
+          (typeof e.location === "string" ? e.location : null),
+        description: e.description ?? e.eventDescription ?? e.activityName ?? null,
+      })
+    )
     .filter((e) => e.date !== null || e.status !== null)
     .sort((a, b) => {
       if (!a.date) return 1;
@@ -271,7 +261,7 @@ function parseResponse(
       eta = deepResult.value;
       deepEtaPath = deepResult.path;
       console.log(
-        `[MaerskPublic] ${containerNumber}: ETA from deep-scan path=${deepResult.path} val=${deepResult.value}`,
+        `[MaerskPublic] ${containerNumber}: ETA from deep-scan path=${deepResult.path} val=${deepResult.value}`
       );
     }
   }
@@ -283,7 +273,7 @@ function parseResponse(
 
   console.log(
     `[MaerskPublic] ${containerNumber}: success — status=${latest?.status ?? "?"} events=${events.length}` +
-    ` eta=${eta ?? "none"}${deepEtaPath ? ` (deep-scan path=${deepEtaPath})` : ""}`,
+      ` eta=${eta ?? "none"}${deepEtaPath ? ` (deep-scan path=${deepEtaPath})` : ""}`
   );
 
   return {

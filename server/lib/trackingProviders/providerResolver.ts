@@ -21,32 +21,68 @@ export type DetectedCarrier = "MAERSK" | "CMA" | "MSC" | "HAPAG" | "OTHER" | nul
 
 const PREFIX_MAP: Record<string, DetectedCarrier> = {
   // ── Maersk Line (incl. Hamburg Süd, SafMarine, Seago subsidiaries) ─────────
-  MAEU: "MAERSK", MRKU: "MAERSK", MSKU: "MAERSK", MRSU: "MAERSK",
-  MCIU: "MAERSK", SUDU: "MAERSK", HASU: "MAERSK", TRHU: "MAERSK",
-  TEMU: "MAERSK", SEAU: "MAERSK", PONU: "MAERSK", SEGU: "MAERSK",
-  HJSC: "MAERSK", HJCU: "MAERSK", SAFM: "MAERSK",
+  MAEU: "MAERSK",
+  MRKU: "MAERSK",
+  MSKU: "MAERSK",
+  MRSU: "MAERSK",
+  MCIU: "MAERSK",
+  SUDU: "MAERSK",
+  HASU: "MAERSK",
+  TRHU: "MAERSK",
+  TEMU: "MAERSK",
+  SEAU: "MAERSK",
+  PONU: "MAERSK",
+  SEGU: "MAERSK",
+  HJSC: "MAERSK",
+  HJCU: "MAERSK",
+  SAFM: "MAERSK",
 
   // ── CMA CGM (incl. ANL, APL, CNC) ─────────────────────────────────────────
-  CMAU: "CMA", CMDU: "CMA", APZU: "CMA", CGMU: "CMA",
-  APMU: "CMA", APHU: "CMA", CXDU: "CMA", CAAU: "CMA",
-  CAJU: "CMA", CAIU: "CMA",
+  CMAU: "CMA",
+  CMDU: "CMA",
+  APZU: "CMA",
+  CGMU: "CMA",
+  APMU: "CMA",
+  APHU: "CMA",
+  CXDU: "CMA",
+  CAAU: "CMA",
+  CAJU: "CMA",
+  CAIU: "CMA",
 
   // ── MSC ───────────────────────────────────────────────────────────────────
-  MSCU: "MSC", MEDU: "MSC", MSDU: "MSC", MSMU: "MSC", MSWU: "MSC",
+  MSCU: "MSC",
+  MEDU: "MSC",
+  MSDU: "MSC",
+  MSMU: "MSC",
+  MSWU: "MSC",
 
   // ── Hapag-Lloyd ───────────────────────────────────────────────────────────
-  HLCU: "HAPAG", HLXU: "HAPAG",
+  HLCU: "HAPAG",
+  HLXU: "HAPAG",
 
   // ── COSCO ─────────────────────────────────────────────────────────────────
-  COSU: "OTHER", CBHU: "OTHER", CCLU: "OTHER", COSJ: "OTHER",
+  COSU: "OTHER",
+  CBHU: "OTHER",
+  CCLU: "OTHER",
+  COSJ: "OTHER",
 
   // ── Evergreen ─────────────────────────────────────────────────────────────
-  EVRU: "OTHER", EVRG: "OTHER", EMCU: "OTHER", EGHU: "OTHER",
+  EVRU: "OTHER",
+  EVRG: "OTHER",
+  EMCU: "OTHER",
+  EGHU: "OTHER",
 
   // ── Leasing (box owner ≠ shipping line — let ParcelsApp auto-detect) ──────
-  TCNU: "OTHER", TGBU: "OTHER", TCKU: "OTHER", TLLU: "OTHER",
-  TCLU: "OTHER", TGHU: "OTHER", TIIU: "OTHER", UETU: "OTHER",
-  ECMU: "OTHER", TXGI: "OTHER",
+  TCNU: "OTHER",
+  TGBU: "OTHER",
+  TCKU: "OTHER",
+  TLLU: "OTHER",
+  TCLU: "OTHER",
+  TGHU: "OTHER",
+  TIIU: "OTHER",
+  UETU: "OTHER",
+  ECMU: "OTHER",
+  TXGI: "OTHER",
 };
 
 // Real ISO container numbers are 11 characters; skip obvious placeholders.
@@ -79,7 +115,7 @@ export function resolveProvider(containerNumber: string): ProviderResolution {
   const detectedCarrier = detectCarrier(containerNumber);
   console.log(
     `[ProviderResolver] container=${containerNumber} prefix=${containerNumber.slice(0, 4).toUpperCase()} ` +
-    `detectedCarrier=${detectedCarrier ?? "unknown"} directProviders=[none]`,
+      `detectedCarrier=${detectedCarrier ?? "unknown"} directProviders=[none]`
   );
   return { detectedCarrier, tryDirect: [] };
 }

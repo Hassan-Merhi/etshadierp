@@ -16,28 +16,29 @@ export function registerNetPositionMonthlyExcelRoute(app: Express) {
       const user = req.session.user as any;
       const isAdminOrDev = user?.role === "Admin" || user?.role === "Developer";
       const requestedCompanyId = req.query.companyId ? parseOptionalId(req.query.companyId) : null;
-      const companyId = isAdminOrDev && requestedCompanyId
-        ? requestedCompanyId
-        : req.session.currentCompanyId;
+      const companyId = isAdminOrDev && requestedCompanyId ? requestedCompanyId : req.session.currentCompanyId;
 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const allCompanies = await storage.getAllCompanies();
-      const company      = allCompanies.find((c: any) => c.id === companyId);
-      const companyName  = company?.name || "Company";
+      const company = allCompanies.find((c: any) => c.id === companyId);
+      const companyName = company?.name || "Company";
 
       const startDate = (req.query.startDate as string) || "";
-      const endDate   = (req.query.endDate   as string) || getClientDate(req);
+      const endDate = (req.query.endDate as string) || getClientDate(req);
       if (!startDate) return res.status(400).json({ message: "startDate is required" });
       if (generateMonthEnds(startDate, endDate).length === 0) {
         return res.status(400).json({ message: "No months in range" });
       }
 
       const safeCompany = companyName.replace(/[^a-z0-9]/gi, "_");
-      const safeStart   = startDate.replace(/-/g, "");
-      const safeEnd     = endDate.replace(/-/g, "");
+      const safeStart = startDate.replace(/-/g, "");
+      const safeEnd = endDate.replace(/-/g, "");
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename="NetPosition_Monthly_${safeCompany}_${safeStart}_${safeEnd}.xlsx"`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="NetPosition_Monthly_${safeCompany}_${safeStart}_${safeEnd}.xlsx"`
+      );
       await generateNetPositionExcel(companyId, companyName, startDate, endDate, res);
       res.end();
     } catch (error: any) {

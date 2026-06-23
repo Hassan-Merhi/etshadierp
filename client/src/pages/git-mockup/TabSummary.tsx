@@ -3,17 +3,26 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertTriangle, FileX, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fmt, parseNum, COMPANY_COLORS } from "./helpers";
 import type { GitContainersResponse, EnrichedContainerApi, CompanyViewMode } from "./types";
 
-function StatCard({ label, value, sub, icon, accent, alert }: {
-  label: string; value: string | number; sub?: string;
-  icon: React.ReactNode; accent?: string; alert?: boolean;
+function StatCard({
+  label,
+  value,
+  sub,
+  icon,
+  accent,
+  alert,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ReactNode;
+  accent?: string;
+  alert?: boolean;
 }) {
   return (
     <Card className={cn("min-w-0", alert && "border-red-300 dark:border-red-800")}>
@@ -29,7 +38,10 @@ function StatCard({ label, value, sub, icon, accent, alert }: {
   );
 }
 
-function SummaryGroupTable({ title, rows }: {
+function SummaryGroupTable({
+  title,
+  rows,
+}: {
   title: string;
   rows: { label: string; count: number; cost: number; fee: number; duty: number }[];
 }) {
@@ -82,9 +94,7 @@ function SummaryGroupTable({ title, rows }: {
 export function TabSummary() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
 
-  const queryUrl = companyMode === "all"
-    ? "/api/git/containers?allCompanies=true"
-    : "/api/git/containers";
+  const queryUrl = companyMode === "all" ? "/api/git/containers?allCompanies=true" : "/api/git/containers";
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],
@@ -98,17 +108,17 @@ export function TabSummary() {
     const byStatus: Record<string, number> = {};
     for (const r of allContainers) byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
     return {
-      total:      allContainers.length,
-      atSea:      (byStatus["OTW"] ?? 0) + (byStatus["Sea"] ?? 0),
-      atPort:     byStatus["At Port"] ?? 0,
-      leftDar:    byStatus["Left Dar"] ?? 0,
-      inTransit:  (byStatus["At Border"] ?? 0) + (byStatus["In Transit"] ?? 0),
-      arrived:    byStatus["Arrived"] ?? 0,
-      delayed:    allContainers.filter(r => r.daysDelayed !== null && r.daysDelayed > 0).length,
-      overdue:    allContainers.filter(r => r.isOverdue).length,
-      totalCost:  allContainers.reduce((s, r) => s + parseNum(r.grandTotal), 0),
-      totalFee:   allContainers.reduce((s, r) => s + parseNum(r.transportFee), 0),
-      totalDuty:  allContainers.reduce((s, r) => s + parseNum(r.dutyFee), 0),
+      total: allContainers.length,
+      atSea: (byStatus["OTW"] ?? 0) + (byStatus["Sea"] ?? 0),
+      atPort: byStatus["At Port"] ?? 0,
+      leftDar: byStatus["Left Dar"] ?? 0,
+      inTransit: (byStatus["At Border"] ?? 0) + (byStatus["In Transit"] ?? 0),
+      arrived: byStatus["Arrived"] ?? 0,
+      delayed: allContainers.filter((r) => r.daysDelayed !== null && r.daysDelayed > 0).length,
+      overdue: allContainers.filter((r) => r.isOverdue).length,
+      totalCost: allContainers.reduce((s, r) => s + parseNum(r.grandTotal), 0),
+      totalFee: allContainers.reduce((s, r) => s + parseNum(r.transportFee), 0),
+      totalDuty: allContainers.reduce((s, r) => s + parseNum(r.dutyFee), 0),
     };
   }, [allContainers]);
 
@@ -119,58 +129,79 @@ export function TabSummary() {
       if (!map.has(k)) map.set(k, { label: k, count: 0, cost: 0, fee: 0, duty: 0 });
       const e = map.get(k)!;
       e.count++;
-      e.cost  += parseNum(r.grandTotal);
-      e.fee   += parseNum(r.transportFee);
-      e.duty  += parseNum(r.dutyFee);
+      e.cost += parseNum(r.grandTotal);
+      e.fee += parseNum(r.transportFee);
+      e.duty += parseNum(r.dutyFee);
     }
     return [...map.values()];
   };
 
-  const byCompany   = useMemo(() => makeBreakdown(r => r.companyName), [allContainers]);
-  const byTransport = useMemo(() => makeBreakdown(r => r.transporter ?? "—"), [allContainers]);
-  const byAgent     = useMemo(() => makeBreakdown(r => r.agent ?? "—"), [allContainers]);
+  const byCompany = useMemo(() => makeBreakdown((r) => r.companyName), [allContainers]);
+  const byTransport = useMemo(() => makeBreakdown((r) => r.transporter ?? "—"), [allContainers]);
+  const byAgent = useMemo(() => makeBreakdown((r) => r.agent ?? "—"), [allContainers]);
 
   const modeSelector = (
     <div className="flex items-center gap-2 flex-wrap" data-testid="summary-mode-selector">
       <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       <span className="text-xs text-muted-foreground">View:</span>
-      <Button size="sm" variant={companyMode === "session" ? "default" : "outline"} className="text-xs gap-1.5" onClick={() => setCompanyMode("session")} data-testid="button-summary-my-company">My Company</Button>
-      <Button size="sm" variant={companyMode === "all" ? "default" : "outline"} className="text-xs gap-1.5" onClick={() => setCompanyMode("all")} data-testid="button-summary-all-companies">All Accessible Companies</Button>
+      <Button
+        size="sm"
+        variant={companyMode === "session" ? "default" : "outline"}
+        className="text-xs gap-1.5"
+        onClick={() => setCompanyMode("session")}
+        data-testid="button-summary-my-company"
+      >
+        My Company
+      </Button>
+      <Button
+        size="sm"
+        variant={companyMode === "all" ? "default" : "outline"}
+        className="text-xs gap-1.5"
+        onClick={() => setCompanyMode("all")}
+        data-testid="button-summary-all-companies"
+      >
+        All Accessible Companies
+      </Button>
     </div>
   );
 
-  if (isLoading) return (
-    <div className="space-y-4">
-      {modeSelector}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-11 gap-2">
-        {Array.from({ length: 11 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-md" />)}
+  if (isLoading)
+    return (
+      <div className="space-y-4">
+        {modeSelector}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-11 gap-2">
+          {Array.from({ length: 11 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 rounded-md" />
+          ))}
+        </div>
+        <Skeleton className="h-40 w-full rounded-md" />
       </div>
-      <Skeleton className="h-40 w-full rounded-md" />
-    </div>
-  );
+    );
 
-  if (isError) return (
-    <div className="space-y-4">
-      {modeSelector}
-      <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 px-4 py-3 flex gap-3 items-start text-sm text-red-800 dark:text-red-300">
-        <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
-        <div>
-          <div className="font-semibold">Failed to load container data</div>
-          <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+  if (isError)
+    return (
+      <div className="space-y-4">
+        {modeSelector}
+        <div className="rounded-md border border-red-200 bg-red-50 dark:bg-red-950/20 px-4 py-3 flex gap-3 items-start text-sm text-red-800 dark:text-red-300">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold">Failed to load container data</div>
+            <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
 
-  if (stats.total === 0) return (
-    <div className="space-y-4">
-      {modeSelector}
-      <div className="rounded-md border border-dashed px-6 py-10 text-center text-muted-foreground text-sm">
-        <FileX className="h-8 w-8 mx-auto mb-2 opacity-40" />
-        <div className="font-medium">No active containers found</div>
+  if (stats.total === 0)
+    return (
+      <div className="space-y-4">
+        {modeSelector}
+        <div className="rounded-md border border-dashed px-6 py-10 text-center text-muted-foreground text-sm">
+          <FileX className="h-8 w-8 mx-auto mb-2 opacity-40" />
+          <div className="font-medium">No active containers found</div>
+        </div>
       </div>
-    </div>
-  );
+    );
 
   return (
     <div className="space-y-4">
@@ -248,8 +279,8 @@ export function TabSummary() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SummaryGroupTable title="Totals by Company"           rows={byCompany} />
-        <SummaryGroupTable title="Totals by Transporter"       rows={byTransport} />
+        <SummaryGroupTable title="Totals by Company" rows={byCompany} />
+        <SummaryGroupTable title="Totals by Transporter" rows={byTransport} />
         <SummaryGroupTable title="Totals by Agent / Declarant" rows={byAgent} />
       </div>
     </div>

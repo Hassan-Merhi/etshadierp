@@ -30,10 +30,7 @@ export function DataTableToolbar({
   const hasSearch = onSearchChange !== undefined;
   return (
     <div
-      className={cn(
-        "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4",
-        className,
-      )}
+      className={cn("flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4", className)}
       data-testid={testId ?? "toolbar-data-table"}
     >
       <div className="flex flex-1 flex-wrap items-center gap-2 min-w-0">
@@ -61,13 +58,9 @@ export function DataTableToolbar({
             )}
           </div>
         )}
-        {filters && (
-          <div className="flex items-center gap-2 flex-wrap">{filters}</div>
-        )}
+        {filters && <div className="flex items-center gap-2 flex-wrap">{filters}</div>}
       </div>
-      {actions && (
-        <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>
-      )}
+      {actions && <div className="flex items-center gap-2 flex-wrap shrink-0">{actions}</div>}
     </div>
   );
 }

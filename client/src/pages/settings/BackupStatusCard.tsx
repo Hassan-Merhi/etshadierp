@@ -8,7 +8,11 @@ import { apiRequest } from "@/lib/queryClient";
 import { BackupStatus } from "./ExportCenterTypes";
 import { RunRow } from "./BackupRunRow";
 
-export function BackupStatusCard({ status, onRefresh, isRefreshing }: {
+export function BackupStatusCard({
+  status,
+  onRefresh,
+  isRefreshing,
+}: {
   status: BackupStatus;
   onRefresh: () => void;
   isRefreshing: boolean;
@@ -19,18 +23,19 @@ export function BackupStatusCard({ status, onRefresh, isRefreshing }: {
   const hasAnyRun = status.recentRuns.length > 0;
   const now = Date.now();
   const stuckRuns = status.recentRuns.filter(
-    r => r.status === "running" && (now - new Date(r.startedAt).getTime()) > 5 * 60 * 1000
+    (r) => r.status === "running" && now - new Date(r.startedAt).getTime() > 5 * 60 * 1000
   );
-  const hasRunning = status.recentRuns.some(r => r.status === "running");
+  const hasRunning = status.recentRuns.some((r) => r.status === "running");
 
   const dismissStuck = async () => {
     setDismissing(true);
     try {
       const data = (await (await apiRequest("POST", "/api/export/cleanup-stuck-runs")).json()) as any;
       toast({
-        title: data.cleared > 0
-          ? `Dismissed ${data.cleared} stalled run${data.cleared === 1 ? "" : "s"}`
-          : "No stalled runs found",
+        title:
+          data.cleared > 0
+            ? `Dismissed ${data.cleared} stalled run${data.cleared === 1 ? "" : "s"}`
+            : "No stalled runs found",
         description: data.cleared > 0 ? "They are now marked as failed." : undefined,
       });
       onRefresh();
@@ -41,19 +46,22 @@ export function BackupStatusCard({ status, onRefresh, isRefreshing }: {
     }
   };
 
-  const headerIcon = stuckRuns.length > 0
-    ? <AlertTriangle className="h-4 w-4 text-amber-500" />
-    : hasRunning
-      ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-      : !hasAnyRun
-        ? <ShieldAlert className="h-4 w-4 text-muted-foreground" />
-        : status.recentRuns[0]?.status === "success"
-          ? <ShieldCheck className="h-4 w-4 text-green-600" />
-          : status.recentRuns[0]?.status === "partial_failed"
-            ? <AlertTriangle className="h-4 w-4 text-amber-500" />
-            : status.recentRuns[0]?.status === "failed"
-              ? <ShieldAlert className="h-4 w-4 text-destructive" />
-              : <ShieldCheck className="h-4 w-4 text-muted-foreground" />;
+  const headerIcon =
+    stuckRuns.length > 0 ? (
+      <AlertTriangle className="h-4 w-4 text-amber-500" />
+    ) : hasRunning ? (
+      <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+    ) : !hasAnyRun ? (
+      <ShieldAlert className="h-4 w-4 text-muted-foreground" />
+    ) : status.recentRuns[0]?.status === "success" ? (
+      <ShieldCheck className="h-4 w-4 text-green-600" />
+    ) : status.recentRuns[0]?.status === "partial_failed" ? (
+      <AlertTriangle className="h-4 w-4 text-amber-500" />
+    ) : status.recentRuns[0]?.status === "failed" ? (
+      <ShieldAlert className="h-4 w-4 text-destructive" />
+    ) : (
+      <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+    );
 
   return (
     <Card data-testid="card-backup-status">
@@ -73,9 +81,7 @@ export function BackupStatusCard({ status, onRefresh, isRefreshing }: {
                 data-testid="button-dismiss-stuck-runs"
                 className="text-xs h-8"
               >
-                {dismissing
-                  ? <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                  : <XCircle className="h-3 w-3 mr-1" />}
+                {dismissing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
                 Dismiss stalled
               </Button>
             )}
@@ -111,7 +117,8 @@ export function BackupStatusCard({ status, onRefresh, isRefreshing }: {
             <ul className="space-y-0.5">
               {status.issues.map((issue, i) => (
                 <li key={i} className="text-xs text-amber-800 dark:text-amber-300 flex items-start gap-1.5">
-                  <span className="shrink-0 mt-0.5">•</span>{issue}
+                  <span className="shrink-0 mt-0.5">•</span>
+                  {issue}
                 </li>
               ))}
             </ul>
@@ -121,7 +128,7 @@ export function BackupStatusCard({ status, onRefresh, isRefreshing }: {
         {/* Run history */}
         {hasAnyRun ? (
           <div className="space-y-2">
-            {status.recentRuns.map(run => (
+            {status.recentRuns.map((run) => (
               <RunRow key={run.id} run={run} />
             ))}
           </div>

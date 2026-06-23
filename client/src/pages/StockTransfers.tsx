@@ -2,32 +2,14 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useLocation } from "wouter";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   ArrowRight,
   ExternalLink,
@@ -82,11 +64,11 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
   const [editNotes, setEditNotes] = useState("");
 
   const startDate = period.fromDate ?? "";
-  const endDate   = period.toDate   ?? "";
+  const endDate = period.toDate ?? "";
 
   const params = new URLSearchParams();
   if (startDate) params.set("startDate", startDate);
-  if (endDate)   params.set("endDate",   endDate);
+  if (endDate) params.set("endDate", endDate);
   const queryString = params.toString();
 
   const { data: transfers = [], isLoading } = useQuery<StockTransferRow[]>({
@@ -124,7 +106,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
       t.sourceLocationName?.toLowerCase().includes(q) ||
       t.destinationLocationName?.toLowerCase().includes(q) ||
       (t.notes ?? "").toLowerCase().includes(q) ||
-      (t.stockItemNames ?? []).some(n => n.toLowerCase().includes(q))
+      (t.stockItemNames ?? []).some((n) => n.toLowerCase().includes(q))
     );
   });
 
@@ -143,11 +125,15 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
   };
 
   const formatVoucherDate = (d: string) => {
-    try { return formatDate(parseISO(d)); } catch { return d; }
+    try {
+      return formatDate(parseISO(d));
+    } catch {
+      return d;
+    }
   };
 
   const totalValue = transfers.reduce((s, t) => s + (t.totalAmount || 0), 0);
-  const pendingCount = transfers.filter(t => !t.inventoryApplied).length;
+  const pendingCount = transfers.filter((t) => !t.inventoryApplied).length;
 
   return (
     <div className="p-4 md:p-6 space-y-5 w-full">
@@ -163,7 +149,9 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
           <ArrowLeftRight className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Transfers</p>
-            {isLoading ? <Skeleton className="h-5 w-10 mt-0.5" /> : (
+            {isLoading ? (
+              <Skeleton className="h-5 w-10 mt-0.5" />
+            ) : (
               <p className="text-lg font-semibold leading-none">{transfers.length}</p>
             )}
           </div>
@@ -172,7 +160,9 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
           <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Value</p>
-            {isLoading ? <Skeleton className="h-5 w-20 mt-0.5" /> : (
+            {isLoading ? (
+              <Skeleton className="h-5 w-20 mt-0.5" />
+            ) : (
               <p className="text-lg font-semibold leading-none font-mono">{formatAmount(totalValue)}</p>
             )}
           </div>
@@ -181,7 +171,9 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
           <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Pending</p>
-            {isLoading ? <Skeleton className="h-5 w-10 mt-0.5" /> : (
+            {isLoading ? (
+              <Skeleton className="h-5 w-10 mt-0.5" />
+            ) : (
               <p className="text-lg font-semibold leading-none">{pendingCount}</p>
             )}
           </div>
@@ -254,9 +246,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                           {t.voucherNumber}
                         </TableCell>
                       )}
-                      <TableCell className="whitespace-nowrap text-sm">
-                        {formatVoucherDate(t.voucherDate)}
-                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-sm">{formatVoucherDate(t.voucherDate)}</TableCell>
                       <TableCell className="whitespace-nowrap text-sm">
                         <span className="flex items-center gap-1.5">
                           <span>{t.sourceLocationName}</span>
@@ -308,10 +298,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                         </TableCell>
                       )}
                       <TableCell className="text-right">
-                        <div
-                          className="flex items-center justify-end gap-1"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
                           <Button
                             size="icon"
                             variant="ghost"
@@ -366,7 +353,10 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                     <div className="font-mono text-sm font-medium">{formatAmount(t.totalAmount)}</div>
                     <div className="flex items-center justify-end gap-1 mt-1">
                       {t.itemCount > 0 && (
-                        <span className="text-xs text-muted-foreground" data-testid={`text-item-count-mobile-${t.transferId}`}>
+                        <span
+                          className="text-xs text-muted-foreground"
+                          data-testid={`text-item-count-mobile-${t.transferId}`}
+                        >
                           {t.itemCount} {t.itemCount === 1 ? "item" : "items"}
                         </span>
                       )}
@@ -380,15 +370,25 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <div className="text-xs text-muted-foreground truncate">
                       {(t.stockItemNames ?? []).join(", ")}
-                      {!hideVoucherNotes && t.notes && (
-                        <span className="ml-1 italic">{t.notes}</span>
-                      )}
+                      {!hideVoucherNotes && t.notes && <span className="ml-1 italic">{t.notes}</span>}
                     </div>
                     <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <Button size="icon" variant="ghost" title="Edit notes" onClick={() => startEdit(t)} data-testid={`button-edit-mobile-${t.transferId}`}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Edit notes"
+                        onClick={() => startEdit(t)}
+                        data-testid={`button-edit-mobile-${t.transferId}`}
+                      >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="icon" variant="ghost" title="Open voucher" onClick={() => openVoucher(t.voucherId)} data-testid={`button-open-mobile-${t.transferId}`}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Open voucher"
+                        onClick={() => openVoucher(t.voucherId)}
+                        data-testid={`button-open-mobile-${t.transferId}`}
+                      >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -397,10 +397,22 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                 {(t.stockItemNames ?? []).length === 0 && (hideVoucherNotes || !t.notes) && (
                   <div className="mt-2 flex justify-end" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center gap-1">
-                      <Button size="icon" variant="ghost" title="Edit notes" onClick={() => startEdit(t)} data-testid={`button-edit-mobile-${t.transferId}`}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Edit notes"
+                        onClick={() => startEdit(t)}
+                        data-testid={`button-edit-mobile-${t.transferId}`}
+                      >
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
-                      <Button size="icon" variant="ghost" title="Open voucher" onClick={() => openVoucher(t.voucherId)} data-testid={`button-open-mobile-${t.transferId}`}>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        title="Open voucher"
+                        onClick={() => openVoucher(t.voucherId)}
+                        data-testid={`button-open-mobile-${t.transferId}`}
+                      >
                         <ExternalLink className="h-3.5 w-3.5" />
                       </Button>
                     </div>
@@ -413,7 +425,12 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
       )}
 
       {/* Edit Notes Dialog */}
-      <Dialog open={!!editingTransfer} onOpenChange={(open) => { if (!open) setEditingTransfer(null); }}>
+      <Dialog
+        open={!!editingTransfer}
+        onOpenChange={(open) => {
+          if (!open) setEditingTransfer(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Transfer Notes — {editingTransfer?.voucherNumber}</DialogTitle>
@@ -433,7 +450,8 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
                       <span>·</span>
                       <span className="flex items-center gap-1">
                         <Package className="h-3 w-3" />
-                        {editingTransfer.stockItemNames.length} item{editingTransfer.stockItemNames.length !== 1 ? "s" : ""}
+                        {editingTransfer.stockItemNames.length} item
+                        {editingTransfer.stockItemNames.length !== 1 ? "s" : ""}
                       </span>
                     </>
                   )}
@@ -455,11 +473,7 @@ export default function StockTransfers({ hideVoucherNotes = false }: StockTransf
               <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
-            <Button
-              onClick={saveNotes}
-              disabled={updateNotesMutation.isPending}
-              data-testid="button-save-notes"
-            >
+            <Button onClick={saveNotes} disabled={updateNotesMutation.isPending} data-testid="button-save-notes">
               <Save className="h-4 w-4 mr-2" />
               {updateNotesMutation.isPending ? "Saving…" : "Save"}
             </Button>

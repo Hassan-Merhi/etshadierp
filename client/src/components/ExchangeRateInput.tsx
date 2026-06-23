@@ -21,11 +21,11 @@ export function ExchangeRateInput({
   className = "",
 }: ExchangeRateInputProps) {
   const { exchangeRate: dailyRate } = useCurrencyContext();
-  
+
   const [inputValue, setInputValue] = useState<string>("");
   const hasUserModified = useRef(false);
   const isInitialized = useRef(false);
-  
+
   useEffect(() => {
     if (!isInitialized.current && !hasUserModified.current) {
       if (value !== null && value > 0) {
@@ -49,28 +49,24 @@ export function ExchangeRateInput({
     const raw = e.target.value;
     setInputValue(raw);
     hasUserModified.current = true;
-    
+
     if (raw === "" || raw === ".") {
       onChange(null);
       return;
     }
-    
+
     const numValue = parseFloat(raw);
     if (isNaN(numValue) || numValue <= 0) {
       onChange(null);
       return;
     }
-    
+
     onChange(numValue);
   };
 
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      {showLabel && (
-        <Label className="text-xs text-muted-foreground whitespace-nowrap">
-          1 USD =
-        </Label>
-      )}
+      {showLabel && <Label className="text-xs text-muted-foreground whitespace-nowrap">1 USD =</Label>}
       <Input
         type="number"
         value={inputValue}
@@ -82,18 +78,13 @@ export function ExchangeRateInput({
         min="0"
         data-testid="input-exchange-rate"
       />
-      {showLabel && (
-        <span className="text-xs text-muted-foreground">CFA</span>
-      )}
+      {showLabel && <span className="text-xs text-muted-foreground">CFA</span>}
     </div>
   );
 }
 
-export function formatRateDisplay(
-  canonicalRate: number | null,
-  selectedCurrency: Currency
-): string {
+export function formatRateDisplay(canonicalRate: number | null, selectedCurrency: Currency): string {
   if (!canonicalRate || canonicalRate <= 0) return "";
-  
+
   return `1 USD = ${Math.round(canonicalRate).toLocaleString()} CFA`;
 }

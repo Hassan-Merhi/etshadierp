@@ -6,32 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -161,9 +141,7 @@ export function PaymentReceiptTab({
 
   // Tab-specific styling / labels
   const Icon = isPayment ? ArrowUpCircle : ArrowDownCircle;
-  const iconColor = isPayment
-    ? "text-amber-600 dark:text-amber-400"
-    : "text-emerald-600 dark:text-emerald-400";
+  const iconColor = isPayment ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400";
   const accentColor = isPayment ? "#f59e0b" : "#10b981";
   const title = isPayment ? "Payment Voucher" : "Receipt Voucher";
   const accountLabel = isPayment ? "Pay From" : "Receive Into";
@@ -196,9 +174,7 @@ export function PaymentReceiptTab({
     : "Add at least one entry with an amount";
 
   // Validation state for summary warnings
-  const validEntryCount = entries.filter(
-    (e) => (e?.accountId ?? 0) > 0 && parseFloat(e?.amount || "0") > 0
-  ).length;
+  const validEntryCount = entries.filter((e) => (e?.accountId ?? 0) > 0 && parseFloat(e?.amount || "0") > 0).length;
   const missingAccount = paymentAccountId === 0;
   const missingEntries = validEntryCount === 0;
 
@@ -258,11 +234,7 @@ export function PaymentReceiptTab({
       <div className="flex-1 min-w-0">
         <Card>
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="flex flex-col"
-              noValidate
-            >
+            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col" noValidate>
               {/* ── Compact header strip ── */}
               <div
                 className="relative flex items-center gap-2 px-4 py-3 border-b border-border/50 overflow-hidden flex-wrap rounded-t-lg"
@@ -296,10 +268,7 @@ export function PaymentReceiptTab({
                     </Badge>
                   )}
                   {voucherNumber && (
-                    <span
-                      className="text-xs font-mono text-muted-foreground"
-                      data-testid="text-voucher-number"
-                    >
+                    <span className="text-xs font-mono text-muted-foreground" data-testid="text-voucher-number">
                       #{voucherNumber}
                     </span>
                   )}
@@ -323,11 +292,7 @@ export function PaymentReceiptTab({
                                 : ""
                           }
                           onChange={(e) =>
-                            field.onChange(
-                              e.target.value
-                                ? new Date(e.target.value + "T00:00:00")
-                                : new Date()
-                            )
+                            field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())
                           }
                           data-testid="input-date-picker"
                           title="Entry Date"
@@ -398,17 +363,11 @@ export function PaymentReceiptTab({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleExportVoucher?.(false)}
-                              data-testid="export-summary"
-                            >
+                            <DropdownMenuItem onClick={() => handleExportVoucher?.(false)} data-testid="export-summary">
                               <FileDown className="h-4 w-4 mr-2" />
                               Summary
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleExportVoucher?.(true)}
-                              data-testid="export-detailed"
-                            >
+                            <DropdownMenuItem onClick={() => handleExportVoucher?.(true)} data-testid="export-detailed">
                               <FileDown className="h-4 w-4 mr-2" />
                               Detailed
                             </DropdownMenuItem>
@@ -436,9 +395,7 @@ export function PaymentReceiptTab({
                   <BookOpen className="h-4 w-4 mr-1.5" />
                   Accounts
                   {activeTargetLabel && (
-                    <span className="ml-1.5 text-xs text-muted-foreground font-normal">
-                      — {activeTargetLabel}
-                    </span>
+                    <span className="ml-1.5 text-xs text-muted-foreground font-normal">— {activeTargetLabel}</span>
                   )}
                 </Button>
               </div>
@@ -457,10 +414,18 @@ export function PaymentReceiptTab({
                           {/* Mobile: tappable card → opens Pay From sheet */}
                           <div
                             className="sm:hidden w-full rounded-md border bg-card px-3 py-2.5 flex items-center justify-between gap-2 cursor-pointer hover-elevate active-elevate-2 min-h-9"
-                            onClick={() => { setPayFromSearch(""); setPayFromSheetOpen(true); }}
+                            onClick={() => {
+                              setPayFromSearch("");
+                              setPayFromSheetOpen(true);
+                            }}
                             data-testid={`${accountTestId}-mobile-card`}
                           >
-                            <span className={cn("text-sm truncate", paymentAccountId > 0 ? "font-medium" : "text-muted-foreground")}>
+                            <span
+                              className={cn(
+                                "text-sm truncate",
+                                paymentAccountId > 0 ? "font-medium" : "text-muted-foreground"
+                              )}
+                            >
                               {paymentAccountId > 0 ? paymentAccountName : accountPlaceholder}
                             </span>
                             <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -468,7 +433,10 @@ export function PaymentReceiptTab({
                           {/* Desktop: AccountAutocomplete */}
                           <div
                             className="hidden sm:block w-full min-w-0"
-                            onFocus={() => { setPayFromActive(true); onAccountPickerOpen?.(); }}
+                            onFocus={() => {
+                              setPayFromActive(true);
+                              onAccountPickerOpen?.();
+                            }}
                           >
                             <AccountAutocomplete
                               value={
@@ -493,54 +461,28 @@ export function PaymentReceiptTab({
 
                       {/* Balance / projection display */}
                       {paymentAccountId > 0 &&
-                        (accountCurrencyBalances &&
-                        accountCurrencyBalances.length > 0 ? (
+                        (accountCurrencyBalances && accountCurrencyBalances.length > 0 ? (
                           <div className="flex flex-col gap-0.5 mt-1.5">
-                            {accountCurrencyBalances.map(
-                              ({ currency, balance }) => (
-                                <div
-                                  key={currency}
-                                  className="flex items-center gap-1.5 text-sm font-mono"
-                                >
-                                  <span className="text-muted-foreground text-xs">
-                                    Bal:
-                                  </span>
-                                  <span className={cn(balColor(balance))}>
-                                    {fmtCurr(balance, currency)}{" "}
-                                    {balance > 0
-                                      ? "CR"
-                                      : balance < 0
-                                        ? "DR"
-                                        : ""}
-                                  </span>
-                                </div>
-                              )
-                            )}
+                            {accountCurrencyBalances.map(({ currency, balance }) => (
+                              <div key={currency} className="flex items-center gap-1.5 text-sm font-mono">
+                                <span className="text-muted-foreground text-xs">Bal:</span>
+                                <span className={cn(balColor(balance))}>
+                                  {fmtCurr(balance, currency)} {balance > 0 ? "CR" : balance < 0 ? "DR" : ""}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5 flex-wrap text-sm mt-1.5 font-mono">
-                            <span className="text-muted-foreground text-xs">
-                              Bal:
-                            </span>
-                            <span className={cn(balColor(accountBalance))}>
-                              {formatAmount(accountBalance)}
-                            </span>
+                            <span className="text-muted-foreground text-xs">Bal:</span>
+                            <span className={cn(balColor(accountBalance))}>{formatAmount(accountBalance)}</span>
                             {total > 0 && (
                               <>
-                                <span className="text-muted-foreground">
-                                  →
-                                </span>
-                                <span
-                                  className={cn(
-                                    "font-semibold",
-                                    balColor(projected)
-                                  )}
-                                >
+                                <span className="text-muted-foreground">→</span>
+                                <span className={cn("font-semibold", balColor(projected))}>
                                   {formatAmount(projected)}
                                 </span>
-                                <span className="text-muted-foreground text-xs">
-                                  after
-                                </span>
+                                <span className="text-muted-foreground text-xs">after</span>
                               </>
                             )}
                           </div>
@@ -570,8 +512,7 @@ export function PaymentReceiptTab({
                     if (fieldName === "account") {
                       setPayFromActive(false);
                       setActiveRowIndex(rowIndex);
-                      const currentAccountName =
-                        entries[rowIndex]?.accountName || "";
+                      const currentAccountName = entries[rowIndex]?.accountName || "";
                       setSidebarSearchValue(currentAccountName);
                     }
                   }}
@@ -595,9 +536,7 @@ export function PaymentReceiptTab({
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                           Lines
                         </span>
-                        <span className="text-sm font-semibold tabular-nums">
-                          {validEntryCount}
-                        </span>
+                        <span className="text-sm font-semibold tabular-nums">{validEntryCount}</span>
                       </div>
 
                       {(missingAccount || missingEntries) && (
@@ -648,11 +587,7 @@ export function PaymentReceiptTab({
                         className="flex items-center gap-1.5 px-1 text-muted-foreground"
                         data-testid="button-toggle-notes"
                       >
-                        {notesOpen ? (
-                          <ChevronUp className="h-3.5 w-3.5" />
-                        ) : (
-                          <ChevronDown className="h-3.5 w-3.5" />
-                        )}
+                        {notesOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         <span className="text-xs font-medium">Notes</span>
                       </Button>
                     </CollapsibleTrigger>
@@ -669,12 +604,7 @@ export function PaymentReceiptTab({
                       render={({ field }) => (
                         <FormItem className="mt-2">
                           <FormControl>
-                            <Textarea
-                              {...field}
-                              placeholder="Additional notes..."
-                              rows={3}
-                              data-testid="input-notes"
-                            />
+                            <Textarea {...field} placeholder="Additional notes..." rows={3} data-testid="input-notes" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -698,12 +628,8 @@ export function PaymentReceiptTab({
                           />
                         </FormControl>
                         <div className="space-y-0.5 leading-none">
-                          <FormLabel className="cursor-pointer">
-                            Mark as Optional
-                          </FormLabel>
-                          <p className="text-xs text-muted-foreground">
-                            Excluded from required balance checks
-                          </p>
+                          <FormLabel className="cursor-pointer">Mark as Optional</FormLabel>
+                          <p className="text-xs text-muted-foreground">Excluded from required balance checks</p>
                         </div>
                       </FormItem>
                     )}
@@ -740,16 +666,10 @@ export function PaymentReceiptTab({
 
       {/* ── Mobile Account Drawer (Sheet) — entry rows ── */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-sm p-0 flex flex-col"
-          data-testid="sheet-accounts-drawer"
-        >
+        <SheetContent side="right" className="w-full sm:max-w-sm p-0 flex flex-col" data-testid="sheet-accounts-drawer">
           <SheetHeader className="p-4 border-b shrink-0">
             <SheetTitle className="text-base">
-              {activeTargetLabel
-                ? `Accounts — ${activeTargetLabel}`
-                : "Select Account"}
+              {activeTargetLabel ? `Accounts — ${activeTargetLabel}` : "Select Account"}
             </SheetTitle>
           </SheetHeader>
           <div className="flex-1 overflow-hidden">
@@ -759,7 +679,13 @@ export function PaymentReceiptTab({
       </Sheet>
 
       {/* ── Mobile Pay From / Receive Into Sheet ── */}
-      <Sheet open={payFromSheetOpen} onOpenChange={(isOpen) => { setPayFromSheetOpen(isOpen); if (!isOpen) setPayFromSearch(""); }}>
+      <Sheet
+        open={payFromSheetOpen}
+        onOpenChange={(isOpen) => {
+          setPayFromSheetOpen(isOpen);
+          if (!isOpen) setPayFromSearch("");
+        }}
+      >
         <SheetContent side="bottom" className="flex flex-col p-0" style={{ height: "auto", maxHeight: "88vh" }}>
           <SheetHeader className="px-4 pt-4 pb-3 border-b shrink-0">
             <SheetTitle className="text-base">{accountLabel}</SheetTitle>
@@ -780,7 +706,10 @@ export function PaymentReceiptTab({
               const search = payFromSearch.toLowerCase().replace(/[\s.-]/g, "");
               const filtered = sidebarAccounts.filter((a) => {
                 if (!payFromSearch) return true;
-                return a.name.toLowerCase().replace(/[\s.-]/g, "").includes(search);
+                return a.name
+                  .toLowerCase()
+                  .replace(/[\s.-]/g, "")
+                  .includes(search);
               });
               if (filtered.length === 0) {
                 return (
@@ -790,11 +719,9 @@ export function PaymentReceiptTab({
                 );
               }
               return filtered.slice(0, 40).map((account) => {
-                const isSelected =
-                  account.id === paymentAccountId && account.type === paymentAccountType;
-                const bal = typeof account.balance === "string"
-                  ? parseFloat(account.balance)
-                  : (account.balance ?? null);
+                const isSelected = account.id === paymentAccountId && account.type === paymentAccountType;
+                const bal =
+                  typeof account.balance === "string" ? parseFloat(account.balance) : (account.balance ?? null);
                 return (
                   <button
                     key={`${account.type}-${account.id}`}
@@ -814,14 +741,10 @@ export function PaymentReceiptTab({
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{account.name}</div>
                       {bal != null && (
-                        <div className="text-xs text-muted-foreground font-mono mt-0.5">
-                          {formatAmount(bal)}
-                        </div>
+                        <div className="text-xs text-muted-foreground font-mono mt-0.5">{formatAmount(bal)}</div>
                       )}
                     </div>
-                    {isSelected && (
-                      <div className="h-2 w-2 rounded-full bg-primary shrink-0" />
-                    )}
+                    {isSelected && <div className="h-2 w-2 rounded-full bg-primary shrink-0" />}
                   </button>
                 );
               });

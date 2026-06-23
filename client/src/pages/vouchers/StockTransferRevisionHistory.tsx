@@ -72,9 +72,7 @@ export function StockTransferRevisionHistory({
               <div key={rev.id} className="border rounded-md overflow-hidden">
                 {rev.optional && (
                   <div className="flex items-center justify-between gap-3 px-3 py-2 status-warning border-b">
-                    <span className="text-xs font-medium">
-                      Pending POS adjustment — awaiting admin approval
-                    </span>
+                    <span className="text-xs font-medium">Pending POS adjustment — awaiting admin approval</span>
                     <Button
                       size="sm"
                       variant="default"
@@ -87,9 +85,7 @@ export function StockTransferRevisionHistory({
                 )}
                 <div className="flex items-center justify-between gap-3 p-3 bg-muted/40 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={rev.optional ? "secondary" : "default"}>
-                      Rev {rev.revisionNumber}
-                    </Badge>
+                    <Badge variant={rev.optional ? "secondary" : "default"}>Rev {rev.revisionNumber}</Badge>
                     {rev.optional && (
                       <Badge variant="outline" className="text-xs">
                         Reference Only
@@ -98,9 +94,7 @@ export function StockTransferRevisionHistory({
                     <span className="text-xs text-muted-foreground">
                       {rev.revisionDate ? format(new Date(rev.revisionDate), "yyyy-MM-dd") : ""}
                     </span>
-                    {rev.note && (
-                      <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>
-                    )}
+                    {rev.note && <span className="text-xs italic text-muted-foreground">"{rev.note}"</span>}
                   </div>
                   <div className="flex items-center gap-2 text-xs">
                     <span className="text-muted-foreground">Reference only:</span>
@@ -114,11 +108,7 @@ export function StockTransferRevisionHistory({
                         } finally {
                           setTransferRevisionsExpanded(true);
                           queryClient.invalidateQueries({
-                            queryKey: [
-                              "/api/stock-transfers",
-                              lastKnownTransferIdRef.current,
-                              "revisions",
-                            ],
+                            queryKey: ["/api/stock-transfers", lastKnownTransferIdRef.current, "revisions"],
                           });
                         }
                       }}
@@ -155,9 +145,7 @@ export function StockTransferRevisionHistory({
                                 <td
                                   className={cn(
                                     "p-2 text-right font-mono font-semibold",
-                                    delta > 0
-                                      ? "text-emerald-600 dark:text-emerald-400"
-                                      : "text-destructive"
+                                    delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
                                   )}
                                 >
                                   {delta > 0 ? "+" : ""}

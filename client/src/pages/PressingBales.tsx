@@ -6,14 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -28,19 +21,21 @@ interface CartItem {
 }
 
 function formatLabelNum(val: string | number): string {
-  const n = typeof val === 'string' ? parseFloat(val) : val;
+  const n = typeof val === "string" ? parseFloat(val) : val;
   if (isNaN(n)) return String(val);
   return n % 1 === 0 ? n.toFixed(0) : parseFloat(n.toFixed(3)).toString();
 }
 
-function generatePressingLabelHtml(labels: Array<{
-  referenceNumber: string;
-  articleCode: string;
-  pieces: number;
-  approxWeightKg: string;
-  productName: string;
-}>) {
-  let labelsHtml = '';
+function generatePressingLabelHtml(
+  labels: Array<{
+    referenceNumber: string;
+    articleCode: string;
+    pieces: number;
+    approxWeightKg: string;
+    productName: string;
+  }>
+) {
+  let labelsHtml = "";
   for (const label of labels) {
     labelsHtml += `
       <div class="label-page">
@@ -112,9 +107,7 @@ export default function PressingBales() {
 
     const trimmed = value.trim().toLowerCase();
     const product = activeProducts?.find(
-      (p) =>
-        p.articleCode?.toLowerCase() === trimmed ||
-        p.code.toLowerCase() === trimmed
+      (p) => p.articleCode?.toLowerCase() === trimmed || p.code.toLowerCase() === trimmed
     );
 
     if (!product) {
@@ -128,11 +121,7 @@ export default function PressingBales() {
     setCart((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
       if (existing) {
-        return prev.map((item) =>
-          item.productId === product.id
-            ? { ...item, qty: item.qty + 1 }
-            : item
-        );
+        return prev.map((item) => (item.productId === product.id ? { ...item, qty: item.qty + 1 } : item));
       }
       return [...prev, { productId: product.id, product, qty: 1, weightPerBaleKg: defaultWeight }];
     });
@@ -150,11 +139,7 @@ export default function PressingBales() {
   const updateQty = (productId: number, delta: number) => {
     setCart((prev) =>
       prev
-        .map((item) =>
-          item.productId === productId
-            ? { ...item, qty: Math.max(0, item.qty + delta) }
-            : item
-        )
+        .map((item) => (item.productId === productId ? { ...item, qty: Math.max(0, item.qty + delta) } : item))
         .filter((item) => item.qty > 0)
     );
   };
@@ -163,20 +148,12 @@ export default function PressingBales() {
     if (qty <= 0) {
       setCart((prev) => prev.filter((item) => item.productId !== productId));
     } else {
-      setCart((prev) =>
-        prev.map((item) =>
-          item.productId === productId ? { ...item, qty } : item
-        )
-      );
+      setCart((prev) => prev.map((item) => (item.productId === productId ? { ...item, qty } : item)));
     }
   };
 
   const updateWeight = (productId: number, weight: number) => {
-    setCart((prev) =>
-      prev.map((item) =>
-        item.productId === productId ? { ...item, weightPerBaleKg: weight } : item
-      )
-    );
+    setCart((prev) => prev.map((item) => (item.productId === productId ? { ...item, weightPerBaleKg: weight } : item)));
   };
 
   const removeItem = (productId: number) => {
@@ -299,13 +276,17 @@ export default function PressingBales() {
           <div>
             <PageHeader title="Pressing Bales" subtitle="Scan products to create PENDING bales for counting" />
           </div>
-          <Badge variant="secondary" data-testid="text-pressing-badge">PRESSING</Badge>
+          <Badge variant="secondary" data-testid="text-pressing-badge">
+            PRESSING
+          </Badge>
         </div>
       </div>
 
       <div className="flex items-start gap-2 text-sm text-muted-foreground bg-muted/40 rounded-md px-3 py-2">
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
-        <span>Raw material usage is recorded at end of day during finalization — no mix batch needed at pressing time.</span>
+        <span>
+          Raw material usage is recorded at end of day during finalization — no mix batch needed at pressing time.
+        </span>
       </div>
 
       <div className="flex gap-6">
@@ -366,8 +347,12 @@ export default function PressingBales() {
                     {cart.map((item) => (
                       <TableRow key={item.productId} data-testid={`row-cart-${item.productId}`}>
                         <TableCell>
-                          <div className="font-medium" data-testid={`text-product-name-${item.productId}`}>{item.product.name}</div>
-                          <div className="text-sm text-muted-foreground font-mono">{item.product.articleCode || item.product.code}</div>
+                          <div className="font-medium" data-testid={`text-product-name-${item.productId}`}>
+                            {item.product.name}
+                          </div>
+                          <div className="text-sm text-muted-foreground font-mono">
+                            {item.product.articleCode || item.product.code}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center justify-center gap-1">
@@ -441,11 +426,15 @@ export default function PressingBales() {
             <CardContent className="space-y-3">
               <div>
                 <div className="text-sm text-muted-foreground">Total Bales</div>
-                <div className="text-2xl font-bold" data-testid="text-total-bales">{totalQty}</div>
+                <div className="text-2xl font-bold" data-testid="text-total-bales">
+                  {totalQty}
+                </div>
               </div>
               <div>
                 <div className="text-sm text-muted-foreground">Total Weight</div>
-                <div className="text-2xl font-bold" data-testid="text-total-weight">{formatNumber(totalKgToConsume)} kg</div>
+                <div className="text-2xl font-bold" data-testid="text-total-weight">
+                  {formatNumber(totalKgToConsume)} kg
+                </div>
               </div>
             </CardContent>
           </Card>

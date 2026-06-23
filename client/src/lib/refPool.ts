@@ -33,7 +33,7 @@ export async function replenishPool(count = POOL_FETCH_SIZE): Promise<void> {
   try {
     const res = await apiRequest("POST", "/api/bale-label-prints/allocate-pool", { count });
     if (!res.ok) return;
-    const { refs } = await res.json() as { refs: string[] };
+    const { refs } = (await res.json()) as { refs: string[] };
     if (!refs?.length) return;
     const now = Date.now();
     await db.refPool.bulkAdd(
@@ -66,7 +66,8 @@ export async function pruneUsedRefs(keepDays = 7): Promise<void> {
   try {
     const cutoff = Date.now() - keepDays * 86_400_000;
     await db.refPool
-      .where("status").equals("used")
+      .where("status")
+      .equals("used")
       .and((item) => (item.usedAt ?? 0) < cutoff)
       .delete();
   } catch {

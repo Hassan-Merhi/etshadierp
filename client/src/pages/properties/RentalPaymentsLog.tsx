@@ -108,11 +108,12 @@ export default function RentalPaymentsLog({
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return payments;
-    return payments.filter(p =>
-      (p.tenantName ?? "").toLowerCase().includes(q) ||
-      (p.unitNumber ?? "").toLowerCase().includes(q) ||
-      (p.locationGroup ?? "").toLowerCase().includes(q) ||
-      (p.notes ?? "").toLowerCase().includes(q)
+    return payments.filter(
+      (p) =>
+        (p.tenantName ?? "").toLowerCase().includes(q) ||
+        (p.unitNumber ?? "").toLowerCase().includes(q) ||
+        (p.locationGroup ?? "").toLowerCase().includes(q) ||
+        (p.notes ?? "").toLowerCase().includes(q)
     );
   }, [payments, search]);
 
@@ -133,7 +134,7 @@ export default function RentalPaymentsLog({
             className="pl-8"
             placeholder="Search tenant, unit, notes…"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             data-testid={`input-${testIdPrefix}-payments-search`}
           />
         </div>
@@ -142,19 +143,34 @@ export default function RentalPaymentsLog({
       {/* Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAYMENTS</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold" data-testid={`stat-${testIdPrefix}-total-payments`}>{filtered.length}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">TOTAL AMOUNT RECEIVED</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600 dark:text-green-400" data-testid={`stat-${testIdPrefix}-total-amount`}>{fmtMoney(total)}</div></CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-xs text-muted-foreground font-normal">UNIQUE TENANTS</CardTitle></CardHeader>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL PAYMENTS</CardTitle>
+          </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {new Set(filtered.map(p => p.tenantName).filter(Boolean)).size}
+            <div className="text-2xl font-bold" data-testid={`stat-${testIdPrefix}-total-payments`}>
+              {filtered.length}
             </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs text-muted-foreground font-normal">TOTAL AMOUNT RECEIVED</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div
+              className="text-2xl font-bold text-green-600 dark:text-green-400"
+              data-testid={`stat-${testIdPrefix}-total-amount`}
+            >
+              {fmtMoney(total)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs text-muted-foreground font-normal">UNIQUE TENANTS</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{new Set(filtered.map((p) => p.tenantName).filter(Boolean)).size}</div>
           </CardContent>
         </Card>
       </div>
@@ -185,7 +201,11 @@ export default function RentalPaymentsLog({
                 </thead>
                 <tbody>
                   {filtered.map((p, i) => (
-                    <tr key={p.id} className={`border-t ${i % 2 === 1 ? "bg-muted/20" : ""}`} data-testid={`row-payment-${p.id}`}>
+                    <tr
+                      key={p.id}
+                      className={`border-t ${i % 2 === 1 ? "bg-muted/20" : ""}`}
+                      data-testid={`row-payment-${p.id}`}
+                    >
                       <td className="px-3 py-2 tabular-nums text-sm">
                         {format(new Date(p.paymentDate), "dd MMM yyyy")}
                       </td>
@@ -193,7 +213,9 @@ export default function RentalPaymentsLog({
                       <td className="px-3 py-2">
                         <span className="font-mono text-xs">{p.unitNumber ?? "—"}</span>
                         {p.locationGroup && (
-                          <Badge variant="outline" className="ml-1.5 text-xs">{p.locationGroup}</Badge>
+                          <Badge variant="outline" className="ml-1.5 text-xs">
+                            {p.locationGroup}
+                          </Badge>
                         )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold text-green-700 dark:text-green-400">
@@ -207,7 +229,10 @@ export default function RentalPaymentsLog({
                         {p.voucherId ? (
                           <span className="text-xs text-muted-foreground font-mono">#{p.voucherId}</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400" title="No accounting entry — payment was recorded without a cash account">
+                          <span
+                            className="inline-flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"
+                            title="No accounting entry — payment was recorded without a cash account"
+                          >
                             <AlertTriangle className="h-3 w-3" />
                             No entry
                           </span>
@@ -228,7 +253,9 @@ export default function RentalPaymentsLog({
                 </tbody>
                 <tfoot className="sticky bottom-0 z-20 border-t-2 bg-muted/30">
                   <tr>
-                    <td className="px-3 py-2 font-semibold" colSpan={3}>TOTAL</td>
+                    <td className="px-3 py-2 font-semibold" colSpan={3}>
+                      TOTAL
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums font-bold text-green-700 dark:text-green-400">
                       {fmtMoney(total)}
                     </td>
@@ -242,19 +269,24 @@ export default function RentalPaymentsLog({
       </Card>
 
       {/* Delete confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this payment?</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget && (
                 <>
-                  This will permanently remove the <strong>{fmtMoneyWithCurrency(deleteTarget.amount, deleteTarget.currency)}</strong> payment
-                  from <strong>{deleteTarget.tenantName ?? "—"}</strong>{" "}
-                  ({MONTH_NAMES[deleteTarget.forMonth]} {deleteTarget.forYear}).
-                  The accounting entry will be reversed, and any inter-company transfer that was automatically
-                  created for this payment will also be fully reversed in both companies.
-                  This cannot be undone.
+                  This will permanently remove the{" "}
+                  <strong>{fmtMoneyWithCurrency(deleteTarget.amount, deleteTarget.currency)}</strong> payment from{" "}
+                  <strong>{deleteTarget.tenantName ?? "—"}</strong> ({MONTH_NAMES[deleteTarget.forMonth]}{" "}
+                  {deleteTarget.forYear}). The accounting entry will be reversed, and any inter-company transfer that
+                  was automatically created for this payment will also be fully reversed in both companies. This cannot
+                  be undone.
                 </>
               )}
             </AlertDialogDescription>

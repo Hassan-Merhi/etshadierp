@@ -37,7 +37,7 @@ export async function captureElementToPdf(
 
   // Ratio that maps content width to A4 width (never upscale beyond original)
   const ratio = Math.min(A4_W / imgW, 1);
-  const pdfH  = imgH * ratio;
+  const pdfH = imgH * ratio;
 
   if (singlePage) {
     // One tall page sized to the content — no slicing, no cut-off rows
@@ -67,13 +67,13 @@ export async function captureElementToPdf(
 
     // Canvas pixels that correspond to one A4 page height
     const pxPerPage = (A4_H / ratio) * scale;
-    const pxStart   = i * pxPerPage;
-    const pxSliceH  = Math.min(pxPerPage, canvas.height - pxStart);
+    const pxStart = i * pxPerPage;
+    const pxSliceH = Math.min(pxPerPage, canvas.height - pxStart);
 
     if (pxSliceH <= 0) break;
 
     const sliceCanvas = document.createElement("canvas");
-    sliceCanvas.width  = canvas.width;
+    sliceCanvas.width = canvas.width;
     sliceCanvas.height = Math.ceil(pxSliceH);
 
     const ctx = sliceCanvas.getContext("2d");

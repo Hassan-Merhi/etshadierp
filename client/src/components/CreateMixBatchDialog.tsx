@@ -2,32 +2,13 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatNumber } from "@/lib/formatNumber";
 import { Plus, Trash2, Layers, Package } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ToastAction } from "@/components/ui/toast";
 import { useToast } from "@/hooks/use-toast";
@@ -64,11 +45,7 @@ interface CreateMixBatchDialogProps {
   onCreated?: (batch: FactoryMixBatch) => void;
 }
 
-export function CreateMixBatchDialog({
-  open,
-  onOpenChange,
-  onCreated,
-}: CreateMixBatchDialogProps) {
+export function CreateMixBatchDialog({ open, onOpenChange, onCreated }: CreateMixBatchDialogProps) {
   const { toast } = useToast();
   const [mode, setMode] = useState<DialogMode>("new");
   const [targetBatchId, setTargetBatchId] = useState<string>("");
@@ -78,7 +55,7 @@ export function CreateMixBatchDialog({
   const [weightInput, setWeightInput] = useState<string>("");
   const [batchName, setBatchName] = useState("");
   const [notes, setNotes] = useState("");
-  const [batchDate, setBatchDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [batchDate, setBatchDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
 
   const { data: supplierStock } = useQuery<SupplierRawStock[]>({
     queryKey: ["/api/factory/raw-stock"],
@@ -94,8 +71,7 @@ export function CreateMixBatchDialog({
   // (negative/zero remaining allowed — over-use is permitted)
   const availableSuppliers = supplierStock?.filter(
     (s) =>
-      s.supplierId !== null &&
-      !selectedSources.some((sel) => sel.type === "supplier" && sel.sourceId === s.supplierId!)
+      s.supplierId !== null && !selectedSources.some((sel) => sel.type === "supplier" && sel.sourceId === s.supplierId!)
   );
 
   const availableBatchesForSource = existingBatches?.filter((b) => {
@@ -107,9 +83,10 @@ export function CreateMixBatchDialog({
     );
   });
 
-  const activeBatchesForTopup = existingBatches?.filter((b) => {
-    return b.status === "ACTIVE" || b.status === "OPEN" || b.status === "CARRY_FORWARD";
-  }) ?? [];
+  const activeBatchesForTopup =
+    existingBatches?.filter((b) => {
+      return b.status === "ACTIVE" || b.status === "OPEN" || b.status === "CARRY_FORWARD";
+    }) ?? [];
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -226,7 +203,10 @@ export function CreateMixBatchDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/factory/raw-stock"] });
       handleClose();
       const batchCode = (result as any).batchCode || `#${result.id}`;
-      toast({ title: "Added to batch", description: `${formatNumber(selectedSources.reduce((s, x) => s + x.weightKg, 0))} kg added to ${batchCode}` });
+      toast({
+        title: "Added to batch",
+        description: `${formatNumber(selectedSources.reduce((s, x) => s + x.weightKg, 0))} kg added to ${batchCode}`,
+      });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -254,13 +234,21 @@ export function CreateMixBatchDialog({
 
   const handleAddSource = () => {
     if (!selectedSourceId || !weightInput) {
-      toast({ title: "Missing information", description: "Please select a source and enter weight", variant: "destructive" });
+      toast({
+        title: "Missing information",
+        description: "Please select a source and enter weight",
+        variant: "destructive",
+      });
       return;
     }
 
     const weight = parseFloat(weightInput);
     if (isNaN(weight) || weight <= 0) {
-      toast({ title: "Invalid weight", description: "Please enter a valid weight greater than 0", variant: "destructive" });
+      toast({
+        title: "Invalid weight",
+        description: "Please enter a valid weight greater than 0",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -290,7 +278,11 @@ export function CreateMixBatchDialog({
 
       const available = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg);
       if (weight > available + 0.001) {
-        toast({ title: "Exceeds available", description: `Only ${formatNumber(available)} kg available in this batch`, variant: "destructive" });
+        toast({
+          title: "Exceeds available",
+          description: `Only ${formatNumber(available)} kg available in this batch`,
+          variant: "destructive",
+        });
         return;
       }
 
@@ -326,7 +318,7 @@ export function CreateMixBatchDialog({
     setWeightInput("");
     setBatchName("");
     setNotes("");
-    setBatchDate(new Date().toLocaleDateString('en-CA'));
+    setBatchDate(new Date().toLocaleDateString("en-CA"));
     setAddSourceType("supplier");
   };
 
@@ -355,7 +347,10 @@ export function CreateMixBatchDialog({
               type="button"
               variant={mode === "new" ? "default" : "outline"}
               size="sm"
-              onClick={() => { setMode("new"); setTargetBatchId(""); }}
+              onClick={() => {
+                setMode("new");
+                setTargetBatchId("");
+              }}
               data-testid="button-mode-new"
             >
               New Batch
@@ -384,12 +379,15 @@ export function CreateMixBatchDialog({
                     const remaining = parseFloat(b.totalWeightKg) - parseFloat(b.usedKg);
                     return (
                       <SelectItem key={b.id} value={b.id.toString()}>
-                        {b.name || b.batchCode} — {formatNumber(remaining)} kg remaining @ ${parseFloat(b.costPerKg).toFixed(4)}/kg
+                        {b.name || b.batchCode} — {formatNumber(remaining)} kg remaining @ $
+                        {parseFloat(b.costPerKg).toFixed(4)}/kg
                       </SelectItem>
                     );
                   })}
                   {activeBatchesForTopup.length === 0 && (
-                    <SelectItem value="__none__" disabled>No active batches available</SelectItem>
+                    <SelectItem value="__none__" disabled>
+                      No active batches available
+                    </SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -444,7 +442,11 @@ export function CreateMixBatchDialog({
                 type="button"
                 variant={addSourceType === "supplier" ? "default" : "outline"}
                 size="sm"
-                onClick={() => { setAddSourceType("supplier"); setSelectedSourceId(""); setWeightInput(""); }}
+                onClick={() => {
+                  setAddSourceType("supplier");
+                  setSelectedSourceId("");
+                  setWeightInput("");
+                }}
                 data-testid="button-source-type-supplier"
               >
                 <Package className="h-3 w-3 mr-1" />
@@ -454,7 +456,11 @@ export function CreateMixBatchDialog({
                 type="button"
                 variant={addSourceType === "batch" ? "default" : "outline"}
                 size="sm"
-                onClick={() => { setAddSourceType("batch"); setSelectedSourceId(""); setWeightInput(""); }}
+                onClick={() => {
+                  setAddSourceType("batch");
+                  setSelectedSourceId("");
+                  setWeightInput("");
+                }}
                 data-testid="button-source-type-batch"
               >
                 <Layers className="h-3 w-3 mr-1" />
@@ -471,11 +477,14 @@ export function CreateMixBatchDialog({
                   <SelectContent>
                     {availableSuppliers?.map((stock) => (
                       <SelectItem key={stock.supplierId!} value={stock.supplierId!.toString()}>
-                        {stock.supplierName} ({formatNumber(parseFloat(stock.remainingKg))} kg @ ${parseFloat(stock.costPerKg).toFixed(4)}/kg)
+                        {stock.supplierName} ({formatNumber(parseFloat(stock.remainingKg))} kg @ $
+                        {parseFloat(stock.costPerKg).toFixed(4)}/kg)
                       </SelectItem>
                     ))}
                     {(!availableSuppliers || availableSuppliers.length === 0) && (
-                      <SelectItem value="__none__" disabled>No supplier stock available</SelectItem>
+                      <SelectItem value="__none__" disabled>
+                        No supplier stock available
+                      </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -489,12 +498,15 @@ export function CreateMixBatchDialog({
                       const remaining = parseFloat(batch.totalWeightKg) - parseFloat(batch.usedKg);
                       return (
                         <SelectItem key={batch.id} value={batch.id.toString()}>
-                          {batch.name || batch.batchCode} ({formatNumber(remaining)} kg @ ${parseFloat(batch.costPerKg).toFixed(4)}/kg)
+                          {batch.name || batch.batchCode} ({formatNumber(remaining)} kg @ $
+                          {parseFloat(batch.costPerKg).toFixed(4)}/kg)
                         </SelectItem>
                       );
                     })}
                     {(!availableBatchesForSource || availableBatchesForSource.length === 0) && (
-                      <SelectItem value="__none__" disabled>No active batches available</SelectItem>
+                      <SelectItem value="__none__" disabled>
+                        No active batches available
+                      </SelectItem>
                     )}
                   </SelectContent>
                 </Select>
@@ -544,14 +556,13 @@ export function CreateMixBatchDialog({
                       </TableCell>
                       <TableCell className="font-medium">{selection.label}</TableCell>
                       <TableCell className="text-right font-mono">
-                        {selection.weightKg.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
+                        {selection.weightKg.toLocaleString(undefined, {
+                          minimumFractionDigits: 3,
+                          maximumFractionDigits: 3,
+                        })}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        ${selection.costPerKg.toFixed(4)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        ${formatNumber(selection.totalCost)}
-                      </TableCell>
+                      <TableCell className="text-right font-mono">${selection.costPerKg.toFixed(4)}</TableCell>
+                      <TableCell className="text-right font-mono">${formatNumber(selection.totalCost)}</TableCell>
                       <TableCell>
                         <Button
                           type="button"
@@ -608,13 +619,17 @@ export function CreateMixBatchDialog({
               Cancel
             </Button>
             <Button
-              onClick={() => mode === "topup" ? topUpMutation.mutate() : createMutation.mutate()}
+              onClick={() => (mode === "topup" ? topUpMutation.mutate() : createMutation.mutate())}
               disabled={isPending || !hasAnySources || (mode === "topup" && !targetBatchId)}
               data-testid="button-submit"
             >
               {isPending
-                ? (mode === "topup" ? "Adding..." : "Creating...")
-                : (mode === "topup" ? "Add to Batch" : "Create Batch")}
+                ? mode === "topup"
+                  ? "Adding..."
+                  : "Creating..."
+                : mode === "topup"
+                  ? "Add to Batch"
+                  : "Create Batch"}
             </Button>
           </div>
         </div>

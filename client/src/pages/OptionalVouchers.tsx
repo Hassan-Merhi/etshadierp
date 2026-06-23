@@ -31,7 +31,12 @@ export default function OptionalVouchers() {
   const queryString = queryParams.toString();
   const queryUrl = `/api/vouchers/optional${queryString ? `?${queryString}` : ""}`;
 
-  const { data: vouchers = [], isLoading, isError, error } = useQuery<any[]>({
+  const {
+    data: vouchers = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<any[]>({
     queryKey: ["/api/vouchers/optional", typeFilter, startDate, endDate, search],
     queryFn: async () => {
       const res = await apiRequest("GET", queryUrl);
@@ -91,16 +96,27 @@ export default function OptionalVouchers() {
   const hasFilters = typeFilter !== "all" || startDate || endDate || search;
 
   const voucherTypes = [
-    "Sales", "Payment", "Receipt", "Journal", "Stock Transfer",
-    "Purchase", "Contra", "Credit Note", "Debit Note",
+    "Sales",
+    "Payment",
+    "Receipt",
+    "Journal",
+    "Stock Transfer",
+    "Purchase",
+    "Contra",
+    "Credit Note",
+    "Debit Note",
   ];
 
   const getTypeBadgeVariant = (type: string): "default" | "secondary" | "outline" => {
     switch (type) {
-      case "Sales": return "default";
-      case "Payment": return "secondary";
-      case "Receipt": return "outline";
-      default: return "secondary";
+      case "Sales":
+        return "default";
+      case "Payment":
+        return "secondary";
+      case "Receipt":
+        return "outline";
+      default:
+        return "secondary";
     }
   };
 
@@ -129,7 +145,6 @@ export default function OptionalVouchers() {
 
   return (
     <div className="flex flex-col gap-4 p-4 md:p-6">
-
       {/* ── Header ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <PageHeader
@@ -152,8 +167,10 @@ export default function OptionalVouchers() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
-            {voucherTypes.map(t => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
+            {voucherTypes.map((t) => (
+              <SelectItem key={t} value={t}>
+                {t}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -186,7 +203,13 @@ export default function OptionalVouchers() {
         />
 
         {hasFilters && (
-          <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters" className="gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={clearFilters}
+            data-testid="button-clear-filters"
+            className="gap-1.5"
+          >
             <X className="h-4 w-4" />
             Clear
           </Button>
@@ -224,18 +247,22 @@ export default function OptionalVouchers() {
           ))}
         </div>
       ) : isError ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-destructive" data-testid="text-optional-vouchers-error">
+        <div
+          className="flex flex-col items-center justify-center py-20 gap-3 text-destructive"
+          data-testid="text-optional-vouchers-error"
+        >
           <FileText className="h-10 w-10 opacity-30" />
           <p className="text-sm font-medium">Failed to load optional vouchers</p>
           <p className="text-xs text-muted-foreground">{(error as any)?.message}</p>
         </div>
       ) : vouchers.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground" data-testid="text-no-optional-vouchers">
+        <div
+          className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground"
+          data-testid="text-no-optional-vouchers"
+        >
           <FileText className="h-10 w-10 opacity-25" />
           <p className="text-sm font-medium">No optional vouchers found</p>
-          <p className="text-xs">
-            {hasFilters ? "Try adjusting your filters" : "All vouchers have been finalized"}
-          </p>
+          <p className="text-xs">{hasFilters ? "Try adjusting your filters" : "All vouchers have been finalized"}</p>
         </div>
       ) : (
         <>
@@ -253,7 +280,11 @@ export default function OptionalVouchers() {
               </thead>
               <tbody>
                 {vouchers.map((v: any) => (
-                  <tr key={v.id} className="border-t hover:bg-muted/30 transition-colors" data-testid={`row-voucher-${v.id}`}>
+                  <tr
+                    key={v.id}
+                    className="border-t hover:bg-muted/30 transition-colors"
+                    data-testid={`row-voucher-${v.id}`}
+                  >
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                       {v.voucherDate ? format(new Date(v.voucherDate + "T00:00:00"), "dd MMM yyyy") : "—"}
                     </td>
@@ -262,11 +293,12 @@ export default function OptionalVouchers() {
                         {v.voucherType}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground text-sm">
-                      {v.description || "—"}
-                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-sm">{v.description || "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">
-                      {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                      {parseFloat(v.totalAmount || "0").toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -309,7 +341,10 @@ export default function OptionalVouchers() {
                   <td colSpan={3} className="px-4 py-2 text-sm font-medium">
                     Total ({vouchers.length} voucher{vouchers.length !== 1 ? "s" : ""})
                   </td>
-                  <td className="px-4 py-2 text-right tabular-nums font-semibold" data-testid="text-optional-grand-total-footer">
+                  <td
+                    className="px-4 py-2 text-right tabular-nums font-semibold"
+                    data-testid="text-optional-grand-total-footer"
+                  >
                     {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
                   </td>
                   <td />
@@ -327,9 +362,7 @@ export default function OptionalVouchers() {
                     <div className="text-sm font-medium">
                       {v.voucherDate ? format(new Date(v.voucherDate + "T00:00:00"), "dd MMM yyyy") : "—"}
                     </div>
-                    {v.description && (
-                      <div className="text-xs text-muted-foreground mt-0.5">{v.description}</div>
-                    )}
+                    {v.description && <div className="text-xs text-muted-foreground mt-0.5">{v.description}</div>}
                   </div>
                   <Badge variant={getTypeBadgeVariant(v.voucherType)} className="text-xs shrink-0">
                     {v.voucherType}
@@ -337,19 +370,40 @@ export default function OptionalVouchers() {
                 </div>
                 <div className="flex items-center justify-end text-sm">
                   <span className="font-semibold tabular-nums">
-                    {parseFloat(v.totalAmount || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {parseFloat(v.totalAmount || "0").toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
                 <div className="flex items-center gap-1 pt-1 border-t">
-                  <Button size="sm" variant="ghost" onClick={() => handleEdit(v)} data-testid={`button-edit-mobile-${v.id}`} className="gap-1.5 flex-1 h-8">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleEdit(v)}
+                    data-testid={`button-edit-mobile-${v.id}`}
+                    className="gap-1.5 flex-1 h-8"
+                  >
                     <Pencil className="h-3.5 w-3.5" />
                     Edit
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setFinalizeVoucherId(v.id)} data-testid={`button-finalize-mobile-${v.id}`} className="gap-1.5 flex-1 h-8 text-green-700 dark:text-green-400">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setFinalizeVoucherId(v.id)}
+                    data-testid={`button-finalize-mobile-${v.id}`}
+                    className="gap-1.5 flex-1 h-8 text-green-700 dark:text-green-400"
+                  >
                     <Check className="h-3.5 w-3.5" />
                     Finalize
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => setDeleteVoucherId(v.id)} data-testid={`button-delete-mobile-${v.id}`} className="h-8 w-8 text-destructive">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setDeleteVoucherId(v.id)}
+                    data-testid={`button-delete-mobile-${v.id}`}
+                    className="h-8 w-8 text-destructive"
+                  >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
@@ -366,7 +420,9 @@ export default function OptionalVouchers() {
         description="Are you sure you want to finalize this voucher? Once posted, it will be included in all financial calculations and reports. This cannot be undone easily."
         confirmText={finalizeMutation.isPending ? "Finalizing..." : "Finalize"}
         loading={finalizeMutation.isPending}
-        onConfirm={() => { if (finalizeVoucherId) finalizeMutation.mutate(finalizeVoucherId); }}
+        onConfirm={() => {
+          if (finalizeVoucherId) finalizeMutation.mutate(finalizeVoucherId);
+        }}
       />
 
       <ConfirmDialog
@@ -377,7 +433,9 @@ export default function OptionalVouchers() {
         tone="destructive"
         confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
         loading={deleteMutation.isPending}
-        onConfirm={() => { if (deleteVoucherId) deleteMutation.mutate(deleteVoucherId); }}
+        onConfirm={() => {
+          if (deleteVoucherId) deleteMutation.mutate(deleteVoucherId);
+        }}
       />
     </div>
   );

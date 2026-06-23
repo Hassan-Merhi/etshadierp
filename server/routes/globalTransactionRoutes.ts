@@ -24,24 +24,9 @@ import {
   fixedAssets,
   factorySuppliers,
 } from "../../shared/schema";
-import {
-  eq,
-  and,
-  gte,
-  lte,
-  inArray,
-  or,
-  ilike,
-  desc,
-  sql,
-  count,
-  isNull,
-} from "drizzle-orm";
+import { eq, and, gte, lte, inArray, or, ilike, desc, sql, count, isNull } from "drizzle-orm";
 
-export function registerGlobalTransactionRoutes(
-  app: Express,
-  requireAuth: any
-) {
+export function registerGlobalTransactionRoutes(app: Express, requireAuth: any) {
   // GET /api/global/transactions
   // Returns vouchers across all ERP companies the user has access to.
   app.get("/api/global/transactions", requireAuth, requireNonPOS, async (req, res) => {
@@ -66,7 +51,7 @@ export function registerGlobalTransactionRoutes(
 
       const includeFactoryBool = includeFactoryParam === "true";
 
-      const page  = Math.max(1, parseInt(pageParam  || "1"));
+      const page = Math.max(1, parseInt(pageParam || "1"));
       const limit = Math.min(200, Math.max(1, parseInt(limitParam || "50")));
       const offset = (page - 1) * limit;
 
@@ -78,15 +63,12 @@ export function registerGlobalTransactionRoutes(
         eq(companies.companyType, "properties"),
         eq(companies.companyType, "factory"),
         eq(companies.companyType, "factory_v2"),
-        eq(companies.companyType, "supplier_partner"),
+        eq(companies.companyType, "supplier_partner")
       );
 
       if (isAdmin) {
         // Admins see all ERP + factory + properties companies
-        const allErpCompanies = await db
-          .select({ id: companies.id })
-          .from(companies)
-          .where(allowedTypeFilter);
+        const allErpCompanies = await db.select({ id: companies.id }).from(companies).where(allowedTypeFilter);
         allowedCompanyIds = allErpCompanies.map((c) => c.id);
       } else {
         // Regular users see only their assigned companies
@@ -117,14 +99,16 @@ export function registerGlobalTransactionRoutes(
         const nonFactoryCompanies = await db
           .select({ id: companies.id })
           .from(companies)
-          .where(and(
-            inArray(companies.id, allowedCompanyIds),
-            or(
-              eq(companies.companyType, "erp"),
-              eq(companies.companyType, "properties"),
-              eq(companies.companyType, "supplier_partner"),
+          .where(
+            and(
+              inArray(companies.id, allowedCompanyIds),
+              or(
+                eq(companies.companyType, "erp"),
+                eq(companies.companyType, "properties"),
+                eq(companies.companyType, "supplier_partner")
+              )
             )
-          ));
+          );
         allowedCompanyIds = nonFactoryCompanies.map((c) => c.id);
         if (allowedCompanyIds.length === 0) {
           return res.json({ vouchers: [], total: 0, page, totalPages: 0, summary: [], companies: [] });
@@ -134,7 +118,10 @@ export function registerGlobalTransactionRoutes(
       // 2. Apply company filter from request (must be subset of allowed)
       let targetCompanyIds = allowedCompanyIds;
       if (companyIdsParam && companyIdsParam !== "all") {
-        const requested = companyIdsParam.split(",").map((id) => parseInt(id)).filter(Boolean);
+        const requested = companyIdsParam
+          .split(",")
+          .map((id) => parseInt(id))
+          .filter(Boolean);
         targetCompanyIds = requested.filter((id) => allowedCompanyIds.includes(id));
         if (targetCompanyIds.length === 0) {
           return res.json({ vouchers: [], total: 0, page, totalPages: 0, summary: [] });
@@ -142,13 +129,10 @@ export function registerGlobalTransactionRoutes(
       }
 
       // 3. Build WHERE conditions
-      const conditions: any[] = [
-        inArray(vouchers.companyId, targetCompanyIds),
-        isNull(vouchers.deletedAt),
-      ];
+      const conditions: any[] = [inArray(vouchers.companyId, targetCompanyIds), isNull(vouchers.deletedAt)];
 
       if (startDate) conditions.push(gte(vouchers.voucherDate, startDate));
-      if (endDate)   conditions.push(lte(vouchers.voucherDate, endDate));
+      if (endDate) conditions.push(lte(vouchers.voucherDate, endDate));
       if (voucherType && voucherType !== "all") {
         // Treat "Stock Transfer" and "StockTransfer" as the same type
         if (voucherType === "Stock Transfer" || voucherType === "StockTransfer") {
@@ -157,10 +141,10 @@ export function registerGlobalTransactionRoutes(
           conditions.push(eq(vouchers.voucherType, voucherType));
         }
       }
-      if (currency    && currency    !== "all") conditions.push(eq(vouchers.currency, currency));
+      if (currency && currency !== "all") conditions.push(eq(vouchers.currency, currency));
 
       // optional filter: "active" → false, "optional" → true, "all" → both
-      if (optionalParam === "active")   conditions.push(eq(vouchers.optional, false));
+      if (optionalParam === "active") conditions.push(eq(vouchers.optional, false));
       if (optionalParam === "optional") conditions.push(eq(vouchers.optional, true));
 
       if (search) {
@@ -181,10 +165,7 @@ export function registerGlobalTransactionRoutes(
       const whereClause = and(...conditions);
 
       // 4. Count total
-      const [{ total }] = await db
-        .select({ total: count() })
-        .from(vouchers)
-        .where(whereClause);
+      const [{ total }] = await db.select({ total: count() }).from(vouchers).where(whereClause);
 
       const totalCount = Number(total);
       const totalPages = Math.ceil(totalCount / limit);
@@ -192,17 +173,17 @@ export function registerGlobalTransactionRoutes(
       // 5. Fetch paginated vouchers with company name + first entry narration
       const rows = await db
         .select({
-          id:            vouchers.id,
-          companyId:     vouchers.companyId,
-          companyName:   companies.name,
+          id: vouchers.id,
+          companyId: vouchers.companyId,
+          companyName: companies.name,
           voucherNumber: vouchers.voucherNumber,
-          voucherType:   vouchers.voucherType,
-          voucherDate:   vouchers.voucherDate,
-          totalAmount:   vouchers.totalAmount,
-          currency:      vouchers.currency,
-          optional:      vouchers.optional,
-          description:   vouchers.description,
-          deletedAt:     vouchers.deletedAt,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          totalAmount: vouchers.totalAmount,
+          currency: vouchers.currency,
+          optional: vouchers.optional,
+          description: vouchers.description,
+          deletedAt: vouchers.deletedAt,
           narration: sql<string>`(
             SELECT ve.narration FROM voucher_entries ve
             WHERE ve.voucher_id = ${vouchers.id}
@@ -220,11 +201,11 @@ export function registerGlobalTransactionRoutes(
       // 6. Per-company summary (debit/credit totals for the filtered period)
       const summaryRows = await db
         .select({
-          companyId:   vouchers.companyId,
+          companyId: vouchers.companyId,
           companyName: companies.name,
-          currency:    vouchers.currency,
+          currency: vouchers.currency,
           voucherCount: count(),
-          totalDebits:  sql<string>`SUM(CASE WHEN ${voucherEntries.debitAmount}  > 0 THEN ${voucherEntries.debitAmount}  ELSE 0 END)`,
+          totalDebits: sql<string>`SUM(CASE WHEN ${voucherEntries.debitAmount}  > 0 THEN ${voucherEntries.debitAmount}  ELSE 0 END)`,
           totalCredits: sql<string>`SUM(CASE WHEN ${voucherEntries.creditAmount} > 0 THEN ${voucherEntries.creditAmount} ELSE 0 END)`,
         })
         .from(vouchers)
@@ -243,11 +224,11 @@ export function registerGlobalTransactionRoutes(
 
       return res.json({
         vouchers: rows,
-        total:       totalCount,
+        total: totalCount,
         page,
         totalPages,
-        summary:     summaryRows,
-        companies:   allCompanyRows,
+        summary: summaryRows,
+        companies: allCompanyRows,
       });
     } catch (err) {
       console.error("[GlobalTransactions]", err);
@@ -269,14 +250,16 @@ export function registerGlobalTransactionRoutes(
         eq(companies.companyType, "properties"),
         eq(companies.companyType, "factory"),
         eq(companies.companyType, "factory_v2"),
-        eq(companies.companyType, "supplier_partner"),
+        eq(companies.companyType, "supplier_partner")
       );
       if (isAdmin) {
         const all = await db.select({ id: companies.id }).from(companies).where(typeFilter);
         allowedCompanyIds = all.map((c) => c.id);
       } else {
-        const userRoles = await db.select({ companyId: userCompanyRoles.companyId })
-          .from(userCompanyRoles).where(eq(userCompanyRoles.userId, userId));
+        const userRoles = await db
+          .select({ companyId: userCompanyRoles.companyId })
+          .from(userCompanyRoles)
+          .where(eq(userCompanyRoles.userId, userId));
         allowedCompanyIds = userRoles.map((r) => r.companyId);
       }
 
@@ -286,10 +269,12 @@ export function registerGlobalTransactionRoutes(
       const types = await db
         .selectDistinct({ voucherType: vouchers.voucherType })
         .from(vouchers)
-        .where(and(
-          inArray(vouchers.companyId, allowedCompanyIds),
-          ...(isPrivilegedTypes ? [] : [isNull(vouchers.deletedAt)]),
-        ))
+        .where(
+          and(
+            inArray(vouchers.companyId, allowedCompanyIds),
+            ...(isPrivilegedTypes ? [] : [isNull(vouchers.deletedAt)])
+          )
+        )
         .orderBy(vouchers.voucherType);
 
       return res.json(types.map((t) => t.voucherType));
@@ -309,16 +294,16 @@ export function registerGlobalTransactionRoutes(
 
       const [voucher] = await db
         .select({
-          id:            vouchers.id,
-          companyId:     vouchers.companyId,
-          companyName:   companies.name,
+          id: vouchers.id,
+          companyId: vouchers.companyId,
+          companyName: companies.name,
           voucherNumber: vouchers.voucherNumber,
-          voucherType:   vouchers.voucherType,
-          voucherDate:   vouchers.voucherDate,
-          totalAmount:   vouchers.totalAmount,
-          currency:      vouchers.currency,
-          optional:      vouchers.optional,
-          description:   vouchers.description,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          totalAmount: vouchers.totalAmount,
+          currency: vouchers.currency,
+          optional: vouchers.optional,
+          description: vouchers.description,
         })
         .from(vouchers)
         .innerJoin(companies, eq(companies.id, vouchers.companyId))
@@ -328,25 +313,25 @@ export function registerGlobalTransactionRoutes(
 
       const entriesRaw = await db
         .select({
-          id:              voucherEntries.id,
+          id: voucherEntries.id,
           ledgerAccountId: voucherEntries.ledgerAccountId,
-          bankAccountId:   voucherEntries.bankAccountId,
-          fixedAssetId:    voucherEntries.fixedAssetId,
-          supplierId:      voucherEntries.supplierId,
-          employeeId:      voucherEntries.employeeId,
+          bankAccountId: voucherEntries.bankAccountId,
+          fixedAssetId: voucherEntries.fixedAssetId,
+          supplierId: voucherEntries.supplierId,
+          employeeId: voucherEntries.employeeId,
           factorySupplierId: voucherEntries.factorySupplierId,
-          customerId:      voucherEntries.customerId,
-          ledgerName:      ledgerAccounts.name,
-          bankName:        bankAccounts.name,
-          fixedAssetName:  fixedAssets.name,
-          supplierName:    suppliers.legalName,
-          employeeFirst:   employees.firstName,
-          employeeLast:    employees.lastName,
+          customerId: voucherEntries.customerId,
+          ledgerName: ledgerAccounts.name,
+          bankName: bankAccounts.name,
+          fixedAssetName: fixedAssets.name,
+          supplierName: suppliers.legalName,
+          employeeFirst: employees.firstName,
+          employeeLast: employees.lastName,
           factorySupplierName: factorySuppliers.name,
-          customerName:    customers.legalName,
-          debitAmount:     voucherEntries.debitAmount,
-          creditAmount:    voucherEntries.creditAmount,
-          narration:       voucherEntries.narration,
+          customerName: customers.legalName,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
         })
         .from(voucherEntries)
         .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
@@ -359,14 +344,22 @@ export function registerGlobalTransactionRoutes(
         .where(eq(voucherEntries.voucherId, voucherId))
         .orderBy(voucherEntries.id);
 
-      const entries = entriesRaw.map(e => {
-        const employeeName = e.employeeFirst && e.employeeLast
-          ? `${e.employeeFirst} ${e.employeeLast}`.trim()
-          : (e.employeeFirst || e.employeeLast || null);
+      const entries = entriesRaw.map((e) => {
+        const employeeName =
+          e.employeeFirst && e.employeeLast
+            ? `${e.employeeFirst} ${e.employeeLast}`.trim()
+            : e.employeeFirst || e.employeeLast || null;
         return {
           ...e,
-          accountName: e.ledgerName || e.bankName || e.fixedAssetName || e.supplierName
-            || employeeName || e.factorySupplierName || e.customerName || null,
+          accountName:
+            e.ledgerName ||
+            e.bankName ||
+            e.fixedAssetName ||
+            e.supplierName ||
+            employeeName ||
+            e.factorySupplierName ||
+            e.customerName ||
+            null,
         };
       });
 
@@ -396,25 +389,25 @@ export function registerGlobalTransactionRoutes(
       // Always fetch base ledger entries (resolve all account types)
       const rawEntries = await db
         .select({
-          id:              voucherEntries.id,
+          id: voucherEntries.id,
           ledgerAccountId: voucherEntries.ledgerAccountId,
-          bankAccountId:   voucherEntries.bankAccountId,
-          fixedAssetId:    voucherEntries.fixedAssetId,
-          supplierId:      voucherEntries.supplierId,
-          employeeId:      voucherEntries.employeeId,
+          bankAccountId: voucherEntries.bankAccountId,
+          fixedAssetId: voucherEntries.fixedAssetId,
+          supplierId: voucherEntries.supplierId,
+          employeeId: voucherEntries.employeeId,
           factorySupplierId: voucherEntries.factorySupplierId,
-          customerId:      voucherEntries.customerId,
-          ledgerName:      ledgerAccounts.name,
-          bankName:        bankAccounts.name,
-          fixedAssetName:  fixedAssets.name,
-          supplierName:    suppliers.legalName,
-          employeeFirst:   employees.firstName,
-          employeeLast:    employees.lastName,
+          customerId: voucherEntries.customerId,
+          ledgerName: ledgerAccounts.name,
+          bankName: bankAccounts.name,
+          fixedAssetName: fixedAssets.name,
+          supplierName: suppliers.legalName,
+          employeeFirst: employees.firstName,
+          employeeLast: employees.lastName,
           factorySupplierName: factorySuppliers.name,
-          customerName:    customers.legalName,
-          debitAmount:     voucherEntries.debitAmount,
-          creditAmount:    voucherEntries.creditAmount,
-          narration:       voucherEntries.narration,
+          customerName: customers.legalName,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
         })
         .from(voucherEntries)
         .leftJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
@@ -427,14 +420,22 @@ export function registerGlobalTransactionRoutes(
         .where(eq(voucherEntries.voucherId, voucherId))
         .orderBy(voucherEntries.id);
 
-      const entries = rawEntries.map(e => {
-        const employeeName = e.employeeFirst && e.employeeLast
-          ? `${e.employeeFirst} ${e.employeeLast}`.trim()
-          : (e.employeeFirst || e.employeeLast || null);
+      const entries = rawEntries.map((e) => {
+        const employeeName =
+          e.employeeFirst && e.employeeLast
+            ? `${e.employeeFirst} ${e.employeeLast}`.trim()
+            : e.employeeFirst || e.employeeLast || null;
         return {
           ...e,
-          accountName: e.ledgerName || e.bankName || e.fixedAssetName || e.supplierName
-            || employeeName || e.factorySupplierName || e.customerName || null,
+          accountName:
+            e.ledgerName ||
+            e.bankName ||
+            e.fixedAssetName ||
+            e.supplierName ||
+            employeeName ||
+            e.factorySupplierName ||
+            e.customerName ||
+            null,
         };
       });
 
@@ -442,12 +443,17 @@ export function registerGlobalTransactionRoutes(
       if (type === "Sales" || type === "POS") {
         const items = await db
           .select({
-            id: salesItems.id, voucherId: salesItems.voucherId,
-            stockItemId: salesItems.stockItemId, quantity: salesItems.quantity,
-            sellingPrice: salesItems.sellingPrice, costPrice: salesItems.costPrice,
-            totalSales: salesItems.totalSales, profit: salesItems.profit,
+            id: salesItems.id,
+            voucherId: salesItems.voucherId,
+            stockItemId: salesItems.stockItemId,
+            quantity: salesItems.quantity,
+            sellingPrice: salesItems.sellingPrice,
+            costPrice: salesItems.costPrice,
+            totalSales: salesItems.totalSales,
+            profit: salesItems.profit,
             configuredPrice: salesItems.configuredPrice,
-            stockItemName: stockItems.name, stockItemCode: stockItems.code,
+            stockItemName: stockItems.name,
+            stockItemCode: stockItems.code,
           })
           .from(salesItems)
           .leftJoin(stockItems, eq(salesItems.stockItemId, stockItems.id))
@@ -461,16 +467,22 @@ export function registerGlobalTransactionRoutes(
             const hassansProfit = cfg > 0 ? (price - cfg) * qty : 0;
             const hassansPercentage = cfg > 0 && cfg * qty > 0 ? (hassansProfit / (cfg * qty)) * 100 : 0;
             return {
-              id: item.id, voucherId: item.voucherId, stockItemId: item.stockItemId,
+              id: item.id,
+              voucherId: item.voucherId,
+              stockItemId: item.stockItemId,
               stockItemName: item.stockItemName || "Unknown Item",
               stockItemCode: item.stockItemCode || "-",
-              quantity: item.quantity, rate: item.sellingPrice,
-              sellingPrice: item.sellingPrice, costPrice: item.costPrice,
-              totalSales: item.totalSales, profit: item.profit,
+              quantity: item.quantity,
+              rate: item.sellingPrice,
+              sellingPrice: item.sellingPrice,
+              costPrice: item.costPrice,
+              totalSales: item.totalSales,
+              profit: item.profit,
               hassansPrice: cfg > 0 ? cfg.toFixed(2) : null,
               hassansProfit: cfg > 0 ? hassansProfit.toFixed(2) : null,
               hassansPercentage: cfg > 0 ? hassansPercentage.toFixed(1) : null,
-              debitAmount: "0", creditAmount: item.totalSales,
+              debitAmount: "0",
+              creditAmount: item.totalSales,
               accountName: item.stockItemName || "Unknown Item",
               isStockItem: true,
             };
@@ -481,58 +493,88 @@ export function registerGlobalTransactionRoutes(
 
       // Stock Transfer
       if (type === "Stock Transfer" || type === "StockTransfer") {
-        const tv = await db.query.stockTransferVouchers.findFirst({ where: eq(stockTransferVouchers.voucherId, voucherId) });
+        const tv = await db.query.stockTransferVouchers.findFirst({
+          where: eq(stockTransferVouchers.voucherId, voucherId),
+        });
         if (tv) {
           const items = await db
-            .select({ id: stockTransferItems.id, transferId: stockTransferItems.transferId,
-              stockItemId: stockTransferItems.stockItemId, quantity: stockTransferItems.quantity,
-              rate: stockTransferItems.rate, totalAmount: stockTransferItems.totalAmount,
-              stockItemName: stockItems.name, stockItemCode: stockItems.code })
+            .select({
+              id: stockTransferItems.id,
+              transferId: stockTransferItems.transferId,
+              stockItemId: stockTransferItems.stockItemId,
+              quantity: stockTransferItems.quantity,
+              rate: stockTransferItems.rate,
+              totalAmount: stockTransferItems.totalAmount,
+              stockItemName: stockItems.name,
+              stockItemCode: stockItems.code,
+            })
             .from(stockTransferItems)
             .leftJoin(stockItems, eq(stockTransferItems.stockItemId, stockItems.id))
             .where(eq(stockTransferItems.transferId, tv.id));
           if (items.length > 0) {
-            return res.json(items.map((item) => ({
-              id: item.id, voucherId: voucherId, stockItemId: item.stockItemId,
-              stockItemName: item.stockItemName || "Unknown Item",
-              stockItemCode: item.stockItemCode || "-",
-              quantity: item.quantity, rate: item.rate, totalAmount: item.totalAmount,
-              debitAmount: "0", creditAmount: item.totalAmount,
-              accountName: item.stockItemName || "Unknown Item",
-              isStockItem: true,
-            })));
+            return res.json(
+              items.map((item) => ({
+                id: item.id,
+                voucherId: voucherId,
+                stockItemId: item.stockItemId,
+                stockItemName: item.stockItemName || "Unknown Item",
+                stockItemCode: item.stockItemCode || "-",
+                quantity: item.quantity,
+                rate: item.rate,
+                totalAmount: item.totalAmount,
+                debitAmount: "0",
+                creditAmount: item.totalAmount,
+                accountName: item.stockItemName || "Unknown Item",
+                isStockItem: true,
+              }))
+            );
           }
         }
       }
 
       // Production / Consumption / Mixed
       if (type === "Production" || type === "Consumption" || type === "Mixed") {
-        const av = await db.query.stockAdjustmentVouchers.findFirst({ where: eq(stockAdjustmentVouchers.voucherId, voucherId) });
+        const av = await db.query.stockAdjustmentVouchers.findFirst({
+          where: eq(stockAdjustmentVouchers.voucherId, voucherId),
+        });
         if (av) {
           const items = await db
-            .select({ id: stockAdjustmentItems.id, adjustmentId: stockAdjustmentItems.adjustmentId,
-              stockItemId: stockAdjustmentItems.stockItemId, quantity: stockAdjustmentItems.quantity,
-              rate: stockAdjustmentItems.rate, totalAmount: stockAdjustmentItems.totalAmount,
-              stockItemName: stockItems.name, stockItemCode: stockItems.code })
+            .select({
+              id: stockAdjustmentItems.id,
+              adjustmentId: stockAdjustmentItems.adjustmentId,
+              stockItemId: stockAdjustmentItems.stockItemId,
+              quantity: stockAdjustmentItems.quantity,
+              rate: stockAdjustmentItems.rate,
+              totalAmount: stockAdjustmentItems.totalAmount,
+              stockItemName: stockItems.name,
+              stockItemCode: stockItems.code,
+            })
             .from(stockAdjustmentItems)
             .leftJoin(stockItems, eq(stockAdjustmentItems.stockItemId, stockItems.id))
             .where(eq(stockAdjustmentItems.adjustmentId, av.id));
           if (items.length > 0) {
-            return res.json(items.map((item) => {
-              const qty = parseFloat(item.quantity || "0");
-              const isProduction = type === "Production" || (type === "Mixed" && qty > 0);
-              const label = type === "Mixed" ? (qty > 0 ? "Production" : "Consumption") : type;
-              return {
-                id: item.id, voucherId, stockItemId: item.stockItemId,
-                stockItemName: item.stockItemName || "Unknown Item",
-                stockItemCode: item.stockItemCode || "-",
-                quantity: item.quantity, rate: item.rate, totalAmount: item.totalAmount,
-                debitAmount: isProduction ? item.totalAmount : "0",
-                creditAmount: isProduction ? "0" : item.totalAmount,
-                accountName: item.stockItemName || "Unknown Item",
-                isStockItem: true, adjustmentType: label,
-              };
-            }));
+            return res.json(
+              items.map((item) => {
+                const qty = parseFloat(item.quantity || "0");
+                const isProduction = type === "Production" || (type === "Mixed" && qty > 0);
+                const label = type === "Mixed" ? (qty > 0 ? "Production" : "Consumption") : type;
+                return {
+                  id: item.id,
+                  voucherId,
+                  stockItemId: item.stockItemId,
+                  stockItemName: item.stockItemName || "Unknown Item",
+                  stockItemCode: item.stockItemCode || "-",
+                  quantity: item.quantity,
+                  rate: item.rate,
+                  totalAmount: item.totalAmount,
+                  debitAmount: isProduction ? item.totalAmount : "0",
+                  creditAmount: isProduction ? "0" : item.totalAmount,
+                  accountName: item.stockItemName || "Unknown Item",
+                  isStockItem: true,
+                  adjustmentType: label,
+                };
+              })
+            );
           }
         }
       }
@@ -569,23 +611,32 @@ export function registerGlobalTransactionRoutes(
 
           const lines = await db
             .select({
-              id: poLineItems.id, poId: poLineItems.poId,
+              id: poLineItems.id,
+              poId: poLineItems.poId,
               stockItemId: poLineItems.stockItemId,
-              itemName: poLineItems.itemName, quantity: poLineItems.quantity,
-              rate: poLineItems.rate, lineTotal: poLineItems.lineTotal,
-              stockItemName: stockItems.name, stockItemCode: stockItems.code,
+              itemName: poLineItems.itemName,
+              quantity: poLineItems.quantity,
+              rate: poLineItems.rate,
+              lineTotal: poLineItems.lineTotal,
+              stockItemName: stockItems.name,
+              stockItemCode: stockItems.code,
             })
             .from(poLineItems)
             .leftJoin(stockItems, eq(poLineItems.stockItemId, stockItems.id))
             .where(eq(poLineItems.poId, po.id));
 
           const lineRows = lines.map((l) => ({
-            id: l.id, voucherId, isPurchaseItem: true,
+            id: l.id,
+            voucherId,
+            isPurchaseItem: true,
             stockItemId: l.stockItemId,
             stockItemName: l.stockItemName || l.itemName,
             accountName: l.stockItemName || l.itemName,
-            quantity: l.quantity, rate: l.rate, totalAmount: l.lineTotal,
-            debitAmount: l.lineTotal, creditAmount: "0",
+            quantity: l.quantity,
+            rate: l.rate,
+            totalAmount: l.lineTotal,
+            debitAmount: l.lineTotal,
+            creditAmount: "0",
             isStockItem: true,
           }));
 

@@ -4,17 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import {
-  Loader2, AlertTriangle, CheckCircle2, ScanSearch, Wrench, Undo2,
-  Building2, ShieldCheck, Link2Off, FileX,
+  Loader2,
+  AlertTriangle,
+  CheckCircle2,
+  ScanSearch,
+  Wrench,
+  Undo2,
+  Building2,
+  ShieldCheck,
+  Link2Off,
+  FileX,
 } from "lucide-react";
 
-const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function fmt(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -22,27 +28,50 @@ function fmt(n: number) {
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface LedgerDrift {
-  id: number; contractId: number; year: number; month: number;
-  module: string; tenantName: string; unitLabel: string;
-  storedPaid: number; computedPaid: number; diff: number;
+  id: number;
+  contractId: number;
+  year: number;
+  month: number;
+  module: string;
+  tenantName: string;
+  unitLabel: string;
+  storedPaid: number;
+  computedPaid: number;
+  diff: number;
 }
 interface VoucherEntryMissing {
-  paymentId: number; voucherId: number; contractId: number;
-  module: string; tenantName: string; unitLabel: string;
-  amount: number; paymentDate: string;
-  cashAccountName: string; unitType: string;
+  paymentId: number;
+  voucherId: number;
+  contractId: number;
+  module: string;
+  tenantName: string;
+  unitLabel: string;
+  amount: number;
+  paymentDate: string;
+  cashAccountName: string;
+  unitType: string;
   issue: "EMPTY_VOUCHER" | "SOFT_DELETED_VOUCHER";
 }
 interface OrphanedTransfer {
-  transferId: number; description: string; amount: number; transferDate: string;
-  fromCompanyName: string; toCompanyName: string;
-  orphanedSide: "FROM" | "TO"; orphanedVoucherId: number;
+  transferId: number;
+  description: string;
+  amount: number;
+  transferDate: string;
+  fromCompanyName: string;
+  toCompanyName: string;
+  orphanedSide: "FROM" | "TO";
+  orphanedVoucherId: number;
   issue: "SOFT_DELETED" | "EMPTY_ENTRIES";
 }
 interface DepositFlagMismatch {
-  contractId: number; tenantName: string; unitLabel: string;
-  module: string; guaranteeAmount: number; voucherAmount?: number;
-  flagValue: boolean; voucherExists: boolean;
+  contractId: number;
+  tenantName: string;
+  unitLabel: string;
+  module: string;
+  guaranteeAmount: number;
+  voucherAmount?: number;
+  flagValue: boolean;
+  voucherExists: boolean;
   issue: "STALE_FLAG" | "MISSING_FLAG" | "AMOUNT_MISMATCH";
 }
 interface ScanResult {
@@ -62,37 +91,50 @@ function ModuleBadge({ module }: { module: string }) {
 
 function IssueBadge({ issue }: { issue: string }) {
   const labels: Record<string, string> = {
-    STALE_FLAG:          "No ledger entry",
-    MISSING_FLAG:        "Flag not set",
-    AMOUNT_MISMATCH:     "Amount mismatch",
-    EMPTY_VOUCHER:       "Voucher has no entries",
-    SOFT_DELETED_VOUCHER:"Voucher was deleted",
-    SOFT_DELETED:        "Voucher soft-deleted",
-    EMPTY_ENTRIES:       "Voucher has no entries",
+    STALE_FLAG: "No ledger entry",
+    MISSING_FLAG: "Flag not set",
+    AMOUNT_MISMATCH: "Amount mismatch",
+    EMPTY_VOUCHER: "Voucher has no entries",
+    SOFT_DELETED_VOUCHER: "Voucher was deleted",
+    SOFT_DELETED: "Voucher soft-deleted",
+    EMPTY_ENTRIES: "Voucher has no entries",
   };
   return <Badge variant="destructive">{labels[issue] ?? issue}</Badge>;
 }
 
 // ── Main ───────────────────────────────────────────────────────────────────
 export default function BalanceRepair() {
-  const { toast }       = useToast();
-  const [phase, setPhase]       = useState<Phase>("idle");
-  const [scan, setScan]         = useState<ScanResult | null>(null);
+  const { toast } = useToast();
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [scan, setScan] = useState<ScanResult | null>(null);
   const [snapshot, setSnapshot] = useState<any | null>(null);
-  const [applied, setApplied]   = useState<{ ledger: number; vouchers: number; orphans: number; deposits: number } | null>(null);
+  const [applied, setApplied] = useState<{
+    ledger: number;
+    vouchers: number;
+    orphans: number;
+    deposits: number;
+  } | null>(null);
 
   async function runScan() {
-    setPhase("scanning"); setScan(null); setSnapshot(null); setApplied(null);
+    setPhase("scanning");
+    setScan(null);
+    setSnapshot(null);
+    setApplied(null);
     try {
       const res = await apiRequest("GET", "/api/admin/repair-balances/scan");
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       const data: ScanResult = await res.json();
-      setScan(data); setPhase("scanned");
+      setScan(data);
+      setPhase("scanned");
       toast({
         title: "Scan complete",
-        description: data.totalDiscrepancies === 0
-          ? "No discrepancies found — everything looks good."
-          : `Found ${data.totalDiscrepancies} issue${data.totalDiscrepancies !== 1 ? "s" : ""}.`,
+        description:
+          data.totalDiscrepancies === 0
+            ? "No discrepancies found — everything looks good."
+            : `Found ${data.totalDiscrepancies} issue${data.totalDiscrepancies !== 1 ? "s" : ""}.`,
       });
     } catch (e: any) {
       toast({ title: "Scan failed", description: e.message, variant: "destructive" });
@@ -104,11 +146,20 @@ export default function BalanceRepair() {
     setPhase("applying");
     try {
       const res = await apiRequest("POST", "/api/admin/repair-balances/apply", {});
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       const data = await res.json();
       setSnapshot(data.snapshot);
-      setApplied({ ledger: data.ledgerFixed, vouchers: data.voucherEntriesFixed, orphans: data.orphansFixed, deposits: data.depositsFixed });
-      setScan(null); setPhase("applied");
+      setApplied({
+        ledger: data.ledgerFixed,
+        vouchers: data.voucherEntriesFixed,
+        orphans: data.orphansFixed,
+        deposits: data.depositsFixed,
+      });
+      setScan(null);
+      setPhase("applied");
       toast({
         title: "Fixes applied",
         description: `${data.ledgerFixed} ledger row(s), ${data.voucherEntriesFixed} voucher(s), ${data.orphansFixed} orphaned transfer(s), ${data.depositsFixed} deposit flag(s).`,
@@ -124,8 +175,14 @@ export default function BalanceRepair() {
     setPhase("undoing");
     try {
       const res = await apiRequest("POST", "/api/admin/repair-balances/undo", { snapshot });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
-      setSnapshot(null); setApplied(null); setScan(null); setPhase("idle");
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
+      setSnapshot(null);
+      setApplied(null);
+      setScan(null);
+      setPhase("idle");
       toast({ title: "Undo complete", description: "All changes have been reverted." });
     } catch (e: any) {
       toast({ title: "Undo failed", description: e.message, variant: "destructive" });
@@ -133,7 +190,7 @@ export default function BalanceRepair() {
     }
   }
 
-  const busy  = ["scanning","applying","undoing"].includes(phase);
+  const busy = ["scanning", "applying", "undoing"].includes(phase);
   const total = scan?.totalDiscrepancies ?? 0;
 
   return (
@@ -146,11 +203,9 @@ export default function BalanceRepair() {
       <Alert>
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription>
-          This tool checks four areas for the current company:{" "}
-          <strong>rent ledger paid amounts</strong>,{" "}
+          This tool checks four areas for the current company: <strong>rent ledger paid amounts</strong>,{" "}
           <strong>missing debit/credit entries on rent vouchers</strong>,{" "}
-          <strong>orphaned inter-company transfer sides</strong>, and{" "}
-          <strong>tenant guarantee deposit flags</strong>.
+          <strong>orphaned inter-company transfer sides</strong>, and <strong>tenant guarantee deposit flags</strong>.
           Scan first to preview, then apply to fix.
         </AlertDescription>
       </Alert>
@@ -159,22 +214,36 @@ export default function BalanceRepair() {
       <Card>
         <CardHeader>
           <CardTitle>Run Repair Audit</CardTitle>
-          <CardDescription>Scan first to preview all issues, then apply fixes in one click. An undo snapshot is saved automatically.</CardDescription>
+          <CardDescription>
+            Scan first to preview all issues, then apply fixes in one click. An undo snapshot is saved automatically.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           <Button variant="outline" onClick={runScan} disabled={busy} data-testid="button-scan-balances">
-            {phase === "scanning" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanSearch className="mr-2 h-4 w-4" />}
+            {phase === "scanning" ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ScanSearch className="mr-2 h-4 w-4" />
+            )}
             Scan for Issues
           </Button>
           {phase === "scanned" && total > 0 && (
             <Button onClick={applyFixes} disabled={busy} data-testid="button-apply-fixes">
-              {phase === "applying" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wrench className="mr-2 h-4 w-4" />}
+              {phase === "applying" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Wrench className="mr-2 h-4 w-4" />
+              )}
               Apply {total} Fix{total !== 1 ? "es" : ""}
             </Button>
           )}
           {phase === "applied" && snapshot && (
             <Button variant="outline" onClick={undoFixes} disabled={busy} data-testid="button-undo-repair">
-              {phase === "undoing" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}
+              {phase === "undoing" ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Undo2 className="mr-2 h-4 w-4" />
+              )}
               Undo Repair
             </Button>
           )}
@@ -190,11 +259,10 @@ export default function BalanceRepair() {
               Repair Applied
             </CardTitle>
             <CardDescription>
-              {applied.ledger} ledger row{applied.ledger !== 1 ? "s" : ""} &middot;{" "}
-              {applied.vouchers} voucher{applied.vouchers !== 1 ? "s" : ""} re-posted &middot;{" "}
-              {applied.orphans} orphaned transfer{applied.orphans !== 1 ? "s" : ""} cleaned &middot;{" "}
-              {applied.deposits} deposit flag{applied.deposits !== 1 ? "s" : ""} fixed.{" "}
-              Click <strong>Undo Repair</strong> to revert all changes.
+              {applied.ledger} ledger row{applied.ledger !== 1 ? "s" : ""} &middot; {applied.vouchers} voucher
+              {applied.vouchers !== 1 ? "s" : ""} re-posted &middot; {applied.orphans} orphaned transfer
+              {applied.orphans !== 1 ? "s" : ""} cleaned &middot; {applied.deposits} deposit flag
+              {applied.deposits !== 1 ? "s" : ""} fixed. Click <strong>Undo Repair</strong> to revert all changes.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -217,11 +285,13 @@ export default function BalanceRepair() {
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
               Rent Ledger Drift
-              <Badge variant="destructive" className="ml-1">{scan.ledgerDrifts.length}</Badge>
+              <Badge variant="destructive" className="ml-1">
+                {scan.ledgerDrifts.length}
+              </Badge>
             </CardTitle>
             <CardDescription>
-              The stored paid amount on these monthly rows doesn't match the sum of actual payment records.
-              Fix will update the stored amount to match.
+              The stored paid amount on these monthly rows doesn't match the sum of actual payment records. Fix will
+              update the stored amount to match.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -238,15 +308,21 @@ export default function BalanceRepair() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scan.ledgerDrifts.map(d => (
+                {scan.ledgerDrifts.map((d) => (
                   <TableRow key={d.id} data-testid={`row-ledger-drift-${d.id}`}>
-                    <TableCell><ModuleBadge module={d.module} /></TableCell>
+                    <TableCell>
+                      <ModuleBadge module={d.module} />
+                    </TableCell>
                     <TableCell className="font-medium">{d.tenantName}</TableCell>
                     <TableCell className="text-muted-foreground">{d.unitLabel}</TableCell>
-                    <TableCell>{MONTHS[d.month - 1]} {d.year}</TableCell>
+                    <TableCell>
+                      {MONTHS[d.month - 1]} {d.year}
+                    </TableCell>
                     <TableCell className="text-right text-muted-foreground font-mono">{fmt(d.storedPaid)}</TableCell>
                     <TableCell className="text-right font-mono">{fmt(d.computedPaid)}</TableCell>
-                    <TableCell className="text-right"><Badge variant="destructive">{fmt(d.diff)}</Badge></TableCell>
+                    <TableCell className="text-right">
+                      <Badge variant="destructive">{fmt(d.diff)}</Badge>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -262,11 +338,13 @@ export default function BalanceRepair() {
             <CardTitle className="flex items-center gap-2">
               <FileX className="h-5 w-5" />
               Missing Debit / Credit Entries
-              <Badge variant="destructive" className="ml-1">{scan.voucherEntryMissing.length}</Badge>
+              <Badge variant="destructive" className="ml-1">
+                {scan.voucherEntryMissing.length}
+              </Badge>
             </CardTitle>
             <CardDescription>
-              These rent payments have a voucher linked, but the voucher has no debit/credit entries (or the voucher was deleted).
-              Fix will re-post the correct entries and restore the voucher if needed.
+              These rent payments have a voucher linked, but the voucher has no debit/credit entries (or the voucher was
+              deleted). Fix will re-post the correct entries and restore the voucher if needed.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -284,16 +362,22 @@ export default function BalanceRepair() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scan.voucherEntryMissing.map(d => (
+                {scan.voucherEntryMissing.map((d) => (
                   <TableRow key={d.voucherId} data-testid={`row-voucher-missing-${d.voucherId}`}>
-                    <TableCell><ModuleBadge module={d.module} /></TableCell>
+                    <TableCell>
+                      <ModuleBadge module={d.module} />
+                    </TableCell>
                     <TableCell className="font-medium">{d.tenantName}</TableCell>
                     <TableCell className="text-muted-foreground">{d.unitLabel}</TableCell>
-                    <TableCell className="text-muted-foreground text-xs">{d.unitType === "SHOP" ? "Shop (Expense)" : "Warehouse (Income)"}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {d.unitType === "SHOP" ? "Shop (Expense)" : "Warehouse (Income)"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{d.paymentDate}</TableCell>
                     <TableCell className="text-muted-foreground">{d.cashAccountName}</TableCell>
                     <TableCell className="text-right font-mono">{fmt(d.amount)}</TableCell>
-                    <TableCell><IssueBadge issue={d.issue} /></TableCell>
+                    <TableCell>
+                      <IssueBadge issue={d.issue} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -309,7 +393,9 @@ export default function BalanceRepair() {
             <CardTitle className="flex items-center gap-2">
               <Link2Off className="h-5 w-5" />
               Orphaned Transfer Sides
-              <Badge variant="destructive" className="ml-1">{scan.orphanedTransfers.length}</Badge>
+              <Badge variant="destructive" className="ml-1">
+                {scan.orphanedTransfers.length}
+              </Badge>
             </CardTitle>
             <CardDescription>
               These inter-company transfers have one side that is missing or deleted while the other side still exists.
@@ -330,17 +416,21 @@ export default function BalanceRepair() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scan.orphanedTransfers.map(d => (
+                {scan.orphanedTransfers.map((d) => (
                   <TableRow key={d.transferId} data-testid={`row-orphan-${d.transferId}`}>
                     <TableCell className="font-medium">{d.fromCompanyName}</TableCell>
                     <TableCell className="font-medium">{d.toCompanyName}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm max-w-xs truncate">{d.description || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm max-w-xs truncate">
+                      {d.description || "—"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{d.transferDate}</TableCell>
                     <TableCell className="text-right font-mono">{fmt(d.amount)}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{d.orphanedSide === "FROM" ? "Source side" : "Destination side"}</Badge>
                     </TableCell>
-                    <TableCell><IssueBadge issue={d.issue} /></TableCell>
+                    <TableCell>
+                      <IssueBadge issue={d.issue} />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -356,13 +446,24 @@ export default function BalanceRepair() {
             <CardTitle className="flex items-center gap-2">
               <ShieldCheck className="h-5 w-5" />
               Guarantee / Deposit Mismatches
-              <Badge variant="destructive" className="ml-1">{scan.depositFlagMismatches.length}</Badge>
+              <Badge variant="destructive" className="ml-1">
+                {scan.depositFlagMismatches.length}
+              </Badge>
             </CardTitle>
             <CardDescription className="space-y-1">
               <span className="block">Three types of issues are detected:</span>
-              <span className="block text-amber-600 dark:text-amber-400 font-medium">No ledger entry — guarantee shows green in the UI but no accounting voucher exists (posted without a cash account). Fix resets the flag so you can re-post it properly with a cash account.</span>
-              <span className="block">Flag not set — a GUAR voucher exists in the ledger but the contract flag is still false. Fix sets the flag.</span>
-              <span className="block">Amount mismatch — flag and voucher both exist but the recorded amount on the contract differs from the actual voucher. Fix syncs the contract to match the voucher.</span>
+              <span className="block text-amber-600 dark:text-amber-400 font-medium">
+                No ledger entry — guarantee shows green in the UI but no accounting voucher exists (posted without a
+                cash account). Fix resets the flag so you can re-post it properly with a cash account.
+              </span>
+              <span className="block">
+                Flag not set — a GUAR voucher exists in the ledger but the contract flag is still false. Fix sets the
+                flag.
+              </span>
+              <span className="block">
+                Amount mismatch — flag and voucher both exist but the recorded amount on the contract differs from the
+                actual voucher. Fix syncs the contract to match the voucher.
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -379,20 +480,40 @@ export default function BalanceRepair() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {scan.depositFlagMismatches.map(d => (
+                {scan.depositFlagMismatches.map((d) => (
                   <TableRow key={d.contractId} data-testid={`row-deposit-${d.contractId}`}>
-                    <TableCell><ModuleBadge module={d.module} /></TableCell>
+                    <TableCell>
+                      <ModuleBadge module={d.module} />
+                    </TableCell>
                     <TableCell className="font-medium">{d.tenantName}</TableCell>
                     <TableCell className="text-muted-foreground">{d.unitLabel}</TableCell>
-                    <TableCell><IssueBadge issue={d.issue} /></TableCell>
+                    <TableCell>
+                      <IssueBadge issue={d.issue} />
+                    </TableCell>
                     <TableCell className="text-right font-mono">{fmt(d.guaranteeAmount)}</TableCell>
                     <TableCell className="text-right font-mono text-muted-foreground">
-                      {d.issue === "AMOUNT_MISMATCH" ? fmt(d.voucherAmount ?? 0) : d.issue === "STALE_FLAG" ? <span className="text-destructive">None</span> : fmt(d.guaranteeAmount)}
+                      {d.issue === "AMOUNT_MISMATCH" ? (
+                        fmt(d.voucherAmount ?? 0)
+                      ) : d.issue === "STALE_FLAG" ? (
+                        <span className="text-destructive">None</span>
+                      ) : (
+                        fmt(d.guaranteeAmount)
+                      )}
                     </TableCell>
                     <TableCell className="text-right text-sm text-muted-foreground">
-                      {d.issue === "STALE_FLAG"      && <span className="text-amber-600 dark:text-amber-400 font-medium">Reset to Unposted — re-post required</span>}
-                      {d.issue === "MISSING_FLAG"    && <span className="text-green-600 dark:text-green-400">Set flag to Posted</span>}
-                      {d.issue === "AMOUNT_MISMATCH" && <span>Sync: {fmt(d.guaranteeAmount)} → {fmt(d.voucherAmount ?? 0)}</span>}
+                      {d.issue === "STALE_FLAG" && (
+                        <span className="text-amber-600 dark:text-amber-400 font-medium">
+                          Reset to Unposted — re-post required
+                        </span>
+                      )}
+                      {d.issue === "MISSING_FLAG" && (
+                        <span className="text-green-600 dark:text-green-400">Set flag to Posted</span>
+                      )}
+                      {d.issue === "AMOUNT_MISMATCH" && (
+                        <span>
+                          Sync: {fmt(d.guaranteeAmount)} → {fmt(d.voucherAmount ?? 0)}
+                        </span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

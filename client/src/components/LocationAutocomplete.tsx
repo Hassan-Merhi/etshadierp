@@ -45,15 +45,14 @@ export function LocationAutocomplete({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const selectedLocation = locations.find((loc) => loc.id === value);
-  const displayValue = searchTerm !== null ? searchTerm : (selectedLocation ? selectedLocation.name : "");
+  const displayValue = searchTerm !== null ? searchTerm : selectedLocation ? selectedLocation.name : "";
 
   const sortedLocations = [...locations].sort((a, b) => a.name.localeCompare(b.name));
 
-  const filteredLocations = searchTerm !== null && searchTerm.length > 0
-    ? sortedLocations.filter((loc) =>
-        loc.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : sortedLocations;
+  const filteredLocations =
+    searchTerm !== null && searchTerm.length > 0
+      ? sortedLocations.filter((loc) => loc.name.toLowerCase().includes(searchTerm.toLowerCase()))
+      : sortedLocations;
 
   const handleSelect = (location: Location) => {
     onChange(location.id, location.name);

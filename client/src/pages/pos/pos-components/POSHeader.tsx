@@ -1,7 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/PageHeader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { FileDown, MoreHorizontal, Eye, Plus, Save } from "lucide-react";
 import { Link } from "wouter";
@@ -61,7 +67,7 @@ export function POSHeader({
                 <Select
                   value={posSelectedLocation?.id?.toString()}
                   onValueChange={(val) => {
-                    const loc = posAssignedLocations.find(l => l.id.toString() === val);
+                    const loc = posAssignedLocations.find((l) => l.id.toString() === val);
                     if (loc) setPosSelectedLocation(loc);
                   }}
                 >
@@ -80,11 +86,14 @@ export function POSHeader({
 
               {posUser && (
                 <Badge variant={hasOpenShift ? "secondary" : "destructive"} className="h-9 px-3 gap-1.5">
-                  <div className={`h-2 w-2 rounded-full ${hasOpenShift ? "bg-emerald-500 animate-pulse" : "bg-destructive"}`} />
+                  <div
+                    className={`h-2 w-2 rounded-full ${hasOpenShift ? "bg-emerald-500 animate-pulse" : "bg-destructive"}`}
+                  />
                   {hasOpenShift ? "Shift Open" : "No Open Shift"}
                   {currentShift?.startTime && (
                     <span className="text-[10px] opacity-70 ml-1 font-normal">
-                      since {new Date(currentShift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      since{" "}
+                      {new Date(currentShift.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </span>
                   )}
                 </Badge>

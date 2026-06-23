@@ -4,52 +4,135 @@ import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, getUserHideAllCosts,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  getUserHideAllCosts,
 } from "./_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
   factorySupplierCategories,
 } from "@shared/schema";
-import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt, aliasedTable } from "drizzle-orm";
+import {
+  eq,
+  and,
+  or,
+  asc,
+  desc,
+  sql,
+  inArray,
+  ilike,
+  ne,
+  isNull,
+  not,
+  gte,
+  lte,
+  lt,
+  gt,
+  aliasedTable,
+} from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
 
 // ── Weekly report: shared Excel builder (used by download + WhatsApp send) ───
 
@@ -58,7 +141,8 @@ function _wrIsoWeekKey(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
   const day = d.getUTCDay();
   const diff = (day === 0 ? -6 : 1) - day;
-  const mon = new Date(d); mon.setUTCDate(d.getUTCDate() + diff);
+  const mon = new Date(d);
+  mon.setUTCDate(d.getUTCDate() + diff);
   const y = mon.getUTCFullYear();
   const jan4 = new Date(Date.UTC(y, 0, 4));
   const week = Math.ceil(((mon.getTime() - jan4.getTime()) / 86400000 + jan4.getUTCDay() + 1) / 7);
@@ -71,29 +155,45 @@ function _wrMondayOfWeek(dateStr: string): string {
   return d.toISOString().slice(0, 10);
 }
 const _WR_DAY_NAMES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-function _wrDayName(dateStr: string): string { return _WR_DAY_NAMES[(new Date(dateStr + "T00:00:00").getUTCDay() + 6) % 7]; }
-function _wrFmtDate(dateStr: string): string { const [, mm, dd] = dateStr.split("-"); return `${dd}/${mm}`; }
+function _wrDayName(dateStr: string): string {
+  return _WR_DAY_NAMES[(new Date(dateStr + "T00:00:00").getUTCDay() + 6) % 7];
+}
+function _wrFmtDate(dateStr: string): string {
+  const [, mm, dd] = dateStr.split("-");
+  return `${dd}/${mm}`;
+}
 
 export async function buildWeeklyReportExcelBuffer(companyId: number, period: string = "all"): Promise<Buffer> {
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
   let periodStart: string | null = null;
   if (period === "week") periodStart = _wrMondayOfWeek(todayStr);
-  else if (period === "month") periodStart = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  else if (period === "month")
+    periodStart = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-01`;
   else if (period === "year") periodStart = `${today.getUTCFullYear()}-01-01`;
 
   const rawStockRows = await db
-    .select({ containerId: factoryRawStock.containerId, categoryId: factorySuppliers.supplierCategoryId, receivedKg: factoryRawStock.receivedKg, usedKg: factoryRawStock.usedKg, offloadedAt: factoryRawStock.offloadedAt })
+    .select({
+      containerId: factoryRawStock.containerId,
+      categoryId: factorySuppliers.supplierCategoryId,
+      receivedKg: factoryRawStock.receivedKg,
+      usedKg: factoryRawStock.usedKg,
+      offloadedAt: factoryRawStock.offloadedAt,
+    })
     .from(factoryRawStock)
     .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
     .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
     .where(and(eq(factoryRawStock.companyId, companyId), sql`${factoryContainers.status} != 'DELETED'`));
 
-  const catRows = await db.select({ id: factorySupplierCategories.id, name: factorySupplierCategories.name }).from(factorySupplierCategories).where(eq(factorySupplierCategories.companyId, companyId));
+  const catRows = await db
+    .select({ id: factorySupplierCategories.id, name: factorySupplierCategories.name })
+    .from(factorySupplierCategories)
+    .where(eq(factorySupplierCategories.companyId, companyId));
   const catNameMap = new Map<number, string>(catRows.map((c: any) => [c.id, c.name]));
   const catBalMap = new Map<WrCatKey, { name: string; currentBalance: number }>();
   const getCK = (id: number | null | undefined): WrCatKey => (id != null ? id : "uncategorized") as WrCatKey;
-  const getCN = (id: number | null | undefined): string => id != null ? (catNameMap.get(id) || `Category ${id}`) : "Uncategorized";
+  const getCN = (id: number | null | undefined): string =>
+    id != null ? catNameMap.get(id) || `Category ${id}` : "Uncategorized";
 
   const stockInByDate = new Map<string, Map<WrCatKey, number>>();
   for (const r of rawStockRows) {
@@ -106,111 +206,277 @@ export async function buildWeeklyReportExcelBuffer(companyId: number, period: st
     stockInByDate.get(ds)!.set(ck, (stockInByDate.get(ds)!.get(ck) || 0) + (parseFloat(r.receivedKg as string) || 0));
   }
 
-  const adjRows = await db.select({ date: factoryRawMaterialAdjustments.date, type: factoryRawMaterialAdjustments.type, kg: factoryRawMaterialAdjustments.kg, catId: factorySuppliers.supplierCategoryId })
-    .from(factoryRawMaterialAdjustments).leftJoin(factorySuppliers, eq(factoryRawMaterialAdjustments.supplierId, factorySuppliers.id)).where(eq(factoryRawMaterialAdjustments.companyId, companyId));
+  const adjRows = await db
+    .select({
+      date: factoryRawMaterialAdjustments.date,
+      type: factoryRawMaterialAdjustments.type,
+      kg: factoryRawMaterialAdjustments.kg,
+      catId: factorySuppliers.supplierCategoryId,
+    })
+    .from(factoryRawMaterialAdjustments)
+    .leftJoin(factorySuppliers, eq(factoryRawMaterialAdjustments.supplierId, factorySuppliers.id))
+    .where(eq(factoryRawMaterialAdjustments.companyId, companyId));
   const manualRemoveByDate = new Map<string, Map<WrCatKey, number>>();
   for (const adj of adjRows) {
-    const ck = getCK(adj.catId as number | null); const kg = parseFloat(adj.kg as string) || 0; if (kg <= 0) continue;
+    const ck = getCK(adj.catId as number | null);
+    const kg = parseFloat(adj.kg as string) || 0;
+    if (kg <= 0) continue;
     const isAdd = adj.type === "ADD";
     if (catBalMap.has(ck)) catBalMap.get(ck)!.currentBalance += isAdd ? kg : -kg;
     else catBalMap.set(ck, { name: getCN(adj.catId as number | null), currentBalance: isAdd ? kg : -kg });
     const ds = typeof adj.date === "string" ? adj.date.slice(0, 10) : (adj.date as any).toISOString().slice(0, 10);
-    if (isAdd) { if (!stockInByDate.has(ds)) stockInByDate.set(ds, new Map()); stockInByDate.get(ds)!.set(ck, (stockInByDate.get(ds)!.get(ck) || 0) + kg); }
-    else { if (!manualRemoveByDate.has(ds)) manualRemoveByDate.set(ds, new Map()); manualRemoveByDate.get(ds)!.set(ck, (manualRemoveByDate.get(ds)!.get(ck) || 0) + kg); }
+    if (isAdd) {
+      if (!stockInByDate.has(ds)) stockInByDate.set(ds, new Map());
+      stockInByDate.get(ds)!.set(ck, (stockInByDate.get(ds)!.get(ck) || 0) + kg);
+    } else {
+      if (!manualRemoveByDate.has(ds)) manualRemoveByDate.set(ds, new Map());
+      manualRemoveByDate.get(ds)!.set(ck, (manualRemoveByDate.get(ds)!.get(ck) || 0) + kg);
+    }
   }
 
-  const srcRows = await db.select({ containerId: factoryMixBatchSources.containerId, batchDate: factoryMixBatches.batchDate, batchCreatedAt: factoryMixBatches.createdAt, catId: factorySuppliers.supplierCategoryId, weightKg: factoryMixBatchSources.weightKg })
-    .from(factoryMixBatchSources).innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id)).innerJoin(factoryContainers, eq(factoryMixBatchSources.containerId, factoryContainers.id)).leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-    .where(and(eq(factoryMixBatches.companyId, companyId), not(isNull(factoryMixBatchSources.containerId)), sql`${factoryContainers.status} != 'DELETED'`));
+  const srcRows = await db
+    .select({
+      containerId: factoryMixBatchSources.containerId,
+      batchDate: factoryMixBatches.batchDate,
+      batchCreatedAt: factoryMixBatches.createdAt,
+      catId: factorySuppliers.supplierCategoryId,
+      weightKg: factoryMixBatchSources.weightKg,
+    })
+    .from(factoryMixBatchSources)
+    .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
+    .innerJoin(factoryContainers, eq(factoryMixBatchSources.containerId, factoryContainers.id))
+    .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
+    .where(
+      and(
+        eq(factoryMixBatches.companyId, companyId),
+        not(isNull(factoryMixBatchSources.containerId)),
+        sql`${factoryContainers.status} != 'DELETED'`
+      )
+    );
   const srcSumByCont = new Map<number, number>();
-  for (const r of srcRows) srcSumByCont.set(r.containerId as number, (srcSumByCont.get(r.containerId as number) || 0) + (parseFloat(r.weightKg as string) || 0));
+  for (const r of srcRows)
+    srcSumByCont.set(
+      r.containerId as number,
+      (srcSumByCont.get(r.containerId as number) || 0) + (parseFloat(r.weightKg as string) || 0)
+    );
 
   const consByDate = new Map<string, Map<WrCatKey, number>>();
   for (const r of srcRows) {
-    const w = parseFloat(r.weightKg as string) || 0; if (w <= 0) continue;
-    const ds = r.batchDate ? (typeof r.batchDate === "string" ? r.batchDate : (r.batchDate as Date).toISOString().slice(0, 10)) : (r.batchCreatedAt as Date).toISOString().slice(0, 10);
+    const w = parseFloat(r.weightKg as string) || 0;
+    if (w <= 0) continue;
+    const ds = r.batchDate
+      ? typeof r.batchDate === "string"
+        ? r.batchDate
+        : (r.batchDate as Date).toISOString().slice(0, 10)
+      : (r.batchCreatedAt as Date).toISOString().slice(0, 10);
     const ck = getCK(r.catId as number | null);
     if (!consByDate.has(ds)) consByDate.set(ds, new Map());
     consByDate.get(ds)!.set(ck, (consByDate.get(ds)!.get(ck) || 0) + w);
     if (!catBalMap.has(ck)) catBalMap.set(ck, { name: getCN(r.catId as number | null), currentBalance: 0 });
   }
   for (const r of rawStockRows) {
-    const actualUsed = parseFloat(r.usedKg as string) || 0; if (actualUsed <= 0) continue;
-    const gap = actualUsed - (srcSumByCont.get(r.containerId as number) || 0); if (gap <= 0.001) continue;
-    const ds = (r.offloadedAt as Date).toISOString().slice(0, 10); const ck = getCK(r.categoryId as number | null);
+    const actualUsed = parseFloat(r.usedKg as string) || 0;
+    if (actualUsed <= 0) continue;
+    const gap = actualUsed - (srcSumByCont.get(r.containerId as number) || 0);
+    if (gap <= 0.001) continue;
+    const ds = (r.offloadedAt as Date).toISOString().slice(0, 10);
+    const ck = getCK(r.categoryId as number | null);
     if (!consByDate.has(ds)) consByDate.set(ds, new Map());
     consByDate.get(ds)!.set(ck, (consByDate.get(ds)!.get(ck) || 0) + gap);
     if (!catBalMap.has(ck)) catBalMap.set(ck, { name: getCN(r.categoryId as number | null), currentBalance: 0 });
   }
-  for (const [ds, cm] of manualRemoveByDate) { if (!consByDate.has(ds)) consByDate.set(ds, new Map()); for (const [ck, kg] of cm) consByDate.get(ds)!.set(ck, (consByDate.get(ds)!.get(ck) || 0) + kg); }
+  for (const [ds, cm] of manualRemoveByDate) {
+    if (!consByDate.has(ds)) consByDate.set(ds, new Map());
+    for (const [ck, kg] of cm) consByDate.get(ds)!.set(ck, (consByDate.get(ds)!.get(ck) || 0) + kg);
+  }
 
   const allDates = new Set<string>([...consByDate.keys(), ...stockInByDate.keys()]);
   const weekMap = new Map<string, string[]>();
-  for (const d of allDates) { const wk = _wrIsoWeekKey(d); if (!weekMap.has(wk)) weekMap.set(wk, []); weekMap.get(wk)!.push(d); }
+  for (const d of allDates) {
+    const wk = _wrIsoWeekKey(d);
+    if (!weekMap.has(wk)) weekMap.set(wk, []);
+    weekMap.get(wk)!.push(d);
+  }
   const sortedWks = [...weekMap.keys()].sort();
   for (const wk of sortedWks) weekMap.get(wk)!.sort();
   const allCKs = [...catBalMap.keys()];
   const weekCons = new Map<string, Map<WrCatKey, number>>();
   const weekSI = new Map<string, Map<WrCatKey, number>>();
   for (const wk of sortedWks) {
-    const cm = new Map<WrCatKey, number>(); const sm = new Map<WrCatKey, number>();
+    const cm = new Map<WrCatKey, number>();
+    const sm = new Map<WrCatKey, number>();
     for (const d of weekMap.get(wk)!) {
-      for (const [ck, kg] of (consByDate.get(d) || new Map())) cm.set(ck, (cm.get(ck) || 0) + kg);
-      for (const [ck, kg] of (stockInByDate.get(d) || new Map())) sm.set(ck, (sm.get(ck) || 0) + kg);
+      for (const [ck, kg] of consByDate.get(d) || new Map()) cm.set(ck, (cm.get(ck) || 0) + kg);
+      for (const [ck, kg] of stockInByDate.get(d) || new Map()) sm.set(ck, (sm.get(ck) || 0) + kg);
     }
-    weekCons.set(wk, cm); weekSI.set(wk, sm);
+    weekCons.set(wk, cm);
+    weekSI.set(wk, sm);
   }
-  const totSI = new Map<WrCatKey, number>(); const totC = new Map<WrCatKey, number>();
-  for (const wk of sortedWks) { for (const [ck, v] of weekSI.get(wk)!) totSI.set(ck, (totSI.get(ck) || 0) + v); for (const [ck, v] of weekCons.get(wk)!) totC.set(ck, (totC.get(ck) || 0) + v); }
+  const totSI = new Map<WrCatKey, number>();
+  const totC = new Map<WrCatKey, number>();
+  for (const wk of sortedWks) {
+    for (const [ck, v] of weekSI.get(wk)!) totSI.set(ck, (totSI.get(ck) || 0) + v);
+    for (const [ck, v] of weekCons.get(wk)!) totC.set(ck, (totC.get(ck) || 0) + v);
+  }
   const openBals = new Map<string, Map<WrCatKey, number>>();
-  const firstOpen = new Map<WrCatKey, number>(allCKs.map(ck => [ck, (catBalMap.get(ck)?.currentBalance || 0) - (totSI.get(ck) || 0) + (totC.get(ck) || 0)]));
+  const firstOpen = new Map<WrCatKey, number>(
+    allCKs.map((ck) => [ck, (catBalMap.get(ck)?.currentBalance || 0) - (totSI.get(ck) || 0) + (totC.get(ck) || 0)])
+  );
   if (sortedWks.length > 0) openBals.set(sortedWks[0], firstOpen);
   for (let i = 0; i < sortedWks.length; i++) {
-    const wk = sortedWks[i]; const op = openBals.get(wk)!; const cl = new Map<WrCatKey, number>();
-    for (const ck of allCKs) cl.set(ck, (op.get(ck) || 0) + (weekSI.get(wk)!.get(ck) || 0) - (weekCons.get(wk)!.get(ck) || 0));
+    const wk = sortedWks[i];
+    const op = openBals.get(wk)!;
+    const cl = new Map<WrCatKey, number>();
+    for (const ck of allCKs)
+      cl.set(ck, (op.get(ck) || 0) + (weekSI.get(wk)!.get(ck) || 0) - (weekCons.get(wk)!.get(ck) || 0));
     if (i < sortedWks.length - 1) openBals.set(sortedWks[i + 1], cl);
   }
-  const displayWks = periodStart ? sortedWks.filter(wk => { const dates = weekMap.get(wk)!; return dates[dates.length - 1] >= periodStart! || _wrMondayOfWeek(dates[0]) >= periodStart!; }) : sortedWks;
+  const displayWks = periodStart
+    ? sortedWks.filter((wk) => {
+        const dates = weekMap.get(wk)!;
+        return dates[dates.length - 1] >= periodStart! || _wrMondayOfWeek(dates[0]) >= periodStart!;
+      })
+    : sortedWks;
 
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   const sh = wb.addWorksheet("Weekly Report");
-  const BLUE = "FF1E40AF", LB = "FFE0EAFF", DG = "FF374151", TBG = "FFD1FAE5";
+  const BLUE = "FF1E40AF",
+    LB = "FFE0EAFF",
+    DG = "FF374151",
+    TBG = "FFD1FAE5";
   const BS: any = { style: "thin", color: { argb: "FFD1D5DB" } };
   const BA = { top: BS, left: BS, bottom: BS, right: BS };
-  sh.getColumn(1).width = 24; sh.getColumn(2).width = 14; sh.getColumn(3).width = 12;
+  sh.getColumn(1).width = 24;
+  sh.getColumn(2).width = 14;
+  sh.getColumn(3).width = 12;
   let row = 1;
-  if (displayWks.length === 0) { const r = sh.getRow(row); const c = r.getCell(1); c.value = "No production data found"; c.font = { italic: true, size: 11 }; sh.mergeCells(row, 1, row, 12); row++; }
+  if (displayWks.length === 0) {
+    const r = sh.getRow(row);
+    const c = r.getCell(1);
+    c.value = "No production data found";
+    c.font = { italic: true, size: 11 };
+    sh.mergeCells(row, 1, row, 12);
+    row++;
+  }
   for (const wk of displayWks) {
-    const dates = weekMap.get(wk)!; const monDate = _wrMondayOfWeek(dates[0]); const monD = new Date(monDate + "T00:00:00");
-    const days: string[] = []; for (let di = 0; di < 7; di++) { const d = new Date(monD); d.setUTCDate(monD.getUTCDate() + di); days.push(d.toISOString().slice(0, 10)); }
+    const dates = weekMap.get(wk)!;
+    const monDate = _wrMondayOfWeek(dates[0]);
+    const monD = new Date(monDate + "T00:00:00");
+    const days: string[] = [];
+    for (let di = 0; di < 7; di++) {
+      const d = new Date(monD);
+      d.setUTCDate(monD.getUTCDate() + di);
+      days.push(d.toISOString().slice(0, 10));
+    }
     const tCols = 3 + days.length + 2;
-    const tRow = sh.getRow(row); tRow.getCell(1).value = `Week of ${_wrFmtDate(monDate)} – ${_wrFmtDate(days[6])}  |  ${wk}`;
-    tRow.getCell(1).font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } }; tRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLUE } };
-    tRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" }; sh.mergeCells(row, 1, row, tCols); tRow.height = 22; row++;
-    const hdrs = ["CATEGORY", "Balance", "Stock In", ...days.map(d => `${_wrDayName(d)}\n${_wrFmtDate(d)}`), "TOTAL", "REMAINS"];
+    const tRow = sh.getRow(row);
+    tRow.getCell(1).value = `Week of ${_wrFmtDate(monDate)} – ${_wrFmtDate(days[6])}  |  ${wk}`;
+    tRow.getCell(1).font = { bold: true, size: 11, color: { argb: "FFFFFFFF" } };
+    tRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: BLUE } };
+    tRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+    sh.mergeCells(row, 1, row, tCols);
+    tRow.height = 22;
+    row++;
+    const hdrs = [
+      "CATEGORY",
+      "Balance",
+      "Stock In",
+      ...days.map((d) => `${_wrDayName(d)}\n${_wrFmtDate(d)}`),
+      "TOTAL",
+      "REMAINS",
+    ];
     const hRow = sh.getRow(row);
-    hdrs.forEach((h, ci) => { const c = hRow.getCell(ci + 1); c.value = h; c.font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DG } }; c.alignment = { horizontal: "center", vertical: "middle", wrapText: true }; c.border = BA; });
+    hdrs.forEach((h, ci) => {
+      const c = hRow.getCell(ci + 1);
+      c.value = h;
+      c.font = { bold: true, size: 9, color: { argb: "FFFFFFFF" } };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: DG } };
+      c.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      c.border = BA;
+    });
     for (let di = 0; di < days.length; di++) sh.getColumn(4 + di).width = 10;
-    sh.getColumn(4 + days.length).width = 11; sh.getColumn(5 + days.length).width = 12; hRow.height = 28; row++;
-    const op = openBals.get(wk)!; const sm = weekSI.get(wk)!;
-    const activeCKs = allCKs.filter(ck => (weekCons.get(wk)!.get(ck) || 0) > 0.001 || (sm.get(ck) || 0) > 0.001).sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
-    let wtB = 0, wtSI = 0, wtT = 0, wtR = 0; const wtD = days.map(() => 0);
+    sh.getColumn(4 + days.length).width = 11;
+    sh.getColumn(5 + days.length).width = 12;
+    hRow.height = 28;
+    row++;
+    const op = openBals.get(wk)!;
+    const sm = weekSI.get(wk)!;
+    const activeCKs = allCKs
+      .filter((ck) => (weekCons.get(wk)!.get(ck) || 0) > 0.001 || (sm.get(ck) || 0) > 0.001)
+      .sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
+    let wtB = 0,
+      wtSI = 0,
+      wtT = 0,
+      wtR = 0;
+    const wtD = days.map(() => 0);
     for (const ck of activeCKs) {
-      const info = catBalMap.get(ck)!; const ob = op.get(ck) || 0; const si = sm.get(ck) || 0;
-      const dv = days.map(d => consByDate.get(d)?.get(ck) || 0); const tot = weekCons.get(wk)!.get(ck) || 0; const rem = ob + si - tot;
-      wtB += ob; wtSI += si; wtT += tot; wtR += rem; dv.forEach((v, i) => { wtD[i] += v; });
+      const info = catBalMap.get(ck)!;
+      const ob = op.get(ck) || 0;
+      const si = sm.get(ck) || 0;
+      const dv = days.map((d) => consByDate.get(d)?.get(ck) || 0);
+      const tot = weekCons.get(wk)!.get(ck) || 0;
+      const rem = ob + si - tot;
+      wtB += ob;
+      wtSI += si;
+      wtT += tot;
+      wtR += rem;
+      dv.forEach((v, i) => {
+        wtD[i] += v;
+      });
       const dr = sh.getRow(row);
-      const vals: (string | number | null)[] = [info.name, Math.round(ob) || 0, si > 0.5 ? Math.round(si) : null, ...dv.map(v => v > 0.5 ? Math.round(v) : null), Math.round(tot) > 0 ? Math.round(tot) : null, Math.round(rem)];
-      vals.forEach((v, ci) => { const c = dr.getCell(ci + 1); c.value = v as any; c.font = { size: 9 }; c.border = BA; if (ci === 0) { c.font = { size: 9, bold: true }; c.alignment = { vertical: "middle" }; } else { c.alignment = { horizontal: "right", vertical: "middle" }; c.numFmt = "#,##0"; } if (ci >= 3 && ci < 3 + days.length && typeof v === "number") c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LB } }; });
-      dr.height = 16; row++;
+      const vals: (string | number | null)[] = [
+        info.name,
+        Math.round(ob) || 0,
+        si > 0.5 ? Math.round(si) : null,
+        ...dv.map((v) => (v > 0.5 ? Math.round(v) : null)),
+        Math.round(tot) > 0 ? Math.round(tot) : null,
+        Math.round(rem),
+      ];
+      vals.forEach((v, ci) => {
+        const c = dr.getCell(ci + 1);
+        c.value = v as any;
+        c.font = { size: 9 };
+        c.border = BA;
+        if (ci === 0) {
+          c.font = { size: 9, bold: true };
+          c.alignment = { vertical: "middle" };
+        } else {
+          c.alignment = { horizontal: "right", vertical: "middle" };
+          c.numFmt = "#,##0";
+        }
+        if (ci >= 3 && ci < 3 + days.length && typeof v === "number")
+          c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LB } };
+      });
+      dr.height = 16;
+      row++;
     }
     const totRow = sh.getRow(row);
-    const totVals: (string | number | null)[] = ["TOTAL", Math.round(wtB), wtSI > 0.5 ? Math.round(wtSI) : null, ...wtD.map(v => Math.round(v) > 0 ? Math.round(v) : null), Math.round(wtT) > 0 ? Math.round(wtT) : null, Math.round(wtR)];
-    totVals.forEach((v, ci) => { const c = totRow.getCell(ci + 1); c.value = v as any; c.font = { bold: true, size: 9 }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TBG } }; c.border = BA; if (ci === 0) c.alignment = { vertical: "middle" }; else { c.alignment = { horizontal: "right", vertical: "middle" }; c.numFmt = "#,##0"; } });
-    totRow.height = 18; row++; row++;
+    const totVals: (string | number | null)[] = [
+      "TOTAL",
+      Math.round(wtB),
+      wtSI > 0.5 ? Math.round(wtSI) : null,
+      ...wtD.map((v) => (Math.round(v) > 0 ? Math.round(v) : null)),
+      Math.round(wtT) > 0 ? Math.round(wtT) : null,
+      Math.round(wtR),
+    ];
+    totVals.forEach((v, ci) => {
+      const c = totRow.getCell(ci + 1);
+      c.value = v as any;
+      c.font = { bold: true, size: 9 };
+      c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: TBG } };
+      c.border = BA;
+      if (ci === 0) c.alignment = { vertical: "middle" };
+      else {
+        c.alignment = { horizontal: "right", vertical: "middle" };
+        c.numFmt = "#,##0";
+      }
+    });
+    totRow.height = 18;
+    row++;
+    row++;
   }
-  return Buffer.from(await wb.xlsx.writeBuffer() as ArrayBuffer);
+  return Buffer.from((await wb.xlsx.writeBuffer()) as ArrayBuffer);
 }
 
 export function registerFactoryBaleExportRoutes(app: Express) {
@@ -286,7 +552,11 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
       const totalKgUsed = usages.reduce((s: number, u: any) => s + (parseFloat(u.kgUsed) || 0), 0);
 
-      const [fCfgDR] = await db.select({ hideAvgCost: factorySettings.hideAvgCost }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
+      const [fCfgDR] = await db
+        .select({ hideAvgCost: factorySettings.hideAvgCost })
+        .from(factorySettings)
+        .where(eq(factorySettings.companyId, companyId))
+        .limit(1);
       const userHideAllCostsDR = await getUserHideAllCosts(req);
       const showCostDR = !fCfgDR?.hideAvgCost && !userHideAllCostsDR;
 
@@ -325,10 +595,19 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           sheet.addRow(rowData);
         }
 
-        const totalRowData: any = { date: "TOTAL", batchCode: "", batchName: "", operatorUser: "", kgUsed: totalKgUsed, notes: "" };
+        const totalRowData: any = {
+          date: "TOTAL",
+          batchCode: "",
+          batchName: "",
+          operatorUser: "",
+          kgUsed: totalKgUsed,
+          notes: "",
+        };
         if (showCostDR) totalRowData.costPerKg = "";
         const totalRow = sheet.addRow(totalRowData);
-        totalRow.eachCell((cell) => { cell.font = { bold: true }; });
+        totalRow.eachCell((cell) => {
+          cell.font = { bold: true };
+        });
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", `attachment; filename="raw-production-report-${filenameDate}.xlsx"`);
@@ -346,7 +625,10 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
         const rpLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
         if (fs.existsSync(rpLogoPath)) {
-          try { doc.image(rpLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 }); doc.moveDown(0.4); } catch {}
+          try {
+            doc.image(rpLogoPath, (doc.page.width - 220) / 2, doc.y, { width: 220 });
+            doc.moveDown(0.4);
+          } catch {}
         }
         const title = allTime ? "Raw Production Report — All Time" : "Raw Production Report";
         doc.fontSize(16).font("Helvetica-Bold").text(title, { align: "center" });
@@ -388,7 +670,10 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         doc.moveDown(0.5);
         doc.moveTo(40, doc.y).lineTo(752, doc.y).stroke();
         doc.moveDown(0.3);
-        doc.font("Helvetica-Bold").fontSize(10).text(`Total KG Consumed: ${totalKgUsed.toFixed(3)} kg`, { align: "right" });
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(10)
+          .text(`Total KG Consumed: ${totalKgUsed.toFixed(3)} kg`, { align: "right" });
 
         doc.end();
         return;
@@ -481,7 +766,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const getCatKey = (categoryId: number | null | undefined): CatKey =>
         (categoryId != null ? categoryId : "uncategorized") as CatKey;
       const getCatName = (categoryId: number | null | undefined): string =>
-        categoryId != null ? (catNameMap.get(categoryId) || `Category ${categoryId}`) : "Uncategorized";
+        categoryId != null ? catNameMap.get(categoryId) || `Category ${categoryId}` : "Uncategorized";
 
       // 2. Stock-in per category per date
       const stockInByDate = new Map<string, Map<CatKey, number>>();
@@ -532,7 +817,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           catBalMap.set(ck, { name: catName, currentBalance: isAdd ? kg : -kg });
         }
 
-        const dateStr = typeof adj.date === "string" ? adj.date.slice(0, 10) : (adj.date as any).toISOString().slice(0, 10);
+        const dateStr =
+          typeof adj.date === "string" ? adj.date.slice(0, 10) : (adj.date as any).toISOString().slice(0, 10);
         if (isAdd) {
           // Treat manual ADD the same as receiving container stock
           if (!stockInByDate.has(dateStr)) stockInByDate.set(dateStr, new Map());
@@ -569,11 +855,13 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
         .innerJoin(factoryContainers, eq(factoryMixBatchSources.containerId, factoryContainers.id))
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .where(and(
-          eq(factoryMixBatches.companyId, companyId),
-          not(isNull(factoryMixBatchSources.containerId)),
-          sql`${factoryContainers.status} != 'DELETED'`,
-        ));
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            not(isNull(factoryMixBatchSources.containerId)),
+            sql`${factoryContainers.status} != 'DELETED'`
+          )
+        );
 
       // Pre-compute total tracked source weight per container (raw, unscaled)
       // Used in step 5b to find the gap between actual usedKg and tracked sources.
@@ -668,8 +956,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         const cMap = new Map<CatKey, number>();
         const sMap = new Map<CatKey, number>();
         for (const d of weekMap.get(wk)!) {
-          for (const [ck, kg] of (consumptionByDate.get(d) || new Map())) cMap.set(ck, (cMap.get(ck) || 0) + kg);
-          for (const [ck, kg] of (stockInByDate.get(d) || new Map())) sMap.set(ck, (sMap.get(ck) || 0) + kg);
+          for (const [ck, kg] of consumptionByDate.get(d) || new Map()) cMap.set(ck, (cMap.get(ck) || 0) + kg);
+          for (const [ck, kg] of stockInByDate.get(d) || new Map()) sMap.set(ck, (sMap.get(ck) || 0) + kg);
         }
         weekConsumption.set(wk, cMap);
         weekStockIn.set(wk, sMap);
@@ -683,15 +971,18 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       const totalConsumptionAll = new Map<CatKey, number>();
       for (const wk of sortedWeekKeys) {
         for (const [ck, v] of weekStockIn.get(wk)!) totalStockInAll.set(ck, (totalStockInAll.get(ck) || 0) + v);
-        for (const [ck, v] of weekConsumption.get(wk)!) totalConsumptionAll.set(ck, (totalConsumptionAll.get(ck) || 0) + v);
+        for (const [ck, v] of weekConsumption.get(wk)!)
+          totalConsumptionAll.set(ck, (totalConsumptionAll.get(ck) || 0) + v);
       }
 
       const openingBalances = new Map<string, Map<CatKey, number>>();
       const closingBalances = new Map<string, Map<CatKey, number>>();
       const firstOpening = new Map<CatKey, number>(
-        allCatKeys.map(ck => [
+        allCatKeys.map((ck) => [
           ck,
-          (catBalMap.get(ck)?.currentBalance || 0) - (totalStockInAll.get(ck) || 0) + (totalConsumptionAll.get(ck) || 0),
+          (catBalMap.get(ck)?.currentBalance || 0) -
+            (totalStockInAll.get(ck) || 0) +
+            (totalConsumptionAll.get(ck) || 0),
         ])
       );
       openingBalances.set(sortedWeekKeys[0], firstOpening);
@@ -700,7 +991,10 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         const opening = openingBalances.get(wk)!;
         const closing = new Map<CatKey, number>();
         for (const ck of allCatKeys) {
-          closing.set(ck, (opening.get(ck) || 0) + (weekStockIn.get(wk)!.get(ck) || 0) - (weekConsumption.get(wk)!.get(ck) || 0));
+          closing.set(
+            ck,
+            (opening.get(ck) || 0) + (weekStockIn.get(wk)!.get(ck) || 0) - (weekConsumption.get(wk)!.get(ck) || 0)
+          );
         }
         closingBalances.set(wk, closing);
         if (i < sortedWeekKeys.length - 1) openingBalances.set(sortedWeekKeys[i + 1], closing);
@@ -709,7 +1003,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       // Apply period filter — only display weeks within the selected range.
       // We include a week if ANY of its activity dates falls on or after the period start.
       const displayWeekKeys = periodStart
-        ? sortedWeekKeys.filter(wk => {
+        ? sortedWeekKeys.filter((wk) => {
             const dates = weekMap.get(wk)!;
             // Include the week if its LAST recorded date is >= period start,
             // OR if the week's Monday falls within the period (handles partially-started weeks)
@@ -719,10 +1013,14 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           })
         : sortedWeekKeys;
 
-      const periodLabel = period === "week" ? "This Week"
-        : period === "month" ? "This Month"
-        : period === "year" ? "This Year"
-        : "All Time";
+      const periodLabel =
+        period === "week"
+          ? "This Week"
+          : period === "month"
+            ? "This Month"
+            : period === "year"
+              ? "This Year"
+              : "All Time";
 
       // 8. Excel generation
       if (format === "excel") {
@@ -779,9 +1077,12 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
           // ── Column header row ──
           const colHeaders = [
-            "CATEGORY", "Balance", "Stock In",
-            ...weekDaysMoSa.map(d => `${dayName(d)}\n${fmtDate(d)}`),
-            "TOTAL", "REMAINS",
+            "CATEGORY",
+            "Balance",
+            "Stock In",
+            ...weekDaysMoSa.map((d) => `${dayName(d)}\n${fmtDate(d)}`),
+            "TOTAL",
+            "REMAINS",
           ];
           const headerRow = sh.getRow(row);
           colHeaders.forEach((h, ci) => {
@@ -806,19 +1107,23 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
           // Active categories this week: only include categories with actual activity
           // (stock-in or consumption). Categories with only a carry-over balance are hidden.
-          const activeCats = allCatKeys.filter(ck => {
-            return (weekConsumption.get(wk)!.get(ck) || 0) > 0.001
-              || (sMap.get(ck) || 0) > 0.001;
-          }).sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
+          const activeCats = allCatKeys
+            .filter((ck) => {
+              return (weekConsumption.get(wk)!.get(ck) || 0) > 0.001 || (sMap.get(ck) || 0) > 0.001;
+            })
+            .sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
 
-          let weekTotalBalance = 0, weekTotalStockIn = 0, weekTotalTotal = 0, weekTotalRemains = 0;
+          let weekTotalBalance = 0,
+            weekTotalStockIn = 0,
+            weekTotalTotal = 0,
+            weekTotalRemains = 0;
           const weekTotalByDay = weekDaysMoSa.map(() => 0);
 
           for (const ck of activeCats) {
             const info = catBalMap.get(ck)!;
             const openBal = opening.get(ck) || 0;
             const stockIn = sMap.get(ck) || 0;
-            const dayVals = weekDaysMoSa.map(d => consumptionByDate.get(d)?.get(ck) || 0);
+            const dayVals = weekDaysMoSa.map((d) => consumptionByDate.get(d)?.get(ck) || 0);
             // Use authoritative weekConsumption (includes all 7 days) for TOTAL and REMAINS
             const total = weekConsumption.get(wk)!.get(ck) || 0;
             const remains = openBal + stockIn - total;
@@ -827,14 +1132,16 @@ export function registerFactoryBaleExportRoutes(app: Express) {
             weekTotalStockIn += stockIn;
             weekTotalTotal += total;
             weekTotalRemains += remains;
-            dayVals.forEach((v, i) => { weekTotalByDay[i] += v; });
+            dayVals.forEach((v, i) => {
+              weekTotalByDay[i] += v;
+            });
 
             const dataRow = sh.getRow(row);
             const vals: (string | number | null)[] = [
               info.name,
               Math.round(openBal) || 0,
               stockIn > 0.5 ? Math.round(stockIn) : null,
-              ...dayVals.map(v => v > 0.5 ? Math.round(v) : null),
+              ...dayVals.map((v) => (v > 0.5 ? Math.round(v) : null)),
               Math.round(total) > 0 ? Math.round(total) : null,
               Math.round(remains),
             ];
@@ -864,7 +1171,7 @@ export function registerFactoryBaleExportRoutes(app: Express) {
             "TOTAL",
             Math.round(weekTotalBalance),
             weekTotalStockIn > 0.5 ? Math.round(weekTotalStockIn) : null,
-            ...weekTotalByDay.map(v => Math.round(v) > 0 ? Math.round(v) : null),
+            ...weekTotalByDay.map((v) => (Math.round(v) > 0 ? Math.round(v) : null)),
             Math.round(weekTotalTotal) > 0 ? Math.round(weekTotalTotal) : null,
             Math.round(weekTotalRemains),
           ];
@@ -909,11 +1216,15 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         if (displayWeekKeys.length === 0) {
           const hasLogo = fs.existsSync(wpLogoPath);
           if (hasLogo) {
-            try { doc.image(wpLogoPath, (doc.page.width - 220) / 2, 10, { width: 220 }); } catch {}
+            try {
+              doc.image(wpLogoPath, (doc.page.width - 220) / 2, 10, { width: 220 });
+            } catch {}
             if (doc.y < 130) (doc as any).y = 130;
             doc.moveDown(0.5);
           }
-          doc.fontSize(13).font("Helvetica-Bold")
+          doc
+            .fontSize(13)
+            .font("Helvetica-Bold")
             .text(`No production data found for period: ${periodLabel}`, 30, doc.y, { width: pageW, align: "center" });
           doc.end();
           return;
@@ -941,7 +1252,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           const monD = new Date(monDate + "T00:00:00");
           const weekDaysMoSa: string[] = [];
           for (let di = 0; di < 7; di++) {
-            const d = new Date(monD); d.setUTCDate(monD.getUTCDate() + di);
+            const d = new Date(monD);
+            d.setUTCDate(monD.getUTCDate() + di);
             weekDaysMoSa.push(d.toISOString().slice(0, 10));
           }
 
@@ -956,26 +1268,43 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           doc.fontSize(11).font("Helvetica-Bold").text(titleText, 30, startY, { width: pageW, align: "center" });
           doc.moveDown(0.3);
 
-          const headers = ["CATEGORY", "Balance", "Stock In", ...weekDaysMoSa.map(d => `${dayName(d)}\n${fmtDate(d)}`), "TOTAL", "REMAINS"];
+          const headers = [
+            "CATEGORY",
+            "Balance",
+            "Stock In",
+            ...weekDaysMoSa.map((d) => `${dayName(d)}\n${fmtDate(d)}`),
+            "TOTAL",
+            "REMAINS",
+          ];
           const hy = doc.y;
           doc.fontSize(7).font("Helvetica-Bold");
           headers.forEach((h, i) => {
             const lines = h.split("\n");
             lines.forEach((line, li) => {
-              doc.text(line, colX[i], hy + li * 8, { width: colWidths[i] - 2, align: i === 0 ? "left" : "right", lineBreak: false });
+              doc.text(line, colX[i], hy + li * 8, {
+                width: colWidths[i] - 2,
+                align: i === 0 ? "left" : "right",
+                lineBreak: false,
+              });
             });
           });
-          const hh = rowH + (headers.some(h => h.includes("\n")) ? 8 : 0);
+          const hh = rowH + (headers.some((h) => h.includes("\n")) ? 8 : 0);
           const lineY = hy + hh;
-          doc.moveTo(30, lineY).lineTo(30 + colWidths.reduce((a, b) => a + b, 0), lineY).stroke();
+          doc
+            .moveTo(30, lineY)
+            .lineTo(30 + colWidths.reduce((a, b) => a + b, 0), lineY)
+            .stroke();
 
           const opening = openingBalances.get(wk)!;
           const sMap = weekStockIn.get(wk)!;
-          const activeCats = allCatKeys.filter(ck =>
-            (weekConsumption.get(wk)!.get(ck) || 0) > 0 || (sMap.get(ck) || 0) > 0
-          ).sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
+          const activeCats = allCatKeys
+            .filter((ck) => (weekConsumption.get(wk)!.get(ck) || 0) > 0 || (sMap.get(ck) || 0) > 0)
+            .sort((a, b) => (catBalMap.get(a)?.name || "").localeCompare(catBalMap.get(b)?.name || ""));
 
-          let weekTotalBalance = 0, weekTotalStockIn = 0, weekTotalTotal = 0, weekTotalRemains = 0;
+          let weekTotalBalance = 0,
+            weekTotalStockIn = 0,
+            weekTotalTotal = 0,
+            weekTotalRemains = 0;
           const weekTotalByDay = Array(nDays).fill(0);
           let rowY = lineY + 3;
           doc.font("Helvetica").fontSize(7);
@@ -984,41 +1313,57 @@ export function registerFactoryBaleExportRoutes(app: Express) {
             const info = catBalMap.get(ck)!;
             const openBal = opening.get(ck) || 0;
             const stockIn = sMap.get(ck) || 0;
-            const dayVals = weekDaysMoSa.map(d => consumptionByDate.get(d)?.get(ck) || 0);
+            const dayVals = weekDaysMoSa.map((d) => consumptionByDate.get(d)?.get(ck) || 0);
             // Use authoritative weekConsumption (includes all 7 days) for TOTAL and REMAINS
             const total = weekConsumption.get(wk)!.get(ck) || 0;
             const remains = openBal + stockIn - total;
-            weekTotalBalance += openBal; weekTotalStockIn += stockIn;
-            weekTotalTotal += total; weekTotalRemains += remains;
-            dayVals.forEach((v, i) => { weekTotalByDay[i] += v; });
+            weekTotalBalance += openBal;
+            weekTotalStockIn += stockIn;
+            weekTotalTotal += total;
+            weekTotalRemains += remains;
+            dayVals.forEach((v, i) => {
+              weekTotalByDay[i] += v;
+            });
 
             const rowVals = [
               info.name,
               Math.round(openBal).toLocaleString(),
               stockIn > 0.5 ? Math.round(stockIn).toLocaleString() : "-",
-              ...dayVals.map(v => v > 0.5 ? Math.round(v).toLocaleString() : "-"),
+              ...dayVals.map((v) => (v > 0.5 ? Math.round(v).toLocaleString() : "-")),
               total > 0.5 ? Math.round(total).toLocaleString() : "-",
               Math.round(remains).toLocaleString(),
             ];
             rowVals.forEach((v, i) => {
-              doc.text(String(v), colX[i], rowY, { width: colWidths[i] - 2, align: i === 0 ? "left" : "right", lineBreak: false });
+              doc.text(String(v), colX[i], rowY, {
+                width: colWidths[i] - 2,
+                align: i === 0 ? "left" : "right",
+                lineBreak: false,
+              });
             });
             rowY += rowH;
           }
 
-          doc.moveTo(30, rowY).lineTo(30 + colWidths.reduce((a, b) => a + b, 0), rowY).strokeColor("#000000").stroke();
+          doc
+            .moveTo(30, rowY)
+            .lineTo(30 + colWidths.reduce((a, b) => a + b, 0), rowY)
+            .strokeColor("#000000")
+            .stroke();
           rowY += 3;
           doc.font("Helvetica-Bold").fontSize(7);
           const totVals = [
             "TOTAL",
             Math.round(weekTotalBalance).toLocaleString(),
             weekTotalStockIn > 0.5 ? Math.round(weekTotalStockIn).toLocaleString() : "-",
-            ...weekTotalByDay.map(v => v > 0.5 ? Math.round(v).toLocaleString() : "-"),
+            ...weekTotalByDay.map((v) => (v > 0.5 ? Math.round(v).toLocaleString() : "-")),
             weekTotalTotal > 0.5 ? Math.round(weekTotalTotal).toLocaleString() : "-",
             Math.round(weekTotalRemains).toLocaleString(),
           ];
           totVals.forEach((v, i) => {
-            doc.text(String(v), colX[i], rowY, { width: colWidths[i] - 2, align: i === 0 ? "left" : "right", lineBreak: false });
+            doc.text(String(v), colX[i], rowY, {
+              width: colWidths[i] - 2,
+              align: i === 0 ? "left" : "right",
+              lineBreak: false,
+            });
           });
         }
 
@@ -1037,34 +1382,60 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
   app.get("/api/factory/weekly-report-wa-settings", requireAuth, async (_req: any, res: any) => {
     try {
-      const r = await pool.query(`SELECT weekly_report_wa_group_chat_id, instance_id, api_token FROM whatsapp_settings WHERE id = 1`);
+      const r = await pool.query(
+        `SELECT weekly_report_wa_group_chat_id, instance_id, api_token FROM whatsapp_settings WHERE id = 1`
+      );
       const s = r.rows[0];
-      res.json({ groupChatId: s?.weekly_report_wa_group_chat_id || "", hasCredentials: !!(s?.instance_id && s?.api_token) });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+      res.json({
+        groupChatId: s?.weekly_report_wa_group_chat_id || "",
+        hasCredentials: !!(s?.instance_id && s?.api_token),
+      });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   app.patch("/api/factory/weekly-report-wa-settings", requireAuth, async (req: any, res: any) => {
     try {
       const { groupChatId } = req.body;
-      await pool.query(`INSERT INTO whatsapp_settings (id, weekly_report_wa_group_chat_id) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET weekly_report_wa_group_chat_id = $1`, [groupChatId || ""]);
+      await pool.query(
+        `INSERT INTO whatsapp_settings (id, weekly_report_wa_group_chat_id) VALUES (1, $1) ON CONFLICT (id) DO UPDATE SET weekly_report_wa_group_chat_id = $1`,
+        [groupChatId || ""]
+      );
       res.json({ success: true });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   app.post("/api/factory/send-weekly-report-whatsapp", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const r = await pool.query(`SELECT weekly_report_wa_group_chat_id, instance_id, api_token, enabled FROM whatsapp_settings WHERE id = 1`);
+      const r = await pool.query(
+        `SELECT weekly_report_wa_group_chat_id, instance_id, api_token, enabled FROM whatsapp_settings WHERE id = 1`
+      );
       const s = r.rows[0];
-      if (!s?.weekly_report_wa_group_chat_id) return res.status(400).json({ message: "No WhatsApp group configured for the weekly report. Please set one in settings." });
-      if (!s.instance_id || !s.api_token) return res.status(400).json({ message: "WhatsApp credentials not configured." });
+      if (!s?.weekly_report_wa_group_chat_id)
+        return res
+          .status(400)
+          .json({ message: "No WhatsApp group configured for the weekly report. Please set one in settings." });
+      if (!s.instance_id || !s.api_token)
+        return res.status(400).json({ message: "WhatsApp credentials not configured." });
       const buf = await buildWeeklyReportExcelBuffer(companyId, "all");
       const { sendWhatsAppFileToChatId } = await import("../../services/whatsappService");
-      const result = await sendWhatsAppFileToChatId(s.weekly_report_wa_group_chat_id, buf, "weekly-production-report.xlsx", "Weekly Production Report", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      const result = await sendWhatsAppFileToChatId(
+        s.weekly_report_wa_group_chat_id,
+        buf,
+        "weekly-production-report.xlsx",
+        "Weekly Production Report",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      );
       if (!result.success) return res.status(500).json({ message: result.error || "Failed to send WhatsApp message" });
       res.json({ success: true });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // ───────────────────────────────────────────────
@@ -1093,8 +1464,14 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         // would double-count that weight in Productions.
         sql`${factoryBales.status} NOT IN ('DELETED', 'REMOVED', 'REPACKED')`,
       ];
-      if (from) baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) >= ${from}`);
-      if (to)   baleConditions.push(sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) <= ${to}`);
+      if (from)
+        baleConditions.push(
+          sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) >= ${from}`
+        );
+      if (to)
+        baleConditions.push(
+          sql`COALESCE(DATE(${factoryBales.stockEntryDate}), DATE(${factoryBales.createdAt})) <= ${to}`
+        );
 
       // Exclude CARRY_FORWARD batches from the "Original Batches" total.
       // CARRY_FORWARD batches represent leftover material from a parent batch whose weight is
@@ -1107,8 +1484,14 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         sql`${factoryMixBatches.carryForwardFromId} IS NULL`,
         isNull(factoryMixBatches.deletedAt),
       ];
-      if (from) mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) >= ${from}`);
-      if (to)   mixBatchConditions.push(sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) <= ${to}`);
+      if (from)
+        mixBatchConditions.push(
+          sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) >= ${from}`
+        );
+      if (to)
+        mixBatchConditions.push(
+          sql`COALESCE(${factoryMixBatches.batchDate}, DATE(${factoryMixBatches.createdAt})) <= ${to}`
+        );
 
       // ── Fetch bales with product cost price and category ──
       const baleRows = await db
@@ -1135,31 +1518,40 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       }
 
       // ── Aggregate by article code (regular bales only) ──
-      const productMap = new Map<string, {
-        articleCode: string;
-        productName: string;
-        categoryName: string;
-        qty: number;
-        totalWeightKg: number;
-        costPricePerBale: number;
-        totalValue: number;
-      }>();
+      const productMap = new Map<
+        string,
+        {
+          articleCode: string;
+          productName: string;
+          categoryName: string;
+          qty: number;
+          totalWeightKg: number;
+          costPricePerBale: number;
+          totalValue: number;
+        }
+      >();
 
       // ── Aggregate by category (regular bales only) ──
-      const categoryMap = new Map<string, {
-        categoryName: string;
-        qty: number;
-        totalWeightKg: number;
-        totalValue: number;
-      }>();
+      const categoryMap = new Map<
+        string,
+        {
+          categoryName: string;
+          qty: number;
+          totalWeightKg: number;
+          totalValue: number;
+        }
+      >();
 
       // ── Wipers & Garbage aggregation (separate) ──
-      const wgMap = new Map<string, {
-        subType: "wiper" | "garbage" | "other";
-        qty: number;
-        totalWeightKg: number;
-        totalValue: number;
-      }>();
+      const wgMap = new Map<
+        string,
+        {
+          subType: "wiper" | "garbage" | "other";
+          qty: number;
+          totalWeightKg: number;
+          totalValue: number;
+        }
+      >();
 
       for (const bale of baleRows) {
         const code = bale.articleCode || "UNKNOWN";
@@ -1172,7 +1564,11 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         if (isWiperOrGarbage(catName)) {
           // Route to wipers/garbage bucket
           const lower = catName.toLowerCase();
-          const subType: "wiper" | "garbage" | "other" = lower.includes("wiper") ? "wiper" : lower.includes("garbage") ? "garbage" : "other";
+          const subType: "wiper" | "garbage" | "other" = lower.includes("wiper")
+            ? "wiper"
+            : lower.includes("garbage")
+              ? "garbage"
+              : "other";
           const existing = wgMap.get(catName);
           if (existing) {
             existing.qty += 1;
@@ -1189,7 +1585,15 @@ export function registerFactoryBaleExportRoutes(app: Express) {
             existing.totalWeightKg += wt;
             existing.totalValue += value;
           } else {
-            productMap.set(code, { articleCode: code, productName: name, categoryName: catName, qty: 1, totalWeightKg: wt, costPricePerBale: price, totalValue: value });
+            productMap.set(code, {
+              articleCode: code,
+              productName: name,
+              categoryName: catName,
+              qty: 1,
+              totalWeightKg: wt,
+              costPricePerBale: price,
+              totalValue: value,
+            });
           }
 
           const catExisting = categoryMap.get(catName);
@@ -1212,10 +1616,14 @@ export function registerFactoryBaleExportRoutes(app: Express) {
 
       // ── Wipers/garbage totals ──
       const wgRows = [...wgMap.entries()].map(([catName, v]) => ({ categoryName: catName, ...v }));
-      const totalWipersQty = wgRows.filter(r => r.subType === "wiper").reduce((s, r) => s + r.qty, 0);
-      const totalWipersKg = wgRows.filter(r => r.subType === "wiper").reduce((s, r) => s + r.totalWeightKg, 0);
-      const totalGarbageQty = wgRows.filter(r => r.subType === "garbage" || r.subType === "other").reduce((s, r) => s + r.qty, 0);
-      const totalGarbageKg = wgRows.filter(r => r.subType === "garbage" || r.subType === "other").reduce((s, r) => s + r.totalWeightKg, 0);
+      const totalWipersQty = wgRows.filter((r) => r.subType === "wiper").reduce((s, r) => s + r.qty, 0);
+      const totalWipersKg = wgRows.filter((r) => r.subType === "wiper").reduce((s, r) => s + r.totalWeightKg, 0);
+      const totalGarbageQty = wgRows
+        .filter((r) => r.subType === "garbage" || r.subType === "other")
+        .reduce((s, r) => s + r.qty, 0);
+      const totalGarbageKg = wgRows
+        .filter((r) => r.subType === "garbage" || r.subType === "other")
+        .reduce((s, r) => s + r.totalWeightKg, 0);
       const totalWgValue = wgRows.reduce((s, r) => s + r.totalValue, 0);
       const totalWgWeightKg = wgRows.reduce((s, r) => s + r.totalWeightKg, 0);
 
@@ -1262,8 +1670,8 @@ export function registerFactoryBaleExportRoutes(app: Express) {
         WHERE company_id = ${companyId}
       `);
       const mixAllTimeRow = ((mixAllTimeResult as any).rows ?? (mixAllTimeResult as any))[0] ?? {};
-      const allTimeMixKg   = parseFloat(String(mixAllTimeRow.mix_kg   ?? "0")) || 0;
-      const allTimeMixCost = parseFloat(String(mixAllTimeRow.mix_cost  ?? "0")) || 0;
+      const allTimeMixKg = parseFloat(String(mixAllTimeRow.mix_kg ?? "0")) || 0;
+      const allTimeMixCost = parseFloat(String(mixAllTimeRow.mix_cost ?? "0")) || 0;
 
       const baleAllTimeResult = await db.execute(sql`
         SELECT COALESCE(SUM(b.weight_kg::numeric), 0) AS bale_kg
@@ -1274,12 +1682,12 @@ export function registerFactoryBaleExportRoutes(app: Express) {
           AND  b.status NOT IN ('DELETED', 'REMOVED')
       `);
       const baleAllTimeRow = ((baleAllTimeResult as any).rows ?? (baleAllTimeResult as any))[0] ?? {};
-      const allTimeBaleKg  = parseFloat(String(baleAllTimeRow.bale_kg ?? "0")) || 0;
+      const allTimeBaleKg = parseFloat(String(baleAllTimeRow.bale_kg ?? "0")) || 0;
 
       const allTimeBlendedCpk = allTimeMixKg > 0 ? allTimeMixCost / allTimeMixKg : 0;
-      const blendedCostPerKg  = totalMixWeightKg > 0 ? totalMixCost / totalMixWeightKg : 0;
-      const balanceWeightKg   = Math.max(0, allTimeMixKg - allTimeBaleKg);
-      const balanceValue      = Math.round(balanceWeightKg * allTimeBlendedCpk * 100) / 100;
+      const blendedCostPerKg = totalMixWeightKg > 0 ? totalMixCost / totalMixWeightKg : 0;
+      const balanceWeightKg = Math.max(0, allTimeMixKg - allTimeBaleKg);
+      const balanceValue = Math.round(balanceWeightKg * allTimeBlendedCpk * 100) / 100;
 
       // ── STATUS = Production value − Batch cost ──
       const statusValue = totalProductionValue - totalMixCost;
@@ -1336,5 +1744,4 @@ export function registerFactoryBaleExportRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 }

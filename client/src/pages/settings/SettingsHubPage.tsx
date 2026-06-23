@@ -5,9 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Users, Building2, Settings2, Wrench, ShoppingCart, Download,
-  MessageCircle, Database, Shield, ChevronRight, Search,
-  TrendingUp, AlertTriangle, Zap, Factory, Activity, ImageIcon,
+  Users,
+  Building2,
+  Settings2,
+  Wrench,
+  ShoppingCart,
+  Download,
+  MessageCircle,
+  Database,
+  Shield,
+  ChevronRight,
+  Search,
+  TrendingUp,
+  AlertTriangle,
+  Zap,
+  Factory,
+  Activity,
+  ImageIcon,
 } from "lucide-react";
 
 interface HubCategory {
@@ -132,7 +146,19 @@ const HUB_CATEGORIES: HubCategory[] = [
     icon: Shield,
     colorClass: "bg-cyan-500/10",
     iconColorClass: "text-cyan-500",
-    keywords: ["active", "users", "watch", "screen", "live", "session", "presence", "monitor", "factory", "erp", "sessions"],
+    keywords: [
+      "active",
+      "users",
+      "watch",
+      "screen",
+      "live",
+      "session",
+      "presence",
+      "monitor",
+      "factory",
+      "erp",
+      "sessions",
+    ],
     firstSection: "sessions-hub",
     group: "controls",
     devOnly: true,
@@ -167,7 +193,20 @@ const HUB_CATEGORIES: HubCategory[] = [
     colorClass: "bg-purple-500/10",
     iconColorClass: "text-purple-500",
     adminOnly: true,
-    keywords: ["label", "banner", "image", "color", "bale", "design", "print", "factory", "upload", "purple", "green", "gold"],
+    keywords: [
+      "label",
+      "banner",
+      "image",
+      "color",
+      "bale",
+      "design",
+      "print",
+      "factory",
+      "upload",
+      "purple",
+      "green",
+      "gold",
+    ],
     firstSection: "label-banners",
     href: "/factory/label-banners",
     factoryOnly: true,
@@ -361,22 +400,16 @@ function StatRow({
   return (
     <div className="flex items-center justify-between gap-2">
       <span className={`text-xs ${muted ? "text-muted-foreground/60" : "text-muted-foreground"}`}>{label}</span>
-      <span className={`text-sm font-semibold tabular-nums ${highlight ? "text-primary" : muted ? "text-muted-foreground/60" : ""}`}>
+      <span
+        className={`text-sm font-semibold tabular-nums ${highlight ? "text-primary" : muted ? "text-muted-foreground/60" : ""}`}
+      >
         {value}
       </span>
     </div>
   );
 }
 
-function SectionHeader({
-  label,
-  subtitle,
-  children,
-}: {
-  label: string;
-  subtitle: string;
-  children?: React.ReactNode;
-}) {
+function SectionHeader({ label, subtitle, children }: { label: string; subtitle: string; children?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2">
       {children}
@@ -388,19 +421,13 @@ function SectionHeader({
   );
 }
 
-function QuickCard({
-  cat,
-  onNavigate,
-}: {
-  cat: HubCategory;
-  onNavigate: (s: string) => void;
-}) {
+function QuickCard({ cat, onNavigate }: { cat: HubCategory; onNavigate: (s: string) => void }) {
   const Icon = cat.icon;
   const [, setLocation] = useLocation();
   return (
     <Card
       className="p-4 cursor-pointer hover-elevate transition-shadow group flex flex-col gap-3"
-      onClick={() => cat.href ? setLocation(cat.href) : onNavigate(cat.firstSection)}
+      onClick={() => (cat.href ? setLocation(cat.href) : onNavigate(cat.firstSection))}
       data-testid={`card-quick-${cat.key}`}
     >
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${cat.colorClass}`}>
@@ -414,19 +441,13 @@ function QuickCard({
   );
 }
 
-function SettingsCard({
-  cat,
-  onNavigate,
-}: {
-  cat: HubCategory;
-  onNavigate: (s: string) => void;
-}) {
+function SettingsCard({ cat, onNavigate }: { cat: HubCategory; onNavigate: (s: string) => void }) {
   const Icon = cat.icon;
   const [, setLocation] = useLocation();
   return (
     <Card
       className="p-5 cursor-pointer hover-elevate transition-shadow group"
-      onClick={() => cat.href ? setLocation(cat.href) : onNavigate(cat.firstSection)}
+      onClick={() => (cat.href ? setLocation(cat.href) : onNavigate(cat.firstSection))}
       data-testid={`card-settings-${cat.key}`}
     >
       <div className="flex items-start gap-4">
@@ -448,9 +469,7 @@ function SettingsCard({
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
-            {cat.description}
-          </p>
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">{cat.description}</p>
         </div>
         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 -translate-x-1 group-hover:translate-x-0 transition-transform" />
       </div>

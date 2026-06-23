@@ -10,13 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,14 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Package,
   ScanLine,
@@ -161,7 +148,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[status] ?? "bg-muted text-muted-foreground"}`}>
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[status] ?? "bg-muted text-muted-foreground"}`}
+    >
       {STATUS_LABELS[status] ?? status}
     </span>
   );
@@ -269,17 +258,30 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
     scanMutation.mutate({ code: pendingBypass.code, bypass: true });
   };
 
-  const activeBales = detail?.bales.filter(b => !b.removedAt) ?? [];
-  const removedBales = detail?.bales.filter(b => b.removedAt) ?? [];
+  const activeBales = detail?.bales.filter((b) => !b.removedAt) ?? [];
+  const removedBales = detail?.bales.filter((b) => b.removedAt) ?? [];
 
   // Build per-article summary: expected (from proforma lines) vs scanned
-  const summaryMap = new Map<string, { productName: string; expectedQty: number; scannedBales: number; scannedKg: number }>();
+  const summaryMap = new Map<
+    string,
+    { productName: string; expectedQty: number; scannedBales: number; scannedKg: number }
+  >();
   for (const line of detail?.proformaLines ?? []) {
-    summaryMap.set(line.articleCode, { productName: line.productName, expectedQty: line.quantity, scannedBales: 0, scannedKg: 0 });
+    summaryMap.set(line.articleCode, {
+      productName: line.productName,
+      expectedQty: line.quantity,
+      scannedBales: 0,
+      scannedKg: 0,
+    });
   }
   for (const b of activeBales) {
     if (!b.articleCode) continue;
-    const row = summaryMap.get(b.articleCode) ?? { productName: b.productName ?? b.articleCode, expectedQty: 0, scannedBales: 0, scannedKg: 0 };
+    const row = summaryMap.get(b.articleCode) ?? {
+      productName: b.productName ?? b.articleCode,
+      expectedQty: 0,
+      scannedBales: 0,
+      scannedKg: 0,
+    };
     row.scannedBales++;
     row.scannedKg += parseFloat(b.weightKg ?? "0");
     summaryMap.set(b.articleCode, row);
@@ -290,11 +292,12 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
   const totalScanned = activeBales.length;
   const diff = totalScanned - totalExpected;
 
-  const flashClass = scanFlash === "success"
-    ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950/20"
-    : scanFlash === "error"
-    ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950/20"
-    : "";
+  const flashClass =
+    scanFlash === "success"
+      ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950/20"
+      : scanFlash === "error"
+        ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950/20"
+        : "";
 
   return (
     <div className="flex flex-col h-full">
@@ -308,7 +311,9 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
             <span className="font-semibold truncate">{load.loadName}</span>
             <StatusBadge status={load.status} />
           </div>
-          <p className="text-xs text-muted-foreground truncate">{load.proformaName} · {load.customerName}</p>
+          <p className="text-xs text-muted-foreground truncate">
+            {load.proformaName} · {load.customerName}
+          </p>
         </div>
         <Button
           variant="default"
@@ -332,8 +337,10 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
                 ref={scannerRef}
                 autoFocus
                 value={scanCode}
-                onChange={e => setScanCode(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") handleScan(); }}
+                onChange={(e) => setScanCode(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleScan();
+                }}
                 placeholder="Scan barcode or type reference..."
                 className="font-mono text-sm"
                 data-testid="input-v3-scan"
@@ -343,7 +350,11 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
                 disabled={scanMutation.isPending || !scanCode.trim()}
                 data-testid="button-v3-scan-submit"
               >
-                {scanMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4" />}
+                {scanMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ScanLine className="h-4 w-4" />
+                )}
               </Button>
             </div>
           </CardContent>
@@ -366,8 +377,11 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
           <Card>
             <CardContent className="p-3 text-center">
               <p className="text-xs text-muted-foreground">Difference</p>
-              <p className={`text-lg font-semibold ${diff < 0 ? "text-orange-500" : diff > 0 ? "text-blue-500" : "text-muted-foreground"}`}>
-                {diff > 0 ? "+" : ""}{diff}
+              <p
+                className={`text-lg font-semibold ${diff < 0 ? "text-orange-500" : diff > 0 ? "text-blue-500" : "text-muted-foreground"}`}
+              >
+                {diff > 0 ? "+" : ""}
+                {diff}
               </p>
             </CardContent>
           </Card>
@@ -390,7 +404,7 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {summaryRows.map(r => {
+                  {summaryRows.map((r) => {
                     const d = r.scannedBales - r.expectedQty;
                     return (
                       <TableRow key={r.code}>
@@ -399,9 +413,14 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
                           <p className="text-xs text-muted-foreground font-mono">{r.code}</p>
                         </TableCell>
                         <TableCell className="text-right text-sm py-2">{r.expectedQty}</TableCell>
-                        <TableCell className="text-right text-sm py-2 text-green-600 dark:text-green-400">{r.scannedBales}</TableCell>
-                        <TableCell className={`pr-4 text-right text-sm py-2 font-medium ${d < 0 ? "text-orange-500" : d > 0 ? "text-blue-500" : "text-muted-foreground"}`}>
-                          {d > 0 ? "+" : ""}{d}
+                        <TableCell className="text-right text-sm py-2 text-green-600 dark:text-green-400">
+                          {r.scannedBales}
+                        </TableCell>
+                        <TableCell
+                          className={`pr-4 text-right text-sm py-2 font-medium ${d < 0 ? "text-orange-500" : d > 0 ? "text-blue-500" : "text-muted-foreground"}`}
+                        >
+                          {d > 0 ? "+" : ""}
+                          {d}
                         </TableCell>
                       </TableRow>
                     );
@@ -424,15 +443,13 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
             )}
             <Table>
               <TableBody>
-                {activeBales.map(b => (
+                {activeBales.map((b) => (
                   <TableRow key={b.id} data-testid={`row-v3-bale-${b.id}`}>
                     <TableCell className="pl-4 py-2">
                       <p className="text-sm font-mono font-medium">{b.baleReference}</p>
                       <p className="text-xs text-muted-foreground">{b.productName ?? b.articleCode ?? "—"}</p>
                     </TableCell>
-                    <TableCell className="text-sm py-2 text-muted-foreground">
-                      {fmtKg(b.weightKg)}
-                    </TableCell>
+                    <TableCell className="text-sm py-2 text-muted-foreground">{fmtKg(b.weightKg)}</TableCell>
                     <TableCell className="py-2 text-right">
                       <Button
                         size="icon"
@@ -453,12 +470,19 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
 
         {/* Removed bales (collapsed) */}
         {removedBales.length > 0 && (
-          <p className="text-xs text-muted-foreground text-center">{removedBales.length} bale(s) removed from this load</p>
+          <p className="text-xs text-muted-foreground text-center">
+            {removedBales.length} bale(s) removed from this load
+          </p>
         )}
       </div>
 
       {/* Bypass warning dialog */}
-      <AlertDialog open={!!pendingBypass} onOpenChange={open => { if (!open) setPendingBypass(null); }}>
+      <AlertDialog
+        open={!!pendingBypass}
+        onOpenChange={(open) => {
+          if (!open) setPendingBypass(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
@@ -467,7 +491,14 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
             <AlertDialogDescription>{pendingBypass?.message}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => { setPendingBypass(null); scannerRef.current?.focus(); }}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel
+              onClick={() => {
+                setPendingBypass(null);
+                scannerRef.current?.focus();
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction onClick={handleBypass}>Load Anyway</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -479,13 +510,18 @@ function ScanningPanel({ load, onClose }: { load: V3Load; onClose: () => void })
           <AlertDialogHeader>
             <AlertDialogTitle>Finalize Load?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will mark all {activeBales.length} scanned bales as SOLD and close the load.
-              This action cannot be undone.
+              This will mark all {activeBales.length} scanned bales as SOLD and close the load. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { setConfirmFinalize(false); finalizeMutation.mutate(); }}>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmFinalize(false);
+                finalizeMutation.mutate();
+              }}
+            >
               Finalize
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -528,14 +564,20 @@ function CreateLoadDialog({
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/loads"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/proformas"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/v3/stock-overview"] });
-      setLoadName(""); setNotes("");
+      setLoadName("");
+      setNotes("");
       onClose();
     },
     onError: (err: any) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Send to Expected to Load</DialogTitle>
@@ -544,41 +586,50 @@ function CreateLoadDialog({
           <div className="flex items-start gap-2 p-3 rounded-md bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800">
             <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0 mt-0.5" />
             <p className="text-sm text-orange-700 dark:text-orange-300">
-              This proforma already has {proforma.v3ActiveCount} active loading job(s). You can still create another — make sure quantities and bales are correct.
+              This proforma already has {proforma.v3ActiveCount} active loading job(s). You can still create another —
+              make sure quantities and bales are correct.
             </p>
           </div>
         )}
         <div className="space-y-4 py-1">
           <div>
             <Label className="text-xs text-muted-foreground mb-1 block">Proforma</Label>
-            <p className="text-sm font-medium">{proforma?.name} · {proforma?.customerName}</p>
+            <p className="text-sm font-medium">
+              {proforma?.name} · {proforma?.customerName}
+            </p>
           </div>
           <div>
-            <Label htmlFor="v3-load-name" className="text-xs mb-1 block">Load Name <span className="text-red-500">*</span></Label>
+            <Label htmlFor="v3-load-name" className="text-xs mb-1 block">
+              Load Name <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="v3-load-name"
               value={loadName}
-              onChange={e => setLoadName(e.target.value)}
+              onChange={(e) => setLoadName(e.target.value)}
               placeholder="e.g. Container 1, Truck A"
               data-testid="input-v3-load-name"
             />
           </div>
           <div>
-            <Label htmlFor="v3-load-date" className="text-xs mb-1 block">Expected Load Date <span className="text-red-500">*</span></Label>
+            <Label htmlFor="v3-load-date" className="text-xs mb-1 block">
+              Expected Load Date <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="v3-load-date"
               type="date"
               value={expectedDate}
-              onChange={e => setExpectedDate(e.target.value)}
+              onChange={(e) => setExpectedDate(e.target.value)}
               data-testid="input-v3-load-date"
             />
           </div>
           <div>
-            <Label htmlFor="v3-load-notes" className="text-xs mb-1 block">Notes</Label>
+            <Label htmlFor="v3-load-notes" className="text-xs mb-1 block">
+              Notes
+            </Label>
             <Textarea
               id="v3-load-notes"
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
               placeholder="Optional notes..."
               rows={2}
               data-testid="input-v3-load-notes"
@@ -586,7 +637,9 @@ function CreateLoadDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} data-testid="button-v3-create-load-cancel">Cancel</Button>
+          <Button variant="outline" onClick={onClose} data-testid="button-v3-create-load-cancel">
+            Cancel
+          </Button>
           <Button
             onClick={() => createMutation.mutate()}
             disabled={createMutation.isPending || !loadName.trim() || !expectedDate}
@@ -604,7 +657,7 @@ function CreateLoadDialog({
 // ─────────────────────── Main Page ───────────────────────
 
 const TABS = ["overview", "expected", "loading", "finalized", "proformas"] as const;
-type Tab = typeof TABS[number];
+type Tab = (typeof TABS)[number];
 
 const TAB_LABELS: Record<Tab, string> = {
   overview: "Stock Overview",
@@ -628,17 +681,18 @@ export default function FactoryStockAllocationV3() {
 
   const { data: expectedLoads = [] } = useQuery<V3Load[]>({
     queryKey: ["/api/factory/v3/loads", "expected_to_load"],
-    queryFn: () => fetch("/api/factory/v3/loads?status=expected_to_load", { credentials: "include" }).then(r => r.json()),
+    queryFn: () =>
+      fetch("/api/factory/v3/loads?status=expected_to_load", { credentials: "include" }).then((r) => r.json()),
   });
 
   const { data: loadingLoads = [] } = useQuery<V3Load[]>({
     queryKey: ["/api/factory/v3/loads", "loading"],
-    queryFn: () => fetch("/api/factory/v3/loads?status=loading", { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch("/api/factory/v3/loads?status=loading", { credentials: "include" }).then((r) => r.json()),
   });
 
   const { data: finalizedLoads = [] } = useQuery<V3Load[]>({
     queryKey: ["/api/factory/v3/loads", "finalized"],
-    queryFn: () => fetch("/api/factory/v3/loads?status=finalized", { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch("/api/factory/v3/loads?status=finalized", { credentials: "include" }).then((r) => r.json()),
   });
 
   const { data: proformas = [] } = useQuery<Proforma[]>({
@@ -699,7 +753,9 @@ export default function FactoryStockAllocationV3() {
         <div className="flex items-center gap-3 mb-4 flex-wrap">
           <PageHeader title="Stock Allocation" />
           <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5 rounded">v3.0 TEST</Badge>
-          <span className="text-xs text-muted-foreground hidden sm:inline">Factory 2.0 isolated module — not production</span>
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            Factory 2.0 isolated module — not production
+          </span>
         </div>
 
         {/* KPI cards */}
@@ -728,7 +784,11 @@ export default function FactoryStockAllocationV3() {
           <Card>
             <CardContent className="p-3">
               <p className="text-xs text-green-600 dark:text-green-400">Free to Promise</p>
-              <p className={`text-2xl font-bold ${totalFtp < 0 ? "text-red-500" : "text-green-600 dark:text-green-400"}`}>{totalFtp}</p>
+              <p
+                className={`text-2xl font-bold ${totalFtp < 0 ? "text-red-500" : "text-green-600 dark:text-green-400"}`}
+              >
+                {totalFtp}
+              </p>
               <p className="text-xs text-muted-foreground">bales available</p>
             </CardContent>
           </Card>
@@ -736,7 +796,7 @@ export default function FactoryStockAllocationV3() {
 
         {/* Tabs */}
         <div className="flex gap-1 flex-wrap">
-          {TABS.map(tab => (
+          {TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -749,10 +809,14 @@ export default function FactoryStockAllocationV3() {
             >
               {TAB_LABELS[tab]}
               {tab === "expected" && expectedLoads.length > 0 && (
-                <span className="ml-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded px-1">{expectedLoads.length}</span>
+                <span className="ml-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded px-1">
+                  {expectedLoads.length}
+                </span>
               )}
               {tab === "loading" && loadingLoads.length > 0 && (
-                <span className="ml-1.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded px-1">{loadingLoads.length}</span>
+                <span className="ml-1.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded px-1">
+                  {loadingLoads.length}
+                </span>
               )}
             </button>
           ))}
@@ -761,11 +825,12 @@ export default function FactoryStockAllocationV3() {
 
       {/* Tab body */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-
         {/* ── Stock Overview ── */}
         {activeTab === "overview" && (
           <div>
-            <p className="text-sm text-muted-foreground mb-3">Per-article breakdown. FTP = Stock in Hand − Expected to Load − Loading.</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Per-article breakdown. FTP = Stock in Hand − Expected to Load − Loading.
+            </p>
             {stockLoading && <p className="text-sm text-muted-foreground">Loading...</p>}
             {!stockLoading && stockRows.length === 0 && (
               <p className="text-sm text-muted-foreground">No stock data available.</p>
@@ -783,7 +848,7 @@ export default function FactoryStockAllocationV3() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {stockRows.map(r => (
+                    {stockRows.map((r) => (
                       <TableRow key={r.articleCode} data-testid={`row-v3-stock-${r.articleCode}`}>
                         <TableCell className="pl-4 py-2">
                           <p className="text-sm font-medium">{r.productName}</p>
@@ -794,7 +859,9 @@ export default function FactoryStockAllocationV3() {
                           <p className="text-xs text-muted-foreground">{fmtKg(r.inStockKg)}</p>
                         </TableCell>
                         <TableCell className="text-right py-2">
-                          <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">{r.expectedToLoadBales}</p>
+                          <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                            {r.expectedToLoadBales}
+                          </p>
                           <p className="text-xs text-muted-foreground">{fmtKg(r.expectedToLoadKg)}</p>
                         </TableCell>
                         <TableCell className="text-right py-2">
@@ -802,7 +869,9 @@ export default function FactoryStockAllocationV3() {
                           <p className="text-xs text-muted-foreground">{fmtKg(r.loadingKg)}</p>
                         </TableCell>
                         <TableCell className="text-right pr-4 py-2">
-                          <p className={`text-sm font-semibold ${r.ftpBales < 0 ? "text-red-500" : "text-green-600 dark:text-green-400"}`}>
+                          <p
+                            className={`text-sm font-semibold ${r.ftpBales < 0 ? "text-red-500" : "text-green-600 dark:text-green-400"}`}
+                          >
                             {r.ftpBales}
                           </p>
                           <p className="text-xs text-muted-foreground">{fmtKg(r.ftpKg)}</p>
@@ -840,7 +909,7 @@ export default function FactoryStockAllocationV3() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {expectedLoads.map(l => (
+                    {expectedLoads.map((l) => (
                       <TableRow key={l.id} data-testid={`row-v3-expected-${l.id}`}>
                         <TableCell className="pl-4 py-2">
                           <p className="text-sm font-medium">{l.loadName}</p>
@@ -891,7 +960,7 @@ export default function FactoryStockAllocationV3() {
             )}
             {loadingLoads.length > 0 && (
               <div className="space-y-3">
-                {loadingLoads.map(l => (
+                {loadingLoads.map((l) => (
                   <Card key={l.id} data-testid={`card-v3-loading-${l.id}`}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -900,7 +969,9 @@ export default function FactoryStockAllocationV3() {
                             <span className="font-semibold">{l.loadName}</span>
                             <StatusBadge status={l.status} />
                           </div>
-                          <p className="text-sm text-muted-foreground">{l.proformaName} · {l.customerName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {l.proformaName} · {l.customerName}
+                          </p>
                           <p className="text-xs text-muted-foreground mt-0.5">Started: {fmtDateTime(l.startedAt)}</p>
                         </div>
                         <div className="flex items-center gap-4 shrink-0">
@@ -953,7 +1024,7 @@ export default function FactoryStockAllocationV3() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {finalizedLoads.map(l => (
+                    {finalizedLoads.map((l) => (
                       <TableRow key={l.id} data-testid={`row-v3-finalized-${l.id}`}>
                         <TableCell className="pl-4 py-2">
                           <p className="text-sm font-medium">{l.loadName}</p>
@@ -963,7 +1034,9 @@ export default function FactoryStockAllocationV3() {
                         <TableCell className="py-2 text-sm">{l.customerName}</TableCell>
                         <TableCell className="py-2 text-sm">{fmtDateTime(l.finalizedAt)}</TableCell>
                         <TableCell className="text-right py-2 text-sm font-semibold">{l.scannedBales}</TableCell>
-                        <TableCell className="text-right pr-4 py-2 text-sm text-muted-foreground">{fmtKg(l.scannedWeightKg)}</TableCell>
+                        <TableCell className="text-right pr-4 py-2 text-sm text-muted-foreground">
+                          {fmtKg(l.scannedWeightKg)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -976,7 +1049,9 @@ export default function FactoryStockAllocationV3() {
         {/* ── Proformas ── */}
         {activeTab === "proformas" && (
           <div>
-            <p className="text-sm text-muted-foreground mb-3">Active proformas. Click "Send to Expected to Load" to create a loading job.</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              Active proformas. Click "Send to Expected to Load" to create a loading job.
+            </p>
             {proformas.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <Package className="h-10 w-10 mx-auto mb-3 opacity-30" />
@@ -997,7 +1072,7 @@ export default function FactoryStockAllocationV3() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {proformas.map(p => (
+                    {proformas.map((p) => (
                       <TableRow key={p.id} data-testid={`row-v3-proforma-${p.id}`}>
                         <TableCell className="pl-4 py-2">
                           <p className="text-sm font-medium">{p.name}</p>
@@ -1011,7 +1086,9 @@ export default function FactoryStockAllocationV3() {
                             <div className="flex items-center gap-1.5">
                               <span className="text-sm">{p.v3LoadCount}</span>
                               {p.v3ActiveCount > 0 && (
-                                <span className="text-xs text-orange-600 dark:text-orange-400">({p.v3ActiveCount} active)</span>
+                                <span className="text-xs text-orange-600 dark:text-orange-400">
+                                  ({p.v3ActiveCount} active)
+                                </span>
                               )}
                             </div>
                           ) : (
@@ -1040,7 +1117,12 @@ export default function FactoryStockAllocationV3() {
       </div>
 
       {/* Cancel confirmation */}
-      <AlertDialog open={cancelTargetId !== null} onOpenChange={open => { if (!open) setCancelTargetId(null); }}>
+      <AlertDialog
+        open={cancelTargetId !== null}
+        onOpenChange={(open) => {
+          if (!open) setCancelTargetId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this load?</AlertDialogTitle>

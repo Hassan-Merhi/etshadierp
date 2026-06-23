@@ -3,46 +3,119 @@ import express, { type Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation, canModifyDate } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, runIntercompanyPosTransfer, recalculateIntercompanyForDate } from "./_helpers";
 import {
-  inventory, stockItems, stockGroups,
-  stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems,
-  bankAccounts, fixedAssets, ledgerAccounts, insertLedgerAccountSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertContainerSchema,
-  insertStockTransferVoucherSchema, insertStockAdjustmentVoucherSchema,
-  updateStockTransferSchema, updateStockAdjustmentSchema,
-  vouchers, voucherEntries, salesItems, suppliers, customers, customerBalances,
-  employees, locations, userLocations, userCompanyRoles, companies,
-  auditLog, users, FEATURE_KEYS, companySettings,
-  purchaseOrders, poLineItems, interCompanyTransfers,
-  insertInterCompanyTransferSchema, insertContainerSaleSchema, containerSales,
-  insertUserPreferencesSchema, userPreferences,
-  insertDraftPosSaleSchema, InsertDraftPosSale,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  fiscalPeriodClosures, wasteDispatches, wasteDispatchItems,
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  upload,
+  logAudit,
+  getCurrentExchangeRate,
+  calculateHistoricalLocationInventory,
+  runIntercompanyPosTransfer,
+  recalculateIntercompanyForDate,
+} from "./_helpers";
+import {
+  inventory,
+  stockItems,
+  stockGroups,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  bankAccounts,
+  fixedAssets,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertContainerSchema,
+  insertStockTransferVoucherSchema,
+  insertStockAdjustmentVoucherSchema,
+  updateStockTransferSchema,
+  updateStockAdjustmentSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  suppliers,
+  customers,
+  customerBalances,
+  employees,
+  locations,
+  userLocations,
+  userCompanyRoles,
+  companies,
+  auditLog,
+  users,
+  FEATURE_KEYS,
+  companySettings,
+  purchaseOrders,
+  poLineItems,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  insertContainerSaleSchema,
+  containerSales,
+  insertUserPreferencesSchema,
+  userPreferences,
+  insertDraftPosSaleSchema,
+  InsertDraftPosSale,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
-  bales, baleProducts, baleProductCategories, storedFiles,
-  stockItemLocationPrices, insertCustomerSchema,
-  posShifts, userLocationCashAccounts,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  storedFiles,
+  stockItemLocationPrices,
+  insertCustomerSchema,
+  posShifts,
+  userLocationCashAccounts,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../excelHelper";
 import { adjustInventory, reverseInventoryByExactValue } from "../inventoryHelper";
-import { generateStockPdf }   from "../helpers/generateStockPdf";
+import { generateStockPdf } from "../helpers/generateStockPdf";
 import { generateInvoicePdf } from "../helpers/generateInvoicePdf";
 import { getErpExportVisibility } from "../helpers/exportVisibility";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "../netPositionHelper";
-import { sendWhatsAppTextToChatIdPos, sendWhatsAppFileToChatIdPos, sendWhatsAppFileByUrlToChatIdPos, sendWhatsAppFileByUploadPos } from "../services/whatsappService";
+import {
+  sendWhatsAppTextToChatIdPos,
+  sendWhatsAppFileToChatIdPos,
+  sendWhatsAppFileByUrlToChatIdPos,
+  sendWhatsAppFileByUploadPos,
+} from "../services/whatsappService";
 import PDFDocument from "pdfkit";
 import { randomUUID } from "crypto";
 
@@ -56,7 +129,6 @@ function storeTempFile(buffer: Buffer, contentType?: string, filename?: string):
 }
 // keep old name as alias
 const storeTempPdf = storeTempFile;
-
 
 export function registerPosRoutes(app: Express) {
   // ── Serve temporarily stored PDFs (used by WhatsApp sendFileByUrl) ──────────
@@ -86,8 +158,8 @@ export function registerPosRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { pdfBase64, locationId, filename, caption } = req.body;
-      if (!pdfBase64)   return res.status(400).json({ message: "pdfBase64 is required" });
-      if (!locationId)  return res.status(400).json({ message: "locationId is required" });
+      if (!pdfBase64) return res.status(400).json({ message: "pdfBase64 is required" });
+      if (!locationId) return res.status(400).json({ message: "locationId is required" });
 
       const [location] = await db
         .select()
@@ -95,18 +167,19 @@ export function registerPosRoutes(app: Express) {
         .where(and(eq(locations.id, parseInt(locationId)), eq(locations.companyId, companyId)))
         .limit(1);
 
-      if (!location)                     return res.status(404).json({ message: "Location not found" });
-      if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
+      if (!location) return res.status(404).json({ message: "Location not found" });
+      if (!location.whatsappGroupChatId)
+        return res.status(400).json({ message: "No WhatsApp group configured for this location" });
 
-      const pdfBuffer  = Buffer.from(pdfBase64, "base64");
-      const safeFile   = (filename || "report.pdf").replace(/[^\w\s.()\-]/g, "_");
+      const pdfBuffer = Buffer.from(pdfBase64, "base64");
+      const safeFile = (filename || "report.pdf").replace(/[^\w\s.()\-]/g, "_");
 
       console.log(`[WA PDF upload] chatId=${location.whatsappGroupChatId} file=${safeFile} size=${pdfBuffer.length}`);
       const result = await sendWhatsAppFileByUploadPos(
         location.whatsappGroupChatId,
         pdfBuffer,
         safeFile,
-        caption ?? safeFile,
+        caption ?? safeFile
       );
 
       if (!result.success) {
@@ -138,8 +211,9 @@ export function registerPosRoutes(app: Express) {
         .where(and(eq(locations.id, locId), eq(locations.companyId, companyId)))
         .limit(1);
 
-      if (!location)                     return res.status(404).json({ message: "Location not found" });
-      if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
+      if (!location) return res.status(404).json({ message: "Location not found" });
+      if (!location.whatsappGroupChatId)
+        return res.status(400).json({ message: "No WhatsApp group configured for this location" });
 
       const [company] = await db
         .select({ name: companies.name })
@@ -148,7 +222,7 @@ export function registerPosRoutes(app: Express) {
         .limit(1);
 
       const companyName = company?.name || "Company";
-      const locName     = location.name;
+      const locName = location.name;
 
       const { buffer: pdfBuffer, pageCount, rowCount } = await generateStockPdf(companyId, companyName, locId, locName);
 
@@ -160,7 +234,7 @@ export function registerPosRoutes(app: Express) {
       if (pageCount > maxAllowedPages) {
         console.error(
           `[WA stock backend] SAFETY GUARD: PDF has ${pageCount} pages for ${rowCount} rows ` +
-          `(max allowed: ${maxAllowedPages}). location="${locName}". Refusing to send.`,
+            `(max allowed: ${maxAllowedPages}). location="${locName}". Refusing to send.`
         );
         return res.status(500).json({
           message:
@@ -169,28 +243,34 @@ export function registerPosRoutes(app: Express) {
         });
       }
 
-      const dateStr  = getClientDate(req);
+      const dateStr = getClientDate(req);
       const safeName = `${locName} STK ${companyName} ${dateStr}`.replace(/[^\w\s.()\-]/g, "_").trim();
-      const stampStr = new Date().toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-      const caption  = `Stock Report — ${locName}\n${stampStr}`;
+      const stampStr = new Date().toLocaleString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const caption = `Stock Report — ${locName}\n${stampStr}`;
 
       console.log(
         `[WA stock backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf ` +
-        `size=${pdfBuffer.length} pageCount=${pageCount} rowCount=${rowCount}`,
+          `size=${pdfBuffer.length} pageCount=${pageCount} rowCount=${rowCount}`
       );
 
       const result = await sendWhatsAppFileToChatIdPos(
         location.whatsappGroupChatId,
         pdfBuffer,
         `${safeName}.pdf`,
-        caption,
+        caption
       );
 
       if (!result.success) {
         console.error(
           `[WA stock backend] Upload failed — chatId=${location.whatsappGroupChatId} ` +
-          `file=${safeName}.pdf size=${pdfBuffer.length} pageCount=${pageCount} rowCount=${rowCount} ` +
-          `greenApiError="${result.error}"`,
+            `file=${safeName}.pdf size=${pdfBuffer.length} pageCount=${pageCount} rowCount=${rowCount} ` +
+            `greenApiError="${result.error}"`
         );
         return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
       }
@@ -209,7 +289,7 @@ export function registerPosRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { voucherId, locationId } = req.body;
-      if (!voucherId)  return res.status(400).json({ message: "voucherId is required" });
+      if (!voucherId) return res.status(400).json({ message: "voucherId is required" });
       if (!locationId) return res.status(400).json({ message: "locationId is required" });
 
       const locId = parseInt(locationId);
@@ -221,8 +301,9 @@ export function registerPosRoutes(app: Express) {
         .where(and(eq(locations.id, locId), eq(locations.companyId, companyId)))
         .limit(1);
 
-      if (!location)                     return res.status(404).json({ message: "Location not found" });
-      if (!location.whatsappGroupChatId) return res.status(400).json({ message: "No WhatsApp group configured for this location" });
+      if (!location) return res.status(404).json({ message: "Location not found" });
+      if (!location.whatsappGroupChatId)
+        return res.status(400).json({ message: "No WhatsApp group configured for this location" });
 
       // POS users can only send invoices for vouchers from their own shifts
       if (req.user?.role === "POS") {
@@ -249,11 +330,13 @@ export function registerPosRoutes(app: Express) {
 
       const erpVis = await getErpExportVisibility(req);
       const hideProfitCols = erpVis.hideSelling || erpVis.hideCost || erpVis.hideSalesProfitCost;
-      const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, (req as any).user?.username, { hideProfitCols });
+      const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, (req as any).user?.username, {
+        hideProfitCols,
+      });
 
       // Build filename — for credit sales include customer name
-      const locName  = location.name;
-      const dateStr  = getClientDate(req);
+      const locName = location.name;
+      const dateStr = getClientDate(req);
 
       let customerNameForFile: string | null = null;
       const [voucherMeta] = await db
@@ -266,10 +349,9 @@ export function registerPosRoutes(app: Express) {
           .select({ name: ledgerAccounts.name })
           .from(voucherEntries)
           .innerJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
-          .where(and(
-            eq(voucherEntries.voucherId, parseInt(voucherId)),
-            sql`${voucherEntries.debitAmount}::numeric > 0`,
-          ))
+          .where(
+            and(eq(voucherEntries.voucherId, parseInt(voucherId)), sql`${voucherEntries.debitAmount}::numeric > 0`)
+          )
           .limit(1);
         customerNameForFile = custEntry?.name || null;
       }
@@ -278,15 +360,17 @@ export function registerPosRoutes(app: Express) {
         ? `${customerNameForFile} Invoice ${locName} ${dateStr}`
         : `${locName} Invoice ${dateStr}`;
       const safeName = rawName.replace(/[^\w\s.()\-]/g, "_").trim();
-      const caption  = "";
+      const caption = "";
 
-      console.log(`[WA invoice backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf size=${pdfBuffer.length}`);
+      console.log(
+        `[WA invoice backend] chatId=${location.whatsappGroupChatId} file=${safeName}.pdf size=${pdfBuffer.length}`
+      );
 
       const result = await sendWhatsAppFileToChatIdPos(
         location.whatsappGroupChatId,
         pdfBuffer,
         `${safeName}.pdf`,
-        caption,
+        caption
       );
 
       if (!result.success) return res.status(502).json({ message: result.error ?? "WhatsApp send failed" });
@@ -326,10 +410,7 @@ export function registerPosRoutes(app: Express) {
           .select({ name: ledgerAccounts.name })
           .from(voucherEntries)
           .innerJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
-          .where(and(
-            eq(voucherEntries.voucherId, voucherId),
-            sql`${voucherEntries.debitAmount}::numeric > 0`,
-          ))
+          .where(and(eq(voucherEntries.voucherId, voucherId), sql`${voucherEntries.debitAmount}::numeric > 0`))
           .limit(1);
         customerName = custEntry?.name || null;
       }
@@ -394,7 +475,7 @@ export function registerPosRoutes(app: Express) {
             and(
               eq(userLocationCashAccounts.userId, req.user!.id),
               eq(userLocationCashAccounts.companyId, req.session.currentCompanyId!),
-              eq(userLocationCashAccounts.locationId, parsedLocId),
+              eq(userLocationCashAccounts.locationId, parsedLocId)
             )
           )
           .limit(1);
@@ -411,7 +492,7 @@ export function registerPosRoutes(app: Express) {
             .where(
               and(
                 eq(userLocationCashAccounts.userId, req.user!.id),
-                eq(userLocationCashAccounts.companyId, req.session.currentCompanyId!),
+                eq(userLocationCashAccounts.companyId, req.session.currentCompanyId!)
               )
             )
             .limit(1);
@@ -442,10 +523,7 @@ export function registerPosRoutes(app: Express) {
           .select()
           .from(ledgerAccounts)
           .where(
-            and(
-              eq(ledgerAccounts.id, paymentAccountId),
-              eq(ledgerAccounts.companyId, req.session.currentCompanyId!)
-            )
+            and(eq(ledgerAccounts.id, paymentAccountId), eq(ledgerAccounts.companyId, req.session.currentCompanyId!))
           )
           .limit(1);
 
@@ -473,12 +551,7 @@ export function registerPosRoutes(app: Express) {
         const [cashLedger] = await db
           .select()
           .from(ledgerAccounts)
-          .where(
-            and(
-              eq(ledgerAccounts.id, cashAccountId),
-              eq(ledgerAccounts.companyId, req.session.currentCompanyId!)
-            )
-          )
+          .where(and(eq(ledgerAccounts.id, cashAccountId), eq(ledgerAccounts.companyId, req.session.currentCompanyId!)))
           .limit(1);
 
         if (!cashLedger) {
@@ -502,10 +575,7 @@ export function registerPosRoutes(app: Express) {
           .select()
           .from(ledgerAccounts)
           .where(
-            and(
-              eq(ledgerAccounts.id, paymentAccountId),
-              eq(ledgerAccounts.companyId, req.session.currentCompanyId!)
-            )
+            and(eq(ledgerAccounts.id, paymentAccountId), eq(ledgerAccounts.companyId, req.session.currentCompanyId!))
           )
           .limit(1);
 
@@ -517,7 +587,8 @@ export function registerPosRoutes(app: Express) {
           } else if (ledgerAccount.accountType === "Asset") {
             // Asset accounts are customer receivables - should only be used for credit sales
             return res.status(400).json({
-              message: "Asset accounts (customer receivables) can only be used for credit sales. Please enable 'Credit Sale' or select a Cash/Bank account.",
+              message:
+                "Asset accounts (customer receivables) can only be used for credit sales. Please enable 'Credit Sale' or select a Cash/Bank account.",
             });
           } else {
             // Other ledger account types (Expense, Liability, etc.) are not valid for POS sales
@@ -531,10 +602,7 @@ export function registerPosRoutes(app: Express) {
             .select()
             .from(bankAccounts)
             .where(
-              and(
-                eq(bankAccounts.id, paymentAccountId),
-                eq(bankAccounts.companyId, req.session.currentCompanyId!)
-              )
+              and(eq(bankAccounts.id, paymentAccountId), eq(bankAccounts.companyId, req.session.currentCompanyId!))
             )
             .limit(1);
 
@@ -563,15 +631,22 @@ export function registerPosRoutes(app: Express) {
         const [existingVoucher] = await db
           .select()
           .from(vouchers)
-          .where(and(
-            eq(vouchers.companyId, req.session.currentCompanyId!),
-            eq(vouchers.clientSaleId, clientSaleId),
-            isNull(vouchers.deletedAt),
-          ))
+          .where(
+            and(
+              eq(vouchers.companyId, req.session.currentCompanyId!),
+              eq(vouchers.clientSaleId, clientSaleId),
+              isNull(vouchers.deletedAt)
+            )
+          )
           .limit(1);
         if (existingVoucher) {
-          const existingSalesItems = await db.select().from(salesItems).where(eq(salesItems.voucherId, existingVoucher.id));
-          const existingLocation = existingVoucher.locationId ? await storage.getLocationById(existingVoucher.locationId) : null;
+          const existingSalesItems = await db
+            .select()
+            .from(salesItems)
+            .where(eq(salesItems.voucherId, existingVoucher.id));
+          const existingLocation = existingVoucher.locationId
+            ? await storage.getLocationById(existingVoucher.locationId)
+            : null;
           return res.json({
             voucher: existingVoucher,
             location: existingLocation,
@@ -595,23 +670,23 @@ export function registerPosRoutes(app: Express) {
       let effectiveShiftId: number | null = shiftId || null;
       if (effectiveShiftId) {
         const shift = await storage.getShiftById(effectiveShiftId);
-        if (!shift || shift.companyId !== req.session.currentCompanyId || shift.locationId !== locationId || shift.status !== "open" || shift.userId !== req.user?.id) {
+        if (
+          !shift ||
+          shift.companyId !== req.session.currentCompanyId ||
+          shift.locationId !== locationId ||
+          shift.status !== "open" ||
+          shift.userId !== req.user?.id
+        ) {
           effectiveShiftId = null;
         }
       }
       if (!accountId) {
-        return res
-          .status(400)
-          .json({
-            message: isCreditSale
-              ? "Customer is required"
-              : "Payment account is required",
-          });
+        return res.status(400).json({
+          message: isCreditSale ? "Customer is required" : "Payment account is required",
+        });
       }
       if (!items || !Array.isArray(items) || items.length === 0) {
-        return res
-          .status(400)
-          .json({ message: "At least one item is required" });
+        return res.status(400).json({ message: "At least one item is required" });
       }
 
       // Input validation assertions for inventory safety
@@ -633,19 +708,13 @@ export function registerPosRoutes(app: Express) {
       let grandTotal = 0;
       for (const item of items) {
         if (!item.stockItemId) {
-          return res
-            .status(400)
-            .json({ message: "Stock item ID is required for all items" });
+          return res.status(400).json({ message: "Stock item ID is required for all items" });
         }
         if (!item.quantity || parseFloat(item.quantity) <= 0) {
-          return res
-            .status(400)
-            .json({ message: "Quantity must be positive for all items" });
+          return res.status(400).json({ message: "Quantity must be positive for all items" });
         }
         if (!item.rate || parseFloat(item.rate) < 0) {
-          return res
-            .status(400)
-            .json({ message: "Rate must be non-negative for all items" });
+          return res.status(400).json({ message: "Rate must be non-negative for all items" });
         }
         grandTotal += parseFloat(item.quantity) * parseFloat(item.rate);
       }
@@ -665,7 +734,9 @@ export function registerPosRoutes(app: Express) {
 
       if (salesAccount.accountType !== "Income") {
         // Validate that Sales account is of type Income for proper import cycle balance
-        console.warn(`[POS Sale] WARNING: SALES account has type "${salesAccount.accountType}" instead of "Income". This will cause import cycle imbalance!`);
+        console.warn(
+          `[POS Sale] WARNING: SALES account has type "${salesAccount.accountType}" instead of "Income". This will cause import cycle imbalance!`
+        );
         return res.status(400).json({
           message: `The SALES account is configured with type "${salesAccount.accountType}" but must be type "Income" for POS sales to work correctly. Please update the SALES account type in Accounts page.`,
         });
@@ -685,11 +756,10 @@ export function registerPosRoutes(app: Express) {
         const assignedLocs = await db
           .select({ locationId: userLocations.locationId })
           .from(userLocations)
-          .where(and(
-            eq(userLocations.userId, req.user!.id),
-            eq(userLocations.companyId, req.session.currentCompanyId!),
-          ));
-        const allowedIds = assignedLocs.map(l => l.locationId);
+          .where(
+            and(eq(userLocations.userId, req.user!.id), eq(userLocations.companyId, req.session.currentCompanyId!))
+          );
+        const allowedIds = assignedLocs.map((l) => l.locationId);
         if (!allowedIds.includes(parsedLocationId)) {
           return res.status(403).json({ message: "You are not allowed to sell from this location." });
         }
@@ -707,10 +777,7 @@ export function registerPosRoutes(app: Express) {
         const [si] = await db
           .select({ id: stockItems.id, name: stockItems.name, deletedAt: stockItems.deletedAt })
           .from(stockItems)
-          .where(and(
-            eq(stockItems.id, item.stockItemId),
-            eq(stockItems.companyId, req.session.currentCompanyId!),
-          ))
+          .where(and(eq(stockItems.id, item.stockItemId), eq(stockItems.companyId, req.session.currentCompanyId!)))
           .limit(1);
         if (!si) {
           return res.status(400).json({
@@ -750,17 +817,10 @@ export function registerPosRoutes(app: Express) {
           })
           .from(inventory)
           .leftJoin(stockItems, eq(stockItems.id, inventory.stockItemId))
-          .where(
-            and(
-              eq(inventory.locationId, locationId),
-              eq(inventory.stockItemId, item.stockItemId),
-            ),
-          );
+          .where(and(eq(inventory.locationId, locationId), eq(inventory.stockItemId, item.stockItemId)));
 
         if (!inventoryRecord) {
-          throw new Error(
-            `Inventory not found for item ${item.stockItemId} at location ${locationId}`,
-          );
+          throw new Error(`Inventory not found for item ${item.stockItemId} at location ${locationId}`);
         }
 
         const currentQty = parseFloat(inventoryRecord.quantity);
@@ -769,7 +829,7 @@ export function registerPosRoutes(app: Express) {
 
         if (currentQty < saleQty && !canSellNegativeStock) {
           throw new Error(
-            `Not enough stock for "${itemDisplayName}". Available: ${currentQty}, requested: ${saleQty}.`,
+            `Not enough stock for "${itemDisplayName}". Available: ${currentQty}, requested: ${saleQty}.`
           );
         }
 
@@ -791,11 +851,9 @@ export function registerPosRoutes(app: Express) {
       let totalSupplierCost = 0;
       // Per-qty deduction that silently reduces Supplier Cash Payable (not income/expense)
       const spPosDeductionPerQty = isSpCompany
-        ? (parseFloat(String((location as any).supplierPartnerPayableDeductionPerQty ?? "0")) || 0)
+        ? parseFloat(String((location as any).supplierPartnerPayableDeductionPerQty ?? "0")) || 0
         : 0;
-      const spPosTotalQtySold = isSpCompany
-        ? inventoryValidation.reduce((sum, v) => sum + v.saleQty, 0)
-        : 0;
+      const spPosTotalQtySold = isSpCompany ? inventoryValidation.reduce((sum, v) => sum + v.saleQty, 0) : 0;
       if (isSpCompany) {
         const spSettings = await storage.getCompanySettings(req.session.currentCompanyId!);
         spPosPayableAccountId = spSettings?.spPosPayableAccountId ?? null;
@@ -813,8 +871,8 @@ export function registerPosRoutes(app: Express) {
             and(
               eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
               eq(ledgerAccounts.subType, "sp_cost_clearing"),
-              isNull(ledgerAccounts.deletedAt),
-            ),
+              isNull(ledgerAccounts.deletedAt)
+            )
           )
           .limit(1);
         spPosCostClrAccountId = clrAcct?.id ?? null;
@@ -826,16 +884,13 @@ export function registerPosRoutes(app: Express) {
             and(
               eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
               eq(ledgerAccounts.subType, "sp_pay_deduction_clearing"),
-              isNull(ledgerAccounts.deletedAt),
-            ),
+              isNull(ledgerAccounts.deletedAt)
+            )
           )
           .limit(1);
         spPosDeductionClrAccountId = ddcAcct?.id ?? null;
         // Pre-compute total supplier cost from inventory averageRate (includes landed/offloading cost)
-        totalSupplierCost = inventoryValidation.reduce(
-          (sum, v) => sum + v.saleQty * v.currentRate,
-          0,
-        );
+        totalSupplierCost = inventoryValidation.reduce((sum, v) => sum + v.saleQty * v.currentRate, 0);
       }
 
       // STEP 1b: Create accounting records, update inventory, and create sales items
@@ -853,7 +908,11 @@ export function registerPosRoutes(app: Express) {
             voucherNumber,
             voucherType: "Sales",
             voucherDate,
-            description: notes || (isCreditSale ? `Credit Invoice Sale at ${location.name} - ${(customerAccount as any).name}` : `POS Sale at ${location.name}`),
+            description:
+              notes ||
+              (isCreditSale
+                ? `Credit Invoice Sale at ${location.name} - ${(customerAccount as any).name}`
+                : `POS Sale at ${location.name}`),
             totalAmount: grandTotal.toFixed(2),
             shiftId: effectiveShiftId,
             clientSaleId: clientSaleId || null,
@@ -874,11 +933,7 @@ export function registerPosRoutes(app: Express) {
           narration: creditSaleNarration,
         };
 
-        if (
-          isCreditSale ||
-          accountType === "cash" ||
-          accountType === "credit"
-        ) {
+        if (isCreditSale || accountType === "cash" || accountType === "credit") {
           debitEntry.ledgerAccountId = accountId;
           // For credit sales, also stamp the customerId on the receivable
           // entry whenever the receivable ledger is linked to a customer.
@@ -890,10 +945,7 @@ export function registerPosRoutes(app: Express) {
                 .select({ id: customers.id })
                 .from(customers)
                 .where(
-                  and(
-                    eq(customers.ledgerAccountId, accountId),
-                    eq(customers.companyId, req.session.currentCompanyId!),
-                  ),
+                  and(eq(customers.ledgerAccountId, accountId), eq(customers.companyId, req.session.currentCompanyId!))
                 )
                 .limit(1);
               if (linkedCust) {
@@ -936,7 +988,7 @@ export function registerPosRoutes(app: Express) {
           if (spDeductionAmount > Math.abs(grandTotalRounded)) {
             throw new Error(
               `Supplier payable deduction (${spDeductionAmount}) exceeds the sale total (${grandTotalRounded}). ` +
-              `Adjust the deduction per qty setting on this location.`
+                `Adjust the deduction per qty setting on this location.`
             );
           }
           const spPayableAmount = Number((grandTotalRounded - spDeductionAmount).toFixed(2));
@@ -988,8 +1040,7 @@ export function registerPosRoutes(app: Express) {
         const txSaleItems: any[] = [];
 
         for (const validatedItem of inventoryValidation) {
-          const { item, newQty, currentRate, inventoryRecord, currentQty, saleQty } =
-            validatedItem;
+          const { item, newQty, currentRate, inventoryRecord, currentQty, saleQty } = validatedItem;
 
           // Fix 3: Authoritative stock check inside the transaction with row lock.
           // Catches race conditions where two cashiers sell the last unit concurrently.
@@ -1012,10 +1063,7 @@ export function registerPosRoutes(app: Express) {
 
           await adjustInventory(tx, locationId, item.stockItemId, -saleQty, req.session.currentCompanyId!);
 
-          const [stockItem] = await tx
-            .select()
-            .from(stockItems)
-            .where(eq(stockItems.id, item.stockItemId));
+          const [stockItem] = await tx.select().from(stockItems).where(eq(stockItems.id, item.stockItemId));
 
           const qty = parseFloat(item.quantity);
           const sellingPrice = parseFloat(item.rate) || 0;
@@ -1091,17 +1139,16 @@ export function registerPosRoutes(app: Express) {
             customer: { new: customerAccount ? (customerAccount as any).name : null },
           },
         });
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
 
       // ── Intercompany POS auto-transfer (non-blocking, cash sales only) ──
       if (!isCreditSale && accountType === "cash") {
         // fire-and-forget; never let errors surface to the client
-        runIntercompanyPosTransfer(
-          req.session.currentCompanyId!,
-          accountId,
-          grandTotal,
-          voucherDate,
-        ).catch((err) => console.error("[IntercompanyPOS] Unhandled:", err));
+        runIntercompanyPosTransfer(req.session.currentCompanyId!, accountId, grandTotal, voucherDate).catch((err) =>
+          console.error("[IntercompanyPOS] Unhandled:", err)
+        );
       }
 
       // Return complete sale details
@@ -1175,8 +1222,8 @@ export function registerPosRoutes(app: Express) {
             and(
               eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
               eq(ledgerAccounts.subType, "sp_cost_clearing"),
-              isNull(ledgerAccounts.deletedAt),
-            ),
+              isNull(ledgerAccounts.deletedAt)
+            )
           )
           .limit(1);
         editSpCostClrAccountId = clrAcct?.id ?? null;
@@ -1188,14 +1235,22 @@ export function registerPosRoutes(app: Express) {
             and(
               eq(ledgerAccounts.companyId, req.session.currentCompanyId!),
               eq(ledgerAccounts.subType, "sp_pay_deduction_clearing"),
-              isNull(ledgerAccounts.deletedAt),
-            ),
+              isNull(ledgerAccounts.deletedAt)
+            )
           )
           .limit(1);
         editSpDeductionClrAccountId = ddcAcct?.id ?? null;
       }
 
-      const { description, items, paymentAccountType, paymentAccountId, isCreditSale, voucherDate, locationId: newLocationId } = req.body;
+      const {
+        description,
+        items,
+        paymentAccountType,
+        paymentAccountId,
+        isCreditSale,
+        voucherDate,
+        locationId: newLocationId,
+      } = req.body;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ message: "At least one item is required" });
@@ -1205,7 +1260,7 @@ export function registerPosRoutes(app: Express) {
       for (const item of items) {
         const qty = parseFloat(item.quantity);
         const price = parseFloat(item.sellingPrice);
-        
+
         if (isNaN(qty) || qty <= 0) {
           throw new Error(`Invalid quantity: ${item.quantity}. Must be greater than 0.`);
         }
@@ -1218,12 +1273,7 @@ export function registerPosRoutes(app: Express) {
       const [existingVoucher] = await db
         .select()
         .from(vouchers)
-        .where(
-          and(
-            eq(vouchers.id, voucherId),
-            eq(vouchers.companyId, req.session.currentCompanyId)
-          )
-        )
+        .where(and(eq(vouchers.id, voucherId), eq(vouchers.companyId, req.session.currentCompanyId)))
         .limit(1);
 
       if (!existingVoucher) {
@@ -1278,7 +1328,7 @@ export function registerPosRoutes(app: Express) {
             )
           )
           .limit(1);
-        
+
         if (!newLocation) {
           return res.status(400).json({ message: "Invalid location or location not found" });
         }
@@ -1286,21 +1336,13 @@ export function registerPosRoutes(app: Express) {
       }
 
       // Get old sales items to reverse inventory and preserve historical cost
-      const oldSalesItems = await db
-        .select()
-        .from(salesItems)
-        .where(eq(salesItems.voucherId, voucherId));
+      const oldSalesItems = await db.select().from(salesItems).where(eq(salesItems.voucherId, voucherId));
 
       // Create map of old items by line ID for cost preservation (not stockItemId to handle duplicates)
-      const oldItemsMap = new Map(
-        oldSalesItems.map(item => [item.id, item])
-      );
+      const oldItemsMap = new Map(oldSalesItems.map((item) => [item.id, item]));
 
       // Get existing voucher entries to recreate them
-      const oldEntries = await db
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, voucherId));
+      const oldEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
 
       // Begin transaction
       await db.transaction(async (tx) => {
@@ -1308,10 +1350,16 @@ export function registerPosRoutes(app: Express) {
         for (const oldItem of oldSalesItems) {
           const oldQty = parseFloat(oldItem.quantity);
           const oldCost = parseFloat(oldItem.costPrice || "0");
-          
+
           // Add back the old quantity to inventory (reversal of sale).
           // Do NOT pass a rate — cost price must never change due to POS activity.
-          await adjustInventory(tx, existingVoucher.locationId!, oldItem.stockItemId, oldQty, existingVoucher.companyId);
+          await adjustInventory(
+            tx,
+            existingVoucher.locationId!,
+            oldItem.stockItemId,
+            oldQty,
+            existingVoucher.companyId
+          );
         }
 
         // Delete old sales items and voucher entries
@@ -1332,12 +1380,7 @@ export function registerPosRoutes(app: Express) {
           let [inventoryRecord] = await tx
             .select()
             .from(inventory)
-            .where(
-              and(
-                eq(inventory.locationId, targetLocationId),
-                eq(inventory.stockItemId, stockItemId)
-              )
-            )
+            .where(and(eq(inventory.locationId, targetLocationId), eq(inventory.stockItemId, stockItemId)))
             .limit(1);
 
           const currentQty = inventoryRecord ? parseFloat(inventoryRecord.quantity) : 0;
@@ -1345,20 +1388,22 @@ export function registerPosRoutes(app: Express) {
 
           // Only check stock if user cannot sell negative stock
           if (currentQty < sellQty && !canSellNegativeStock) {
-            throw new Error(`Insufficient stock for item ${stockItemId}. Available: ${currentQty}, Requested: ${sellQty}`);
+            throw new Error(
+              `Insufficient stock for item ${stockItemId}. Available: ${currentQty}, Requested: ${sellQty}`
+            );
           }
 
           // Preserve historical cost from old sale line if it exists (by line ID), otherwise use current cost
           // Items with id field are existing items, items without id are new items
           const oldItem = id !== undefined && id > 0 ? oldItemsMap.get(id) : null;
-          const costPrice = oldItem 
+          const costPrice = oldItem
             ? parseFloat(oldItem.costPrice || "0")
             : parseFloat(inventoryRecord?.averageRate || "0");
-          
+
           // Use the entered selling price directly - don't override with configured price during edits
           // This preserves the original sale price and prevents unintended cash balance changes
           const effectiveSellingPrice = parseFloat(sellingPrice);
-          
+
           const totalSales = sellQty * effectiveSellingPrice;
           const totalCost = sellQty * costPrice;
           const profit = totalSales - totalCost;
@@ -1404,20 +1449,19 @@ export function registerPosRoutes(app: Express) {
         };
         if (locationChanged) {
           voucherUpdate.locationId = targetLocationId;
-          console.log(`[POS Sales Edit] Updated voucher ${voucherId} location from ${oldLocationId} to ${targetLocationId}`);
+          console.log(
+            `[POS Sales Edit] Updated voucher ${voucherId} location from ${oldLocationId} to ${targetLocationId}`
+          );
         }
         if (voucherDate) {
           voucherUpdate.voucherDate = new Date(voucherDate);
         }
-        await tx
-          .update(vouchers)
-          .set(voucherUpdate)
-          .where(eq(vouchers.id, voucherId));
+        await tx.update(vouchers).set(voucherUpdate).where(eq(vouchers.id, voucherId));
 
         // Recreate voucher entries with new total
         // Get original entries for reference
-        const paymentEntry = oldEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
-        const revenueEntry = oldEntries.find(e => parseFloat(e.creditAmount || "0") > 0);
+        const paymentEntry = oldEntries.find((e) => parseFloat(e.debitAmount || "0") > 0);
+        const revenueEntry = oldEntries.find((e) => parseFloat(e.creditAmount || "0") > 0);
 
         if (!paymentEntry || !revenueEntry) {
           throw new Error("Original voucher entries not found");
@@ -1478,7 +1522,7 @@ export function registerPosRoutes(app: Express) {
           if (editDeductionAmount > Math.abs(grandTotalRounded)) {
             throw new Error(
               `Supplier payable deduction (${editDeductionAmount}) exceeds the sale total (${grandTotalRounded}). ` +
-              `Adjust the deduction per qty setting on this location.`
+                `Adjust the deduction per qty setting on this location.`
             );
           }
           const editSpPayableAmount = Number((grandTotalRounded - editDeductionAmount).toFixed(2));
@@ -1526,11 +1570,7 @@ export function registerPosRoutes(app: Express) {
       });
 
       // Fetch updated data to return for print template
-      const [updatedVoucher] = await db
-        .select()
-        .from(vouchers)
-        .where(eq(vouchers.id, voucherId))
-        .limit(1);
+      const [updatedVoucher] = await db.select().from(vouchers).where(eq(vouchers.id, voucherId)).limit(1);
 
       const updatedSalesItems = await db
         .select({
@@ -1555,11 +1595,8 @@ export function registerPosRoutes(app: Express) {
 
       let customerAccount = null;
       if (isCreditSale) {
-        const updatedEntries = await db
-          .select()
-          .from(voucherEntries)
-          .where(eq(voucherEntries.voucherId, voucherId));
-        const debitEntry = updatedEntries.find(e => parseFloat(e.debitAmount || "0") > 0);
+        const updatedEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucherId));
+        const debitEntry = updatedEntries.find((e) => parseFloat(e.debitAmount || "0") > 0);
         if (debitEntry?.ledgerAccountId) {
           customerAccount = await storage.getLedgerAccountById(debitEntry.ledgerAccountId);
         }
@@ -1572,8 +1609,9 @@ export function registerPosRoutes(app: Express) {
       const datesToRecalc = new Set<string>([oldDate]);
       if (newDate !== oldDate) datesToRecalc.add(newDate);
       for (const d of datesToRecalc) {
-        recalculateIntercompanyForDate(req.session.currentCompanyId!, d)
-          .catch((err) => console.error("[IntercompanyPOS Recalc] Unhandled:", err));
+        recalculateIntercompanyForDate(req.session.currentCompanyId!, d).catch((err) =>
+          console.error("[IntercompanyPOS Recalc] Unhandled:", err)
+        );
       }
 
       try {
@@ -1595,7 +1633,9 @@ export function registerPosRoutes(app: Express) {
           recordIdentifier: updatedVoucher.voucherNumber,
           changes: _posChanges,
         });
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
       res.json({
         voucher: updatedVoucher,
         location: updatedLocation,
@@ -1625,7 +1665,7 @@ export function registerPosRoutes(app: Express) {
     try {
       const locationId = parseInt(req.query.locationId as string);
       const userId = req.user?.id;
-      
+
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1651,7 +1691,7 @@ export function registerPosRoutes(app: Express) {
     try {
       const locationId = parseInt(req.query.locationId as string);
       const limit = parseInt(req.query.limit as string) || 50;
-      
+
       if (!locationId || isNaN(locationId)) {
         return res.status(400).json({ message: "Location ID is required" });
       }
@@ -1666,7 +1706,7 @@ export function registerPosRoutes(app: Express) {
       // POS users can only see their own shifts
       if (req.user?.role === "POS") {
         const posUserId = req.user.id;
-        shifts = shifts.filter(s => s.userId === posUserId);
+        shifts = shifts.filter((s) => s.userId === posUserId);
       }
       res.json(shifts);
     } catch (error: any) {
@@ -1679,7 +1719,7 @@ export function registerPosRoutes(app: Express) {
     try {
       const shiftId = parseInt(req.params.id);
       const shift = await storage.getShiftById(shiftId);
-      
+
       if (!shift) {
         return res.status(404).json({ message: "Shift not found" });
       }
@@ -1705,7 +1745,7 @@ export function registerPosRoutes(app: Express) {
     try {
       const userId = req.user?.id;
       const username = req.user?.username;
-      
+
       if (!userId || !username) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1728,9 +1768,9 @@ export function registerPosRoutes(app: Express) {
       // Check if user already has an open shift at this location
       const existingShift = await storage.getCurrentShift(userId, locationId);
       if (existingShift) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "You already have an open shift at this location. Please close it first.",
-          existingShiftId: existingShift.id
+          existingShiftId: existingShift.id,
         });
       }
 
@@ -1756,7 +1796,7 @@ export function registerPosRoutes(app: Express) {
     try {
       const shiftId = parseInt(req.params.id);
       const userId = req.user?.id;
-      
+
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1779,7 +1819,7 @@ export function registerPosRoutes(app: Express) {
       }
 
       const { closingCash, notes } = req.body;
-      
+
       if (closingCash === undefined || closingCash === null) {
         return res.status(400).json({ message: "Closing cash amount is required" });
       }
@@ -1833,7 +1873,7 @@ export function registerPosRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
       const draft = await storage.getDraftPosSaleById(id);
-      
+
       if (!draft) {
         return res.status(404).json({ message: "Draft not found" });
       }
@@ -1887,7 +1927,7 @@ export function registerPosRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
       const userId = req.user?.id;
-      
+
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1922,7 +1962,7 @@ export function registerPosRoutes(app: Express) {
     try {
       const id = parseInt(req.params.id);
       const userId = req.user?.id;
-      
+
       if (!userId) {
         return res.status(401).json({ message: "User not authenticated" });
       }
@@ -1957,10 +1997,12 @@ export function registerPosRoutes(app: Express) {
         const [roleRow] = await db
           .select({ canAccessCustomers: userCompanyRoles.canAccessCustomers })
           .from(userCompanyRoles)
-          .where(and(
-            eq(userCompanyRoles.userId, String(req.session.userId)),
-            eq(userCompanyRoles.companyId, req.session.currentCompanyId),
-          ));
+          .where(
+            and(
+              eq(userCompanyRoles.userId, String(req.session.userId)),
+              eq(userCompanyRoles.companyId, req.session.currentCompanyId)
+            )
+          );
         if (roleRow?.canAccessCustomers) {
           hasAccess = true;
           req.session.canAccessCustomers = true;
@@ -1980,17 +2022,20 @@ export function registerPosRoutes(app: Express) {
             const openingBalance = parseFloat(customer.openingBalance || "0");
             const openingSide = customer.openingBalanceSide || "Dr";
 
-            const balance = entries.reduce((sum, entry) => {
-              const debit = parseFloat(entry.debitAmount || "0");
-              const credit = parseFloat(entry.creditAmount || "0");
+            const balance = entries.reduce(
+              (sum, entry) => {
+                const debit = parseFloat(entry.debitAmount || "0");
+                const credit = parseFloat(entry.creditAmount || "0");
 
-              if (debit > 0 && credit === 0) {
-                return sum + debit;
-              } else if (credit > 0 && debit === 0) {
-                return sum - credit;
-              }
-              return sum;
-            }, openingSide === "Dr" ? openingBalance : -openingBalance);
+                if (debit > 0 && credit === 0) {
+                  return sum + debit;
+                } else if (credit > 0 && debit === 0) {
+                  return sum - credit;
+                }
+                return sum;
+              },
+              openingSide === "Dr" ? openingBalance : -openingBalance
+            );
 
             return {
               ...customer,
@@ -2002,9 +2047,9 @@ export function registerPosRoutes(app: Express) {
           const customerBalance = await storage.getCustomerBalance(customer.id, req.session.currentCompanyId!);
           const openingBalance = parseFloat(customer.openingBalance || "0");
           const openingSide = customer.openingBalanceSide || "Dr";
-          
+
           const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + customerBalance;
-          
+
           return {
             ...customer,
             balance: Math.abs(totalBalance),
@@ -2142,11 +2187,7 @@ export function registerPosRoutes(app: Express) {
         .select()
         .from(posShifts)
         .where(
-          and(
-            eq(posShifts.locationId, locationId),
-            eq(posShifts.companyId, companyId),
-            gte(posShifts.openedAt, today),
-          )
+          and(eq(posShifts.locationId, locationId), eq(posShifts.companyId, companyId), gte(posShifts.openedAt, today))
         )
         .orderBy(desc(posShifts.openedAt))
         .limit(1);
@@ -2170,9 +2211,7 @@ export function registerPosRoutes(app: Express) {
         stockLines.push(`  • ${row.name}: ${qty.toLocaleString()}${unitLabel}${flag}`);
       }
 
-      const stockSection = stockLines.length
-        ? stockLines.join("\n")
-        : "  No stock data available";
+      const stockSection = stockLines.length ? stockLines.join("\n") : "  No stock data available";
 
       const salesLine = shift
         ? `*Sales Today:* ${shift.salesCount ?? 0} transactions | ${parseFloat(shift.salesTotal ?? "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -2246,15 +2285,10 @@ export function registerPosRoutes(app: Express) {
       const now = new Date();
       const safeLocationName = location.name.replace(/\s+/g, "_").replace(/[^a-zA-Z0-9_-]/g, "");
       const fileName = `Stock_${safeLocationName}_${format(now, "yyyyMMdd_HHmm")}.pdf`;
-      const caption  = "";
+      const caption = "";
 
       console.log(`[WA stock upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`);
-      const result = await sendWhatsAppFileByUploadPos(
-        location.whatsappGroupChatId,
-        pdfBuffer,
-        fileName,
-        caption,
-      );
+      const result = await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, caption);
 
       if (!result.success) {
         console.error("[/api/pos/send-stock-pdf]", {
@@ -2295,13 +2329,13 @@ export function registerPosRoutes(app: Express) {
         transactions = await storage.getVoucherEntriesByLedger(
           customer.ledgerAccountId,
           startDate as string | undefined,
-          endDate as string | undefined,
+          endDate as string | undefined
         );
       } else {
         transactions = await storage.getVoucherEntriesByCustomer(
           customerId,
           startDate as string | undefined,
-          endDate as string | undefined,
+          endDate as string | undefined
         );
       }
 
@@ -2360,8 +2394,8 @@ export function registerPosRoutes(app: Express) {
       const waVis = await getErpExportVisibility(req);
       const hideProfitCols = waVis.hideSelling || waVis.hideCost || waVis.hideSalesProfitCost;
       const pdfBuffer = await generateInvoicePdf(parseInt(voucherId), companyId, senderName, { hideProfitCols });
-      const safeDate  = (voucher.voucherDate ?? getClientDate(req)).replace(/[^0-9-]/g, "");
-      const safeLoc   = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
+      const safeDate = (voucher.voucherDate ?? getClientDate(req)).replace(/[^0-9-]/g, "");
+      const safeLoc = (location.name ?? "").replace(/[^\w\s.()\-]/g, "_").trim();
 
       // For credit sales, resolve customer name for the filename
       let customerNameForFile2: string | null = null;
@@ -2370,10 +2404,7 @@ export function registerPosRoutes(app: Express) {
           .select({ name: ledgerAccounts.name })
           .from(voucherEntries)
           .innerJoin(ledgerAccounts, eq(ledgerAccounts.id, voucherEntries.ledgerAccountId))
-          .where(and(
-            eq(voucherEntries.voucherId, voucher.id),
-            sql`${voucherEntries.debitAmount}::numeric > 0`,
-          ))
+          .where(and(eq(voucherEntries.voucherId, voucher.id), sql`${voucherEntries.debitAmount}::numeric > 0`))
           .limit(1);
         customerNameForFile2 = custEntry2?.name || null;
       }
@@ -2381,16 +2412,17 @@ export function registerPosRoutes(app: Express) {
       const rawFileName2 = customerNameForFile2
         ? `${customerNameForFile2} Invoice ${safeLoc} ${safeDate}`
         : `${safeLoc} Invoice ${safeDate}`;
-      const fileName  = rawFileName2.replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, " ").trim() + ".pdf";
-      const caption   = "";
+      const fileName =
+        rawFileName2
+          .replace(/[^\w\s.()\-]/g, "_")
+          .replace(/\s+/g, " ")
+          .trim() + ".pdf";
+      const caption = "";
 
-      console.log(`[WA invoice upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`);
-      const result = await sendWhatsAppFileByUploadPos(
-        location.whatsappGroupChatId,
-        pdfBuffer,
-        fileName,
-        caption,
+      console.log(
+        `[WA invoice upload] chatId=${location.whatsappGroupChatId} file=${fileName} size=${pdfBuffer.length}`
       );
+      const result = await sendWhatsAppFileByUploadPos(location.whatsappGroupChatId, pdfBuffer, fileName, caption);
       if (!result.success) {
         return res.status(502).json({ message: result.error ?? "Failed to send WhatsApp PDF" });
       }

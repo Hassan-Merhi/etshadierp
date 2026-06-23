@@ -2,7 +2,16 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -46,7 +55,13 @@ export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCredi
   });
 
   return (
-    <AlertDialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setResult(null); }}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) setResult(null);
+      }}
+    >
       <AlertDialogContent className="max-w-2xl">
         <AlertDialogHeader>
           <AlertDialogTitle>Inter-Company Credit Management</AlertDialogTitle>
@@ -54,7 +69,9 @@ export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCredi
             <div className="space-y-4 text-foreground">
               {!result ? (
                 <>
-                  <p className="text-sm text-muted-foreground">Manage credit management between subsidiaries and parent.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Manage credit management between subsidiaries and parent.
+                  </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Subsidiary (Source)</Label>
@@ -63,7 +80,11 @@ export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCredi
                           <SelectValue placeholder="Subsidiary..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {companies.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                          {companies.map((c) => (
+                            <SelectItem key={c.id} value={c.id.toString()}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -74,7 +95,11 @@ export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCredi
                           <SelectValue placeholder="Parent..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {companies.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                          {companies.map((c) => (
+                            <SelectItem key={c.id} value={c.id.toString()}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -92,13 +117,20 @@ export function FixPOCreditsDialog({ open, onOpenChange, companies }: FixPOCredi
             <>
               <Button
                 variant="destructive"
-                onClick={() => reverseMutation.mutate({ companyId: parseInt(selectedSub), parentCompanyId: parseInt(selectedParent) })}
+                onClick={() =>
+                  reverseMutation.mutate({
+                    companyId: parseInt(selectedSub),
+                    parentCompanyId: parseInt(selectedParent),
+                  })
+                }
                 disabled={!selectedSub || !selectedParent || reverseMutation.isPending}
               >
                 Reverse Credits
               </Button>
               <AlertDialogAction
-                onClick={() => fixMutation.mutate({ companyId: parseInt(selectedSub), parentCompanyId: parseInt(selectedParent) })}
+                onClick={() =>
+                  fixMutation.mutate({ companyId: parseInt(selectedSub), parentCompanyId: parseInt(selectedParent) })
+                }
                 disabled={!selectedSub || !selectedParent || fixMutation.isPending}
               >
                 Fix Credits
@@ -136,7 +168,13 @@ export function ResetCompanyDataDialog({ open, onOpenChange, companies }: ResetC
   });
 
   return (
-    <AlertDialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setResult(null); }}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) setResult(null);
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Reset Company Data</AlertDialogTitle>
@@ -144,11 +182,19 @@ export function ResetCompanyDataDialog({ open, onOpenChange, companies }: ResetC
             <div className="space-y-4 text-foreground">
               {!result ? (
                 <>
-                  <p className="text-sm text-muted-foreground">Clear all vouchers and entries for a company. This is IRREVERSIBLE.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Clear all vouchers and entries for a company. This is IRREVERSIBLE.
+                  </p>
                   <Select value={selected} onValueChange={setSelected}>
-                    <SelectTrigger><SelectValue placeholder="Select company..." /></SelectTrigger>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select company..." />
+                    </SelectTrigger>
                     <SelectContent>
-                      {companies.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                      {companies.map((c) => (
+                        <SelectItem key={c.id} value={c.id.toString()}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </>

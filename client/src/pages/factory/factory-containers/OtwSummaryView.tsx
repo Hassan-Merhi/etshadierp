@@ -1,8 +1,6 @@
 import { Ship, Building2, Package, Boxes, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { OtwNotes, OtwCurrencyInline } from "./ContainerBadges";
 import { otwContainerByCurrency, otwNum, otwFmtCcy, otwCcySymbol, OTW_STATUS_LABEL } from "./otwHelpers";
@@ -67,9 +65,7 @@ export function OtwSummaryView({
                       data-testid={`row-otw-supplier-${key}`}
                     >
                       <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="font-semibold text-sm flex-1 min-w-0 truncate">
-                        {group.supplierName}
-                      </span>
+                      <span className="font-semibold text-sm flex-1 min-w-0 truncate">{group.supplierName}</span>
                       <Badge variant="secondary" className="shrink-0 text-xs">
                         {group.containers.length} ctr{group.containers.length !== 1 ? "s" : ""}
                       </Badge>
@@ -89,11 +85,21 @@ export function OtwSummaryView({
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/40 border-b border-border/60 hover:bg-muted/40">
-                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2 pl-4">Container</TableHead>
-                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Origin</TableHead>
-                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">KG</TableHead>
-                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Value</TableHead>
-                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Status</TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2 pl-4">
+                              Container
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                              Origin
+                            </TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                              KG
+                            </TableHead>
+                            <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                              Value
+                            </TableHead>
+                            <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                              Status
+                            </TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -121,8 +127,12 @@ export function OtwSummaryView({
                         </TableBody>
                         <tfoot>
                           <TableRow className="bg-muted/30 font-medium">
-                            <TableCell colSpan={2} className="text-muted-foreground">Supplier total</TableCell>
-                            <TableCell className="text-right font-mono font-semibold">{fmtOtwKg(group.totalKg)} kg</TableCell>
+                            <TableCell colSpan={2} className="text-muted-foreground">
+                              Supplier total
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold">
+                              {fmtOtwKg(group.totalKg)} kg
+                            </TableCell>
                             <TableCell className="text-right">
                               <OtwCurrencyInline amounts={group.totalsByCurrency} />
                             </TableCell>

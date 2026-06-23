@@ -11,27 +11,27 @@
 import { pool } from "../db";
 
 // ── Brand colours (matches generateStockPdf) ──────────────────────────────────
-const CLR_BRAND   = "#0f172a";   // dark navy  — header bar, col header, paid box
-const CLR_ACCENT  = "#059669";   // emerald    — total row, paid amount
-const CLR_WHITE   = "#ffffff";
-const CLR_MUTED   = "#94a3b8";   // slate-400  — subtitle / meta text
-const CLR_BODY    = "#1e293b";   // slate-800  — item text
-const CLR_ROW_ALT = "#f8fafc";   // slate-50   — alternating stripe
-const CLR_SEP     = "#b0bec8";   // slate-300+ — row divider (visible)
-const CLR_GREEN   = "#059669";
-const CLR_RED     = "#c2272d";
+const CLR_BRAND = "#0f172a"; // dark navy  — header bar, col header, paid box
+const CLR_ACCENT = "#059669"; // emerald    — total row, paid amount
+const CLR_WHITE = "#ffffff";
+const CLR_MUTED = "#94a3b8"; // slate-400  — subtitle / meta text
+const CLR_BODY = "#1e293b"; // slate-800  — item text
+const CLR_ROW_ALT = "#f8fafc"; // slate-50   — alternating stripe
+const CLR_SEP = "#b0bec8"; // slate-300+ — row divider (visible)
+const CLR_GREEN = "#059669";
+const CLR_RED = "#c2272d";
 
 // ── Page geometry ─────────────────────────────────────────────────────────────
-const PAGE_W   = 595;
-const PAGE_H   = 842;
+const PAGE_W = 595;
+const PAGE_H = 842;
 const MARGIN_X = 36;
 const MARGIN_Y = 36;
-const USABLE_W = PAGE_W - MARGIN_X * 2;   // 523 pt
+const USABLE_W = PAGE_W - MARGIN_X * 2; // 523 pt
 
-const HEADER_BAR_H = 52;   // coloured top bar covering top margin area
+const HEADER_BAR_H = 52; // coloured top bar covering top margin area
 
 // ── Text line height at fontSize 7.5 ─────────────────────────────────────────
-const LINE_H_PT      = 9;
+const LINE_H_PT = 9;
 const MAX_DESC_LINES = 2;
 
 // ── Date formatting ───────────────────────────────────────────────────────────
@@ -40,7 +40,11 @@ function formatDbDate(d: unknown): string {
   if (d instanceof Date) return d.toISOString().slice(0, 10);
   const s = String(d);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  try { return new Date(s).toISOString().slice(0, 10); } catch { return s; }
+  try {
+    return new Date(s).toISOString().slice(0, 10);
+  } catch {
+    return s;
+  }
 }
 
 // ── Manual text wrapper (prevents PDFKit mid-row page breaks) ─────────────────
@@ -75,13 +79,17 @@ function wrapText(doc: any, text: string, maxWidth: number, maxLines: number): s
 // ── Number formatting ─────────────────────────────────────────────────────────
 function fmtNum(n: number, prefix = ""): string {
   const fixed = Math.abs(n).toFixed(2).replace(/\.00$/, "");
-  const parts  = fixed.split(".");
+  const parts = fixed.split(".");
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const num = parts.join(".");
   return prefix ? prefix + "\u00A0" + num : num;
 }
-function fmtQty(n: number):  string { return fmtNum(Math.floor(Math.abs(n))); }
-function fmtUSD(n: number):  string { return fmtNum(n, "$"); }
+function fmtQty(n: number): string {
+  return fmtNum(Math.floor(Math.abs(n)));
+}
+function fmtUSD(n: number): string {
+  return fmtNum(n, "$");
+}
 function plColor(n: number): string {
   if (n > 0) return CLR_GREEN;
   if (n < 0) return CLR_RED;
@@ -90,20 +98,20 @@ function plColor(n: number): string {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface InvoiceItem {
-  stockItemName:   string;
-  quantity:        number;
-  rateUSD:         number;
+  stockItemName: string;
+  quantity: number;
+  rateUSD: number;
   configuredPrice: number;
 }
 interface InvoiceData {
-  voucherDate:    string;
-  description:    string | null;
-  exchangeRate:   number | null;
-  isCreditSale:   boolean;
-  companyName:    string;
-  userName:       string;
-  customerName:   string | null;
-  items:          InvoiceItem[];
+  voucherDate: string;
+  description: string | null;
+  exchangeRate: number | null;
+  isCreditSale: boolean;
+  companyName: string;
+  userName: string;
+  customerName: string | null;
+  items: InvoiceItem[];
   hideProfitCols: boolean;
 }
 
@@ -112,12 +120,14 @@ export async function generateInvoicePdf(
   voucherId: number,
   companyId: number,
   callerUserName?: string,
-  opts?: { hideProfitCols?: boolean },
+  opts?: { hideProfitCols?: boolean }
 ): Promise<Buffer> {
-
   const vRes = await pool.query<{
-    voucher_date: string; description: string | null; exchange_rate: string | null;
-    is_credit_sale: boolean; shift_id: number | null;
+    voucher_date: string;
+    description: string | null;
+    exchange_rate: string | null;
+    is_credit_sale: boolean;
+    shift_id: number | null;
     company_name: string;
   }>(
     `SELECT v.voucher_date, v.description, v.exchange_rate, v.is_credit_sale, v.shift_id,
@@ -125,24 +135,27 @@ export async function generateInvoicePdf(
      FROM vouchers v
      JOIN companies c ON c.id = v.company_id
      WHERE v.id = $1 AND v.company_id = $2 LIMIT 1`,
-    [voucherId, companyId],
+    [voucherId, companyId]
   );
   if (!vRes.rows.length) throw new Error("Voucher not found");
   const v = vRes.rows[0];
 
   const itemsRes = await pool.query<{
-    stock_item_name: string; quantity: string; selling_price: string; configured_price: string | null;
+    stock_item_name: string;
+    quantity: string;
+    selling_price: string;
+    configured_price: string | null;
   }>(
     `SELECT s.name AS stock_item_name, si.quantity, si.selling_price, si.configured_price
      FROM sales_items si
      JOIN stock_items s ON s.id = si.stock_item_id
      WHERE si.voucher_id = $1 ORDER BY si.id`,
-    [voucherId],
+    [voucherId]
   );
-  const items: InvoiceItem[] = itemsRes.rows.map(r => ({
-    stockItemName:   r.stock_item_name,
-    quantity:        parseFloat(r.quantity        || "0"),
-    rateUSD:         parseFloat(r.selling_price   || "0"),
+  const items: InvoiceItem[] = itemsRes.rows.map((r) => ({
+    stockItemName: r.stock_item_name,
+    quantity: parseFloat(r.quantity || "0"),
+    rateUSD: parseFloat(r.selling_price || "0"),
     configuredPrice: parseFloat(r.configured_price || "0"),
   }));
 
@@ -153,7 +166,7 @@ export async function generateInvoicePdf(
        FROM voucher_entries ve
        JOIN ledger_accounts la ON la.id = ve.ledger_account_id
        WHERE ve.voucher_id = $1 AND ve.debit_amount::numeric > 0 LIMIT 1`,
-      [voucherId],
+      [voucherId]
     );
     customerName = cRes.rows[0]?.customer_name || null;
   }
@@ -164,17 +177,17 @@ export async function generateInvoicePdf(
       `SELECT u.username FROM pos_shifts ps
        JOIN users u ON u.id = ps.user_id
        WHERE ps.id = $1 LIMIT 1`,
-      [v.shift_id],
+      [v.shift_id]
     );
     userName = uRes.rows[0]?.username || "—";
   }
 
   return buildPdf({
-    voucherDate:    formatDbDate(v.voucher_date),
-    description:    v.description,
-    exchangeRate:   v.exchange_rate ? parseFloat(v.exchange_rate) : null,
-    isCreditSale:   v.is_credit_sale,
-    companyName:    v.company_name,
+    voucherDate: formatDbDate(v.voucher_date),
+    description: v.description,
+    exchangeRate: v.exchange_rate ? parseFloat(v.exchange_rate) : null,
+    isCreditSale: v.is_credit_sale,
+    companyName: v.company_name,
     userName,
     customerName,
     items,
@@ -190,14 +203,14 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
   const pdfReady = new Promise<Buffer>((resolve, reject) => {
-    doc.on("end",   () => resolve(Buffer.concat(chunks)));
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
   });
 
   const isMali = d.companyName.toLowerCase().includes("mali");
 
   // Auto-hide profit columns when no item has a configured price set
-  const hasConfiguredPrice = d.items.some(item => item.configuredPrice > 0);
+  const hasConfiguredPrice = d.items.some((item) => item.configuredPrice > 0);
   const hideProfitCols = d.hideProfitCols || !hasConfiguredPrice;
 
   // ── Column geometry ──────────────────────────────────────────────────────────
@@ -209,31 +222,35 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
 
   if (hideProfitCols) {
     COL_DESC_W = Math.round(USABLE_W * 0.42);
-    COL_QTY_W  = Math.round(USABLE_W * 0.08);
+    COL_QTY_W = Math.round(USABLE_W * 0.08);
     COL_RATE_W = Math.round(USABLE_W * 0.18);
-    COL_AMT_W  = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W;
-    COL_CFG_W  = 0; COL_PLB_W = 0; COL_TPL_W = 0;
+    COL_AMT_W = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W;
+    COL_CFG_W = 0;
+    COL_PLB_W = 0;
+    COL_TPL_W = 0;
     X_DESC = MARGIN_X;
-    X_QTY  = X_DESC + COL_DESC_W;
-    X_RATE = X_QTY  + COL_QTY_W;
-    X_AMT  = X_RATE + COL_RATE_W;
-    X_CFG  = X_AMT; X_PLB = X_AMT; X_TPL = X_AMT;
+    X_QTY = X_DESC + COL_DESC_W;
+    X_RATE = X_QTY + COL_QTY_W;
+    X_AMT = X_RATE + COL_RATE_W;
+    X_CFG = X_AMT;
+    X_PLB = X_AMT;
+    X_TPL = X_AMT;
     innerDividers = [X_QTY, X_RATE, X_AMT];
   } else {
     COL_DESC_W = Math.round(USABLE_W * 0.34);
-    COL_QTY_W  = Math.round(USABLE_W * 0.07);
-    COL_RATE_W = Math.round(USABLE_W * 0.10);
-    COL_AMT_W  = Math.round(USABLE_W * 0.11);
-    COL_CFG_W  = Math.round(USABLE_W * 0.11);
-    COL_PLB_W  = Math.round(USABLE_W * 0.13);
-    COL_TPL_W  = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W - COL_AMT_W - COL_CFG_W - COL_PLB_W;
+    COL_QTY_W = Math.round(USABLE_W * 0.07);
+    COL_RATE_W = Math.round(USABLE_W * 0.1);
+    COL_AMT_W = Math.round(USABLE_W * 0.11);
+    COL_CFG_W = Math.round(USABLE_W * 0.11);
+    COL_PLB_W = Math.round(USABLE_W * 0.13);
+    COL_TPL_W = USABLE_W - COL_DESC_W - COL_QTY_W - COL_RATE_W - COL_AMT_W - COL_CFG_W - COL_PLB_W;
     X_DESC = MARGIN_X;
-    X_QTY  = X_DESC + COL_DESC_W;
-    X_RATE = X_QTY  + COL_QTY_W;
-    X_AMT  = X_RATE + COL_RATE_W;
-    X_CFG  = X_AMT  + COL_AMT_W;
-    X_PLB  = X_CFG  + COL_CFG_W;
-    X_TPL  = X_PLB  + COL_PLB_W;
+    X_QTY = X_DESC + COL_DESC_W;
+    X_RATE = X_QTY + COL_QTY_W;
+    X_AMT = X_RATE + COL_RATE_W;
+    X_CFG = X_AMT + COL_AMT_W;
+    X_PLB = X_CFG + COL_CFG_W;
+    X_TPL = X_PLB + COL_PLB_W;
     innerDividers = [X_QTY, X_RATE, X_AMT, X_CFG, X_PLB, X_TPL];
   }
 
@@ -281,7 +298,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.rect(MARGIN_X, y, USABLE_W, boxH).strokeColor("#bfdbfe").lineWidth(0.75).stroke();
     doc.restore();
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor("#1e40af");
-    doc.text("CREDIT SALE",               MARGIN_X + 6, y + 5,  { lineBreak: false });
+    doc.text("CREDIT SALE", MARGIN_X + 6, y + 5, { lineBreak: false });
     doc.font("Helvetica").fontSize(7.5).fillColor(CLR_BODY);
     doc.text(`Customer: ${d.customerName}`, MARGIN_X + 6, y + 16, { lineBreak: false });
     y += boxH + 5;
@@ -300,19 +317,22 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.save();
     doc.strokeColor("rgba(255,255,255,0.15)").lineWidth(0.5);
     for (const x of innerDividers) {
-      doc.moveTo(x, atY).lineTo(x, atY + THR_H).stroke();
+      doc
+        .moveTo(x, atY)
+        .lineTo(x, atY + THR_H)
+        .stroke();
     }
     doc.restore();
 
     doc.font("Helvetica-Bold").fontSize(7).fillColor(CLR_WHITE);
     cellText(doc, "DESCRIPTION", X_DESC, COL_DESC_W, atY, THR_H, "left");
-    cellText(doc, "QTY",         X_QTY,  COL_QTY_W,  atY, THR_H, "center");
-    cellText(doc, "RATE",        X_RATE, COL_RATE_W,  atY, THR_H, "center");
-    cellText(doc, "AMT",         X_AMT,  COL_AMT_W,   atY, THR_H, "center");
+    cellText(doc, "QTY", X_QTY, COL_QTY_W, atY, THR_H, "center");
+    cellText(doc, "RATE", X_RATE, COL_RATE_W, atY, THR_H, "center");
+    cellText(doc, "AMT", X_AMT, COL_AMT_W, atY, THR_H, "center");
     if (!hideProfitCols) {
-      cellText(doc, "CONFIG",    X_CFG,  COL_CFG_W,   atY, THR_H, "center");
-      cellText(doc, "P/L BALE",  X_PLB,  COL_PLB_W,   atY, THR_H, "center");
-      cellText(doc, "TOTAL P/L", X_TPL,  COL_TPL_W,   atY, THR_H, "center");
+      cellText(doc, "CONFIG", X_CFG, COL_CFG_W, atY, THR_H, "center");
+      cellText(doc, "P/L BALE", X_PLB, COL_PLB_W, atY, THR_H, "center");
+      cellText(doc, "TOTAL P/L", X_TPL, COL_TPL_W, atY, THR_H, "center");
     }
     return atY + THR_H;
   }
@@ -322,7 +342,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   // ── Item rows ─────────────────────────────────────────────────────────────────
   let totalQty = 0;
   let totalAmt = 0;
-  let totalPL  = 0;
+  let totalPL = 0;
   let rowIndex = 0;
 
   for (const item of d.items) {
@@ -332,12 +352,12 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
 
     totalQty += item.quantity;
     totalAmt += amtUSD;
-    totalPL  += itemPL;
+    totalPL += itemPL;
 
     doc.font("Helvetica-Bold").fontSize(7.5);
-    const descW     = COL_DESC_W - 8;
+    const descW = COL_DESC_W - 8;
     const descLines = wrapText(doc, item.stockItemName, descW, MAX_DESC_LINES);
-    const dynH      = Math.max(ROW_H, descLines.length * LINE_H_PT + 6);
+    const dynH = Math.max(ROW_H, descLines.length * LINE_H_PT + 6);
 
     if (y + dynH > PAGE_H - MARGIN_Y) {
       doc.addPage({ size: "A4" });
@@ -351,12 +371,19 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.save();
     doc.rect(MARGIN_X, y, USABLE_W, dynH).fill(rowBg);
     // bottom separator
-    doc.moveTo(MARGIN_X, y + dynH).lineTo(MARGIN_X + USABLE_W, y + dynH)
-      .strokeColor(CLR_SEP).lineWidth(0.75).stroke();
+    doc
+      .moveTo(MARGIN_X, y + dynH)
+      .lineTo(MARGIN_X + USABLE_W, y + dynH)
+      .strokeColor(CLR_SEP)
+      .lineWidth(0.75)
+      .stroke();
     // inner dividers
     doc.strokeColor(CLR_SEP).lineWidth(0.75);
     for (const x of innerDividers) {
-      doc.moveTo(x, y).lineTo(x, y + dynH).stroke();
+      doc
+        .moveTo(x, y)
+        .lineTo(x, y + dynH)
+        .stroke();
     }
     doc.restore();
 
@@ -364,7 +391,9 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor(CLR_BRAND);
     for (let li = 0; li < descLines.length; li++) {
       doc.text(descLines[li], X_DESC + 4, y + 3 + li * LINE_H_PT, {
-        width: descW, align: "left", lineBreak: false,
+        width: descW,
+        align: "left",
+        lineBreak: false,
       });
     }
 
@@ -372,14 +401,18 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
 
     // Qty, Rate, Amt
     doc.font("Helvetica").fontSize(7.5).fillColor(CLR_BODY);
-    doc.text(fmtQty(item.quantity),  X_QTY  + 1, cy, { width: COL_QTY_W  - 2, align: "center", lineBreak: false });
-    doc.text(fmtUSD(item.rateUSD),   X_RATE + 1, cy, { width: COL_RATE_W - 2, align: "center", lineBreak: false });
+    doc.text(fmtQty(item.quantity), X_QTY + 1, cy, { width: COL_QTY_W - 2, align: "center", lineBreak: false });
+    doc.text(fmtUSD(item.rateUSD), X_RATE + 1, cy, { width: COL_RATE_W - 2, align: "center", lineBreak: false });
     doc.font("Helvetica-Bold").fontSize(7.5).fillColor(CLR_BODY);
-    doc.text(fmtUSD(amtUSD),         X_AMT  + 1, cy, { width: COL_AMT_W  - 2, align: "center", lineBreak: false });
+    doc.text(fmtUSD(amtUSD), X_AMT + 1, cy, { width: COL_AMT_W - 2, align: "center", lineBreak: false });
 
     if (!hideProfitCols) {
       doc.font("Helvetica").fontSize(7.5).fillColor(CLR_BODY);
-      doc.text(fmtUSD(item.configuredPrice), X_CFG + 1, cy, { width: COL_CFG_W - 2, align: "center", lineBreak: false });
+      doc.text(fmtUSD(item.configuredPrice), X_CFG + 1, cy, {
+        width: COL_CFG_W - 2,
+        align: "center",
+        lineBreak: false,
+      });
       doc.font("Helvetica-Bold").fontSize(7.5);
       doc.fillColor(plColor(plBale));
       doc.text(fmtUSD(plBale), X_PLB + 1, cy, { width: COL_PLB_W - 2, align: "center", lineBreak: false });
@@ -406,9 +439,9 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   doc.restore();
 
   doc.font("Helvetica-Bold").fontSize(8).fillColor(CLR_WHITE);
-  cellText(doc, "TOTAL",          X_DESC, COL_DESC_W, y, totH, "left");
-  cellText(doc, fmtQty(totalQty), X_QTY,  COL_QTY_W,  y, totH, "center");
-  cellText(doc, fmtUSD(totalAmt), X_AMT,  COL_AMT_W,  y, totH, "center");
+  cellText(doc, "TOTAL", X_DESC, COL_DESC_W, y, totH, "left");
+  cellText(doc, fmtQty(totalQty), X_QTY, COL_QTY_W, y, totH, "center");
+  cellText(doc, fmtUSD(totalAmt), X_AMT, COL_AMT_W, y, totH, "center");
   if (!hideProfitCols) {
     // White for profit, bright red for loss — clearly readable on green background.
     // Always show sign (+/−) so direction is unambiguous.
@@ -421,7 +454,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   // ── TOTAL PAID block ──────────────────────────────────────────────────────────
   // (overflow already handled by the combined check above — no extra addPage here)
 
-  const paidH  = 32;
+  const paidH = 32;
   const paidStr = fmtUSD(totalAmt);
 
   doc.save();
@@ -441,7 +474,7 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   if (d.description) {
     doc.font("Helvetica-Bold").fontSize(7.5);
     const noteBodyH = doc.heightOfString(d.description, { width: USABLE_W - 16 });
-    const noteH     = Math.ceil(noteBodyH) + 14;
+    const noteH = Math.ceil(noteBodyH) + 14;
     if (y + noteH > PAGE_H - MARGIN_Y) {
       doc.addPage({ size: "A4" });
       y = MARGIN_Y;
@@ -464,8 +497,12 @@ async function buildPdf(d: InvoiceData): Promise<Buffer> {
   // ── Footer ────────────────────────────────────────────────────────────────────
   y += 4;
   doc.save();
-  doc.moveTo(MARGIN_X, y).lineTo(MARGIN_X + USABLE_W, y)
-    .strokeColor(CLR_ACCENT).lineWidth(1.5).stroke();
+  doc
+    .moveTo(MARGIN_X, y)
+    .lineTo(MARGIN_X + USABLE_W, y)
+    .strokeColor(CLR_ACCENT)
+    .lineWidth(1.5)
+    .stroke();
   doc.restore();
   y += 6;
   doc.font("Helvetica-Bold").fontSize(8).fillColor(CLR_ACCENT);
@@ -483,9 +520,9 @@ function cellText(
   w: number,
   rowY: number,
   rowH: number,
-  align: "left" | "center" | "right",
+  align: "left" | "center" | "right"
 ): void {
   const textY = rowY + Math.round((rowH - 8) / 2);
-  const pad   = align === "left" ? 4 : 1;
+  const pad = align === "left" ? 4 : 1;
   doc.text(text, x + pad, textY, { width: w - pad * 2, align, lineBreak: false });
 }

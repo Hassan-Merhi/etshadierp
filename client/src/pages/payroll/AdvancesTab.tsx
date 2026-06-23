@@ -1,48 +1,15 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogHeader, 
-  DialogTitle 
-} from "@/components/ui/dialog";
-import { 
-  Form, 
-  FormControl, 
-  FormField, 
-  FormItem, 
-  FormLabel, 
-  FormMessage 
-} from "@/components/ui/form";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Plus, 
-  Trash2, 
-  Banknote, 
-  ArrowDownCircle, 
-  MinusCircle, 
-  Loader2 
-} from "lucide-react";
+import { Plus, Trash2, Banknote, ArrowDownCircle, MinusCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -54,12 +21,12 @@ import { queryClient } from "@/lib/queryClient";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useAppMode } from "@/contexts/AppModeContext";
 import type { Employee } from "@shared/schema";
-import { 
-  salaryAdvanceSchema, 
-  deductionSchema, 
-  type SalaryAdvanceFormData, 
-  type DeductionFormData, 
-  type SalaryAdvance 
+import {
+  salaryAdvanceSchema,
+  deductionSchema,
+  type SalaryAdvanceFormData,
+  type DeductionFormData,
+  type SalaryAdvance,
 } from "./payrollSchemas";
 
 export function AdvancesTab() {
@@ -77,7 +44,7 @@ export function AdvancesTab() {
   const { data: workerStaff = [] } = useQuery<Employee[]>({
     queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
     enabled: !!selectedCompany,
-    select: (data: any[]) => data.filter(e => e.employeeType === "Worker"),
+    select: (data: any[]) => data.filter((e) => e.employeeType === "Worker"),
   });
 
   const { data: salaryAdvances = [], isLoading: advancesLoading } = useQuery<SalaryAdvance[]>({
@@ -163,7 +130,11 @@ export function AdvancesTab() {
   });
 
   if (advancesLoading) {
-    return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
@@ -214,9 +185,13 @@ export function AdvancesTab() {
                   </TableCell>
                   <TableCell>
                     {advance.fullyPaid ? (
-                      <Badge variant="default" className="bg-green-500 hover:bg-green-600">Fully Paid</Badge>
+                      <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+                        Fully Paid
+                      </Badge>
                     ) : (
-                      <Badge variant="outline" className="border-amber-500 text-amber-500">Outstanding</Badge>
+                      <Badge variant="outline" className="border-amber-500 text-amber-500">
+                        Outstanding
+                      </Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -309,9 +284,9 @@ export function AdvancesTab() {
                     <FormItem>
                       <FormLabel>Date</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="date" 
-                          value={field.value ? format(field.value, "yyyy-MM-dd") : ""} 
+                        <Input
+                          type="date"
+                          value={field.value ? format(field.value, "yyyy-MM-dd") : ""}
                           onChange={(e) => field.onChange(new Date(e.target.value))}
                         />
                       </FormControl>
@@ -326,10 +301,7 @@ export function AdvancesTab() {
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                     <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                      />
+                      <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                     </FormControl>
                     <div className="space-y-1 leading-none">
                       <FormLabel>Opening Balance</FormLabel>
@@ -355,7 +327,9 @@ export function AdvancesTab() {
                         </FormControl>
                         <SelectContent>
                           {cashAccounts.map((acc) => (
-                            <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
+                            <SelectItem key={acc.id} value={String(acc.id)}>
+                              {acc.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -390,9 +364,7 @@ export function AdvancesTab() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Record Repayment</DialogTitle>
-            <DialogDescription>
-              Manually record a repayment for {selectedAdvance?.employeeName}.
-            </DialogDescription>
+            <DialogDescription>Manually record a repayment for {selectedAdvance?.employeeName}.</DialogDescription>
           </DialogHeader>
           <Form {...deductionForm}>
             <form onSubmit={deductionForm.handleSubmit((data) => deductionMutation.mutate(data))} className="space-y-4">

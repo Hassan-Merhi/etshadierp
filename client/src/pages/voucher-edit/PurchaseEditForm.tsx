@@ -24,7 +24,7 @@ export function PurchaseEditForm({
   stockItems,
   formatDisplayDate,
   formatAmount,
-  grandTotal
+  grandTotal,
 }: {
   form: UseFormReturn<any>;
   voucher: any;
@@ -76,12 +76,7 @@ export function PurchaseEditForm({
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
+                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -114,7 +109,13 @@ export function PurchaseEditForm({
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
                       {fields.length > 1 && (
-                        <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} data-testid={`button-remove-purchase-mobile-${index}`}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => remove(index)}
+                          data-testid={`button-remove-purchase-mobile-${index}`}
+                        >
                           <X className="h-4 w-4" />
                         </Button>
                       )}
@@ -127,8 +128,18 @@ export function PurchaseEditForm({
                           <FormLabel className="text-xs">Stock Item</FormLabel>
                           <FormControl>
                             <StockItemCombobox
-                              value={form.watch(`items.${index}.stockItemId`) > 0 ? { id: form.watch(`items.${index}.stockItemId`), name: form.watch(`items.${index}.stockItemName`) } : null}
-                              onChange={(id, name) => { form.setValue(`items.${index}.stockItemId`, id); form.setValue(`items.${index}.stockItemName`, name); }}
+                              value={
+                                form.watch(`items.${index}.stockItemId`) > 0
+                                  ? {
+                                      id: form.watch(`items.${index}.stockItemId`),
+                                      name: form.watch(`items.${index}.stockItemName`),
+                                    }
+                                  : null
+                              }
+                              onChange={(id, name) => {
+                                form.setValue(`items.${index}.stockItemId`, id);
+                                form.setValue(`items.${index}.stockItemName`, name);
+                              }}
                               stockItems={stockItems}
                               rowIndex={index}
                               testIdPrefix="button-stock-item-purchase-mobile"
@@ -146,7 +157,14 @@ export function PurchaseEditForm({
                           <FormItem>
                             <FormLabel className="text-xs">Quantity</FormLabel>
                             <FormControl>
-                              <Input {...field} type="number" step="0.001" placeholder="0" className="font-mono" data-testid={`input-quantity-purchase-mobile-${index}`} />
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.001"
+                                placeholder="0"
+                                className="font-mono"
+                                data-testid={`input-quantity-purchase-mobile-${index}`}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -159,7 +177,14 @@ export function PurchaseEditForm({
                           <FormItem>
                             <FormLabel className="text-xs">Rate</FormLabel>
                             <FormControl>
-                              <Input {...field} type="number" step="0.01" placeholder="0.00" className="font-mono" data-testid={`input-rate-purchase-mobile-${index}`} />
+                              <Input
+                                {...field}
+                                type="number"
+                                step="0.01"
+                                placeholder="0.00"
+                                className="font-mono"
+                                data-testid={`input-rate-purchase-mobile-${index}`}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -168,13 +193,21 @@ export function PurchaseEditForm({
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t">
                       <span className="text-sm text-muted-foreground">Total</span>
-                      <span className="font-mono font-medium" data-testid={`text-total-purchase-mobile-${index}`}>{formatAmount(lineTotal)}</span>
+                      <span className="font-mono font-medium" data-testid={`text-total-purchase-mobile-${index}`}>
+                        {formatAmount(lineTotal)}
+                      </span>
                     </div>
                   </div>
                 );
               })}
               <div className="flex items-center justify-between gap-2 pt-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })} data-testid="button-add-row-purchase-mobile">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })}
+                  data-testid="button-add-row-purchase-mobile"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Row
                 </Button>
@@ -326,9 +359,15 @@ export function PurchaseEditForm({
                     <td></td>
                   </tr>
                   <tr className="border-t">
-                    <td className="p-3 text-right font-medium" colSpan={1}>Total Quantity:</td>
+                    <td className="p-3 text-right font-medium" colSpan={1}>
+                      Total Quantity:
+                    </td>
                     <td className="p-3 font-mono font-medium">
-                      {formatNumber(form.watch("items").reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0))}
+                      {formatNumber(
+                        form
+                          .watch("items")
+                          .reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0)
+                      )}
                     </td>
                     <td colSpan={3}></td>
                   </tr>
@@ -343,12 +382,7 @@ export function PurchaseEditForm({
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Additional notes..."
-                      rows={3}
-                      data-testid="input-notes"
-                    />
+                    <Textarea {...field} placeholder="Additional notes..." rows={3} data-testid="input-notes" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -365,11 +399,7 @@ export function PurchaseEditForm({
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isPending || grandTotal === 0}
-                data-testid="button-save-changes"
-              >
+              <Button type="submit" disabled={isPending || grandTotal === 0} data-testid="button-save-changes">
                 {isPending ? "Saving..." : "Save Changes"}
               </Button>
             </div>

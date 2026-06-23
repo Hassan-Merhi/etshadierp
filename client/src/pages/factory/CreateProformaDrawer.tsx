@@ -63,10 +63,14 @@ function loadDraft(): Draft | null {
   }
 }
 function saveDraft(d: Draft) {
-  try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, savedAt: Date.now() })); } catch {}
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ ...d, savedAt: Date.now() }));
+  } catch {}
 }
 function clearDraft() {
-  try { localStorage.removeItem(DRAFT_KEY); } catch {}
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {}
 }
 
 export default function CreateProformaDrawer({ open, onClose, articleRows, onSuccess }: Props) {
@@ -119,7 +123,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
   useEffect(() => {
     if (!productsQuery.data) return;
     const map = productMap();
-    setSellingPrices(prev => {
+    setSellingPrices((prev) => {
       const next = { ...prev };
       for (const row of articleRows) {
         if (!next[row.articleCode]) {
@@ -131,7 +135,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
       }
       return next;
     });
-    setProductionPrices(prev => {
+    setProductionPrices((prev) => {
       const next = { ...prev };
       for (const row of articleRows) {
         if (!next[row.articleCode]) {
@@ -146,8 +150,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
   }, [productsQuery.data, articleRows, productMap]);
 
   const createMutation = useMutation({
-    mutationFn: async (payload: object) =>
-      apiRequest("POST", "/api/factory/customer-proformas/bulk", payload),
+    mutationFn: async (payload: object) => apiRequest("POST", "/api/factory/customer-proformas/bulk", payload),
     onSuccess: () => {
       clearDraft();
       qc.invalidateQueries({ queryKey: ["/api/factory/v2/stock-allocation"] });
@@ -170,7 +173,15 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
   }, []);
 
   useEffect(() => {
-    triggerAutosave({ customerId, proformaName, isActive, quantities, sellingPrices, productionPrices, savedAt: Date.now() });
+    triggerAutosave({
+      customerId,
+      proformaName,
+      isActive,
+      quantities,
+      sellingPrices,
+      productionPrices,
+      savedAt: Date.now(),
+    });
   }, [customerId, proformaName, isActive, quantities, sellingPrices, productionPrices, triggerAutosave]);
 
   useEffect(() => {
@@ -185,19 +196,29 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
   });
 
   function handleQtyChange(code: string, val: string) {
-    setQuantities(prev => ({ ...prev, [code]: val }));
-    setErrors(prev => { const n = { ...prev }; delete n[`qty_${code}`]; return n; });
+    setQuantities((prev) => ({ ...prev, [code]: val }));
+    setErrors((prev) => {
+      const n = { ...prev };
+      delete n[`qty_${code}`];
+      return n;
+    });
   }
 
   function handleQtyKeyDown(e: React.KeyboardEvent<HTMLInputElement>, rowIdx: number) {
     if (e.key === "ArrowDown" || e.key === "Enter") {
       e.preventDefault();
       const next = qtyRefs.current[rowIdx + 1];
-      if (next) { next.focus(); next.select(); }
+      if (next) {
+        next.focus();
+        next.select();
+      }
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       const prev = qtyRefs.current[rowIdx - 1];
-      if (prev) { prev.focus(); prev.select(); }
+      if (prev) {
+        prev.focus();
+        prev.select();
+      }
     } else if (e.key === "Escape") {
       e.currentTarget.blur();
     }
@@ -210,7 +231,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
       const p = m.get(row.articleCode);
       if (p?.sellingPrice && parseFloat(p.sellingPrice) > 0) next[row.articleCode] = p.sellingPrice;
     }
-    setSellingPrices(prev => ({ ...prev, ...next }));
+    setSellingPrices((prev) => ({ ...prev, ...next }));
   }
 
   function applyCatalogProductionPrice() {
@@ -221,19 +242,19 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
       if (p?.productionPrice && parseFloat(p.productionPrice) > 0) next[row.articleCode] = p.productionPrice;
     }
     // Both buttons target the single visible price column (sellingPrices)
-    setSellingPrices(prev => ({ ...prev, ...next }));
+    setSellingPrices((prev) => ({ ...prev, ...next }));
   }
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
     if (!customerId) errs.customerId = "Customer is required";
     if (!proformaName.trim()) errs.proformaName = "Proforma name is required";
-    const hasQty = articleRows.some(r => {
+    const hasQty = articleRows.some((r) => {
       const v = quantities[r.articleCode];
       return v && parseInt(v) > 0;
     });
     if (!hasQty) errs.lines = "Enter at least one quantity";
-    articleRows.forEach(r => {
+    articleRows.forEach((r) => {
       const v = quantities[r.articleCode];
       if (!v || v === "") return;
       const n = parseInt(v);
@@ -247,8 +268,11 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
   function handleSubmit() {
     if (!validate()) return;
     const lines = articleRows
-      .filter(r => { const v = quantities[r.articleCode]; return v && parseInt(v) > 0; })
-      .map(r => ({
+      .filter((r) => {
+        const v = quantities[r.articleCode];
+        return v && parseInt(v) > 0;
+      })
+      .map((r) => ({
         articleCode: r.articleCode,
         productName: r.displayName,
         quantity: parseInt(quantities[r.articleCode]),
@@ -270,16 +294,24 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
     const w = parseFloat(p?.weightPerBaleKg || "0");
     return s + qty * w;
   }, 0);
-  const filledLines = articleRows.filter(r => { const v = quantities[r.articleCode]; return v && parseInt(v) > 0; }).length;
-  const warningCount = articleRows.filter(r => {
+  const filledLines = articleRows.filter((r) => {
+    const v = quantities[r.articleCode];
+    return v && parseInt(v) > 0;
+  }).length;
+  const warningCount = articleRows.filter((r) => {
     const n = parseInt(quantities[r.articleCode] || "0");
     return !isNaN(n) && n > r.freeToPromise && n > 0;
   }).length;
-  const zeroItemCount = articleRows.filter(r => r.onHand === 0).length;
-  const visibleRows = showZeroItems ? articleRows : articleRows.filter(r => r.onHand > 0);
+  const zeroItemCount = articleRows.filter((r) => r.onHand === 0).length;
+  const visibleRows = showZeroItems ? articleRows : articleRows.filter((r) => r.onHand > 0);
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent
         className="max-w-[98vw] w-[98vw] h-[85dvh] sm:h-[96dvh] flex flex-col p-0 gap-0"
         data-testid="dialog-create-proforma"
@@ -294,14 +326,34 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
             <Label htmlFor="proforma-customer" className="text-xs font-medium">
               Customer <span className="text-destructive">*</span>
             </Label>
-            <Select value={customerId} onValueChange={v => { setCustomerId(v); setErrors(p => { const n = { ...p }; delete n.customerId; return n; }); }}>
-              <SelectTrigger id="proforma-customer" data-testid="select-proforma-customer" className={cn(errors.customerId && "border-destructive")}>
+            <Select
+              value={customerId}
+              onValueChange={(v) => {
+                setCustomerId(v);
+                setErrors((p) => {
+                  const n = { ...p };
+                  delete n.customerId;
+                  return n;
+                });
+              }}
+            >
+              <SelectTrigger
+                id="proforma-customer"
+                data-testid="select-proforma-customer"
+                className={cn(errors.customerId && "border-destructive")}
+              >
                 <SelectValue placeholder="Select customer…" />
               </SelectTrigger>
               <SelectContent>
-                {customersQuery.isLoading && <SelectItem value="__loading" disabled>Loading…</SelectItem>}
-                {(customersQuery.data || []).map(c => (
-                  <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
+                {customersQuery.isLoading && (
+                  <SelectItem value="__loading" disabled>
+                    Loading…
+                  </SelectItem>
+                )}
+                {(customersQuery.data || []).map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>
+                    {c.legalName}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -316,7 +368,14 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
               id="proforma-name"
               data-testid="input-proforma-name"
               value={proformaName}
-              onChange={e => { setProformaName(e.target.value); setErrors(p => { const n = { ...p }; delete n.proformaName; return n; }); }}
+              onChange={(e) => {
+                setProformaName(e.target.value);
+                setErrors((p) => {
+                  const n = { ...p };
+                  delete n.proformaName;
+                  return n;
+                });
+              }}
               placeholder="e.g. Proforma #001"
               className={cn(errors.proformaName && "border-destructive")}
             />
@@ -333,10 +392,20 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
 
           {/* Global pricing controls */}
           <div className="flex items-center gap-2 border-l pl-4">
-            <Button size="default" variant="outline" onClick={applyCatalogSellingPrice} data-testid="button-apply-selling-price">
+            <Button
+              size="default"
+              variant="outline"
+              onClick={applyCatalogSellingPrice}
+              data-testid="button-apply-selling-price"
+            >
               Apply Sell Price
             </Button>
-            <Button size="default" variant="outline" onClick={applyCatalogProductionPrice} data-testid="button-apply-production-price">
+            <Button
+              size="default"
+              variant="outline"
+              onClick={applyCatalogProductionPrice}
+              data-testid="button-apply-production-price"
+            >
               Apply Prod Price
             </Button>
           </div>
@@ -346,7 +415,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
               <Button
                 size="default"
                 variant={showZeroItems ? "secondary" : "outline"}
-                onClick={() => setShowZeroItems(v => !v)}
+                onClick={() => setShowZeroItems((v) => !v)}
                 data-testid="button-toggle-zero-items"
               >
                 {showZeroItems ? `Hide 0-bale (${zeroItemCount})` : `Show 0-bale (${zeroItemCount})`}
@@ -356,7 +425,10 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
 
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground h-9 ml-auto">
             {draftStatus === "saved" && (
-              <><CheckCircle className="h-3 w-3 text-green-500" />Draft autosaved</>
+              <>
+                <CheckCircle className="h-3 w-3 text-green-500" />
+                Draft autosaved
+              </>
             )}
           </div>
         </div>
@@ -372,13 +444,27 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
           <table className="w-full text-sm border-collapse min-w-max">
             <thead>
               <tr className="bg-muted sticky top-0 z-30">
-                <th className="text-left px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[200px] sticky left-0 bg-muted z-20">Product</th>
-                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[72px]">On Hand</th>
-                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[80px] text-amber-600 dark:text-amber-400">Reserved</th>
-                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[85px] text-blue-600 dark:text-blue-400">In Loading</th>
-                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[95px] text-green-700 dark:text-green-400">Free to Promise</th>
-                <th className="text-center px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px]">Qty</th>
-                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-muted-foreground">Total KG</th>
+                <th className="text-left px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[200px] sticky left-0 bg-muted z-20">
+                  Product
+                </th>
+                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[72px]">
+                  On Hand
+                </th>
+                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[80px] text-amber-600 dark:text-amber-400">
+                  Reserved
+                </th>
+                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[85px] text-blue-600 dark:text-blue-400">
+                  In Loading
+                </th>
+                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[95px] text-green-700 dark:text-green-400">
+                  Free to Promise
+                </th>
+                <th className="text-center px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[110px]">
+                  Qty
+                </th>
+                <th className="text-right px-3 py-2 font-medium border-b border-r whitespace-nowrap min-w-[90px] text-muted-foreground">
+                  Total KG
+                </th>
                 <th className="text-center px-3 py-2 font-medium border-b whitespace-nowrap min-w-[130px]">Price</th>
               </tr>
             </thead>
@@ -392,7 +478,7 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                 const hasError = !!errors[`qty_${row.articleCode}`];
                 const product = map.get(row.articleCode);
                 const weightPerBale = parseFloat(product?.weightPerBaleKg || "0");
-                const totalRowKg = qty > 0 && weightPerBale > 0 ? (qty * weightPerBale) : null;
+                const totalRowKg = qty > 0 && weightPerBale > 0 ? qty * weightPerBale : null;
 
                 return (
                   <tr
@@ -400,13 +486,15 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                     className={cn(
                       "border-b transition-colors",
                       idx % 2 === 0 ? "bg-background" : "bg-muted/20",
-                      qty > 0 && "bg-blue-50/30 dark:bg-blue-950/20",
+                      qty > 0 && "bg-blue-50/30 dark:bg-blue-950/20"
                     )}
                     data-testid={`row-create-${row.articleCode}`}
                   >
                     {/* Product */}
                     <td className="px-3 py-1.5 border-r sticky left-0 bg-inherit z-10">
-                      <div className="font-medium truncate max-w-[220px] text-xs leading-tight" title={row.displayName}>{row.displayName}</div>
+                      <div className="font-medium truncate max-w-[220px] text-xs leading-tight" title={row.displayName}>
+                        {row.displayName}
+                      </div>
                       {row.displayName !== row.articleCode && (
                         <div className="text-[10px] text-muted-foreground font-mono">{row.articleCode}</div>
                       )}
@@ -416,22 +504,40 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                     <td className="px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs">{row.onHand}</td>
 
                     {/* Reserved */}
-                    <td className={cn("px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs", row.reservedNotYetLoaded > 0 && "text-amber-600 dark:text-amber-400")}>
-                      {row.reservedNotYetLoaded > 0 ? row.reservedNotYetLoaded : <span className="text-muted-foreground/40">—</span>}
+                    <td
+                      className={cn(
+                        "px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs",
+                        row.reservedNotYetLoaded > 0 && "text-amber-600 dark:text-amber-400"
+                      )}
+                    >
+                      {row.reservedNotYetLoaded > 0 ? (
+                        row.reservedNotYetLoaded
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
                     </td>
 
                     {/* In Loading */}
-                    <td className={cn("px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs", row.inLoading > 0 && "text-blue-600 dark:text-blue-400")}>
+                    <td
+                      className={cn(
+                        "px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs",
+                        row.inLoading > 0 && "text-blue-600 dark:text-blue-400"
+                      )}
+                    >
                       {row.inLoading > 0 ? row.inLoading : <span className="text-muted-foreground/40">—</span>}
                     </td>
 
                     {/* FTP */}
-                    <td className={cn(
-                      "px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs font-semibold",
-                      row.freeToPromise > 0 ? "text-green-700 dark:text-green-400"
-                        : row.freeToPromise === 0 ? "text-muted-foreground"
-                        : "text-destructive",
-                    )}>
+                    <td
+                      className={cn(
+                        "px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs font-semibold",
+                        row.freeToPromise > 0
+                          ? "text-green-700 dark:text-green-400"
+                          : row.freeToPromise === 0
+                            ? "text-muted-foreground"
+                            : "text-destructive"
+                      )}
+                    >
                       {row.freeToPromise}
                     </td>
 
@@ -439,23 +545,27 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                     <td className="px-2 py-1 border-r">
                       <div className="flex flex-col gap-0.5 items-center">
                         <Input
-                          ref={el => { qtyRefs.current[idx] = el; }}
+                          ref={(el) => {
+                            qtyRefs.current[idx] = el;
+                          }}
                           type="number"
                           min={0}
                           value={rawVal}
-                          onChange={e => handleQtyChange(row.articleCode, e.target.value)}
-                          onKeyDown={e => handleQtyKeyDown(e, idx)}
-                          onFocus={e => e.target.select()}
+                          onChange={(e) => handleQtyChange(row.articleCode, e.target.value)}
+                          onKeyDown={(e) => handleQtyKeyDown(e, idx)}
+                          onFocus={(e) => e.target.select()}
                           placeholder="0"
                           className={cn(
                             "h-7 text-center text-xs font-mono w-20 px-1 tabular-nums",
                             hasError && "border-destructive",
                             overFtp && !hasError && "border-amber-400 dark:border-amber-500",
-                            qty > 0 && !overFtp && !hasError && "border-blue-400 dark:border-blue-500",
+                            qty > 0 && !overFtp && !hasError && "border-blue-400 dark:border-blue-500"
                           )}
                           data-testid={`input-qty-${row.articleCode}`}
                         />
-                        {hasError && <span className="text-[10px] text-destructive">{errors[`qty_${row.articleCode}`]}</span>}
+                        {hasError && (
+                          <span className="text-[10px] text-destructive">{errors[`qty_${row.articleCode}`]}</span>
+                        )}
                         {overFtp && !hasError && (
                           <span className="text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-0.5 whitespace-nowrap">
                             <AlertTriangle className="h-2.5 w-2.5" />+{overBy} over FTP
@@ -466,9 +576,13 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
 
                     {/* Total KG */}
                     <td className="px-3 py-1.5 border-r text-right font-mono tabular-nums text-xs text-muted-foreground">
-                      {totalRowKg != null
-                        ? <span className="text-foreground font-medium">{totalRowKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg</span>
-                        : <span className="text-muted-foreground/40">—</span>}
+                      {totalRowKg != null ? (
+                        <span className="text-foreground font-medium">
+                          {totalRowKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
                     </td>
 
                     {/* Price (selling or production, depending on which Apply button was used) */}
@@ -478,8 +592,8 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
                         min={0}
                         step="0.01"
                         value={sellingPrices[row.articleCode] ?? ""}
-                        onChange={e => setSellingPrices(prev => ({ ...prev, [row.articleCode]: e.target.value }))}
-                        onFocus={e => e.target.select()}
+                        onChange={(e) => setSellingPrices((prev) => ({ ...prev, [row.articleCode]: e.target.value }))}
+                        onFocus={(e) => e.target.select()}
                         placeholder="0.00"
                         className="h-7 text-right text-xs font-mono w-24 px-2 tabular-nums"
                         data-testid={`input-price-${row.articleCode}`}
@@ -495,10 +609,19 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
         {/* Footer */}
         <div className="px-5 py-3 border-t bg-muted/30 shrink-0 flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-            <span><span className="font-semibold text-foreground">{filledLines}</span> line{filledLines !== 1 ? "s" : ""}</span>
-            <span><span className="font-semibold text-foreground">{totalQty}</span> total bales</span>
+            <span>
+              <span className="font-semibold text-foreground">{filledLines}</span> line{filledLines !== 1 ? "s" : ""}
+            </span>
+            <span>
+              <span className="font-semibold text-foreground">{totalQty}</span> total bales
+            </span>
             {totalKg > 0 && (
-              <span><span className="font-semibold text-foreground">{totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })}</span> kg</span>
+              <span>
+                <span className="font-semibold text-foreground">
+                  {totalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                </span>{" "}
+                kg
+              </span>
             )}
             {warningCount > 0 && (
               <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
@@ -509,16 +632,26 @@ export default function CreateProformaDrawer({ open, onClose, articleRows, onSuc
             <span className="text-[10px] text-muted-foreground/60">Ctrl/⌘+S to save</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="default" onClick={onClose} data-testid="button-cancel-proforma">Cancel</Button>
+            <Button variant="outline" size="default" onClick={onClose} data-testid="button-cancel-proforma">
+              Cancel
+            </Button>
             <Button
               size="default"
               onClick={handleSubmit}
               disabled={createMutation.isPending}
               data-testid="button-create-proforma-submit"
             >
-              {createMutation.isPending
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating…</>
-                : <><Save className="h-4 w-4 mr-2" />Create Proforma</>}
+              {createMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating…
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Create Proforma
+                </>
+              )}
             </Button>
           </div>
         </div>

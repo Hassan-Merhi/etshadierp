@@ -32,10 +32,7 @@ process.on("uncaughtException", (err: Error) => {
 // Build version for cache-busting and deployment tracking.
 // IMPORTANT: never use Date.now() as the fallback — it changes on every restart
 // and causes the browser to think the app was updated, triggering false reload prompts.
-const BUILD_VERSION =
-  process.env.BUILD_VERSION ||
-  process.env.RENDER_GIT_COMMIT?.substring(0, 8) ||
-  "dev";
+const BUILD_VERSION = process.env.BUILD_VERSION || process.env.RENDER_GIT_COMMIT?.substring(0, 8) || "dev";
 
 // Unique ID generated fresh on every server start.
 // The frontend polls /api/boot and reloads when this changes, which recovers
@@ -75,13 +72,13 @@ declare global {
   }
 }
 
-declare module 'http' {
+declare module "http" {
   interface IncomingMessage {
-    rawBody: unknown
+    rawBody: unknown;
   }
 }
 
-declare module 'express-session' {
+declare module "express-session" {
   interface SessionData {
     userId?: string;
     username?: string;
@@ -100,12 +97,14 @@ declare module 'express-session' {
 }
 
 // General API body limit is 2 MB. Upload routes specify their own higher limit via multer.
-app.use(express.json({
-  limit: "2mb",
-  verify: (req, _res, buf) => {
-    req.rawBody = buf;
-  }
-}));
+app.use(
+  express.json({
+    limit: "2mb",
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: false, limit: "2mb" }));
 // /uploads is NOT served publicly — file access goes through authenticated endpoints.
 
@@ -131,7 +130,10 @@ app.use((req, res, next) => {
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type,Authorization,X-CSRF-Token,X-Client-Date,X-Requested-With");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type,Authorization,X-CSRF-Token,X-Client-Date,X-Requested-With"
+    );
     res.setHeader("Access-Control-Max-Age", "86400"); // 24h preflight cache
     if (req.method === "OPTIONS") {
       res.sendStatus(204);
@@ -157,8 +159,8 @@ if (!process.env.SESSION_SECRET) {
 }
 
 const sessionConfig: session.SessionOptions = {
-  name: 'erp.session',
-  secret: process.env.SESSION_SECRET || randomBytes(32).toString('hex'),
+  name: "erp.session",
+  secret: process.env.SESSION_SECRET || randomBytes(32).toString("hex"),
   resave: false,
   saveUninitialized: false,
   rolling: true,
@@ -166,25 +168,26 @@ const sessionConfig: session.SessionOptions = {
     secure: process.env.NODE_ENV === "production" || !!process.env.REPL_ID || process.env.CAPACITOR_ENABLED === "true",
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000, // 24 hours
-    path: '/',
+    path: "/",
     // SameSite=None is required for Capacitor WebView cross-origin requests.
     // Origin guard + CSRF token remain primary CSRF protection.
     // Set CAPACITOR_ENABLED=true on the server used by the Capacitor app.
-    sameSite: process.env.CAPACITOR_ENABLED === "true" ? 'none' : 'lax',
+    sameSite: process.env.CAPACITOR_ENABLED === "true" ? "none" : "lax",
   },
 };
 
 // Use PostgreSQL session store when a database is available
 // This ensures sessions persist across server restarts
 if (process.env.DATABASE_URL || process.env.PGHOST) {
-  const connectionString = process.env.DATABASE_URL || 
+  const connectionString =
+    process.env.DATABASE_URL ||
     `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
-  
+
   // Match SSL configuration with main database connection
   const isLocalReplitDB = process.env.PGHOST === "helium";
   const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
   const requiresSSL = !isLocalReplitDB && !sslExplicitlyDisabled;
-  
+
   sessionConfig.store = new PgSession({
     conObject: {
       connectionString,
@@ -196,8 +199,8 @@ if (process.env.DATABASE_URL || process.env.PGHOST) {
     },
     createTableIfMissing: true,
   });
-  
-  console.log(`✓ PostgreSQL session store configured (SSL: ${requiresSSL ? 'enabled' : 'disabled'})`);
+
+  console.log(`✓ PostgreSQL session store configured (SSL: ${requiresSSL ? "enabled" : "disabled"})`);
 }
 
 app.use(session(sessionConfig));
@@ -208,7 +211,7 @@ app.use(blockViewOnlyWrites);
 
 // Add build version header to all responses for cache tracking
 app.use((_req, res, next) => {
-  res.setHeader('X-Build-Version', BUILD_VERSION);
+  res.setHeader("X-Build-Version", BUILD_VERSION);
   next();
 });
 
@@ -217,10 +220,10 @@ app.use((_req, res, next) => {
 // for every subsequent request — causing TanStack Query's invalidateQueries to have
 // no effect (the browser hands back its cached response instead of hitting the server).
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+  if (req.path.startsWith("/api")) {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
   }
   next();
 });
@@ -285,14 +288,18 @@ app.use((req, res, next) => {
   // iOS:     capacitor://localhost
   // Android: http://localhost or https://localhost (depending on androidScheme)
   // Ionic:   ionic://localhost
-  if (originHeader && (
-    originHeader === "capacitor://localhost" ||
-    originHeader === "http://localhost"       ||
-    originHeader === "https://localhost"      ||
-    originHeader === "ionic://localhost"
-  )) return next();
+  if (
+    originHeader &&
+    (originHeader === "capacitor://localhost" ||
+      originHeader === "http://localhost" ||
+      originHeader === "https://localhost" ||
+      originHeader === "ionic://localhost")
+  )
+    return next();
 
-  console.warn(`[OriginGuard] BLOCKED ${method} ${req.path} | host=${host} origin=${originHeader || "-"} referer=${refererHeader || "-"}`);
+  console.warn(
+    `[OriginGuard] BLOCKED ${method} ${req.path} | host=${host} origin=${originHeader || "-"} referer=${refererHeader || "-"}`
+  );
   return res.status(403).json({
     message: "Cross-origin state-changing request rejected by origin guard.",
     code: "CSRF_ORIGIN_MISMATCH",
@@ -332,7 +339,9 @@ app.use((req, res, next) => {
   if (typeof got === "string" && got === expected) return next();
 
   if (CSRF_ENFORCE) {
-    console.warn(`[CSRF] BLOCKED ${method} ${req.path} | expected=${expected.slice(0,8)}… got=${typeof got === "string" ? got.slice(0,8) + "…" : "<missing>"}`);
+    console.warn(
+      `[CSRF] BLOCKED ${method} ${req.path} | expected=${expected.slice(0, 8)}… got=${typeof got === "string" ? got.slice(0, 8) + "…" : "<missing>"}`
+    );
     return res.status(403).json({
       message: "CSRF token missing or invalid.",
       code: "CSRF_TOKEN_MISMATCH",
@@ -2425,17 +2434,17 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers ADD CONSTRAINT stock_transfer_vouchers_destination_location_id_fkey FOREIGN KEY (destination_location_id) REFERENCES locations(id) ON DELETE RESTRICT NOT VALID; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
     `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers ADD CONSTRAINT stock_transfer_vouchers_source_location_id_fkey FOREIGN KEY (source_location_id) REFERENCES locations(id) ON DELETE RESTRICT NOT VALID; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
 
-      // ── F-Phase 5 (May 2026) — companies long-tail FKs (137 children: 136 clean + 1 NOT VALID, the "final boss" batch) ──
-      // Survey: ALL 137 unenforced company_id children scanned. Surprisingly clean — only ONE child has orphans:
-      //   chat_messages (16/141 orphans → NOT VALID).
-      // Other 136 children all have ZERO orphans → fully validated FK.
-      // RESTRICT on all — companies are tenant roots; deletion must be blocked while ANY child exists.
-      // Schema.ts: NOT updated for any of these 137 tables — would create massive churn. Per project convention (replit.md),
-      //   schema.ts is "authoritative for clean rebuilds" but the migrations array in server/index.ts is the runtime authority.
-      //   Drizzle-kit push is blocked anyway, so schema.ts/DB drift on company_id is intentional and documented.
-      //   This is the same pattern used for bales.erp_location_id in F-Phase 4b.
-      // Idempotent: ALTER guarded by EXCEPTION duplicate_object. NOT VALID preserves chat_messages orphans.
-      `DO $$ BEGIN ALTER TABLE agent_accounts ADD CONSTRAINT agent_accounts_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
+    // ── F-Phase 5 (May 2026) — companies long-tail FKs (137 children: 136 clean + 1 NOT VALID, the "final boss" batch) ──
+    // Survey: ALL 137 unenforced company_id children scanned. Surprisingly clean — only ONE child has orphans:
+    //   chat_messages (16/141 orphans → NOT VALID).
+    // Other 136 children all have ZERO orphans → fully validated FK.
+    // RESTRICT on all — companies are tenant roots; deletion must be blocked while ANY child exists.
+    // Schema.ts: NOT updated for any of these 137 tables — would create massive churn. Per project convention (replit.md),
+    //   schema.ts is "authoritative for clean rebuilds" but the migrations array in server/index.ts is the runtime authority.
+    //   Drizzle-kit push is blocked anyway, so schema.ts/DB drift on company_id is intentional and documented.
+    //   This is the same pattern used for bales.erp_location_id in F-Phase 4b.
+    // Idempotent: ALTER guarded by EXCEPTION duplicate_object. NOT VALID preserves chat_messages orphans.
+    `DO $$ BEGIN ALTER TABLE agent_accounts ADD CONSTRAINT agent_accounts_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE audit_log ADD CONSTRAINT audit_log_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE bale_label_prints ADD CONSTRAINT bale_label_prints_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE bale_product_categories ADD CONSTRAINT bale_product_categories_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
@@ -2573,52 +2582,52 @@ let migrationsDone = false;
     `DO $$ BEGIN ALTER TABLE whatsapp_recipients ADD CONSTRAINT whatsapp_recipients_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE whatsapp_stock_settings ADD CONSTRAINT whatsapp_stock_settings_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
     `DO $$ BEGIN ALTER TABLE worker_bonuses ADD CONSTRAINT worker_bonuses_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
-      `DO $$ BEGIN ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT NOT VALID; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
+    `DO $$ BEGIN ALTER TABLE chat_messages ADD CONSTRAINT chat_messages_company_id_fkey FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT NOT VALID; EXCEPTION WHEN duplicate_object THEN NULL;  END $$;`,
 
-      // ── NOT VALID promotion (Phases A, B, C — May 2026) ─────────────────────
-      // After archiving 16,272 orphan rows in dev to _orphan_archive_* tables,
-      // all 12 NOT VALID constraints were validated. These ALTER ... VALIDATE
-      // statements are idempotent: once a constraint is validated, re-running
-      // is a no-op. Only `undefined_object` (constraint name doesn't exist in
-      // an older schema) is swallowed — `foreign_key_violation` (orphans still
-      // present) intentionally propagates so production failures are loud and
-      // forced to be remediated before deploy completes.
-      `DO $$ BEGIN ALTER TABLE chat_messages VALIDATE CONSTRAINT chat_messages_company_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE container_offloads VALIDATE CONSTRAINT container_offloads_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE factory_container_commissions VALIDATE CONSTRAINT factory_container_commissions_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE factory_fx_allocations VALIDATE CONSTRAINT factory_fx_allocations_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE factory_raw_stock VALIDATE CONSTRAINT factory_raw_stock_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE import_logs VALIDATE CONSTRAINT import_logs_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE inventory VALIDATE CONSTRAINT inventory_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE stock_adjustment_vouchers VALIDATE CONSTRAINT stock_adjustment_vouchers_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE stock_transfer_items VALIDATE CONSTRAINT stock_transfer_items_source_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE stock_transfer_items VALIDATE CONSTRAINT stock_transfer_items_transfer_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers VALIDATE CONSTRAINT stock_transfer_vouchers_destination_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
-      `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers VALIDATE CONSTRAINT stock_transfer_vouchers_source_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    // ── NOT VALID promotion (Phases A, B, C — May 2026) ─────────────────────
+    // After archiving 16,272 orphan rows in dev to _orphan_archive_* tables,
+    // all 12 NOT VALID constraints were validated. These ALTER ... VALIDATE
+    // statements are idempotent: once a constraint is validated, re-running
+    // is a no-op. Only `undefined_object` (constraint name doesn't exist in
+    // an older schema) is swallowed — `foreign_key_violation` (orphans still
+    // present) intentionally propagates so production failures are loud and
+    // forced to be remediated before deploy completes.
+    `DO $$ BEGIN ALTER TABLE chat_messages VALIDATE CONSTRAINT chat_messages_company_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE container_offloads VALIDATE CONSTRAINT container_offloads_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_container_commissions VALIDATE CONSTRAINT factory_container_commissions_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_fx_allocations VALIDATE CONSTRAINT factory_fx_allocations_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE factory_raw_stock VALIDATE CONSTRAINT factory_raw_stock_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE import_logs VALIDATE CONSTRAINT import_logs_container_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE inventory VALIDATE CONSTRAINT inventory_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_adjustment_vouchers VALIDATE CONSTRAINT stock_adjustment_vouchers_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_transfer_items VALIDATE CONSTRAINT stock_transfer_items_source_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_transfer_items VALIDATE CONSTRAINT stock_transfer_items_transfer_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers VALIDATE CONSTRAINT stock_transfer_vouchers_destination_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
+    `DO $$ BEGIN ALTER TABLE stock_transfer_vouchers VALIDATE CONSTRAINT stock_transfer_vouchers_source_location_id_fkey; EXCEPTION WHEN undefined_object THEN NULL; END $$;`,
 
-      // ── Phase 4+5 perf indexes (May 2026) — hot-path scoping ────────────────
-      // 12 strategic indexes covering bale-pick, customer-order, voucher-entry,
-      // and inventory hot paths surfaced by the Customer-Ledger Phase 9 / factory
-      // override audit. All idempotent CREATE INDEX IF NOT EXISTS.
-      `CREATE INDEX IF NOT EXISTS factory_bales_company_idx ON factory_bales(company_id)`,
-      `CREATE INDEX IF NOT EXISTS factory_bales_status_idx ON factory_bales(status)`,
-      `CREATE INDEX IF NOT EXISTS factory_bales_product_idx ON factory_bales(product_id)`,
-      `CREATE INDEX IF NOT EXISTS factory_bales_company_status_idx ON factory_bales(company_id, status)`,
-      `CREATE INDEX IF NOT EXISTS customer_orders_company_idx ON customer_orders(company_id)`,
-      `CREATE INDEX IF NOT EXISTS customer_orders_customer_idx ON customer_orders(customer_id)`,
-      `CREATE INDEX IF NOT EXISTS customer_orders_status_idx ON customer_orders(status)`,
-      `CREATE INDEX IF NOT EXISTS customer_order_bales_order_idx ON customer_order_bales(order_id)`,
-      `CREATE INDEX IF NOT EXISTS customer_order_bales_bale_idx ON customer_order_bales(bale_id)`,
-      `CREATE INDEX IF NOT EXISTS voucher_entries_ledger_voucher_idx ON voucher_entries(ledger_account_id, voucher_id)`,
-      `CREATE INDEX IF NOT EXISTS voucher_entries_voucher_id_idx ON voucher_entries(voucher_id)`,
-      `CREATE INDEX IF NOT EXISTS voucher_entries_customer_id_idx ON voucher_entries(customer_id)`,
-      `CREATE INDEX IF NOT EXISTS vouchers_company_date_idx ON vouchers(company_id, voucher_date)`,
-      `CREATE INDEX IF NOT EXISTS inventory_location_idx ON inventory(location_id)`,
+    // ── Phase 4+5 perf indexes (May 2026) — hot-path scoping ────────────────
+    // 12 strategic indexes covering bale-pick, customer-order, voucher-entry,
+    // and inventory hot paths surfaced by the Customer-Ledger Phase 9 / factory
+    // override audit. All idempotent CREATE INDEX IF NOT EXISTS.
+    `CREATE INDEX IF NOT EXISTS factory_bales_company_idx ON factory_bales(company_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_bales_status_idx ON factory_bales(status)`,
+    `CREATE INDEX IF NOT EXISTS factory_bales_product_idx ON factory_bales(product_id)`,
+    `CREATE INDEX IF NOT EXISTS factory_bales_company_status_idx ON factory_bales(company_id, status)`,
+    `CREATE INDEX IF NOT EXISTS customer_orders_company_idx ON customer_orders(company_id)`,
+    `CREATE INDEX IF NOT EXISTS customer_orders_customer_idx ON customer_orders(customer_id)`,
+    `CREATE INDEX IF NOT EXISTS customer_orders_status_idx ON customer_orders(status)`,
+    `CREATE INDEX IF NOT EXISTS customer_order_bales_order_idx ON customer_order_bales(order_id)`,
+    `CREATE INDEX IF NOT EXISTS customer_order_bales_bale_idx ON customer_order_bales(bale_id)`,
+    `CREATE INDEX IF NOT EXISTS voucher_entries_ledger_voucher_idx ON voucher_entries(ledger_account_id, voucher_id)`,
+    `CREATE INDEX IF NOT EXISTS voucher_entries_voucher_id_idx ON voucher_entries(voucher_id)`,
+    `CREATE INDEX IF NOT EXISTS voucher_entries_customer_id_idx ON voucher_entries(customer_id)`,
+    `CREATE INDEX IF NOT EXISTS vouchers_company_date_idx ON vouchers(company_id, voucher_date)`,
+    `CREATE INDEX IF NOT EXISTS inventory_location_idx ON inventory(location_id)`,
 
-      // ── Tables flagged missing from runtime migrations by audit (May 2026) ────
-      // These exist in shared/schema.ts but had no CREATE TABLE in this array,
-      // so a fresh deploy on Render would fail. All idempotent.
-      `CREATE TABLE IF NOT EXISTS bale_transfer_items (
+    // ── Tables flagged missing from runtime migrations by audit (May 2026) ────
+    // These exist in shared/schema.ts but had no CREATE TABLE in this array,
+    // so a fresh deploy on Render would fail. All idempotent.
+    `CREATE TABLE IF NOT EXISTS bale_transfer_items (
         id serial PRIMARY KEY,
         transfer_id integer NOT NULL,
         production_bale_id integer NOT NULL,
@@ -2628,7 +2637,7 @@ let migrationsDone = false;
         total_cost numeric(20,2) NOT NULL,
         created_at timestamp NOT NULL DEFAULT now()
       )`,
-      `CREATE TABLE IF NOT EXISTS factory_daybook_entry_edits (
+    `CREATE TABLE IF NOT EXISTS factory_daybook_entry_edits (
         id serial PRIMARY KEY,
         daybook_entry_id integer NOT NULL,
         edited_at timestamp NOT NULL DEFAULT now(),
@@ -2637,51 +2646,51 @@ let migrationsDone = false;
         after_json text,
         reason text NOT NULL
       )`,
-      `CREATE INDEX IF NOT EXISTS daybook_edits_entry_idx ON factory_daybook_entry_edits(daybook_entry_id)`,
-      `CREATE TABLE IF NOT EXISTS system_settings (
+    `CREATE INDEX IF NOT EXISTS daybook_edits_entry_idx ON factory_daybook_entry_edits(daybook_entry_id)`,
+    `CREATE TABLE IF NOT EXISTS system_settings (
         id serial PRIMARY KEY,
         key varchar(100) NOT NULL UNIQUE,
         value text,
         updated_at timestamp NOT NULL DEFAULT now()
       )`,
 
-      // ── Wave 1 soft-delete columns (Task #10) ──────────────────────────────
-      // All idempotent: ADD COLUMN IF NOT EXISTS is safe to run repeatedly.
-      `ALTER TABLE locations ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS is_hidden boolean NOT NULL DEFAULT false`,
-      `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`,
-      `ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS stock_group_id integer REFERENCES stock_groups(id) ON DELETE SET NULL`,
-      `ALTER TABLE stock_groups ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE customers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE stock_group_location_archives ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE factory_categories ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE factory_bale_products ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE factory_raw_material_adjustments ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE factory_raw_material_adjustments ADD COLUMN IF NOT EXISTS reference varchar(200)`,
-      `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS worker_name TEXT`,
-      `UPDATE factory_bales fb SET worker_name = fw.full_name FROM factory_workers fw WHERE fb.finalized_by = fw.id AND fb.worker_name IS NULL`,
-      `ALTER TABLE customer_proformas ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
-      `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    // ── Wave 1 soft-delete columns (Task #10) ──────────────────────────────
+    // All idempotent: ADD COLUMN IF NOT EXISTS is safe to run repeatedly.
+    `ALTER TABLE locations ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS is_hidden boolean NOT NULL DEFAULT false`,
+    `ALTER TABLE ledger_accounts ADD COLUMN IF NOT EXISTS created_at timestamp NOT NULL DEFAULT now()`,
+    `ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE suppliers ADD COLUMN IF NOT EXISTS stock_group_id integer REFERENCES stock_groups(id) ON DELETE SET NULL`,
+    `ALTER TABLE stock_groups ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE stock_items ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE bank_accounts ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE vouchers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE customers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE stock_group_location_archives ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE factory_categories ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE factory_bale_products ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE factory_containers ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE factory_raw_stock ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE factory_raw_material_adjustments ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE factory_raw_material_adjustments ADD COLUMN IF NOT EXISTS reference varchar(200)`,
+    `ALTER TABLE factory_mix_batches ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE factory_bales ADD COLUMN IF NOT EXISTS worker_name TEXT`,
+    `UPDATE factory_bales fb SET worker_name = fw.full_name FROM factory_workers fw WHERE fb.finalized_by = fw.id AND fb.worker_name IS NULL`,
+    `ALTER TABLE customer_proformas ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
+    `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS deleted_at timestamp`,
 
-      // ── Fix GUAR-CASH voucher entry orientation for landlord companies (May 2026) ──
-      // Bug: guarantee-to-cash for properties (landlord) companies created entries with
-      // Dr Tenant Deposits / Cr Cash instead of the correct Dr Cash / Cr Tenant Deposits.
-      // This made both the journal entry AND the auto-transfer credit the cashbox, doubling
-      // the outflow. The correct flow: Dr Cash (deposit in) then auto-transfer Cr Cash
-      // (cash out), netting to zero on the cashbox.
-      // Idempotent: once Tenant Deposits has credit_amount > 0, debit_amount = 0 condition
-      // no longer matches and the UPDATE is skipped.
-      `DO $$
+    // ── Fix GUAR-CASH voucher entry orientation for landlord companies (May 2026) ──
+    // Bug: guarantee-to-cash for properties (landlord) companies created entries with
+    // Dr Tenant Deposits / Cr Cash instead of the correct Dr Cash / Cr Tenant Deposits.
+    // This made both the journal entry AND the auto-transfer credit the cashbox, doubling
+    // the outflow. The correct flow: Dr Cash (deposit in) then auto-transfer Cr Cash
+    // (cash out), netting to zero on the cashbox.
+    // Idempotent: once Tenant Deposits has credit_amount > 0, debit_amount = 0 condition
+    // no longer matches and the UPDATE is skipped.
+    `DO $$
       DECLARE
         bad_voucher_ids integer[];
       BEGIN
@@ -4198,7 +4207,7 @@ END $$`,
     `ALTER TABLE customer_order_lines ADD COLUMN IF NOT EXISTS price_per_kg decimal(20,4)`,
     // Hide individual loadings from the list (June 2026)
     `ALTER TABLE customer_orders ADD COLUMN IF NOT EXISTS is_hidden BOOLEAN NOT NULL DEFAULT FALSE`,
-    ];
+  ];
 
   // /api/health/db — reports migration status but does NOT block deployment.
   // The deployment health check uses /api/health (always 200) so Render never times out.
@@ -4226,13 +4235,13 @@ END $$`,
   // Without this, Express closes sockets at 5 s (Node default), causing the
   // proxy to send a request on a dead connection → socket hang-up retries.
   server.keepAliveTimeout = 65_000;
-  server.headersTimeout   = 66_000;
+  server.headersTimeout = 66_000;
   setupWS(server);
-  if (process.env.ENABLE_SCHEDULERS !== 'false') {
+  if (process.env.ENABLE_SCHEDULERS !== "false") {
     startScheduler();
-    console.log('[Schedulers] Started (ENABLE_SCHEDULERS != false)');
+    console.log("[Schedulers] Started (ENABLE_SCHEDULERS != false)");
   } else {
-    console.log('[Schedulers] Disabled via ENABLE_SCHEDULERS=false');
+    console.log("[Schedulers] Disabled via ENABLE_SCHEDULERS=false");
   }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -4252,14 +4261,15 @@ END $$`,
 
     const status = err.status || err.statusCode || 500;
     const isProduction = process.env.NODE_ENV === "production";
-    
+
     if (status >= 500) {
       console.error("[Server Error]", isProduction ? err.message : err);
     }
-    
-    const message = isProduction && status >= 500
-      ? "An unexpected error occurred. Please try again."
-      : (err.message || "Internal Server Error");
+
+    const message =
+      isProduction && status >= 500
+        ? "An unexpected error occurred. Please try again."
+        : err.message || "Internal Server Error";
 
     res.status(status).json({ message });
   });
@@ -4274,25 +4284,25 @@ END $$`,
     const distPath = path.resolve(import.meta.dirname, "public");
 
     if (!fs.existsSync(distPath)) {
-      throw new Error(
-        `Could not find the build directory: ${distPath}, make sure to build the client first`,
-      );
+      throw new Error(`Could not find the build directory: ${distPath}, make sure to build the client first`);
     }
 
     // Serve static assets with cache control
-    app.use(express.static(distPath, {
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith('index.html')) {
-          // Never cache index.html to prevent suppress stale bundles
-          res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-          res.setHeader('Pragma', 'no-cache');
-          res.setHeader('Expires', '0');
-        } else {
-          // Allow long-term caching for hashed assets
-          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-        }
-      }
-    }));
+    app.use(
+      express.static(distPath, {
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith("index.html")) {
+            // Never cache index.html to prevent suppress stale bundles
+            res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+            res.setHeader("Pragma", "no-cache");
+            res.setHeader("Expires", "0");
+          } else {
+            // Allow long-term caching for hashed assets
+            res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+          }
+        },
+      })
+    );
 
     // Return 404 for /assets/* that express.static didn't find.
     // This prevents the SPA index.html fallback from being served as JavaScript,
@@ -4303,9 +4313,9 @@ END $$`,
 
     // Fallback to index.html with no-cache headers (SPA routing)
     app.use("*", (_req, res) => {
-      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
       res.sendFile(path.resolve(distPath, "index.html"));
     });
   }
@@ -4314,12 +4324,13 @@ END $$`,
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
 
   const runMigrations = async () => {
     // Use a dedicated single Client for migrations — completely separate from the
     // shared connection pool so migrations never starve user requests of connections.
-    const connectionString = process.env.DATABASE_URL ||
+    const connectionString =
+      process.env.DATABASE_URL ||
       `postgresql://${process.env.PGUSER}:${process.env.PGPASSWORD}@${process.env.PGHOST}:${process.env.PGPORT}/${process.env.PGDATABASE}`;
     const isLocalReplitDB = process.env.PGHOST === "helium" || connectionString.includes("@helium:");
     const sslExplicitlyDisabled = process.env.PGSSLMODE === "disable";
@@ -4371,7 +4382,8 @@ END $mig$`;
             /terminating connection|connection.*reset|could not connect|connection closed|socket.*hang/i.test(errMsg);
 
           // PG lock_timeout code is 55P03
-          const isLockTimeout = errCode === "55P03" || /lock timeout|canceling statement due to lock timeout/i.test(errMsg);
+          const isLockTimeout =
+            errCode === "55P03" || /lock timeout|canceling statement due to lock timeout/i.test(errMsg);
 
           if (isConnDrop) {
             // Reconnect and retry once — if retry also fails, record as a failure
@@ -4396,8 +4408,10 @@ END $mig$`;
             }
           } else if (isLockTimeout) {
             // Lock timeout — wait 5 s for in-flight queries to drain, then retry once
-            console.warn(`[Migration] Lock timeout — waiting 5s before retry... (${migration.trim().substring(0, 80)})`);
-            await new Promise(r => setTimeout(r, 5000));
+            console.warn(
+              `[Migration] Lock timeout — waiting 5s before retry... (${migration.trim().substring(0, 80)})`
+            );
+            await new Promise((r) => setTimeout(r, 5000));
             try {
               await migrationClient.query(safeMigration(migration));
               console.log(`[Migration] Lock-timeout retry succeeded`);
@@ -4441,14 +4455,14 @@ END $mig$`;
         const tableCheck = await migrationClient.query(
           `SELECT table_name FROM information_schema.tables
            WHERE table_schema = 'public' AND table_name = ANY($1)`,
-          [IC_TABLES],
+          [IC_TABLES]
         );
         const found = new Set<string>(tableCheck.rows.map((r: any) => r.table_name as string));
-        const missing = IC_TABLES.filter(t => !found.has(t));
+        const missing = IC_TABLES.filter((t) => !found.has(t));
         if (missing.length > 0) {
           console.error(
             `✗ Missing critical tables after migration: ${missing.join(", ")} — ` +
-            `IC notification feature will not work. Run the CREATE TABLE statements manually.`,
+              `IC notification feature will not work. Run the CREATE TABLE statements manually.`
           );
         }
       } catch (tableCheckErr: any) {
@@ -4491,7 +4505,9 @@ END $mig$`;
                 AND d.tx_type = 'POS_EXPENSE'
             )
         `);
-      } catch { /* table may not exist yet — skip */ }
+      } catch {
+        /* table may not exist yet — skip */
+      }
 
       // Ensure customer invoice sequences start at 11827 (or higher if already advanced)
       try {
@@ -4500,7 +4516,9 @@ END $mig$`;
           SET next_number = 11827
           WHERE next_number < 11827
         `);
-      } catch { /* skip if table not ready */ }
+      } catch {
+        /* skip if table not ready */
+      }
 
       // One-time fix: correct reversed rental auto-transfer entries on the TO company side.
       // Previously, TR-IN vouchers incorrectly DEBITED the clearing account and CREDITED the
@@ -4521,7 +4539,9 @@ END $mig$`;
               AND ve2.debit_amount::numeric > 0
           )
         `);
-      } catch { /* skip if tables not ready */ }
+      } catch {
+        /* skip if tables not ready */
+      }
 
       // Fix: cascade overpaid rental months to the correct next available month.
       // Handles two cases:
@@ -4533,10 +4553,11 @@ END $mig$`;
       // Written as plain JS (not PL/pgSQL) so every step is logged and errors are visible.
       try {
         const now = new Date();
-        const nowYear  = now.getFullYear();
+        const nowYear = now.getFullYear();
         const nowMonth = now.getMonth() + 1;
 
-        const overpaidResult = await migrationClient.query(`
+        const overpaidResult = await migrationClient.query(
+          `
           SELECT
             pml.id,
             pml.company_id,
@@ -4564,22 +4585,26 @@ END $mig$`;
             )
           )
           ORDER BY pml.contract_id, pml.year, pml.month
-        `, [nowYear, nowMonth]);
+        `,
+          [nowYear, nowMonth]
+        );
 
         console.log(`[RentalFix] Found ${overpaidResult.rows.length} overpaid ledger row(s) to fix`);
 
         for (const row of overpaidResult.rows) {
-          const paidAmt    = Number(row.paid_amount);
+          const paidAmt = Number(row.paid_amount);
           const expectedAmt = Number(row.expected_amount);
-          const rentalAmt  = Number(row.rental_amount);
+          const rentalAmt = Number(row.rental_amount);
 
           const capacity = expectedAmt > 0 ? expectedAmt : rentalAmt;
-          const excess   = paidAmt - capacity;
+          const excess = paidAmt - capacity;
 
           if (excess < 0.005) continue;
 
-          console.log(`[RentalFix] contract=${row.contract_id} ledger=${row.id} ` +
-            `month=${row.year}/${row.month} paid=${paidAmt} capacity=${capacity} excess=${excess}`);
+          console.log(
+            `[RentalFix] contract=${row.contract_id} ledger=${row.id} ` +
+              `month=${row.year}/${row.month} paid=${paidAmt} capacity=${capacity} excess=${excess}`
+          );
 
           // 1. Reduce the overpaid row
           await migrationClient.query(
@@ -4588,11 +4613,14 @@ END $mig$`;
           );
 
           // 2. Search forward for the first month with remaining capacity
-          let checkYear  = row.year;
+          let checkYear = row.year;
           let checkMonth = row.month + 1;
-          if (checkMonth > 12) { checkMonth = 1; checkYear++; }
+          if (checkMonth > 12) {
+            checkMonth = 1;
+            checkYear++;
+          }
 
-          let targetYear: number | null  = null;
+          let targetYear: number | null = null;
           let targetMonth: number | null = null;
 
           for (let i = 0; i < 200; i++) {
@@ -4603,37 +4631,42 @@ END $mig$`;
               [row.contract_id, checkYear, checkMonth]
             );
 
-            const slotPaid = slotResult.rows.length > 0
-              ? Number(slotResult.rows[0].paid_amount)
-              : null;
+            const slotPaid = slotResult.rows.length > 0 ? Number(slotResult.rows[0].paid_amount) : null;
 
             // Available if: row doesn't exist yet, OR paid < rental_amount
             if (slotPaid === null || slotPaid < rentalAmt) {
-              targetYear  = checkYear;
+              targetYear = checkYear;
               targetMonth = checkMonth;
               break;
             }
 
             checkMonth++;
-            if (checkMonth > 12) { checkMonth = 1; checkYear++; }
+            if (checkMonth > 12) {
+              checkMonth = 1;
+              checkYear++;
+            }
           }
 
           if (targetYear === null || targetMonth === null) {
-            console.warn(`[RentalFix] No target slot found for contract=${row.contract_id} ledger=${row.id} — skipping`);
+            console.warn(
+              `[RentalFix] No target slot found for contract=${row.contract_id} ledger=${row.id} — skipping`
+            );
             continue;
           }
 
           console.log(`[RentalFix] → moving excess $${excess} to ${targetYear}/${targetMonth}`);
 
           // 3. Create or top-up the target month
-          await migrationClient.query(`
+          await migrationClient.query(
+            `
             INSERT INTO property_monthly_ledger
               (company_id, module, contract_id, unit_id, year, month, expected_amount, paid_amount, created_at)
             VALUES ($1, $2, $3, $4, $5, $6, 0, $7, NOW())
             ON CONFLICT (contract_id, year, month)
             DO UPDATE SET paid_amount = property_monthly_ledger.paid_amount + EXCLUDED.paid_amount
-          `, [row.company_id, row.module, row.contract_id, row.unit_id,
-              targetYear, targetMonth, excess.toFixed(2)]);
+          `,
+            [row.company_id, row.module, row.contract_id, row.unit_id, targetYear, targetMonth, excess.toFixed(2)]
+          );
 
           // 4. Reassign the most-recent payment from the overpaid month → target month
           const newLedger = await migrationClient.query(
@@ -4643,7 +4676,8 @@ END $mig$`;
           );
           if (newLedger.rows.length > 0) {
             const newLedgerId = newLedger.rows[0].id;
-            await migrationClient.query(`
+            await migrationClient.query(
+              `
               UPDATE property_payments
               SET for_year = $1, for_month = $2, ledger_row_id = $3
               WHERE id = (
@@ -4652,11 +4686,14 @@ END $mig$`;
                 ORDER BY created_at DESC
                 LIMIT 1
               )
-            `, [targetYear, targetMonth, newLedgerId,
-                row.contract_id, row.year, row.month]);
+            `,
+              [targetYear, targetMonth, newLedgerId, row.contract_id, row.year, row.month]
+            );
           }
 
-          console.log(`[RentalFix] Done: contract=${row.contract_id} fixed ${row.year}/${row.month} → ${targetYear}/${targetMonth}`);
+          console.log(
+            `[RentalFix] Done: contract=${row.contract_id} fixed ${row.year}/${row.month} → ${targetYear}/${targetMonth}`
+          );
         }
 
         console.log("[RentalFix] Rental overpayment fix complete");
@@ -4673,7 +4710,9 @@ END $mig$`;
           SET status = 'OFFLOADED'
           WHERE status = 'PARTIALLY_OFFLOADED'
         `);
-      } catch { /* skip if table not ready */ }
+      } catch {
+        /* skip if table not ready */
+      }
 
       // ── Fix misallocated property payments ──────────────────────────────────────
       // Phase 1 (JS): For each active contract, re-process payments in date order
@@ -4696,22 +4735,32 @@ END $mig$`;
           const compId = Number(contract.company_id);
 
           // Load all payments that link to a ledger row (rent + guarantee-applied)
-          const pmts = (await migrationClient.query(`
+          const pmts = (
+            await migrationClient.query(
+              `
             SELECT id, amount::numeric AS amount, for_year, for_month, ledger_row_id
             FROM property_payments
             WHERE contract_id = $1 AND company_id = $2
               AND ledger_row_id IS NOT NULL
             ORDER BY payment_date, id
-          `, [cid, compId])).rows;
+          `,
+              [cid, compId]
+            )
+          ).rows;
           if (!pmts.length) continue;
 
           // Load all ledger rows ordered oldest first
-          const ledger = (await migrationClient.query(`
+          const ledger = (
+            await migrationClient.query(
+              `
             SELECT id, year, month, expected_amount::numeric AS expected
             FROM property_monthly_ledger
             WHERE contract_id = $1 AND company_id = $2
             ORDER BY year, month
-          `, [cid, compId])).rows;
+          `,
+              [cid, compId]
+            )
+          ).rows;
           if (!ledger.length) continue;
 
           // In-memory map: key="year-month", value={id, expected, paid(reset to 0)}
@@ -4727,7 +4776,8 @@ END $mig$`;
 
             while (rem > 0.005) {
               // Find oldest month with remaining capacity
-              let tgt: { key: string; year: number; month: number; id: number; expected: number; paid: number } | null = null;
+              let tgt: { key: string; year: number; month: number; id: number; expected: number; paid: number } | null =
+                null;
               for (const [key, row] of lmap) {
                 if (row.expected - row.paid > 0.005) {
                   const [y, m] = key.split("-").map(Number);
@@ -4746,16 +4796,21 @@ END $mig$`;
                 firstChunk = false;
                 // Update payment if it points to wrong ledger row
                 const origLedgerId = Number(pmt.ledger_row_id);
-                const origForYear  = Number(pmt.for_year);
+                const origForYear = Number(pmt.for_year);
                 const origForMonth = Number(pmt.for_month);
                 if (origLedgerId !== tgt.id || origForYear !== tgt.year || origForMonth !== tgt.month) {
-                  await migrationClient.query(`
+                  await migrationClient.query(
+                    `
                     UPDATE property_payments
                     SET ledger_row_id = $1, for_year = $2, for_month = $3
                     WHERE id = $4
-                  `, [tgt.id, tgt.year, tgt.month, Number(pmt.id)]);
+                  `,
+                    [tgt.id, tgt.year, tgt.month, Number(pmt.id)]
+                  );
                   pmtFixed++;
-                  console.log(`[AllocationFix] pmt=${pmt.id} contract=${cid} moved ${origForYear}/${origForMonth} → ${tgt.year}/${tgt.month}`);
+                  console.log(
+                    `[AllocationFix] pmt=${pmt.id} contract=${cid} moved ${origForYear}/${origForMonth} → ${tgt.year}/${tgt.month}`
+                  );
                 }
               }
             }
@@ -4796,9 +4851,7 @@ END $mig$`;
       // and CONSUMPTION_EXPENSE (Indirect Expense). Now a single STOCK_ADJUSTMENT
       // account is used for both sides. This runs once per company and is idempotent.
       try {
-        const companies = await migrationClient.query(
-          `SELECT id FROM companies`
-        );
+        const companies = await migrationClient.query(`SELECT id FROM companies`);
         let mergedCount = 0;
         for (const { id: cid } of companies.rows) {
           const oldAccts = await migrationClient.query(
@@ -4854,7 +4907,9 @@ END $mig$`;
           mergedCount++;
         }
         if (mergedCount > 0) {
-          console.log(`[StockAdjFix] Merged Production/Consumption accounts → unified STOCK_ADJUSTMENT for ${mergedCount} company(ies)`);
+          console.log(
+            `[StockAdjFix] Merged Production/Consumption accounts → unified STOCK_ADJUSTMENT for ${mergedCount} company(ies)`
+          );
         } else {
           console.log(`[StockAdjFix] All companies already use unified STOCK_ADJUSTMENT — nothing to merge`);
         }
@@ -4887,26 +4942,33 @@ END $mig$`;
 
           for (const cid of companyIds) {
             // Find existing "Sales Returns" account or create one
-            const { rows: existing } = await migrationClient.query(`
+            const { rows: existing } = await migrationClient.query(
+              `
               SELECT id FROM ledger_accounts
               WHERE company_id = $1
                 AND (LOWER(name) LIKE '%sales return%' OR code = 'SALES-RETURNS')
               LIMIT 1
-            `, [cid]);
+            `,
+              [cid]
+            );
 
             let accountId: number;
             if (existing.length > 0) {
               accountId = existing[0].id;
             } else {
-              const { rows: created } = await migrationClient.query(`
+              const { rows: created } = await migrationClient.query(
+                `
                 INSERT INTO ledger_accounts (company_id, code, name, account_type, active, is_hidden)
                 VALUES ($1, 'SALES-RETURNS', 'Sales Returns & Allowances', 'Income', true, false)
                 ON CONFLICT DO NOTHING
                 RETURNING id
-              `, [cid]);
+              `,
+                [cid]
+              );
               if (created.length === 0) {
                 const { rows: refetch } = await migrationClient.query(
-                  `SELECT id FROM ledger_accounts WHERE company_id = $1 AND code = 'SALES-RETURNS' LIMIT 1`, [cid]
+                  `SELECT id FROM ledger_accounts WHERE company_id = $1 AND code = 'SALES-RETURNS' LIMIT 1`,
+                  [cid]
                 );
                 accountId = refetch[0]?.id;
               } else {
@@ -4915,18 +4977,18 @@ END $mig$`;
             }
             if (!accountId!) continue;
 
-            const entryIds = badVariance.rows
-              .filter((r: any) => Number(r.company_id) === cid)
-              .map((r: any) => r.id);
+            const entryIds = badVariance.rows.filter((r: any) => Number(r.company_id) === cid).map((r: any) => r.id);
 
-            await migrationClient.query(
-              `UPDATE voucher_entries SET ledger_account_id = $1 WHERE id = ANY($2)`,
-              [accountId, entryIds]
-            );
+            await migrationClient.query(`UPDATE voucher_entries SET ledger_account_id = $1 WHERE id = ANY($2)`, [
+              accountId,
+              entryIds,
+            ]);
             totalFixed += entryIds.length;
           }
 
-          console.log(`[CreditNoteVarianceFix] Moved ${totalFixed} variance entry/entries → Sales Returns & Allowances`);
+          console.log(
+            `[CreditNoteVarianceFix] Moved ${totalFixed} variance entry/entries → Sales Returns & Allowances`
+          );
         }
       } catch (e: any) {
         console.error("[CreditNoteVarianceFix] Error:", e.message);
@@ -4975,7 +5037,9 @@ END $mig$`;
           await migrationClient.query(
             `SELECT setval('${seq}', GREATEST((SELECT COALESCE(MAX(id), 1) FROM ${table}), 1))`
           );
-        } catch { /* table may not exist yet on first run — skip */ }
+        } catch {
+          /* table may not exist yet on first run — skip */
+        }
       }
     } catch (err: any) {
       console.error("Migration connection error:", err.message);
@@ -5005,9 +5069,11 @@ END $mig$`;
 
   // Ensure Puppeteer's Chrome binary is present before the server starts
   // accepting tracking requests.  Runs in background — does not block startup.
-  import("./lib/parcelsAppScraper").then(({ ensureChromiumAvailable }) => {
-    ensureChromiumAvailable().catch(() => {});
-  }).catch(() => {});
+  import("./lib/parcelsAppScraper")
+    .then(({ ensureChromiumAvailable }) => {
+      ensureChromiumAvailable().catch(() => {});
+    })
+    .catch(() => {});
 
   // ── Post-startup background jobs (run after port is open) ───────────────────
   const runPostStartupJobs = () => {
@@ -5015,35 +5081,33 @@ END $mig$`;
     // connections the moment the server goes live.
     setTimeout(async () => {
       try {
-        const [
-          posRows,
-          posWithStation,
-          normalUserRows,
-          oldRoleRows,
-          canDeleteCol,
-        ] = await Promise.all([
+        const [posRows, posWithStation, normalUserRows, oldRoleRows, canDeleteCol] = await Promise.all([
           pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'POS'`),
           pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'POS' AND pos_station IS NOT NULL`),
           pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role = 'Normal User'`),
-          pool.query(`SELECT COUNT(*) AS n FROM user_company_roles WHERE role IN ('POS1','POS2','POS3','POS4','POS5','POS6','User')`),
+          pool.query(
+            `SELECT COUNT(*) AS n FROM user_company_roles WHERE role IN ('POS1','POS2','POS3','POS4','POS5','POS6','User')`
+          ),
           pool.query(
             `SELECT COUNT(*) AS n FROM information_schema.columns
              WHERE table_name = 'user_company_roles' AND column_name = 'can_delete_records'`
           ),
         ]);
-        const posCount      = parseInt(posRows.rows[0]?.n ?? "0", 10);
-        const posWithStn    = parseInt(posWithStation.rows[0]?.n ?? "0", 10);
-        const normalCount   = parseInt(normalUserRows.rows[0]?.n ?? "0", 10);
-        const oldRoleCount  = parseInt(oldRoleRows.rows[0]?.n ?? "0", 10);
-        const canDeleteOk   = parseInt(canDeleteCol.rows[0]?.n ?? "0", 10) > 0;
+        const posCount = parseInt(posRows.rows[0]?.n ?? "0", 10);
+        const posWithStn = parseInt(posWithStation.rows[0]?.n ?? "0", 10);
+        const normalCount = parseInt(normalUserRows.rows[0]?.n ?? "0", 10);
+        const oldRoleCount = parseInt(oldRoleRows.rows[0]?.n ?? "0", 10);
+        const canDeleteOk = parseInt(canDeleteCol.rows[0]?.n ?? "0", 10) > 0;
         console.log(
           `[MigrationDiag] POS roles: ${posCount} (${posWithStn} with pos_station set) | ` +
-          `Normal User roles: ${normalCount} | ` +
-          `Old roles remaining: ${oldRoleCount} | ` +
-          `can_delete_records column: ${canDeleteOk ? "✓ present" : "✗ MISSING"}`
+            `Normal User roles: ${normalCount} | ` +
+            `Old roles remaining: ${oldRoleCount} | ` +
+            `can_delete_records column: ${canDeleteOk ? "✓ present" : "✗ MISSING"}`
         );
         if (oldRoleCount > 0) {
-          console.warn(`[MigrationDiag] ⚠️  ${oldRoleCount} row(s) still have old roles (POS1–POS6 or User) — check /api/admin/deployment-diagnostics`);
+          console.warn(
+            `[MigrationDiag] ⚠️  ${oldRoleCount} row(s) still have old roles (POS1–POS6 or User) — check /api/admin/deployment-diagnostics`
+          );
         }
       } catch (e: any) {
         console.warn("[MigrationDiag] Could not run startup diagnostic:", e.message);
@@ -5063,8 +5127,10 @@ END $mig$`;
           RETURNING id, run_type
         `);
         if (r.rowCount && r.rowCount > 0) {
-          console.log(`[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed:`,
-            r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "));
+          console.log(
+            `[ExportRun] Startup: marked ${r.rowCount} orphaned run(s) as failed:`,
+            r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ")
+          );
         }
       } catch (e: any) {
         console.warn("[ExportRun] Startup orphan-cleanup failed:", e.message);
@@ -5083,8 +5149,10 @@ END $mig$`;
           RETURNING id, run_type
         `);
         if (r.rowCount && r.rowCount > 0) {
-          console.log(`[ExportRun] Periodic: timed out ${r.rowCount} hung run(s):`,
-            r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", "));
+          console.log(
+            `[ExportRun] Periodic: timed out ${r.rowCount} hung run(s):`,
+            r.rows.map((x: any) => `#${x.id} ${x.run_type}`).join(", ")
+          );
         }
       } catch (e: any) {
         console.warn("[ExportRun] Periodic hung-run cleanup failed:", e.message);
@@ -5121,7 +5189,9 @@ END $mig$`;
       } catch {}
       setTimeout(() => {
         server.removeAllListeners("error");
-        server.on("error", (e: any) => { console.error("Server error:", e); });
+        server.on("error", (e: any) => {
+          console.error("Server error:", e);
+        });
         doListen();
       }, 600);
     } else {
@@ -5142,7 +5212,7 @@ END $mig$`;
     process.exit(0);
   };
   process.on("SIGTERM", () => shutdown("SIGTERM"));
-  process.on("SIGINT",  () => shutdown("SIGINT"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 
   // ── Startup sequence: warmup → migrations → listen ────────────────────────
   // Migrations run to completion BEFORE the port opens. This guarantees:
@@ -5151,7 +5221,7 @@ END $mig$`;
   //      instead of serving requests against a stale or broken schema.
   // Set RUN_STARTUP_MIGRATIONS=false to skip migrations entirely (emergency
   // kill-switch for severe lock contention).
-  const migrationsEnabled = process.env.RUN_STARTUP_MIGRATIONS !== 'false';
+  const migrationsEnabled = process.env.RUN_STARTUP_MIGRATIONS !== "false";
   if (!migrationsEnabled) {
     console.log("⚠ Startup migrations DISABLED via RUN_STARTUP_MIGRATIONS=false");
     migrationsDone = true;

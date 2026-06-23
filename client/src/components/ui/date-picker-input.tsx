@@ -43,9 +43,10 @@ export function DatePickerInput({
     const rawValue = e.target.value;
     setInputValue(rawValue);
 
-    const formats = dateFormat === "DD/MM/YYYY" 
-      ? ["dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy"]
-      : ["MM/dd/yyyy", "M/d/yyyy", "MM-dd-yyyy", "M-d-yyyy"];
+    const formats =
+      dateFormat === "DD/MM/YYYY"
+        ? ["dd/MM/yyyy", "d/M/yyyy", "dd-MM-yyyy", "d-M-yyyy"]
+        : ["MM/dd/yyyy", "M/d/yyyy", "MM-dd-yyyy", "M-d-yyyy"];
 
     for (const fmt of formats) {
       try {
@@ -54,8 +55,7 @@ export function DatePickerInput({
           onChange(format(parsed, "yyyy-MM-dd"));
           return;
         }
-      } catch {
-      }
+      } catch {}
     }
   };
 
@@ -88,12 +88,7 @@ export function DatePickerInput({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="end">
-          <Calendar
-            mode="single"
-            selected={isValidDate ? dateValue : undefined}
-            onSelect={handleSelect}
-            initialFocus
-          />
+          <Calendar mode="single" selected={isValidDate ? dateValue : undefined} onSelect={handleSelect} initialFocus />
         </PopoverContent>
       </Popover>
     </div>

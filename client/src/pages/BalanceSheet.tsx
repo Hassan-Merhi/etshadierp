@@ -46,21 +46,14 @@ export default function BalanceSheet() {
   });
 
   const assetAccounts = accounts.filter(
-    (acc) =>
-      acc.type === "fixedAsset" ||
-      (acc.type === "ledger" && acc.accountType === "Asset") ||
-      acc.type === "bank"
+    (acc) => acc.type === "fixedAsset" || (acc.type === "ledger" && acc.accountType === "Asset") || acc.type === "bank"
   );
 
   const liabilityAccounts = accounts.filter(
-    (acc) =>
-      acc.type === "supplier" ||
-      (acc.type === "ledger" && acc.accountType === "Liability")
+    (acc) => acc.type === "supplier" || (acc.type === "ledger" && acc.accountType === "Liability")
   );
 
-  const equityAccounts = accounts.filter(
-    (acc) => acc.type === "ledger" && acc.accountType === "Equity"
-  );
+  const equityAccounts = accounts.filter((acc) => acc.type === "ledger" && acc.accountType === "Equity");
 
   const calculateTotal = (accountList: Account[], naturalSide: "Dr" | "Cr" = "Dr") => {
     return accountList.reduce((sum, acc) => {
@@ -119,7 +112,12 @@ export default function BalanceSheet() {
               <TableRow key={account.id} data-testid={`row-account-${account.id}`}>
                 <TableCell>{account.name}</TableCell>
                 <TableCell className="text-right font-mono">
-                  {formatAmount(account.balance)}{account.balanceSide ? <span className={`ml-1 ${drCrClass(account.balanceSide)}`}>{account.balanceSide}</span> : ""}
+                  {formatAmount(account.balance)}
+                  {account.balanceSide ? (
+                    <span className={`ml-1 ${drCrClass(account.balanceSide)}`}>{account.balanceSide}</span>
+                  ) : (
+                    ""
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -139,9 +137,12 @@ export default function BalanceSheet() {
 
   const getActiveAccounts = () => {
     switch (activeSection) {
-      case "assets": return assetAccounts;
-      case "liabilities": return liabilityAccounts;
-      case "equity": return equityAccounts;
+      case "assets":
+        return assetAccounts;
+      case "liabilities":
+        return liabilityAccounts;
+      case "equity":
+        return equityAccounts;
     }
   };
 
@@ -223,9 +224,7 @@ export default function BalanceSheet() {
 
         <div className="flex-1 min-w-0">
           <Card>
-            <CardContent className="p-6">
-              {renderAccountTable(getActiveAccounts())}
-            </CardContent>
+            <CardContent className="p-6">{renderAccountTable(getActiveAccounts())}</CardContent>
           </Card>
         </div>
       </div>

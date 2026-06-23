@@ -13,30 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Layers,
-  Plus,
-  ArrowLeft,
-  Trash2,
-  UserPlus,
-  Search,
-  FolderOpen,
-  Folder,
-} from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Layers, Plus, ArrowLeft, Trash2, UserPlus, Search, FolderOpen, Folder } from "lucide-react";
 import type { LedgerAccount } from "@shared/schema";
 
 const ACCOUNT_TYPES = [
@@ -76,9 +55,7 @@ export default function AccountGroups() {
   const { data: allAccounts = [], isLoading } = useQuery<LedgerAccount[]>({
     queryKey: ["/api/ledger-accounts", selectedCompany?.id],
     queryFn: async () => {
-      const url = selectedCompany?.id
-        ? `/api/ledger-accounts?companyId=${selectedCompany.id}`
-        : "/api/ledger-accounts";
+      const url = selectedCompany?.id ? `/api/ledger-accounts?companyId=${selectedCompany.id}` : "/api/ledger-accounts";
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch accounts");
       return res.json();
@@ -90,30 +67,34 @@ export default function AccountGroups() {
   // A "group" is identified by having children pointing to it
   const childAccountIds = useMemo(() => {
     const set = new Set<number>();
-    allAccounts.forEach((a) => { if (a.parentId) set.add(a.parentId); });
+    allAccounts.forEach((a) => {
+      if (a.parentId) set.add(a.parentId);
+    });
     return set;
   }, [allAccounts]);
 
-  const parentGroups = useMemo(() =>
-    allAccounts.filter((a) => childAccountIds.has(a.id)),
+  const parentGroups = useMemo(
+    () => allAccounts.filter((a) => childAccountIds.has(a.id)),
     [allAccounts, childAccountIds]
   );
 
-  const filteredGroups = useMemo(() =>
-    parentGroups.filter((g) =>
-      g.name.toLowerCase().includes(groupSearch.toLowerCase()) ||
-      g.code.toLowerCase().includes(groupSearch.toLowerCase())
-    ),
+  const filteredGroups = useMemo(
+    () =>
+      parentGroups.filter(
+        (g) =>
+          g.name.toLowerCase().includes(groupSearch.toLowerCase()) ||
+          g.code.toLowerCase().includes(groupSearch.toLowerCase())
+      ),
     [parentGroups, groupSearch]
   );
 
-  const selectedGroup = useMemo(() =>
-    allAccounts.find((a) => a.id === selectedGroupId) ?? null,
+  const selectedGroup = useMemo(
+    () => allAccounts.find((a) => a.id === selectedGroupId) ?? null,
     [allAccounts, selectedGroupId]
   );
 
-  const childrenOfSelected = useMemo(() =>
-    allAccounts.filter((a) => a.parentId === selectedGroupId),
+  const childrenOfSelected = useMemo(
+    () => allAccounts.filter((a) => a.parentId === selectedGroupId),
     [allAccounts, selectedGroupId]
   );
 
@@ -123,9 +104,7 @@ export default function AccountGroups() {
     const childIds = new Set(childrenOfSelected.map((c) => c.id));
     return allAccounts.filter(
       (a) =>
-        a.id !== selectedGroupId &&
-        !childIds.has(a.id) &&
-        a.name.toLowerCase().includes(accountSearch.toLowerCase())
+        a.id !== selectedGroupId && !childIds.has(a.id) && a.name.toLowerCase().includes(accountSearch.toLowerCase())
     );
   }, [allAccounts, selectedGroupId, childrenOfSelected, accountSearch]);
 
@@ -204,12 +183,7 @@ export default function AccountGroups() {
       {/* Header */}
       <div className="border-b px-6 py-4">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate("/settings")}
-            data-testid="button-back-settings"
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} data-testid="button-back-settings">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-2">
@@ -226,11 +200,7 @@ export default function AccountGroups() {
         {/* Left panel — group list */}
         <div className="w-72 border-r flex flex-col shrink-0">
           <div className="p-4 border-b space-y-3">
-            <Button
-              className="w-full"
-              onClick={() => setCreateOpen(true)}
-              data-testid="button-create-group"
-            >
+            <Button className="w-full" onClick={() => setCreateOpen(true)} data-testid="button-create-group">
               <Plus className="h-4 w-4 mr-2" />
               Create Group
             </Button>
@@ -259,9 +229,7 @@ export default function AccountGroups() {
                   key={group.id}
                   onClick={() => setSelectedGroupId(group.id)}
                   className={`w-full text-left rounded-md p-3 transition-colors hover-elevate ${
-                    selectedGroupId === group.id
-                      ? "bg-primary/10 text-primary"
-                      : "hover:bg-muted/60"
+                    selectedGroupId === group.id ? "bg-primary/10 text-primary" : "hover:bg-muted/60"
                   }`}
                   data-testid={`button-group-${group.id}`}
                 >
@@ -319,9 +287,7 @@ export default function AccountGroups() {
 
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium">
-                    Member Accounts ({childrenOfSelected.length})
-                  </CardTitle>
+                  <CardTitle className="text-sm font-medium">Member Accounts ({childrenOfSelected.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {childrenOfSelected.length === 0 ? (
@@ -391,14 +357,18 @@ export default function AccountGroups() {
                 </SelectTrigger>
                 <SelectContent>
                   {ACCOUNT_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={handleCreateGroup}
               disabled={!newGroupName.trim() || !newGroupType || createGroupMutation.isPending}
@@ -446,10 +416,14 @@ export default function AccountGroups() {
                     />
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm">{acc.name}</div>
-                      <div className="text-xs text-muted-foreground">{acc.code} · {acc.accountType}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {acc.code} · {acc.accountType}
+                      </div>
                     </div>
                     {acc.parentId && (
-                      <Badge variant="outline" className="text-xs shrink-0">In group</Badge>
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        In group
+                      </Badge>
                     )}
                   </label>
                 ))
@@ -462,13 +436,17 @@ export default function AccountGroups() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddAccountsOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAddAccountsOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={handleAssignAccounts}
               disabled={selectedToAdd.size === 0 || assignMutation.isPending}
               data-testid="button-confirm-add-accounts"
             >
-              {assignMutation.isPending ? "Assigning…" : `Add ${selectedToAdd.size > 0 ? selectedToAdd.size : ""} Account${selectedToAdd.size !== 1 ? "s" : ""}`}
+              {assignMutation.isPending
+                ? "Assigning…"
+                : `Add ${selectedToAdd.size > 0 ? selectedToAdd.size : ""} Account${selectedToAdd.size !== 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>

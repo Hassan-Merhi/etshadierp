@@ -1,5 +1,12 @@
 import { Edit } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,9 +71,7 @@ export function VoucherDetailsDialog({
         <DialogHeader>
           <div className="flex items-center gap-3">
             <DialogTitle>Voucher Details</DialogTitle>
-            <Badge {...getVoucherTypeBadge(selectedVoucher.voucherType)}>
-              {selectedVoucher.voucherType}
-            </Badge>
+            <Badge {...getVoucherTypeBadge(selectedVoucher.voucherType)}>{selectedVoucher.voucherType}</Badge>
           </div>
           <DialogDescription>
             {selectedVoucher.voucherNumber} — {formatDisplayDate(selectedVoucher.voucherDate)}
@@ -81,7 +86,9 @@ export function VoucherDetailsDialog({
             </div>
             <div className="space-y-1 md:text-right">
               <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Created At</span>
-              <p className="text-sm font-mono">{formatDisplayDate(selectedVoucher.createdAt)} {formatDisplayTime(selectedVoucher.createdAt)}</p>
+              <p className="text-sm font-mono">
+                {formatDisplayDate(selectedVoucher.createdAt)} {formatDisplayTime(selectedVoucher.createdAt)}
+              </p>
             </div>
           </div>
 
@@ -144,7 +151,12 @@ export function VoucherDetailsDialog({
                             {filteredItems.map((entry, idx) => {
                               const isSelected = selectedDialogRow === idx;
                               const profit = parseFloat(entry.profit || "0");
-                              const pColor = profit > 0.01 ? "text-emerald-600" : profit < -0.01 ? "text-destructive" : "text-muted-foreground";
+                              const pColor =
+                                profit > 0.01
+                                  ? "text-emerald-600"
+                                  : profit < -0.01
+                                    ? "text-destructive"
+                                    : "text-muted-foreground";
                               return (
                                 <TableRow
                                   key={entry.id}
@@ -152,10 +164,20 @@ export function VoucherDetailsDialog({
                                   className={isSelected ? "bg-accent/40" : ""}
                                   onClick={() => setSelectedDialogRow(idx)}
                                 >
-                                  <TableCell className="font-medium">{entry.stockItemName || entry.accountName}</TableCell>
-                                  <TableCell className="text-right font-mono">{parseFloat(entry.quantity || "0")}</TableCell>
-                                  {!isPOSUser && <TableCell className="text-right font-mono">{formatAmount(entry.rate)}</TableCell>}
-                                  {!isPOSUser && <TableCell className="text-right font-mono">{formatAmount(entry.totalAmount)}</TableCell>}
+                                  <TableCell className="font-medium">
+                                    {entry.stockItemName || entry.accountName}
+                                  </TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {parseFloat(entry.quantity || "0")}
+                                  </TableCell>
+                                  {!isPOSUser && (
+                                    <TableCell className="text-right font-mono">{formatAmount(entry.rate)}</TableCell>
+                                  )}
+                                  {!isPOSUser && (
+                                    <TableCell className="text-right font-mono">
+                                      {formatAmount(entry.totalAmount)}
+                                    </TableCell>
+                                  )}
                                   {!isPOSUser && (
                                     <TableCell className={`text-right font-mono font-medium ${pColor}`}>
                                       {formatAmount(profit)}
@@ -218,9 +240,7 @@ export function VoucherDetailsDialog({
                           selectedVoucher.voucherType === "StockTransfer" ? (
                             <>
                               <TableHead>Item Name</TableHead>
-                              {selectedVoucher.voucherType === "Mixed" && (
-                                <TableHead>Type</TableHead>
-                              )}
+                              {selectedVoucher.voucherType === "Mixed" && <TableHead>Type</TableHead>}
                               <TableHead className="text-right">Qty</TableHead>
                               {user && user?.role !== "POS" && (
                                 <>
@@ -258,7 +278,8 @@ export function VoucherDetailsDialog({
                             return viewVoucherEntries.map((entry) => {
                               const qty = parseFloat(entry.quantity || "0");
                               const rate = entry.rate != null ? parseFloat(entry.rate) : 0;
-                              const totalAmount = entry.totalAmount != null ? parseFloat(entry.totalAmount) : qty * rate;
+                              const totalAmount =
+                                entry.totalAmount != null ? parseFloat(entry.totalAmount) : qty * rate;
                               return (
                                 <TableRow key={entry.id}>
                                   <TableCell>
@@ -271,11 +292,15 @@ export function VoucherDetailsDialog({
                                       </Badge>
                                     </TableCell>
                                   )}
-                                  <TableCell className="text-right font-mono">{Math.round(Math.abs(qty)).toLocaleString()}</TableCell>
+                                  <TableCell className="text-right font-mono">
+                                    {Math.round(Math.abs(qty)).toLocaleString()}
+                                  </TableCell>
                                   {!isPOSUser && (
                                     <>
                                       <TableCell className="text-right font-mono">{formatAmount(rate)}</TableCell>
-                                      <TableCell className="text-right font-mono">{formatAmount(totalAmount)}</TableCell>
+                                      <TableCell className="text-right font-mono">
+                                        {formatAmount(totalAmount)}
+                                      </TableCell>
                                     </>
                                   )}
                                 </TableRow>
@@ -283,27 +308,41 @@ export function VoucherDetailsDialog({
                             });
                           }
 
-                          const displayEntries = selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal"
-                            ? viewVoucherEntries.filter((entry) => {
-                                if (selectedVoucher.voucherType === "Payment") return parseFloat(entry.debitAmount || "0") > 0;
-                                if (selectedVoucher.voucherType === "Receipt") return parseFloat(entry.creditAmount || "0") > 0;
-                                return true;
-                              })
-                            : viewVoucherEntries;
+                          const displayEntries =
+                            selectedVoucher.voucherType === "Payment" ||
+                            selectedVoucher.voucherType === "Receipt" ||
+                            selectedVoucher.voucherType === "Journal"
+                              ? viewVoucherEntries.filter((entry) => {
+                                  if (selectedVoucher.voucherType === "Payment")
+                                    return parseFloat(entry.debitAmount || "0") > 0;
+                                  if (selectedVoucher.voucherType === "Receipt")
+                                    return parseFloat(entry.creditAmount || "0") > 0;
+                                  return true;
+                                })
+                              : viewVoucherEntries;
 
                           return displayEntries.map((entry) => (
                             <TableRow key={entry.id}>
                               <TableCell>
                                 <div className="font-medium">{entry.accountName}</div>
-                                {(selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal") && (
+                                {(selectedVoucher.voucherType === "Payment" ||
+                                  selectedVoucher.voucherType === "Receipt" ||
+                                  selectedVoucher.voucherType === "Journal") && (
                                   <div className="text-xs text-muted-foreground mt-0.5">
                                     Balance: {formatAmount(entryBalances[entry.id] ?? "0")}
                                   </div>
                                 )}
                               </TableCell>
-                              {selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal" ? (
+                              {selectedVoucher.voucherType === "Payment" ||
+                              selectedVoucher.voucherType === "Receipt" ||
+                              selectedVoucher.voucherType === "Journal" ? (
                                 <TableCell className="text-right font-mono">
-                                  {formatAmount(Math.max(parseFloat(entry.debitAmount || "0"), parseFloat(entry.creditAmount || "0")))}
+                                  {formatAmount(
+                                    Math.max(
+                                      parseFloat(entry.debitAmount || "0"),
+                                      parseFloat(entry.creditAmount || "0")
+                                    )
+                                  )}
                                 </TableCell>
                               ) : (
                                 <>
@@ -313,7 +352,9 @@ export function VoucherDetailsDialog({
                                   <TableCell className="text-right font-mono">
                                     {parseFloat(entry.creditAmount) > 0 ? formatAmount(entry.creditAmount) : "-"}
                                   </TableCell>
-                                  <TableCell className="text-sm text-muted-foreground">{entry.narration || "-"}</TableCell>
+                                  <TableCell className="text-sm text-muted-foreground">
+                                    {entry.narration || "-"}
+                                  </TableCell>
                                 </>
                               )}
                             </TableRow>
@@ -328,40 +369,53 @@ export function VoucherDetailsDialog({
                               <>
                                 <TableCell>Total</TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {viewVoucherEntries.reduce((sum, e) => sum + Math.abs(parseFloat(e.quantity || "0")), 0).toFixed(3).replace(/\.?0+$/, "")}
+                                  {viewVoucherEntries
+                                    .reduce((sum, e) => sum + Math.abs(parseFloat(e.quantity || "0")), 0)
+                                    .toFixed(3)
+                                    .replace(/\.?0+$/, "")}
                                 </TableCell>
                                 {user && user?.role !== "POS" && (
                                   <>
                                     <TableCell></TableCell>
                                     <TableCell className="text-right font-mono">
-                                      {formatAmount(viewVoucherEntries.reduce((sum, e) => {
-                                        if (e.totalAmount != null) return sum + Math.abs(parseFloat(e.totalAmount));
-                                        const qty = Math.abs(parseFloat(e.quantity || "0"));
-                                        const rate = e.rate != null ? parseFloat(e.rate) : 0;
-                                        return sum + qty * rate;
-                                      }, 0))}
+                                      {formatAmount(
+                                        viewVoucherEntries.reduce((sum, e) => {
+                                          if (e.totalAmount != null) return sum + Math.abs(parseFloat(e.totalAmount));
+                                          const qty = Math.abs(parseFloat(e.quantity || "0"));
+                                          const rate = e.rate != null ? parseFloat(e.rate) : 0;
+                                          return sum + qty * rate;
+                                        }, 0)
+                                      )}
                                     </TableCell>
                                   </>
                                 )}
                               </>
-                            ) : selectedVoucher.voucherType === "Payment" || selectedVoucher.voucherType === "Receipt" || selectedVoucher.voucherType === "Journal" ? (
+                            ) : selectedVoucher.voucherType === "Payment" ||
+                              selectedVoucher.voucherType === "Receipt" ||
+                              selectedVoucher.voucherType === "Journal" ? (
                               <>
                                 <TableCell>Total</TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {formatAmount(Math.max(
-                                    viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0),
-                                    viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0)
-                                  ))}
+                                  {formatAmount(
+                                    Math.max(
+                                      viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0),
+                                      viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0)
+                                    )
+                                  )}
                                 </TableCell>
                               </>
                             ) : (
                               <>
                                 <TableCell>Total</TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {formatAmount(viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0))}
+                                  {formatAmount(
+                                    viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.debitAmount || "0"), 0)
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right font-mono">
-                                  {formatAmount(viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0))}
+                                  {formatAmount(
+                                    viewVoucherEntries.reduce((sum, e) => sum + parseFloat(e.creditAmount || "0"), 0)
+                                  )}
                                 </TableCell>
                                 <TableCell></TableCell>
                               </>
@@ -375,17 +429,29 @@ export function VoucherDetailsDialog({
                         <div className="flex items-center gap-4">
                           <span>Total</span>
                           <span className="font-mono text-sm text-muted-foreground">
-                            {viewVoucherEntries.reduce((sum, e) => sum + Math.abs(parseFloat(e.quantity || "0")), 0).toFixed(3).replace(/\.?0+$/, "")} units
+                            {viewVoucherEntries
+                              .reduce((sum, e) => sum + Math.abs(parseFloat(e.quantity || "0")), 0)
+                              .toFixed(3)
+                              .replace(/\.?0+$/, "")}{" "}
+                            units
                           </span>
                         </div>
                         {user && user?.role !== "POS" && (
                           <span className="font-mono">
                             {(() => {
                               const prodTotal = viewVoucherEntries
-                                .filter((e) => e.adjustmentType === "Production" || (e.adjustmentType == null && parseFloat(e.quantity || "0") > 0))
+                                .filter(
+                                  (e) =>
+                                    e.adjustmentType === "Production" ||
+                                    (e.adjustmentType == null && parseFloat(e.quantity || "0") > 0)
+                                )
                                 .reduce((sum, e) => sum + Math.abs(parseFloat(e.totalAmount || "0")), 0);
                               const consTotal = viewVoucherEntries
-                                .filter((e) => e.adjustmentType === "Consumption" || (e.adjustmentType == null && parseFloat(e.quantity || "0") < 0))
+                                .filter(
+                                  (e) =>
+                                    e.adjustmentType === "Consumption" ||
+                                    (e.adjustmentType == null && parseFloat(e.quantity || "0") < 0)
+                                )
                                 .reduce((sum, e) => sum + Math.abs(parseFloat(e.totalAmount || "0")), 0);
                               return formatAmount(prodTotal - consTotal);
                             })()}
@@ -414,16 +480,16 @@ export function VoucherDetailsDialog({
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">Rev #{rev.revisionNumber}</span>
                             {rev.optional && (
-                              <Badge variant="outline" className="text-xs">POS Adjustment{rev._mergedCount > 1 ? ` (${rev._mergedCount} submissions)` : ""}</Badge>
+                              <Badge variant="outline" className="text-xs">
+                                POS Adjustment{rev._mergedCount > 1 ? ` (${rev._mergedCount} submissions)` : ""}
+                              </Badge>
                             )}
                           </div>
                           <span className="text-xs text-muted-foreground">
                             {rev.createdAt ? new Date(rev.createdAt).toLocaleString() : ""}
                           </span>
                         </div>
-                        {rev.note && (
-                          <p className="text-sm text-muted-foreground">{rev.note}</p>
-                        )}
+                        {rev.note && <p className="text-sm text-muted-foreground">{rev.note}</p>}
                         {rev.items && rev.items.length > 0 && (
                           <div className="border rounded-md overflow-hidden">
                             <Table>
@@ -436,19 +502,28 @@ export function VoucherDetailsDialog({
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {rev.items.filter((item: any) => parseFloat(item.delta ?? "0") !== 0).map((item: any, idx: number) => {
-                                  const delta = parseFloat(item.delta ?? "0");
-                                  return (
-                                    <TableRow key={idx}>
-                                      <TableCell className="py-1.5 text-sm">{item.stockItemName}</TableCell>
-                                      <TableCell className="py-1.5 text-right font-mono text-sm text-muted-foreground">{parseFloat(item.originalQuantity)}</TableCell>
-                                      <TableCell className="py-1.5 text-right font-mono text-sm font-semibold">{parseFloat(item.newQuantity)}</TableCell>
-                                      <TableCell className={`py-1.5 text-right font-mono text-sm font-semibold ${delta > 0 ? "text-green-600 dark:text-green-400" : delta < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
-                                        {delta > 0 ? "+" : ""}{delta}
-                                      </TableCell>
-                                    </TableRow>
-                                  );
-                                })}
+                                {rev.items
+                                  .filter((item: any) => parseFloat(item.delta ?? "0") !== 0)
+                                  .map((item: any, idx: number) => {
+                                    const delta = parseFloat(item.delta ?? "0");
+                                    return (
+                                      <TableRow key={idx}>
+                                        <TableCell className="py-1.5 text-sm">{item.stockItemName}</TableCell>
+                                        <TableCell className="py-1.5 text-right font-mono text-sm text-muted-foreground">
+                                          {parseFloat(item.originalQuantity)}
+                                        </TableCell>
+                                        <TableCell className="py-1.5 text-right font-mono text-sm font-semibold">
+                                          {parseFloat(item.newQuantity)}
+                                        </TableCell>
+                                        <TableCell
+                                          className={`py-1.5 text-right font-mono text-sm font-semibold ${delta > 0 ? "text-green-600 dark:text-green-400" : delta < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}
+                                        >
+                                          {delta > 0 ? "+" : ""}
+                                          {delta}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
                               </TableBody>
                             </Table>
                           </div>
@@ -468,7 +543,10 @@ export function VoucherDetailsDialog({
           </Button>
           {canEdit(selectedVoucher) && (
             <Button
-              onClick={() => { onOpenChange(false); handleEdit(selectedVoucher); }}
+              onClick={() => {
+                onOpenChange(false);
+                handleEdit(selectedVoucher);
+              }}
               data-testid="button-edit-from-view-dialog"
             >
               <Edit className="w-4 h-4 mr-2" />

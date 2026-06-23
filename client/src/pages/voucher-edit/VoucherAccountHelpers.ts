@@ -1,11 +1,7 @@
 import { useMemo } from "react";
 import { CombinedAccount } from "@/components/AccountAutocomplete";
 import { formatNumber } from "@/lib/formatNumber";
-import { 
-  LedgerAccount, 
-  BankAccount, 
-  Supplier 
-} from "./VoucherEditHelpers";
+import { LedgerAccount, BankAccount, Supplier } from "./VoucherEditHelpers";
 
 export interface AccountWithBalance {
   type: string;
@@ -25,8 +21,8 @@ export const useAccountsWithBalances = (
 ) => {
   return useMemo(() => {
     const accounts: CombinedAccount[] = [];
-    ledgerAccounts.forEach(ledger => {
-      const accountData = allAccountsData.find(a => a.id === `ledger-${ledger.id}`);
+    ledgerAccounts.forEach((ledger) => {
+      const accountData = allAccountsData.find((a) => a.id === `ledger-${ledger.id}`);
       const baseBalance = parseFloat(accountData?.balance || "0");
       const adjustment = balanceAdjustments[`ledger-${ledger.id}`] || 0;
       const adjustedBalance = baseBalance + adjustment;
@@ -39,8 +35,8 @@ export const useAccountsWithBalances = (
       });
     });
 
-    bankAccounts.forEach(bank => {
-      const accountData = allAccountsData.find(a => a.id === `bank-${bank.id}`);
+    bankAccounts.forEach((bank) => {
+      const accountData = allAccountsData.find((a) => a.id === `bank-${bank.id}`);
       const baseBalance = parseFloat(accountData?.balance || bank.balance || "0");
       const adjustment = balanceAdjustments[`bank-${bank.id}`] || 0;
       const adjustedBalance = baseBalance + adjustment;
@@ -53,8 +49,8 @@ export const useAccountsWithBalances = (
       });
     });
 
-    suppliers.forEach(supplier => {
-      const accountData = allAccountsData.find(a => a.id === `supplier-${supplier.id}`);
+    suppliers.forEach((supplier) => {
+      const accountData = allAccountsData.find((a) => a.id === `supplier-${supplier.id}`);
       const baseBalance = parseFloat(accountData?.balance || "0");
       const adjustment = balanceAdjustments[`supplier-${supplier.id}`] || 0;
       const adjustedBalance = baseBalance + adjustment;
@@ -67,17 +63,20 @@ export const useAccountsWithBalances = (
       });
     });
 
-    (allAccountsData as any[]).filter(a => a.type === "factorySupplier").forEach(fs => {
-      const adjustment = balanceAdjustments[`factorySupplier-${fs.id}`] || 0;
-      const adjustedBalance = (typeof fs.balance === "number" ? fs.balance : parseFloat(fs.balance || "0")) + adjustment;
-      accounts.push({
-        type: "factorySupplier" as const,
-        id: Number(fs.id),
-        name: fs.name,
-        code: fs.code || String(fs.id),
-        balance: formatNumber(adjustedBalance),
+    (allAccountsData as any[])
+      .filter((a) => a.type === "factorySupplier")
+      .forEach((fs) => {
+        const adjustment = balanceAdjustments[`factorySupplier-${fs.id}`] || 0;
+        const adjustedBalance =
+          (typeof fs.balance === "number" ? fs.balance : parseFloat(fs.balance || "0")) + adjustment;
+        accounts.push({
+          type: "factorySupplier" as const,
+          id: Number(fs.id),
+          name: fs.name,
+          code: fs.code || String(fs.id),
+          balance: formatNumber(adjustedBalance),
+        });
       });
-    });
 
     return accounts.sort((a, b) => a.name.localeCompare(b.name));
   }, [ledgerAccounts, bankAccounts, suppliers, allAccountsData, balanceAdjustments]);

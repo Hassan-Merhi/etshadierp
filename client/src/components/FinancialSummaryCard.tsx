@@ -10,13 +10,13 @@ export interface FinancialSummaryCardProps extends Omit<StatCardProps, "tone" | 
 }
 
 const FLOW_TONE: Record<NonNullable<FinancialSummaryCardProps["flow"]>, StatCardProps["tone"]> = {
-  revenue:    "success",
-  expense:    "warning",
-  profit:     "success",
-  loss:       "destructive",
-  balance:    "primary",
+  revenue: "success",
+  expense: "warning",
+  profit: "success",
+  loss: "destructive",
+  balance: "primary",
   receivable: "info",
-  payable:    "warning",
+  payable: "warning",
 };
 
 function formatAmount(amount: number | string, currency?: string): string {

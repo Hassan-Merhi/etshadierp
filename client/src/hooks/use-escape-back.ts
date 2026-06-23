@@ -9,13 +9,13 @@ function hasAnyOpenDialog(): boolean {
   return !!(
     document.querySelector('[data-state="open"][role="dialog"]') ||
     document.querySelector('[data-state="open"][role="alertdialog"]') ||
-    document.querySelector('[data-radix-popper-content-wrapper]') ||
+    document.querySelector("[data-radix-popper-content-wrapper]") ||
     document.querySelector('[role="listbox"]') ||
     document.querySelector('[data-state="open"].fixed') ||
     document.querySelector('[data-state="open"][role="menu"]') ||
     document.querySelector('[data-state="open"][role="combobox"]') ||
-    document.querySelector('[data-radix-select-viewport]') ||
-    document.querySelector('[cmdk-dialog]')
+    document.querySelector("[data-radix-select-viewport]") ||
+    document.querySelector("[cmdk-dialog]")
   );
 }
 

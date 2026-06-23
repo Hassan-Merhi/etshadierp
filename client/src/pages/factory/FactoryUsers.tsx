@@ -10,14 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -58,7 +51,7 @@ const COST_FIELDS: { key: string; label: string }[] = [
 
 // Central source of truth from FactorySidebar — no separate hardcoded list
 const ALL_FACTORY_PAGES = FACTORY_NAV_PAGES;
-const PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map(p => p.group)));
+const PAGE_GROUPS = Array.from(new Set(ALL_FACTORY_PAGES.map((p) => p.group)));
 
 export default function FactoryUsers() {
   const { wrapAdminAction, AdminDialog } = useAdminOverride();
@@ -82,7 +75,15 @@ export default function FactoryUsers() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { username: string; password: string; displayName: string; pageAccess: string[]; hasErpAccess: boolean; hasFactoryAccess: boolean; hiddenCostFields: string[] }) => {
+    mutationFn: async (data: {
+      username: string;
+      password: string;
+      displayName: string;
+      pageAccess: string[];
+      hasErpAccess: boolean;
+      hasFactoryAccess: boolean;
+      hiddenCostFields: string[];
+    }) => {
       const res = await factoryApiRequest("POST", "/api/factory/users", data);
       if (!res.ok) {
         const err = await res.json();
@@ -145,9 +146,7 @@ export default function FactoryUsers() {
   };
 
   const toggleCostField = (key: string) => {
-    setHiddenCostFields(prev =>
-      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-    );
+    setHiddenCostFields((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
   const isAdminOrOwner = (user: FactoryUser) => {
@@ -156,7 +155,13 @@ export default function FactoryUsers() {
   };
 
   const toggleAccessMutation = useMutation({
-    mutationFn: async ({ userId, data }: { userId: string; data: { hasErpAccess?: boolean; hasFactoryAccess?: boolean } }) => {
+    mutationFn: async ({
+      userId,
+      data,
+    }: {
+      userId: string;
+      data: { hasErpAccess?: boolean; hasFactoryAccess?: boolean };
+    }) => {
       const res = await factoryApiRequest("PUT", `/api/factory/users/${userId}`, data);
       if (!res.ok) {
         const err = await res.json();
@@ -198,40 +203,42 @@ export default function FactoryUsers() {
     if (editingUser) {
       const isPrivileged = isAdminOrOwner(editingUser);
       wrapAdminAction(
-        () => updateMutation.mutate({
-          userId: editingUser.id,
-          data: {
-            username: formData.username !== editingUser.username ? formData.username : undefined,
-            displayName: formData.displayName,
-            pageAccess: Array.from(selectedPages),
-            password: formData.password || undefined,
-            hasErpAccess: isPrivileged ? true : formData.hasErpAccess,
-            hasFactoryAccess: isPrivileged ? true : formData.hasFactoryAccess,
-            hiddenCostFields: isPrivileged ? [] : hiddenCostFields,
-            hideAllCosts: isPrivileged ? false : hideAllCosts,
-          },
-        }),
-        "Update User",
+        () =>
+          updateMutation.mutate({
+            userId: editingUser.id,
+            data: {
+              username: formData.username !== editingUser.username ? formData.username : undefined,
+              displayName: formData.displayName,
+              pageAccess: Array.from(selectedPages),
+              password: formData.password || undefined,
+              hasErpAccess: isPrivileged ? true : formData.hasErpAccess,
+              hasFactoryAccess: isPrivileged ? true : formData.hasFactoryAccess,
+              hiddenCostFields: isPrivileged ? [] : hiddenCostFields,
+              hideAllCosts: isPrivileged ? false : hideAllCosts,
+            },
+          }),
+        "Update User"
       );
     } else {
       wrapAdminAction(
-        () => createMutation.mutate({
-          username: formData.username,
-          password: formData.password,
-          displayName: formData.displayName,
-          pageAccess: Array.from(selectedPages),
-          hasErpAccess: formData.hasErpAccess,
-          hasFactoryAccess: formData.hasFactoryAccess,
-          hiddenCostFields,
-          hideAllCosts,
-        }),
-        "Create User",
+        () =>
+          createMutation.mutate({
+            username: formData.username,
+            password: formData.password,
+            displayName: formData.displayName,
+            pageAccess: Array.from(selectedPages),
+            hasErpAccess: formData.hasErpAccess,
+            hasFactoryAccess: formData.hasFactoryAccess,
+            hiddenCostFields,
+            hideAllCosts,
+          }),
+        "Create User"
       );
     }
   };
 
   const togglePage = (pageKey: string) => {
-    setSelectedPages(prev => {
+    setSelectedPages((prev) => {
       const next = new Set(prev);
       if (next.has(pageKey)) next.delete(pageKey);
       else next.add(pageKey);
@@ -240,11 +247,11 @@ export default function FactoryUsers() {
   };
 
   const toggleGroup = (group: string) => {
-    const groupPages = ALL_FACTORY_PAGES.filter(p => p.group === group).map(p => p.key);
-    const allSelected = groupPages.every(k => selectedPages.has(k));
-    setSelectedPages(prev => {
+    const groupPages = ALL_FACTORY_PAGES.filter((p) => p.group === group).map((p) => p.key);
+    const allSelected = groupPages.every((k) => selectedPages.has(k));
+    setSelectedPages((prev) => {
       const next = new Set(prev);
-      groupPages.forEach(k => {
+      groupPages.forEach((k) => {
         if (allSelected) next.delete(k);
         else next.add(k);
       });
@@ -252,7 +259,7 @@ export default function FactoryUsers() {
     });
   };
 
-  const selectAll = () => setSelectedPages(new Set(ALL_FACTORY_PAGES.map(p => p.key)));
+  const selectAll = () => setSelectedPages(new Set(ALL_FACTORY_PAGES.map((p) => p.key)));
 
   const selectNone = () => setSelectedPages(new Set());
 
@@ -272,7 +279,10 @@ export default function FactoryUsers() {
           <PageHeader title="Factory Users" subtitle="Create users and control which pages they can access" />
         </div>
         <Button
-          onClick={() => { resetForm(); setCreateOpen(true); }}
+          onClick={() => {
+            resetForm();
+            setCreateOpen(true);
+          }}
           data-testid="button-add-factory-user"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -284,123 +294,119 @@ export default function FactoryUsers() {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-muted-foreground" />
-            <CardTitle className="text-lg">
-              Users ({factoryUsers?.length || 0})
-            </CardTitle>
+            <CardTitle className="text-lg">Users ({factoryUsers?.length || 0})</CardTitle>
           </div>
         </CardHeader>
         <CardContent>
           {factoryUsers && factoryUsers.length > 0 ? (
             <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="sticky top-0 z-30 bg-background">
-                <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Display Name</TableHead>
-                  <TableHead>ERP Access</TableHead>
-                  <TableHead>Factory Access</TableHead>
-                  <TableHead>Pages Access</TableHead>
-                  <TableHead>Cost Access</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="w-28">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {factoryUsers.map((user) => (
-                  <TableRow key={user.id} data-testid={`row-factory-user-${user.id}`}>
-                    <TableCell className="font-medium font-mono">{user.username}</TableCell>
-                    <TableCell className="text-muted-foreground">{user.displayName || "-"}</TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={isAdminOrOwner(user) ? true : (user.hasErpAccess ?? true)}
-                        disabled={isAdminOrOwner(user) || toggleAccessMutation.isPending}
-                        onCheckedChange={(checked) => {
-                          toggleAccessMutation.mutate({
-                            userId: user.id,
-                            data: { hasErpAccess: checked },
-                          });
-                        }}
-                        data-testid={`switch-erp-access-${user.id}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Switch
-                        checked={isAdminOrOwner(user) ? true : (user.hasFactoryAccess ?? true)}
-                        disabled={isAdminOrOwner(user) || toggleAccessMutation.isPending}
-                        onCheckedChange={(checked) => {
-                          toggleAccessMutation.mutate({
-                            userId: user.id,
-                            data: { hasFactoryAccess: checked },
-                          });
-                        }}
-                        data-testid={`switch-factory-access-${user.id}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      {user.pageAccess.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {user.pageAccess.length <= 3 ? (
-                            user.pageAccess.map(pk => {
-                              const page = ALL_FACTORY_PAGES.find(p => p.key === pk);
-                              return (
-                                <Badge key={pk} variant="secondary">
-                                  {page?.label || pk}
-                                </Badge>
-                              );
-                            })
-                          ) : (
-                            <Badge variant="secondary">
-                              {user.pageAccess.length} pages
-                            </Badge>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Full access</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {isAdminOrOwner(user) ? (
-                        <span className="text-xs text-muted-foreground">Full access</span>
-                      ) : user.hideAllCosts ? (
-                        <Badge variant="secondary">No cost access</Badge>
-                      ) : user.hiddenCostFields.length > 0 ? (
-                        <Badge variant="secondary">{user.hiddenCostFields.length} hidden</Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Full access</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.active ? "default" : "secondary"}>
-                        {user.active ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(user)}
-                          data-testid={`button-edit-user-${user.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        {!isAdminOrOwner(user) && (
+              <Table>
+                <TableHeader className="sticky top-0 z-30 bg-background">
+                  <TableRow>
+                    <TableHead>Username</TableHead>
+                    <TableHead>Display Name</TableHead>
+                    <TableHead>ERP Access</TableHead>
+                    <TableHead>Factory Access</TableHead>
+                    <TableHead>Pages Access</TableHead>
+                    <TableHead>Cost Access</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="w-28">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {factoryUsers.map((user) => (
+                    <TableRow key={user.id} data-testid={`row-factory-user-${user.id}`}>
+                      <TableCell className="font-medium font-mono">{user.username}</TableCell>
+                      <TableCell className="text-muted-foreground">{user.displayName || "-"}</TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={isAdminOrOwner(user) ? true : (user.hasErpAccess ?? true)}
+                          disabled={isAdminOrOwner(user) || toggleAccessMutation.isPending}
+                          onCheckedChange={(checked) => {
+                            toggleAccessMutation.mutate({
+                              userId: user.id,
+                              data: { hasErpAccess: checked },
+                            });
+                          }}
+                          data-testid={`switch-erp-access-${user.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Switch
+                          checked={isAdminOrOwner(user) ? true : (user.hasFactoryAccess ?? true)}
+                          disabled={isAdminOrOwner(user) || toggleAccessMutation.isPending}
+                          onCheckedChange={(checked) => {
+                            toggleAccessMutation.mutate({
+                              userId: user.id,
+                              data: { hasFactoryAccess: checked },
+                            });
+                          }}
+                          data-testid={`switch-factory-access-${user.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        {user.pageAccess.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {user.pageAccess.length <= 3 ? (
+                              user.pageAccess.map((pk) => {
+                                const page = ALL_FACTORY_PAGES.find((p) => p.key === pk);
+                                return (
+                                  <Badge key={pk} variant="secondary">
+                                    {page?.label || pk}
+                                  </Badge>
+                                );
+                              })
+                            ) : (
+                              <Badge variant="secondary">{user.pageAccess.length} pages</Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Full access</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isAdminOrOwner(user) ? (
+                          <span className="text-xs text-muted-foreground">Full access</span>
+                        ) : user.hideAllCosts ? (
+                          <Badge variant="secondary">No cost access</Badge>
+                        ) : user.hiddenCostFields.length > 0 ? (
+                          <Badge variant="secondary">{user.hiddenCostFields.length} hidden</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Full access</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={user.active ? "default" : "secondary"}>
+                          {user.active ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => setDeletingUser(user)}
-                            data-testid={`button-delete-user-${user.id}`}
-                            className="text-destructive"
+                            onClick={() => openEdit(user)}
+                            data-testid={`button-edit-user-${user.id}`}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" />
                           </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                          {!isAdminOrOwner(user) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeletingUser(user)}
+                              data-testid={`button-delete-user-${user.id}`}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
@@ -412,9 +418,16 @@ export default function FactoryUsers() {
         </CardContent>
       </Card>
 
-      <Dialog open={createOpen || !!editingUser} onOpenChange={(open) => {
-        if (!open) { setCreateOpen(false); setEditingUser(null); resetForm(); }
-      }}>
+      <Dialog
+        open={createOpen || !!editingUser}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateOpen(false);
+            setEditingUser(null);
+            resetForm();
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -424,8 +437,7 @@ export default function FactoryUsers() {
             <DialogDescription>
               {editingUser
                 ? "Update display name, password, or page access"
-                : "Create a new user and choose which factory pages they can see"
-              }
+                : "Create a new user and choose which factory pages they can see"}
             </DialogDescription>
           </DialogHeader>
 
@@ -467,7 +479,9 @@ export default function FactoryUsers() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="flex items-center justify-between rounded-md border p-3">
-                <Label htmlFor="form-erp-access" className="cursor-pointer">ERP Access</Label>
+                <Label htmlFor="form-erp-access" className="cursor-pointer">
+                  ERP Access
+                </Label>
                 <Switch
                   id="form-erp-access"
                   checked={editingUser && isAdminOrOwner(editingUser) ? true : formData.hasErpAccess}
@@ -477,7 +491,9 @@ export default function FactoryUsers() {
                 />
               </div>
               <div className="flex items-center justify-between rounded-md border p-3">
-                <Label htmlFor="form-factory-access" className="cursor-pointer">Factory Access</Label>
+                <Label htmlFor="form-factory-access" className="cursor-pointer">
+                  Factory Access
+                </Label>
                 <Switch
                   id="form-factory-access"
                   checked={editingUser && isAdminOrOwner(editingUser) ? true : formData.hasFactoryAccess}
@@ -507,10 +523,10 @@ export default function FactoryUsers() {
               </p>
 
               <div className="space-y-4 border rounded-md p-4 max-h-80 overflow-y-auto">
-                {PAGE_GROUPS.map(group => {
-                  const groupPages = ALL_FACTORY_PAGES.filter(p => p.group === group);
-                  const allGroupSelected = groupPages.every(p => selectedPages.has(p.key));
-                  const someGroupSelected = groupPages.some(p => selectedPages.has(p.key));
+                {PAGE_GROUPS.map((group) => {
+                  const groupPages = ALL_FACTORY_PAGES.filter((p) => p.group === group);
+                  const allGroupSelected = groupPages.every((p) => selectedPages.has(p.key));
+                  const someGroupSelected = groupPages.some((p) => selectedPages.has(p.key));
 
                   return (
                     <div key={group} className="space-y-2">
@@ -519,7 +535,7 @@ export default function FactoryUsers() {
                           checked={allGroupSelected}
                           ref={undefined}
                           onCheckedChange={() => toggleGroup(group)}
-                          data-testid={`checkbox-group-${group.toLowerCase().replace(/\s+/g, '-')}`}
+                          data-testid={`checkbox-group-${group.toLowerCase().replace(/\s+/g, "-")}`}
                         />
                         <span className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                           {group}
@@ -529,12 +545,12 @@ export default function FactoryUsers() {
                         )}
                       </div>
                       <div className="grid grid-cols-2 gap-1 ml-6">
-                        {groupPages.map(page => (
+                        {groupPages.map((page) => (
                           <div key={page.key} className="flex items-center gap-2">
                             <Checkbox
                               checked={selectedPages.has(page.key)}
                               onCheckedChange={() => togglePage(page.key)}
-                              data-testid={`checkbox-page-${page.key.replace(/\//g, '-')}`}
+                              data-testid={`checkbox-page-${page.key.replace(/\//g, "-")}`}
                             />
                             <span className="text-sm">{page.label}</span>
                           </div>
@@ -546,9 +562,7 @@ export default function FactoryUsers() {
               </div>
 
               {selectedPages.size > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  {selectedPages.size} pages selected
-                </p>
+                <p className="text-sm text-muted-foreground">{selectedPages.size} pages selected</p>
               )}
             </div>
 
@@ -565,20 +579,22 @@ export default function FactoryUsers() {
                   <div className="flex items-center justify-between px-4 py-3 bg-muted/40 rounded-t-md">
                     <div>
                       <span className="text-sm font-semibold">User</span>
-                      <p className="text-xs text-muted-foreground mt-0.5">Hide all costs in the app and in any downloaded/exported files</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Hide all costs in the app and in any downloaded/exported files
+                      </p>
                     </div>
                     <Switch
                       checked={hideAllCosts}
-                      onCheckedChange={val => {
+                      onCheckedChange={(val) => {
                         setHideAllCosts(val);
-                        if (val) setHiddenCostFields(COST_FIELDS.map(f => f.key));
+                        if (val) setHiddenCostFields(COST_FIELDS.map((f) => f.key));
                         else setHiddenCostFields([]);
                       }}
                       data-testid="switch-hide-all-costs"
                     />
                   </div>
                   <div className={`divide-y ${hideAllCosts ? "opacity-40 pointer-events-none" : ""}`}>
-                    {COST_FIELDS.map(field => (
+                    {COST_FIELDS.map((field) => (
                       <div key={field.key} className="flex items-center justify-between px-4 py-3">
                         <span className="text-sm">{field.label}</span>
                         <Switch
@@ -597,7 +613,11 @@ export default function FactoryUsers() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => { setCreateOpen(false); setEditingUser(null); resetForm(); }}
+              onClick={() => {
+                setCreateOpen(false);
+                setEditingUser(null);
+                resetForm();
+              }}
             >
               Cancel
             </Button>
@@ -610,21 +630,24 @@ export default function FactoryUsers() {
               }
               data-testid="button-save-factory-user"
             >
-              {createMutation.isPending || updateMutation.isPending
-                ? "Saving..."
-                : editingUser ? "Update" : "Create"
-              }
+              {createMutation.isPending || updateMutation.isPending ? "Saving..." : editingUser ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!deletingUser} onOpenChange={(open) => { if (!open) setDeletingUser(null); }}>
+      <Dialog
+        open={!!deletingUser}
+        onOpenChange={(open) => {
+          if (!open) setDeletingUser(null);
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Remove User</DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove <strong>{deletingUser?.username}</strong>? Their account will be deactivated and they will lose all access to this company.
+              Are you sure you want to remove <strong>{deletingUser?.username}</strong>? Their account will be
+              deactivated and they will lose all access to this company.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
@@ -633,7 +656,9 @@ export default function FactoryUsers() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => wrapAdminAction(() => deletingUser && deleteMutation.mutate(deletingUser.id), "Remove User")}
+              onClick={() =>
+                wrapAdminAction(() => deletingUser && deleteMutation.mutate(deletingUser.id), "Remove User")
+              }
               disabled={deleteMutation.isPending}
               data-testid="button-confirm-delete-user"
             >

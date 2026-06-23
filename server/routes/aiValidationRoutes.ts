@@ -3,13 +3,7 @@ import Papa from "papaparse";
 import { db } from "../db";
 import { requireAuth } from "../auth";
 import { upload } from "./_helpers";
-import {
-  readExcel,
-  sheetToJson,
-  createWorkbook,
-  jsonToSheet,
-  writeWorkbook,
-} from "../excelHelper";
+import { readExcel, sheetToJson, createWorkbook, jsonToSheet, writeWorkbook } from "../excelHelper";
 import { stockItems, stockItemCodeAliases } from "@shared/schema";
 import { eq, and, isNull } from "drizzle-orm";
 
@@ -61,21 +55,42 @@ async function parseFile(buffer: Buffer, originalName: string): Promise<Record<s
 
 // ─── Column detection helpers ─────────────────────────────────────────────────
 
-const CODE_HEADERS = ["code", "item code", "item_code", "sku", "article", "article code",
-  "product code", "barcode", "part number", "part_number", "itemcode"];
-const NAME_HEADERS = ["name", "item name", "item_name", "product name", "product_name",
-  "description", "desc", "title", "stockitem", "stock item"];
+const CODE_HEADERS = [
+  "code",
+  "item code",
+  "item_code",
+  "sku",
+  "article",
+  "article code",
+  "product code",
+  "barcode",
+  "part number",
+  "part_number",
+  "itemcode",
+];
+const NAME_HEADERS = [
+  "name",
+  "item name",
+  "item_name",
+  "product name",
+  "product_name",
+  "description",
+  "desc",
+  "title",
+  "stockitem",
+  "stock item",
+];
 
 function detectColumn(rows: Record<string, any>[], candidates: string[]): string | null {
   if (!rows.length) return null;
   const keys = Object.keys(rows[0]);
   for (const candidate of candidates) {
-    const found = keys.find(k => k.toLowerCase().trim() === candidate);
+    const found = keys.find((k) => k.toLowerCase().trim() === candidate);
     if (found) return found;
   }
   // fuzzy: check if any key *contains* one of the candidates
   for (const candidate of candidates) {
-    const found = keys.find(k => k.toLowerCase().includes(candidate));
+    const found = keys.find((k) => k.toLowerCase().includes(candidate));
     if (found) return found;
   }
   return null;
@@ -84,16 +99,14 @@ function detectColumn(rows: Record<string, any>[], candidates: string[]): string
 // ─── Levenshtein distance ─────────────────────────────────────────────────────
 
 function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length;
+  const m = a.length,
+    n = b.length;
   const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
     Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
   );
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] =
-        a[i - 1] === b[j - 1]
-          ? dp[i - 1][j - 1]
-          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
     }
   }
   return dp[m][n];
@@ -112,9 +125,9 @@ function normalizeName(raw: string): string {
   return raw
     .toLowerCase()
     .trim()
-    .replace(/\s*#\s*\d+\s*$/g, "")          // trailing #1, #2
-    .replace(/\s+no\.?\s*\d+\s*$/gi, "")     // trailing "no 1", "no.2"
-    .replace(/\s+-\s*[a-z]\s*$/gi, "")       // trailing " - A", " - B"
+    .replace(/\s*#\s*\d+\s*$/g, "") // trailing #1, #2
+    .replace(/\s+no\.?\s*\d+\s*$/gi, "") // trailing "no 1", "no.2"
+    .replace(/\s+-\s*[a-z]\s*$/gi, "") // trailing " - A", " - B"
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -124,7 +137,7 @@ function normalizeName(raw: string): string {
 async function runItemCodeCheck(
   companyId: number,
   rows: Record<string, any>[],
-  file1Name: string,
+  file1Name: string
 ): Promise<ValidationResult> {
   const codeCol = detectColumn(rows, CODE_HEADERS);
   if (!codeCol) {
@@ -142,16 +155,18 @@ async function runItemCodeCheck(
 
   // Load DB codes
   const [dbPrimary, dbAliases] = await Promise.all([
-    db.select({ id: stockItems.id, code: stockItems.code, name: stockItems.name })
+    db
+      .select({ id: stockItems.id, code: stockItems.code, name: stockItems.name })
       .from(stockItems)
       .where(and(eq(stockItems.companyId, companyId), eq(stockItems.active, true), isNull(stockItems.deletedAt))),
-    db.select({ aliasCode: stockItemCodeAliases.aliasCode, stockItemId: stockItemCodeAliases.stockItemId })
+    db
+      .select({ aliasCode: stockItemCodeAliases.aliasCode, stockItemId: stockItemCodeAliases.stockItemId })
       .from(stockItemCodeAliases)
       .where(eq(stockItemCodeAliases.companyId, companyId)),
   ]);
 
-  const primaryMap = new Map(dbPrimary.map(r => [r.code?.toLowerCase() ?? "", r]));
-  const aliasMap   = new Map(dbAliases.map(a => [a.aliasCode.toLowerCase(), a.stockItemId]));
+  const primaryMap = new Map(dbPrimary.map((r) => [r.code?.toLowerCase() ?? "", r]));
+  const aliasMap = new Map(dbAliases.map((a) => [a.aliasCode.toLowerCase(), a.stockItemId]));
   const allDbCodes = [...primaryMap.keys(), ...aliasMap.keys()];
 
   // Count codes in upload (for intra-file duplicate detection)
@@ -168,7 +183,10 @@ async function runItemCodeCheck(
   const suggestedFixes: SuggestedFix[] = [];
   const cleanedRows: Record<string, any>[] = [];
 
-  let found = 0, missing = 0, duplicateInFile = 0, closeMatches = 0;
+  let found = 0,
+    missing = 0,
+    duplicateInFile = 0,
+    closeMatches = 0;
   const seenInFile = new Set<string>();
 
   rows.forEach((row, idx) => {
@@ -198,12 +216,12 @@ async function runItemCodeCheck(
         found++;
         status = "Found (alias)";
         const itemId = aliasMap.get(lower)!;
-        const item = dbPrimary.find(i => i.id === itemId);
+        const item = dbPrimary.find((i) => i.id === itemId);
         detail = item ? `Alias of: ${item.name}` : "Alias";
       } else {
         // Check close matches
         const close = allDbCodes
-          .map(dbCode => ({ dbCode, dist: levenshtein(lower, dbCode) }))
+          .map((dbCode) => ({ dbCode, dist: levenshtein(lower, dbCode) }))
           .filter(({ dbCode, dist }) => dist > 0 && dist <= closeMatchThreshold(lower))
           .sort((a, b) => a.dist - b.dist)
           .slice(0, 3);
@@ -211,7 +229,7 @@ async function runItemCodeCheck(
         if (close.length) {
           closeMatches++;
           status = "Close Match";
-          detail = close.map(c => c.dbCode).join(", ");
+          detail = close.map((c) => c.dbCode).join(", ");
           warnings.push({
             row: idx + 2,
             value: raw,
@@ -265,7 +283,7 @@ async function runItemCodeCheck(
 async function runDuplicateNameCheck(
   _companyId: number,
   rows: Record<string, any>[],
-  file1Name: string,
+  file1Name: string
 ): Promise<ValidationResult> {
   const nameCol = detectColumn(rows, NAME_HEADERS);
   if (!nameCol) {

@@ -1,4 +1,17 @@
-import { Trash2, AlertTriangle, RefreshCw, Calculator, Package, Building2, Loader2, Eraser, Search, Check, Info, Database } from "lucide-react";
+import {
+  Trash2,
+  AlertTriangle,
+  RefreshCw,
+  Calculator,
+  Package,
+  Building2,
+  Loader2,
+  Eraser,
+  Search,
+  Check,
+  Info,
+  Database,
+} from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -161,7 +174,9 @@ export function SystemToolsTab({
       <div>
         <div className="flex items-center gap-3 mb-1">
           <h2 className="text-2xl font-semibold">System Tools</h2>
-          <Badge variant="secondary" className="text-xs">Admin Tools</Badge>
+          <Badge variant="secondary" className="text-xs">
+            Admin Tools
+          </Badge>
         </div>
         <p className="text-muted-foreground text-sm">
           Maintenance tools for database cleanup, diagnostics, and system-wide adjustments.
@@ -183,7 +198,9 @@ export function SystemToolsTab({
                   <RefreshCw className="h-6 w-6 text-red-500" />
                 </div>
                 <div>
-                  <h4 className="font-semibold" data-testid="text-zero-balances-title">Zero Account Balances</h4>
+                  <h4 className="font-semibold" data-testid="text-zero-balances-title">
+                    Zero Account Balances
+                  </h4>
                   <p className="text-sm text-muted-foreground">
                     Reset opening balances for selected accounts in the current company
                   </p>
@@ -209,7 +226,9 @@ export function SystemToolsTab({
                   <Database className="h-6 w-6 text-blue-500" />
                 </div>
                 <div>
-                  <h4 className="font-semibold" data-testid="text-init-accounting-title">Initialize Accounting</h4>
+                  <h4 className="font-semibold" data-testid="text-init-accounting-title">
+                    Initialize Accounting
+                  </h4>
                   <p className="text-sm text-muted-foreground">
                     Initial setup for companies with no accounting structure
                   </p>
@@ -226,7 +245,7 @@ export function SystemToolsTab({
           </Card>
         </div>
 
-      <DiagnosticsSection setOrphanedChargesDiagnostic={setOrphanedChargesDiagnostic} toast={toast} />
+        <DiagnosticsSection setOrphanedChargesDiagnostic={setOrphanedChargesDiagnostic} toast={toast} />
       </div>
 
       {/* Advanced Admin Actions (Only for Developers) */}
@@ -240,7 +259,9 @@ export function SystemToolsTab({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card className="p-4 border-l-4 border-l-rose-500">
               <h4 className="font-semibold text-sm mb-1">Fix Inter-Company</h4>
-              <p className="text-xs text-muted-foreground mb-3">Manage credit management between subsidiaries and parent.</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Manage credit management between subsidiaries and parent.
+              </p>
               <Button size="sm" variant="outline" className="w-full" onClick={() => setIsFixPOCreditsDialogOpen(true)}>
                 Manage Credits
               </Button>
@@ -248,23 +269,39 @@ export function SystemToolsTab({
 
             <Card className="p-4 border-l-4 border-l-orange-500">
               <h4 className="font-semibold text-sm mb-1">Reset Company Data</h4>
-              <p className="text-xs text-muted-foreground mb-3">Clear vouchers and entries for a company (Preserves Master Data).</p>
-              <Button size="sm" variant="outline" className="w-full text-orange-600 border-orange-200" onClick={() => setIsResetDataDialogOpen(true)}>
+              <p className="text-xs text-muted-foreground mb-3">
+                Clear vouchers and entries for a company (Preserves Master Data).
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-orange-600 border-orange-200"
+                onClick={() => setIsResetDataDialogOpen(true)}
+              >
                 Reset Data
               </Button>
             </Card>
 
             <Card className="p-4 border-l-4 border-l-cyan-500">
               <h4 className="font-semibold text-sm mb-1">Clean Empty Accounts</h4>
-              <p className="text-xs text-muted-foreground mb-3">Bulk delete ledger accounts that have no transactions.</p>
-              <Button size="sm" variant="outline" className="w-full text-cyan-600 border-cyan-200" onClick={() => setEmptyAccountsOpen(true)}>
+              <p className="text-xs text-muted-foreground mb-3">
+                Bulk delete ledger accounts that have no transactions.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full text-cyan-600 border-cyan-200"
+                onClick={() => setEmptyAccountsOpen(true)}
+              >
                 Clean Accounts
               </Button>
             </Card>
 
             <Card className="p-4 border-l-4 border-l-blue-500">
               <h4 className="font-semibold text-sm mb-1">Fix Parent PO Supplier</h4>
-              <p className="text-xs text-muted-foreground mb-3">Fix supplier entries in parent company for subsidiary POs.</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Fix supplier entries in parent company for subsidiary POs.
+              </p>
               <Button
                 size="sm"
                 variant="outline"
@@ -304,7 +341,11 @@ export function SystemToolsTab({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None (Disabled)</SelectItem>
-                    {companies.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {setParentCompanyMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -315,33 +356,30 @@ export function SystemToolsTab({
       )}
 
       {/* ALL DIALOGS (Extracted from the main Settings page) */}
-      
-      <ZeroBalancesDialog 
-        open={isZeroBalanceDialogOpen} 
-        onOpenChange={setIsZeroBalanceDialogOpen} 
-        companyId={selectedCompany?.id} 
+
+      <ZeroBalancesDialog
+        open={isZeroBalanceDialogOpen}
+        onOpenChange={setIsZeroBalanceDialogOpen}
+        companyId={selectedCompany?.id}
       />
 
-      <InitializeBalancesDialog 
-        open={isInitBalancesDialogOpen} 
-        onOpenChange={setIsInitBalancesDialogOpen} 
-      />
+      <InitializeBalancesDialog open={isInitBalancesDialogOpen} onOpenChange={setIsInitBalancesDialogOpen} />
 
-      <FixPOCreditsDialog 
-        open={isFixPOCreditsDialogOpen} 
-        onOpenChange={setIsFixPOCreditsDialogOpen} 
+      <FixPOCreditsDialog
+        open={isFixPOCreditsDialogOpen}
+        onOpenChange={setIsFixPOCreditsDialogOpen}
         companies={companies}
       />
 
-      <ResetCompanyDataDialog 
-        open={isResetDataDialogOpen} 
-        onOpenChange={setIsResetDataDialogOpen} 
+      <ResetCompanyDataDialog
+        open={isResetDataDialogOpen}
+        onOpenChange={setIsResetDataDialogOpen}
         companies={companies}
       />
 
-      <CleanEmptyAccountsDialog 
-        open={emptyAccountsOpen} 
-        onOpenChange={setEmptyAccountsOpen} 
+      <CleanEmptyAccountsDialog
+        open={emptyAccountsOpen}
+        onOpenChange={setEmptyAccountsOpen}
         companyId={selectedCompany?.id}
       />
     </div>

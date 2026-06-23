@@ -21,10 +21,7 @@ export async function getBaleByBarcode(barcode: string, companyId: number): Prom
   const [bale] = await db
     .select()
     .from(schema.bales)
-    .where(and(
-      eq(schema.bales.barcode, barcode),
-      eq(schema.bales.companyId, companyId)
-    ));
+    .where(and(eq(schema.bales.barcode, barcode), eq(schema.bales.companyId, companyId)));
   return bale;
 }
 
@@ -61,14 +58,14 @@ export async function getAllPendingBarcodes(companyId: number): Promise<schema.P
     .orderBy(desc(schema.pendingBarcodes.createdAt));
 }
 
-export async function getPendingBarcodeByCode(barcode: string, companyId: number): Promise<schema.PendingBarcode | undefined> {
+export async function getPendingBarcodeByCode(
+  barcode: string,
+  companyId: number
+): Promise<schema.PendingBarcode | undefined> {
   const results = await db
     .select()
     .from(schema.pendingBarcodes)
-    .where(and(
-      eq(schema.pendingBarcodes.barcode, barcode),
-      eq(schema.pendingBarcodes.companyId, companyId)
-    ));
+    .where(and(eq(schema.pendingBarcodes.barcode, barcode), eq(schema.pendingBarcodes.companyId, companyId)));
   return results[0];
 }
 
@@ -77,7 +74,10 @@ export async function createPendingBarcode(data: schema.InsertPendingBarcode): P
   return result;
 }
 
-export async function updatePendingBarcode(id: number, updates: Partial<schema.InsertPendingBarcode>): Promise<schema.PendingBarcode> {
+export async function updatePendingBarcode(
+  id: number,
+  updates: Partial<schema.InsertPendingBarcode>
+): Promise<schema.PendingBarcode> {
   const [result] = await db
     .update(schema.pendingBarcodes)
     .set(updates)
@@ -90,17 +90,16 @@ export async function deletePendingBarcode(id: number): Promise<void> {
   await db.delete(schema.pendingBarcodes).where(eq(schema.pendingBarcodes.id, id));
 }
 
-export async function bulkCreatePendingBarcodes(barcodes: schema.InsertPendingBarcode[]): Promise<schema.PendingBarcode[]> {
+export async function bulkCreatePendingBarcodes(
+  barcodes: schema.InsertPendingBarcode[]
+): Promise<schema.PendingBarcode[]> {
   if (barcodes.length === 0) return [];
   return await db.insert(schema.pendingBarcodes).values(barcodes).returning();
 }
 
 export async function markBarcodesAsPrinted(ids: number[]): Promise<void> {
   if (ids.length === 0) return;
-  await db
-    .update(schema.pendingBarcodes)
-    .set({ printed: true })
-    .where(inArray(schema.pendingBarcodes.id, ids));
+  await db.update(schema.pendingBarcodes).set({ printed: true }).where(inArray(schema.pendingBarcodes.id, ids));
 }
 
 // Bale Product Categories
@@ -114,30 +113,32 @@ export async function getAllBaleProductCategories(companyId: number): Promise<sc
 }
 
 export async function getBaleProductCategoryById(id: number): Promise<schema.BaleProductCategory | undefined> {
-  const [cat] = await db
-    .select()
-    .from(schema.baleProductCategories)
-    .where(eq(schema.baleProductCategories.id, id));
+  const [cat] = await db.select().from(schema.baleProductCategories).where(eq(schema.baleProductCategories.id, id));
   return cat;
 }
 
-export async function getBaleProductCategoryByName(name: string, companyId: number): Promise<schema.BaleProductCategory | undefined> {
+export async function getBaleProductCategoryByName(
+  name: string,
+  companyId: number
+): Promise<schema.BaleProductCategory | undefined> {
   const [cat] = await db
     .select()
     .from(schema.baleProductCategories)
-    .where(and(
-      eq(schema.baleProductCategories.name, name),
-      eq(schema.baleProductCategories.companyId, companyId)
-    ));
+    .where(and(eq(schema.baleProductCategories.name, name), eq(schema.baleProductCategories.companyId, companyId)));
   return cat;
 }
 
-export async function createBaleProductCategory(category: schema.InsertBaleProductCategory): Promise<schema.BaleProductCategory> {
+export async function createBaleProductCategory(
+  category: schema.InsertBaleProductCategory
+): Promise<schema.BaleProductCategory> {
   const [created] = await db.insert(schema.baleProductCategories).values(category).returning();
   return created;
 }
 
-export async function updateBaleProductCategory(id: number, updates: Partial<schema.InsertBaleProductCategory>): Promise<schema.BaleProductCategory> {
+export async function updateBaleProductCategory(
+  id: number,
+  updates: Partial<schema.InsertBaleProductCategory>
+): Promise<schema.BaleProductCategory> {
   const [updated] = await db
     .update(schema.baleProductCategories)
     .set({ ...updates, updatedAt: sql`now()` })
@@ -161,10 +162,7 @@ export async function getAllBaleProducts(companyId: number): Promise<schema.Bale
 }
 
 export async function getBaleProductById(id: number): Promise<schema.BaleProduct | undefined> {
-  const [product] = await db
-    .select()
-    .from(schema.baleProducts)
-    .where(eq(schema.baleProducts.id, id));
+  const [product] = await db.select().from(schema.baleProducts).where(eq(schema.baleProducts.id, id));
   return product;
 }
 
@@ -172,10 +170,7 @@ export async function getBaleProductByCode(code: string, companyId: number): Pro
   const [product] = await db
     .select()
     .from(schema.baleProducts)
-    .where(and(
-      eq(schema.baleProducts.code, code),
-      eq(schema.baleProducts.companyId, companyId)
-    ));
+    .where(and(eq(schema.baleProducts.code, code), eq(schema.baleProducts.companyId, companyId)));
   return product;
 }
 
@@ -188,7 +183,10 @@ export async function createBaleProduct(product: schema.InsertBaleProduct): Prom
   return created;
 }
 
-export async function updateBaleProduct(id: number, updates: Partial<schema.InsertBaleProduct>): Promise<schema.BaleProduct> {
+export async function updateBaleProduct(
+  id: number,
+  updates: Partial<schema.InsertBaleProduct>
+): Promise<schema.BaleProduct> {
   const [updated] = await db
     .update(schema.baleProducts)
     .set({ ...updates, updatedAt: sql`now()` })
@@ -204,17 +202,17 @@ export async function deleteBaleProduct(id: number): Promise<void> {
 export async function bulkCreateBaleProducts(products: schema.InsertBaleProduct[]): Promise<schema.BaleProduct[]> {
   if (products.length === 0) return [];
 
-  const companyIds = new Set(products.map(p => p.companyId));
+  const companyIds = new Set(products.map((p) => p.companyId));
   if (companyIds.size > 1) {
     throw new Error("All products must belong to the same company");
   }
 
-  const withCodes = products.map(p => ({
+  const withCodes = products.map((p) => ({
     ...p,
     code: p.code || p.articleCode || `AUTO-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
   }));
 
-  const codes = withCodes.map(p => p.code);
+  const codes = withCodes.map((p) => p.code);
   const duplicates = codes.filter((code, index) => codes.indexOf(code) !== index);
   if (duplicates.length > 0) {
     throw new Error(`Duplicate product codes in import: ${duplicates.join(", ")}`);
@@ -230,36 +228,38 @@ export async function createBaleLabelPrint(data: schema.InsertBaleLabelPrint): P
   return created;
 }
 
-export async function getBaleLabelPrintByReference(referenceNumber: string, companyId: number): Promise<schema.BaleLabelPrint | undefined> {
+export async function getBaleLabelPrintByReference(
+  referenceNumber: string,
+  companyId: number
+): Promise<schema.BaleLabelPrint | undefined> {
   const [record] = await db
     .select()
     .from(schema.baleLabelPrints)
-    .where(and(
-      eq(schema.baleLabelPrints.referenceNumber, referenceNumber),
-      eq(schema.baleLabelPrints.companyId, companyId)
-    ));
+    .where(
+      and(eq(schema.baleLabelPrints.referenceNumber, referenceNumber), eq(schema.baleLabelPrints.companyId, companyId))
+    );
   return record;
 }
 
-export async function getBaleLabelPrintsByArticle(articleCode: string, companyId: number): Promise<schema.BaleLabelPrint[]> {
+export async function getBaleLabelPrintsByArticle(
+  articleCode: string,
+  companyId: number
+): Promise<schema.BaleLabelPrint[]> {
   return await db
     .select()
     .from(schema.baleLabelPrints)
-    .where(and(
-      eq(schema.baleLabelPrints.articleCode, articleCode),
-      eq(schema.baleLabelPrints.companyId, companyId)
-    ))
+    .where(and(eq(schema.baleLabelPrints.articleCode, articleCode), eq(schema.baleLabelPrints.companyId, companyId)))
     .orderBy(desc(schema.baleLabelPrints.printedAt));
 }
 
-export async function getBaleProductByArticleCode(articleCode: string, companyId: number): Promise<schema.BaleProduct | undefined> {
+export async function getBaleProductByArticleCode(
+  articleCode: string,
+  companyId: number
+): Promise<schema.BaleProduct | undefined> {
   const [product] = await db
     .select()
     .from(schema.baleProducts)
-    .where(and(
-      eq(schema.baleProducts.articleCode, articleCode),
-      eq(schema.baleProducts.companyId, companyId)
-    ));
+    .where(and(eq(schema.baleProducts.articleCode, articleCode), eq(schema.baleProducts.companyId, companyId)));
   return product;
 }
 
@@ -274,10 +274,7 @@ export async function getAllBaleTransfers(companyId: number): Promise<schema.Bal
 }
 
 export async function getBaleTransferById(id: number): Promise<schema.BaleTransfer | undefined> {
-  const [transfer] = await db
-    .select()
-    .from(schema.baleTransfers)
-    .where(eq(schema.baleTransfers.id, id));
+  const [transfer] = await db.select().from(schema.baleTransfers).where(eq(schema.baleTransfers.id, id));
   return transfer;
 }
 
@@ -286,7 +283,10 @@ export async function createBaleTransfer(transfer: schema.InsertBaleTransfer): P
   return created;
 }
 
-export async function updateBaleTransfer(id: number, updates: Partial<schema.InsertBaleTransfer>): Promise<schema.BaleTransfer> {
+export async function updateBaleTransfer(
+  id: number,
+  updates: Partial<schema.InsertBaleTransfer>
+): Promise<schema.BaleTransfer> {
   const [updated] = await db
     .update(schema.baleTransfers)
     .set({ ...updates, updatedAt: sql`now()` })
@@ -300,10 +300,7 @@ export async function deleteBaleTransfer(id: number): Promise<void> {
 }
 
 export async function getBaleTransferItems(transferId: number): Promise<schema.BaleTransferItem[]> {
-  return await db
-    .select()
-    .from(schema.baleTransferItems)
-    .where(eq(schema.baleTransferItems.transferId, transferId));
+  return await db.select().from(schema.baleTransferItems).where(eq(schema.baleTransferItems.transferId, transferId));
 }
 
 export async function createBaleTransferItem(item: schema.InsertBaleTransferItem): Promise<schema.BaleTransferItem> {
@@ -311,7 +308,10 @@ export async function createBaleTransferItem(item: schema.InsertBaleTransferItem
   return created;
 }
 
-export async function updateBaleTransferItem(id: number, updates: Partial<schema.InsertBaleTransferItem>): Promise<schema.BaleTransferItem> {
+export async function updateBaleTransferItem(
+  id: number,
+  updates: Partial<schema.InsertBaleTransferItem>
+): Promise<schema.BaleTransferItem> {
   const [updated] = await db
     .update(schema.baleTransferItems)
     .set(updates)
@@ -326,15 +326,20 @@ export async function deleteBaleTransferItem(id: number): Promise<void> {
 
 // Production Bales
 
-export async function getProductionBalesByLocation(companyId: number, locationId: number): Promise<schema.ProductionBale[]> {
+export async function getProductionBalesByLocation(
+  companyId: number,
+  locationId: number
+): Promise<schema.ProductionBale[]> {
   return await db
     .select()
     .from(schema.productionBales)
-    .where(and(
-      eq(schema.productionBales.companyId, companyId),
-      eq(schema.productionBales.locationId, locationId),
-      eq(schema.productionBales.status, "IN_STOCK")
-    ));
+    .where(
+      and(
+        eq(schema.productionBales.companyId, companyId),
+        eq(schema.productionBales.locationId, locationId),
+        eq(schema.productionBales.status, "IN_STOCK")
+      )
+    );
 }
 
 // Mix Batches
@@ -351,10 +356,7 @@ export async function getMixBatchById(id: number, companyId: number): Promise<sc
   const [batch] = await db
     .select()
     .from(schema.mixBatches)
-    .where(and(
-      eq(schema.mixBatches.id, id),
-      eq(schema.mixBatches.companyId, companyId)
-    ));
+    .where(and(eq(schema.mixBatches.id, id), eq(schema.mixBatches.companyId, companyId)));
   return batch;
 }
 
@@ -383,26 +385,23 @@ export async function getMixBatchSources(mixBatchId: number, companyId: number):
   if (!batch) {
     return [];
   }
-  return await db
-    .select()
-    .from(schema.mixBatchSources)
-    .where(eq(schema.mixBatchSources.mixBatchId, mixBatchId));
+  return await db.select().from(schema.mixBatchSources).where(eq(schema.mixBatchSources.mixBatchId, mixBatchId));
 }
 
 export async function addMixBatchSource(source: schema.InsertMixBatchSource): Promise<schema.MixBatchSource> {
-  const [created] = await db
-    .insert(schema.mixBatchSources)
-    .values(source)
-    .returning();
+  const [created] = await db.insert(schema.mixBatchSources).values(source).returning();
   return created;
 }
 
-export async function getAllProductionBales(companyId: number, filters?: {
-  mixBatchId?: number;
-  status?: string;
-  category?: string;
-  grade?: string;
-}): Promise<any[]> {
+export async function getAllProductionBales(
+  companyId: number,
+  filters?: {
+    mixBatchId?: number;
+    status?: string;
+    category?: string;
+    grade?: string;
+  }
+): Promise<any[]> {
   let conditions = [eq(schema.productionBales.companyId, companyId)];
 
   if (filters?.mixBatchId) {
@@ -434,21 +433,18 @@ export async function getAllProductionBales(companyId: number, filters?: {
 }
 
 export async function getProductionBaleById(id: number): Promise<schema.ProductionBale | undefined> {
-  const [bale] = await db
-    .select()
-    .from(schema.productionBales)
-    .where(eq(schema.productionBales.id, id));
+  const [bale] = await db.select().from(schema.productionBales).where(eq(schema.productionBales.id, id));
   return bale;
 }
 
-export async function getProductionBaleByBarcode(barcodeValue: string, companyId: number): Promise<schema.ProductionBale | undefined> {
+export async function getProductionBaleByBarcode(
+  barcodeValue: string,
+  companyId: number
+): Promise<schema.ProductionBale | undefined> {
   const [bale] = await db
     .select()
     .from(schema.productionBales)
-    .where(and(
-      eq(schema.productionBales.barcodeValue, barcodeValue),
-      eq(schema.productionBales.companyId, companyId)
-    ));
+    .where(and(eq(schema.productionBales.barcodeValue, barcodeValue), eq(schema.productionBales.companyId, companyId)));
   return bale;
 }
 
@@ -461,7 +457,10 @@ export async function createProductionBale(bale: schema.InsertProductionBale): P
   return created;
 }
 
-export async function updateProductionBale(id: number, updates: Partial<schema.InsertProductionBale>): Promise<schema.ProductionBale> {
+export async function updateProductionBale(
+  id: number,
+  updates: Partial<schema.InsertProductionBale>
+): Promise<schema.ProductionBale> {
   const updateData: any = { ...updates, updatedAt: sql`now()` };
   if (updates.pressedAt) {
     updateData.pressedAt = new Date(updates.pressedAt);
@@ -477,15 +476,14 @@ export async function updateProductionBale(id: number, updates: Partial<schema.I
 export async function deleteProductionBale(id: number, companyId: number): Promise<void> {
   await db
     .delete(schema.productionBales)
-    .where(and(
-      eq(schema.productionBales.id, id),
-      eq(schema.productionBales.companyId, companyId)
-    ));
+    .where(and(eq(schema.productionBales.id, id), eq(schema.productionBales.companyId, companyId)));
 }
 
-export async function bulkCreateProductionBales(bales: schema.InsertProductionBale[]): Promise<schema.ProductionBale[]> {
+export async function bulkCreateProductionBales(
+  bales: schema.InsertProductionBale[]
+): Promise<schema.ProductionBale[]> {
   if (bales.length === 0) return [];
-  const balesData = bales.map(bale => {
+  const balesData = bales.map((bale) => {
     const data: any = { ...bale };
     if (bale.pressedAt) {
       data.pressedAt = new Date(bale.pressedAt);
@@ -543,17 +541,11 @@ export async function updateProductionBaleFromScan(
 }
 
 export async function getNextBaleBarcode(companyId: number): Promise<string> {
-  const [sequence] = await db
-    .select()
-    .from(schema.baleSequences)
-    .where(eq(schema.baleSequences.companyId, companyId));
+  const [sequence] = await db.select().from(schema.baleSequences).where(eq(schema.baleSequences.companyId, companyId));
 
   if (!sequence) {
-    const [newSeq] = await db
-      .insert(schema.baleSequences)
-      .values({ companyId, nextNumber: 2 })
-      .returning();
-    return `HD${String(newSeq.nextNumber - 1).padStart(5, '0')}`;
+    const [newSeq] = await db.insert(schema.baleSequences).values({ companyId, nextNumber: 2 }).returning();
+    return `HD${String(newSeq.nextNumber - 1).padStart(5, "0")}`;
   }
 
   const nextNum = sequence.nextNumber;
@@ -562,5 +554,5 @@ export async function getNextBaleBarcode(companyId: number): Promise<string> {
     .set({ nextNumber: nextNum + 1 })
     .where(eq(schema.baleSequences.id, sequence.id));
 
-  return `HD${String(nextNum).padStart(5, '0')}`;
+  return `HD${String(nextNum).padStart(5, "0")}`;
 }

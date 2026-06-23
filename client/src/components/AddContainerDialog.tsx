@@ -3,38 +3,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,17 +18,19 @@ import { queryClient } from "@/lib/queryClient";
 import { insertContainerSchema } from "@shared/schema";
 
 // ── ERP schema (unchanged) ───────────────────────────────────────────────────
-const erpFormSchema = insertContainerSchema.pick({
-  containerNumber: true,
-  supplierId: true,
-  status: true,
-  importDate: true,
-}).extend({
-  status: z.string().default("AVAILABLE"),
-  itemName: z.string().min(1, "Item name is required"),
-  ratePerKg: z.coerce.number().positive("Rate must be positive"),
-  totalKg: z.coerce.number().positive("Weight must be positive"),
-});
+const erpFormSchema = insertContainerSchema
+  .pick({
+    containerNumber: true,
+    supplierId: true,
+    status: true,
+    importDate: true,
+  })
+  .extend({
+    status: z.string().default("AVAILABLE"),
+    itemName: z.string().min(1, "Item name is required"),
+    ratePerKg: z.coerce.number().positive("Rate must be positive"),
+    totalKg: z.coerce.number().positive("Weight must be positive"),
+  });
 
 // ── SP schema ────────────────────────────────────────────────────────────────
 const spLineSchema = z.object({
@@ -144,55 +120,87 @@ function ErpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => v
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(d => createMutation.mutate(d))} className="space-y-4" noValidate>
-        <FormField control={form.control} name="containerNumber" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Container Number *</FormLabel>
-            <FormControl><Input {...field} placeholder="CONT-001" data-testid="input-container-number" /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
-
-        <FormField control={form.control} name="supplierId" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Supplier *</FormLabel>
-            <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString()}>
+      <form onSubmit={form.handleSubmit((d) => createMutation.mutate(d))} className="space-y-4" noValidate>
+        <FormField
+          control={form.control}
+          name="containerNumber"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Container Number *</FormLabel>
               <FormControl>
-                <SelectTrigger data-testid="select-supplier"><SelectValue placeholder="Select supplier" /></SelectTrigger>
+                <Input {...field} placeholder="CONT-001" data-testid="input-container-number" />
               </FormControl>
-              <SelectContent>
-                {suppliers?.map((s) => (
-                  <SelectItem key={s.id} value={s.id.toString()}>{s.legalName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )} />
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-        <FormField control={form.control} name="itemName" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Item Name *</FormLabel>
-            <FormControl><Input {...field} placeholder="e.g., Used Clothing Mix" data-testid="input-item-name" /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
+        <FormField
+          control={form.control}
+          name="supplierId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Supplier *</FormLabel>
+              <Select onValueChange={(v) => field.onChange(parseInt(v))} value={field.value?.toString()}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-supplier">
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {suppliers?.map((s) => (
+                    <SelectItem key={s.id} value={s.id.toString()}>
+                      {s.legalName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="itemName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Item Name *</FormLabel>
+              <FormControl>
+                <Input {...field} placeholder="e.g., Used Clothing Mix" data-testid="input-item-name" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="grid grid-cols-2 gap-4">
-          <FormField control={form.control} name="ratePerKg" render={({ field }) => (
-            <FormItem>
-              <FormLabel>Rate ($/kg) *</FormLabel>
-              <FormControl><Input {...field} type="number" step="any" placeholder="0.3600000" data-testid="input-rate-per-kg" /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )} />
-          <FormField control={form.control} name="totalKg" render={({ field }) => (
-            <FormItem>
-              <FormLabel>Total Weight (kg) *</FormLabel>
-              <FormControl><Input {...field} type="number" step="0.01" placeholder="20000" data-testid="input-total-kg" /></FormControl>
-              <FormMessage />
-            </FormItem>
-          )} />
+          <FormField
+            control={form.control}
+            name="ratePerKg"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Rate ($/kg) *</FormLabel>
+                <FormControl>
+                  <Input {...field} type="number" step="any" placeholder="0.3600000" data-testid="input-rate-per-kg" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="totalKg"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Total Weight (kg) *</FormLabel>
+                <FormControl>
+                  <Input {...field} type="number" step="0.01" placeholder="20000" data-testid="input-total-kg" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </div>
         {/* Live total value preview */}
         {(() => {
@@ -201,44 +209,64 @@ function ErpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => v
           if (!rate || !kg || isNaN(rate) || isNaN(kg)) return null;
           const total = rate * kg;
           return (
-            <div className="flex items-center justify-between rounded-md bg-muted/50 border px-3 py-2 text-sm" data-testid="text-container-value-preview">
+            <div
+              className="flex items-center justify-between rounded-md bg-muted/50 border px-3 py-2 text-sm"
+              data-testid="text-container-value-preview"
+            >
               <span className="text-muted-foreground">Estimated total value</span>
               <span className="font-semibold font-mono tabular-nums">
                 ${total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                <span className="text-xs text-muted-foreground font-normal ml-1.5">({rate.toLocaleString("en-US", { maximumFractionDigits: 7 })} × {kg.toLocaleString("en-US", { maximumFractionDigits: 2 })} kg)</span>
+                <span className="text-xs text-muted-foreground font-normal ml-1.5">
+                  ({rate.toLocaleString("en-US", { maximumFractionDigits: 7 })} ×{" "}
+                  {kg.toLocaleString("en-US", { maximumFractionDigits: 2 })} kg)
+                </span>
               </span>
             </div>
           );
         })()}
 
-        <FormField control={form.control} name="status" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Status</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <FormControl>
-                <SelectTrigger data-testid="select-status"><SelectValue /></SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value="OTW">OTW (On The Way)</SelectItem>
-                <SelectItem value="ARRIVED">Arrived</SelectItem>
-                <SelectItem value="AVAILABLE">Available</SelectItem>
-                <SelectItem value="OFFLOADED">Offloaded</SelectItem>
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )} />
+        <FormField
+          control={form.control}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Status</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger data-testid="select-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="OTW">OTW (On The Way)</SelectItem>
+                  <SelectItem value="ARRIVED">Arrived</SelectItem>
+                  <SelectItem value="AVAILABLE">Available</SelectItem>
+                  <SelectItem value="OFFLOADED">Offloaded</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-        <FormField control={form.control} name="importDate" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Import Date *</FormLabel>
-            <FormControl><Input {...field} type="date" data-testid="input-import-date" /></FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
+        <FormField
+          control={form.control}
+          name="importDate"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Import Date *</FormLabel>
+              <FormControl>
+                <Input {...field} type="date" data-testid="input-import-date" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <div className="flex justify-end gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">Cancel</Button>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
+            Cancel
+          </Button>
           <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit">
             {createMutation.isPending ? "Adding..." : "Add Container"}
           </Button>
@@ -317,10 +345,13 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
 
   const parsePaste = useCallback(() => {
     if (!pasteText.trim()) return;
-    const rows = pasteText.trim().split("\n").map(r => r.split("\t").map(c => c.trim()));
+    const rows = pasteText
+      .trim()
+      .split("\n")
+      .map((r) => r.split("\t").map((c) => c.trim()));
     const parsed = rows
-      .filter(r => r.length >= 3 && r[0])
-      .map(r => ({
+      .filter((r) => r.length >= 3 && r[0])
+      .map((r) => ({
         articleCode: r[0] || "",
         description: r.length >= 4 ? r[1] : "",
         qty: r.length >= 4 ? r[2] : r[1],
@@ -336,91 +367,166 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(d => createMutation.mutate(d))} className="space-y-5" noValidate>
+      <form onSubmit={form.handleSubmit((d) => createMutation.mutate(d))} className="space-y-5" noValidate>
         {/* Supplier & Header */}
         <div className="space-y-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Supplier &amp; Invoice</p>
           <div className="grid grid-cols-2 gap-3">
-            <FormField control={form.control} name="supplierId" render={({ field }) => (
-              <FormItem className="col-span-2">
-                <FormLabel>Supplier</FormLabel>
-                <Select
-                  value={field.value ? String(field.value) : ""}
-                  onValueChange={(val) => {
-                    const id = parseInt(val);
-                    field.onChange(id);
-                    const found = suppliers.find(s => s.id === id);
-                    if (found) form.setValue("supplierName", found.legalName);
-                  }}
-                >
+            <FormField
+              control={form.control}
+              name="supplierId"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>Supplier</FormLabel>
+                  <Select
+                    value={field.value ? String(field.value) : ""}
+                    onValueChange={(val) => {
+                      const id = parseInt(val);
+                      field.onChange(id);
+                      const found = suppliers.find((s) => s.id === id);
+                      if (found) form.setValue("supplierName", found.legalName);
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger data-testid="select-sp-supplier">
+                        <SelectValue placeholder="Select supplier…" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {suppliers.map((s) => (
+                        <SelectItem key={s.id} value={String(s.id)}>
+                          {s.legalName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="supplierName"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>
+                    Supplier Name{" "}
+                    <span className="text-muted-foreground font-normal text-xs">(override or type if unlisted)</span>
+                  </FormLabel>
                   <FormControl>
-                    <SelectTrigger data-testid="select-sp-supplier"><SelectValue placeholder="Select supplier…" /></SelectTrigger>
+                    <Input {...field} data-testid="input-sp-supplier-name" />
                   </FormControl>
-                  <SelectContent>
-                    {suppliers.map(s => (
-                      <SelectItem key={s.id} value={String(s.id)}>{s.legalName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="supplierName" render={({ field }) => (
-              <FormItem className="col-span-2">
-                <FormLabel>Supplier Name <span className="text-muted-foreground font-normal text-xs">(override or type if unlisted)</span></FormLabel>
-                <FormControl><Input {...field} data-testid="input-sp-supplier-name" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="containerNumber" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Container No. <span className="text-muted-foreground font-normal text-xs">(optional)</span></FormLabel>
-                <FormControl><Input placeholder="ABCD1234567" {...field} data-testid="input-sp-container-number" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="invoiceNumber" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Invoice Number</FormLabel>
-                <FormControl><Input {...field} data-testid="input-sp-invoice-number" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="invoiceDate" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Invoice Date</FormLabel>
-                <FormControl><Input type="date" {...field} data-testid="input-sp-invoice-date" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="invoiceTotalUsd" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Invoice Total (USD)</FormLabel>
-                <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-sp-invoice-total" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="discountPct" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Discount %</FormLabel>
-                <FormControl><Input type="number" step="0.01" placeholder="0" {...field} data-testid="input-sp-discount-pct" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="freightEstimateUsd" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Freight Estimate (USD)</FormLabel>
-                <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-sp-freight-estimate" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem className="col-span-2">
-                <FormLabel>Notes <span className="text-muted-foreground font-normal text-xs">(optional)</span></FormLabel>
-                <FormControl><Input {...field} data-testid="input-sp-notes" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="containerNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>
+                    Container No. <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="ABCD1234567" {...field} data-testid="input-sp-container-number" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="invoiceNumber"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Invoice Number</FormLabel>
+                  <FormControl>
+                    <Input {...field} data-testid="input-sp-invoice-number" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="invoiceDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Invoice Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} data-testid="input-sp-invoice-date" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="invoiceTotalUsd"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Invoice Total (USD)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      {...field}
+                      data-testid="input-sp-invoice-total"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="discountPct"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Discount %</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.01" placeholder="0" {...field} data-testid="input-sp-discount-pct" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="freightEstimateUsd"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Freight Estimate (USD)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      {...field}
+                      data-testid="input-sp-freight-estimate"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="notes"
+              render={({ field }) => (
+                <FormItem className="col-span-2">
+                  <FormLabel>
+                    Notes <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input {...field} data-testid="input-sp-notes" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
         </div>
 
@@ -439,7 +545,10 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
             </div>
             <div className="grid grid-cols-3 text-xs py-0.5">
               <span className="col-span-2 font-medium">
-                Goods OTW <Badge variant="secondary" className="ml-1 text-xs">Dr</Badge>
+                Goods OTW{" "}
+                <Badge variant="secondary" className="ml-1 text-xs">
+                  Dr
+                </Badge>
               </span>
               <span className="text-right tabular-nums font-semibold">{fmt2(invoiceTotal)}</span>
             </div>
@@ -485,7 +594,7 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
               </p>
               <Textarea
                 value={pasteText}
-                onChange={e => setPasteText(e.target.value)}
+                onChange={(e) => setPasteText(e.target.value)}
                 placeholder={"A001\tUsed Clothing\t500\t1.20\nA002\tShoes\t200\t2.50"}
                 className="text-xs font-mono"
                 rows={4}
@@ -496,7 +605,10 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => { setShowPaste(false); setPasteText(""); }}
+                  onClick={() => {
+                    setShowPaste(false);
+                    setPasteText("");
+                  }}
                 >
                   Cancel
                 </Button>
@@ -522,10 +634,7 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
               <TableBody>
                 {fields.map((field, idx) => {
                   const line = watchLines[idx];
-                  const lineCost =
-                    parseFloat(line?.qty || "0") *
-                    parseFloat(line?.unitRateUsd || "0") *
-                    discountFactor;
+                  const lineCost = parseFloat(line?.qty || "0") * parseFloat(line?.unitRateUsd || "0") * discountFactor;
                   return (
                     <TableRow key={field.id}>
                       <TableCell className="p-1">
@@ -587,7 +696,9 @@ function SpContainerForm({ onOpenChange }: { onOpenChange: (open: boolean) => vo
           </div>
 
           <div className="flex justify-end text-xs text-muted-foreground gap-4 px-1">
-            <span>{fields.length} line{fields.length !== 1 ? "s" : ""}</span>
+            <span>
+              {fields.length} line{fields.length !== 1 ? "s" : ""}
+            </span>
             <span>
               Discounted total: <span className="font-semibold">{fmt2(totalBaseCost)}</span>
             </span>
@@ -620,11 +731,7 @@ export function AddContainerDialog({ open, onOpenChange, isSP = false }: AddCont
               : "Manually add a container to the system"}
           </DialogDescription>
         </DialogHeader>
-        {isSP ? (
-          <SpContainerForm onOpenChange={onOpenChange} />
-        ) : (
-          <ErpContainerForm onOpenChange={onOpenChange} />
-        )}
+        {isSP ? <SpContainerForm onOpenChange={onOpenChange} /> : <ErpContainerForm onOpenChange={onOpenChange} />}
       </DialogContent>
     </Dialog>
   );

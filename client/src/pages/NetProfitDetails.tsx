@@ -3,12 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -87,12 +82,8 @@ function CategoryGroup({
 }) {
   const [open, setOpen] = useState(true);
   const total = accounts.reduce((s, a) => s + Math.abs(a.value), 0);
-  const color = side === "asset"
-    ? "text-emerald-600 dark:text-emerald-400"
-    : "text-rose-600 dark:text-rose-400";
-  const headerBg = side === "asset"
-    ? "bg-emerald-50/60 dark:bg-emerald-950/30"
-    : "bg-rose-50/60 dark:bg-rose-950/30";
+  const color = side === "asset" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
+  const headerBg = side === "asset" ? "bg-emerald-50/60 dark:bg-emerald-950/30" : "bg-rose-50/60 dark:bg-rose-950/30";
 
   return (
     <div className="rounded-md overflow-hidden border border-border/60">
@@ -113,9 +104,7 @@ function CategoryGroup({
             {accounts.length}
           </span>
         </div>
-        <span className={`font-mono font-bold tabular-nums ${color}`}>
-          {formatAmount(total)}
-        </span>
+        <span className={`font-mono font-bold tabular-nums ${color}`}>{formatAmount(total)}</span>
       </button>
       {open && (
         <div className="divide-y divide-border/50">
@@ -180,18 +169,14 @@ function SidePanel({
   }, {});
 
   const sortedCategories = Object.entries(grouped).sort(
-    ([, a], [, b]) =>
-      b.reduce((s, x) => s + Math.abs(x.value), 0) -
-      a.reduce((s, x) => s + Math.abs(x.value), 0)
+    ([, a], [, b]) => b.reduce((s, x) => s + Math.abs(x.value), 0) - a.reduce((s, x) => s + Math.abs(x.value), 0)
   );
 
   const isAsset = side === "asset";
   const headerGradient = isAsset
     ? "from-emerald-500/10 to-transparent dark:from-emerald-500/15"
     : "from-rose-500/10 to-transparent dark:from-rose-500/15";
-  const totalColor = isAsset
-    ? "text-emerald-600 dark:text-emerald-400"
-    : "text-rose-600 dark:text-rose-400";
+  const totalColor = isAsset ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
   const iconBg = isAsset
     ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400"
     : "bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400";
@@ -208,26 +193,20 @@ function SidePanel({
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
             <div className={`p-2 rounded-lg ${iconBg}`}>
-              {isAsset
-                ? <ArrowUpRight className="h-4 w-4" />
-                : <ArrowDownRight className="h-4 w-4" />
-              }
+              {isAsset ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
             </div>
             <div>
               <div className={`font-semibold text-base ${totalColor}`}>{title}</div>
-              {subtitle && (
-                <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>
-              )}
+              {subtitle && <div className="text-xs text-muted-foreground mt-0.5">{subtitle}</div>}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-2xl font-bold font-mono tabular-nums ${totalColor}`}>
-              {formatAmount(total)}
-            </span>
-            {open
-              ? <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-              : <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            }
+            <span className={`text-2xl font-bold font-mono tabular-nums ${totalColor}`}>{formatAmount(total)}</span>
+            {open ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            )}
           </div>
         </div>
       </div>
@@ -245,13 +224,11 @@ function SidePanel({
                   formatAmount={formatAmount}
                 />
               ))}
-              <div className={`flex justify-between items-center px-3 py-2.5 rounded-md border font-semibold text-sm mt-2 ${footerBg}`}>
-                <span className="text-muted-foreground">
-                  {isAsset ? "Total Assets" : "Total Liabilities"}
-                </span>
-                <span className={`font-mono tabular-nums ${totalColor}`}>
-                  {formatAmount(total)}
-                </span>
+              <div
+                className={`flex justify-between items-center px-3 py-2.5 rounded-md border font-semibold text-sm mt-2 ${footerBg}`}
+              >
+                <span className="text-muted-foreground">{isAsset ? "Total Assets" : "Total Liabilities"}</span>
+                <span className={`font-mono tabular-nums ${totalColor}`}>{formatAmount(total)}</span>
               </div>
             </>
           ) : (
@@ -276,11 +253,17 @@ export default function NetProfitDetails() {
   const [toDate, setToDate] = useState<string>("");
 
   const isValidDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v);
-  const commitFrom = (v: string) => { if (v === "" || isValidDate(v)) setFromDate(v); };
-  const commitTo   = (v: string) => { if (v === "" || isValidDate(v)) setToDate(v); };
+  const commitFrom = (v: string) => {
+    if (v === "" || isValidDate(v)) setFromDate(v);
+  };
+  const commitTo = (v: string) => {
+    if (v === "" || isValidDate(v)) setToDate(v);
+  };
   const clearDates = () => {
-    setFromInput(""); setToInput("");
-    setFromDate(""); setToDate("");
+    setFromInput("");
+    setToInput("");
+    setFromDate("");
+    setToDate("");
   };
 
   const queryParam = toDate ? `?toDate=${toDate}` : "";
@@ -299,11 +282,14 @@ export default function NetProfitDetails() {
   const sendWhatsApp = useMutation({
     mutationFn: () => {
       const today = new Date().toLocaleDateString("en-CA");
-      const start = fromDate || fromInput || (() => {
-        const d = new Date();
-        d.setFullYear(d.getFullYear() - 1);
-        return d.toLocaleDateString("en-CA");
-      })();
+      const start =
+        fromDate ||
+        fromInput ||
+        (() => {
+          const d = new Date();
+          d.setFullYear(d.getFullYear() - 1);
+          return d.toLocaleDateString("en-CA");
+        })();
       const end = toDate || toInput || today;
       return apiRequest("POST", "/api/whatsapp/send-net-position", { startDate: start, endDate: end });
     },
@@ -349,17 +335,16 @@ export default function NetProfitDetails() {
   }
 
   const forUsTotal = data?.forUsTotal || 0;
-  const onUsTotal  = data?.onUsTotal  || 0;
-  const netPos     = data?.netPosition || 0;
+  const onUsTotal = data?.onUsTotal || 0;
+  const netPos = data?.netPosition || 0;
   const isPositive = netPos >= 0;
 
   // Ratio bar: what fraction of total is assets
   const grandTotal = forUsTotal + onUsTotal;
-  const assetPct   = grandTotal > 0 ? (forUsTotal / grandTotal) * 100 : 50;
+  const assetPct = grandTotal > 0 ? (forUsTotal / grandTotal) * 100 : 50;
 
   return (
     <div className="p-4 md:p-6 space-y-5 w-full">
-
       {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-3">
@@ -374,10 +359,10 @@ export default function NetProfitDetails() {
               {fromDate && toDate
                 ? `${fromDate} — ${toDate} (balances as of ${toDate})`
                 : toDate
-                ? `Balances as of ${toDate}`
-                : fromDate
-                ? `From ${fromDate} — present`
-                : "Current balances — all time"}
+                  ? `Balances as of ${toDate}`
+                  : fromDate
+                    ? `From ${fromDate} — present`
+                    : "Current balances — all time"}
             </p>
           </div>
         </div>
@@ -448,16 +433,16 @@ export default function NetProfitDetails() {
                 data-testid="button-export-monthly-excel"
                 onClick={() => {
                   const today = new Date().toLocaleDateString("en-CA");
-                  const start = fromDate || fromInput || (() => {
-                    const d = new Date();
-                    d.setFullYear(d.getFullYear() - 1);
-                    return d.toLocaleDateString("en-CA");
-                  })();
+                  const start =
+                    fromDate ||
+                    fromInput ||
+                    (() => {
+                      const d = new Date();
+                      d.setFullYear(d.getFullYear() - 1);
+                      return d.toLocaleDateString("en-CA");
+                    })();
                   const end = toDate || toInput || today;
-                  window.open(
-                    `/api/reports/net-position-monthly-excel?startDate=${start}&endDate=${end}`,
-                    "_blank"
-                  );
+                  window.open(`/api/reports/net-position-monthly-excel?startDate=${start}&endDate=${end}`, "_blank");
                 }}
               >
                 <Download className="h-4 w-4 mr-2 shrink-0" />
@@ -473,10 +458,7 @@ export default function NetProfitDetails() {
                 {sendWhatsApp.isPending ? "Sending…" : "Send to WhatsApp"}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                data-testid="button-refresh"
-                onClick={() => refetch()}
-              >
+              <DropdownMenuItem data-testid="button-refresh" onClick={() => refetch()}>
                 <RefreshCw className="h-4 w-4 mr-2 shrink-0" />
                 Refresh
               </DropdownMenuItem>
@@ -514,9 +496,7 @@ export default function NetProfitDetails() {
                 <Scale className="h-5 w-5 text-rose-600 dark:text-rose-400" />
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
-                  What We Owe
-                </p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0.5">What We Owe</p>
                 <p className="text-2xl font-bold font-mono tabular-nums text-rose-600 dark:text-rose-400 truncate">
                   {formatAmount(onUsTotal)}
                 </p>
@@ -527,24 +507,28 @@ export default function NetProfitDetails() {
             </div>
 
             {/* Net Position */}
-            <div className={`p-5 flex items-center gap-4 ${isPositive ? "bg-emerald-50/40 dark:bg-emerald-950/20" : "bg-rose-50/40 dark:bg-rose-950/20"}`}>
-              <div className={`p-2.5 rounded-xl shrink-0 ${isPositive ? "bg-emerald-100 dark:bg-emerald-900/50" : "bg-rose-100 dark:bg-rose-900/50"}`}>
-                {isPositive
-                  ? <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                  : <Minus className="h-5 w-5 text-rose-600 dark:text-rose-400" />
-                }
+            <div
+              className={`p-5 flex items-center gap-4 ${isPositive ? "bg-emerald-50/40 dark:bg-emerald-950/20" : "bg-rose-50/40 dark:bg-rose-950/20"}`}
+            >
+              <div
+                className={`p-2.5 rounded-xl shrink-0 ${isPositive ? "bg-emerald-100 dark:bg-emerald-900/50" : "bg-rose-100 dark:bg-rose-900/50"}`}
+              >
+                {isPositive ? (
+                  <TrendingUp className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Minus className="h-5 w-5 text-rose-600 dark:text-rose-400" />
+                )}
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
                   Net Position
                 </p>
-                <p className={`text-2xl font-bold font-mono tabular-nums truncate ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
+                <p
+                  className={`text-2xl font-bold font-mono tabular-nums truncate ${isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}
+                >
                   {formatAmount(netPos)}
                 </p>
-                <Badge
-                  variant={isPositive ? "default" : "destructive"}
-                  className="mt-1 text-xs"
-                >
+                <Badge variant={isPositive ? "default" : "destructive"} className="mt-1 text-xs">
                   {data?.netPositionLabel || "Net Position"}
                 </Badge>
               </div>
@@ -607,7 +591,9 @@ export default function NetProfitDetails() {
                   </div>
                 </div>
               </div>
-              <span className={`text-2xl font-bold font-mono tabular-nums ${(data?.spPosProfit ?? 0) >= 0 ? "text-blue-600 dark:text-blue-400" : "text-destructive"}`}>
+              <span
+                className={`text-2xl font-bold font-mono tabular-nums ${(data?.spPosProfit ?? 0) >= 0 ? "text-blue-600 dark:text-blue-400" : "text-destructive"}`}
+              >
                 {formatAmount(data?.spPosProfit ?? 0)}
               </span>
             </div>
@@ -628,7 +614,6 @@ export default function NetProfitDetails() {
           </CardContent>
         </Card>
       )}
-
     </div>
   );
 }

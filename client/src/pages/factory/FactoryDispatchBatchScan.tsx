@@ -6,13 +6,29 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
-  ScanLine, Trash2, CheckCircle, AlertTriangle, Package, Truck,
-  ArrowLeft, Scale, DollarSign,
+  ScanLine,
+  Trash2,
+  CheckCircle,
+  AlertTriangle,
+  Package,
+  Truck,
+  ArrowLeft,
+  Scale,
+  DollarSign,
 } from "lucide-react";
 
 interface BatchDetail {
@@ -145,7 +161,10 @@ export default function FactoryDispatchBatchScan() {
       if (data.overageWarning) {
         flashFeedback("warn", `⚠ ${data.message}`);
       } else {
-        flashFeedback("success", `✓ ${data.bale?.referenceNumber} — ${data.bale?.articleCode} — ${fmt(data.bale?.weightKg)} kg`);
+        flashFeedback(
+          "success",
+          `✓ ${data.bale?.referenceNumber} — ${data.bale?.articleCode} — ${fmt(data.bale?.weightKg)} kg`
+        );
       }
       setTimeout(() => scanRef.current?.focus(), 40);
     },
@@ -204,7 +223,11 @@ export default function FactoryDispatchBatchScan() {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-12 w-full" />
-        <div className="grid grid-cols-3 gap-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
+        <div className="grid grid-cols-3 gap-3">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
         <Skeleton className="h-64 w-full" />
       </div>
     );
@@ -215,7 +238,10 @@ export default function FactoryDispatchBatchScan() {
       <div className="p-6 flex flex-col items-center gap-3 py-16 text-muted-foreground">
         <AlertTriangle className="w-8 h-8" />
         <p>Ride or batch not found</p>
-        <Button variant="outline" onClick={() => navigate(batchId ? `/factory/dispatch-batches/${batchId}` : "/factory/dispatch-batches")}>
+        <Button
+          variant="outline"
+          onClick={() => navigate(batchId ? `/factory/dispatch-batches/${batchId}` : "/factory/dispatch-batches")}
+        >
           <ArrowLeft className="w-4 h-4 mr-1" /> Back
         </Button>
       </div>
@@ -240,8 +266,8 @@ export default function FactoryDispatchBatchScan() {
 
   const flashColors = {
     success: "bg-green-100 border-green-400 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-200",
-    error:   "bg-red-100 border-red-400 text-red-800 dark:bg-red-900 dark:border-red-700 dark:text-red-200",
-    warn:    "bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-900 dark:border-amber-700 dark:text-amber-200",
+    error: "bg-red-100 border-red-400 text-red-800 dark:bg-red-900 dark:border-red-700 dark:text-red-200",
+    warn: "bg-amber-100 border-amber-400 text-amber-800 dark:bg-amber-900 dark:border-amber-700 dark:text-amber-200",
   };
 
   return (
@@ -263,17 +289,19 @@ export default function FactoryDispatchBatchScan() {
             <span className="text-muted-foreground">·</span>
             <span className="text-sm">Ride #{thisRide.rideNumber}</span>
             {thisRide.truckPlate && <span className="text-muted-foreground text-sm">({thisRide.truckPlate})</span>}
-            <Badge className={
-              thisRide.status === "LOADING" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" :
-              thisRide.status === "DISPATCHED" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" :
-              "bg-muted text-muted-foreground"
-            }>
+            <Badge
+              className={
+                thisRide.status === "LOADING"
+                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                  : thisRide.status === "DISPATCHED"
+                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                    : "bg-muted text-muted-foreground"
+              }
+            >
               {thisRide.status}
             </Badge>
           </div>
-          {batchData.proforma && (
-            <p className="text-xs text-muted-foreground mt-0.5">{batchData.proforma.name}</p>
-          )}
+          {batchData.proforma && <p className="text-xs text-muted-foreground mt-0.5">{batchData.proforma.name}</p>}
         </div>
         {!isDispatched && !isCancelled && batch.status !== "INVOICED" && (
           <Button
@@ -295,7 +323,9 @@ export default function FactoryDispatchBatchScan() {
                   <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
                     <Package className="w-3.5 h-3.5" /> Bales Scanned
                   </div>
-                  <p className="text-2xl font-bold" data-testid="text-scan-bale-count">{rideScans.length}</p>
+                  <p className="text-2xl font-bold" data-testid="text-scan-bale-count">
+                    {rideScans.length}
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -303,7 +333,9 @@ export default function FactoryDispatchBatchScan() {
                   <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
                     <Scale className="w-3.5 h-3.5" /> Total Weight (kg)
                   </div>
-                  <p className="text-2xl font-bold" data-testid="text-scan-weight">{fmt(totalWeight)}</p>
+                  <p className="text-2xl font-bold" data-testid="text-scan-weight">
+                    {fmt(totalWeight)}
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -345,7 +377,11 @@ export default function FactoryDispatchBatchScan() {
                 className={`flex items-start gap-2 border rounded-md px-3 py-2.5 text-sm font-medium transition-all ${flashColors[flash]}`}
                 data-testid={`scan-feedback-${flash}`}
               >
-                {flash === "success" ? <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" /> : <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
+                {flash === "success" ? (
+                  <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                )}
                 <span>{flashMsg}</span>
               </div>
             )}
@@ -368,9 +404,7 @@ export default function FactoryDispatchBatchScan() {
           <div className="flex-1 overflow-auto px-4 pb-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">
-                  Scanned Bales ({rideScans.length})
-                </CardTitle>
+                <CardTitle className="text-sm">Scanned Bales ({rideScans.length})</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
                 {rideScans.length === 0 ? (
@@ -435,9 +469,11 @@ export default function FactoryDispatchBatchScan() {
                 <div
                   key={p.articleCode}
                   className={`rounded-md p-2 text-xs border ${
-                    p.isOver ? "border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-800" :
-                    p.remaining === 0 ? "border-green-300 bg-green-50 dark:bg-green-950 dark:border-green-800" :
-                    "border-border bg-muted/30"
+                    p.isOver
+                      ? "border-amber-300 bg-amber-50 dark:bg-amber-950 dark:border-amber-800"
+                      : p.remaining === 0
+                        ? "border-green-300 bg-green-50 dark:bg-green-950 dark:border-green-800"
+                        : "border-border bg-muted/30"
                   }`}
                   data-testid={`sidebar-progress-${p.articleCode}`}
                 >
@@ -449,7 +485,15 @@ export default function FactoryDispatchBatchScan() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Scanned</span>
-                    <span className={p.isOver ? "text-amber-600 font-semibold" : p.remaining === 0 ? "text-green-600 font-semibold" : "font-semibold"}>
+                    <span
+                      className={
+                        p.isOver
+                          ? "text-amber-600 font-semibold"
+                          : p.remaining === 0
+                            ? "text-green-600 font-semibold"
+                            : "font-semibold"
+                      }
+                    >
                       {p.scannedQty}
                     </span>
                   </div>
@@ -458,9 +502,7 @@ export default function FactoryDispatchBatchScan() {
                       <AlertTriangle className="w-3 h-3" /> +{p.scannedQty - p.proformaQty} over
                     </p>
                   )}
-                  {p.remaining > 0 && (
-                    <p className="text-muted-foreground mt-0.5">{p.remaining} remaining</p>
-                  )}
+                  {p.remaining > 0 && <p className="text-muted-foreground mt-0.5">{p.remaining} remaining</p>}
                   {p.remaining === 0 && !p.isOver && (
                     <p className="text-green-600 mt-0.5 flex items-center gap-0.5">
                       <CheckCircle className="w-3 h-3" /> Done
@@ -478,8 +520,8 @@ export default function FactoryDispatchBatchScan() {
           <AlertDialogHeader>
             <AlertDialogTitle>Mark Truck as Dispatched?</AlertDialogTitle>
             <AlertDialogDescription>
-              Ride #{thisRide.rideNumber} has <strong>{rideScans.length}</strong> bales ({fmt(totalWeight)} kg).
-              After dispatching, scanning will be locked for this ride.
+              Ride #{thisRide.rideNumber} has <strong>{rideScans.length}</strong> bales ({fmt(totalWeight)} kg). After
+              dispatching, scanning will be locked for this ride.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -495,7 +537,12 @@ export default function FactoryDispatchBatchScan() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!removeScanId} onOpenChange={(o) => { if (!o) setRemoveScanId(null); }}>
+      <AlertDialog
+        open={!!removeScanId}
+        onOpenChange={(o) => {
+          if (!o) setRemoveScanId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Bale?</AlertDialogTitle>

@@ -24,12 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface OrderLine {
   articleCode: string;
@@ -116,13 +111,23 @@ function pct(n: number | null) {
 
 function ProfitValue({ value, className }: { value: number | null; className?: string }) {
   if (value === null) return <span className="text-muted-foreground text-xs">—</span>;
-  const color = value > 0 ? "text-green-600 dark:text-green-400" : value < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground";
+  const color =
+    value > 0
+      ? "text-green-600 dark:text-green-400"
+      : value < 0
+        ? "text-red-600 dark:text-red-400"
+        : "text-muted-foreground";
   return <span className={`font-mono font-semibold ${color} ${className ?? ""}`}>{fmt(value)}</span>;
 }
 
 function ProfitPct({ value }: { value: number | null }) {
   if (value === null) return <span className="text-muted-foreground text-xs">—</span>;
-  const color = value > 0 ? "text-green-600 dark:text-green-400" : value < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground";
+  const color =
+    value > 0
+      ? "text-green-600 dark:text-green-400"
+      : value < 0
+        ? "text-red-600 dark:text-red-400"
+        : "text-muted-foreground";
   return <span className={`text-xs font-mono ${color}`}>{pct(value)}</span>;
 }
 
@@ -193,7 +198,10 @@ export default function CustomerInvoiceDetail() {
 
   const handleExportPdf = () => {
     if (!orderId) return;
-    if (!navigator.onLine) { window.print(); return; }
+    if (!navigator.onLine) {
+      window.print();
+      return;
+    }
     window.open(`/api/factory/customer-orders/${orderId}/export-pdf`, "_blank");
   };
 
@@ -211,7 +219,9 @@ export default function CustomerInvoiceDetail() {
   if (!order) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
-        <p className="text-muted-foreground" data-testid="text-not-found">Invoice not found</p>
+        <p className="text-muted-foreground" data-testid="text-not-found">
+          Invoice not found
+        </p>
         <Button
           variant="outline"
           className="mt-4"
@@ -225,9 +235,7 @@ export default function CustomerInvoiceDetail() {
     );
   }
 
-  const sortedLines = [...(order.lines || [])].sort((a, b) =>
-    (a.baleName || "").localeCompare(b.baleName || "")
-  );
+  const sortedLines = [...(order.lines || [])].sort((a, b) => (a.baleName || "").localeCompare(b.baleName || ""));
 
   const freightCharges = (order.charges || []).filter((c) => c.chargeType === "FREIGHT");
   const otherCharges = (order.charges || []).filter((c) => c.chargeType !== "FREIGHT");
@@ -297,38 +305,22 @@ export default function CustomerInvoiceDetail() {
               Continue Editing
             </Button>
           )}
-          <Button
-            variant="outline"
-            onClick={() => setShowProfitability(true)}
-            data-testid="button-view-profitability"
-          >
+          <Button variant="outline" onClick={() => setShowProfitability(true)} data-testid="button-view-profitability">
             <TrendingUp className="mr-2 h-4 w-4" />
             Profitability
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportExcel}
-            data-testid="button-export-excel"
-          >
+          <Button variant="outline" onClick={handleExportExcel} data-testid="button-export-excel">
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             Download Excel
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportPdf}
-            data-testid="button-export-pdf"
-          >
+          <Button variant="outline" onClick={handleExportPdf} data-testid="button-export-pdf">
             <FileDown className="mr-2 h-4 w-4" />
             Download PDF
           </Button>
           {order.status !== "FINALIZED" && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="text-destructive"
-                  data-testid="button-delete-invoice"
-                >
+                <Button variant="outline" className="text-destructive" data-testid="button-delete-invoice">
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </Button>
@@ -337,8 +329,9 @@ export default function CustomerInvoiceDetail() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for {order.customerName}. 
-                    Any bales assigned to this order will be returned to stock. This cannot be undone.
+                    This will permanently delete invoice {order.invoiceNumber || `#${order.id}`} for{" "}
+                    {order.customerName}. Any bales assigned to this order will be returned to stock. This cannot be
+                    undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -384,23 +377,33 @@ export default function CustomerInvoiceDetail() {
                   <TableCell className="font-mono text-sm" data-testid={`text-article-code-${idx}`}>
                     {line.articleCode}
                   </TableCell>
-                  <TableCell data-testid={`text-bale-name-${idx}`}>
-                    {line.baleName}
-                  </TableCell>
+                  <TableCell data-testid={`text-bale-name-${idx}`}>{line.baleName}</TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-qty-${idx}`}>
                     {line.qty}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-weight-per-bale-${idx}`}>
-                    {Number(line.weightPerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {Number(line.weightPerBale || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-total-weight-${idx}`}>
-                    {Number(line.totalWeight || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {Number(line.totalWeight || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-price-per-bale-${idx}`}>
-                    {Number(line.pricePerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {Number(line.pricePerBale || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold" data-testid={`text-total-price-${idx}`}>
-                    {Number(line.totalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {Number(line.totalPrice || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
                   </TableCell>
                 </TableRow>
               ))
@@ -411,21 +414,37 @@ export default function CustomerInvoiceDetail() {
 
       {(freightCharges.length > 0 || otherCharges.length > 0) && (
         <Card className="p-4 mb-6">
-          <h3 className="font-semibold mb-3" data-testid="text-charges-header">Charges</h3>
+          <h3 className="font-semibold mb-3" data-testid="text-charges-header">
+            Charges
+          </h3>
           <div className="space-y-2">
             {freightCharges.map((charge, idx) => (
-              <div key={`freight-${idx}`} className="flex items-center justify-between gap-2" data-testid={`row-freight-charge-${idx}`}>
+              <div
+                key={`freight-${idx}`}
+                className="flex items-center justify-between gap-2"
+                data-testid={`row-freight-charge-${idx}`}
+              >
                 <span className="text-sm">{charge.name}</span>
                 <span className="font-mono text-sm" data-testid={`text-freight-amount-${idx}`}>
-                  {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  {Number(charge.amount || 0).toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
                 </span>
               </div>
             ))}
             {otherCharges.map((charge, idx) => (
-              <div key={`other-${idx}`} className="flex items-center justify-between gap-2" data-testid={`row-other-charge-${idx}`}>
+              <div
+                key={`other-${idx}`}
+                className="flex items-center justify-between gap-2"
+                data-testid={`row-other-charge-${idx}`}
+              >
                 <span className="text-sm">{charge.name}</span>
                 <span className="font-mono text-sm" data-testid={`text-other-amount-${idx}`}>
-                  {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                  {Number(charge.amount || 0).toLocaleString(undefined, {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 2,
+                  })}
                 </span>
               </div>
             ))}
@@ -437,15 +456,21 @@ export default function CustomerInvoiceDetail() {
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-2 text-sm">
             <span>Subtotal (Bales)</span>
-            <span className="font-mono" data-testid="text-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+            <span className="font-mono" data-testid="text-subtotal">
+              {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
           </div>
           <div className="flex items-center justify-between gap-2 text-sm">
             <span>Total Charges</span>
-            <span className="font-mono" data-testid="text-total-charges">{totalCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+            <span className="font-mono" data-testid="text-total-charges">
+              {totalCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
           </div>
           <div className="border-t pt-2 flex items-center justify-between gap-2">
             <span className="font-semibold">Grand Total</span>
-            <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+            <span className="font-mono font-bold text-lg" data-testid="text-grand-total">
+              {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+            </span>
           </div>
           <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
             <span>Total Bales Qty</span>
@@ -471,7 +496,9 @@ export default function CustomerInvoiceDetail() {
 
           {profitLoading ? (
             <div className="space-y-3 py-4">
-              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
             </div>
           ) : !profitability ? (
             <div className="py-8 text-center text-muted-foreground" data-testid="text-profit-error">
@@ -480,7 +507,10 @@ export default function CustomerInvoiceDetail() {
           ) : (
             <div className="space-y-4">
               {profitability.partialCostData && (
-                <div className="flex items-start gap-2 rounded-md border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-yellow-800 dark:text-yellow-300" data-testid="text-partial-cost-warning">
+                <div
+                  className="flex items-start gap-2 rounded-md border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30 p-3 text-sm text-yellow-800 dark:text-yellow-300"
+                  data-testid="text-partial-cost-warning"
+                >
                   <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                   <span>Some lines are missing production cost data. Totals may be incomplete.</span>
                 </div>
@@ -530,12 +560,16 @@ export default function CustomerInvoiceDetail() {
                               <span className="text-yellow-600 dark:text-yellow-400 text-xs flex items-center justify-end gap-1">
                                 <AlertTriangle className="h-3 w-3" /> No cost
                               </span>
-                            ) : fmt(line.costPerBale)}
+                            ) : (
+                              fmt(line.costPerBale)
+                            )}
                           </TableCell>
                           <TableCell className="text-right font-mono text-sm" data-testid={`text-total-cost-${idx}`}>
                             {line.missingCost ? (
                               <span className="text-muted-foreground text-xs">—</span>
-                            ) : fmt(line.cost)}
+                            ) : (
+                              fmt(line.cost)
+                            )}
                           </TableCell>
                           <TableCell className="text-right" data-testid={`text-line-profit-${idx}`}>
                             <ProfitValue value={line.profit} />
@@ -544,7 +578,9 @@ export default function CustomerInvoiceDetail() {
                             <div className="flex flex-col items-end gap-0.5">
                               <ProfitPct value={line.marginPct} />
                               {line.profitPctOnCost !== null && (
-                                <span className="text-xs text-muted-foreground font-mono">{pct(line.profitPctOnCost)} on cost</span>
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  {pct(line.profitPctOnCost)} on cost
+                                </span>
                               )}
                             </div>
                           </TableCell>
@@ -566,7 +602,9 @@ export default function CustomerInvoiceDetail() {
                   <div className="flex items-center justify-between gap-4 text-sm">
                     <span className="text-muted-foreground">Total Cost</span>
                     <span className="font-mono font-semibold" data-testid="text-total-cost-sum">
-                      {profitability.totalCost !== null ? fmt(profitability.totalCost) : (
+                      {profitability.totalCost !== null ? (
+                        fmt(profitability.totalCost)
+                      ) : (
                         <span className="text-muted-foreground text-xs">Incomplete</span>
                       )}
                     </span>

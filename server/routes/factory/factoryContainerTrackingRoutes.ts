@@ -15,7 +15,6 @@ import {
 } from "../../services/factoryContainerTrackingService";
 
 export function registerFactoryContainerTrackingRoutes(app: Express) {
-
   // GET /api/factory/container-tracking/:id/events — tracking event history
   app.get("/api/factory/container-tracking/:id/events", requireAuth, async (req: any, res: any) => {
     try {
@@ -105,9 +104,13 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
 
       res.json({ success: true, queued: true, containerId });
     } catch (err: any) {
-      const status = err.message?.includes("not found") ? 404 :
-                     err.message?.includes("disabled") ? 400 :
-                     err.message?.includes("quota") ? 429 : 500;
+      const status = err.message?.includes("not found")
+        ? 404
+        : err.message?.includes("disabled")
+          ? 400
+          : err.message?.includes("quota")
+            ? 429
+            : 500;
       res.status(status).json({ message: err.message || "Tracking failed" });
     }
   });
@@ -130,7 +133,11 @@ export function registerFactoryContainerTrackingRoutes(app: Express) {
 
       if (!container) return res.status(404).json({ message: "Container not found" });
 
-      await updateFactoryContainerTrackingSettings(containerId, { trackingEnabled, trackingAutoUpdate, trackingCarrierHint });
+      await updateFactoryContainerTrackingSettings(containerId, {
+        trackingEnabled,
+        trackingAutoUpdate,
+        trackingCarrierHint,
+      });
       res.json({ success: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Failed to update tracking settings" });

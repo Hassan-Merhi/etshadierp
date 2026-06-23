@@ -12,19 +12,33 @@ import { apiRequest } from "@/lib/queryClient";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
 import { useDateFormat } from "@/contexts/DateFormatContext";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  ScanLine, ArrowLeft, Play, CheckCircle, XCircle, Trash2,
-  FileDown, FileSpreadsheet, AlertTriangle, Package, Truck, RotateCcw, List, FilePlus,
+  ScanLine,
+  ArrowLeft,
+  Play,
+  CheckCircle,
+  XCircle,
+  Trash2,
+  FileDown,
+  FileSpreadsheet,
+  AlertTriangle,
+  Package,
+  Truck,
+  RotateCcw,
+  List,
+  FilePlus,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
@@ -103,8 +117,10 @@ interface LoadingSummaryResponse {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === "OPEN") return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Open</Badge>;
-  if (status === "COMPLETED") return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
+  if (status === "OPEN")
+    return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Open</Badge>;
+  if (status === "COMPLETED")
+    return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
   if (status === "CANCELLED") return <Badge variant="secondary">Cancelled</Badge>;
   return <Badge variant="outline">{status}</Badge>;
 }
@@ -129,17 +145,32 @@ export default function FactoryInvoiceLoadingScan() {
   const [showStartForm, setShowStartForm] = useState(false);
 
   const lsKey = `loading-scan-form-${invoiceId}`;
-  const savedForm = (() => { try { return JSON.parse(localStorage.getItem(lsKey) || "{}"); } catch { return {}; } })();
+  const savedForm = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(lsKey) || "{}");
+    } catch {
+      return {};
+    }
+  })();
   const [truckNo, setTruckNo] = useState<string>(savedForm.truckNo ?? "");
   const [driverName, setDriverName] = useState<string>(savedForm.driverName ?? "");
   const [notes, setNotes] = useState<string>(savedForm.notes ?? "");
 
-  const autosaveForm = useCallback((updates: { truckNo?: string; driverName?: string; notes?: string }) => {
-    try {
-      const current = (() => { try { return JSON.parse(localStorage.getItem(lsKey) || "{}"); } catch { return {}; } })();
-      localStorage.setItem(lsKey, JSON.stringify({ ...current, ...updates }));
-    } catch {}
-  }, [lsKey]);
+  const autosaveForm = useCallback(
+    (updates: { truckNo?: string; driverName?: string; notes?: string }) => {
+      try {
+        const current = (() => {
+          try {
+            return JSON.parse(localStorage.getItem(lsKey) || "{}");
+          } catch {
+            return {};
+          }
+        })();
+        localStorage.setItem(lsKey, JSON.stringify({ ...current, ...updates }));
+      } catch {}
+    },
+    [lsKey]
+  );
 
   // ── Scanner state ──
   const [scanInput, setScanInput] = useState("");
@@ -159,7 +190,12 @@ export default function FactoryInvoiceLoadingScan() {
 
   // ── Data ──
   const summaryKey = [`/api/factory/invoices/${invoiceId}/loading-summary`, activeSessionId];
-  const { data: summary, isLoading, isError, error } = useQuery<LoadingSummaryResponse>({
+  const {
+    data: summary,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<LoadingSummaryResponse>({
     queryKey: summaryKey,
     queryFn: async () => {
       const url = activeSessionId
@@ -221,7 +257,9 @@ export default function FactoryInvoiceLoadingScan() {
 
   const scanBaleMutation = useMutation({
     mutationFn: async (barcode: string) => {
-      const res = await apiRequest("POST", `/api/factory/invoice-loading-sessions/${activeSessionId}/scan-bale`, { barcode });
+      const res = await apiRequest("POST", `/api/factory/invoice-loading-sessions/${activeSessionId}/scan-bale`, {
+        barcode,
+      });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message);
@@ -333,7 +371,8 @@ export default function FactoryInvoiceLoadingScan() {
       <div className="flex flex-col items-center justify-center h-full p-6 gap-3">
         <p className="text-destructive font-medium">{msg}</p>
         <Button variant="outline" onClick={() => navigate(`/factory/sales/invoices/${invoiceId}`)}>
-          <ArrowLeft className="h-4 w-4 mr-2" />Back to Invoice
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Invoice
         </Button>
       </div>
     );
@@ -343,7 +382,6 @@ export default function FactoryInvoiceLoadingScan() {
 
   return (
     <div className="flex flex-col min-h-full p-4 sm:p-6 max-w-5xl mx-auto space-y-4">
-
       {/* ── Back + Title ── */}
       <div className="flex flex-wrap items-center gap-3">
         <Button
@@ -360,7 +398,9 @@ export default function FactoryInvoiceLoadingScan() {
               {inv.invoiceNumber || `Order #${inv.id}`}
             </h1>
             <Badge variant="default">Finalized</Badge>
-            <Badge variant="outline" className="text-xs">Scan Loading</Badge>
+            <Badge variant="outline" className="text-xs">
+              Scan Loading
+            </Badge>
           </div>
           <p className="text-sm text-muted-foreground mt-0.5">
             {inv.customerName} · {inv.orderDate ? formatDisplayDate(inv.orderDate) : ""}
@@ -373,7 +413,10 @@ export default function FactoryInvoiceLoadingScan() {
         <Card>
           <CardContent className="pt-5 pb-4 text-center">
             <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Scanned</p>
-            <p className="text-5xl font-bold text-green-600 dark:text-green-400 leading-none" data-testid="text-loaded-bales">
+            <p
+              className="text-5xl font-bold text-green-600 dark:text-green-400 leading-none"
+              data-testid="text-loaded-bales"
+            >
               {summary.totals.alreadyLoaded}
             </p>
             <p className="text-xs text-muted-foreground mt-1">of {summary.totals.invoiceBales} bales</p>
@@ -405,7 +448,8 @@ export default function FactoryInvoiceLoadingScan() {
           <CardContent className="pt-4 pb-3 flex items-center gap-3">
             <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
             <p className="text-sm font-medium text-green-800 dark:text-green-200">
-              This invoice is fully loaded — all {summary.totals.invoiceBales} bales have been assigned to loading sessions.
+              This invoice is fully loaded — all {summary.totals.invoiceBales} bales have been assigned to loading
+              sessions.
             </p>
           </CardContent>
         </Card>
@@ -458,9 +502,13 @@ export default function FactoryInvoiceLoadingScan() {
                         </button>
                       </TableCell>
                       <TableCell className="text-right text-sm">{line.invoiceQty}</TableCell>
-                      <TableCell className="text-right text-sm text-green-700 dark:text-green-400">{line.alreadyLoaded}</TableCell>
+                      <TableCell className="text-right text-sm text-green-700 dark:text-green-400">
+                        {line.alreadyLoaded}
+                      </TableCell>
                       {activeSessionId && (
-                        <TableCell className="text-right text-sm text-blue-700 dark:text-blue-400">{line.currentSessionLoaded}</TableCell>
+                        <TableCell className="text-right text-sm text-blue-700 dark:text-blue-400">
+                          {line.currentSessionLoaded}
+                        </TableCell>
                       )}
                       <TableCell className="text-right text-sm font-bold text-amber-700 dark:text-amber-400">
                         {line.remaining}
@@ -481,11 +529,7 @@ export default function FactoryInvoiceLoadingScan() {
             <div className="flex items-center justify-between gap-2">
               <CardTitle className="text-sm font-medium">Start New Loading Session</CardTitle>
               {!showStartForm && (
-                <Button
-                  size="sm"
-                  onClick={() => setShowStartForm(true)}
-                  data-testid="button-show-start-form"
-                >
+                <Button size="sm" onClick={() => setShowStartForm(true)} data-testid="button-show-start-form">
                   <Play className="h-4 w-4 mr-1" />
                   Start Loading
                 </Button>
@@ -501,7 +545,10 @@ export default function FactoryInvoiceLoadingScan() {
                     id="input-truck-no"
                     placeholder="e.g. ABC-1234"
                     value={truckNo}
-                    onChange={(e) => { setTruckNo(e.target.value); autosaveForm({ truckNo: e.target.value }); }}
+                    onChange={(e) => {
+                      setTruckNo(e.target.value);
+                      autosaveForm({ truckNo: e.target.value });
+                    }}
                     data-testid="input-truck-no"
                   />
                 </div>
@@ -511,7 +558,10 @@ export default function FactoryInvoiceLoadingScan() {
                     id="input-driver-name"
                     placeholder="Driver's name"
                     value={driverName}
-                    onChange={(e) => { setDriverName(e.target.value); autosaveForm({ driverName: e.target.value }); }}
+                    onChange={(e) => {
+                      setDriverName(e.target.value);
+                      autosaveForm({ driverName: e.target.value });
+                    }}
                     data-testid="input-driver-name"
                   />
                 </div>
@@ -522,7 +572,10 @@ export default function FactoryInvoiceLoadingScan() {
                   id="input-notes"
                   placeholder="Optional notes..."
                   value={notes}
-                  onChange={(e) => { setNotes(e.target.value); autosaveForm({ notes: e.target.value }); }}
+                  onChange={(e) => {
+                    setNotes(e.target.value);
+                    autosaveForm({ notes: e.target.value });
+                  }}
                   data-testid="input-notes"
                   className="resize-none"
                   rows={2}
@@ -552,14 +605,15 @@ export default function FactoryInvoiceLoadingScan() {
           <CardHeader className="pb-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <CardTitle className="text-sm font-medium">
-                  Active Session #{currentSession.id}
-                </CardTitle>
+                <CardTitle className="text-sm font-medium">Active Session #{currentSession.id}</CardTitle>
                 <StatusBadge status={currentSession.status} />
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 {currentSession.truckNo && (
-                  <span className="flex items-center gap-1"><Truck className="h-3 w-3" />{currentSession.truckNo}</span>
+                  <span className="flex items-center gap-1">
+                    <Truck className="h-3 w-3" />
+                    {currentSession.truckNo}
+                  </span>
                 )}
                 {currentSession.driverName && <span>{currentSession.driverName}</span>}
               </div>
@@ -571,7 +625,8 @@ export default function FactoryInvoiceLoadingScan() {
               <div className="flex items-center gap-2 p-3 rounded-md bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800">
                 <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                 <p className="text-sm text-amber-800 dark:text-amber-200">
-                  This load has reached {currentBales.length} bales. You can continue scanning if this truck is taking more.
+                  This load has reached {currentBales.length} bales. You can continue scanning if this truck is taking
+                  more.
                 </p>
               </div>
             )}
@@ -586,9 +641,11 @@ export default function FactoryInvoiceLoadingScan() {
                 }`}
                 data-testid="text-scan-feedback"
               >
-                {scanFlash === "success"
-                  ? <CheckCircle className="h-4 w-4 shrink-0" />
-                  : <XCircle className="h-4 w-4 shrink-0" />}
+                {scanFlash === "success" ? (
+                  <CheckCircle className="h-4 w-4 shrink-0" />
+                ) : (
+                  <XCircle className="h-4 w-4 shrink-0" />
+                )}
                 {scanMessage}
               </div>
             )}
@@ -618,15 +675,26 @@ export default function FactoryInvoiceLoadingScan() {
             </form>
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-              <span><strong className="text-foreground">{currentBales.length}</strong> scanned this session</span>
-              <span>·</span>
               <span>
-                <strong className={summary.totals.remaining === 0 ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}>
-                  {summary.totals.remaining}
-                </strong> remaining overall
+                <strong className="text-foreground">{currentBales.length}</strong> scanned this session
               </span>
               <span>·</span>
-              <span>Press <kbd className="text-xs border rounded px-1">Enter</kbd> to submit</span>
+              <span>
+                <strong
+                  className={
+                    summary.totals.remaining === 0
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-amber-600 dark:text-amber-400"
+                  }
+                >
+                  {summary.totals.remaining}
+                </strong>{" "}
+                remaining overall
+              </span>
+              <span>·</span>
+              <span>
+                Press <kbd className="text-xs border rounded px-1">Enter</kbd> to submit
+              </span>
             </div>
 
             {/* Current session bales table */}
@@ -650,12 +718,17 @@ export default function FactoryInvoiceLoadingScan() {
                         <TableCell className="font-mono text-sm">{b.baleReference}</TableCell>
                         <TableCell className="text-xs">{b.articleCode || "—"}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{b.productName || "—"}</TableCell>
-                        <TableCell className="text-right text-sm font-mono">{parseFloat(b.weightKg || "0").toFixed(3)}</TableCell>
+                        <TableCell className="text-right text-sm font-mono">
+                          {parseFloat(b.weightKg || "0").toFixed(3)}
+                        </TableCell>
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => activeSessionId && removeBaleFromSessionMutation.mutate({ sessionId: activeSessionId, baleId: b.baleId })}
+                            onClick={() =>
+                              activeSessionId &&
+                              removeBaleFromSessionMutation.mutate({ sessionId: activeSessionId, baleId: b.baleId })
+                            }
                             disabled={removeBaleFromSessionMutation.isPending}
                             data-testid={`button-remove-bale-${b.baleId}`}
                             title="Remove from session"
@@ -680,11 +753,7 @@ export default function FactoryInvoiceLoadingScan() {
                 <CheckCircle className="h-4 w-4 mr-1" />
                 Complete Loading
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => setCancelDialogOpen(true)}
-                data-testid="button-cancel-session"
-              >
+              <Button variant="outline" onClick={() => setCancelDialogOpen(true)} data-testid="button-cancel-session">
                 <XCircle className="h-4 w-4 mr-1" />
                 Cancel Session
               </Button>
@@ -692,7 +761,9 @@ export default function FactoryInvoiceLoadingScan() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`/api/factory/invoice-loading-sessions/${activeSessionId}/export/excel`, "_blank")}
+                  onClick={() =>
+                    window.open(`/api/factory/invoice-loading-sessions/${activeSessionId}/export/excel`, "_blank")
+                  }
                   data-testid="button-export-session-excel"
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-1" />
@@ -701,7 +772,9 @@ export default function FactoryInvoiceLoadingScan() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`/api/factory/invoice-loading-sessions/${activeSessionId}/export/pdf`, "_blank")}
+                  onClick={() =>
+                    window.open(`/api/factory/invoice-loading-sessions/${activeSessionId}/export/pdf`, "_blank")
+                  }
                   data-testid="button-export-session-pdf"
                 >
                   <FileDown className="h-4 w-4 mr-1" />
@@ -714,31 +787,34 @@ export default function FactoryInvoiceLoadingScan() {
       )}
 
       {/* ── Create proforma for remaining bales ── */}
-      {!activeSessionId && !isFullyLoaded && summary.totals.remaining > 0 && summary.sessions.some((s) => s.status === "COMPLETED") && (
-        <Card className="border-amber-200 dark:border-amber-800">
-          <CardContent className="pt-4 pb-4 flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <FilePlus className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                  {summary.totals.remaining} bale{summary.totals.remaining !== 1 ? "s" : ""} not loaded
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Create a new proforma with the remaining items so you can start a new loading.
-                </p>
+      {!activeSessionId &&
+        !isFullyLoaded &&
+        summary.totals.remaining > 0 &&
+        summary.sessions.some((s) => s.status === "COMPLETED") && (
+          <Card className="border-amber-200 dark:border-amber-800">
+            <CardContent className="pt-4 pb-4 flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <FilePlus className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                    {summary.totals.remaining} bale{summary.totals.remaining !== 1 ? "s" : ""} not loaded
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Create a new proforma with the remaining items so you can start a new loading.
+                  </p>
+                </div>
               </div>
-            </div>
-            <Button
-              onClick={() => createRemainingProformaMutation.mutate()}
-              disabled={createRemainingProformaMutation.isPending}
-              data-testid="button-create-remaining-proforma"
-            >
-              <FilePlus className="h-4 w-4 mr-1" />
-              {createRemainingProformaMutation.isPending ? "Creating…" : "Create Proforma for Remaining"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+              <Button
+                onClick={() => createRemainingProformaMutation.mutate()}
+                disabled={createRemainingProformaMutation.isPending}
+                data-testid="button-create-remaining-proforma"
+              >
+                <FilePlus className="h-4 w-4 mr-1" />
+                {createRemainingProformaMutation.isPending ? "Creating…" : "Create Proforma for Remaining"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
       {/* ── Previous sessions ── */}
       {summary.sessions.length > 0 && (
@@ -750,7 +826,9 @@ export default function FactoryInvoiceLoadingScan() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`/api/factory/invoices/${invoiceId}/loading-report/export/excel`, "_blank")}
+                  onClick={() =>
+                    window.open(`/api/factory/invoices/${invoiceId}/loading-report/export/excel`, "_blank")
+                  }
                   data-testid="button-export-report-excel"
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-1" />
@@ -790,14 +868,18 @@ export default function FactoryInvoiceLoadingScan() {
                       className={s.id === activeSessionId ? "bg-blue-50 dark:bg-blue-950/40" : ""}
                     >
                       <TableCell className="font-mono text-sm">#{s.id}</TableCell>
-                      <TableCell><StatusBadge status={s.status} /></TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {s.truckNo || s.driverName
-                          ? [s.truckNo, s.driverName].filter(Boolean).join(" / ")
-                          : "—"}
+                      <TableCell>
+                        <StatusBadge status={s.status} />
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{fmtTime(s.startedAt)}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{fmtTime(s.completedAt)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {s.truckNo || s.driverName ? [s.truckNo, s.driverName].filter(Boolean).join(" / ") : "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {fmtTime(s.startedAt)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {fmtTime(s.completedAt)}
+                      </TableCell>
                       <TableCell className="text-right font-medium">{s.totalBales}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -828,7 +910,9 @@ export default function FactoryInvoiceLoadingScan() {
                             variant="ghost"
                             size="icon"
                             title="Export session Excel"
-                            onClick={() => window.open(`/api/factory/invoice-loading-sessions/${s.id}/export/excel`, "_blank")}
+                            onClick={() =>
+                              window.open(`/api/factory/invoice-loading-sessions/${s.id}/export/excel`, "_blank")
+                            }
                             data-testid={`button-session-excel-${s.id}`}
                           >
                             <FileSpreadsheet className="h-3.5 w-3.5" />
@@ -837,7 +921,9 @@ export default function FactoryInvoiceLoadingScan() {
                             variant="ghost"
                             size="icon"
                             title="Export session PDF"
-                            onClick={() => window.open(`/api/factory/invoice-loading-sessions/${s.id}/export/pdf`, "_blank")}
+                            onClick={() =>
+                              window.open(`/api/factory/invoice-loading-sessions/${s.id}/export/pdf`, "_blank")
+                            }
                             data-testid={`button-session-pdf-${s.id}`}
                           >
                             <FileDown className="h-3.5 w-3.5" />
@@ -875,14 +961,17 @@ export default function FactoryInvoiceLoadingScan() {
           <AlertDialogHeader>
             <AlertDialogTitle>Complete loading session?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will mark session #{activeSessionId} as COMPLETED with {currentBales.length} bale{currentBales.length !== 1 ? "s" : ""}.
-              You can start another session later for remaining bales.
+              This will mark session #{activeSessionId} as COMPLETED with {currentBales.length} bale
+              {currentBales.length !== 1 ? "s" : ""}. You can start another session later for remaining bales.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-complete-dialog">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => { setCompleteDialogOpen(false); completeSessionMutation.mutate(); }}
+              onClick={() => {
+                setCompleteDialogOpen(false);
+                completeSessionMutation.mutate();
+              }}
               disabled={completeSessionMutation.isPending}
               data-testid="button-confirm-complete"
             >
@@ -897,15 +986,18 @@ export default function FactoryInvoiceLoadingScan() {
           <AlertDialogHeader>
             <AlertDialogTitle>Cancel this loading session?</AlertDialogTitle>
             <AlertDialogDescription>
-              Session #{activeSessionId} will be cancelled. Scanned bales will be kept for audit history
-              but will no longer count as loaded. Bales can be re-scanned in a new session.
+              Session #{activeSessionId} will be cancelled. Scanned bales will be kept for audit history but will no
+              longer count as loaded. Bales can be re-scanned in a new session.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-cancel-dialog">Keep Session</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground"
-              onClick={() => { setCancelDialogOpen(false); cancelSessionMutation.mutate(); }}
+              onClick={() => {
+                setCancelDialogOpen(false);
+                cancelSessionMutation.mutate();
+              }}
               disabled={cancelSessionMutation.isPending}
               data-testid="button-confirm-cancel-session"
             >
@@ -916,7 +1008,12 @@ export default function FactoryInvoiceLoadingScan() {
       </AlertDialog>
 
       {/* View / Delete session bales dialog */}
-      <Dialog open={viewSessionId !== null} onOpenChange={(open) => { if (!open) setViewSessionId(null); }}>
+      <Dialog
+        open={viewSessionId !== null}
+        onOpenChange={(open) => {
+          if (!open) setViewSessionId(null);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           {(() => {
             const session = summary?.sessions.find((s) => s.id === viewSessionId);
@@ -927,15 +1024,22 @@ export default function FactoryInvoiceLoadingScan() {
                   <DialogTitle className="text-base flex flex-wrap items-center gap-2">
                     Session #{viewSessionId}
                     {session && <StatusBadge status={session.status} />}
-                    {session?.truckNo && <span className="font-mono text-sm text-muted-foreground">{session.truckNo}</span>}
-                    {session?.driverName && <span className="text-sm text-muted-foreground">/ {session.driverName}</span>}
+                    {session?.truckNo && (
+                      <span className="font-mono text-sm text-muted-foreground">{session.truckNo}</span>
+                    )}
+                    {session?.driverName && (
+                      <span className="text-sm text-muted-foreground">/ {session.driverName}</span>
+                    )}
                   </DialogTitle>
                 </DialogHeader>
                 {sessionBales.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-6 text-center">No bales found in this session.</p>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-xs text-muted-foreground">{sessionBales.length} bale{sessionBales.length !== 1 ? "s" : ""}. Click the trash icon to remove a bale and return it to unloaded.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {sessionBales.length} bale{sessionBales.length !== 1 ? "s" : ""}. Click the trash icon to remove a
+                      bale and return it to unloaded.
+                    </p>
                     <div className="table-responsive rounded-md border">
                       <Table>
                         <TableHeader className="sticky top-0 z-30 bg-background">
@@ -955,13 +1059,21 @@ export default function FactoryInvoiceLoadingScan() {
                                 <TableCell className="font-mono text-sm">{b.baleReference}</TableCell>
                                 <TableCell className="text-xs">{b.articleCode || "—"}</TableCell>
                                 <TableCell className="text-xs text-muted-foreground">{b.productName || "—"}</TableCell>
-                                <TableCell className="text-right text-sm font-mono">{parseFloat(b.weightKg || "0").toFixed(3)}</TableCell>
+                                <TableCell className="text-right text-sm font-mono">
+                                  {parseFloat(b.weightKg || "0").toFixed(3)}
+                                </TableCell>
                                 <TableCell>
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     disabled={removeBaleFromSessionMutation.isPending}
-                                    onClick={() => viewSessionId && removeBaleFromSessionMutation.mutate({ sessionId: viewSessionId, baleId: b.baleId })}
+                                    onClick={() =>
+                                      viewSessionId &&
+                                      removeBaleFromSessionMutation.mutate({
+                                        sessionId: viewSessionId,
+                                        baleId: b.baleId,
+                                      })
+                                    }
                                     data-testid={`button-delete-session-bale-${b.baleId}`}
                                     title="Remove bale and return to unloaded"
                                   >
@@ -982,7 +1094,12 @@ export default function FactoryInvoiceLoadingScan() {
       </Dialog>
 
       {/* Bale References Dialog */}
-      <Dialog open={baleRefLine !== null} onOpenChange={(open) => { if (!open) setBaleRefLine(null); }}>
+      <Dialog
+        open={baleRefLine !== null}
+        onOpenChange={(open) => {
+          if (!open) setBaleRefLine(null);
+        }}
+      >
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base">
@@ -990,48 +1107,67 @@ export default function FactoryInvoiceLoadingScan() {
               <span className="ml-2 font-mono text-sm text-muted-foreground">({baleRefLine?.code})</span>
             </DialogTitle>
           </DialogHeader>
-          {baleRefLine && (() => {
-            const bales = (summary?.invoiceBales ?? [])
-              .filter((b) => b.articleCode === baleRefLine.code)
-              .sort((a, b) => a.baleReference.localeCompare(b.baleReference));
-            if (bales.length === 0) {
-              return <p className="text-sm text-muted-foreground py-4 text-center">No bale references found for this item.</p>;
-            }
-            const loaded = bales.filter((b) => b.loaded);
-            const pending = bales.filter((b) => !b.loaded);
-            return (
-              <div className="space-y-4">
-                <p className="text-xs text-muted-foreground">
-                  {bales.length} total · <span className="text-green-700 dark:text-green-400">{loaded.length} loaded</span>
-                  {pending.length > 0 && <> · <span className="text-amber-700 dark:text-amber-400">{pending.length} pending</span></>}
-                </p>
-                {loaded.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Loaded</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {loaded.map((b) => (
-                        <div key={b.baleId} className="rounded-md border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 px-2.5 py-1.5 font-mono text-sm text-center text-green-800 dark:text-green-300">
-                          {b.baleReference}
-                        </div>
-                      ))}
+          {baleRefLine &&
+            (() => {
+              const bales = (summary?.invoiceBales ?? [])
+                .filter((b) => b.articleCode === baleRefLine.code)
+                .sort((a, b) => a.baleReference.localeCompare(b.baleReference));
+              if (bales.length === 0) {
+                return (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    No bale references found for this item.
+                  </p>
+                );
+              }
+              const loaded = bales.filter((b) => b.loaded);
+              const pending = bales.filter((b) => !b.loaded);
+              return (
+                <div className="space-y-4">
+                  <p className="text-xs text-muted-foreground">
+                    {bales.length} total ·{" "}
+                    <span className="text-green-700 dark:text-green-400">{loaded.length} loaded</span>
+                    {pending.length > 0 && (
+                      <>
+                        {" "}
+                        · <span className="text-amber-700 dark:text-amber-400">{pending.length} pending</span>
+                      </>
+                    )}
+                  </p>
+                  {loaded.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Loaded</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {loaded.map((b) => (
+                          <div
+                            key={b.baleId}
+                            className="rounded-md border bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800 px-2.5 py-1.5 font-mono text-sm text-center text-green-800 dark:text-green-300"
+                          >
+                            {b.baleReference}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {pending.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Not Yet Loaded</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {pending.map((b) => (
-                        <div key={b.baleId} className="rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center">
-                          {b.baleReference}
-                        </div>
-                      ))}
+                  )}
+                  {pending.length > 0 && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                        Not Yet Loaded
+                      </p>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {pending.map((b) => (
+                          <div
+                            key={b.baleId}
+                            className="rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center"
+                          >
+                            {b.baleReference}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+                  )}
+                </div>
+              );
+            })()}
         </DialogContent>
       </Dialog>
     </div>

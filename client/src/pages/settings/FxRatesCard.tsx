@@ -13,7 +13,9 @@ export function FxRatesCard() {
   const [newCurrency, setNewCurrency] = useState("");
   const [newRate, setNewRate] = useState("");
 
-  const { data: rates = [], isLoading } = useQuery<{ currencyCode: string; rateToUsd: string; effectiveDate: string }[]>({
+  const { data: rates = [], isLoading } = useQuery<
+    { currencyCode: string; rateToUsd: string; effectiveDate: string }[]
+  >({
     queryKey: ["/api/factory/fx-rates"],
   });
 
@@ -50,7 +52,8 @@ export function FxRatesCard() {
   const handleAdd = () => {
     const cc = newCurrency.trim().toUpperCase();
     const rate = parseFloat(newRate);
-    if (!cc || cc.length < 2 || cc.length > 6) return toast({ title: "Enter a valid currency code (2–6 letters)", variant: "destructive" });
+    if (!cc || cc.length < 2 || cc.length > 6)
+      return toast({ title: "Enter a valid currency code (2–6 letters)", variant: "destructive" });
     if (isNaN(rate) || rate <= 0) return toast({ title: "Enter a positive rate", variant: "destructive" });
     saveMutation.mutate({ currencyCode: cc, rateToUsd: newRate });
   };
@@ -63,8 +66,8 @@ export function FxRatesCard() {
           FX Rates
         </CardTitle>
         <CardDescription>
-          Set the exchange rates used to convert foreign-currency supplier balances to USD in Net Position and on supplier cards.
-          For example: EUR = 1.18 means 1 EUR = 1.18 USD.
+          Set the exchange rates used to convert foreign-currency supplier balances to USD in Net Position and on
+          supplier cards. For example: EUR = 1.18 means 1 EUR = 1.18 USD.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -122,12 +125,12 @@ export function FxRatesCard() {
             min="0"
             data-testid="input-fxrate-rate"
           />
-          <Button
-            onClick={handleAdd}
-            disabled={saveMutation.isPending}
-            data-testid="button-add-fxrate"
-          >
-            {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+          <Button onClick={handleAdd} disabled={saveMutation.isPending} data-testid="button-add-fxrate">
+            {saveMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Plus className="h-4 w-4 mr-2" />
+            )}
             Add / Update Rate
           </Button>
         </div>

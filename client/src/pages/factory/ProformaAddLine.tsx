@@ -67,7 +67,11 @@ export default function ProformaAddLine() {
   const [price, setPrice] = useState("");
   const [addedCodes, setAddedCodes] = useState<Set<string>>(new Set());
   const [autoSave, setAutoSave] = useState<boolean>(() => {
-    try { return localStorage.getItem(AUTOSAVE_KEY) === "true"; } catch { return false; }
+    try {
+      return localStorage.getItem(AUTOSAVE_KEY) === "true";
+    } catch {
+      return false;
+    }
   });
   const [autoSaveCountdown, setAutoSaveCountdown] = useState(0);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,7 +85,8 @@ export default function ProformaAddLine() {
 
   const { data: baleProducts = [] } = useQuery<BaleProductWeight[]>({
     queryKey: ["/api/factory/bale-products"],
-    select: (data: any[]) => data.map((p) => ({ articleCode: p.articleCode || p.code, weightPerBaleKg: p.weightPerBaleKg ?? null })),
+    select: (data: any[]) =>
+      data.map((p) => ({ articleCode: p.articleCode || p.code, weightPerBaleKg: p.weightPerBaleKg ?? null })),
   });
 
   const baleWeightMap = useMemo(() => {
@@ -116,7 +121,9 @@ export default function ProformaAddLine() {
 
   const groups = useMemo(() => {
     const s = new Set<string>();
-    allItems.forEach((it) => { if (it.stockGroup?.name) s.add(it.stockGroup.name); });
+    allItems.forEach((it) => {
+      if (it.stockGroup?.name) s.add(it.stockGroup.name);
+    });
     return ["all", ...Array.from(s).sort()];
   }, [allItems]);
 
@@ -147,7 +154,9 @@ export default function ProformaAddLine() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/factory/customer-proformas?customerId=${customerId}`, customerId],
+      });
       setAddedCodes((prev) => new Set([...prev, selectedItem!.code]));
       toast({ title: "Added", description: `${selectedItem!.name} added to proforma` });
       setSelectedItem(null);
@@ -161,15 +170,23 @@ export default function ProformaAddLine() {
   });
 
   const clearAutoSaveTimers = () => {
-    if (autoSaveTimer.current) { clearTimeout(autoSaveTimer.current); autoSaveTimer.current = null; }
-    if (countdownInterval.current) { clearInterval(countdownInterval.current); countdownInterval.current = null; }
+    if (autoSaveTimer.current) {
+      clearTimeout(autoSaveTimer.current);
+      autoSaveTimer.current = null;
+    }
+    if (countdownInterval.current) {
+      clearInterval(countdownInterval.current);
+      countdownInterval.current = null;
+    }
     setAutoSaveCountdown(0);
   };
 
   const toggleAutoSave = () => {
     const next = !autoSave;
     setAutoSave(next);
-    try { localStorage.setItem(AUTOSAVE_KEY, String(next)); } catch {}
+    try {
+      localStorage.setItem(AUTOSAVE_KEY, String(next));
+    } catch {}
     if (!next) clearAutoSaveTimers();
   };
 
@@ -240,8 +257,12 @@ export default function ProformaAddLine() {
         >
           <Zap className={`h-4 w-4 ${autoSave ? "fill-green-500 text-green-500" : ""}`} />
           <span className="hidden sm:inline">Autosave</span>
-          <span className={`w-8 h-4 rounded-full relative transition-colors ${autoSave ? "bg-green-500" : "bg-muted-foreground/30"}`}>
-            <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${autoSave ? "translate-x-4" : "translate-x-0.5"}`} />
+          <span
+            className={`w-8 h-4 rounded-full relative transition-colors ${autoSave ? "bg-green-500" : "bg-muted-foreground/30"}`}
+          >
+            <span
+              className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${autoSave ? "translate-x-4" : "translate-x-0.5"}`}
+            />
           </span>
         </button>
         <Button variant="outline" size="sm" onClick={goBack} data-testid="button-done">
@@ -262,7 +283,11 @@ export default function ProformaAddLine() {
             data-testid="input-search"
           />
           {search && (
-            <button className="absolute right-3 top-2.5" onClick={() => setSearch("")} data-testid="button-clear-search">
+            <button
+              className="absolute right-3 top-2.5"
+              onClick={() => setSearch("")}
+              data-testid="button-clear-search"
+            >
               <X className="h-4 w-4 text-muted-foreground" />
             </button>
           )}
@@ -291,7 +316,9 @@ export default function ProformaAddLine() {
       {/* Item count */}
       <div className="px-4 pt-2 pb-1">
         <p className="text-xs text-muted-foreground">
-          {itemsLoading ? "Loading..." : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}${search ? ` matching "${search}"` : ""}`}
+          {itemsLoading
+            ? "Loading..."
+            : `${filtered.length} item${filtered.length !== 1 ? "s" : ""}${search ? ` matching "${search}"` : ""}`}
         </p>
       </div>
 
@@ -338,9 +365,7 @@ export default function ProformaAddLine() {
                     </span>
                   )}
                   <p className="text-sm font-medium leading-snug line-clamp-2 pr-5">{item.name}</p>
-                  {item.code && (
-                    <p className="text-xs font-mono text-muted-foreground">{item.code}</p>
-                  )}
+                  {item.code && <p className="text-xs font-mono text-muted-foreground">{item.code}</p>}
                   {wt !== null && (
                     <p className="text-xs text-muted-foreground mt-auto">
                       {formatNumber(wt)} kg/bale{wtFromBaleProduct && wt > 0 ? " *" : ""}
@@ -390,7 +415,8 @@ export default function ProformaAddLine() {
                   {(() => {
                     const ew = getEffectiveWeight(selectedItem);
                     if (!ew || parseFloat(ew) === 0) return null;
-                    const fromBaleProduct = !selectedItem.weightPerBaleKg || parseFloat(selectedItem.weightPerBaleKg) === 0;
+                    const fromBaleProduct =
+                      !selectedItem.weightPerBaleKg || parseFloat(selectedItem.weightPerBaleKg) === 0;
                     return (
                       <p className="text-xs text-muted-foreground">
                         {formatNumber(parseFloat(ew))} kg/bale{fromBaleProduct ? " (from product)" : ""}
@@ -403,7 +429,10 @@ export default function ProformaAddLine() {
                 size="icon"
                 variant="ghost"
                 className="shrink-0"
-                onClick={() => { setSelectedItem(null); clearAutoSaveTimers(); }}
+                onClick={() => {
+                  setSelectedItem(null);
+                  clearAutoSaveTimers();
+                }}
                 data-testid="button-deselect"
               >
                 <X className="h-4 w-4" />
@@ -418,7 +447,10 @@ export default function ProformaAddLine() {
                   placeholder="Qty"
                   value={qty}
                   onChange={(e) => setQty(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); if (e.key === "Enter" && qty && price) addMutation.mutate(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                    if (e.key === "Enter" && qty && price) addMutation.mutate();
+                  }}
                   data-testid="input-qty"
                 />
               </div>
@@ -430,12 +462,18 @@ export default function ProformaAddLine() {
                   placeholder="0.00"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); if (e.key === "Enter" && qty && price) addMutation.mutate(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+                    if (e.key === "Enter" && qty && price) addMutation.mutate();
+                  }}
                   data-testid="input-price"
                 />
               </div>
               <Button
-                onClick={() => { clearAutoSaveTimers(); addMutation.mutate(); }}
+                onClick={() => {
+                  clearAutoSaveTimers();
+                  addMutation.mutate();
+                }}
                 disabled={!qty || !price || addMutation.isPending}
                 data-testid="button-add-line"
               >

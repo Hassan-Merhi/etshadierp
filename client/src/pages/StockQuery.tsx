@@ -68,13 +68,14 @@ export default function StockQuery() {
 
   const items = isFactory
     ? factoryProducts
-        .filter(p =>
-          !debouncedSearch.trim() ||
-          p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-          (p.articleCode || p.code).toLowerCase().includes(debouncedSearch.toLowerCase())
+        .filter(
+          (p) =>
+            !debouncedSearch.trim() ||
+            p.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+            (p.articleCode || p.code).toLowerCase().includes(debouncedSearch.toLowerCase())
         )
-        .map(p => ({ id: p.id, code: p.articleCode || p.code, name: p.name, active: p.active }))
-    : (pagedStockItems?.data ?? []).map(p => ({ id: p.id, code: p.code, name: p.name, active: p.active }));
+        .map((p) => ({ id: p.id, code: p.articleCode || p.code, name: p.name, active: p.active }))
+    : (pagedStockItems?.data ?? []).map((p) => ({ id: p.id, code: p.code, name: p.name, active: p.active }));
 
   const handleItemClick = (item: { id: number }) => {
     navigate(isFactory ? `/factory/stock-query/${item.id}` : `/stock-query/${item.id}`);
@@ -87,10 +88,7 @@ export default function StockQuery() {
       {/* ── Header + Search ── */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="flex-1">
-          <PageHeader
-            title="Stock Query"
-            subtitle="Click any item to view purchase history, sales, and inventory"
-          />
+          <PageHeader title="Stock Query" subtitle="Click any item to view purchase history, sales, and inventory" />
         </div>
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -132,9 +130,7 @@ export default function StockQuery() {
           <p className="text-sm font-medium">
             {hasSearch ? "No items match your search" : "Search for a stock item to get started"}
           </p>
-          {hasSearch && (
-            <p className="text-xs">Try a different name or code</p>
-          )}
+          {hasSearch && <p className="text-xs">Try a different name or code</p>}
         </div>
       ) : (
         <>

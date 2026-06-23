@@ -25,7 +25,6 @@ function getCellRawValue(cell: any): CellVal {
 }
 
 export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
-
   // ── List all sheets ────────────────────────────────────────────────────────
   app.get("/api/factory/status-builder/sheets", requireAuth, async (req, res) => {
     try {
@@ -54,9 +53,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         .where(eq(statusBuilderSheets.companyId, companyId))
         .orderBy(asc(statusBuilderSheets.orderIndex));
 
-      const maxOrder = existing.length > 0
-        ? Math.max(...existing.map(r => r.orderIndex))
-        : -1;
+      const maxOrder = existing.length > 0 ? Math.max(...existing.map((r) => r.orderIndex)) : -1;
 
       const [created] = await db
         .insert(statusBuilderSheets)
@@ -142,21 +139,22 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         const rawData: any[][] = xlsxUtils.sheet_to_json(ws, { header: 1, defval: null });
 
         if (!rawData || rawData.length === 0) {
-          const [s] = await db.insert(statusBuilderSheets).values({
-            companyId,
-            name: sheetName,
-            orderIndex: sheetIdx,
-            columns: [],
-            rows: [],
-          }).returning();
+          const [s] = await db
+            .insert(statusBuilderSheets)
+            .values({
+              companyId,
+              name: sheetName,
+              orderIndex: sheetIdx,
+              columns: [],
+              rows: [],
+            })
+            .returning();
           created.push(s);
           continue;
         }
 
         const headerRow = rawData[0] ?? [];
-        const columns: string[] = headerRow.slice(1).map((h: any) =>
-          h == null ? "" : String(h)
-        );
+        const columns: string[] = headerRow.slice(1).map((h: any) => (h == null ? "" : String(h)));
 
         const rows: { label: string; cells: (number | string | null)[] }[] = [];
         for (let r = 1; r < rawData.length; r++) {
@@ -192,13 +190,16 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
           rows.push({ label, cells: cells.slice(0, columns.length) });
         }
 
-        const [s] = await db.insert(statusBuilderSheets).values({
-          companyId,
-          name: sheetName,
-          orderIndex: sheetIdx,
-          columns,
-          rows,
-        }).returning();
+        const [s] = await db
+          .insert(statusBuilderSheets)
+          .values({
+            companyId,
+            name: sheetName,
+            orderIndex: sheetIdx,
+            columns,
+            rows,
+          })
+          .returning();
         created.push(s);
       }
 
@@ -221,9 +222,9 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
 
       const sheet1: any[][] = [
         ["Label", "Week 1", "Week 2", "Week 3", "Week 4"],
-        ["Target",  150,  150,  150,  150],
-        ["Actual",  120,  135,  140,  155],
-        ["Variance", -30, -15, -10,    5],
+        ["Target", 150, 150, 150, 150],
+        ["Actual", 120, 135, 140, 155],
+        ["Variance", -30, -15, -10, 5],
       ];
       const ws1 = xlsxUtils.aoa_to_sheet(sheet1);
       ws1["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
@@ -256,7 +257,7 @@ export function registerFactoryStatusBuilderSheetsRoutes(app: Express) {
         const colLabels = rawColumns.map(getColLabel);
 
         const headerRow = ["", ...colLabels];
-        const dataRows = rows.map(r => [r.label, ...r.cells.map((c: any) => getCellRawValue(c) ?? "")]);
+        const dataRows = rows.map((r) => [r.label, ...r.cells.map((c: any) => getCellRawValue(c) ?? "")]);
 
         const diffCells = colLabels.map((_, colIdx) => {
           const sum = rows.reduce((acc, r) => {

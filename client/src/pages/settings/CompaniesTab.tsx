@@ -6,7 +6,16 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ParentCreditAccountSelect } from "./ParentCreditAccountSelect";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { UseFormReturn } from "react-hook-form";
 import { UseMutationResult } from "@tanstack/react-query";
 
@@ -179,7 +188,11 @@ export function CompaniesTab({
                   render={({ field }) => (
                     <FormItem className="flex items-center gap-2 space-y-0">
                       <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-company-active" />
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-company-active"
+                        />
                       </FormControl>
                       <FormLabel className="!mt-0">Active</FormLabel>
                     </FormItem>
@@ -187,7 +200,9 @@ export function CompaniesTab({
                 />
                 {editingCompany && (
                   <div className="border-t pt-4">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Parent Credit Account</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
+                      Parent Credit Account
+                    </p>
                     <ParentCreditAccountSelect company={editingCompany} />
                   </div>
                 )}
@@ -195,7 +210,10 @@ export function CompaniesTab({
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => { setIsCompanyDialogOpen(false); setEditingCompany(null); }}
+                    onClick={() => {
+                      setIsCompanyDialogOpen(false);
+                      setEditingCompany(null);
+                    }}
                     disabled={createCompanyMutation.isPending}
                     data-testid="button-cancel-company"
                   >
@@ -218,7 +236,7 @@ export function CompaniesTab({
           <Input
             placeholder="Search companies…"
             value={companySearch}
-            onChange={e => setCompanySearch(e.target.value)}
+            onChange={(e) => setCompanySearch(e.target.value)}
             className="pl-9"
             data-testid="input-company-search"
           />
@@ -228,7 +246,7 @@ export function CompaniesTab({
       {/* Cards */}
       {isLoadingCompanies ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map(i => (
+          {[1, 2, 3].map((i) => (
             <div key={i} className="h-36 rounded-md border bg-muted/30 animate-pulse" />
           ))}
         </div>
@@ -240,109 +258,111 @@ export function CompaniesTab({
             <p className="text-sm text-muted-foreground/70 mt-1">Click "Add Company" above to create your first one.</p>
           </div>
         </div>
-      ) : (() => {
-        const q = companySearch.toLowerCase();
-        const filtered = companies.filter((c: any) =>
-          !q || c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q)
-        );
-
-        if (filtered.length === 0) {
-          return (
-            <p className="text-sm text-muted-foreground text-center py-10">
-              No companies match "<span className="font-medium">{companySearch}</span>"
-            </p>
+      ) : (
+        (() => {
+          const q = companySearch.toLowerCase();
+          const filtered = companies.filter(
+            (c: any) => !q || c.name?.toLowerCase().includes(q) || c.code?.toLowerCase().includes(q)
           );
-        }
 
-        return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((company: any) => {
-              const isFactory = company.companyType === "factory" || company.companyType === "factory_v2";
-              const isProperties = company.companyType === "properties";
-              const typeLabel = isFactory ? "Factory" : isProperties ? "Properties" : "ERP";
+          if (filtered.length === 0) {
+            return (
+              <p className="text-sm text-muted-foreground text-center py-10">
+                No companies match "<span className="font-medium">{companySearch}</span>"
+              </p>
+            );
+          }
 
-              const accentClass = isFactory
-                ? "bg-orange-500"
-                : isProperties
-                ? "bg-green-500"
-                : "bg-indigo-500";
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filtered.map((company: any) => {
+                const isFactory = company.companyType === "factory" || company.companyType === "factory_v2";
+                const isProperties = company.companyType === "properties";
+                const typeLabel = isFactory ? "Factory" : isProperties ? "Properties" : "ERP";
 
-              const typeBadgeClass = isFactory
-                ? "border-orange-200 text-orange-700 bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:bg-orange-950"
-                : isProperties
-                ? "border-green-200 text-green-700 bg-green-50 dark:border-green-800 dark:text-green-300 dark:bg-green-950"
-                : "border-indigo-200 text-indigo-700 bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:bg-indigo-950";
+                const accentClass = isFactory ? "bg-orange-500" : isProperties ? "bg-green-500" : "bg-indigo-500";
 
-              return (
-                <div
-                  key={company.id}
-                  className="rounded-md border bg-card flex flex-col overflow-hidden"
-                  data-testid={`card-company-${company.id}`}
-                >
-                  {/* Colored top accent bar */}
-                  <div className={`h-1.5 w-full ${accentClass}`} />
+                const typeBadgeClass = isFactory
+                  ? "border-orange-200 text-orange-700 bg-orange-50 dark:border-orange-800 dark:text-orange-300 dark:bg-orange-950"
+                  : isProperties
+                    ? "border-green-200 text-green-700 bg-green-50 dark:border-green-800 dark:text-green-300 dark:bg-green-950"
+                    : "border-indigo-200 text-indigo-700 bg-indigo-50 dark:border-indigo-800 dark:text-indigo-300 dark:bg-indigo-950";
 
-                  <div className="flex flex-col gap-3 p-4 flex-1">
-                    {/* Name + badges */}
-                    <div className="flex items-start justify-between gap-2">
-                      <p
-                        className="font-semibold text-base leading-tight"
-                        data-testid={`text-company-name-${company.id}`}
-                      >
-                        {company.name}
-                      </p>
-                      <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
-                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${typeBadgeClass}`}
-                          data-testid={`text-company-type-${company.id}`}>
-                          {typeLabel}
-                        </span>
-                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${
-                          company.active
-                            ? "border-emerald-200 text-emerald-700 bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:bg-emerald-950"
-                            : "border-border text-muted-foreground bg-muted"
-                        }`}
-                          data-testid={`text-company-status-${company.id}`}>
-                          {company.active ? "Active" : "Inactive"}
-                        </span>
+                return (
+                  <div
+                    key={company.id}
+                    className="rounded-md border bg-card flex flex-col overflow-hidden"
+                    data-testid={`card-company-${company.id}`}
+                  >
+                    {/* Colored top accent bar */}
+                    <div className={`h-1.5 w-full ${accentClass}`} />
+
+                    <div className="flex flex-col gap-3 p-4 flex-1">
+                      {/* Name + badges */}
+                      <div className="flex items-start justify-between gap-2">
+                        <p
+                          className="font-semibold text-base leading-tight"
+                          data-testid={`text-company-name-${company.id}`}
+                        >
+                          {company.name}
+                        </p>
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                          <span
+                            className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${typeBadgeClass}`}
+                            data-testid={`text-company-type-${company.id}`}
+                          >
+                            {typeLabel}
+                          </span>
+                          <span
+                            className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-medium ${
+                              company.active
+                                ? "border-emerald-200 text-emerald-700 bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:bg-emerald-950"
+                                : "border-border text-muted-foreground bg-muted"
+                            }`}
+                            data-testid={`text-company-status-${company.id}`}
+                          >
+                            {company.active ? "Active" : "Inactive"}
+                          </span>
+                        </div>
                       </div>
+
+                      {/* Currency row */}
+                      <p className="text-xs text-muted-foreground">
+                        {company.baseCurrency || "USD"}
+                        {company.displayCurrency && company.displayCurrency !== "none"
+                          ? ` · ${company.displayCurrency}`
+                          : ""}
+                      </p>
                     </div>
 
-                    {/* Currency row */}
-                    <p className="text-xs text-muted-foreground">
-                      {company.baseCurrency || "USD"}
-                      {company.displayCurrency && company.displayCurrency !== "none"
-                        ? ` · ${company.displayCurrency}`
-                        : ""}
-                    </p>
+                    {/* Action footer */}
+                    <div className="border-t px-4 py-2 flex justify-end gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleEditCompany(company)}
+                        data-testid={`button-edit-company-${company.id}`}
+                        title="Edit company"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => setCompanyToDelete(company)}
+                        data-testid={`button-delete-company-${company.id}`}
+                        title="Delete company"
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
                   </div>
-
-                  {/* Action footer */}
-                  <div className="border-t px-4 py-2 flex justify-end gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleEditCompany(company)}
-                      data-testid={`button-edit-company-${company.id}`}
-                      title="Edit company"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setCompanyToDelete(company)}
-                      data-testid={`button-delete-company-${company.id}`}
-                      title="Delete company"
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        );
-      })()}
+                );
+              })}
+            </div>
+          );
+        })()
+      )}
 
       {/* Delete confirmation */}
       <AlertDialog open={!!companyToDelete} onOpenChange={(open) => !open && setCompanyToDelete(null)}>
@@ -351,8 +371,12 @@ export function CompaniesTab({
             <AlertDialogTitle>Delete Company</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-2">
-                <p>Are you sure you want to delete <strong>{companyToDelete?.name}</strong>?</p>
-                <p className="text-destructive font-medium">This will permanently delete ALL data associated with this company, including:</p>
+                <p>
+                  Are you sure you want to delete <strong>{companyToDelete?.name}</strong>?
+                </p>
+                <p className="text-destructive font-medium">
+                  This will permanently delete ALL data associated with this company, including:
+                </p>
                 <ul className="list-disc list-inside text-sm space-y-1 ml-2">
                   <li>All locations and inventory</li>
                   <li>All ledger accounts and bank accounts</li>

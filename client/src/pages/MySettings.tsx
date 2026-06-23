@@ -101,9 +101,7 @@ export default function MySettings() {
             <CalendarDays className="h-4 w-4" />
             Date Format
           </CardTitle>
-          <CardDescription>
-            Choose how dates are displayed across your account.
-          </CardDescription>
+          <CardDescription>Choose how dates are displayed across your account.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -117,8 +115,12 @@ export default function MySettings() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="MM/DD/YYYY" data-testid="option-date-format-mmddyyyy">MM/DD/YYYY</SelectItem>
-                <SelectItem value="DD/MM/YYYY" data-testid="option-date-format-ddmmyyyy">DD/MM/YYYY</SelectItem>
+                <SelectItem value="MM/DD/YYYY" data-testid="option-date-format-mmddyyyy">
+                  MM/DD/YYYY
+                </SelectItem>
+                <SelectItem value="DD/MM/YYYY" data-testid="option-date-format-ddmmyyyy">
+                  DD/MM/YYYY
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>

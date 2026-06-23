@@ -86,7 +86,7 @@ export default function CustomerInvoiceCreate() {
   const modeApiRequest = getApiRequest(appMode);
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-  const [orderDate, setOrderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [orderDate, setOrderDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [orderId, setOrderId] = useState<number | null>(null);
   const [scanCode, setScanCode] = useState("");
@@ -234,11 +234,14 @@ export default function CustomerInvoiceCreate() {
     }
   }, [customerId, activeProforma?.id]);
 
-  const handleScan = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
-    e.preventDefault();
-    addBaleMutation.mutate({ scanCode: scanCode.trim(), locationId: parseInt(selectedLocationId) });
-  }, [scanCode, orderId, selectedLocationId, addBaleMutation]);
+  const handleScan = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
+      e.preventDefault();
+      addBaleMutation.mutate({ scanCode: scanCode.trim(), locationId: parseInt(selectedLocationId) });
+    },
+    [scanCode, orderId, selectedLocationId, addBaleMutation]
+  );
 
   const handleAddCharge = useCallback(() => {
     if (!chargeAmount || !orderId) return;
@@ -254,7 +257,19 @@ export default function CustomerInvoiceCreate() {
   const bales = orderDetail?.bales || [];
   const charges = orderDetail?.charges || [];
 
-  const groupedBales = bales.reduce<Record<string, { articleCode: string; productName: string; bales: OrderBale[]; totalWeight: number; totalPrice: number; pricePerBale: number }>>((acc, bale) => {
+  const groupedBales = bales.reduce<
+    Record<
+      string,
+      {
+        articleCode: string;
+        productName: string;
+        bales: OrderBale[];
+        totalWeight: number;
+        totalPrice: number;
+        pricePerBale: number;
+      }
+    >
+  >((acc, bale) => {
     const key = bale.articleCode;
     if (!acc[key]) {
       acc[key] = {
@@ -273,15 +288,20 @@ export default function CustomerInvoiceCreate() {
   }, {});
 
   const subtotal = bales.reduce((sum, b) => sum + parseFloat(b.totalPrice || "0"), 0);
-  const freightCharges = charges.filter((c) => c.chargeType === "FREIGHT").reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
-  const otherCharges = charges.filter((c) => c.chargeType !== "FREIGHT").reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
+  const freightCharges = charges
+    .filter((c) => c.chargeType === "FREIGHT")
+    .reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
+  const otherCharges = charges
+    .filter((c) => c.chargeType !== "FREIGHT")
+    .reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
   const grandTotal = subtotal + freightCharges + otherCharges;
 
-  const scanInputClass = scanFlash === "success"
-    ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950 transition-all"
-    : scanFlash === "error"
-    ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
-    : "";
+  const scanInputClass =
+    scanFlash === "success"
+      ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950 transition-all"
+      : scanFlash === "error"
+        ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
+        : "";
 
   return (
     <div className="flex flex-col h-full p-4 lg:p-6">
@@ -300,13 +320,20 @@ export default function CustomerInvoiceCreate() {
         <div className="lg:w-[60%] flex flex-col min-h-0">
           <Card className="flex-1 flex flex-col min-h-0 p-4">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="font-semibold text-lg" data-testid="text-bales-header">Scanned Bales</h2>
-              <Badge variant="secondary" data-testid="badge-bale-count">{bales.length} bales</Badge>
+              <h2 className="font-semibold text-lg" data-testid="text-bales-header">
+                Scanned Bales
+              </h2>
+              <Badge variant="secondary" data-testid="badge-bale-count">
+                {bales.length} bales
+              </Badge>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {Object.keys(groupedBales).length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground" data-testid="text-no-bales">
+                <div
+                  className="flex flex-col items-center justify-center py-12 text-muted-foreground"
+                  data-testid="text-no-bales"
+                >
                   <ScanLine className="h-12 w-12 mb-3 opacity-40" />
                   <p>No bales scanned yet</p>
                   <p className="text-sm mt-1">Select a customer and location, then scan bales</p>
@@ -317,14 +344,33 @@ export default function CustomerInvoiceCreate() {
                     <div key={group.articleCode} data-testid={`group-article-${group.articleCode}`}>
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2 px-1">
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" data-testid={`badge-article-${group.articleCode}`}>{group.articleCode}</Badge>
+                          <Badge variant="outline" data-testid={`badge-article-${group.articleCode}`}>
+                            {group.articleCode}
+                          </Badge>
                           <span className="text-sm font-medium">{group.productName}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                           <span>Qty: {group.bales.length}</span>
-                          <span>Wt: {group.totalWeight.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                          <span className="font-mono">@{group.pricePerBale.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
-                          <span className="font-mono font-semibold text-foreground">{group.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          <span>
+                            Wt:{" "}
+                            {group.totalWeight.toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                          <span className="font-mono">
+                            @
+                            {group.pricePerBale.toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
+                          <span className="font-mono font-semibold text-foreground">
+                            {group.totalPrice.toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
                         </div>
                       </div>
                       <Table>
@@ -335,10 +381,20 @@ export default function CustomerInvoiceCreate() {
                                 {bale.referenceNumber}
                               </TableCell>
                               <TableCell className="text-right text-sm text-muted-foreground">
-                                {parseFloat(bale.weight || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg
+                                {parseFloat(bale.weight || "0").toLocaleString(undefined, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                kg
                               </TableCell>
-                              <TableCell className="text-right font-mono text-sm" data-testid={`text-bale-price-${bale.id}`}>
-                                {parseFloat(bale.totalPrice || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              <TableCell
+                                className="text-right font-mono text-sm"
+                                data-testid={`text-bale-price-${bale.id}`}
+                              >
+                                {parseFloat(bale.totalPrice || "0").toLocaleString(undefined, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}
                               </TableCell>
                               <TableCell className="w-[40px]">
                                 <Button
@@ -364,7 +420,9 @@ export default function CustomerInvoiceCreate() {
             {bales.length > 0 && (
               <div className="border-t pt-3 mt-3 flex items-center justify-between gap-2">
                 <span className="font-medium">Subtotal</span>
-                <span className="font-mono font-semibold text-lg" data-testid="text-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                <span className="font-mono font-semibold text-lg" data-testid="text-subtotal">
+                  {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
               </div>
             )}
           </Card>
@@ -374,11 +432,7 @@ export default function CustomerInvoiceCreate() {
           <Card className="p-4 space-y-4">
             <div>
               <label className="text-sm font-medium mb-1 block">Customer</label>
-              <Select
-                value={selectedCustomerId}
-                onValueChange={handleCustomerChange}
-                disabled={!!orderId}
-              >
+              <Select value={selectedCustomerId} onValueChange={handleCustomerChange} disabled={!!orderId}>
                 <SelectTrigger data-testid="select-customer">
                   <SelectValue placeholder="Select customer..." />
                 </SelectTrigger>
@@ -405,7 +459,11 @@ export default function CustomerInvoiceCreate() {
 
             {activeProforma && (
               <div className="flex items-center gap-2">
-                <Badge variant="default" className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate" data-testid="badge-active-proforma">
+                <Badge
+                  variant="default"
+                  className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
+                  data-testid="badge-active-proforma"
+                >
                   {activeProforma.name}
                 </Badge>
                 <span className="text-sm text-muted-foreground">{activeProforma.lines.length} price lines</span>
@@ -413,7 +471,9 @@ export default function CustomerInvoiceCreate() {
             )}
 
             {customerId && !activeProforma && proformas.length === 0 && (
-              <p className="text-sm text-destructive" data-testid="text-no-proforma">No active proforma found for this customer</p>
+              <p className="text-sm text-destructive" data-testid="text-no-proforma">
+                No active proforma found for this customer
+              </p>
             )}
 
             <div>
@@ -464,10 +524,19 @@ export default function CustomerInvoiceCreate() {
             {charges.length > 0 && (
               <div className="space-y-1">
                 {charges.map((charge) => (
-                  <div key={charge.id} className="flex items-center justify-between gap-2" data-testid={`row-charge-${charge.id}`}>
+                  <div
+                    key={charge.id}
+                    className="flex items-center justify-between gap-2"
+                    data-testid={`row-charge-${charge.id}`}
+                  >
                     <span className="text-sm">{charge.name}</span>
                     <div className="flex items-center gap-1">
-                      <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{parseFloat(charge.amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>
+                        {parseFloat(charge.amount).toLocaleString(undefined, {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -528,19 +597,27 @@ export default function CustomerInvoiceCreate() {
           <Card className="p-4 space-y-2">
             <div className="flex items-center justify-between gap-2 text-sm">
               <span>Subtotal</span>
-              <span className="font-mono" data-testid="text-summary-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              <span className="font-mono" data-testid="text-summary-subtotal">
+                {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span>Freight</span>
-              <span className="font-mono" data-testid="text-summary-freight">{freightCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              <span className="font-mono" data-testid="text-summary-freight">
+                {freightCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span>Other Charges</span>
-              <span className="font-mono" data-testid="text-summary-other">{otherCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              <span className="font-mono" data-testid="text-summary-other">
+                {otherCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="border-t pt-2 flex items-center justify-between gap-2">
               <span className="font-semibold">Grand Total</span>
-              <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              <span className="font-mono font-bold text-lg" data-testid="text-grand-total">
+                {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
               <span>Total Bales</span>
@@ -568,8 +645,8 @@ export default function CustomerInvoiceCreate() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              This will generate an invoice number, mark {bales.length} bale(s) as SOLD, and update the customer balance.
-              This action cannot be undone.
+              This will generate an invoice number, mark {bales.length} bale(s) as SOLD, and update the customer
+              balance. This action cannot be undone.
             </p>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between gap-2">
@@ -580,11 +657,15 @@ export default function CustomerInvoiceCreate() {
               </div>
               <div className="flex justify-between gap-2">
                 <span>Bales</span>
-                <span className="font-medium" data-testid="text-confirm-bales">{bales.length}</span>
+                <span className="font-medium" data-testid="text-confirm-bales">
+                  {bales.length}
+                </span>
               </div>
               <div className="flex justify-between gap-2">
                 <span>Grand Total</span>
-                <span className="font-mono font-semibold" data-testid="text-confirm-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                <span className="font-mono font-semibold" data-testid="text-confirm-total">
+                  {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
               </div>
             </div>
             <div className="flex justify-end gap-2">

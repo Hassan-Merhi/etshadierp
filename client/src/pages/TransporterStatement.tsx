@@ -3,23 +3,25 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useDateFormat } from "@/contexts/DateFormatContext";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Settings2, Pencil, Check, X, TrendingDown, TrendingUp, Minus,
-  RefreshCw, Printer, MessageCircle,
+  Settings2,
+  Pencil,
+  Check,
+  X,
+  TrendingDown,
+  TrendingUp,
+  Minus,
+  RefreshCw,
+  Printer,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -96,7 +98,11 @@ function monthAgo(): string {
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 
-function StatusBadge({ status, paidAmount, total }: {
+function StatusBadge({
+  status,
+  paidAmount,
+  total,
+}: {
   status: "unpaid" | "partial" | "paid" | null;
   paidAmount: string | null;
   total: string | null;
@@ -104,7 +110,10 @@ function StatusBadge({ status, paidAmount, total }: {
   if (!status) return null;
   if (status === "paid") {
     return (
-      <Badge className="text-[10px] bg-green-600/10 text-green-700 dark:text-green-400 border-green-600/20" variant="outline">
+      <Badge
+        className="text-[10px] bg-green-600/10 text-green-700 dark:text-green-400 border-green-600/20"
+        variant="outline"
+      >
         Paid
       </Badge>
     );
@@ -112,7 +121,10 @@ function StatusBadge({ status, paidAmount, total }: {
   if (status === "partial") {
     const remaining = parseFloat(total || "0") - parseFloat(paidAmount || "0");
     return (
-      <Badge className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20" variant="outline">
+      <Badge
+        className="text-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+        variant="outline"
+      >
         Partial · {fmtAmt(remaining.toFixed(2))} left
       </Badge>
     );
@@ -173,18 +185,16 @@ function DueDateCell({
   return (
     <div
       className="flex items-center gap-1.5 group cursor-pointer"
-      onClick={() => { setValue(row.dateToBePaid ?? ""); setEditing(true); }}
+      onClick={() => {
+        setValue(row.dateToBePaid ?? "");
+        setEditing(true);
+      }}
       data-testid={`cell-due-date-${row.id}`}
     >
       {row.dateToBePaid ? (
-        <span className={cn(
-          "text-sm",
-          isOverdue ? "text-destructive font-medium" : "text-foreground",
-        )}>
+        <span className={cn("text-sm", isOverdue ? "text-destructive font-medium" : "text-foreground")}>
           {formatDate(row.dateToBePaid)}
-          {row.hasManualDueDate && (
-            <span className="ml-1 text-xs text-muted-foreground">(manual)</span>
-          )}
+          {row.hasManualDueDate && <span className="ml-1 text-xs text-muted-foreground">(manual)</span>}
         </span>
       ) : (
         <span className="text-xs text-muted-foreground/60 italic">set date</span>
@@ -350,7 +360,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     let totalPaid = 0;
     let overdueCount = 0;
     const now = today();
-    for (const r of (statement.rows ?? [])) {
+    for (const r of statement.rows ?? []) {
       totalDebit += parseFloat(r.debit || "0");
       totalCredit += parseFloat(r.credit || "0");
       totalPaid += parseFloat(r.paidAmount || "0");
@@ -368,7 +378,10 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     if (!statement || !selectedTransporter) return null;
 
     const esc = (s: unknown) =>
-      String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
     const fmt = (v: string | null | undefined) => {
       if (!v) return "—";
@@ -411,7 +424,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
       <td style="${td()};color:#6b7280;font-style:italic"></td>
       <td style="${td()};color:#6b7280;font-style:italic">Opening Balance</td>
       <td style="${td()}"></td><td style="${td()}"></td><td style="${td()}"></td>
-      <td style="${td("right","#374151",true)}">${fmt(String(openBal))}</td>
+      <td style="${td("right", "#374151", true)}">${fmt(String(openBal))}</td>
       <td style="${td()}"></td><td style="${td()}"></td>
     </tr>`;
 
@@ -425,9 +438,9 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
         <td style="${td()};font-family:monospace">${esc(row.date)}</td>
         <td style="${td()};max-width:280px;overflow:hidden;text-overflow:ellipsis">${esc(row.description || row.narration || row.voucherNumber)}</td>
         <td style="${td()};font-family:monospace">${esc(row.numberPlate ?? row.containerNumber ?? "—")}</td>
-        <td style="${td("right","#dc2626")}">${esc(fmtAmt2(row.debit))}</td>
-        <td style="${td("right","#059669")}">${esc(fmtAmt2(row.credit))}</td>
-        <td style="${td("right",balColor,true)}">${fmt(row.runningBalance)}</td>
+        <td style="${td("right", "#dc2626")}">${esc(fmtAmt2(row.debit))}</td>
+        <td style="${td("right", "#059669")}">${esc(fmtAmt2(row.credit))}</td>
+        <td style="${td("right", balColor, true)}">${fmt(row.runningBalance)}</td>
         <td style="${td()}">${esc(row.dateToBePaid ?? "—")}</td>
         <td style="${td()}">${statusLabel(row)}</td>
       </tr>`;
@@ -436,11 +449,11 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     // Closing balance row
     rowsHtml += `<tr style="background:#e6f7f3">
       <td style="${td()};color:#6b7280;font-style:italic"></td>
-      <td style="${td("left","#374151",true)}">Closing Balance</td>
+      <td style="${td("left", "#374151", true)}">Closing Balance</td>
       <td style="${td()}"></td>
-      <td style="${td("right","#dc2626",true)}">${fmt(String(stats?.totalDebit ?? 0))}</td>
-      <td style="${td("right","#059669",true)}">${fmt(String(stats?.totalCredit ?? 0))}</td>
-      <td style="${td("right",closingBal > 0 ? "#b45309" : closingBal < 0 ? "#059669" : "#374151",true)}">${fmt(statement.closingBalance)}${closingSide}</td>
+      <td style="${td("right", "#dc2626", true)}">${fmt(String(stats?.totalDebit ?? 0))}</td>
+      <td style="${td("right", "#059669", true)}">${fmt(String(stats?.totalCredit ?? 0))}</td>
+      <td style="${td("right", closingBal > 0 ? "#b45309" : closingBal < 0 ? "#059669" : "#374151", true)}">${fmt(statement.closingBalance)}${closingSide}</td>
       <td style="${td()}"></td><td style="${td()}"></td>
     </tr>`;
 
@@ -473,7 +486,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
       <table style="width:100%;border-collapse:collapse;table-layout:auto;">
         <thead>
           <tr>
-            ${["DATE","DESCRIPTION","PLATE","DEBIT","CREDIT","BALANCE","DUE DATE","STATUS"]
+            ${["DATE", "DESCRIPTION", "PLATE", "DEBIT", "CREDIT", "BALANCE", "DUE DATE", "STATUS"]
               .map((h, idx) => `<th style="${th(idx >= 3 && idx <= 5 ? "right" : "left")}">${h}</th>`)
               .join("")}
           </tr>
@@ -496,10 +509,15 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     try {
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(el, {
-        scale: 2, useCORS: true, allowTaint: true,
-        backgroundColor: "#ffffff", logging: false,
-        width: 1060, height: el.scrollHeight,
-        windowWidth: 1060, windowHeight: el.scrollHeight,
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        width: 1060,
+        height: el.scrollHeight,
+        windowWidth: 1060,
+        windowHeight: el.scrollHeight,
       });
       document.body.removeChild(el);
       const link = document.createElement("a");
@@ -523,15 +541,22 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
     try {
       const html2canvas = (await import("html2canvas")).default;
       const canvas = await html2canvas(el, {
-        scale: 2, useCORS: true, allowTaint: true,
-        backgroundColor: "#ffffff", logging: false,
-        width: 1060, height: el.scrollHeight,
-        windowWidth: 1060, windowHeight: el.scrollHeight,
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        width: 1060,
+        height: el.scrollHeight,
+        windowWidth: 1060,
+        windowHeight: el.scrollHeight,
       });
       document.body.removeChild(el);
       const imageBase64 = canvas.toDataURL("image/png");
       const data: any = await apiRequest("POST", `/api/transporter-statement/${selectedAccountId}/send-whatsapp`, {
-        dateFrom, dateTo, imageBase64,
+        dateFrom,
+        dateTo,
+        imageBase64,
       });
       toast({ title: "WhatsApp sent", description: `Delivered to ${data?.sent ?? 0} recipient(s).` });
     } catch (err: any) {
@@ -544,8 +569,7 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
 
   // Reallocate mutation (FIFO)
   const reallocateMutation = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", `/api/transporter-statement/${selectedAccountId}/reallocate`, {}),
+    mutationFn: () => apiRequest("POST", `/api/transporter-statement/${selectedAccountId}/reallocate`, {}),
     onSuccess: () => {
       toast({ title: "Allocations updated", description: "FIFO allocation has been re-run." });
       queryClient.invalidateQueries({
@@ -631,7 +655,6 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
       `}</style>
 
       <div id="transporter-print-area" className={cn("flex flex-col h-full overflow-hidden", embedded ? "" : "p-4")}>
-
         {/* ── Print header (only visible when printing) ─── */}
         <div className="print-header hidden print:block">
           <h1>{selectedTransporter?.name ?? "Transporter"}</h1>
@@ -645,17 +668,15 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
             {loadingTransporters ? (
               <Skeleton className="h-9 w-[220px]" />
             ) : (
-              <Select
-                value={selectedAccountId}
-                onValueChange={setSelectedAccountId}
-                data-testid="select-transporter"
-              >
+              <Select value={selectedAccountId} onValueChange={setSelectedAccountId} data-testid="select-transporter">
                 <SelectTrigger className="w-[220px]" data-testid="trigger-transporter">
                   <SelectValue placeholder="Select transporter…" />
                 </SelectTrigger>
                 <SelectContent>
                   {transporters.length === 0 && (
-                    <SelectItem value="__none__" disabled>No active OTW transporters with matching accounts</SelectItem>
+                    <SelectItem value="__none__" disabled>
+                      No active OTW transporters with matching accounts
+                    </SelectItem>
                   )}
                   {transporters.map((t) => (
                     <SelectItem key={t.id} value={String(t.id)} data-testid={`option-transporter-${t.id}`}>
@@ -747,10 +768,12 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
             <div className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
               <Minus className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Outstanding:</span>
-              <span className={cn(
-                "font-medium tabular-nums",
-                closingBal > 0 ? "text-amber-600 dark:text-amber-400" : closingBal < 0 ? "text-green-600" : "",
-              )}>
+              <span
+                className={cn(
+                  "font-medium tabular-nums",
+                  closingBal > 0 ? "text-amber-600 dark:text-amber-400" : closingBal < 0 ? "text-green-600" : ""
+                )}
+              >
                 {fmtNum(statement.closingBalance)}
                 {closingBal > 0 && <span className="ml-1 text-xs">Cr</span>}
                 {closingBal < 0 && <span className="ml-1 text-xs">Dr</span>}
@@ -821,20 +844,16 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                 ) : (
                   statement?.rows?.map((row) => {
                     const bal = parseFloat(row.runningBalance);
-                    const isOverdue = row.dateToBePaid && row.dateToBePaid < today() && row.status && row.status !== "paid";
+                    const isOverdue =
+                      row.dateToBePaid && row.dateToBePaid < today() && row.status && row.status !== "paid";
                     const isPaid = row.status === "paid";
                     return (
                       <TableRow
                         key={row.id}
-                        className={cn(
-                          isOverdue ? "bg-destructive/5" : "",
-                          isPaid ? "opacity-50" : "",
-                        )}
+                        className={cn(isOverdue ? "bg-destructive/5" : "", isPaid ? "opacity-50" : "")}
                         data-testid={`row-statement-${row.id}`}
                       >
-                        <TableCell className="text-sm tabular-nums whitespace-nowrap">
-                          {formatDate(row.date)}
-                        </TableCell>
+                        <TableCell className="text-sm tabular-nums whitespace-nowrap">{formatDate(row.date)}</TableCell>
                         <TableCell className="text-sm max-w-[260px]">
                           <div className="truncate" title={row.description}>
                             {row.description || row.narration || row.voucherNumber}
@@ -857,21 +876,23 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                         <TableCell className="text-right tabular-nums text-sm text-green-700 dark:text-green-400">
                           {fmtAmt(row.credit)}
                         </TableCell>
-                        <TableCell className={cn(
-                          "text-right tabular-nums text-sm font-medium",
-                          bal > 0 ? "text-amber-700 dark:text-amber-400" : bal < 0 ? "text-green-700 dark:text-green-400" : "text-muted-foreground",
-                        )}>
+                        <TableCell
+                          className={cn(
+                            "text-right tabular-nums text-sm font-medium",
+                            bal > 0
+                              ? "text-amber-700 dark:text-amber-400"
+                              : bal < 0
+                                ? "text-green-700 dark:text-green-400"
+                                : "text-muted-foreground"
+                          )}
+                        >
                           {fmtNum(row.runningBalance)}
                         </TableCell>
                         <TableCell>
                           <DueDateCell row={row} onSave={handleDueDateSave} />
                         </TableCell>
                         <TableCell>
-                          <StatusBadge
-                            status={row.status}
-                            paidAmount={row.paidAmount}
-                            total={row.credit}
-                          />
+                          <StatusBadge status={row.status} paidAmount={row.paidAmount} total={row.credit} />
                         </TableCell>
                       </TableRow>
                     );
@@ -890,10 +911,16 @@ export default function TransporterStatement({ embedded }: { embedded?: boolean 
                     <TableCell className="text-right tabular-nums text-green-700 dark:text-green-400">
                       {fmtNum(String(stats?.totalCredit ?? 0))}
                     </TableCell>
-                    <TableCell className={cn(
-                      "text-right tabular-nums",
-                      closingBal > 0 ? "text-amber-700 dark:text-amber-400" : closingBal < 0 ? "text-green-700 dark:text-green-400" : "",
-                    )}>
+                    <TableCell
+                      className={cn(
+                        "text-right tabular-nums",
+                        closingBal > 0
+                          ? "text-amber-700 dark:text-amber-400"
+                          : closingBal < 0
+                            ? "text-green-700 dark:text-green-400"
+                            : ""
+                      )}
+                    >
                       {fmtNum(statement.closingBalance)}
                       {closingBal !== 0 && (
                         <span className="ml-1 font-normal text-xs text-muted-foreground">

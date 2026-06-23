@@ -4,34 +4,34 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { PageHeader } from "@/components/PageHeader";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar, DollarSign, Package, Eye, EyeOff, Lock, Pencil, Save, X, Plus, Trash2, ArrowRight, Printer, TrendingUp, TrendingDown, LayoutList } from "lucide-react";
+import {
+  Calendar,
+  DollarSign,
+  Package,
+  Eye,
+  EyeOff,
+  Lock,
+  Pencil,
+  Save,
+  X,
+  Plus,
+  Trash2,
+  ArrowRight,
+  Printer,
+  TrendingUp,
+  TrendingDown,
+  LayoutList,
+} from "lucide-react";
 import { useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import { format, startOfDay, endOfDay, isValid, parseISO, addDays } from "date-fns";
@@ -88,7 +88,7 @@ export default function POSDaybook() {
   const { formatDisplayDate } = useDateFormat();
   const { formatCashAmount } = useCurrencyContext();
   const { selectedCompany } = useCompany();
-  const isMaliCompany = selectedCompany?.name?.toLowerCase().includes('mali');
+  const isMaliCompany = selectedCompany?.name?.toLowerCase().includes("mali");
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherWithItems | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editedItems, setEditedItems] = useState<SalesItem[]>([]);
@@ -106,8 +106,8 @@ export default function POSDaybook() {
 
   // Check for date and voucherId in URL query parameters (from stock item voucher history)
   const urlParams = new URLSearchParams(window.location.search);
-  const voucherIdParam = urlParams.get('voucherId');
-  const dateParam = urlParams.get('date');
+  const voucherIdParam = urlParams.get("voucherId");
+  const dateParam = urlParams.get("date");
 
   // Period filter state - initialize based on URL param or default to today
   const getInitialPeriod = (): PeriodFilterValue => {
@@ -137,7 +137,8 @@ export default function POSDaybook() {
   // Only allow editing if explicitly permitted - defaults to false for safety
   // Admin and Owner can always edit regardless of daybookEditDays setting
   const daybookEditDays = currentUser?.daybookEditDays || 0;
-  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
+  const isAdminOrOwner =
+    currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
   const isPOS = currentUser?.role === "POS";
   const canEditDaybook = isAdminOrOwner || daybookEditDays > 0;
 
@@ -149,7 +150,7 @@ export default function POSDaybook() {
   });
   // Build a fast-lookup set of allowed location IDs for this POS user
   const myLocationIds = new Set(myLocations.map((l) => l.id));
-  
+
   // Check if user can see profit/cost (Admin or Owner only)
   const canSeeProfitCost = isAdminOrOwner;
 
@@ -171,15 +172,16 @@ export default function POSDaybook() {
   // Filter to show Sales and StockTransfer vouchers from the user's assigned location
   // Exception: When voucherId is provided (from history), bypass location filter for Admin/Owner
   const bypassLocationFilter = voucherIdParam && isAdminOrOwner;
-  
+
   const filteredVouchers = vouchers
     .filter((v) => {
       // Must be a Sales or Stock Transfer voucher
-      if (v.voucherType !== "Sales" && v.voucherType !== "Stock Transfer" && v.voucherType !== "StockTransfer") return false;
-      
+      if (v.voucherType !== "Sales" && v.voucherType !== "Stock Transfer" && v.voucherType !== "StockTransfer")
+        return false;
+
       // Bypass location filter when viewing specific historical voucher
       if (bypassLocationFilter) return true;
-      
+
       // POS users: show transactions from all their assigned locations
       if (isPOS) {
         // While locations are still loading, show nothing to avoid flicker
@@ -196,14 +198,12 @@ export default function POSDaybook() {
       if (dateCompare !== 0) return dateCompare;
       return b.voucherNumber.localeCompare(a.voucherNumber);
     });
-  
+
   // Backward compatibility alias
   const salesVouchers = filteredVouchers;
 
   // Visible vouchers: filter out hidden rows unless showHidden is true
-  const visibleVouchers = showHidden
-    ? salesVouchers
-    : salesVouchers.filter((v) => !hiddenRowIds.has(v.id));
+  const visibleVouchers = showHidden ? salesVouchers : salesVouchers.filter((v) => !hiddenRowIds.has(v.id));
 
   // Fetch voucher details when viewing
   const { data: voucherDetails, isLoading: detailsLoading } = useQuery<VoucherWithItems>({
@@ -229,14 +229,14 @@ export default function POSDaybook() {
   useEffect(() => {
     if (voucherIdParam && vouchers.length > 0 && !selectedVoucher) {
       const voucherId = parseInt(voucherIdParam);
-      const voucherToSelect = vouchers.find(v => v.id === voucherId);
-      
+      const voucherToSelect = vouchers.find((v) => v.id === voucherId);
+
       // Clear the voucherId parameter from URL
       const newParams = new URLSearchParams(window.location.search);
-      newParams.delete('voucherId');
+      newParams.delete("voucherId");
       const newSearch = newParams.toString();
-      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : '');
-      window.history.replaceState({}, '', newUrl);
+      const newUrl = window.location.pathname + (newSearch ? `?${newSearch}` : "");
+      window.history.replaceState({}, "", newUrl);
 
       if (voucherToSelect) {
         setSelectedVoucher(voucherToSelect);
@@ -312,7 +312,7 @@ export default function POSDaybook() {
 
       if (e.key === "ArrowDown" && !isTyping) {
         e.preventDefault();
-        setSelectedDialogRow(prev => {
+        setSelectedDialogRow((prev) => {
           if (prev === null) return 0;
           return Math.min(prev + 1, items.length - 1);
         });
@@ -321,7 +321,7 @@ export default function POSDaybook() {
 
       if (e.key === "ArrowUp" && !isTyping) {
         e.preventDefault();
-        setSelectedDialogRow(prev => {
+        setSelectedDialogRow((prev) => {
           if (prev === null) return items.length - 1;
           return Math.max(prev - 1, 0);
         });
@@ -350,18 +350,18 @@ export default function POSDaybook() {
     mutationFn: async () => {
       if (!selectedVoucher) throw new Error("No voucher selected");
 
-      const items = editedItems.map(item => {
+      const items = editedItems.map((item) => {
         const payload: any = {
           stockItemId: item.stockItemId,
           quantity: item.quantity,
           sellingPrice: item.sellingPrice,
         };
-        
+
         // Only include ID for existing items (positive IDs), not new items (negative IDs)
         if (item.id > 0) {
           payload.id = item.id;
         }
-        
+
         return payload;
       });
 
@@ -400,7 +400,10 @@ export default function POSDaybook() {
   };
 
   const fmtPrint = (n: number, prefix = "") => {
-    const parts = Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",").split(".");
+    const parts = Math.abs(n)
+      .toFixed(2)
+      .replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+      .split(".");
     const num = parts[1] === "00" ? parts[0] : parts.join(".");
     return prefix ? prefix + "\u00A0" + num : num;
   };
@@ -445,16 +448,16 @@ export default function POSDaybook() {
   const handleItemChange = (index: number, field: keyof SalesItem, value: string) => {
     const newItems = [...editedItems];
     newItems[index] = { ...newItems[index], [field]: value };
-    
+
     // Recalculate totals
     const qty = parseFloat(newItems[index].quantity) || 0;
     const price = parseFloat(newItems[index].sellingPrice) || 0;
     const cost = parseFloat(newItems[index].costPrice) || 0;
-    
+
     newItems[index].totalSales = formatNumber(qty * price);
     newItems[index].totalCost = formatNumber(qty * cost);
     newItems[index].profit = formatNumber(qty * (price - cost));
-    
+
     setEditedItems(newItems);
   };
 
@@ -471,7 +474,7 @@ export default function POSDaybook() {
       totalCost: item.averageRate,
       profit: formatNumber((parseFloat(item.lastSellingPrice || item.averageRate) - parseFloat(item.averageRate)) * 1),
     };
-    
+
     setEditedItems([...editedItems, newItem]);
     setAddItemOpen(false);
     setItemSearch("");
@@ -487,9 +490,9 @@ export default function POSDaybook() {
   };
 
   // Separate sales from transfers for accurate metrics
-  const salesOnlyVouchers = salesVouchers.filter(v => v.voucherType === "Sales");
-  const transferVouchers = salesVouchers.filter(v => v.voucherType !== "Sales");
-  
+  const salesOnlyVouchers = salesVouchers.filter((v) => v.voucherType === "Sales");
+  const transferVouchers = salesVouchers.filter((v) => v.voucherType !== "Sales");
+
   const totalSales = salesOnlyVouchers.reduce((sum, v) => sum + parseFloat(v.totalAmount), 0);
   const salesTransactionCount = salesOnlyVouchers.length;
   const transferCount = transferVouchers.length;
@@ -507,15 +510,8 @@ export default function POSDaybook() {
   return (
     <div className="container mx-auto p-4 md:p-6 space-y-4 md:space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <PageHeader 
-          title="POS Daybook" 
-          subtitle={getSubtitle()}
-        />
-        <PeriodFilter
-          value={periodFilter}
-          onChange={setPeriodFilter}
-          data-testid="pos-daybook-period-filter"
-        />
+        <PageHeader title="POS Daybook" subtitle={getSubtitle()} />
+        <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="pos-daybook-period-filter" />
       </div>
 
       {/* Stats pill bar */}
@@ -524,8 +520,12 @@ export default function POSDaybook() {
           <Package className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Sales</p>
-            {isLoading ? <Skeleton className="h-5 w-10 mt-0.5" /> : (
-              <p className="text-lg font-semibold leading-none" data-testid="text-transaction-count">{salesTransactionCount}</p>
+            {isLoading ? (
+              <Skeleton className="h-5 w-10 mt-0.5" />
+            ) : (
+              <p className="text-lg font-semibold leading-none" data-testid="text-transaction-count">
+                {salesTransactionCount}
+              </p>
             )}
           </div>
         </div>
@@ -533,8 +533,12 @@ export default function POSDaybook() {
           <DollarSign className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Total Revenue</p>
-            {isLoading ? <Skeleton className="h-5 w-20 mt-0.5" /> : (
-              <p className="text-lg font-semibold leading-none font-mono" data-testid="text-total-sales">{formatCashAmount(totalSales)}</p>
+            {isLoading ? (
+              <Skeleton className="h-5 w-20 mt-0.5" />
+            ) : (
+              <p className="text-lg font-semibold leading-none font-mono" data-testid="text-total-sales">
+                {formatCashAmount(totalSales)}
+              </p>
             )}
           </div>
         </div>
@@ -542,7 +546,9 @@ export default function POSDaybook() {
           <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Avg per Sale</p>
-            {isLoading ? <Skeleton className="h-5 w-16 mt-0.5" /> : (
+            {isLoading ? (
+              <Skeleton className="h-5 w-16 mt-0.5" />
+            ) : (
               <p className="text-lg font-semibold leading-none font-mono" data-testid="text-avg-transaction">
                 {formatCashAmount(salesTransactionCount > 0 ? totalSales / salesTransactionCount : 0)}
               </p>
@@ -553,8 +559,12 @@ export default function POSDaybook() {
           <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
           <div>
             <p className="text-xs text-muted-foreground leading-none mb-0.5">Transfers</p>
-            {isLoading ? <Skeleton className="h-5 w-10 mt-0.5" /> : (
-              <p className="text-lg font-semibold leading-none" data-testid="text-transfer-count">{transferCount}</p>
+            {isLoading ? (
+              <Skeleton className="h-5 w-10 mt-0.5" />
+            ) : (
+              <p className="text-lg font-semibold leading-none" data-testid="text-transfer-count">
+                {transferCount}
+              </p>
             )}
           </div>
         </div>
@@ -579,7 +589,13 @@ export default function POSDaybook() {
               data-testid="button-toggle-show-hidden"
               className="gap-1"
               disabled={hiddenRowIds.size === 0}
-              title={hiddenRowIds.size === 0 ? "No hidden rows" : showHidden ? "Hide hidden rows" : `Show ${hiddenRowIds.size} hidden row${hiddenRowIds.size !== 1 ? "s" : ""}`}
+              title={
+                hiddenRowIds.size === 0
+                  ? "No hidden rows"
+                  : showHidden
+                    ? "Hide hidden rows"
+                    : `Show ${hiddenRowIds.size} hidden row${hiddenRowIds.size !== 1 ? "s" : ""}`
+              }
             >
               {showHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
               {showHidden ? "Showing hidden" : "Show hidden"}
@@ -589,7 +605,10 @@ export default function POSDaybook() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setHiddenRowIds(new Set()); setShowHidden(false); }}
+                onClick={() => {
+                  setHiddenRowIds(new Set());
+                  setShowHidden(false);
+                }}
                 className="gap-1 text-muted-foreground"
                 data-testid="button-clear-hidden-rows"
                 title="Clear all hidden rows"
@@ -670,7 +689,9 @@ export default function POSDaybook() {
                                       data-testid={`button-reprint-row-${voucher.id}`}
                                       title={isOwnVoucher ? "Reprint invoice" : "You can only reprint your own sales"}
                                     >
-                                      <Printer className={`h-4 w-4 ${reprintRowVoucherId === voucher.id ? "animate-pulse" : ""}`} />
+                                      <Printer
+                                        className={`h-4 w-4 ${reprintRowVoucherId === voucher.id ? "animate-pulse" : ""}`}
+                                      />
                                     </Button>
                                   )}
                                   <Button
@@ -679,7 +700,9 @@ export default function POSDaybook() {
                                     onClick={() => isOwnVoucher && setSelectedVoucher(voucher as VoucherWithItems)}
                                     disabled={!isOwnVoucher}
                                     data-testid={`button-view-${voucher.id}`}
-                                    title={isOwnVoucher ? "View details" : "You can only view details of your own sales"}
+                                    title={
+                                      isOwnVoucher ? "View details" : "You can only view details of your own sales"
+                                    }
                                   >
                                     <Eye className="h-4 w-4" />
                                   </Button>
@@ -692,14 +715,26 @@ export default function POSDaybook() {
                               title={isHidden ? "Unhide row" : "Hide row"}
                               onClick={() => {
                                 if (isHidden) {
-                                  setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(voucher.id); return next; });
+                                  setHiddenRowIds((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(voucher.id);
+                                    return next;
+                                  });
                                 } else {
-                                  setHiddenRowIds((prev) => { const next = new Set(prev); next.add(voucher.id); return next; });
+                                  setHiddenRowIds((prev) => {
+                                    const next = new Set(prev);
+                                    next.add(voucher.id);
+                                    return next;
+                                  });
                                 }
                               }}
                               data-testid={isHidden ? `button-unhide-${voucher.id}` : `button-hide-${voucher.id}`}
                             >
-                              {isHidden ? <Eye className="h-4 w-4 text-muted-foreground" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+                              {isHidden ? (
+                                <Eye className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>
@@ -715,34 +750,184 @@ export default function POSDaybook() {
 
       {/* Hidden row-level reprint template (outside dialog, always in DOM) */}
       <div className="hidden">
-        <div ref={reprintRowRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
-          <style dangerouslySetInnerHTML={{ __html: `@media print { body { font-family: Arial, Helvetica, sans-serif !important; } * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; } }` }} />
-          <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>POS INVOICE</div>
-          <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
+        <div
+          ref={reprintRowRef}
+          style={{
+            fontFamily: "Arial, Helvetica, sans-serif",
+            fontSize: "11pt",
+            padding: "12px",
+            backgroundColor: "white",
+            color: "black",
+            width: "100%",
+            fontWeight: "normal",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          <style
+            dangerouslySetInnerHTML={{
+              __html: `@media print { body { font-family: Arial, Helvetica, sans-serif !important; } * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; } }`,
+            }}
+          />
+          <div
+            style={{
+              textAlign: "center",
+              fontWeight: "900",
+              fontSize: "18pt",
+              letterSpacing: "2px",
+              marginBottom: "6px",
+            }}
+          >
+            POS INVOICE
+          </div>
+          <div
+            style={{
+              fontSize: "11pt",
+              fontWeight: "700",
+              display: "flex",
+              justifyContent: "space-between",
+              borderTop: "2px solid black",
+              borderBottom: "2px solid black",
+              padding: "5px 0",
+              marginBottom: "6px",
+            }}
+          >
             <span>Date: {reprintRowDetails?.voucherDate}</span>
-            <span>User: {currentUser?.fullName || currentUser?.name || currentUser?.username || currentUser?.email}</span>
+            <span>
+              User: {currentUser?.fullName || currentUser?.name || currentUser?.username || currentUser?.email}
+            </span>
           </div>
           {isMaliCompany && reprintRowDetails?.exchangeRate && (
-            <div style={{ fontSize: '11pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black', textAlign: 'center' }}>
-              <span style={{ fontWeight: '900' }}>Daily Rate:</span> $1 = {formatNumber(parseFloat(String(reprintRowDetails.exchangeRate)))} CFA
+            <div
+              style={{
+                fontSize: "11pt",
+                fontWeight: "700",
+                marginBottom: "6px",
+                padding: "4px",
+                border: "2px solid black",
+                textAlign: "center",
+              }}
+            >
+              <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
+              {formatNumber(parseFloat(String(reprintRowDetails.exchangeRate)))} CFA
             </div>
           )}
           {reprintRowDetails?.isCreditSale && (
-            <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black' }}>
-              <div style={{ fontWeight: '900' }}>CREDIT SALE</div>
+            <div
+              style={{
+                fontSize: "10pt",
+                fontWeight: "700",
+                marginBottom: "6px",
+                padding: "4px",
+                border: "2px solid black",
+              }}
+            >
+              <div style={{ fontWeight: "900" }}>CREDIT SALE</div>
               {reprintRowDetails.customerName && <div>Customer: {reprintRowDetails.customerName}</div>}
             </div>
           )}
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums', border: '1px solid #999' }}>
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "11pt",
+              marginBottom: "0",
+              fontVariantNumeric: "tabular-nums",
+              border: "1px solid #999",
+            }}
+          >
             <thead>
               <tr>
-                <th style={{ textAlign: 'left', padding: '4px 7px', width: '30%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Description</th>
-                <th style={{ textAlign: 'center', padding: '4px 7px', width: '6%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Qty</th>
-                <th style={{ textAlign: 'center', padding: '4px 7px', width: '9%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Rate</th>
-                <th style={{ textAlign: 'center', padding: '4px 7px', width: '10%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Amt</th>
-                <th style={{ textAlign: 'center', padding: '4px 7px', width: '10%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Config</th>
-                <th style={{ textAlign: 'center', padding: '4px 7px', width: '12%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>P/L Bale</th>
-                <th style={{ textAlign: 'center', padding: '4px 7px', width: '13%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Total P/L</th>
+                <th
+                  style={{
+                    textAlign: "left",
+                    padding: "4px 7px",
+                    width: "30%",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  Description
+                </th>
+                <th
+                  style={{
+                    textAlign: "center",
+                    padding: "4px 7px",
+                    width: "6%",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  Qty
+                </th>
+                <th
+                  style={{
+                    textAlign: "center",
+                    padding: "4px 7px",
+                    width: "9%",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  Rate
+                </th>
+                <th
+                  style={{
+                    textAlign: "center",
+                    padding: "4px 7px",
+                    width: "10%",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  Amt
+                </th>
+                <th
+                  style={{
+                    textAlign: "center",
+                    padding: "4px 7px",
+                    width: "10%",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  Config
+                </th>
+                <th
+                  style={{
+                    textAlign: "center",
+                    padding: "4px 7px",
+                    width: "12%",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  P/L Bale
+                </th>
+                <th
+                  style={{
+                    textAlign: "center",
+                    padding: "4px 7px",
+                    width: "13%",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  Total P/L
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -752,47 +937,227 @@ export default function POSDaybook() {
                 const configPrice = parseFloat(item.configuredPrice || "0");
                 const plPerBale = rate - configPrice;
                 const totalPL = plPerBale * qty;
-                const rowBg = idx % 2 === 0 ? '#ffffff' : '#f5f5f5';
+                const rowBg = idx % 2 === 0 ? "#ffffff" : "#f5f5f5";
                 return (
                   <tr key={idx} style={{ backgroundColor: rowBg }}>
-                    <td style={{ padding: '4px 7px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{item.stockItemName}</td>
-                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(qty)}</td>
-                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(rate, "$")}</td>
-                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(qty * rate, "$")}</td>
-                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(configPrice, "$")}</td>
-                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: plPerBale > 0 ? '#0a7e1f' : plPerBale < 0 ? '#c2272d' : undefined }}>{fmtPrint(plPerBale, "$")}</td>
-                    <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: totalPL > 0 ? '#0a7e1f' : totalPL < 0 ? '#c2272d' : undefined }}>{fmtPrint(totalPL, "$")}</td>
+                    <td
+                      style={{
+                        padding: "4px 7px",
+                        verticalAlign: "top",
+                        wordBreak: "break-word",
+                        fontWeight: "600",
+                        lineHeight: "1.3",
+                        fontSize: "9pt",
+                        border: "1px solid #c8c8c8",
+                      }}
+                    >
+                      {item.stockItemName}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "4px 7px",
+                        verticalAlign: "top",
+                        fontWeight: "600",
+                        fontSize: "9pt",
+                        border: "1px solid #c8c8c8",
+                      }}
+                    >
+                      {fmtPrint(qty)}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "4px 7px",
+                        verticalAlign: "top",
+                        fontWeight: "600",
+                        fontSize: "9pt",
+                        border: "1px solid #c8c8c8",
+                      }}
+                    >
+                      {fmtPrint(rate, "$")}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "4px 7px",
+                        verticalAlign: "top",
+                        fontWeight: "600",
+                        fontSize: "9pt",
+                        border: "1px solid #c8c8c8",
+                      }}
+                    >
+                      {fmtPrint(qty * rate, "$")}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "4px 7px",
+                        verticalAlign: "top",
+                        fontWeight: "600",
+                        fontSize: "9pt",
+                        border: "1px solid #c8c8c8",
+                      }}
+                    >
+                      {fmtPrint(configPrice, "$")}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "4px 7px",
+                        verticalAlign: "top",
+                        fontWeight: "600",
+                        fontSize: "9pt",
+                        border: "1px solid #c8c8c8",
+                        color: plPerBale > 0 ? "#0a7e1f" : plPerBale < 0 ? "#c2272d" : undefined,
+                      }}
+                    >
+                      {fmtPrint(plPerBale, "$")}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        padding: "4px 7px",
+                        verticalAlign: "top",
+                        fontWeight: "600",
+                        fontSize: "9pt",
+                        border: "1px solid #c8c8c8",
+                        color: totalPL > 0 ? "#0a7e1f" : totalPL < 0 ? "#c2272d" : undefined,
+                      }}
+                    >
+                      {fmtPrint(totalPL, "$")}
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
             <tfoot>
               <tr>
-                <td style={{ padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>TOTAL</td>
-                <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>{fmtPrint((reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0))}</td>
-                <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
-                <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>{fmtPrint((reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</td>
-                <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
-                <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
-                <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee', color: (() => { const t = (reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity || "0"), 0); return t > 0 ? '#0a7e1f' : t < 0 ? '#c2272d' : undefined; })() }}>
+                <td
+                  style={{
+                    padding: "4px 7px",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  TOTAL
+                </td>
+                <td
+                  style={{
+                    textAlign: "center",
+                    padding: "4px 7px",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  {fmtPrint(
+                    (reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0)
+                  )}
+                </td>
+                <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
+                <td
+                  style={{
+                    textAlign: "center",
+                    padding: "4px 7px",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                  }}
+                >
+                  {fmtPrint(
+                    (reprintRowDetails?.salesItems ?? []).reduce(
+                      (s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"),
+                      0
+                    ),
+                    "$"
+                  )}
+                </td>
+                <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
+                <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
+                <td
+                  style={{
+                    textAlign: "center",
+                    padding: "4px 7px",
+                    fontWeight: "900",
+                    fontSize: "9pt",
+                    border: "1px solid #999",
+                    backgroundColor: "#eeeeee",
+                    color: (() => {
+                      const t = (reprintRowDetails?.salesItems ?? []).reduce(
+                        (s, i) =>
+                          s +
+                          (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) *
+                            parseFloat(i.quantity || "0"),
+                        0
+                      );
+                      return t > 0 ? "#0a7e1f" : t < 0 ? "#c2272d" : undefined;
+                    })(),
+                  }}
+                >
                   {(() => {
-                    const t = (reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity || "0"), 0);
+                    const t = (reprintRowDetails?.salesItems ?? []).reduce(
+                      (s, i) =>
+                        s +
+                        (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) *
+                          parseFloat(i.quantity || "0"),
+                      0
+                    );
                     return fmtPrint(t, "$");
                   })()}
                 </td>
               </tr>
             </tfoot>
           </table>
-          <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '1.5px solid #333', display: 'flex', justifyContent: 'space-between' }}>
+          <div
+            style={{
+              fontSize: "14pt",
+              fontWeight: "900",
+              marginTop: "8px",
+              paddingTop: "8px",
+              borderTop: "1.5px solid #333",
+              display: "flex",
+              justifyContent: "space-between",
+            }}
+          >
             <span>TOTAL PAID:</span>
-            <span>{fmtPrint((reprintRowDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</span>
+            <span>
+              {fmtPrint(
+                (reprintRowDetails?.salesItems ?? []).reduce(
+                  (s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"),
+                  0
+                ),
+                "$"
+              )}
+            </span>
           </div>
           {reprintRowDetails?.description && (
-            <div style={{ fontSize: '9pt', fontWeight: '600', marginTop: '8px', padding: '4px', border: '2px solid black' }}>
-              <span style={{ fontWeight: '900' }}>Note:</span> {reprintRowDetails.description}
+            <div
+              style={{
+                fontSize: "9pt",
+                fontWeight: "600",
+                marginTop: "8px",
+                padding: "4px",
+                border: "2px solid black",
+              }}
+            >
+              <span style={{ fontWeight: "900" }}>Note:</span> {reprintRowDetails.description}
             </div>
           )}
-          <div style={{ textAlign: 'center', fontSize: '9pt', fontWeight: '700', marginTop: '10px', paddingTop: '5px', borderTop: '2px solid black' }}>
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: "9pt",
+              fontWeight: "700",
+              marginTop: "10px",
+              paddingTop: "5px",
+              borderTop: "2px solid black",
+            }}
+          >
             <div>Thank you for your business!</div>
           </div>
         </div>
@@ -806,7 +1171,10 @@ export default function POSDaybook() {
               Transaction Details - {selectedVoucher?.voucherNumber}
             </DialogTitle>
             <div className="flex flex-wrap items-center gap-2 sm:gap-4 pt-2 text-sm text-muted-foreground">
-              <span>{selectedVoucher && `${formatDisplayDate(new Date(selectedVoucher.createdAt))} at ${format(new Date(selectedVoucher.createdAt), "hh:mm a")}`}</span>
+              <span>
+                {selectedVoucher &&
+                  `${formatDisplayDate(new Date(selectedVoucher.createdAt))} at ${format(new Date(selectedVoucher.createdAt), "hh:mm a")}`}
+              </span>
               <span>•</span>
               <span>{selectedVoucher?.locationName || `Location ${selectedVoucher?.locationId}`}</span>
             </div>
@@ -837,11 +1205,7 @@ export default function POSDaybook() {
                     <p className="text-sm font-medium text-muted-foreground">Items Sold</p>
                     <Popover open={addItemOpen} onOpenChange={setAddItemOpen}>
                       <PopoverTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          data-testid="button-add-item"
-                        >
+                        <Button size="sm" variant="outline" data-testid="button-add-item">
                           <Plus className="h-4 w-4 mr-2" />
                           Add Item
                         </Button>
@@ -858,9 +1222,10 @@ export default function POSDaybook() {
                             <CommandEmpty>No items found.</CommandEmpty>
                             <CommandGroup>
                               {inventory
-                                .filter(item => 
-                                  (item.stockItemName || "").toLowerCase().includes(itemSearch.toLowerCase()) ||
-                                  (item.stockItemCode || "").toLowerCase().includes(itemSearch.toLowerCase())
+                                .filter(
+                                  (item) =>
+                                    (item.stockItemName || "").toLowerCase().includes(itemSearch.toLowerCase()) ||
+                                    (item.stockItemCode || "").toLowerCase().includes(itemSearch.toLowerCase())
                                 )
                                 .map((item) => (
                                   <CommandItem
@@ -886,7 +1251,13 @@ export default function POSDaybook() {
                       </PopoverContent>
                     </Popover>
                   </div>
-                  <p className="text-xs text-muted-foreground mb-2">Hover or use ↑↓ to select · {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌥S" : "Alt+S"} to view item</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Hover or use ↑↓ to select ·{" "}
+                    {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+                      ? "⌥S"
+                      : "Alt+S"}{" "}
+                    to view item
+                  </p>
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -903,7 +1274,7 @@ export default function POSDaybook() {
                       {editedItems.map((item, idx) => {
                         const profit = parseFloat(item.profit || "0");
                         const isPositiveProfit = profit >= 0;
-                        
+
                         return (
                           <TableRow
                             key={item.id || idx}
@@ -945,7 +1316,9 @@ export default function POSDaybook() {
                               {formatCashAmount(parseFloat(item.totalSales))}
                             </TableCell>
                             {canSeeProfitCost && (
-                              <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              <TableCell
+                                className={`text-right font-mono font-semibold ${isPositiveProfit ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                              >
                                 {formatCashAmount(profit)}
                               </TableCell>
                             )}
@@ -973,7 +1346,9 @@ export default function POSDaybook() {
                       <div className="text-sm">
                         <span className="text-muted-foreground">Total Cost: </span>
                         <span className="font-mono font-semibold">
-                          {formatCashAmount(editedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0))}
+                          {formatCashAmount(
+                            editedItems.reduce((sum, item) => sum + parseFloat(item.totalCost || "0"), 0)
+                          )}
                         </span>
                       </div>
                       <div className="text-sm">
@@ -1020,7 +1395,9 @@ export default function POSDaybook() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className={plFilter === "gain" ? "toggle-elevate toggle-elevated text-green-600" : "toggle-elevate"}
+                            className={
+                              plFilter === "gain" ? "toggle-elevate toggle-elevated text-green-600" : "toggle-elevate"
+                            }
                             onClick={() => setPlFilter("gain")}
                             data-testid="button-filter-gaining"
                           >
@@ -1030,7 +1407,9 @@ export default function POSDaybook() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className={plFilter === "loss" ? "toggle-elevate toggle-elevated text-red-600" : "toggle-elevate"}
+                            className={
+                              plFilter === "loss" ? "toggle-elevate toggle-elevated text-red-600" : "toggle-elevate"
+                            }
                             onClick={() => setPlFilter("loss")}
                             data-testid="button-filter-losing"
                           >
@@ -1040,7 +1419,12 @@ export default function POSDaybook() {
                           <div className="w-px h-5 bg-border mx-0.5" />
                         </>
                       )}
-                      <p className="text-xs text-muted-foreground">↑↓ · {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform) ? "⌥S" : "Alt+S"}</p>
+                      <p className="text-xs text-muted-foreground">
+                        ↑↓ ·{" "}
+                        {typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform)
+                          ? "⌥S"
+                          : "Alt+S"}
+                      </p>
                     </div>
                   </div>
                   {(() => {
@@ -1054,135 +1438,164 @@ export default function POSDaybook() {
                         })
                       : voucherDetails.salesItems;
                     return (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Item</TableHead>
-                        <TableHead className="text-right">Qty</TableHead>
-                        <TableHead className="text-right">Price</TableHead>
-                        {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
-                        <TableHead className="text-right">Total</TableHead>
-                        {canSeeProfitCost && <TableHead className="text-right">Profit</TableHead>}
-                        {canSeeProfitCost && <TableHead className="text-right">Hassan's Price</TableHead>}
-                        {canSeeProfitCost && <TableHead className="text-right">Hassan's Profit</TableHead>}
-                        {canSeeProfitCost && <TableHead className="text-right">Hassan's %</TableHead>}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {displayedItems.map((item: any, idx: number) => {
-                        const profit = parseFloat(item.profit || "0");
-                        const isPositiveProfit = profit >= 0;
-                        const hassansProfit = parseFloat(item.hassansProfit || "0");
-                        const isHassansProfitPositive = hassansProfit >= 0;
-                        
-                        return (
-                          <TableRow
-                            key={item.id || idx}
-                            data-dialog-row={idx}
-                            className={`cursor-pointer ${selectedDialogRow === idx ? "bg-accent" : ""}`}
-                            onMouseEnter={() => setSelectedDialogRow(idx)}
-                          >
-                            <TableCell className="font-medium">
-                              {item.stockItemName || `Item ${item.stockItemId}`}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatNumber(parseFloat(item.quantity), 0)}
-                            </TableCell>
-                            <TableCell className="text-right font-mono">
-                              {formatCashAmount(parseFloat(item.sellingPrice))}
-                            </TableCell>
-                            {canSeeProfitCost && (
-                              <TableCell className="text-right font-mono text-muted-foreground">
-                                {formatCashAmount(parseFloat(item.costPrice || "0"))}
-                              </TableCell>
-                            )}
-                            <TableCell className="text-right font-mono font-semibold">
-                              {formatCashAmount(parseFloat(item.totalSales))}
-                            </TableCell>
-                            {canSeeProfitCost && (
-                              <TableCell className={`text-right font-mono font-semibold ${isPositiveProfit ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {formatCashAmount(profit)}
-                              </TableCell>
-                            )}
-                            {canSeeProfitCost && (
-                              <TableCell className="text-right font-mono text-muted-foreground">
-                                {formatCashAmount(parseFloat(item.configuredPrice || "0"))}
-                              </TableCell>
-                            )}
-                            {canSeeProfitCost && (
-                              <TableCell className={`text-right font-mono font-semibold ${isHassansProfitPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {formatCashAmount(hassansProfit)}
-                              </TableCell>
-                            )}
-                            {canSeeProfitCost && (
-                              <TableCell className={`text-right font-mono ${isHassansProfitPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {item.hassansPercentage || "0"}%
-                              </TableCell>
-                            )}
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Item</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Price</TableHead>
+                            {canSeeProfitCost && <TableHead className="text-right">Cost</TableHead>}
+                            <TableHead className="text-right">Total</TableHead>
+                            {canSeeProfitCost && <TableHead className="text-right">Profit</TableHead>}
+                            {canSeeProfitCost && <TableHead className="text-right">Hassan's Price</TableHead>}
+                            {canSeeProfitCost && <TableHead className="text-right">Hassan's Profit</TableHead>}
+                            {canSeeProfitCost && <TableHead className="text-right">Hassan's %</TableHead>}
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {displayedItems.map((item: any, idx: number) => {
+                            const profit = parseFloat(item.profit || "0");
+                            const isPositiveProfit = profit >= 0;
+                            const hassansProfit = parseFloat(item.hassansProfit || "0");
+                            const isHassansProfitPositive = hassansProfit >= 0;
+
+                            return (
+                              <TableRow
+                                key={item.id || idx}
+                                data-dialog-row={idx}
+                                className={`cursor-pointer ${selectedDialogRow === idx ? "bg-accent" : ""}`}
+                                onMouseEnter={() => setSelectedDialogRow(idx)}
+                              >
+                                <TableCell className="font-medium">
+                                  {item.stockItemName || `Item ${item.stockItemId}`}
+                                </TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {formatNumber(parseFloat(item.quantity), 0)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono">
+                                  {formatCashAmount(parseFloat(item.sellingPrice))}
+                                </TableCell>
+                                {canSeeProfitCost && (
+                                  <TableCell className="text-right font-mono text-muted-foreground">
+                                    {formatCashAmount(parseFloat(item.costPrice || "0"))}
+                                  </TableCell>
+                                )}
+                                <TableCell className="text-right font-mono font-semibold">
+                                  {formatCashAmount(parseFloat(item.totalSales))}
+                                </TableCell>
+                                {canSeeProfitCost && (
+                                  <TableCell
+                                    className={`text-right font-mono font-semibold ${isPositiveProfit ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                                  >
+                                    {formatCashAmount(profit)}
+                                  </TableCell>
+                                )}
+                                {canSeeProfitCost && (
+                                  <TableCell className="text-right font-mono text-muted-foreground">
+                                    {formatCashAmount(parseFloat(item.configuredPrice || "0"))}
+                                  </TableCell>
+                                )}
+                                {canSeeProfitCost && (
+                                  <TableCell
+                                    className={`text-right font-mono font-semibold ${isHassansProfitPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                                  >
+                                    {formatCashAmount(hassansProfit)}
+                                  </TableCell>
+                                )}
+                                {canSeeProfitCost && (
+                                  <TableCell
+                                    className={`text-right font-mono ${isHassansProfitPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                                  >
+                                    {item.hassansPercentage || "0"}%
+                                  </TableCell>
+                                )}
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
                     );
                   })()}
                 </div>
 
                 {(() => {
-                  const totalProfit = voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.profit || "0"), 0);
-                  const totalHassansProfit = voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansProfit || "0"), 0);
+                  const totalProfit = voucherDetails.salesItems.reduce(
+                    (sum: number, item: any) => sum + parseFloat(item.profit || "0"),
+                    0
+                  );
+                  const totalHassansProfit = voucherDetails.salesItems.reduce(
+                    (sum: number, item: any) => sum + parseFloat(item.hassansProfit || "0"),
+                    0
+                  );
                   return (
-                <div className="border-t pt-4 flex flex-wrap gap-4 justify-between">
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">Total Sales: </span>
-                    <span className="font-mono font-semibold">
-                      {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalSales), 0))}
-                    </span>
-                  </div>
-                  {canSeeProfitCost && (
-                    <>
+                    <div className="border-t pt-4 flex flex-wrap gap-4 justify-between">
                       <div className="text-sm">
-                        <span className="text-muted-foreground">Total Cost: </span>
+                        <span className="text-muted-foreground">Total Sales: </span>
                         <span className="font-mono font-semibold">
-                          {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.totalCost || "0"), 0))}
+                          {formatCashAmount(
+                            voucherDetails.salesItems.reduce(
+                              (sum: number, item: any) => sum + parseFloat(item.totalSales),
+                              0
+                            )
+                          )}
                         </span>
                       </div>
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Total Profit: </span>
-                        <span className={`font-mono font-semibold ${totalProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {formatCashAmount(totalProfit)}
-                        </span>
-                      </div>
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Hassan's Total: </span>
-                        <span className="font-mono font-semibold">
-                          {formatCashAmount(voucherDetails.salesItems.reduce((sum: number, item: any) => sum + parseFloat(item.hassansTotal || "0"), 0))}
-                        </span>
-                      </div>
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Hassan's Profit: </span>
-                        <span className={`font-mono font-semibold ${totalHassansProfit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                          {formatCashAmount(totalHassansProfit)}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                </div>
+                      {canSeeProfitCost && (
+                        <>
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Total Cost: </span>
+                            <span className="font-mono font-semibold">
+                              {formatCashAmount(
+                                voucherDetails.salesItems.reduce(
+                                  (sum: number, item: any) => sum + parseFloat(item.totalCost || "0"),
+                                  0
+                                )
+                              )}
+                            </span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Total Profit: </span>
+                            <span
+                              className={`font-mono font-semibold ${totalProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                            >
+                              {formatCashAmount(totalProfit)}
+                            </span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Hassan's Total: </span>
+                            <span className="font-mono font-semibold">
+                              {formatCashAmount(
+                                voucherDetails.salesItems.reduce(
+                                  (sum: number, item: any) => sum + parseFloat(item.hassansTotal || "0"),
+                                  0
+                                )
+                              )}
+                            </span>
+                          </div>
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Hassan's Profit: </span>
+                            <span
+                              className={`font-mono font-semibold ${totalHassansProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                            >
+                              {formatCashAmount(totalHassansProfit)}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   );
                 })()}
               </div>
             ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                No items found for this transaction
-              </div>
+              <div className="text-center py-8 text-muted-foreground">No items found for this transaction</div>
             )}
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
             {isEditMode ? (
               <>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleCancelEdit}
                   disabled={saveMutation.isPending}
                   data-testid="button-cancel-edit"
@@ -1190,11 +1603,7 @@ export default function POSDaybook() {
                   <X className="h-4 w-4 mr-2" />
                   Cancel
                 </Button>
-                <Button 
-                  onClick={handleSave}
-                  disabled={saveMutation.isPending}
-                  data-testid="button-save"
-                >
+                <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save">
                   <Save className="h-4 w-4 mr-2" />
                   {saveMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
@@ -1203,41 +1612,190 @@ export default function POSDaybook() {
               <>
                 {/* Hidden print template for reprint — matches POS invoice exactly */}
                 <div className="hidden">
-                  <div ref={reprintRef} style={{ fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '11pt', padding: '12px', backgroundColor: 'white', color: 'black', width: '100%', fontWeight: 'normal', fontVariantNumeric: 'tabular-nums' }}>
-                    <style dangerouslySetInnerHTML={{ __html: `@media print { body { font-family: Arial, Helvetica, sans-serif !important; } * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; } }` }} />
+                  <div
+                    ref={reprintRef}
+                    style={{
+                      fontFamily: "Arial, Helvetica, sans-serif",
+                      fontSize: "11pt",
+                      padding: "12px",
+                      backgroundColor: "white",
+                      color: "black",
+                      width: "100%",
+                      fontWeight: "normal",
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    <style
+                      dangerouslySetInnerHTML={{
+                        __html: `@media print { body { font-family: Arial, Helvetica, sans-serif !important; } * { font-family: Arial, Helvetica, sans-serif !important; font-variant-numeric: tabular-nums !important; } }`,
+                      }}
+                    />
                     {/* Title */}
-                    <div style={{ textAlign: 'center', fontWeight: '900', fontSize: '18pt', letterSpacing: '2px', marginBottom: '6px' }}>POS INVOICE</div>
+                    <div
+                      style={{
+                        textAlign: "center",
+                        fontWeight: "900",
+                        fontSize: "18pt",
+                        letterSpacing: "2px",
+                        marginBottom: "6px",
+                      }}
+                    >
+                      POS INVOICE
+                    </div>
                     {/* Date + User row */}
-                    <div style={{ fontSize: '11pt', fontWeight: '700', display: 'flex', justifyContent: 'space-between', borderTop: '2px solid black', borderBottom: '2px solid black', padding: '5px 0', marginBottom: '6px' }}>
+                    <div
+                      style={{
+                        fontSize: "11pt",
+                        fontWeight: "700",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        borderTop: "2px solid black",
+                        borderBottom: "2px solid black",
+                        padding: "5px 0",
+                        marginBottom: "6px",
+                      }}
+                    >
                       <span>Date: {voucherDetails?.voucherDate}</span>
-                      <span>User: {currentUser?.fullName || currentUser?.name || currentUser?.username || currentUser?.email}</span>
+                      <span>
+                        User:{" "}
+                        {currentUser?.fullName || currentUser?.name || currentUser?.username || currentUser?.email}
+                      </span>
                     </div>
                     {/* Daily Rate — Mali company only */}
                     {isMaliCompany && voucherDetails?.exchangeRate && (
-                      <div style={{ fontSize: '11pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black', textAlign: 'center' }}>
-                        <span style={{ fontWeight: '900' }}>Daily Rate:</span> $1 = {formatNumber(parseFloat(String(voucherDetails.exchangeRate)))} CFA
+                      <div
+                        style={{
+                          fontSize: "11pt",
+                          fontWeight: "700",
+                          marginBottom: "6px",
+                          padding: "4px",
+                          border: "2px solid black",
+                          textAlign: "center",
+                        }}
+                      >
+                        <span style={{ fontWeight: "900" }}>Daily Rate:</span> $1 ={" "}
+                        {formatNumber(parseFloat(String(voucherDetails.exchangeRate)))} CFA
                       </div>
                     )}
                     {/* Credit Sale */}
                     {voucherDetails?.isCreditSale && (
-                      <div style={{ fontSize: '10pt', fontWeight: '700', marginBottom: '6px', padding: '4px', border: '2px solid black' }}>
-                        <div style={{ fontWeight: '900' }}>CREDIT SALE</div>
-                        {voucherDetails.customerName && (
-                          <div>Customer: {voucherDetails.customerName}</div>
-                        )}
+                      <div
+                        style={{
+                          fontSize: "10pt",
+                          fontWeight: "700",
+                          marginBottom: "6px",
+                          padding: "4px",
+                          border: "2px solid black",
+                        }}
+                      >
+                        <div style={{ fontWeight: "900" }}>CREDIT SALE</div>
+                        {voucherDetails.customerName && <div>Customer: {voucherDetails.customerName}</div>}
                       </div>
                     )}
                     {/* Items table */}
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11pt', marginBottom: '0', fontVariantNumeric: 'tabular-nums', border: '1px solid #999' }}>
+                    <table
+                      style={{
+                        width: "100%",
+                        borderCollapse: "collapse",
+                        fontSize: "11pt",
+                        marginBottom: "0",
+                        fontVariantNumeric: "tabular-nums",
+                        border: "1px solid #999",
+                      }}
+                    >
                       <thead className="sticky top-0 z-30 bg-muted/50">
                         <tr>
-                          <th style={{ textAlign: 'left', padding: '4px 7px', width: '30%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Description</th>
-                          <th style={{ textAlign: 'center', padding: '4px 7px', width: '6%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Qty</th>
-                          <th style={{ textAlign: 'center', padding: '4px 7px', width: '9%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Rate</th>
-                          <th style={{ textAlign: 'center', padding: '4px 7px', width: '10%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Amt</th>
-                          <th style={{ textAlign: 'center', padding: '4px 7px', width: '10%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Config</th>
-                          <th style={{ textAlign: 'center', padding: '4px 7px', width: '12%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>P/L Bale</th>
-                          <th style={{ textAlign: 'center', padding: '4px 7px', width: '13%', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>Total P/L</th>
+                          <th
+                            style={{
+                              textAlign: "left",
+                              padding: "4px 7px",
+                              width: "30%",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            Description
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "center",
+                              padding: "4px 7px",
+                              width: "6%",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            Qty
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "center",
+                              padding: "4px 7px",
+                              width: "9%",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            Rate
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "center",
+                              padding: "4px 7px",
+                              width: "10%",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            Amt
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "center",
+                              padding: "4px 7px",
+                              width: "10%",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            Config
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "center",
+                              padding: "4px 7px",
+                              width: "12%",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            P/L Bale
+                          </th>
+                          <th
+                            style={{
+                              textAlign: "center",
+                              padding: "4px 7px",
+                              width: "13%",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            Total P/L
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1247,20 +1805,96 @@ export default function POSDaybook() {
                           const configPrice = parseFloat(item.configuredPrice || "0");
                           const plPerBale = rate - configPrice;
                           const totalPL = plPerBale * qty;
-                          const plBaleColor = plPerBale > 0 ? '#0a7e1f' : plPerBale < 0 ? '#c2272d' : undefined;
-                          const totalPLColor = totalPL > 0 ? '#0a7e1f' : totalPL < 0 ? '#c2272d' : undefined;
-                          const rowBg = idx % 2 === 0 ? '#ffffff' : '#f5f5f5';
+                          const plBaleColor = plPerBale > 0 ? "#0a7e1f" : plPerBale < 0 ? "#c2272d" : undefined;
+                          const totalPLColor = totalPL > 0 ? "#0a7e1f" : totalPL < 0 ? "#c2272d" : undefined;
+                          const rowBg = idx % 2 === 0 ? "#ffffff" : "#f5f5f5";
                           return (
                             <tr key={idx} style={{ backgroundColor: rowBg }}>
-                              <td style={{ padding: '4px 7px', verticalAlign: 'top', wordBreak: 'break-word', fontWeight: '600', lineHeight: '1.3', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{item.stockItemName}</td>
-                              <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(qty)}</td>
-                              <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(rate, "$")}</td>
-                              <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(qty * rate, "$")}</td>
-                              <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8' }}>{fmtPrint(configPrice, "$")}</td>
-                              <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: plBaleColor }}>
+                              <td
+                                style={{
+                                  padding: "4px 7px",
+                                  verticalAlign: "top",
+                                  wordBreak: "break-word",
+                                  fontWeight: "600",
+                                  lineHeight: "1.3",
+                                  fontSize: "9pt",
+                                  border: "1px solid #c8c8c8",
+                                }}
+                              >
+                                {item.stockItemName}
+                              </td>
+                              <td
+                                style={{
+                                  textAlign: "center",
+                                  padding: "4px 7px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  fontSize: "9pt",
+                                  border: "1px solid #c8c8c8",
+                                }}
+                              >
+                                {fmtPrint(qty)}
+                              </td>
+                              <td
+                                style={{
+                                  textAlign: "center",
+                                  padding: "4px 7px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  fontSize: "9pt",
+                                  border: "1px solid #c8c8c8",
+                                }}
+                              >
+                                {fmtPrint(rate, "$")}
+                              </td>
+                              <td
+                                style={{
+                                  textAlign: "center",
+                                  padding: "4px 7px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  fontSize: "9pt",
+                                  border: "1px solid #c8c8c8",
+                                }}
+                              >
+                                {fmtPrint(qty * rate, "$")}
+                              </td>
+                              <td
+                                style={{
+                                  textAlign: "center",
+                                  padding: "4px 7px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  fontSize: "9pt",
+                                  border: "1px solid #c8c8c8",
+                                }}
+                              >
+                                {fmtPrint(configPrice, "$")}
+                              </td>
+                              <td
+                                style={{
+                                  textAlign: "center",
+                                  padding: "4px 7px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  fontSize: "9pt",
+                                  border: "1px solid #c8c8c8",
+                                  color: plBaleColor,
+                                }}
+                              >
                                 {fmtPrint(plPerBale, "$")}
                               </td>
-                              <td style={{ textAlign: 'center', padding: '4px 7px', verticalAlign: 'top', fontWeight: '600', fontSize: '9pt', border: '1px solid #c8c8c8', color: totalPLColor }}>
+                              <td
+                                style={{
+                                  textAlign: "center",
+                                  padding: "4px 7px",
+                                  verticalAlign: "top",
+                                  fontWeight: "600",
+                                  fontSize: "9pt",
+                                  border: "1px solid #c8c8c8",
+                                  color: totalPLColor,
+                                }}
+                              >
                                 {fmtPrint(totalPL, "$")}
                               </td>
                             </tr>
@@ -1269,15 +1903,80 @@ export default function POSDaybook() {
                       </tbody>
                       <tfoot>
                         <tr>
-                          <td style={{ padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>TOTAL</td>
-                          <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0))}</td>
-                          <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
-                          <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee' }}>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</td>
-                          <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
-                          <td style={{ padding: '4px 7px', border: '1px solid #999', backgroundColor: '#eeeeee' }}></td>
-                          <td style={{ textAlign: 'center', padding: '4px 7px', fontWeight: '900', fontSize: '9pt', border: '1px solid #999', backgroundColor: '#eeeeee', color: (() => { const t = (voucherDetails?.salesItems ?? []).reduce((s, i) => s + (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity || "0"), 0); return t > 0 ? '#0a7e1f' : t < 0 ? '#c2272d' : undefined; })() }}>
+                          <td
+                            style={{
+                              padding: "4px 7px",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            TOTAL
+                          </td>
+                          <td
+                            style={{
+                              textAlign: "center",
+                              padding: "4px 7px",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            {fmtPrint(
+                              (voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0"), 0)
+                            )}
+                          </td>
+                          <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
+                          <td
+                            style={{
+                              textAlign: "center",
+                              padding: "4px 7px",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                            }}
+                          >
+                            {fmtPrint(
+                              (voucherDetails?.salesItems ?? []).reduce(
+                                (s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"),
+                                0
+                              ),
+                              "$"
+                            )}
+                          </td>
+                          <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
+                          <td style={{ padding: "4px 7px", border: "1px solid #999", backgroundColor: "#eeeeee" }}></td>
+                          <td
+                            style={{
+                              textAlign: "center",
+                              padding: "4px 7px",
+                              fontWeight: "900",
+                              fontSize: "9pt",
+                              border: "1px solid #999",
+                              backgroundColor: "#eeeeee",
+                              color: (() => {
+                                const t = (voucherDetails?.salesItems ?? []).reduce(
+                                  (s, i) =>
+                                    s +
+                                    (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) *
+                                      parseFloat(i.quantity || "0"),
+                                  0
+                                );
+                                return t > 0 ? "#0a7e1f" : t < 0 ? "#c2272d" : undefined;
+                              })(),
+                            }}
+                          >
                             {(() => {
-                              const t = (voucherDetails?.salesItems ?? []).reduce((s, i) => s + (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) * parseFloat(i.quantity || "0"), 0);
+                              const t = (voucherDetails?.salesItems ?? []).reduce(
+                                (s, i) =>
+                                  s +
+                                  (parseFloat(i.sellingPrice || "0") - parseFloat(i.configuredPrice || "0")) *
+                                    parseFloat(i.quantity || "0"),
+                                0
+                              );
                               return fmtPrint(t, "$");
                             })()}
                           </td>
@@ -1285,18 +1984,53 @@ export default function POSDaybook() {
                       </tfoot>
                     </table>
                     {/* Total Paid */}
-                    <div style={{ fontSize: '14pt', fontWeight: '900', marginTop: '8px', paddingTop: '8px', borderTop: '1.5px solid #333', display: 'flex', justifyContent: 'space-between' }}>
+                    <div
+                      style={{
+                        fontSize: "14pt",
+                        fontWeight: "900",
+                        marginTop: "8px",
+                        paddingTop: "8px",
+                        borderTop: "1.5px solid #333",
+                        display: "flex",
+                        justifyContent: "space-between",
+                      }}
+                    >
                       <span>TOTAL PAID:</span>
-                      <span>{fmtPrint((voucherDetails?.salesItems ?? []).reduce((s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"), 0), "$")}</span>
+                      <span>
+                        {fmtPrint(
+                          (voucherDetails?.salesItems ?? []).reduce(
+                            (s, i) => s + parseFloat(i.quantity || "0") * parseFloat(i.sellingPrice || "0"),
+                            0
+                          ),
+                          "$"
+                        )}
+                      </span>
                     </div>
                     {/* Notes */}
                     {voucherDetails?.description && (
-                      <div style={{ fontSize: '9pt', fontWeight: '600', marginTop: '8px', padding: '4px', border: '2px solid black' }}>
-                        <span style={{ fontWeight: '900' }}>Note:</span> {voucherDetails.description}
+                      <div
+                        style={{
+                          fontSize: "9pt",
+                          fontWeight: "600",
+                          marginTop: "8px",
+                          padding: "4px",
+                          border: "2px solid black",
+                        }}
+                      >
+                        <span style={{ fontWeight: "900" }}>Note:</span> {voucherDetails.description}
                       </div>
                     )}
                     {/* Footer */}
-                    <div style={{ textAlign: 'center', fontSize: '9pt', fontWeight: '700', marginTop: '10px', paddingTop: '5px', borderTop: '2px solid black' }}>
+                    <div
+                      style={{
+                        textAlign: "center",
+                        fontSize: "9pt",
+                        fontWeight: "700",
+                        marginTop: "10px",
+                        paddingTop: "5px",
+                        borderTop: "2px solid black",
+                      }}
+                    >
                       <div>Thank you for your business!</div>
                     </div>
                   </div>

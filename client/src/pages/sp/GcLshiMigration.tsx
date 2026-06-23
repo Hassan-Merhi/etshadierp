@@ -9,20 +9,33 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Collapsible, CollapsibleContent, CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Building2, ChevronDown, ChevronRight, CheckCircle2, XCircle,
-  AlertTriangle, RefreshCw, Play, RotateCcw, Plus, DollarSign,
-  Package, FileText, Layers, Lock,
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  RefreshCw,
+  Play,
+  RotateCcw,
+  Plus,
+  DollarSign,
+  Package,
+  FileText,
+  Layers,
+  Lock,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -39,7 +52,14 @@ interface GcPreview {
   sourceCompany: { id: number; code: string; name: string };
   targetCompany: { id: number; code: string; name: string };
   stockSummary: { itemCount: number; totalQty: number; totalValueUsd: number; alreadyMapped: number };
-  stockItems: Array<{ code: string; name: string; quantity: number; averageCostUsd: number; totalValueUsd: number; aliasExists: boolean }>;
+  stockItems: Array<{
+    code: string;
+    name: string;
+    quantity: number;
+    averageCostUsd: number;
+    totalValueUsd: number;
+    aliasExists: boolean;
+  }>;
   voucherSummary: { sourceCount: number; totalAmount: number; alreadyMigrated: number };
   spAccountsStatus: Array<{ subType: string; name: string; exists: boolean }>;
   gcProfitAccountsStatus: Array<{ subType: string; name: string; exists: boolean }>;
@@ -71,10 +91,10 @@ interface MigProgress {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; label: string }> = {
-    completed:    { variant: "default",     label: "Completed"    },
-    running:      { variant: "secondary",   label: "Running"      },
-    failed:       { variant: "destructive", label: "Failed"       },
-    rolled_back:  { variant: "outline",     label: "Rolled Back"  },
+    completed: { variant: "default", label: "Completed" },
+    running: { variant: "secondary", label: "Running" },
+    failed: { variant: "destructive", label: "Failed" },
+    rolled_back: { variant: "outline", label: "Rolled Back" },
   };
   const cfg = map[status] ?? { variant: "secondary", label: status };
   return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
@@ -129,16 +149,24 @@ export default function GcLshiMigration() {
     queryKey: ["/api/companies"],
   });
 
-  const erpCompanies  = (companies ?? []).filter(c => (c.company_type ?? c.companyType) === "erp");
-  const spCompanies   = (companies ?? []).filter(c => (c.company_type ?? c.companyType) === "supplier_partner");
+  const erpCompanies = (companies ?? []).filter((c) => (c.company_type ?? c.companyType) === "erp");
+  const spCompanies = (companies ?? []).filter((c) => (c.company_type ?? c.companyType) === "supplier_partner");
 
-  const { data: preview, isLoading: previewLoading, refetch: refetchPreview, error: previewError } = useQuery<GcPreview>({
+  const {
+    data: preview,
+    isLoading: previewLoading,
+    refetch: refetchPreview,
+    error: previewError,
+  } = useQuery<GcPreview>({
     queryKey: ["/api/sp/migration/gc-preview", sourceCompanyId, targetCompanyId],
     queryFn: async () => {
       const r = await fetch(
         `/api/sp/migration/gc-preview?sourceCompanyId=${sourceCompanyId}&targetCompanyId=${targetCompanyId}`
       );
-      if (!r.ok) { const e = await r.json(); throw new Error(e.message); }
+      if (!r.ok) {
+        const e = await r.json();
+        throw new Error(e.message);
+      }
       return r.json();
     },
     enabled: !!(sourceCompanyId && targetCompanyId),
@@ -149,11 +177,16 @@ export default function GcLshiMigration() {
     queryKey: ["/api/sp/migration/runs"],
   });
 
-  const { data: cashAccountsData } = useQuery<{ accounts: Array<{ id: number; code: string; name: string; account_type: string }> }>({
+  const { data: cashAccountsData } = useQuery<{
+    accounts: Array<{ id: number; code: string; name: string; account_type: string }>;
+  }>({
     queryKey: ["/api/sp/migration/cash-accounts", targetCompanyId],
     queryFn: async () => {
       const r = await fetch(`/api/sp/migration/cash-accounts?targetCompanyId=${targetCompanyId}`);
-      if (!r.ok) { const e = await r.json(); throw new Error(e.message); }
+      if (!r.ok) {
+        const e = await r.json();
+        throw new Error(e.message);
+      }
       return r.json();
     },
     enabled: !!targetCompanyId,
@@ -166,7 +199,10 @@ export default function GcLshiMigration() {
       apiRequest("POST", "/api/sp/migration/create-sp-company", body),
     onSuccess: async (data: any) => {
       const result = await data.json();
-      toast({ title: "Company created", description: `${result.company.name} (${result.company.code}) created successfully.` });
+      toast({
+        title: "Company created",
+        description: `${result.company.name} (${result.company.code}) created successfully.`,
+      });
       setShowCreateDialog(false);
       qc.invalidateQueries({ queryKey: ["/api/companies"] });
       setTargetCompanyId(result.company.id);
@@ -242,10 +278,14 @@ export default function GcLshiMigration() {
         buffer = messages.pop() ?? "";
 
         for (const msg of messages) {
-          const dataLine = msg.split("\n").find(l => l.startsWith("data: "));
+          const dataLine = msg.split("\n").find((l) => l.startsWith("data: "));
           if (!dataLine) continue;
           let event: any;
-          try { event = JSON.parse(dataLine.slice(6)); } catch { continue; }
+          try {
+            event = JSON.parse(dataLine.slice(6));
+          } catch {
+            continue;
+          }
 
           if (event.type === "progress") {
             setMigProgress({ pct: event.pct, step: event.step, detail: event.detail });
@@ -277,11 +317,13 @@ export default function GcLshiMigration() {
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
-  const sourceComp = erpCompanies.find(c => c.id === sourceCompanyId);
-  const targetComp = spCompanies.find(c => c.id === targetCompanyId);
+  const sourceComp = erpCompanies.find((c) => c.id === sourceCompanyId);
+  const targetComp = spCompanies.find((c) => c.id === targetCompanyId);
   const allRuns = runsData?.runs ?? [];
 
-  function fmt(n: number) { return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function fmt(n: number) {
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   // ── Role gate ────────────────────────────────────────────────────────────
 
@@ -314,7 +356,6 @@ export default function GcLshiMigration() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -346,17 +387,17 @@ export default function GcLshiMigration() {
               <select
                 className="w-full border rounded-md h-9 px-3 text-sm bg-background"
                 value={sourceCompanyId ?? ""}
-                onChange={e => setSourceCompanyId(e.target.value ? Number(e.target.value) : null)}
+                onChange={(e) => setSourceCompanyId(e.target.value ? Number(e.target.value) : null)}
                 data-testid="select-source-company"
               >
                 <option value="">— select ERP company —</option>
-                {erpCompanies.map(c => (
-                  <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                {erpCompanies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({c.code})
+                  </option>
                 ))}
               </select>
-              {sourceComp && (
-                <p className="text-xs text-muted-foreground">ID: {sourceComp.id} · Type: ERP</p>
-              )}
+              {sourceComp && <p className="text-xs text-muted-foreground">ID: {sourceComp.id} · Type: ERP</p>}
             </div>
 
             {/* Target */}
@@ -366,12 +407,14 @@ export default function GcLshiMigration() {
                 <select
                   className="flex-1 border rounded-md h-9 px-3 text-sm bg-background"
                   value={targetCompanyId ?? ""}
-                  onChange={e => setTargetCompanyId(e.target.value ? Number(e.target.value) : null)}
+                  onChange={(e) => setTargetCompanyId(e.target.value ? Number(e.target.value) : null)}
                   data-testid="select-target-company"
                 >
                   <option value="">— select SP company —</option>
-                  {spCompanies.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.code})</option>
+                  {spCompanies.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.code})
+                    </option>
                   ))}
                 </select>
                 <Button
@@ -393,7 +436,10 @@ export default function GcLshiMigration() {
           {sourceCompanyId && targetCompanyId && (
             <Button
               variant="outline"
-              onClick={() => { setPreviewOpen(true); refetchPreview(); }}
+              onClick={() => {
+                setPreviewOpen(true);
+                refetchPreview();
+              }}
               data-testid="button-load-preview"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -404,7 +450,7 @@ export default function GcLshiMigration() {
       </Card>
 
       {/* Step 2 — Preview */}
-      {previewOpen && (sourceCompanyId && targetCompanyId) && (
+      {previewOpen && sourceCompanyId && targetCompanyId && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -433,7 +479,10 @@ export default function GcLshiMigration() {
                 {preview.warnings.length > 0 && (
                   <div className="space-y-1">
                     {preview.warnings.map((w, i) => (
-                      <div key={i} className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md px-3 py-2">
+                      <div
+                        key={i}
+                        className="flex items-start gap-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-md px-3 py-2"
+                      >
                         <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
                         {w}
                       </div>
@@ -456,7 +505,9 @@ export default function GcLshiMigration() {
                   <div className="rounded-md border p-3 space-y-0.5">
                     <p className="text-xs text-muted-foreground">Sale Vouchers</p>
                     <p className="text-lg font-semibold">{preview.voucherSummary.sourceCount}</p>
-                    <p className="text-xs text-muted-foreground">{preview.voucherSummary.alreadyMigrated} already migrated</p>
+                    <p className="text-xs text-muted-foreground">
+                      {preview.voucherSummary.alreadyMigrated} already migrated
+                    </p>
                   </div>
                   <div className="rounded-md border p-3 space-y-0.5">
                     <p className="text-xs text-muted-foreground">Voucher Total</p>
@@ -469,22 +520,26 @@ export default function GcLshiMigration() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium">SP Accounts (10 standard)</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {preview.spAccountsStatus.map(a => (
+                    {preview.spAccountsStatus.map((a) => (
                       <Badge key={a.subType} variant={a.exists ? "secondary" : "outline"} className="gap-1">
-                        {a.exists
-                          ? <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-                          : <Plus className="h-3 w-3" />}
+                        {a.exists ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <Plus className="h-3 w-3" />
+                        )}
                         {a.name}
                       </Badge>
                     ))}
                   </div>
                   <p className="text-sm font-medium mt-2">GC Profit Accounts (2 new)</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {preview.gcProfitAccountsStatus.map(a => (
+                    {preview.gcProfitAccountsStatus.map((a) => (
                       <Badge key={a.subType} variant={a.exists ? "secondary" : "outline"} className="gap-1">
-                        {a.exists
-                          ? <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-                          : <Plus className="h-3 w-3" />}
+                        {a.exists ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <Plus className="h-3 w-3" />
+                        )}
                         {a.name}
                       </Badge>
                     ))}
@@ -494,7 +549,12 @@ export default function GcLshiMigration() {
                 {/* Stock item table (collapsible) */}
                 <Collapsible open={stockTableOpen} onOpenChange={setStockTableOpen}>
                   <CollapsibleTrigger asChild>
-                    <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" data-testid="button-toggle-stock-table">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1 text-muted-foreground"
+                      data-testid="button-toggle-stock-table"
+                    >
                       {stockTableOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                       <Package className="h-4 w-4" />
                       Show stock items ({preview.stockItems.length})
@@ -514,7 +574,7 @@ export default function GcLshiMigration() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {preview.stockItems.map(item => (
+                          {preview.stockItems.map((item) => (
                             <TableRow key={item.code}>
                               <TableCell className="font-mono text-xs">{item.code}</TableCell>
                               <TableCell className="text-sm">{item.name}</TableCell>
@@ -522,9 +582,11 @@ export default function GcLshiMigration() {
                               <TableCell className="text-right text-sm">${fmt(item.averageCostUsd)}</TableCell>
                               <TableCell className="text-right text-sm">${fmt(item.totalValueUsd)}</TableCell>
                               <TableCell className="text-center">
-                                {item.aliasExists
-                                  ? <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mx-auto" />
-                                  : <Plus className="h-4 w-4 text-muted-foreground mx-auto" />}
+                                {item.aliasExists ? (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400 mx-auto" />
+                                ) : (
+                                  <Plus className="h-4 w-4 text-muted-foreground mx-auto" />
+                                )}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -553,14 +615,18 @@ export default function GcLshiMigration() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button
-              onClick={() => setShowMigrateDialog(true)}
-              disabled={migrating}
-              data-testid="button-run-migration"
-            >
-              {migrating
-                ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Migrating…</>
-                : <><Play className="h-4 w-4 mr-2" />Run GC Migration</>}
+            <Button onClick={() => setShowMigrateDialog(true)} disabled={migrating} data-testid="button-run-migration">
+              {migrating ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Migrating…
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4 mr-2" />
+                  Run GC Migration
+                </>
+              )}
             </Button>
 
             {/* Live progress bar */}
@@ -571,9 +637,7 @@ export default function GcLshiMigration() {
                   <span>{migProgress.pct}%</span>
                 </div>
                 <Progress value={migProgress.pct} className="h-2" />
-                {migProgress.detail && (
-                  <p className="text-xs text-muted-foreground">{migProgress.detail}</p>
-                )}
+                {migProgress.detail && <p className="text-xs text-muted-foreground">{migProgress.detail}</p>}
               </div>
             )}
           </CardContent>
@@ -588,9 +652,7 @@ export default function GcLshiMigration() {
               <DollarSign className="h-4 w-4" />
               Step 4 — Opening Cash Balance
             </CardTitle>
-            <CardDescription>
-              Creates a Journal voucher: Dr Cash → Cr Opening Balance Clearing.
-            </CardDescription>
+            <CardDescription>Creates a Journal voucher: Dr Cash → Cr Opening Balance Clearing.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
@@ -598,18 +660,21 @@ export default function GcLshiMigration() {
                 <Label>Cash / Bank Account</Label>
                 {(cashAccountsData?.accounts ?? []).length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    No Cash or Bank accounts found in target company. Run the migration first to create SP accounts, or add a Cash account manually.
+                    No Cash or Bank accounts found in target company. Run the migration first to create SP accounts, or
+                    add a Cash account manually.
                   </p>
                 ) : (
                   <select
                     className="w-full border rounded-md h-9 px-3 text-sm bg-background"
                     value={obCashAccountId ?? ""}
-                    onChange={e => setObCashAccountId(e.target.value ? Number(e.target.value) : null)}
+                    onChange={(e) => setObCashAccountId(e.target.value ? Number(e.target.value) : null)}
                     data-testid="select-ob-cash-account"
                   >
                     <option value="">— select cash/bank account —</option>
-                    {(cashAccountsData?.accounts ?? []).map(a => (
-                      <option key={a.id} value={a.id}>{a.name} ({a.account_type})</option>
+                    {(cashAccountsData?.accounts ?? []).map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.account_type})
+                      </option>
                     ))}
                   </select>
                 )}
@@ -623,7 +688,7 @@ export default function GcLshiMigration() {
                   step="0.01"
                   placeholder="0.00"
                   value={obAmount}
-                  onChange={e => setObAmount(e.target.value)}
+                  onChange={(e) => setObAmount(e.target.value)}
                   data-testid="input-ob-amount"
                 />
               </div>
@@ -633,7 +698,7 @@ export default function GcLshiMigration() {
                   id="ob-date"
                   type="date"
                   value={obDate}
-                  onChange={e => setObDate(e.target.value)}
+                  onChange={(e) => setObDate(e.target.value)}
                   data-testid="input-ob-date"
                 />
               </div>
@@ -642,26 +707,36 @@ export default function GcLshiMigration() {
                 <Input
                   id="ob-narration"
                   value={obNarration}
-                  onChange={e => setObNarration(e.target.value)}
+                  onChange={(e) => setObNarration(e.target.value)}
                   data-testid="input-ob-narration"
                 />
               </div>
             </div>
             <Button
               className="mt-3"
-              onClick={() => openingBalanceMutation.mutate({
-                targetCompanyId,
-                cashAccountId: obCashAccountId,
-                amount: obAmount,
-                date: obDate,
-                narration: obNarration,
-              })}
+              onClick={() =>
+                openingBalanceMutation.mutate({
+                  targetCompanyId,
+                  cashAccountId: obCashAccountId,
+                  amount: obAmount,
+                  date: obDate,
+                  narration: obNarration,
+                })
+              }
               disabled={!obCashAccountId || !obAmount || !obDate || openingBalanceMutation.isPending}
               data-testid="button-submit-opening-balance"
             >
-              {openingBalanceMutation.isPending
-                ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Saving…</>
-                : <><DollarSign className="h-4 w-4 mr-2" />Post Opening Balance</>}
+              {openingBalanceMutation.isPending ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                <>
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  Post Opening Balance
+                </>
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -695,16 +770,22 @@ export default function GcLshiMigration() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allRuns.map(run => (
+                  {allRuns.map((run) => (
                     <TableRow key={run.id}>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{String(run.id).slice(0, 8)}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {String(run.id).slice(0, 8)}
+                      </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="text-xs">{run.action}</Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {run.action}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-sm">{run.source_name}</TableCell>
                       <TableCell className="text-sm">{run.target_name}</TableCell>
                       <TableCell className="text-right text-sm">{run.rows_created}</TableCell>
-                      <TableCell><StatusBadge status={run.status} /></TableCell>
+                      <TableCell>
+                        <StatusBadge status={run.status} />
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                         {new Date(run.created_at).toLocaleString()}
                       </TableCell>
@@ -739,16 +820,14 @@ export default function GcLshiMigration() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Create New SP Company</AlertDialogTitle>
-            <AlertDialogDescription>
-              This creates a new Supplier Partner company in the system.
-            </AlertDialogDescription>
+            <AlertDialogDescription>This creates a new Supplier Partner company in the system.</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
               <Label>Company Name</Label>
               <Input
                 value={createName}
-                onChange={e => setCreateName(e.target.value)}
+                onChange={(e) => setCreateName(e.target.value)}
                 placeholder="GC-LSHI"
                 data-testid="input-create-company-name"
               />
@@ -757,7 +836,7 @@ export default function GcLshiMigration() {
               <Label>Company Code (unique)</Label>
               <Input
                 value={createCode}
-                onChange={e => setCreateCode(e.target.value)}
+                onChange={(e) => setCreateCode(e.target.value)}
                 placeholder="GC-LSHI-SP"
                 data-testid="input-create-company-code"
               />
@@ -777,14 +856,20 @@ export default function GcLshiMigration() {
       </AlertDialog>
 
       {/* Migration Confirmation Dialog */}
-      <AlertDialog open={showMigrateDialog} onOpenChange={open => { if (!open && !migrating) setShowMigrateDialog(false); }}>
+      <AlertDialog
+        open={showMigrateDialog}
+        onOpenChange={(open) => {
+          if (!open && !migrating) setShowMigrateDialog(false);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm GC Migration</AlertDialogTitle>
             <AlertDialogDescription>
-              This will copy stock items, opening stock movements, SP accounts, GC profit accounts, and
-              historical sale vouchers from <strong>{sourceComp?.name}</strong> into <strong>{targetComp?.name}</strong>.
-              <br /><br />
+              This will copy stock items, opening stock movements, SP accounts, GC profit accounts, and historical sale
+              vouchers from <strong>{sourceComp?.name}</strong> into <strong>{targetComp?.name}</strong>.
+              <br />
+              <br />
               Type the source company name exactly to confirm:
               <strong className="block mt-1">{sourceComp?.name}</strong>
             </AlertDialogDescription>
@@ -793,7 +878,7 @@ export default function GcLshiMigration() {
             <Input
               placeholder={sourceComp?.name}
               value={migrateConfirmName}
-              onChange={e => setMigrateConfirmName(e.target.value)}
+              onChange={(e) => setMigrateConfirmName(e.target.value)}
               data-testid="input-migrate-confirm-name"
             />
           </div>
@@ -811,13 +896,18 @@ export default function GcLshiMigration() {
       </AlertDialog>
 
       {/* Rollback Confirmation Dialog */}
-      <AlertDialog open={!!rollbackRunId} onOpenChange={open => { if (!open) setRollbackRunId(null); }}>
+      <AlertDialog
+        open={!!rollbackRunId}
+        onOpenChange={(open) => {
+          if (!open) setRollbackRunId(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Rollback Run {rollbackRunId?.slice(0, 8)}</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete all rows created by this migration run from the target company.
-              The source ERP company will not be touched. This action cannot be undone.
+              This will permanently delete all rows created by this migration run from the target company. The source
+              ERP company will not be touched. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

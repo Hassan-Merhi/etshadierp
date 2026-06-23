@@ -74,14 +74,16 @@ export function SaleGrid({
                   {columns.map((col, colIndex) => (
                     <div
                       key={col.key}
-                      className={`${col.width} border-r h-10 sm:h-10 ${
-                        col.key === "amount" ? "bg-muted/30" : ""
-                      }`}
+                      className={`${col.width} border-r h-10 sm:h-10 ${col.key === "amount" ? "bg-muted/30" : ""}`}
                       onMouseDown={(e) => {
-                        const invalidIdx = rows.findIndex(r => r.itemName?.trim() && !r.stockItemId);
+                        const invalidIdx = rows.findIndex((r) => r.itemName?.trim() && !r.stockItemId);
                         if (invalidIdx !== -1 && !(rowIndex === invalidIdx && col.key === "itemName")) {
                           e.preventDefault();
-                          toast({ title: "Select an item first", description: `Row ${invalidIdx + 1} has an incomplete item. Please choose an item from the list.`, variant: "destructive" });
+                          toast({
+                            title: "Select an item first",
+                            description: `Row ${invalidIdx + 1} has an incomplete item. Please choose an item from the list.`,
+                            variant: "destructive",
+                          });
                           focusCell(invalidIdx, 0);
                         }
                       }}
@@ -98,19 +100,30 @@ export function SaleGrid({
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
-                      ) : col.key === "plBale" || col.key === "totalPL" ? (() => {
-                        const cfgUSD = row.configuredPrice ?? 0;
-                        const plBaleUSD = row.rateUSD - cfgUSD;
-                        const plBaleDisplay = activeCurrency === "CFA" && exchangeRate ? plBaleUSD * exchangeRate : plBaleUSD;
-                        const val = col.key === "plBale" ? plBaleDisplay : plBaleDisplay * row.quantity;
-                        const hasConfig = (row.stockItemId && cfgUSD > 0);
-                        const color = !hasConfig ? undefined : val > 0 ? "text-green-700 dark:text-green-400" : val < 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground";
-                        return (
-                          <div className={`flex items-center justify-end h-full px-1.5 sm:px-2 font-mono text-xs sm:text-sm ${color ?? "text-muted-foreground"}`}>
-                            {hasConfig ? formatDisplayAmount(Math.abs(val)) : "—"}
-                          </div>
-                        );
-                      })() : (
+                      ) : col.key === "plBale" || col.key === "totalPL" ? (
+                        (() => {
+                          const cfgUSD = row.configuredPrice ?? 0;
+                          const plBaleUSD = row.rateUSD - cfgUSD;
+                          const plBaleDisplay =
+                            activeCurrency === "CFA" && exchangeRate ? plBaleUSD * exchangeRate : plBaleUSD;
+                          const val = col.key === "plBale" ? plBaleDisplay : plBaleDisplay * row.quantity;
+                          const hasConfig = row.stockItemId && cfgUSD > 0;
+                          const color = !hasConfig
+                            ? undefined
+                            : val > 0
+                              ? "text-green-700 dark:text-green-400"
+                              : val < 0
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-muted-foreground";
+                          return (
+                            <div
+                              className={`flex items-center justify-end h-full px-1.5 sm:px-2 font-mono text-xs sm:text-sm ${color ?? "text-muted-foreground"}`}
+                            >
+                              {hasConfig ? formatDisplayAmount(Math.abs(val)) : "—"}
+                            </div>
+                          );
+                        })()
+                      ) : (
                         <input
                           ref={(el) => {
                             if (el) inputRefs.current[`${rowIndex}-${colIndex}`] = el;
@@ -121,7 +134,9 @@ export function SaleGrid({
                             col.key === "amount"
                               ? formatDisplayAmount(row.amount)
                               : col.key === "quantity" || col.key === "rate"
-                                ? (row[col.key as keyof SaleRow] === 0 ? "" : row[col.key as keyof SaleRow])
+                                ? row[col.key as keyof SaleRow] === 0
+                                  ? ""
+                                  : row[col.key as keyof SaleRow]
                                 : row[col.key as keyof SaleRow]
                           }
                           onChange={(e) => {
@@ -136,8 +151,16 @@ export function SaleGrid({
                               setActiveRow(rowIndex);
                               setSearchTerm(row.itemName);
                               setHighlightedIndex(0);
-                            } else if ((col.key === "quantity" || col.key === "rate") && row.itemName?.trim() && !row.stockItemId) {
-                              toast({ title: "Invalid item", description: "Please select an item from the list.", variant: "destructive" });
+                            } else if (
+                              (col.key === "quantity" || col.key === "rate") &&
+                              row.itemName?.trim() &&
+                              !row.stockItemId
+                            ) {
+                              toast({
+                                title: "Invalid item",
+                                description: "Please select an item from the list.",
+                                variant: "destructive",
+                              });
                               setTimeout(() => {
                                 setSelectedCell({ row: rowIndex, col: 0 });
                                 focusCell(rowIndex, 0);
@@ -163,11 +186,7 @@ export function SaleGrid({
                           } ${col.key === "amount" ? "cursor-not-allowed" : ""} ${
                             col.key === "quantity" && getStockWarning(row) ? "text-destructive font-bold" : ""
                           }`}
-                          placeholder={
-                            col.key === "itemName"
-                              ? "Type to search..."
-                              : ""
-                          }
+                          placeholder={col.key === "itemName" ? "Type to search..." : ""}
                           style={col.key === "quantity" || col.key === "rate" ? { fontSize: "16px" } : undefined}
                           data-testid={`input-${col.key}-${rowIndex}`}
                         />

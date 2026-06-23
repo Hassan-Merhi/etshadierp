@@ -6,43 +6,109 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
   factorySupplierCategories,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
@@ -51,7 +117,6 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
 
 export function registerRawStockReceiptRoutes(app: Express) {
   app.get("/api/factory/raw-stock", requireAuth, async (req: any, res: any) => {
@@ -98,18 +163,20 @@ export function registerRawStockReceiptRoutes(app: Express) {
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .where(and(
-          eq(factoryRawStock.companyId, companyId),
-          sql`${factoryContainers.status} != 'DELETED'`,
-          isNull(factoryRawStock.deletedAt),
-          isNull(factoryContainers.deletedAt),
-        ));
+        .where(
+          and(
+            eq(factoryRawStock.companyId, companyId),
+            sql`${factoryContainers.status} != 'DELETED'`,
+            isNull(factoryRawStock.deletedAt),
+            isNull(factoryContainers.deletedAt)
+          )
+        );
 
       const supplierMap = new Map<string, any>();
       for (const r of results) {
         const isOB = r.containerStatus === "OPENING_BALANCE";
         // Always merge by supplier — one row per supplier regardless of OB vs Container
-        const key = r.supplierId ? `supplier-${r.supplierId}` : (r.supplierName || `unknown-${r.containerId}`);
+        const key = r.supplierId ? `supplier-${r.supplierId}` : r.supplierName || `unknown-${r.containerId}`;
         const received = parseFloat(r.receivedKg as string) || 0;
         const used = parseFloat(r.usedKg as string) || 0;
         const costPerKg = parseFloat(r.costPerKg as string) || 0;
@@ -123,19 +190,19 @@ export function registerRawStockReceiptRoutes(app: Express) {
           const newTotalCostUsd = received * costPerKgUsd;
           existing._totalReceived += received;
           existing._totalUsed += used;
-          existing._avgCostPerKg = existing._totalReceived > 0
-            ? (prevTotalCost + newTotalCost) / existing._totalReceived
-            : 0;
-          existing._avgCostPerKgUsd = existing._totalReceived > 0
-            ? (prevTotalCostUsd + newTotalCostUsd) / existing._totalReceived
-            : 0;
+          existing._avgCostPerKg =
+            existing._totalReceived > 0 ? (prevTotalCost + newTotalCost) / existing._totalReceived : 0;
+          existing._avgCostPerKgUsd =
+            existing._totalReceived > 0 ? (prevTotalCostUsd + newTotalCostUsd) / existing._totalReceived : 0;
           if (new Date(r.offloadedAt) > new Date(existing.lastOffloaded)) {
             existing.lastOffloaded = r.offloadedAt;
           }
           // If any container for this supplier is not OB, show as Container
           if (!isOB) existing.sourceType = "CONTAINER";
         } else {
-          const catInfo = r.supplierId ? (supplierCategoryMap.get(r.supplierId) || { categoryId: null, categoryName: null }) : { categoryId: null, categoryName: null };
+          const catInfo = r.supplierId
+            ? supplierCategoryMap.get(r.supplierId) || { categoryId: null, categoryName: null }
+            : { categoryId: null, categoryName: null };
           supplierMap.set(key, {
             supplierName: r.supplierName || "Unknown",
             supplierId: r.supplierId,
@@ -153,8 +220,12 @@ export function registerRawStockReceiptRoutes(app: Express) {
       }
 
       // Fetch manual adjustments and merge into supplierMap
-      const adjustments = await db.select().from(factoryRawMaterialAdjustments)
-        .where(and(eq(factoryRawMaterialAdjustments.companyId, companyId), isNull(factoryRawMaterialAdjustments.deletedAt)));
+      const adjustments = await db
+        .select()
+        .from(factoryRawMaterialAdjustments)
+        .where(
+          and(eq(factoryRawMaterialAdjustments.companyId, companyId), isNull(factoryRawMaterialAdjustments.deletedAt))
+        );
 
       for (const adj of adjustments) {
         if (adj.type === "DEDUCT") continue; // DEDUCT is history-only; receivedKg on rows already reduced
@@ -172,7 +243,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
           if (anyEntry) {
             supplierName = anyEntry.supplierName;
           } else {
-            const [sup] = await db.select({ name: factorySuppliers.name })
+            const [sup] = await db
+              .select({ name: factorySuppliers.name })
               .from(factorySuppliers)
               .where(and(eq(factorySuppliers.id, adj.supplierId), eq(factorySuppliers.companyId, companyId)))
               .limit(1);
@@ -190,14 +262,15 @@ export function registerRawStockReceiptRoutes(app: Express) {
             const prevCost = existing._totalReceived * existing._avgCostPerKg;
             const newCost = kg * costPerKgAdj;
             existing._totalReceived += kg;
-            existing._avgCostPerKg = existing._totalReceived > 0
-              ? (prevCost + newCost) / existing._totalReceived : 0;
+            existing._avgCostPerKg = existing._totalReceived > 0 ? (prevCost + newCost) / existing._totalReceived : 0;
             existing._avgCostPerKgUsd = existing._avgCostPerKg;
           } else {
             existing._totalUsed += kg;
           }
         } else {
-          const adjCatInfo = supplierId ? (supplierCategoryMap.get(supplierId) || { categoryId: null, categoryName: null }) : { categoryId: null, categoryName: null };
+          const adjCatInfo = supplierId
+            ? supplierCategoryMap.get(supplierId) || { categoryId: null, categoryName: null }
+            : { categoryId: null, categoryName: null };
           supplierMap.set(key, {
             supplierName,
             supplierId,
@@ -231,11 +304,13 @@ export function registerRawStockReceiptRoutes(app: Express) {
         })
         .from(factoryMixBatchSources)
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
-        .where(and(
-          eq(factoryMixBatches.companyId, companyId),
-          sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
-          sql`${factoryMixBatches.status} NOT IN ('CLOSED', 'COMPLETED')`,
-        ))
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
+            sql`${factoryMixBatches.status} NOT IN ('CLOSED', 'COMPLETED')`
+          )
+        )
         .groupBy(factoryMixBatchSources.supplierId);
 
       const reservedBySupplierId = new Map<number, number>();
@@ -246,7 +321,7 @@ export function registerRawStockReceiptRoutes(app: Express) {
       // Track which supplierIds have actual container raw stock records (those already
       // have usedKg properly maintained on the factoryRawStock rows).
       const supplierIdsWithContainerStock = new Set<number>(
-        results.filter(r => r.supplierId).map(r => r.supplierId as number)
+        results.filter((r) => r.supplierId).map((r) => r.supplierId as number)
       );
 
       // For MANUAL-only suppliers (no factoryRawStock container records), usedKg is never
@@ -262,11 +337,13 @@ export function registerRawStockReceiptRoutes(app: Express) {
         })
         .from(factoryMixBatchSources)
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
-        .where(and(
-          eq(factoryMixBatches.companyId, companyId),
-          sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
-          sql`${factoryMixBatches.status} IN ('CLOSED', 'COMPLETED')`,
-        ))
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            sql`${factoryMixBatchSources.supplierId} IS NOT NULL`,
+            sql`${factoryMixBatches.status} IN ('CLOSED', 'COMPLETED')`
+          )
+        )
         .groupBy(factoryMixBatchSources.supplierId);
 
       // Apply completed-batch consumption to MANUAL-only suppliers only
@@ -351,7 +428,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
       const { supplierId, newCostPerKg } = req.body;
       if (!supplierId) return res.status(400).json({ message: "supplierId is required" });
       const newCost = parseFloat(newCostPerKg);
-      if (isNaN(newCost) || newCost < 0) return res.status(400).json({ message: "newCostPerKg must be a non-negative number" });
+      if (isNaN(newCost) || newCost < 0)
+        return res.status(400).json({ message: "newCostPerKg must be a non-negative number" });
 
       await db.transaction(async (tx) => {
         // 1. Update costPerKg on all factory_raw_stock rows for this supplier
@@ -359,26 +437,32 @@ export function registerRawStockReceiptRoutes(app: Express) {
           .select({ id: factoryRawStock.id })
           .from(factoryRawStock)
           .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-          .where(and(
-            eq(factoryRawStock.companyId, companyId),
-            eq(factoryContainers.supplierId, Number(supplierId)),
-            sql`${factoryContainers.status} != 'DELETED'`
-          ));
+          .where(
+            and(
+              eq(factoryRawStock.companyId, companyId),
+              eq(factoryContainers.supplierId, Number(supplierId)),
+              sql`${factoryContainers.status} != 'DELETED'`
+            )
+          );
 
         for (const row of rawStockRows) {
-          await tx.update(factoryRawStock)
+          await tx
+            .update(factoryRawStock)
             .set({ costPerKg: String(newCost), costPerKgUsd: String(newCost) })
             .where(eq(factoryRawStock.id, row.id));
         }
 
         // 1b. Also update ADD adjustments for this supplier so the weighted avg isn't pulled back
-        await tx.update(factoryRawMaterialAdjustments)
+        await tx
+          .update(factoryRawMaterialAdjustments)
           .set({ costPerKg: String(newCost) })
-          .where(and(
-            eq(factoryRawMaterialAdjustments.companyId, companyId),
-            eq(factoryRawMaterialAdjustments.supplierId, Number(supplierId)),
-            eq(factoryRawMaterialAdjustments.type, "ADD"),
-          ));
+          .where(
+            and(
+              eq(factoryRawMaterialAdjustments.companyId, companyId),
+              eq(factoryRawMaterialAdjustments.supplierId, Number(supplierId)),
+              eq(factoryRawMaterialAdjustments.type, "ADD")
+            )
+          );
 
         // 2. Update costPerKg + totalCost on factory_mix_batch_sources for this supplier
         const batchSources = await tx
@@ -393,7 +477,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
         const affectedBatchIds = new Set<number>();
         for (const src of batchSources) {
           const wt = parseFloat(src.weightKg as string) || 0;
-          await tx.update(factoryMixBatchSources)
+          await tx
+            .update(factoryMixBatchSources)
             .set({
               costPerKg: String(newCost),
               totalCost: String((wt * newCost).toFixed(2)),
@@ -420,7 +505,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
           }, 0);
           const blendedCost = totalWt > 0 ? totalCostSum / totalWt : 0;
 
-          await tx.update(factoryMixBatches)
+          await tx
+            .update(factoryMixBatches)
             .set({
               costPerKg: String(blendedCost.toFixed(4)),
               totalCost: String(totalCostSum.toFixed(2)),
@@ -432,15 +518,18 @@ export function registerRawStockReceiptRoutes(app: Express) {
           const balesInBatch = await tx
             .select({ id: factoryBales.id, weightKg: factoryBales.weightKg })
             .from(factoryBales)
-            .where(and(
-              eq(factoryBales.mixBatchId, batchId),
-              eq(factoryBales.companyId, companyId),
-              sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
-            ));
+            .where(
+              and(
+                eq(factoryBales.mixBatchId, batchId),
+                eq(factoryBales.companyId, companyId),
+                sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
+              )
+            );
 
           for (const bale of balesInBatch) {
             const baleWt = parseFloat(bale.weightKg as string) || 0;
-            await tx.update(factoryBales)
+            await tx
+              .update(factoryBales)
               .set({
                 costPerKg: String(blendedCost.toFixed(2)),
                 totalCost: String((baleWt * blendedCost).toFixed(2)),
@@ -482,11 +571,13 @@ export function registerRawStockReceiptRoutes(app: Express) {
         })
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-        .where(and(
-          eq(factoryRawStock.companyId, companyId),
-          eq(factoryContainers.supplierId, Number(supplierId)),
-          sql`${factoryContainers.status} != 'DELETED'`
-        ))
+        .where(
+          and(
+            eq(factoryRawStock.companyId, companyId),
+            eq(factoryContainers.supplierId, Number(supplierId)),
+            sql`${factoryContainers.status} != 'DELETED'`
+          )
+        )
         .orderBy(desc(factoryRawStock.offloadedAt));
 
       // Free kg from actual rows
@@ -499,10 +590,12 @@ export function registerRawStockReceiptRoutes(app: Express) {
       const adjRows = await db
         .select({ type: factoryRawMaterialAdjustments.type, kg: factoryRawMaterialAdjustments.kg })
         .from(factoryRawMaterialAdjustments)
-        .where(and(
-          eq(factoryRawMaterialAdjustments.companyId, companyId),
-          eq(factoryRawMaterialAdjustments.supplierId, Number(supplierId))
-        ));
+        .where(
+          and(
+            eq(factoryRawMaterialAdjustments.companyId, companyId),
+            eq(factoryRawMaterialAdjustments.supplierId, Number(supplierId))
+          )
+        );
       const adjFree = adjRows.reduce((sum, a) => {
         if (a.type === "DEDUCT") return sum; // DEDUCT is history-only; receivedKg on rows already reduced
         const k = parseFloat(a.kg as string) || 0;
@@ -532,13 +625,18 @@ export function registerRawStockReceiptRoutes(app: Express) {
 
       let fxRate = 1;
       if (ccy !== "USD" && costPerKgNum > 0) {
-        try { fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, ccy, today)); } catch { fxRate = 1; }
+        try {
+          fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, ccy, today));
+        } catch {
+          fxRate = 1;
+        }
       }
 
       await db.transaction(async (tx) => {
         // 1. Update actual rows
         for (const u of updates) {
-          await tx.update(factoryRawStock)
+          await tx
+            .update(factoryRawStock)
             .set({ receivedKg: String(u.newReceived.toFixed(3)) })
             .where(eq(factoryRawStock.id, u.id));
         }
@@ -563,17 +661,20 @@ export function registerRawStockReceiptRoutes(app: Express) {
         // 2. REMOVE adjustment for any overflow (from adjustment-sourced free)
         let insertedAdj: any = null;
         if (adjDeductKg > 0) {
-          [insertedAdj] = await tx.insert(factoryRawMaterialAdjustments).values({
-            companyId,
-            date: today,
-            type: "REMOVE",
-            kg: adjDeductKg.toFixed(3),
-            costPerKg: costPerKgNum > 0 ? String(costPerKgNum) : "0",
-            currencyCode: ccy,
-            supplierId: Number(supplierId),
-            notes: notes ? `${notes} (auto-adj)` : "Deduct from received (auto-adj)",
-            reference: reference || null,
-          }).returning();
+          [insertedAdj] = await tx
+            .insert(factoryRawMaterialAdjustments)
+            .values({
+              companyId,
+              date: today,
+              type: "REMOVE",
+              kg: adjDeductKg.toFixed(3),
+              costPerKg: costPerKgNum > 0 ? String(costPerKgNum) : "0",
+              currencyCode: ccy,
+              supplierId: Number(supplierId),
+              notes: notes ? `${notes} (auto-adj)` : "Deduct from received (auto-adj)",
+              reference: reference || null,
+            })
+            .returning();
         }
 
         // 3. Write daybook entry for the balance update (if costPerKg provided)
@@ -581,7 +682,8 @@ export function registerRawStockReceiptRoutes(app: Express) {
           const totalValue = deductKg * costPerKgNum;
           const totalValueUsd = totalValue * fxRate;
 
-          const [sup] = await tx.select({ name: factorySuppliers.name })
+          const [sup] = await tx
+            .select({ name: factorySuppliers.name })
             .from(factorySuppliers)
             .where(and(eq(factorySuppliers.id, Number(supplierId)), eq(factorySuppliers.companyId, companyId)))
             .limit(1);
@@ -607,5 +709,4 @@ export function registerRawStockReceiptRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 }

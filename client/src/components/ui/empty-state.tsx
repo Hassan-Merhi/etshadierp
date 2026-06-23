@@ -9,14 +9,7 @@ interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
   action?: React.ReactNode;
 }
 
-export function EmptyState({
-  icon: Icon,
-  title,
-  description,
-  action,
-  className,
-  ...props
-}: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action, className, ...props }: EmptyStateProps) {
   return (
     <div className={cn("empty-state", className)} {...props}>
       {Icon && (

@@ -6,43 +6,109 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
   factorySupplierCategories,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
@@ -52,8 +118,6 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-
-
 export function registerRawStockOffloadRoutes(app: Express) {
   app.post("/api/factory/raw-stock/offload", requireAuth, async (req: any, res: any) => {
     try {
@@ -61,18 +125,26 @@ export function registerRawStockOffloadRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const {
-        containerId, receivedKg, costPerKg, commission,
-        currencyCode: reqCurrencyCode, fxRateToUsd: reqFxRate,
-        freight: reqFreight, freightAccountId: reqFreightAccountId,
+        containerId,
+        receivedKg,
+        costPerKg,
+        commission,
+        currencyCode: reqCurrencyCode,
+        fxRateToUsd: reqFxRate,
+        freight: reqFreight,
+        freightAccountId: reqFreightAccountId,
         freightSupplierId: reqFreightSupplierId,
         freightCurrencyCode: reqFreightCurrencyCode,
         freightFxRate: reqFreightFxRate,
-        otherCharges: reqOtherCharges, otherChargesAccountId: reqOtherChargesAccountId,
+        otherCharges: reqOtherCharges,
+        otherChargesAccountId: reqOtherChargesAccountId,
         otherChargesSupplierId: reqOtherChargesSupplierId,
         otherChargesCurrencyCode: reqOtherChargesCurrencyCode,
         otherChargesFxRate: reqOtherChargesFxRate,
-        dutyAmount: reqDutyAmount, dutyAccountId: reqDutyAccountId,
-        dutyStatus: reqDutyStatus, dutyNotes: reqDutyNotes,
+        dutyAmount: reqDutyAmount,
+        dutyAccountId: reqDutyAccountId,
+        dutyStatus: reqDutyStatus,
+        dutyNotes: reqDutyNotes,
         additionalCharges: reqAdditionalCharges,
         offloadDate: reqOffloadDate,
         mixBatchAllocations: reqMixBatchAllocations,
@@ -127,7 +199,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
         const chargeFx = parseFloat(c.fxRateToUsd || String(fxRate));
         if (chargeCcy === currencyCode) return sum + amt;
         const amtUsd = chargeCcy === "USD" ? amt : amt * chargeFx;
-        const amtInContainerCcy = currencyCode === "USD" ? amtUsd : (fxRate > 0 ? amtUsd / fxRate : amtUsd);
+        const amtInContainerCcy = currencyCode === "USD" ? amtUsd : fxRate > 0 ? amtUsd / fxRate : amtUsd;
         return sum + amtInContainerCcy;
       }, 0);
       const dutyVal = reqDutyStatus === "CONFIRMED" ? parseFloat(reqDutyAmount || "0") : 0;
@@ -144,15 +216,14 @@ export function registerRawStockOffloadRoutes(app: Express) {
       if (commission && commission.personName && commission.commissionRate) {
         const commType = commission.commissionType || "PER_KG";
         const commRate = parseFloat(commission.commissionRate) || 0;
-        commTotalVal = commType === "PER_KG"
-          ? commRate * parseFloat(actualKg)
-          : commRate;
+        commTotalVal = commType === "PER_KG" ? commRate * parseFloat(actualKg) : commRate;
         const commCurrency = commission.currencyCode || currencyCode;
         const commFxRate = parseFloat(commission.fxRateToUsd || String(fxRate));
         commCurrencyForUsd = commCurrency;
         commFxRateForUsd = commFxRate;
         const commTotalUsd = commCurrency === "USD" ? commTotalVal : commTotalVal * commFxRate;
-        commInContainerCcy = commCurrency === currencyCode ? commTotalVal : (fxRate > 0 ? commTotalUsd / fxRate : commTotalUsd);
+        commInContainerCcy =
+          commCurrency === currencyCode ? commTotalVal : fxRate > 0 ? commTotalUsd / fxRate : commTotalUsd;
         commInsertValues = {
           companyId,
           containerId,
@@ -172,15 +243,17 @@ export function registerRawStockOffloadRoutes(app: Express) {
       const freightFxRateVal = parseFloat(reqFreightFxRate || String(fxRate));
       const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFxRateVal;
       // Convert freight to container currency for totalCost
-      const freightInContainerCcy = (freightCcy === currencyCode) ? freightVal : (fxRate > 0 ? freightUsd / fxRate : freightVal);
+      const freightInContainerCcy =
+        freightCcy === currencyCode ? freightVal : fxRate > 0 ? freightUsd / fxRate : freightVal;
 
       const ocCcy = reqOtherChargesCurrencyCode || currencyCode;
       const ocFxRateVal = parseFloat(reqOtherChargesFxRate || String(fxRate));
       const ocUsd = ocCcy === "USD" ? otherChargesVal : otherChargesVal * ocFxRateVal;
       // Convert OC to container currency for totalCost
-      const ocInContainerCcy = (ocCcy === currencyCode) ? otherChargesVal : (fxRate > 0 ? ocUsd / fxRate : otherChargesVal);
+      const ocInContainerCcy = ocCcy === currencyCode ? otherChargesVal : fxRate > 0 ? ocUsd / fxRate : otherChargesVal;
 
-      const totalCost = basePayable + freightInContainerCcy + ocInContainerCcy + additionalChargesTotal + commInContainerCcy + dutyVal;
+      const totalCost =
+        basePayable + freightInContainerCcy + ocInContainerCcy + additionalChargesTotal + commInContainerCcy + dutyVal;
       const inclusiveCostPerKg = parseFloat(actualKg) > 0 ? totalCost / parseFloat(actualKg) : 0;
       const finalPayableAmount = String(totalCost);
 
@@ -205,17 +278,23 @@ export function registerRawStockOffloadRoutes(app: Express) {
       // getOrCreateLedgerAccount uses the raw db connection and must not run inside
       // a transaction (it performs its own upsert). We resolve all IDs here so the
       // transaction body only uses tx.* calls and stays fully atomic.
-      const chargesPayableAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
-      const freightExpenseAcctId = (freightVal > 0 && reqFreightSupplierId)
-        ? (reqFreightAccountId
+      const chargesPayableAcctId = await getOrCreateLedgerAccount(
+        companyId,
+        "FACTORY_CHARGES_PAYABLE",
+        "Factory Charges Payable"
+      );
+      const freightExpenseAcctId =
+        freightVal > 0 && reqFreightSupplierId
+          ? reqFreightAccountId
             ? parseInt(reqFreightAccountId)
-            : await getOrCreateLedgerAccount(companyId, "FACTORY_FREIGHT_EXPENSE", "Freight Expense"))
-        : null;
-      const ocExpenseAcctId = (otherChargesVal > 0 && reqOtherChargesSupplierId)
-        ? (reqOtherChargesAccountId
+            : await getOrCreateLedgerAccount(companyId, "FACTORY_FREIGHT_EXPENSE", "Freight Expense")
+          : null;
+      const ocExpenseAcctId =
+        otherChargesVal > 0 && reqOtherChargesSupplierId
+          ? reqOtherChargesAccountId
             ? parseInt(reqOtherChargesAccountId)
-            : await getOrCreateLedgerAccount(companyId, "FACTORY_OC_EXPENSE", "Other Charges Expense"))
-        : null;
+            : await getOrCreateLedgerAccount(companyId, "FACTORY_OC_EXPENSE", "Other Charges Expense")
+          : null;
 
       // ── Single atomic transaction: all DB writes happen here or not at all ────
       let rawStock: any;
@@ -223,10 +302,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
       await db.transaction(async (tx) => {
         // 1. Commission INSERT
         if (commInsertValues) {
-          [commissionRecord] = await tx
-            .insert(factoryContainerCommissions)
-            .values(commInsertValues)
-            .returning();
+          [commissionRecord] = await tx.insert(factoryContainerCommissions).values(commInsertValues).returning();
         }
 
         // 2. Raw stock INSERT
@@ -279,7 +355,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             otherChargesCurrencyCode: ocCcy || null,
             otherChargesAccountId: reqOtherChargesAccountId ? parseInt(reqOtherChargesAccountId) : null,
             otherChargesSupplierId: reqOtherChargesSupplierId ? parseInt(reqOtherChargesSupplierId) : null,
-            commissionAmount: commTotalVal > 0 ? String(commTotalVal) : (container.commissionAmount || "0"),
+            commissionAmount: commTotalVal > 0 ? String(commTotalVal) : container.commissionAmount || "0",
             dutyAmount: dutyStatus !== "NONE" ? String(parseFloat(reqDutyAmount || "0")) : null,
             dutyAccountId: reqDutyAccountId ? parseInt(reqDutyAccountId) : null,
             dutyStatus,
@@ -297,7 +373,7 @@ export function registerRawStockOffloadRoutes(app: Express) {
             preOffloadCommissionAccountId: (container as any).commissionAccountId || null,
             preOffloadCommissionSupplierId: (container as any).commissionSupplierId || null,
             preOffloadCommissionNotes: (container as any).commissionNotes || null,
-            destination: reqDestination ? String(reqDestination).trim() : (container.destination || null),
+            destination: reqDestination ? String(reqDestination).trim() : container.destination || null,
             updatedAt: new Date(),
           })
           .where(eq(factoryContainers.id, containerId));
@@ -411,38 +487,47 @@ export function registerRawStockOffloadRoutes(app: Express) {
         const existingFreightVouchers = await tx
           .select({ id: vouchers.id })
           .from(vouchers)
-          .where(and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.sourceModule, "FACTORY"),
-            ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}-%`)
-          ));
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.sourceModule, "FACTORY"),
+              ilike(vouchers.voucherNumber, `FACTORY-FREIGHT-${containerId}-%`)
+            )
+          );
         if (existingFreightVouchers.length > 0) {
           const vIds = existingFreightVouchers.map((v: any) => v.id);
           await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
           await tx.delete(vouchers).where(inArray(vouchers.id, vIds));
         }
-        await tx.delete(factoryDaybookEntries).where(and(
-          eq(factoryDaybookEntries.companyId, companyId),
-          eq(factoryDaybookEntries.txType, "FREIGHT"),
-          eq(factoryDaybookEntries.referenceId, containerId)
-        ));
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "FREIGHT"),
+              eq(factoryDaybookEntries.referenceId, containerId)
+            )
+          );
 
         // 8. Freight voucher (double-entry)
         if (freightVal > 0 && (reqFreightAccountId || reqFreightSupplierId)) {
           const freightVoucherNum = `FACTORY-FREIGHT-${containerId}-${Date.now()}`;
           const freightVoucherCcy = reqFreightCurrencyCode || currencyCode;
           const freightFx = parseFloat(reqFreightFxRate || String(fxRate));
-          const [freightVoucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherType: "Journal",
-            voucherNumber: freightVoucherNum,
-            voucherDate: offloadDate,
-            description: `Freight on container ${container.containerNumber}`,
-            totalAmount: String(freightVal),
-            currency: freightVoucherCcy,
-            exchangeRate: String(freightFx),
-            sourceModule: "FACTORY",
-          }).returning();
+          const [freightVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: freightVoucherNum,
+              voucherDate: offloadDate,
+              description: `Freight on container ${container.containerNumber}`,
+              totalAmount: String(freightVal),
+              currency: freightVoucherCcy,
+              exchangeRate: String(freightFx),
+              sourceModule: "FACTORY",
+            })
+            .returning();
           if (reqFreightSupplierId) {
             // Supplier: Dr Freight Expense / Cr Supplier Balance
             await tx.insert(voucherEntries).values({
@@ -483,17 +568,20 @@ export function registerRawStockOffloadRoutes(app: Express) {
           const ocMainVoucherNum = `FACTORY-OC-${containerId}-MAIN-${Date.now()}`;
           const ocVoucherCcy = reqOtherChargesCurrencyCode || currencyCode;
           const ocFx = parseFloat(reqOtherChargesFxRate || String(fxRate));
-          const [ocMainVoucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherType: "Journal",
-            voucherNumber: ocMainVoucherNum,
-            voucherDate: offloadDate,
-            description: `Other charges on container ${container.containerNumber}`,
-            totalAmount: String(otherChargesVal),
-            currency: ocVoucherCcy,
-            exchangeRate: String(ocFx),
-            sourceModule: "FACTORY",
-          }).returning();
+          const [ocMainVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: ocMainVoucherNum,
+              voucherDate: offloadDate,
+              description: `Other charges on container ${container.containerNumber}`,
+              totalAmount: String(otherChargesVal),
+              currency: ocVoucherCcy,
+              exchangeRate: String(ocFx),
+              sourceModule: "FACTORY",
+            })
+            .returning();
           if (reqOtherChargesSupplierId) {
             // Supplier: Dr OC Expense / Cr Supplier Balance
             await tx.insert(voucherEntries).values({
@@ -537,17 +625,20 @@ export function registerRawStockOffloadRoutes(app: Express) {
           const addlChargeCcy = inserted.currencyCode || currencyCode;
           const addlChargeFx = String(parseFloat(inserted.fxRateToUsd || String(fxRate)));
           const ocVoucherNum = `FACTORY-OC-${containerId}-${inserted.id}-${Date.now()}`;
-          const [ocVoucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherType: "Journal",
-            voucherNumber: ocVoucherNum,
-            voucherDate: offloadDate,
-            description: `${inserted.description} - container ${container.containerNumber}`,
-            totalAmount: String(chargeAmount),
-            currency: addlChargeCcy,
-            exchangeRate: addlChargeFx,
-            sourceModule: "FACTORY",
-          }).returning();
+          const [ocVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: ocVoucherNum,
+              voucherDate: offloadDate,
+              description: `${inserted.description} - container ${container.containerNumber}`,
+              totalAmount: String(chargeAmount),
+              currency: addlChargeCcy,
+              exchangeRate: addlChargeFx,
+              sourceModule: "FACTORY",
+            })
+            .returning();
           await tx.insert(voucherEntries).values({
             voucherId: ocVoucher.id,
             ledgerAccountId: chargesPayableAcctId,
@@ -612,13 +703,19 @@ export function registerRawStockOffloadRoutes(app: Express) {
       if (mixSourceLinks.length > 0) {
         const linkedBatchIds = [...new Set(mixSourceLinks.map((s: any) => s.mixBatchId))];
         const usedBatches = await db
-          .select({ id: factoryMixBatches.id, batchCode: factoryMixBatches.batchCode, usedKg: factoryMixBatches.usedKg })
+          .select({
+            id: factoryMixBatches.id,
+            batchCode: factoryMixBatches.batchCode,
+            usedKg: factoryMixBatches.usedKg,
+          })
           .from(factoryMixBatches)
-          .where(and(
-            eq(factoryMixBatches.companyId, companyId),
-            inArray(factoryMixBatches.id, linkedBatchIds),
-            sql`${factoryMixBatches.usedKg}::numeric > 0`
-          ));
+          .where(
+            and(
+              eq(factoryMixBatches.companyId, companyId),
+              inArray(factoryMixBatches.id, linkedBatchIds),
+              sql`${factoryMixBatches.usedKg}::numeric > 0`
+            )
+          );
 
         if (usedBatches.length > 0) {
           const codes = usedBatches.map((b: any) => b.batchCode).join(", ");
@@ -639,7 +736,12 @@ export function registerRawStockOffloadRoutes(app: Express) {
         const commissionRows = await tx
           .select({ id: factoryContainerCommissions.id })
           .from(factoryContainerCommissions)
-          .where(and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, containerId)));
+          .where(
+            and(
+              eq(factoryContainerCommissions.companyId, companyId),
+              eq(factoryContainerCommissions.containerId, containerId)
+            )
+          );
         const commissionIds = commissionRows.map((r: any) => r.id);
         const hadOffloadCommission = commissionRows.length > 0;
 
@@ -648,31 +750,37 @@ export function registerRawStockOffloadRoutes(app: Express) {
         //    - COMMISSION referencing each commission record id
         //    - FREIGHT / OTHER_CHARGE / DUTY referencing the container id
         if (rawStockRow) {
-          await tx.delete(factoryDaybookEntries).where(
-            and(
-              eq(factoryDaybookEntries.companyId, companyId),
-              eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
-              eq(factoryDaybookEntries.referenceId, rawStockRow.id)
-            )
-          );
+          await tx
+            .delete(factoryDaybookEntries)
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+                eq(factoryDaybookEntries.referenceId, rawStockRow.id)
+              )
+            );
         }
         if (commissionIds.length > 0) {
-          await tx.delete(factoryDaybookEntries).where(
-            and(
-              eq(factoryDaybookEntries.companyId, companyId),
-              eq(factoryDaybookEntries.txType, "COMMISSION"),
-              inArray(factoryDaybookEntries.referenceId, commissionIds)
-            )
-          );
+          await tx
+            .delete(factoryDaybookEntries)
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "COMMISSION"),
+                inArray(factoryDaybookEntries.referenceId, commissionIds)
+              )
+            );
         }
         // FREIGHT, OTHER_CHARGE, DUTY entries all reference containerId directly
-        await tx.delete(factoryDaybookEntries).where(
-          and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            inArray(factoryDaybookEntries.txType, ["FREIGHT", "OTHER_CHARGE", "DUTY"]),
-            eq(factoryDaybookEntries.referenceId, containerId)
-          )
-        );
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              inArray(factoryDaybookEntries.txType, ["FREIGHT", "OTHER_CHARGE", "DUTY"]),
+              eq(factoryDaybookEntries.referenceId, containerId)
+            )
+          );
 
         // 4. Delete all double-entry accounting vouchers created at or after offload for this container:
         //    FACTORY-COMM-{id}-*   commission vouchers (from offload or pre-registration)
@@ -700,19 +808,27 @@ export function registerRawStockOffloadRoutes(app: Express) {
         }
 
         // 5. Delete offload records: raw stock, commission records, additional charges, mix-batch links
-        await tx.delete(factoryRawStock).where(
-          and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId))
-        );
-        await tx.delete(factoryContainerCommissions).where(
-          and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, containerId))
-        );
-        await tx.delete(factoryOffloadAdditionalCharges).where(
-          and(eq(factoryOffloadAdditionalCharges.companyId, companyId), eq(factoryOffloadAdditionalCharges.containerId, containerId))
-        );
+        await tx
+          .delete(factoryRawStock)
+          .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, containerId)));
+        await tx
+          .delete(factoryContainerCommissions)
+          .where(
+            and(
+              eq(factoryContainerCommissions.companyId, companyId),
+              eq(factoryContainerCommissions.containerId, containerId)
+            )
+          );
+        await tx
+          .delete(factoryOffloadAdditionalCharges)
+          .where(
+            and(
+              eq(factoryOffloadAdditionalCharges.companyId, companyId),
+              eq(factoryOffloadAdditionalCharges.containerId, containerId)
+            )
+          );
         // Remove mix-batch source links created during offload for this container
-        await tx.delete(factoryMixBatchSources).where(
-          eq(factoryMixBatchSources.containerId, containerId)
-        );
+        await tx.delete(factoryMixBatchSources).where(eq(factoryMixBatchSources.containerId, containerId));
 
         // 6. Restore pre-offload charges and reset container to RECEIVED status.
         //    If a pre-offload snapshot exists (set during offload), restore those values
@@ -722,28 +838,37 @@ export function registerRawStockOffloadRoutes(app: Express) {
         const preFreight = (container as any).preOffloadFreight;
         const hasSnapshot = preFreight !== null && preFreight !== undefined;
         const restoredFreight = hasSnapshot ? String(preFreight || "0") : "0";
-        const restoredFreightAccountId = hasSnapshot ? ((container as any).preOffloadFreightAccountId || null) : null;
-        const restoredFreightSupplierId = hasSnapshot ? ((container as any).preOffloadFreightSupplierId || null) : null;
-        const restoredFreightCurrencyCode = hasSnapshot ? ((container as any).preOffloadFreightCurrencyCode || container.currencyCode || "USD") : (container.currencyCode || "USD");
+        const restoredFreightAccountId = hasSnapshot ? (container as any).preOffloadFreightAccountId || null : null;
+        const restoredFreightSupplierId = hasSnapshot ? (container as any).preOffloadFreightSupplierId || null : null;
+        const restoredFreightCurrencyCode = hasSnapshot
+          ? (container as any).preOffloadFreightCurrencyCode || container.currencyCode || "USD"
+          : container.currencyCode || "USD";
         const restoredOtherCharges = hasSnapshot ? String((container as any).preOffloadOtherCharges || "0") : "0";
-        const restoredOtherChargesAccountId = hasSnapshot ? ((container as any).preOffloadOtherChargesAccountId || null) : null;
-        const restoredOtherChargesSupplierId = hasSnapshot ? ((container as any).preOffloadOtherChargesSupplierId || null) : null;
+        const restoredOtherChargesAccountId = hasSnapshot
+          ? (container as any).preOffloadOtherChargesAccountId || null
+          : null;
+        const restoredOtherChargesSupplierId = hasSnapshot
+          ? (container as any).preOffloadOtherChargesSupplierId || null
+          : null;
 
         // Re-post the original creation-time FACTORY-FREIGHT voucher if one existed before offload
         const restoredFreightAmt = parseFloat(restoredFreight || "0");
         if (restoredFreightAmt > 0 && restoredFreightAccountId) {
           const restoredFreightVoucherNum = `FACTORY-FREIGHT-${containerId}-${Date.now()}`;
-          const [restoredFreightVoucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherType: "Journal",
-            voucherNumber: restoredFreightVoucherNum,
-            voucherDate: container.arrivalDate || getClientDate(req),
-            description: `Freight on container ${container.containerNumber}`,
-            totalAmount: String(restoredFreightAmt),
-            currency: restoredFreightCurrencyCode,
-            exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
-            sourceModule: "FACTORY",
-          }).returning();
+          const [restoredFreightVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: restoredFreightVoucherNum,
+              voucherDate: container.arrivalDate || getClientDate(req),
+              description: `Freight on container ${container.containerNumber}`,
+              totalAmount: String(restoredFreightAmt),
+              currency: restoredFreightCurrencyCode,
+              exchangeRate: String(parseFloat(container.fxRateToUsd || "1")),
+              sourceModule: "FACTORY",
+            })
+            .returning();
           // Dr Freight Expense
           await tx.insert(voucherEntries).values({
             voucherId: restoredFreightVoucher.id,
@@ -769,61 +894,70 @@ export function registerRawStockOffloadRoutes(app: Express) {
         const preCommAmt = (container as any).preOffloadCommissionAmount;
         const hasCommSnapshot = preCommAmt !== null && preCommAmt !== undefined;
         const restoredCommissionAmount = hasCommSnapshot ? String(preCommAmt || "0") : "0";
-        const restoredCommissionCurrencyCode = hasCommSnapshot ? ((container as any).preOffloadCommissionCurrencyCode || "USD") : "USD";
-        const restoredCommissionAccountId = hasCommSnapshot ? ((container as any).preOffloadCommissionAccountId || null) : null;
-        const restoredCommissionSupplierId = hasCommSnapshot ? ((container as any).preOffloadCommissionSupplierId || null) : null;
-        const restoredCommissionNotes = hasCommSnapshot ? ((container as any).preOffloadCommissionNotes || null) : null;
+        const restoredCommissionCurrencyCode = hasCommSnapshot
+          ? (container as any).preOffloadCommissionCurrencyCode || "USD"
+          : "USD";
+        const restoredCommissionAccountId = hasCommSnapshot
+          ? (container as any).preOffloadCommissionAccountId || null
+          : null;
+        const restoredCommissionSupplierId = hasCommSnapshot
+          ? (container as any).preOffloadCommissionSupplierId || null
+          : null;
+        const restoredCommissionNotes = hasCommSnapshot ? (container as any).preOffloadCommissionNotes || null : null;
 
         // Restore pre-offload status (fallback to "ARRIVED" for legacy containers without snapshot)
         const restoredStatus = (container as any).preOffloadStatus || "ARRIVED";
 
-        await tx.update(factoryContainers).set({
-          status: restoredStatus,
-          actualReceivedKg: null,
-          differenceKg: null,
-          declaredKg: null,
-          // Restore pre-offload freight (or zero if no snapshot)
-          freight: restoredFreight,
-          freightCurrencyCode: restoredFreightCurrencyCode,
-          freightAccountId: restoredFreightAccountId,
-          freightSupplierId: restoredFreightSupplierId,
-          // Restore pre-offload other charges (or zero if no snapshot)
-          otherCharges: restoredOtherCharges,
-          otherChargesAccountId: restoredOtherChargesAccountId,
-          otherChargesSupplierId: restoredOtherChargesSupplierId,
-          // Restore pre-offload commission
-          commissionAmount: restoredCommissionAmount,
-          commissionCurrencyCode: restoredCommissionCurrencyCode,
-          commissionAccountId: restoredCommissionAccountId,
-          commissionSupplierId: restoredCommissionSupplierId,
-          commissionNotes: restoredCommissionNotes,
-          // Clear duty (always offload-specific)
-          dutyAmount: null,
-          dutyAccountId: null,
-          dutyStatus: "NONE",
-          dutyNotes: null,
-          // Clear computed financials
-          finalPayableAmount: null,
-          finalPayableAmountUsd: null,
-          ratePerKgUsd: null,
-          fxRateToUsdOffload: null,
-          fxRateDateOffload: null,
-          // Clear the pre-offload snapshot columns
-          preOffloadFreight: null,
-          preOffloadFreightCurrencyCode: null,
-          preOffloadFreightAccountId: null,
-          preOffloadFreightSupplierId: null,
-          preOffloadOtherCharges: null,
-          preOffloadOtherChargesAccountId: null,
-          preOffloadOtherChargesSupplierId: null,
-          preOffloadStatus: null,
-          preOffloadCommissionAmount: null,
-          preOffloadCommissionCurrencyCode: null,
-          preOffloadCommissionAccountId: null,
-          preOffloadCommissionSupplierId: null,
-          preOffloadCommissionNotes: null,
-          updatedAt: new Date(),
-        }).where(eq(factoryContainers.id, containerId));
+        await tx
+          .update(factoryContainers)
+          .set({
+            status: restoredStatus,
+            actualReceivedKg: null,
+            differenceKg: null,
+            declaredKg: null,
+            // Restore pre-offload freight (or zero if no snapshot)
+            freight: restoredFreight,
+            freightCurrencyCode: restoredFreightCurrencyCode,
+            freightAccountId: restoredFreightAccountId,
+            freightSupplierId: restoredFreightSupplierId,
+            // Restore pre-offload other charges (or zero if no snapshot)
+            otherCharges: restoredOtherCharges,
+            otherChargesAccountId: restoredOtherChargesAccountId,
+            otherChargesSupplierId: restoredOtherChargesSupplierId,
+            // Restore pre-offload commission
+            commissionAmount: restoredCommissionAmount,
+            commissionCurrencyCode: restoredCommissionCurrencyCode,
+            commissionAccountId: restoredCommissionAccountId,
+            commissionSupplierId: restoredCommissionSupplierId,
+            commissionNotes: restoredCommissionNotes,
+            // Clear duty (always offload-specific)
+            dutyAmount: null,
+            dutyAccountId: null,
+            dutyStatus: "NONE",
+            dutyNotes: null,
+            // Clear computed financials
+            finalPayableAmount: null,
+            finalPayableAmountUsd: null,
+            ratePerKgUsd: null,
+            fxRateToUsdOffload: null,
+            fxRateDateOffload: null,
+            // Clear the pre-offload snapshot columns
+            preOffloadFreight: null,
+            preOffloadFreightCurrencyCode: null,
+            preOffloadFreightAccountId: null,
+            preOffloadFreightSupplierId: null,
+            preOffloadOtherCharges: null,
+            preOffloadOtherChargesAccountId: null,
+            preOffloadOtherChargesSupplierId: null,
+            preOffloadStatus: null,
+            preOffloadCommissionAmount: null,
+            preOffloadCommissionCurrencyCode: null,
+            preOffloadCommissionAccountId: null,
+            preOffloadCommissionSupplierId: null,
+            preOffloadCommissionNotes: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(factoryContainers.id, containerId));
       });
 
       res.json({ message: "Offload reversed successfully. Container is back to its previous status." });
@@ -832,5 +966,4 @@ export function registerRawStockOffloadRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 }

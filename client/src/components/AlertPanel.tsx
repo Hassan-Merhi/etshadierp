@@ -18,10 +18,13 @@ export interface AlertPanelProps {
 }
 
 const TONE: Record<AlertTone, { wrap: string; icon: LucideIcon }> = {
-  info:        { wrap: "border-info/30 bg-info-soft text-info-soft-foreground",                 icon: Info },
-  success:     { wrap: "border-success/30 bg-success-soft text-success-soft-foreground",         icon: CheckCircle2 },
-  warning:     { wrap: "border-warning/30 bg-warning-soft text-warning-soft-foreground",         icon: AlertTriangle },
-  destructive: { wrap: "border-destructive/30 bg-destructive-soft text-destructive-soft-foreground", icon: AlertCircle },
+  info: { wrap: "border-info/30 bg-info-soft text-info-soft-foreground", icon: Info },
+  success: { wrap: "border-success/30 bg-success-soft text-success-soft-foreground", icon: CheckCircle2 },
+  warning: { wrap: "border-warning/30 bg-warning-soft text-warning-soft-foreground", icon: AlertTriangle },
+  destructive: {
+    wrap: "border-destructive/30 bg-destructive-soft text-destructive-soft-foreground",
+    icon: AlertCircle,
+  },
 };
 
 /**

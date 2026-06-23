@@ -1,20 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Settings, Printer, TestTube } from "lucide-react";
 import {
@@ -112,7 +100,14 @@ export function LabelPrintSettings() {
         <div className="space-y-4">
           <div className="space-y-2">
             <Label>Paper Format</Label>
-            <Select value={paperFormat} onValueChange={(val) => { const f = val as PaperFormat; setPaperFormat(f); setPaperFormatSetting(f); }}>
+            <Select
+              value={paperFormat}
+              onValueChange={(val) => {
+                const f = val as PaperFormat;
+                setPaperFormat(f);
+                setPaperFormatSetting(f);
+              }}
+            >
               <SelectTrigger data-testid="select-paper-format">
                 <SelectValue />
               </SelectTrigger>
@@ -122,9 +117,9 @@ export function LabelPrintSettings() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {paperFormat === 'A4'
-                ? 'Each A4 sheet prints one label: detail block on top half, product name on bottom half.'
-                : 'Each bale prints 2 A5 portrait pages: page 1 has detail block on top + product name below, page 2 has large product name. Select A5 paper and Portrait in print dialog.'}
+              {paperFormat === "A4"
+                ? "Each A4 sheet prints one label: detail block on top half, product name on bottom half."
+                : "Each bale prints 2 A5 portrait pages: page 1 has detail block on top + product name below, page 2 has large product name. Select A5 paper and Portrait in print dialog."}
             </p>
           </div>
 
@@ -140,13 +135,13 @@ export function LabelPrintSettings() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              {mode === 'BROWSER'
-                ? 'Labels print through browser print dialog (works with any printer).'
-                : 'Labels sent as raw ZPL directly to Zebra thermal printer via QZ Tray. Requires QZ Tray installed.'}
+              {mode === "BROWSER"
+                ? "Labels print through browser print dialog (works with any printer)."
+                : "Labels sent as raw ZPL directly to Zebra thermal printer via QZ Tray. Requires QZ Tray installed."}
             </p>
           </div>
 
-          {mode === 'ZEBRA_RAW' && (
+          {mode === "ZEBRA_RAW" && (
             <>
               <div className="space-y-2">
                 <Label>Zebra Printer</Label>
@@ -157,7 +152,9 @@ export function LabelPrintSettings() {
                     </SelectTrigger>
                     <SelectContent>
                       {printers.map((p) => (
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

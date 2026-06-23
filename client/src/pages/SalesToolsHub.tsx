@@ -5,9 +5,9 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Book, ArrowLeftRight, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const POSDaybook   = lazy(() => import("@/pages/pos/POSDaybook"));
+const POSDaybook = lazy(() => import("@/pages/pos/POSDaybook"));
 const StockTransfers = lazy(() => import("@/pages/StockTransfers"));
-const POSPriceList  = lazy(() => import("@/pages/pos/POSPriceList"));
+const POSPriceList = lazy(() => import("@/pages/pos/POSPriceList"));
 
 export default function SalesToolsHub() {
   const [, setLocation] = useLocation();
@@ -23,16 +23,16 @@ export default function SalesToolsHub() {
 
   const tabs = isPOS
     ? [
-        { key: "daybook",   label: "POS Daybook",    icon: Book           },
+        { key: "daybook", label: "POS Daybook", icon: Book },
         { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
       ]
     : [
         { key: "transfers", label: "Stock Transfers", icon: ArrowLeftRight },
-        { key: "pricelist", label: "Price List",      icon: Tag            },
+        { key: "pricelist", label: "Price List", icon: Tag },
       ];
 
   const defaultTab = tabs[0].key;
-  const activeTab  = tabs.find(t => t.key === tabParam) ? tabParam : defaultTab;
+  const activeTab = tabs.find((t) => t.key === tabParam) ? tabParam : defaultTab;
 
   const setTab = (key: string) => setLocation("/sales-tools?tab=" + key);
 
@@ -42,7 +42,7 @@ export default function SalesToolsHub() {
         {/* Tab strip header */}
         <div className="border-b bg-background px-4 py-2.5 shrink-0">
           <div className="flex gap-1 p-1 rounded-xl border bg-card w-fit">
-            {tabs.map(t => {
+            {tabs.map((t) => {
               const isActive = activeTab === t.key;
               return (
                 <button
@@ -65,10 +65,10 @@ export default function SalesToolsHub() {
           </div>
         </div>
 
-        {tabs.map(t => (
+        {tabs.map((t) => (
           <TabsContent key={t.key} value={t.key} className="flex-1 overflow-auto m-0 p-0">
             <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Loading…</div>}>
-              {t.key === "daybook"   && <POSDaybook />}
+              {t.key === "daybook" && <POSDaybook />}
               {t.key === "transfers" && <StockTransfers hideVoucherNotes />}
               {t.key === "pricelist" && <POSPriceList />}
             </Suspense>

@@ -37,56 +37,72 @@ export function getPageLabel(route: string): string {
     "/deleted-items": "Deleted Items",
   };
   if (routeLabels[route]) return routeLabels[route];
-  return route.replace(/^\//, "").replace(/-/g, " ").replace(/\//g, " > ")
-    .split(" ").map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  return route
+    .replace(/^\//, "")
+    .replace(/-/g, " ")
+    .replace(/\//g, " > ")
+    .split(" ")
+    .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
 }
 
-export function WatchUserDialog({ userId, username, onClose }: {
+export function WatchUserDialog({
+  userId,
+  username,
+  onClose,
+}: {
   userId: string;
   username: string;
   onClose: () => void;
 }) {
   const { data: presenceRaw } = useQuery<any>({
     queryKey: ["/api/user-presence", userId],
-    queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`).then(r => r.json()),
+    queryFn: () => apiRequest("GET", `/api/user-presence/${userId}`).then((r) => r.json()),
     refetchInterval: 30000,
   });
   const { data: activityRaw } = useQuery<any>({
     queryKey: ["/api/user-presence", userId, "activity"],
-    queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`).then(r => r.json()),
+    queryFn: () => apiRequest("GET", `/api/user-presence/${userId}/activity`).then((r) => r.json()),
     refetchInterval: 30000,
   });
   const watchStartRef = useRef(Date.now());
   const { data: screenFrameRaw } = useQuery<any>({
     queryKey: ["/api/screen-feed", userId],
-    queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`).then(r => r.json()),
+    queryFn: () => apiRequest("GET", `/api/screen-feed/${userId}`).then((r) => r.json()),
     refetchInterval: 30000,
   });
 
-  const presence    = presenceRaw && typeof presenceRaw === "object" && !Array.isArray(presenceRaw) ? presenceRaw : null;
-  const activity    = Array.isArray(activityRaw) ? activityRaw : [];
-  const screenFrame = screenFrameRaw && typeof screenFrameRaw === "object" && !Array.isArray(screenFrameRaw) ? screenFrameRaw : null;
-  const clicks: Array<{ x: number; y: number; label: string; ts: number }> =
-    Array.isArray(screenFrame?.clicks) ? screenFrame.clicks : [];
+  const presence = presenceRaw && typeof presenceRaw === "object" && !Array.isArray(presenceRaw) ? presenceRaw : null;
+  const activity = Array.isArray(activityRaw) ? activityRaw : [];
+  const screenFrame =
+    screenFrameRaw && typeof screenFrameRaw === "object" && !Array.isArray(screenFrameRaw) ? screenFrameRaw : null;
+  const clicks: Array<{ x: number; y: number; label: string; ts: number }> = Array.isArray(screenFrame?.clicks)
+    ? screenFrame.clicks
+    : [];
 
-  const isOnline = !!presence && !!presence.userId && !!presence.lastSeen &&
-    (Date.now() - new Date(presence.lastSeen).getTime()) < 3 * 60 * 1000;
+  const isOnline =
+    !!presence &&
+    !!presence.userId &&
+    !!presence.lastSeen &&
+    Date.now() - new Date(presence.lastSeen).getTime() < 3 * 60 * 1000;
   const hasScreen = !!screenFrame?.dataUrl;
 
   const now = Date.now();
-  const recentClicks = clicks.filter(c => (now - c.ts) < 4000);
+  const recentClicks = clicks.filter((c) => now - c.ts < 4000);
 
   const fmtTime = (val: string | Date | null | undefined) => {
     if (!val) return "—";
     const d = new Date(val as string);
-    return isNaN(d.getTime()) ? "—" : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    return isNaN(d.getTime())
+      ? "—"
+      : d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   };
   const timeAgo = (val: string | Date | null | undefined) => {
     if (!val) return "unknown";
     const d = new Date(val as string);
     if (isNaN(d.getTime())) return "unknown";
     const s = Math.floor((Date.now() - d.getTime()) / 1000);
-    if (s < 5)  return "just now";
+    if (s < 5) return "just now";
     if (s < 60) return `${s}s ago`;
     if (s < 3600) return `${Math.floor(s / 60)}m ago`;
     return `${Math.floor(s / 3600)}h ago`;
@@ -103,7 +119,7 @@ export function WatchUserDialog({ userId, username, onClose }: {
   };
 
   return (
-    <Dialog open onOpenChange={open => !open && onClose()}>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className="!fixed !inset-0 !left-0 !top-0 !translate-x-0 !translate-y-0 !max-w-none !w-screen !h-screen !rounded-none p-0 overflow-hidden flex flex-col"
         data-testid="dialog-watch-user"
@@ -116,7 +132,9 @@ export function WatchUserDialog({ userId, username, onClose }: {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
               </span>
-              <span className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">Live</span>
+              <span className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase tracking-wide">
+                Live
+              </span>
             </span>
           ) : (
             <span className="h-2.5 w-2.5 rounded-full bg-muted-foreground/40" />
@@ -124,15 +142,12 @@ export function WatchUserDialog({ userId, username, onClose }: {
           <span className="font-semibold text-sm">Watching: {username}</span>
           {isOnline && presence && (
             <span className="text-sm text-muted-foreground">
-              · {presence.companyName || "no company"} · {presence.role || "—"}
-              · last seen {timeAgo(presence.lastSeen)}
+              · {presence.companyName || "no company"} · {presence.role || "—"}· last seen {timeAgo(presence.lastSeen)}
             </span>
           )}
           <div className="ml-auto flex items-center gap-2">
             {screenFrame?.capturedAt && (
-              <span className="text-xs text-muted-foreground">
-                captured {timeAgo(screenFrame.capturedAt)}
-              </span>
+              <span className="text-xs text-muted-foreground">captured {timeAgo(screenFrame.capturedAt)}</span>
             )}
             {hasScreen && (
               <Button size="sm" variant="outline" onClick={openNativeFullscreen} data-testid="button-fullscreen-feed">
@@ -164,9 +179,9 @@ export function WatchUserDialog({ userId, username, onClose }: {
                         key={i}
                         title={click.label}
                         style={{
-                          position:  "absolute",
-                          left:      `${click.x * 100}%`,
-                          top:       `${click.y * 100}%`,
+                          position: "absolute",
+                          left: `${click.x * 100}%`,
+                          top: `${click.y * 100}%`,
                           transform: "translate(-50%, -50%)",
                           opacity,
                           pointerEvents: "none",
@@ -185,7 +200,7 @@ export function WatchUserDialog({ userId, username, onClose }: {
                   <Clock className="h-10 w-10 opacity-30" />
                   <p className="text-sm">Waiting for first frame…</p>
                   <p className="text-xs">Updates every 3–5 seconds while watched</p>
-                  {(Date.now() - watchStartRef.current) > 20000 && (
+                  {Date.now() - watchStartRef.current > 20000 && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 text-center max-w-xs">
                       Still waiting — user may be on a background tab.
                     </p>
@@ -200,14 +215,21 @@ export function WatchUserDialog({ userId, username, onClose }: {
                   <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide flex items-center gap-1 shrink-0">
                     <Eye className="h-3 w-3" /> Clicks
                   </span>
-                  {[...clicks].reverse().slice(0, 6).map((click, i) => (
-                    <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <span className="truncate max-w-[160px]">{click.label || "—"}</span>
-                      <span className="text-muted-foreground/50 shrink-0">
-                        {new Date(click.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                      </span>
-                    </div>
-                  ))}
+                  {[...clicks]
+                    .reverse()
+                    .slice(0, 6)
+                    .map((click, i) => (
+                      <div key={i} className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span className="truncate max-w-[160px]">{click.label || "—"}</span>
+                        <span className="text-muted-foreground/50 shrink-0">
+                          {new Date(click.ts).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}

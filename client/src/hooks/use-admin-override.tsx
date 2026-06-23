@@ -55,7 +55,7 @@ export function useAdminOverride(): UseAdminOverrideReturn {
         setPendingAction(() => fn);
       }
     },
-    [isAdmin],
+    [isAdmin]
   );
 
   const handleSuccess = useCallback(() => {

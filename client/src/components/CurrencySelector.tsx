@@ -10,9 +10,9 @@ interface CurrencySelectorProps {
 
 export function CurrencySelector({ value, onChange, className }: CurrencySelectorProps) {
   const { selectedCurrency, setCurrency } = useCurrencyContext();
-  
+
   const currentValue = value !== undefined ? value : selectedCurrency;
-  
+
   const handleChange = (currency: Currency) => {
     if (onChange) {
       onChange(currency);
@@ -56,7 +56,7 @@ interface CurrencyLabelProps {
 export function CurrencyLabel({ amount, currency, className }: CurrencyLabelProps) {
   const { formatAmount, selectedCurrency } = useCurrencyContext();
   const curr = currency || selectedCurrency;
-  
+
   return (
     <span className={className} data-testid="currency-label">
       {formatAmount(amount, curr)}

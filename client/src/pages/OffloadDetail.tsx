@@ -109,7 +109,10 @@ function LiveBadge({ original, live }: { original: number; live: number }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Badge variant="outline" className="text-amber-600 border-amber-500 bg-amber-500/10 gap-1 ml-2 text-[10px] px-1 py-0">
+        <Badge
+          variant="outline"
+          className="text-amber-600 border-amber-500 bg-amber-500/10 gap-1 ml-2 text-[10px] px-1 py-0"
+        >
           <Zap className="w-2.5 h-2.5" />
           updated
         </Badge>
@@ -122,7 +125,14 @@ function LiveBadge({ original, live }: { original: number; live: number }) {
   );
 }
 
-function ChargeRow({ label, original, live, isSubtotal = false, isNegative = false, indent = false }: {
+function ChargeRow({
+  label,
+  original,
+  live,
+  isSubtotal = false,
+  isNegative = false,
+  indent = false,
+}: {
   label: string;
   original: number;
   live?: number;
@@ -153,7 +163,12 @@ export default function OffloadDetail() {
   const id = params.id;
   const { toast } = useToast();
 
-  const { data: offload, isLoading, isError, error } = useQuery<OffloadDetailData>({
+  const {
+    data: offload,
+    isLoading,
+    isError,
+    error,
+  } = useQuery<OffloadDetailData>({
     queryKey: [`/api/offloads/${id}`],
     enabled: !!id,
   });
@@ -173,42 +188,40 @@ export default function OffloadDetail() {
   const itemsTotal = offload?.items.reduce((s, i) => s + Number(i.totalValue), 0) ?? 0;
   const live = offload?.liveCharges;
   // Prefer live voucher amounts when available
-  const displayDuties         = live?.hasVouchers ? live.duties          : Number(offload?.duties || 0);
-  const displayOfficeCharges  = live?.hasVouchers ? live.officeCharges   : Number(offload?.officeCharges || 0);
-  const displayTransportFees  = live?.hasVouchers ? live.transportFees   : Number(offload?.transportFees || 0);
-  const displayTransferCharges= live?.hasVouchers ? live.transferCharges : Number(offload?.transferCharges || 0);
+  const displayDuties = live?.hasVouchers ? live.duties : Number(offload?.duties || 0);
+  const displayOfficeCharges = live?.hasVouchers ? live.officeCharges : Number(offload?.officeCharges || 0);
+  const displayTransportFees = live?.hasVouchers ? live.transportFees : Number(offload?.transportFees || 0);
+  const displayTransferCharges = live?.hasVouchers ? live.transferCharges : Number(offload?.transferCharges || 0);
   // containerCharges (Freight, Discount, Document Charges) are always in additionalCharges — add regardless of live vouchers
   const storedAdditionalCharges = (offload?.additionalCharges || []).reduce((s, c) => s + Number(c.amount || 0), 0);
-  const displayAddlCharges    = live?.hasVouchers ? live.additionalCharges : 0;
-  const displayOffloadTotal   = (live?.hasVouchers
-    ? live.totalOffloadCharges
-    : (displayDuties + displayOfficeCharges + displayTransportFees + displayTransferCharges + displayAddlCharges))
-    + storedAdditionalCharges;
+  const displayAddlCharges = live?.hasVouchers ? live.additionalCharges : 0;
+  const displayOffloadTotal =
+    (live?.hasVouchers
+      ? live.totalOffloadCharges
+      : displayDuties + displayOfficeCharges + displayTransportFees + displayTransferCharges + displayAddlCharges) +
+    storedAdditionalCharges;
 
-  const displayCostPerBale        = live?.hasVouchers ? live.additionalCostPerBale : Number(offload?.additionalCostPerBale || 0);
+  const displayCostPerBale = live?.hasVouchers
+    ? live.additionalCostPerBale
+    : Number(offload?.additionalCostPerBale || 0);
 
   // Stored original values for comparison badges
-  const storedDuties          = Number(offload?.duties || 0);
-  const storedOfficeCharges   = Number(offload?.officeCharges || 0);
-  const storedTransportFees   = Number(offload?.transportFees || 0);
+  const storedDuties = Number(offload?.duties || 0);
+  const storedOfficeCharges = Number(offload?.officeCharges || 0);
+  const storedTransportFees = Number(offload?.transportFees || 0);
   const storedTransferCharges = Number(offload?.transferCharges || 0);
 
-  const anyVoucherUpdated = live?.hasVouchers && (
-    Math.abs(live.duties - storedDuties) >= 0.01 ||
-    Math.abs(live.officeCharges - storedOfficeCharges) >= 0.01 ||
-    Math.abs(live.transportFees - storedTransportFees) >= 0.01 ||
-    Math.abs(live.transferCharges - storedTransferCharges) >= 0.01
-  );
+  const anyVoucherUpdated =
+    live?.hasVouchers &&
+    (Math.abs(live.duties - storedDuties) >= 0.01 ||
+      Math.abs(live.officeCharges - storedOfficeCharges) >= 0.01 ||
+      Math.abs(live.transportFees - storedTransportFees) >= 0.01 ||
+      Math.abs(live.transferCharges - storedTransferCharges) >= 0.01);
 
   return (
     <div className="w-full p-4 sm:p-8 space-y-6">
       <div className="flex items-start gap-3 flex-wrap">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleBack}
-          data-testid="button-back-offload"
-        >
+        <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back-offload">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1 min-w-0">
@@ -217,11 +230,7 @@ export default function OffloadDetail() {
               <Package className="w-3 h-3" />
               Offload
             </Badge>
-            {isLoading ? (
-              <Skeleton className="h-7 w-40" />
-            ) : (
-              <PageHeader title={offload?.containerNumber} />
-            )}
+            {isLoading ? <Skeleton className="h-7 w-40" /> : <PageHeader title={offload?.containerNumber} />}
             {offload?.optional && (
               <Badge variant="outline" className="text-red-600 border-red-500 bg-red-500/10 gap-1">
                 <PauseCircle className="w-3 h-3" />
@@ -251,29 +260,33 @@ export default function OffloadDetail() {
                 data-testid="button-toggle-optional"
                 disabled={toggleOptionalMutation.isPending}
               >
-                {offload.optional
-                  ? <><PlayCircle className="w-4 h-4" /> Restore Offload</>
-                  : <><PauseCircle className="w-4 h-4" /> Suspend Offload</>
-                }
+                {offload.optional ? (
+                  <>
+                    <PlayCircle className="w-4 h-4" /> Restore Offload
+                  </>
+                ) : (
+                  <>
+                    <PauseCircle className="w-4 h-4" /> Suspend Offload
+                  </>
+                )}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {offload.optional ? "Restore Offload?" : "Suspend Offload?"}
-                </AlertDialogTitle>
+                <AlertDialogTitle>{offload.optional ? "Restore Offload?" : "Suspend Offload?"}</AlertDialogTitle>
                 <AlertDialogDescription>
                   {offload.optional
                     ? `This will re-add all ${formatNumber(Number(offload.totalBales))} bales back into stock at the original rates, and make all related vouchers (duties, transport, office, transfer, additional charges) active again.`
-                    : `This will remove all ${formatNumber(Number(offload.totalBales))} bales from stock and mark all related vouchers (duties, transport, office, transfer, additional charges) as optional so they are excluded from financial calculations. You can restore it at any time.`
-                  }
+                    : `This will remove all ${formatNumber(Number(offload.totalBales))} bales from stock and mark all related vouchers (duties, transport, office, transfer, additional charges) as optional so they are excluded from financial calculations. You can restore it at any time.`}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   onClick={() => toggleOptionalMutation.mutate()}
-                  className={offload.optional ? "" : "bg-destructive text-destructive-foreground hover:bg-destructive/90"}
+                  className={
+                    offload.optional ? "" : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  }
                 >
                   {offload.optional ? "Restore" : "Suspend"}
                 </AlertDialogAction>
@@ -307,7 +320,9 @@ export default function OffloadDetail() {
                   <tbody>
                     {offload.items.map((item) => (
                       <tr key={item.id} className="border-b last:border-0">
-                        <td className="p-3">{item.stockItemName || item.stockItemCode || `Item #${item.stockItemId}`}</td>
+                        <td className="p-3">
+                          {item.stockItemName || item.stockItemCode || `Item #${item.stockItemId}`}
+                        </td>
                         <td className="p-3 text-right font-mono">{formatNumber(Number(item.quantity))}</td>
                         <td className="p-3 text-right font-mono">{formatAmount(Number(item.rate))}</td>
                         <td className="p-3 text-right font-mono">{formatAmount(Number(item.totalValue))}</td>
@@ -356,7 +371,10 @@ export default function OffloadDetail() {
                 <tbody>
                   {/* ── Landing / Local Charges ── */}
                   <tr className="bg-muted/20">
-                    <td colSpan={2} className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    <td
+                      colSpan={2}
+                      className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
+                    >
                       Landing Charges
                     </td>
                   </tr>
@@ -392,17 +410,24 @@ export default function OffloadDetail() {
                       indent
                     />
                   )}
-                  {offload.additionalCharges.filter(c => Number(c.amount) !== 0).map((c) => (
-                    <tr key={c.id} className="border-b">
-                      <td className="p-3 pl-5">{c.chargeType}</td>
-                      <td className="p-3 text-right font-mono">{formatAmount(Number(c.amount))}</td>
-                    </tr>
-                  ))}
+                  {offload.additionalCharges
+                    .filter((c) => Number(c.amount) !== 0)
+                    .map((c) => (
+                      <tr key={c.id} className="border-b">
+                        <td className="p-3 pl-5">{c.chargeType}</td>
+                        <td className="p-3 text-right font-mono">{formatAmount(Number(c.amount))}</td>
+                      </tr>
+                    ))}
                   {displayAddlCharges > 0 && (
                     <tr className="border-b">
                       <td className="p-3 pl-5 flex items-center gap-1">
                         Additional Charges
-                        {live?.hasVouchers && <Badge variant="outline" className="text-[10px] px-1 py-0 gap-0.5"><Zap className="w-2.5 h-2.5" />live</Badge>}
+                        {live?.hasVouchers && (
+                          <Badge variant="outline" className="text-[10px] px-1 py-0 gap-0.5">
+                            <Zap className="w-2.5 h-2.5" />
+                            live
+                          </Badge>
+                        )}
                       </td>
                       <td className="p-3 text-right font-mono">{formatAmount(displayAddlCharges)}</td>
                     </tr>
@@ -422,7 +447,8 @@ export default function OffloadDetail() {
                     <td className="p-3 text-right font-mono font-semibold text-amber-600 dark:text-amber-400">
                       {Number(offload.totalBales) > 0
                         ? formatAmount(Math.round((displayOffloadTotal / Number(offload.totalBales)) * 100) / 100)
-                        : formatAmount(0)} / bale
+                        : formatAmount(0)}{" "}
+                      / bale
                     </td>
                   </tr>
                 </tbody>

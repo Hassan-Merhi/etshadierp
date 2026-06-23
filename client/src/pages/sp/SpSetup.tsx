@@ -38,9 +38,7 @@ export default function SpSetup() {
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts"] });
       toast({
         title: "Setup complete",
-        description: data.created?.length > 0
-          ? `Created: ${data.created.join(", ")}`
-          : "Already fully configured.",
+        description: data.created?.length > 0 ? `Created: ${data.created.join(", ")}` : "Already fully configured.",
       });
     },
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -59,8 +57,7 @@ export default function SpSetup() {
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const isPosConfigured =
-    !!companySettings?.spPosPayableAccountId && !!companySettings?.spPosProfitAccountId;
+  const isPosConfigured = !!companySettings?.spPosPayableAccountId && !!companySettings?.spPosProfitAccountId;
 
   if (isLoading) {
     return (
@@ -84,9 +81,7 @@ export default function SpSetup() {
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle className="text-base">Chart of Accounts</CardTitle>
-              <CardDescription className="text-xs mt-1">
-                9 accounts required for SP accounting flow
-              </CardDescription>
+              <CardDescription className="text-xs mt-1">9 accounts required for SP accounting flow</CardDescription>
             </div>
             {status?.isConfigured ? (
               <Badge variant="outline" className="text-green-600 border-green-600/40">
@@ -103,12 +98,17 @@ export default function SpSetup() {
           {status?.spAccounts && status.spAccounts.length > 0 && (
             <div className="grid gap-1.5">
               {status.spAccounts.map((acct: any) => (
-                <div key={acct.id} className="flex items-center justify-between text-sm py-1 border-b border-border/40 last:border-0">
+                <div
+                  key={acct.id}
+                  className="flex items-center justify-between text-sm py-1 border-b border-border/40 last:border-0"
+                >
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs text-muted-foreground w-20">{acct.code}</span>
                     <span>{acct.name}</span>
                     {acct.isHidden && (
-                      <Badge variant="secondary" className="text-xs py-0">hidden</Badge>
+                      <Badge variant="secondary" className="text-xs py-0">
+                        hidden
+                      </Badge>
                     )}
                   </div>
                   <span className="text-xs text-muted-foreground">{acct.accountType}</span>
@@ -127,7 +127,9 @@ export default function SpSetup() {
           {status?.bankAccounts?.length === 0 && (
             <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 dark:bg-amber-950/20 rounded-md p-3">
               <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-              <span>No bank accounts found. Add at least one bank account to record prepaid payments and sales receipts.</span>
+              <span>
+                No bank accounts found. Add at least one bank account to record prepaid payments and sales receipts.
+              </span>
             </div>
           )}
 
@@ -152,8 +154,8 @@ export default function SpSetup() {
             <div>
               <CardTitle className="text-base">POS Accounting Accounts</CardTitle>
               <CardDescription className="text-xs mt-1">
-                Accounts used when recording POS sales for this supplier partner company.
-                Each sale debits Cash and splits the credit between Supplier Payable (cost) and Profit.
+                Accounts used when recording POS sales for this supplier partner company. Each sale debits Cash and
+                splits the credit between Supplier Payable (cost) and Profit.
               </CardDescription>
             </div>
             {isPosConfigured ? (
@@ -177,10 +179,7 @@ export default function SpSetup() {
             <>
               <div className="space-y-2">
                 <Label htmlFor="payable-account">Supplier Payable Account (Cr cost)</Label>
-                <Select
-                  value={payableId}
-                  onValueChange={setSelectedPayableId}
-                >
+                <Select value={payableId} onValueChange={setSelectedPayableId}>
                   <SelectTrigger id="payable-account" data-testid="select-sp-pos-payable-account">
                     <SelectValue placeholder="Select account…" />
                   </SelectTrigger>
@@ -208,10 +207,7 @@ export default function SpSetup() {
 
               <div className="space-y-2">
                 <Label htmlFor="profit-account">POS Profit Account (Cr margin)</Label>
-                <Select
-                  value={profitId}
-                  onValueChange={setSelectedProfitId}
-                >
+                <Select value={profitId} onValueChange={setSelectedProfitId}>
                   <SelectTrigger id="profit-account" data-testid="select-sp-pos-profit-account">
                     <SelectValue placeholder="Select account…" />
                   </SelectTrigger>
@@ -239,7 +235,10 @@ export default function SpSetup() {
 
               <div className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground space-y-1">
                 <p className="font-medium text-foreground">Accounting entry per sale:</p>
-                <p>Dr Cash / Bank &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= Grand Total</p>
+                <p>
+                  Dr Cash / Bank &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=
+                  Grand Total
+                </p>
                 <p>Cr Supplier Payable &nbsp;&nbsp;&nbsp;&nbsp; = Total Supplier Cost</p>
                 <p>Cr Profit Account &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = Grand Total − Cost</p>
               </div>

@@ -8,11 +8,14 @@ import ExcelJS from "exceljs";
 // ── In-memory undo store for bulk Excel imports ────────────────────────────
 // Keyed by importId (UUID). Stores the "before" snapshot so the last import
 // can be rolled back. Entries expire after 2 hours to prevent unbounded growth.
-const importUndoStore = new Map<string, {
-  companyId: number;
-  createdAt: number;
-  changes: Array<{ id: number; containerNumber: string; prevData: Record<string, any> }>;
-}>();
+const importUndoStore = new Map<
+  string,
+  {
+    companyId: number;
+    createdAt: number;
+    changes: Array<{ id: number; containerNumber: string; prevData: Record<string, any> }>;
+  }
+>();
 const UNDO_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
@@ -219,9 +222,7 @@ async function buildAgentsForCompany(cid: number) {
   if (rawContainers.length === 0) return [];
 
   // ── 2. Unique agent names ──
-  const uniqueAgents = [
-    ...new Set(rawContainers.map((r) => r.agent!.trim()).filter(Boolean)),
-  ];
+  const uniqueAgents = [...new Set(rawContainers.map((r) => r.agent!.trim()).filter(Boolean))];
 
   // ── 3. Active mappings for this company + global (company_id IS NULL) ──
   const allMappings = await db
@@ -230,10 +231,7 @@ async function buildAgentsForCompany(cid: number) {
     .where(
       and(
         eq(agentDeclarantMappings.active, true),
-        or(
-          eq(agentDeclarantMappings.companyId, cid),
-          isNull(agentDeclarantMappings.companyId)
-        )
+        or(eq(agentDeclarantMappings.companyId, cid), isNull(agentDeclarantMappings.companyId))
       )
     );
 
@@ -241,9 +239,7 @@ async function buildAgentsForCompany(cid: number) {
   // Also include any account explicitly referenced by the mappings for this company,
   // because an agent may be mapped to an account that lives under a different company ID
   // (e.g. a shared/parent-company agent account).
-  const mappedAccountIds = allMappings
-    .map((m) => m.ledgerAccountId)
-    .filter((id): id is number => id !== null);
+  const mappedAccountIds = allMappings.map((m) => m.ledgerAccountId).filter((id): id is number => id !== null);
 
   const allLedgerAccts = await db
     .select({
@@ -257,9 +253,7 @@ async function buildAgentsForCompany(cid: number) {
       and(
         or(
           eq(ledgerAccounts.companyId, cid),
-          mappedAccountIds.length > 0
-            ? inArray(ledgerAccounts.id, mappedAccountIds)
-            : sql`false`
+          mappedAccountIds.length > 0 ? inArray(ledgerAccounts.id, mappedAccountIds) : sql`false`
         ),
         isNull(ledgerAccounts.deletedAt)
       )
@@ -279,36 +273,28 @@ async function buildAgentsForCompany(cid: number) {
   } {
     const norm = agentName.trim().toLowerCase();
 
-    const byCompanyName = allMappings.find(
-      (m) => m.companyId === cid && m.agentName.trim().toLowerCase() === norm
-    );
+    const byCompanyName = allMappings.find((m) => m.companyId === cid && m.agentName.trim().toLowerCase() === norm);
     if (byCompanyName?.ledgerAccountId) {
       const acc = allLedgerAccts.find((a) => a.id === byCompanyName.ledgerAccountId);
       if (acc) return { accountId: acc.id, accountName: acc.name, confidence: "exact" };
     }
 
     const byCompanyAlias = allMappings.find(
-      (m) =>
-        m.companyId === cid &&
-        (m.aliases as string[]).some((al) => al.trim().toLowerCase() === norm)
+      (m) => m.companyId === cid && (m.aliases as string[]).some((al) => al.trim().toLowerCase() === norm)
     );
     if (byCompanyAlias?.ledgerAccountId) {
       const acc = allLedgerAccts.find((a) => a.id === byCompanyAlias.ledgerAccountId);
       if (acc) return { accountId: acc.id, accountName: acc.name, confidence: "exact" };
     }
 
-    const byGlobalName = allMappings.find(
-      (m) => m.companyId === null && m.agentName.trim().toLowerCase() === norm
-    );
+    const byGlobalName = allMappings.find((m) => m.companyId === null && m.agentName.trim().toLowerCase() === norm);
     if (byGlobalName?.ledgerAccountId) {
       const acc = allLedgerAccts.find((a) => a.id === byGlobalName.ledgerAccountId);
       if (acc) return { accountId: acc.id, accountName: acc.name, confidence: "exact" };
     }
 
     const byGlobalAlias = allMappings.find(
-      (m) =>
-        m.companyId === null &&
-        (m.aliases as string[]).some((al) => al.trim().toLowerCase() === norm)
+      (m) => m.companyId === null && (m.aliases as string[]).some((al) => al.trim().toLowerCase() === norm)
     );
     if (byGlobalAlias?.ledgerAccountId) {
       const acc = allLedgerAccts.find((a) => a.id === byGlobalAlias.ledgerAccountId);
@@ -319,8 +305,7 @@ async function buildAgentsForCompany(cid: number) {
       const an = acc.name.trim().toLowerCase();
       return an.includes(norm) || norm.includes(an);
     });
-    if (fuzzy)
-      return { accountId: fuzzy.id, accountName: fuzzy.name, confidence: "fuzzy" };
+    if (fuzzy) return { accountId: fuzzy.id, accountName: fuzzy.name, confidence: "fuzzy" };
 
     return { accountId: null, accountName: null, confidence: "unmapped" };
   }
@@ -340,11 +325,7 @@ async function buildAgentsForCompany(cid: number) {
       .from(voucherEntries)
       .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
       .where(
-        and(
-          eq(voucherEntries.ledgerAccountId, accountId),
-          eq(vouchers.optional, false),
-          isNull(vouchers.deletedAt)
-        )
+        and(eq(voucherEntries.ledgerAccountId, accountId), eq(vouchers.optional, false), isNull(vouchers.deletedAt))
       );
 
     for (const e of entries) {
@@ -354,7 +335,11 @@ async function buildAgentsForCompany(cid: number) {
     // Linked bank accounts — entries stored under bankAccountId, not ledgerAccountId.
     // The Accounts page balance folds these in, so we must too.
     const linkedBanks = await db
-      .select({ id: bankAccounts.id, openingBalance: bankAccounts.openingBalance, openingBalanceSide: bankAccounts.openingBalanceSide })
+      .select({
+        id: bankAccounts.id,
+        openingBalance: bankAccounts.openingBalance,
+        openingBalanceSide: bankAccounts.openingBalanceSide,
+      })
       .from(bankAccounts)
       .where(eq(bankAccounts.linkedLedgerId, accountId));
 
@@ -367,11 +352,7 @@ async function buildAgentsForCompany(cid: number) {
         .from(voucherEntries)
         .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
         .where(
-          and(
-            eq(voucherEntries.bankAccountId, bank.id),
-            eq(vouchers.optional, false),
-            isNull(vouchers.deletedAt)
-          )
+          and(eq(voucherEntries.bankAccountId, bank.id), eq(vouchers.optional, false), isNull(vouchers.deletedAt))
         );
 
       for (const e of bankEntries) {
@@ -405,12 +386,8 @@ async function buildAgentsForCompany(cid: number) {
           supplierCode: r.supplierCode ?? null,
         }));
 
-      const offloadedContainers = agentContainers.filter((r) =>
-        OFFLOADED_STATUSES.has(r.status)
-      );
-      const activeContainers = agentContainers.filter(
-        (r) => !OFFLOADED_STATUSES.has(r.status)
-      );
+      const offloadedContainers = agentContainers.filter((r) => OFFLOADED_STATUSES.has(r.status));
+      const activeContainers = agentContainers.filter((r) => !OFFLOADED_STATUSES.has(r.status));
 
       const containerDutyTotal = agentContainers.reduce((s, r) => s + r.dutyFee, 0);
       const offloadedDutyTotal = offloadedContainers.reduce((s, r) => s + r.dutyFee, 0);
@@ -469,8 +446,7 @@ async function buildAgentsForCompany(cid: number) {
           partialRows = result.partialRows;
           openRows = result.openRows;
           clearedByPayments =
-            clearedRows.reduce((s, r) => s + r.clearedAmount, 0) +
-            partialRows.reduce((s, r) => s + r.clearedAmount, 0);
+            clearedRows.reduce((s, r) => s + r.clearedAmount, 0) + partialRows.reduce((s, r) => s + r.clearedAmount, 0);
           openBalance = outstanding;
 
           const openSum =
@@ -482,19 +458,21 @@ async function buildAgentsForCompany(cid: number) {
         }
       }
 
-      const activePreviewRows: PreviewRow[] = activeContainers.filter((r) => !!(r.numberPlate ?? "").trim()).map((r) => ({
-        id: r.id,
-        containerNumber: r.containerNumber,
-        companyId: r.companyId,
-        numberPlate: r.numberPlate,
-        borderDate: r.borderDate,
-        transporter: r.transporter,
-        location: r.location,
-        dutyFee: r.dutyFee,
-        supplierName: r.supplierName,
-        supplierCode: r.supplierCode,
-        status: r.status,
-      }));
+      const activePreviewRows: PreviewRow[] = activeContainers
+        .filter((r) => !!(r.numberPlate ?? "").trim())
+        .map((r) => ({
+          id: r.id,
+          containerNumber: r.containerNumber,
+          companyId: r.companyId,
+          numberPlate: r.numberPlate,
+          borderDate: r.borderDate,
+          transporter: r.transporter,
+          location: r.location,
+          dutyFee: r.dutyFee,
+          supplierName: r.supplierName,
+          supplierCode: r.supplierCode,
+          status: r.status,
+        }));
 
       return {
         agentName,
@@ -540,127 +518,110 @@ export function registerGitRoutes(app: Express) {
    *
    * Read-only. No vouchers, containers, or accounting records are modified.
    */
-  app.get(
-    "/api/git/agent-duty-summary",
-    requireAuth,
-    requireRole("Admin", "Owner"),
-    async (req, res) => {
-      try {
-        const sessionCompanyId: number | undefined =
-          (req.session as any)?.currentCompanyId;
-        const userId: string = (req.user as any).id;
-        const role: string = (req.user as any).role;
-        const isAdminOrDev = role === "Admin" || role === "Developer";
+  app.get("/api/git/agent-duty-summary", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
+    try {
+      const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
+      const userId: string = (req.user as any).id;
+      const role: string = (req.user as any).role;
+      const isAdminOrDev = role === "Admin" || role === "Developer";
 
-        const wantsAll = req.query.allCompanies === "true";
-        const requestedId = req.query.companyId
-          ? parseInt(req.query.companyId as string, 10)
-          : undefined;
+      const wantsAll = req.query.allCompanies === "true";
+      const requestedId = req.query.companyId ? parseInt(req.query.companyId as string, 10) : undefined;
 
-        const asOf = new Date().toISOString();
+      const asOf = new Date().toISOString();
 
-        // ── All-companies mode ──────────────────────────────────────────────
-        if (wantsAll) {
-          let accessibleIds: number[];
+      // ── All-companies mode ──────────────────────────────────────────────
+      if (wantsAll) {
+        let accessibleIds: number[];
 
-          if (isAdminOrDev) {
-            // Admin/Dev: all companies that actually have containers with duty
-            const rows = await db
-              .selectDistinct({ companyId: containers.companyId })
-              .from(containers)
-              .where(
-                and(
-                  isNotNull(containers.agent),
-                  isNotNull(containers.dutyFee),
-                  sql`${containers.agent} <> ''`,
-                  sql`CAST(${containers.dutyFee} AS NUMERIC) > 0`
-                )
-              );
-            accessibleIds = rows.map((r) => r.companyId);
-          } else {
-            // Owner: only their user_company_roles companies
-            const roles = await db
-              .select({ companyId: userCompanyRoles.companyId })
-              .from(userCompanyRoles)
-              .where(eq(userCompanyRoles.userId, userId));
-            accessibleIds = roles.map((r) => r.companyId);
-          }
-
-          if (accessibleIds.length === 0) {
-            return res.json({ asOf, mode: "all", companies: [] });
-          }
-
-          // Load company names in one query
-          const companyRows = await db
-            .select({ id: companies.id, name: companies.name })
-            .from(companies)
-            .where(inArray(companies.id, accessibleIds));
-          const nameMap: Record<number, string> = Object.fromEntries(
-            companyRows.map((c) => [c.id, c.name])
-          );
-
-          // Build each company section in parallel
-          const sections = await Promise.all(
-            accessibleIds.map(async (cid) => ({
-              companyId: cid,
-              companyName: nameMap[cid] ?? `Company ${cid}`,
-              agents: await buildAgentsForCompany(cid),
-            }))
-          );
-
-          // Sort by companyId for stable order
-          sections.sort((a, b) => a.companyId - b.companyId);
-
-          return res.json({ asOf, mode: "all", companies: sections });
-        }
-
-        // ── Single-company mode ────────────────────────────────────────────
-        let companyId: number;
-
-        if (requestedId) {
-          // Owner: validate they have access to this specific company
-          if (!isAdminOrDev) {
-            const access = await db
-              .select({ id: userCompanyRoles.id })
-              .from(userCompanyRoles)
-              .where(
-                and(
-                  eq(userCompanyRoles.userId, userId),
-                  eq(userCompanyRoles.companyId, requestedId)
-                )
+        if (isAdminOrDev) {
+          // Admin/Dev: all companies that actually have containers with duty
+          const rows = await db
+            .selectDistinct({ companyId: containers.companyId })
+            .from(containers)
+            .where(
+              and(
+                isNotNull(containers.agent),
+                isNotNull(containers.dutyFee),
+                sql`${containers.agent} <> ''`,
+                sql`CAST(${containers.dutyFee} AS NUMERIC) > 0`
               )
-              .limit(1);
-            if (access.length === 0) {
-              return res
-                .status(403)
-                .json({ message: "Access denied to this company" });
-            }
-          }
-          companyId = requestedId;
+            );
+          accessibleIds = rows.map((r) => r.companyId);
         } else {
-          if (!sessionCompanyId) {
-            return res.status(400).json({ message: "Company ID required" });
-          }
-          companyId = sessionCompanyId;
+          // Owner: only their user_company_roles companies
+          const roles = await db
+            .select({ companyId: userCompanyRoles.companyId })
+            .from(userCompanyRoles)
+            .where(eq(userCompanyRoles.userId, userId));
+          accessibleIds = roles.map((r) => r.companyId);
         }
 
-        // Load company name
-        const companyRow = await db
-          .select({ name: companies.name })
+        if (accessibleIds.length === 0) {
+          return res.json({ asOf, mode: "all", companies: [] });
+        }
+
+        // Load company names in one query
+        const companyRows = await db
+          .select({ id: companies.id, name: companies.name })
           .from(companies)
-          .where(eq(companies.id, companyId))
-          .limit(1);
-        const companyName = companyRow[0]?.name ?? `Company ${companyId}`;
+          .where(inArray(companies.id, accessibleIds));
+        const nameMap: Record<number, string> = Object.fromEntries(companyRows.map((c) => [c.id, c.name]));
 
-        const agents = await buildAgentsForCompany(companyId);
+        // Build each company section in parallel
+        const sections = await Promise.all(
+          accessibleIds.map(async (cid) => ({
+            companyId: cid,
+            companyName: nameMap[cid] ?? `Company ${cid}`,
+            agents: await buildAgentsForCompany(cid),
+          }))
+        );
 
-        return res.json({ asOf, mode: "single", companyId, companyName, agents });
-      } catch (err) {
-        console.error("[gitRoutes] agent-duty-summary error:", err);
-        return res.status(500).json({ message: "Internal server error" });
+        // Sort by companyId for stable order
+        sections.sort((a, b) => a.companyId - b.companyId);
+
+        return res.json({ asOf, mode: "all", companies: sections });
       }
+
+      // ── Single-company mode ────────────────────────────────────────────
+      let companyId: number;
+
+      if (requestedId) {
+        // Owner: validate they have access to this specific company
+        if (!isAdminOrDev) {
+          const access = await db
+            .select({ id: userCompanyRoles.id })
+            .from(userCompanyRoles)
+            .where(and(eq(userCompanyRoles.userId, userId), eq(userCompanyRoles.companyId, requestedId)))
+            .limit(1);
+          if (access.length === 0) {
+            return res.status(403).json({ message: "Access denied to this company" });
+          }
+        }
+        companyId = requestedId;
+      } else {
+        if (!sessionCompanyId) {
+          return res.status(400).json({ message: "Company ID required" });
+        }
+        companyId = sessionCompanyId;
+      }
+
+      // Load company name
+      const companyRow = await db
+        .select({ name: companies.name })
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .limit(1);
+      const companyName = companyRow[0]?.name ?? `Company ${companyId}`;
+
+      const agents = await buildAgentsForCompany(companyId);
+
+      return res.json({ asOf, mode: "single", companyId, companyName, agents });
+    } catch (err) {
+      console.error("[gitRoutes] agent-duty-summary error:", err);
+      return res.status(500).json({ message: "Internal server error" });
     }
-  );
+  });
 
   // ─── Shared inner helper ────────────────────────────────────────────────────
   // Resolves scope, fetches+enriches active containers, applies query filters,
@@ -669,27 +630,25 @@ export function registerGitRoutes(app: Express) {
   async function handleGitListing(
     req: Request,
     res: Response,
-    preFilter?: (rows: EnrichedContainer[]) => EnrichedContainer[],
+    preFilter?: (rows: EnrichedContainer[]) => EnrichedContainer[]
   ): Promise<void> {
     try {
       const userId: string = (req.user as any).id;
       const role: string = (req.user as any).role;
-      const sessionCompanyId: number | undefined =
-        (req.session as any)?.currentCompanyId;
+      const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
 
       const scope = await resolveGitCompanyScope(
         userId,
         role,
         req.query as Record<string, string | undefined>,
-        sessionCompanyId,
+        sessionCompanyId
       );
       if ("error" in scope) {
         res.status(scope.status).json({ message: scope.error });
         return;
       }
 
-      const companyIds =
-        scope.mode === "all" ? scope.companyIds : [scope.companyId];
+      const companyIds = scope.mode === "all" ? scope.companyIds : [scope.companyId];
 
       const includeOffloaded = req.query.includeOffloaded === "true";
 
@@ -748,12 +707,7 @@ export function registerGitRoutes(app: Express) {
    *
    * Read-only. No mutations.
    */
-  app.get(
-    "/api/git/containers",
-    requireAuth,
-    requireRole("Admin", "Owner"),
-    (req, res) => handleGitListing(req, res),
-  );
+  app.get("/api/git/containers", requireAuth, requireRole("Admin", "Owner"), (req, res) => handleGitListing(req, res));
 
   /**
    * GET /api/git/summary
@@ -771,72 +725,61 @@ export function registerGitRoutes(app: Express) {
    *
    * Read-only. No mutations.
    */
-  app.get(
-    "/api/git/summary",
-    requireAuth,
-    requireRole("Admin", "Owner"),
-    async (req, res) => {
-      try {
-        const userId: string = (req.user as any).id;
-        const role: string = (req.user as any).role;
-        const sessionCompanyId: number | undefined =
-          (req.session as any)?.currentCompanyId;
+  app.get("/api/git/summary", requireAuth, requireRole("Admin", "Owner"), async (req, res) => {
+    try {
+      const userId: string = (req.user as any).id;
+      const role: string = (req.user as any).role;
+      const sessionCompanyId: number | undefined = (req.session as any)?.currentCompanyId;
 
-        const scope = await resolveGitCompanyScope(
-          userId,
-          role,
-          req.query as Record<string, string | undefined>,
-          sessionCompanyId,
-        );
-        if ("error" in scope) {
-          return res.status(scope.status).json({ message: scope.error });
-        }
+      const scope = await resolveGitCompanyScope(
+        userId,
+        role,
+        req.query as Record<string, string | undefined>,
+        sessionCompanyId
+      );
+      if ("error" in scope) {
+        return res.status(scope.status).json({ message: scope.error });
+      }
 
-        const companyIds =
-          scope.mode === "all" ? scope.companyIds : [scope.companyId];
+      const companyIds = scope.mode === "all" ? scope.companyIds : [scope.companyId];
 
-        const [raw, nameMap] = await Promise.all([
-          fetchActiveContainers(companyIds),
-          loadCompanyNames(companyIds),
-        ]);
+      const [raw, nameMap] = await Promise.all([fetchActiveContainers(companyIds), loadCompanyNames(companyIds)]);
 
-        const enriched = enrichContainers(raw, nameMap);
-        const filtered = applyGitFilters(enriched, req.query as GitFilterQuery);
-        const asOf = new Date().toISOString();
+      const enriched = enrichContainers(raw, nameMap);
+      const filtered = applyGitFilters(enriched, req.query as GitFilterQuery);
+      const asOf = new Date().toISOString();
 
-        if (scope.mode === "all") {
-          // Overall + per-company breakdown
-          const overall = buildSummary(filtered);
+      if (scope.mode === "all") {
+        // Overall + per-company breakdown
+        const overall = buildSummary(filtered);
 
-          const byCompany = companyIds.map((cid) => ({
-            companyId: cid,
-            companyName: nameMap[cid] ?? `Company ${cid}`,
-            summary: buildSummary(filtered.filter((r) => r.companyId === cid)),
-          }));
+        const byCompany = companyIds.map((cid) => ({
+          companyId: cid,
+          companyName: nameMap[cid] ?? `Company ${cid}`,
+          summary: buildSummary(filtered.filter((r) => r.companyId === cid)),
+        }));
 
-          return res.json({
-            asOf,
-            mode: "all",
-            summary: overall,
-            byCompany,
-          });
-        }
-
-        const companyName =
-          nameMap[scope.companyId] ?? `Company ${scope.companyId}`;
         return res.json({
           asOf,
-          mode: "single",
-          companyId: scope.companyId,
-          companyName,
-          summary: buildSummary(filtered),
+          mode: "all",
+          summary: overall,
+          byCompany,
         });
-      } catch (err) {
-        console.error("[gitRoutes] summary error:", err);
-        return res.status(500).json({ message: "Internal server error" });
       }
-    },
-  );
+
+      const companyName = nameMap[scope.companyId] ?? `Company ${scope.companyId}`;
+      return res.json({
+        asOf,
+        mode: "single",
+        companyId: scope.companyId,
+        companyName,
+        summary: buildSummary(filtered),
+      });
+    } catch (err) {
+      console.error("[gitRoutes] summary error:", err);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   /**
    * GET /api/git/at-port
@@ -847,14 +790,8 @@ export function registerGitRoutes(app: Express) {
    *
    * Read-only. No mutations.
    */
-  app.get(
-    "/api/git/at-port",
-    requireAuth,
-    requireRole("Admin", "Owner"),
-    (req, res) =>
-      handleGitListing(req, res, (rows) =>
-        rows.filter((r) => r.status === "At Port"),
-      ),
+  app.get("/api/git/at-port", requireAuth, requireRole("Admin", "Owner"), (req, res) =>
+    handleGitListing(req, res, (rows) => rows.filter((r) => r.status === "At Port"))
   );
 
   /**
@@ -866,14 +803,8 @@ export function registerGitRoutes(app: Express) {
    *
    * Read-only. No mutations.
    */
-  app.get(
-    "/api/git/truck-location",
-    requireAuth,
-    requireRole("Admin", "Owner"),
-    (req, res) =>
-      handleGitListing(req, res, (rows) =>
-        rows.filter((r) => !!(r.numberPlate ?? "").trim()),
-      ),
+  app.get("/api/git/truck-location", requireAuth, requireRole("Admin", "Owner"), (req, res) =>
+    handleGitListing(req, res, (rows) => rows.filter((r) => !!(r.numberPlate ?? "").trim()))
   );
 
   // ─── ETA-only template — 2 columns: Container # + New ETA ───────────────
@@ -949,7 +880,7 @@ export function registerGitRoutes(app: Express) {
         console.error("[ETA template]", err);
         res.status(500).json({ message: err.message });
       }
-    },
+    }
   );
 
   // ─── Excel import template ────────────────────────────────────────────────
@@ -1027,10 +958,24 @@ export function registerGitRoutes(app: Express) {
 
         // Example row 1
         const ex1 = ws.addRow([
-          "MSKU1234567", "In Transit", "T840 EFX", "2026-05-20", "2026-05-15",
-          "FARHAT", "NAKONDE", "NCA", "8500", "1200",
-          "Yes", "Yes", "2026-05-10", "",
-          "Cleared border — heading inland", "Yes", "MAERSK", "ABC SHOP",
+          "MSKU1234567",
+          "In Transit",
+          "T840 EFX",
+          "2026-05-20",
+          "2026-05-15",
+          "FARHAT",
+          "NAKONDE",
+          "NCA",
+          "8500",
+          "1200",
+          "Yes",
+          "Yes",
+          "2026-05-10",
+          "",
+          "Cleared border — heading inland",
+          "Yes",
+          "MAERSK",
+          "ABC SHOP",
         ]);
         ex1.eachCell((cell: any) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
@@ -1039,10 +984,24 @@ export function registerGitRoutes(app: Express) {
 
         // Example row 2
         const ex2 = ws.addRow([
-          "TCNU9876543", "At Port", "", "2026-05-25", "",
-          "CONTINENTAL", "LEFT DAR", "FARHAT AGENCY", "8500", "",
-          "Pending", "No", "", "",
-          "Awaiting customs clearance", "No", "", "XYZ STORE",
+          "TCNU9876543",
+          "At Port",
+          "",
+          "2026-05-25",
+          "",
+          "CONTINENTAL",
+          "LEFT DAR",
+          "FARHAT AGENCY",
+          "8500",
+          "",
+          "Pending",
+          "No",
+          "",
+          "",
+          "Awaiting customs clearance",
+          "No",
+          "",
+          "XYZ STORE",
         ]);
         ex2.eachCell((cell: any) => {
           cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
@@ -1055,7 +1014,9 @@ export function registerGitRoutes(app: Express) {
 
         // Column widths (18 columns)
         const colWidths = [20, 28, 18, 20, 20, 18, 16, 18, 12, 14, 14, 14, 24, 30, 35, 14, 22, 20];
-        colWidths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+        colWidths.forEach((w, i) => {
+          ws.getColumn(i + 1).width = w;
+        });
 
         res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         res.setHeader("Content-Disposition", 'attachment; filename="container_import_template.xlsx"');
@@ -1065,7 +1026,7 @@ export function registerGitRoutes(app: Express) {
         console.error("[GIT import template]", err);
         res.status(500).json({ message: err.message });
       }
-    },
+    }
   );
 
   // ─── Excel bulk import / update ───────────────────────────────────────────
@@ -1092,9 +1053,7 @@ export function registerGitRoutes(app: Express) {
 
         const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
         // Prefer a sheet named "Containers" (case-insensitive), fallback to first sheet
-        const sheetName =
-          workbook.SheetNames.find((n) => n.toLowerCase() === "containers") ??
-          workbook.SheetNames[0];
+        const sheetName = workbook.SheetNames.find((n) => n.toLowerCase() === "containers") ?? workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         // No range override — let sheet_to_json use the first row (the real header row) as
         // column names. The hint row (row 2) and the two example rows are caught later by
@@ -1179,7 +1138,9 @@ export function registerGitRoutes(app: Express) {
                 const dd = String(parsed.d).padStart(2, "0");
                 return `${parsed.y}-${mm}-${dd}`;
               }
-            } catch { /* fall through */ }
+            } catch {
+              /* fall through */
+            }
           }
           return s;
         }
@@ -1251,8 +1212,16 @@ export function registerGitRoutes(app: Express) {
         // user input like "otw" or "AT PORT" still works.
         const STATUS_CANONICAL: Record<string, string> = {};
         for (const s of [
-          "OTW", "Sea", "At Port", "Left Dar", "At Border", "In Transit", "Arrived",
-          "Offloaded", "Closed", "Completed",
+          "OTW",
+          "Sea",
+          "At Port",
+          "Left Dar",
+          "At Border",
+          "In Transit",
+          "Arrived",
+          "Offloaded",
+          "Closed",
+          "Completed",
         ]) {
           STATUS_CANONICAL[s.toLowerCase()] = s;
         }
@@ -1294,13 +1263,19 @@ export function registerGitRoutes(app: Express) {
           const ctrNum = row.containerNumber?.trim().toUpperCase() ?? "";
 
           // Skip blank rows
-          if (!ctrNum) { skipped++; continue; }
+          if (!ctrNum) {
+            skipped++;
+            continue;
+          }
 
           // Skip example/hint rows: the template ships with a hint row (row 2) that
           // says "Required — used to match" and two example data rows (MSKU…/TCNU…).
           // Detect any row whose container-number cell is obviously descriptive text.
           const knownExamples = new Set(["MSKU1234567", "TCNU9876543"]);
-          if (knownExamples.has(ctrNum)) { skipped++; continue; }
+          if (knownExamples.has(ctrNum)) {
+            skipped++;
+            continue;
+          }
           const lowerCtr = ctrNum.toLowerCase();
           if (
             lowerCtr.includes("required") ||
@@ -1308,7 +1283,10 @@ export function registerGitRoutes(app: Express) {
             lowerCtr.includes("container #") ||
             lowerCtr.includes("yyyy-mm-dd") ||
             lowerCtr.startsWith("e.g")
-          ) { skipped++; continue; }
+          ) {
+            skipped++;
+            continue;
+          }
 
           const match = byNumber.get(ctrNum);
           if (!match) {
@@ -1324,7 +1302,9 @@ export function registerGitRoutes(app: Express) {
           if (statusVal) {
             const canonical = STATUS_CANONICAL[statusVal.toLowerCase()];
             if (!canonical) {
-              errors.push(`Row ${rowNum} (${ctrNum}): invalid status "${statusVal}" — valid values: ${Object.values(STATUS_CANONICAL).join(", ")}`);
+              errors.push(
+                `Row ${rowNum} (${ctrNum}): invalid status "${statusVal}" — valid values: ${Object.values(STATUS_CANONICAL).join(", ")}`
+              );
               skipped++;
               continue;
             }
@@ -1406,18 +1386,16 @@ export function registerGitRoutes(app: Express) {
           if (updateData.eta) updateData.etaSource = "manual";
 
           if (Object.keys(updateData).length === 0) {
-            errors.push(`Row ${rowNum} (${ctrNum}): no fields to update — fill in at least one column besides Container # (Status, ETA, Location, etc.)`);
+            errors.push(
+              `Row ${rowNum} (${ctrNum}): no fields to update — fill in at least one column besides Container # (Status, ETA, Location, etc.)`
+            );
             skipped++;
             continue;
           }
 
           // Capture "before" snapshot for undo (only keys we're about to overwrite)
           const prevData: Record<string, any> = {};
-          const [current] = await db
-            .select()
-            .from(containers)
-            .where(eq(containers.id, match.id))
-            .limit(1);
+          const [current] = await db.select().from(containers).where(eq(containers.id, match.id)).limit(1);
           if (current) {
             for (const key of Object.keys(updateData)) {
               prevData[key] = (current as any)[key] ?? null;
@@ -1448,7 +1426,7 @@ export function registerGitRoutes(app: Express) {
         console.error("[GIT import excel]", err);
         res.status(500).json({ message: err.message });
       }
-    },
+    }
   );
 
   // ─── Undo last Excel import ───────────────────────────────────────────────
@@ -1464,7 +1442,9 @@ export function registerGitRoutes(app: Express) {
         }
         const snap = importUndoStore.get(importId);
         if (!snap) {
-          return res.status(404).json({ message: "Undo data not found — it may have expired (2 hr limit) or already been used." });
+          return res
+            .status(404)
+            .json({ message: "Undo data not found — it may have expired (2 hr limit) or already been used." });
         }
         if (snap.companyId !== req.session.currentCompanyId) {
           return res.status(403).json({ message: "Forbidden" });
@@ -1485,7 +1465,7 @@ export function registerGitRoutes(app: Express) {
         console.error("[GIT import undo]", err);
         res.status(500).json({ message: err.message });
       }
-    },
+    }
   );
 
   // ── Stock Transfer WhatsApp Settings ────────────────────────────────────────
@@ -1497,25 +1477,30 @@ export function registerGitRoutes(app: Express) {
       res.json({
         companies,
         hasCredentials: !!(main?.instanceId && main?.apiToken),
-        waEnabled:      main?.enabled ?? false,
+        waEnabled: main?.enabled ?? false,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  app.patch("/api/git/transfer-wa-settings/:companyId", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
-    try {
-      const companyId = parseInt(req.params.companyId, 10);
-      if (isNaN(companyId)) return res.status(400).json({ message: "Invalid companyId" });
-      const { groupChatId = "" } = req.body;
-      const { setCompanyTransferWaGroupChatId } = await import("../services/whatsappService");
-      await setCompanyTransferWaGroupChatId(companyId, String(groupChatId));
-      res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+  app.patch(
+    "/api/git/transfer-wa-settings/:companyId",
+    requireAuth,
+    requireRole("Admin", "Developer", "Owner"),
+    async (req: Request, res: Response) => {
+      try {
+        const companyId = parseInt(req.params.companyId, 10);
+        if (isNaN(companyId)) return res.status(400).json({ message: "Invalid companyId" });
+        const { groupChatId = "" } = req.body;
+        const { setCompanyTransferWaGroupChatId } = await import("../services/whatsappService");
+        await setCompanyTransferWaGroupChatId(companyId, String(groupChatId));
+        res.json({ ok: true });
+      } catch (err: any) {
+        res.status(500).json({ message: err.message });
+      }
     }
-  });
+  );
 
   // ── Agent Duty WhatsApp Settings ─────────────────────────────────────────────
 
@@ -1524,58 +1509,70 @@ export function registerGitRoutes(app: Express) {
       const { getAgentDutyWaCredentials, getWaSettings } = await import("../services/whatsappService");
       const [settings, main] = await Promise.all([getAgentDutyWaCredentials(), getWaSettings()]);
       res.json({
-        groups:         settings?.groups ?? {},
+        groups: settings?.groups ?? {},
         hasCredentials: !!(main?.instanceId && main?.apiToken),
-        waEnabled:      main?.enabled ?? false,
+        waEnabled: main?.enabled ?? false,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  app.patch("/api/git/agent-duty-wa-settings", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
-    try {
-      const { groups = {} } = req.body;
-      const { updateAgentDutyWaGroups } = await import("../services/whatsappService");
-      await updateAgentDutyWaGroups(groups);
-      res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+  app.patch(
+    "/api/git/agent-duty-wa-settings",
+    requireAuth,
+    requireRole("Admin", "Developer", "Owner"),
+    async (req: Request, res: Response) => {
+      try {
+        const { groups = {} } = req.body;
+        const { updateAgentDutyWaGroups } = await import("../services/whatsappService");
+        await updateAgentDutyWaGroups(groups);
+        res.json({ ok: true });
+      } catch (err: any) {
+        res.status(500).json({ message: err.message });
+      }
     }
-  });
+  );
 
-  app.post("/api/git/send-agent-duty-whatsapp", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
-    try {
-      const { imageBase64, agentName, fileName } = req.body ?? {};
-      if (!imageBase64 || !agentName) {
-        return res.status(400).json({ message: "imageBase64 and agentName are required." });
+  app.post(
+    "/api/git/send-agent-duty-whatsapp",
+    requireAuth,
+    requireRole("Admin", "Developer", "Owner"),
+    async (req: Request, res: Response) => {
+      try {
+        const { imageBase64, agentName, fileName } = req.body ?? {};
+        if (!imageBase64 || !agentName) {
+          return res.status(400).json({ message: "imageBase64 and agentName are required." });
+        }
+        const { getAgentDutyWaCredentials, sendWhatsAppFileToChatId } = await import("../services/whatsappService");
+        const settings = await getAgentDutyWaCredentials();
+        if (!settings) return res.status(400).json({ message: "WhatsApp not configured." });
+        const groupChatId = settings.groups[agentName] ?? settings.groups[agentName.toLowerCase()] ?? null;
+        if (!groupChatId) {
+          return res.status(400).json({
+            message: `No WhatsApp group configured for agent "${agentName}". Configure it in Settings → Agent Duty WA.`,
+          });
+        }
+        if (!settings.instanceId || !settings.apiToken) {
+          return res.status(400).json({ message: "WhatsApp credentials not configured." });
+        }
+        if (!settings.enabled) {
+          return res.status(400).json({ message: "WhatsApp sending is disabled." });
+        }
+        const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
+        const buffer = Buffer.from(base64Data, "base64");
+        const today = new Date().toISOString().substring(0, 10);
+        const finalFileName = String(fileName || `AgentDuty_${agentName}_${today}.png`);
+        const caption = "";
+        const result = await sendWhatsAppFileToChatId(groupChatId, buffer, finalFileName, caption, "image/png");
+        if (!result.success) return res.status(500).json({ message: result.error || "Failed to send" });
+        res.json({ ok: true, message: `Sent to WhatsApp group for ${agentName}.` });
+      } catch (err: any) {
+        console.error("[AgentDutyWA] send error:", err);
+        res.status(500).json({ message: err.message });
       }
-      const { getAgentDutyWaCredentials, sendWhatsAppFileToChatId } = await import("../services/whatsappService");
-      const settings = await getAgentDutyWaCredentials();
-      if (!settings) return res.status(400).json({ message: "WhatsApp not configured." });
-      const groupChatId = settings.groups[agentName] ?? settings.groups[agentName.toLowerCase()] ?? null;
-      if (!groupChatId) {
-        return res.status(400).json({ message: `No WhatsApp group configured for agent "${agentName}". Configure it in Settings → Agent Duty WA.` });
-      }
-      if (!settings.instanceId || !settings.apiToken) {
-        return res.status(400).json({ message: "WhatsApp credentials not configured." });
-      }
-      if (!settings.enabled) {
-        return res.status(400).json({ message: "WhatsApp sending is disabled." });
-      }
-      const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-      const today = new Date().toISOString().substring(0, 10);
-      const finalFileName = String(fileName || `AgentDuty_${agentName}_${today}.png`);
-      const caption = "";
-      const result = await sendWhatsAppFileToChatId(groupChatId, buffer, finalFileName, caption, "image/png");
-      if (!result.success) return res.status(500).json({ message: result.error || "Failed to send" });
-      res.json({ ok: true, message: `Sent to WhatsApp group for ${agentName}.` });
-    } catch (err: any) {
-      console.error("[AgentDutyWA] send error:", err);
-      res.status(500).json({ message: err.message });
     }
-  });
+  );
 
   // ── Containers WhatsApp Settings ────────────────────────────────────────────
 
@@ -1584,76 +1581,88 @@ export function registerGitRoutes(app: Express) {
       const { getContainersWaSettings, getWaSettings } = await import("../services/whatsappService");
       const [settings, main] = await Promise.all([getContainersWaSettings(), getWaSettings()]);
       res.json({
-        groupChatId:     settings?.groupChatId     ?? "",
+        groupChatId: settings?.groupChatId ?? "",
         scheduleEnabled: settings?.scheduleEnabled ?? false,
-        scheduleHour:    settings?.scheduleHour    ?? 8,
-        lastSentAt:      settings?.lastSentAt      ?? null,
-        hasCredentials:  !!(main?.instanceId && main?.apiToken),
-        waEnabled:       main?.enabled             ?? false,
+        scheduleHour: settings?.scheduleHour ?? 8,
+        lastSentAt: settings?.lastSentAt ?? null,
+        hasCredentials: !!(main?.instanceId && main?.apiToken),
+        waEnabled: main?.enabled ?? false,
       });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   });
 
-  app.patch("/api/git/containers-wa-settings", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
-    try {
-      const { groupChatId = "", scheduleEnabled = false, scheduleHour = 8 } = req.body;
-      const { updateContainersWaSettings } = await import("../services/whatsappService");
-      await updateContainersWaSettings(String(groupChatId), Boolean(scheduleEnabled), Number(scheduleHour));
-      res.json({ ok: true });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
+  app.patch(
+    "/api/git/containers-wa-settings",
+    requireAuth,
+    requireRole("Admin", "Developer", "Owner"),
+    async (req: Request, res: Response) => {
+      try {
+        const { groupChatId = "", scheduleEnabled = false, scheduleHour = 8 } = req.body;
+        const { updateContainersWaSettings } = await import("../services/whatsappService");
+        await updateContainersWaSettings(String(groupChatId), Boolean(scheduleEnabled), Number(scheduleHour));
+        res.json({ ok: true });
+      } catch (err: any) {
+        res.status(500).json({ message: err.message });
+      }
     }
-  });
+  );
 
   // ── Send containers table to WhatsApp ───────────────────────────────────────
 
-  app.post("/api/git/send-containers-whatsapp", requireAuth, requireRole("Admin", "Developer", "Owner"), async (req: Request, res: Response) => {
-    try {
-      const { imageBase64, fileName } = req.body ?? {};
-      const { getContainersWaSettings, sendWhatsAppFileToChatId } = await import("../services/whatsappService");
-      const settings = await getContainersWaSettings();
+  app.post(
+    "/api/git/send-containers-whatsapp",
+    requireAuth,
+    requireRole("Admin", "Developer", "Owner"),
+    async (req: Request, res: Response) => {
+      try {
+        const { imageBase64, fileName } = req.body ?? {};
+        const { getContainersWaSettings, sendWhatsAppFileToChatId } = await import("../services/whatsappService");
+        const settings = await getContainersWaSettings();
 
-      if (!settings?.groupChatId) {
-        return res.status(400).json({ message: "No WhatsApp group configured. Go to Settings → Containers WhatsApp to configure it." });
-      }
-      if (!settings.instanceId || !settings.apiToken) {
-        return res.status(400).json({ message: "WhatsApp credentials not configured." });
-      }
-      if (!settings.enabled) {
-        return res.status(400).json({ message: "WhatsApp sending is disabled." });
-      }
+        if (!settings?.groupChatId) {
+          return res
+            .status(400)
+            .json({ message: "No WhatsApp group configured. Go to Settings → Containers WhatsApp to configure it." });
+        }
+        if (!settings.instanceId || !settings.apiToken) {
+          return res.status(400).json({ message: "WhatsApp credentials not configured." });
+        }
+        if (!settings.enabled) {
+          return res.status(400).json({ message: "WhatsApp sending is disabled." });
+        }
 
-      let buffer: Buffer;
-      let finalFileName: string;
-      let mimeType: string;
-      const today = new Date().toISOString().substring(0, 10);
+        let buffer: Buffer;
+        let finalFileName: string;
+        let mimeType: string;
+        const today = new Date().toISOString().substring(0, 10);
 
-      if (imageBase64) {
-        const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
-        buffer       = Buffer.from(base64Data, "base64");
-        finalFileName = String(fileName || `Containers_${today}.png`);
-        mimeType      = "image/png";
-      } else {
-        const { generateContainersPdf } = await import("../helpers/generateContainersPdf");
-        const pdf    = await generateContainersPdf();
-        buffer       = pdf.buffer;
-        finalFileName = `Containers_${today}.pdf`;
-        mimeType      = "application/pdf";
-      }
+        if (imageBase64) {
+          const base64Data = String(imageBase64).replace(/^data:image\/\w+;base64,/, "");
+          buffer = Buffer.from(base64Data, "base64");
+          finalFileName = String(fileName || `Containers_${today}.png`);
+          mimeType = "image/png";
+        } else {
+          const { generateContainersPdf } = await import("../helpers/generateContainersPdf");
+          const pdf = await generateContainersPdf();
+          buffer = pdf.buffer;
+          finalFileName = `Containers_${today}.pdf`;
+          mimeType = "application/pdf";
+        }
 
-      const caption = "";
-      const result  = await sendWhatsAppFileToChatId(settings.groupChatId, buffer, finalFileName, caption, mimeType);
-      if (!result.success) {
-        return res.status(500).json({ message: result.error || "Failed to send" });
+        const caption = "";
+        const result = await sendWhatsAppFileToChatId(settings.groupChatId, buffer, finalFileName, caption, mimeType);
+        if (!result.success) {
+          return res.status(500).json({ message: result.error || "Failed to send" });
+        }
+        res.json({ ok: true, message: "Sent to WhatsApp group." });
+      } catch (err: any) {
+        console.error("[ContainersWA] send error:", err);
+        res.status(500).json({ message: err.message });
       }
-      res.json({ ok: true, message: "Sent to WhatsApp group." });
-    } catch (err: any) {
-      console.error("[ContainersWA] send error:", err);
-      res.status(500).json({ message: err.message });
     }
-  });
+  );
 
   // ── Agent notes (per-company, per-agent, shared across all users) ─────────
   app.get("/api/git/agent-note/:companyId/:agentName", requireAuth, async (req, res) => {
@@ -1690,9 +1699,7 @@ export function registerGitRoutes(app: Express) {
   app.get("/api/git/agent-notes-bulk/:companyId", requireAuth, async (req, res) => {
     try {
       const companyId = parseInt(req.params.companyId, 10);
-      const rows = await db.execute(
-        sql`SELECT agent_name, note FROM git_agent_notes WHERE company_id = ${companyId}`
-      );
+      const rows = await db.execute(sql`SELECT agent_name, note FROM git_agent_notes WHERE company_id = ${companyId}`);
       res.json({ notes: rows.rows.map((r: any) => ({ agentName: r.agent_name, note: r.note ?? "" })) });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1712,7 +1719,13 @@ export function registerGitRoutes(app: Express) {
       const byAgent: Record<string, any[]> = {};
       for (const r of result.rows as any[]) {
         if (!byAgent[r.agent_name]) byAgent[r.agent_name] = [];
-        byAgent[r.agent_name].push({ id: r.id, description: r.description, amount: parseFloat(r.amount), type: r.type, createdAt: r.created_at });
+        byAgent[r.agent_name].push({
+          id: r.id,
+          description: r.description,
+          amount: parseFloat(r.amount),
+          type: r.type,
+          createdAt: r.created_at,
+        });
       }
       res.json({ byAgent });
     } catch (err: any) {
@@ -1731,13 +1744,15 @@ export function registerGitRoutes(app: Express) {
             WHERE company_id = ${companyId} AND agent_name = ${agentName}
             ORDER BY created_at ASC`
       );
-      res.json(result.rows.map((r: any) => ({
-        id: r.id,
-        description: r.description,
-        amount: parseFloat(r.amount),
-        type: r.type,
-        createdAt: r.created_at,
-      })));
+      res.json(
+        result.rows.map((r: any) => ({
+          id: r.id,
+          description: r.description,
+          amount: parseFloat(r.amount),
+          type: r.type,
+          createdAt: r.created_at,
+        }))
+      );
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -1752,14 +1767,21 @@ export function registerGitRoutes(app: Express) {
       const type: string = req.body.type;
       if (!description) return res.status(400).json({ message: "Description is required." });
       if (isNaN(amount) || amount <= 0) return res.status(400).json({ message: "Amount must be a positive number." });
-      if (!["debit", "credit"].includes(type)) return res.status(400).json({ message: "Type must be 'debit' or 'credit'." });
+      if (!["debit", "credit"].includes(type))
+        return res.status(400).json({ message: "Type must be 'debit' or 'credit'." });
       const result = await db.execute(
         sql`INSERT INTO git_agent_adjustments (company_id, agent_name, description, amount, type)
             VALUES (${companyId}, ${agentName}, ${description}, ${amount}, ${type})
             RETURNING id, description, amount, type, created_at`
       );
       const r = result.rows[0] as any;
-      res.json({ id: r.id, description: r.description, amount: parseFloat(r.amount), type: r.type, createdAt: r.created_at });
+      res.json({
+        id: r.id,
+        description: r.description,
+        amount: parseFloat(r.amount),
+        type: r.type,
+        createdAt: r.created_at,
+      });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -1794,7 +1816,7 @@ export function registerGitRoutes(app: Express) {
             WHERE company_id = ${companyId} AND agent_name = ${agentName}
             ORDER BY created_at ASC`
       );
-      res.json({ designations: (result.rows as any[]).map(r => ({ containerId: r.container_id })) });
+      res.json({ designations: (result.rows as any[]).map((r) => ({ containerId: r.container_id })) });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -1847,8 +1869,8 @@ export function registerGitRoutes(app: Express) {
             WHERE id IN (${oldContainerId}, ${newContainerId})`
       );
       const rows = cResult.rows as any[];
-      const oldC = rows.find(r => r.id === oldContainerId || r.id === Number(oldContainerId));
-      const newC = rows.find(r => r.id === newContainerId || r.id === Number(newContainerId));
+      const oldC = rows.find((r) => r.id === oldContainerId || r.id === Number(oldContainerId));
+      const newC = rows.find((r) => r.id === newContainerId || r.id === Number(newContainerId));
 
       if (!oldC) return res.status(404).json({ message: `Old container (id ${oldContainerId}) not found.` });
       if (!newC) return res.status(404).json({ message: `New container (id ${newContainerId}) not found.` });
@@ -1859,7 +1881,9 @@ export function registerGitRoutes(app: Express) {
             WHERE company_id = ${companyId} AND agent_name = ${agentName} AND container_id = ${Number(oldContainerId)}`
       );
       if ((existing.rows as any[]).length === 0) {
-        return res.status(409).json({ message: `Container ${oldC.container_number} is not currently designated as prepaid for this agent.` });
+        return res.status(409).json({
+          message: `Container ${oldC.container_number} is not currently designated as prepaid for this agent.`,
+        });
       }
 
       // Warn on mismatched duty amounts

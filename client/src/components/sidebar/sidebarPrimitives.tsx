@@ -22,12 +22,9 @@ export interface NavSection {
   [key: string]: any;
 }
 
-const baseLinkClasses =
-  "relative flex items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-colors";
-const inactiveClasses =
-  "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground";
-const activeClasses =
-  "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-xs";
+const baseLinkClasses = "relative flex items-center gap-2.5 rounded-md py-1.5 pl-3 pr-2.5 text-sm transition-colors";
+const inactiveClasses = "text-muted-foreground hover:bg-sidebar-accent/40 hover:text-foreground";
+const activeClasses = "bg-sidebar-accent text-sidebar-accent-foreground font-semibold shadow-xs";
 
 interface ActiveRailProps {
   color: string;
@@ -173,10 +170,7 @@ export function SidebarSectionGroup({
         />
       </button>
       {isOpen && (
-        <div
-          className="mt-0.5 space-y-0.5 ml-[13px] border-l-2"
-          style={{ borderColor: `${section.color}28` }}
-        >
+        <div className="mt-0.5 space-y-0.5 ml-[13px] border-l-2" style={{ borderColor: `${section.color}28` }}>
           {section.items.map((item) => (
             <SidebarNavLink
               key={item.url}
@@ -192,19 +186,12 @@ export function SidebarSectionGroup({
   );
 }
 
-export function useOpenSections(
-  visibleSections: NavSection[],
-  options: { defaultFirstWhenNoneActive?: boolean } = {},
-) {
+export function useOpenSections(visibleSections: NavSection[], options: { defaultFirstWhenNoneActive?: boolean } = {}) {
   const [location] = useLocation();
-  const activeSection = visibleSections.find((s) =>
-    s.items.some((i) => location === i.url)
-  );
-  const initialLabel = activeSection?.label
-    ?? (options.defaultFirstWhenNoneActive ? visibleSections[0]?.label : undefined);
-  const [openSections, setOpenSections] = useState<Set<string>>(
-    () => new Set(initialLabel ? [initialLabel] : [])
-  );
+  const activeSection = visibleSections.find((s) => s.items.some((i) => location === i.url));
+  const initialLabel =
+    activeSection?.label ?? (options.defaultFirstWhenNoneActive ? visibleSections[0]?.label : undefined);
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(initialLabel ? [initialLabel] : []));
 
   const activeLabel = activeSection?.label;
   useEffect(() => {
@@ -260,9 +247,7 @@ export function usePinnedOrder(storageKey: string, defaults: NavItem[]) {
     save(next);
   };
 
-  const items: NavItem[] = pinnedOrder
-    .map((url) => defaults.find((i) => i.url === url))
-    .filter(Boolean) as NavItem[];
+  const items: NavItem[] = pinnedOrder.map((url) => defaults.find((i) => i.url === url)).filter(Boolean) as NavItem[];
 
   return { items, reorder };
 }
@@ -276,14 +261,7 @@ interface PinnedNavListProps {
   trailingFor?: (item: NavItem) => ReactNode;
 }
 
-export function PinnedNavList({
-  items,
-  color,
-  onReorder,
-  isVisible,
-  testIdFor,
-  trailingFor,
-}: PinnedNavListProps) {
+export function PinnedNavList({ items, color, onReorder, isVisible, testIdFor, trailingFor }: PinnedNavListProps) {
   const [location] = useLocation();
   const dragRef = useRef<string | null>(null);
 
@@ -417,9 +395,7 @@ export function ModuleFooter({ user, avatarClassName, accent }: ModuleFooterProp
     <SidebarFooter
       className="px-4 py-3 border-t border-sidebar-border relative overflow-hidden"
       style={{
-        background: accent
-          ? `linear-gradient(to top, ${accent}22 0%, ${accent}08 55%, transparent 100%)`
-          : undefined,
+        background: accent ? `linear-gradient(to top, ${accent}22 0%, ${accent}08 55%, transparent 100%)` : undefined,
       }}
     >
       <div className="flex items-center gap-3 relative">
@@ -428,9 +404,7 @@ export function ModuleFooter({ user, avatarClassName, accent }: ModuleFooterProp
           <div
             className="rounded-full p-[2px]"
             style={{
-              background: accent
-                ? `linear-gradient(135deg, ${accent}cc, ${accent}44)`
-                : undefined,
+              background: accent ? `linear-gradient(135deg, ${accent}cc, ${accent}44)` : undefined,
             }}
           >
             <Avatar className="h-8 w-8 block">
@@ -449,12 +423,8 @@ export function ModuleFooter({ user, avatarClassName, accent }: ModuleFooterProp
           />
         </div>
         <div className="flex flex-col flex-1 min-w-0">
-          <span className="text-sm font-medium leading-tight truncate">
-            {user?.username || "User"}
-          </span>
-          <span className="text-xs text-muted-foreground leading-tight">
-            {user?.role || "Role"}
-          </span>
+          <span className="text-sm font-medium leading-tight truncate">{user?.username || "User"}</span>
+          <span className="text-xs text-muted-foreground leading-tight">{user?.role || "Role"}</span>
         </div>
         <Button
           variant="ghost"

@@ -48,29 +48,26 @@ export function InventoryPicker({
               data-testid={`button-select-item-${item.code}`}
             >
               <div className="flex items-start justify-between gap-2">
-                <span className="text-sm font-medium leading-tight">
-                  {item.name}
-                </span>
-                <span className="text-xs font-mono text-muted-foreground shrink-0">
-                  {item.code}
-                </span>
+                <span className="text-sm font-medium leading-tight">{item.name}</span>
+                <span className="text-xs font-mono text-muted-foreground shrink-0">{item.code}</span>
               </div>
               <div className="flex items-center justify-between mt-0.5">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono font-bold">
                     $ {item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  {item.stock < 10 && item.stock > 0 && (
-                    <AlertTriangle className="h-3 w-3 text-amber-500" />
-                  )}
+                  {item.stock < 10 && item.stock > 0 && <AlertTriangle className="h-3 w-3 text-amber-500" />}
                 </div>
-                <Badge variant="outline" className={`text-[10px] h-4 px-1.5 ${
-                  item.stock === 0 
-                    ? "border-red-400/40 bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400"
-                    : item.stock < 10 
-                      ? "border-amber-400/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-                      : "border-emerald-400/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-                }`}>
+                <Badge
+                  variant="outline"
+                  className={`text-[10px] h-4 px-1.5 ${
+                    item.stock === 0
+                      ? "border-red-400/40 bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-400"
+                      : item.stock < 10
+                        ? "border-amber-400/40 bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                        : "border-emerald-400/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                  }`}
+                >
                   {item.stock === 0 ? "Out" : Math.round(item.stock)}
                 </Badge>
               </div>

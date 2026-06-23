@@ -6,9 +6,21 @@ import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  BookOpen, Eye, EyeOff, ExternalLink, List, AlignJustify, Package,
-  Trash2, ChevronDown, ChevronRight, X, FileDown, Plus,
-  Pencil, AlertTriangle,
+  BookOpen,
+  Eye,
+  EyeOff,
+  ExternalLink,
+  List,
+  AlignJustify,
+  Package,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  X,
+  FileDown,
+  Plus,
+  Pencil,
+  AlertTriangle,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -35,12 +47,8 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -98,7 +106,7 @@ type DisplayEntry = DaybookEntry & { _vKey: string; _source: DaybookEntry };
 // into a single synthetic entry so the detail popup shows ALL bales together.
 function mergeBaleEntries(entries: DaybookEntry[]): DaybookEntry {
   if (entries.length === 1) return entries[0];
-  const allBales = entries.flatMap(e => parseBalesMeta(e));
+  const allBales = entries.flatMap((e) => parseBalesMeta(e));
   const totalCurrency = entries.reduce((s, e) => s + parseFloat(e.amountCurrency || "0"), 0);
   const totalUsd = entries.reduce((s, e) => s + parseFloat(e.amountUsd || "0"), 0);
   const base = entries[0];
@@ -157,7 +165,12 @@ function formatDaybookDescription(entry: DaybookEntry): string {
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
-  USD: "$", EUR: "€", GBP: "£", AUD: "A$", LBP: "LL", LKR: "₨",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  AUD: "A$",
+  LBP: "LL",
+  LKR: "₨",
 };
 function currencySymbol(code: string): string {
   return CURRENCY_SYMBOLS[code] || code + " ";
@@ -211,10 +224,16 @@ const TX_TYPE_LABELS: Record<string, string> = {
 
 function formatTxType(type: string): string {
   if (TX_TYPE_LABELS[type]) return TX_TYPE_LABELS[type];
-  return type.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  return type
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function getFactoryTxTypeBadge(type: string): { variant: "default" | "secondary" | "destructive" | "outline"; className?: string } {
+function getFactoryTxTypeBadge(type: string): {
+  variant: "default" | "secondary" | "destructive" | "outline";
+  className?: string;
+} {
   switch (type) {
     case "PAYMENT":
     case "SUPPLIER_PAYMENT":
@@ -222,35 +241,59 @@ function getFactoryTxTypeBadge(type: string): { variant: "default" | "secondary"
     case "PAYROLL_PAYMENT":
       return { variant: "outline", className: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40" };
     case "RECEIPT":
-      return { variant: "outline", className: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/40" };
+      return {
+        variant: "outline",
+        className: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/40",
+      };
     case "JOURNAL":
-      return { variant: "outline", className: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/40" };
+      return {
+        variant: "outline",
+        className: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/40",
+      };
     case "INVOICE":
       return { variant: "outline", className: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/40" };
     case "CONTAINER_IMPORT":
-      return { variant: "outline", className: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/40" };
+      return {
+        variant: "outline",
+        className: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/40",
+      };
     case "COMMISSION":
     case "DUTY":
       return { variant: "outline", className: "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/40" };
     case "BALE_PRESSING":
     case "BALE_FINALIZE":
-      return { variant: "outline", className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/40" };
+      return {
+        variant: "outline",
+        className: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/40",
+      };
     case "BALE_STOCK_ENTRY":
     case "BALE_IMPORT":
     case "BALE_REIMPORT":
     case "OPENING_BALANCE_RAW":
-      return { variant: "outline", className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40" };
+      return {
+        variant: "outline",
+        className: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40",
+      };
     case "BALE_SALE":
-      return { variant: "outline", className: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/40" };
+      return {
+        variant: "outline",
+        className: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/40",
+      };
     case "POS_EXPENSE":
       return { variant: "outline", className: "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/40" };
     case "BALE_REMOVAL":
     case "BALE_TRANSFER":
       return { variant: "outline", className: "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40" };
     case "OFFLOAD_RAW_STOCK":
-      return { variant: "outline", className: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40" };
+      return {
+        variant: "outline",
+        className: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40",
+      };
     case "FREIGHT_ADD":
-      return { variant: "outline", className: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/40" };
+      return {
+        variant: "outline",
+        className: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/40",
+      };
     case "LOADING_CREATED":
       return { variant: "outline", className: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/40" };
     case "ORDER_VERIFIED":
@@ -261,7 +304,10 @@ function getFactoryTxTypeBadge(type: string): { variant: "default" | "secondary"
     case "WORKER_IMPORT":
     case "CONTRACT_ENDED":
     case "CONTRACT_SETTLED":
-      return { variant: "outline", className: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/40" };
+      return {
+        variant: "outline",
+        className: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/40",
+      };
     default:
       return { variant: "outline" };
   }
@@ -308,7 +354,12 @@ function saveFactoryDaybookState(state: FactoryDaybookUIState): void {
   } catch {}
 }
 
-function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
+function ViewEntryModal({
+  entry,
+  onClose,
+  onNavigate,
+  formatDisplayDate,
+}: {
   entry: DaybookEntry;
   onClose: () => void;
   onNavigate: (path: string) => void;
@@ -320,14 +371,21 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   const hasBalesMeta = isBaleStockEntry || isBaleRemoval;
   const isContainerImport = entry.txType === "CONTAINER_IMPORT" && !!entry.referenceId;
   const isPayrollPayment = entry.txType === "PAYROLL_PAYMENT" && !!entry.referenceId;
-  const isMixBatchCreated = (entry.txType === "MIX_BATCH_CREATED" || entry.txType === "MIX_BATCH_TOPUP") && !!entry.referenceId;
+  const isMixBatchCreated =
+    (entry.txType === "MIX_BATCH_CREATED" || entry.txType === "MIX_BATCH_TOPUP") && !!entry.referenceId;
   const isLoadingCreated = entry.txType === "LOADING_CREATED" && !!entry.referenceId;
   const isOffloadRawStock = entry.txType === "OFFLOAD_RAW_STOCK";
   const isCommission = entry.txType === "COMMISSION";
   const isWasteDisposal = entry.txType === "WASTE_DISPOSAL";
   const isOtherCharge = entry.txType === "OTHER_CHARGE";
 
-  const entryMeta = (() => { try { return JSON.parse(entry.metaJson || "{}"); } catch { return {}; } })();
+  const entryMeta = (() => {
+    try {
+      return JSON.parse(entry.metaJson || "{}");
+    } catch {
+      return {};
+    }
+  })();
   const metaContainerId: number | undefined = entryMeta.containerId;
 
   const { data: viewEntries = [] } = useQuery<any[]>({
@@ -393,18 +451,20 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
     }
 
     // Determine source entry (the "Paid From" / "Received In" account)
-    const src = txType === "PAYMENT"
-      ? viewEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
-      : txType === "RECEIPT"
-      ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
-      : null;
+    const src =
+      txType === "PAYMENT"
+        ? viewEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
+        : txType === "RECEIPT"
+          ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
+          : null;
 
     // Determine display entries
-    const display = txType === "PAYMENT"
-      ? viewEntries.filter((e: any) => parseFloat(e.debitAmount || "0") > 0)
-      : txType === "RECEIPT"
-      ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
-      : viewEntries;
+    const display =
+      txType === "PAYMENT"
+        ? viewEntries.filter((e: any) => parseFloat(e.debitAmount || "0") > 0)
+        : txType === "RECEIPT"
+          ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
+          : viewEntries;
 
     const resolveUrl = (e: any): string | null => {
       if (e.ledgerAccountId) return `/api/accounts/ledger/${e.ledgerAccountId}/balance`;
@@ -423,20 +483,32 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
         if (url) {
           try {
             const r = await fetch(url, { credentials: "include" });
-            if (r.ok) { const d = await r.json(); setSourceBalance(d.balance?.toString() ?? null); }
-          } catch { /* ignore */ }
+            if (r.ok) {
+              const d = await r.json();
+              setSourceBalance(d.balance?.toString() ?? null);
+            }
+          } catch {
+            /* ignore */
+          }
         }
       }
       // Per-entry balances
       const results: Record<number, string> = {};
-      await Promise.all(display.map(async (e: any) => {
-        const url = resolveUrl(e);
-        if (!url) return;
-        try {
-          const r = await fetch(url, { credentials: "include" });
-          if (r.ok) { const d = await r.json(); results[e.id] = d.balance?.toString() || "0"; }
-        } catch { /* ignore */ }
-      }));
+      await Promise.all(
+        display.map(async (e: any) => {
+          const url = resolveUrl(e);
+          if (!url) return;
+          try {
+            const r = await fetch(url, { credentials: "include" });
+            if (r.ok) {
+              const d = await r.json();
+              results[e.id] = d.balance?.toString() || "0";
+            }
+          } catch {
+            /* ignore */
+          }
+        })
+      );
       setEntryBalances(results);
     };
 
@@ -454,10 +526,14 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
 
   if (isVoucherBacked) {
     // Determine voucher type from txType: PAYMENT → Payment, RECEIPT → Receipt, JOURNAL → Journal
-    const voucherType = entry.txType === "PAYMENT" ? "Payment"
-      : entry.txType === "RECEIPT" ? "Receipt"
-      : entry.txType === "JOURNAL" ? "Journal"
-      : entry.txType;
+    const voucherType =
+      entry.txType === "PAYMENT"
+        ? "Payment"
+        : entry.txType === "RECEIPT"
+          ? "Receipt"
+          : entry.txType === "JOURNAL"
+            ? "Journal"
+            : entry.txType;
 
     const isPayment = voucherType === "Payment";
     const isReceipt = voucherType === "Receipt";
@@ -468,22 +544,22 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
     const sourceEntry = isPayment
       ? viewEntries.find((e: any) => parseFloat(e.creditAmount || "0") > 0)
       : isReceipt
-      ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
-      : null;
+        ? viewEntries.find((e: any) => parseFloat(e.debitAmount || "0") > 0)
+        : null;
 
     // Total = opposite side of source for Payment/Receipt
     const totalAmount = isPayment
       ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.debitAmount || "0"), 0)
       : isReceipt
-      ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0)
-      : Math.max(totalDebit, totalCredit);
+        ? viewEntries.reduce((s: number, e: any) => s + parseFloat(e.creditAmount || "0"), 0)
+        : Math.max(totalDebit, totalCredit);
 
     // Display entries: Payment = debit side only, Receipt = credit side only, Journal = all
     const displayEntries = isPayment
       ? viewEntries.filter((e: any) => parseFloat(e.debitAmount || "0") > 0)
       : isReceipt
-      ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
-      : viewEntries;
+        ? viewEntries.filter((e: any) => parseFloat(e.creditAmount || "0") > 0)
+        : viewEntries;
 
     return (
       <>
@@ -500,7 +576,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             <div>
               <p className="text-sm text-muted-foreground">Type</p>
               <div className="flex items-center gap-2 flex-wrap">
-                <Badge variant={badgeVariant} className={badgeClass}>{voucherType}</Badge>
+                <Badge variant={badgeVariant} className={badgeClass}>
+                  {voucherType}
+                </Badge>
                 {entry.optional && <span className="text-sm text-muted-foreground">Optional</span>}
               </div>
             </div>
@@ -515,13 +593,12 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             <div className="p-3 md:p-4 bg-muted/50 rounded-md">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">
-                    {isPayment ? "Paid From" : "Received In"}
-                  </p>
+                  <p className="text-sm text-muted-foreground mb-1">{isPayment ? "Paid From" : "Received In"}</p>
                   <p className="font-medium text-base md:text-lg">{sourceEntry.accountName}</p>
                   {sourceBalance !== null && (
                     <p className="text-sm font-mono mt-2 text-muted-foreground">
-                      Balance: {sym}{formatNumber(parseFloat(sourceBalance))}
+                      Balance: {sym}
+                      {formatNumber(parseFloat(sourceBalance))}
                     </p>
                   )}
                 </div>
@@ -545,13 +622,21 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/40">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Account</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Account
+                      </th>
                       {isPaymentOrReceipt || isJournal ? (
-                        <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Amount</th>
+                        <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Amount
+                        </th>
                       ) : (
                         <>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Debit</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Credit</th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Debit
+                          </th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Credit
+                          </th>
                         </>
                       )}
                     </tr>
@@ -563,21 +648,29 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                           <p className="font-medium">{e.accountName || "—"}</p>
                           {(isPaymentOrReceipt || isJournal) && entryBalances[e.id] !== undefined && (
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              Balance: {sym}{formatNumber(parseFloat(entryBalances[e.id] || "0"))}
+                              Balance: {sym}
+                              {formatNumber(parseFloat(entryBalances[e.id] || "0"))}
                             </p>
                           )}
                         </td>
                         {isPaymentOrReceipt || isJournal ? (
                           <td className="px-3 py-2 text-right font-mono">
-                            {sym}{formatNumber(Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0")))}
+                            {sym}
+                            {formatNumber(
+                              Math.max(parseFloat(e.debitAmount || "0"), parseFloat(e.creditAmount || "0"))
+                            )}
                           </td>
                         ) : (
                           <>
                             <td className="px-3 py-2 text-right font-mono">
-                              {parseFloat(e.debitAmount || "0") > 0 ? `${sym}${formatNumber(parseFloat(e.debitAmount))}` : "-"}
+                              {parseFloat(e.debitAmount || "0") > 0
+                                ? `${sym}${formatNumber(parseFloat(e.debitAmount))}`
+                                : "-"}
                             </td>
                             <td className="px-3 py-2 text-right font-mono">
-                              {parseFloat(e.creditAmount || "0") > 0 ? `${sym}${formatNumber(parseFloat(e.creditAmount))}` : "-"}
+                              {parseFloat(e.creditAmount || "0") > 0
+                                ? `${sym}${formatNumber(parseFloat(e.creditAmount))}`
+                                : "-"}
                             </td>
                           </>
                         )}
@@ -588,11 +681,20 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                     <tr className="bg-muted/50 font-bold border-t">
                       <td className="px-3 py-2">Total</td>
                       {isPaymentOrReceipt || isJournal ? (
-                        <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalAmount)}</td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {sym}
+                          {formatNumber(totalAmount)}
+                        </td>
                       ) : (
                         <>
-                          <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalDebit)}</td>
-                          <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalCredit)}</td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {sym}
+                            {formatNumber(totalDebit)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {sym}
+                            {formatNumber(totalCredit)}
+                          </td>
                         </>
                       )}
                     </tr>
@@ -610,18 +712,17 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
   if (isContainerImport) {
     const c = containerDetail;
     const csym = c ? currencySymbol(c.currencyCode || "USD") : "$";
-    const fx = c ? (parseFloat(c.fxRateToUsd || "1") || 1) : 1;
+    const fx = c ? parseFloat(c.fxRateToUsd || "1") || 1 : 1;
     const totalKg = c ? parseFloat(c.totalKg || "0") : 0;
     const ratePerKg = c ? parseFloat(c.ratePerKg || "0") : 0;
     const goodsTotal = totalKg * ratePerKg;
     const freight = c ? parseFloat(c.freight || "0") : 0;
     const commission = c ? parseFloat(c.commissionAmount || "0") : 0;
     const grandTotal = c
-      ? (parseFloat(c.finalPayableAmount || String(goodsTotal + freight + commission)) || goodsTotal + freight + commission)
+      ? parseFloat(c.finalPayableAmount || String(goodsTotal + freight + commission)) ||
+        goodsTotal + freight + commission
       : 0;
-    const grandTotalUsd = c
-      ? (parseFloat(c.finalPayableAmountUsd || "0") || grandTotal * fx)
-      : 0;
+    const grandTotalUsd = c ? parseFloat(c.finalPayableAmountUsd || "0") || grandTotal * fx : 0;
     const balanceUsd: number = supplierBalance?.balance ?? supplierBalance?.outstandingUsd ?? null;
 
     return (
@@ -642,7 +743,8 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                     <p className="font-semibold text-base">{c.supplierName || "Unknown Supplier"}</p>
                     {balanceUsd !== null && (
                       <p className="text-sm text-muted-foreground mt-0.5">
-                        Balance: <span className="font-mono font-medium text-foreground">${formatNumber(balanceUsd)}</span>
+                        Balance:{" "}
+                        <span className="font-mono font-medium text-foreground">${formatNumber(balanceUsd)}</span>
                       </p>
                     )}
                     <p className="text-xs text-muted-foreground mt-0.5">Container: {c.containerNumber}</p>
@@ -652,9 +754,16 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                         <span className="text-xs text-muted-foreground">Total KG imported:</span>
                         <span className="font-mono text-sm font-semibold">{formatNumber(totalKg)} kg</span>
                         {parseFloat(c.actualReceivedKg || "0") === 0 ? (
-                          <Badge variant="outline" className="text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40">Pending</Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/40"
+                          >
+                            Pending
+                          </Badge>
                         ) : (
-                          <span className="text-xs text-muted-foreground">({formatNumber(parseFloat(c.actualReceivedKg))} kg received)</span>
+                          <span className="text-xs text-muted-foreground">
+                            ({formatNumber(parseFloat(c.actualReceivedKg))} kg received)
+                          </span>
                         )}
                       </div>
                     )}
@@ -662,7 +771,10 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                   <Button
                     size="sm"
                     variant="default"
-                    onClick={() => { onClose(); onNavigate(`/factory/containers?edit=${entry.referenceId}`); }}
+                    onClick={() => {
+                      onClose();
+                      onNavigate(`/factory/containers?edit=${entry.referenceId}`);
+                    }}
                     data-testid="button-open-container"
                   >
                     Open
@@ -678,10 +790,18 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-muted/40 border-b">
-                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Item</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Qty / KG</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Rate</th>
-                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Total</th>
+                    <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Item
+                    </th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Qty / KG
+                    </th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Rate
+                    </th>
+                    <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Total
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -689,8 +809,14 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                   <tr className="border-b">
                     <td className="px-3 py-2 font-medium">Goods (Raw Stock)</td>
                     <td className="px-3 py-2 text-right font-mono text-muted-foreground">{formatNumber(totalKg)} kg</td>
-                    <td className="px-3 py-2 text-right font-mono text-muted-foreground">{csym}{formatNumber(ratePerKg)}/kg</td>
-                    <td className="px-3 py-2 text-right font-mono font-medium">{csym}{formatNumber(goodsTotal)}</td>
+                    <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+                      {csym}
+                      {formatNumber(ratePerKg)}/kg
+                    </td>
+                    <td className="px-3 py-2 text-right font-mono font-medium">
+                      {csym}
+                      {formatNumber(goodsTotal)}
+                    </td>
                   </tr>
                   {/* Freight row */}
                   {freight > 0 && (
@@ -699,7 +825,8 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                       <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                       <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                       <td className="px-3 py-2 text-right font-mono font-medium">
-                        {currencySymbol(c.freightCurrencyCode || c.currencyCode || "USD")}{formatNumber(freight)}
+                        {currencySymbol(c.freightCurrencyCode || c.currencyCode || "USD")}
+                        {formatNumber(freight)}
                       </td>
                     </tr>
                   )}
@@ -710,14 +837,17 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                       <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                       <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                       <td className="px-3 py-2 text-right font-mono font-medium">
-                        {currencySymbol(c.commissionCurrencyCode || c.currencyCode || "USD")}{formatNumber(commission)}
+                        {currencySymbol(c.commissionCurrencyCode || c.currencyCode || "USD")}
+                        {formatNumber(commission)}
                       </td>
                     </tr>
                   )}
                   {/* Actual received KG info */}
                   {parseFloat(c.actualReceivedKg || "0") > 0 && parseFloat(c.actualReceivedKg || "0") !== totalKg && (
                     <tr className="border-b bg-muted/20">
-                      <td className="px-3 py-2 text-muted-foreground text-xs" colSpan={2}>Actual Received</td>
+                      <td className="px-3 py-2 text-muted-foreground text-xs" colSpan={2}>
+                        Actual Received
+                      </td>
                       <td className="px-3 py-2 text-right text-xs text-muted-foreground font-mono" colSpan={2}>
                         {formatNumber(parseFloat(c.actualReceivedKg))} kg
                       </td>
@@ -726,9 +856,14 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted/50 font-bold border-t">
-                    <td className="px-3 py-2" colSpan={3}>Grand Total</td>
+                    <td className="px-3 py-2" colSpan={3}>
+                      Grand Total
+                    </td>
                     <td className="px-3 py-2 text-right font-mono">
-                      <div>{csym}{formatNumber(grandTotal)}</div>
+                      <div>
+                        {csym}
+                        {formatNumber(grandTotal)}
+                      </div>
                       {c.currencyCode !== "USD" && grandTotalUsd > 0 && (
                         <div className="text-xs text-muted-foreground font-normal">${formatNumber(grandTotalUsd)}</div>
                       )}
@@ -748,7 +883,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
     const p = payrollSummary;
     const n = (v: any) => parseFloat(v || "0");
 
-    const grossEarnings = p ? n(p.baseSalary) + n(p.baleEarnings) + n(p.kgEarnings) + n(p.overtimePay) + n(p.bonuses) + n(p.transport) : 0;
+    const grossEarnings = p
+      ? n(p.baseSalary) + n(p.baleEarnings) + n(p.kgEarnings) + n(p.overtimePay) + n(p.bonuses) + n(p.transport)
+      : 0;
     const totalDeductions = p ? n(p.deductions) + n(p.advances) : 0;
     const netPay = p ? n(p.netSalary) : 0;
 
@@ -785,7 +922,12 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/40 border-b">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide" colSpan={2}>Payment Accounts</th>
+                      <th
+                        className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide"
+                        colSpan={2}
+                      >
+                        Payment Accounts
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -806,8 +948,12 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/40 border-b">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Earnings Breakdown</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Amount</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Earnings Breakdown
+                      </th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Amount
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -821,7 +967,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                       <tr className="border-b">
                         <td className="px-3 py-2">
                           Bale Earnings
-                          {n(p.balesCount) > 0 && <span className="text-xs text-muted-foreground ml-1">({p.balesCount} bales)</span>}
+                          {n(p.balesCount) > 0 && (
+                            <span className="text-xs text-muted-foreground ml-1">({p.balesCount} bales)</span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.baleEarnings))}</td>
                       </tr>
@@ -830,7 +978,11 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                       <tr className="border-b">
                         <td className="px-3 py-2">
                           KG Earnings
-                          {n(p.kgProcessed) > 0 && <span className="text-xs text-muted-foreground ml-1">({formatNumber(n(p.kgProcessed))} kg)</span>}
+                          {n(p.kgProcessed) > 0 && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({formatNumber(n(p.kgProcessed))} kg)
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.kgEarnings))}</td>
                       </tr>
@@ -839,7 +991,11 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                       <tr className="border-b">
                         <td className="px-3 py-2">
                           Overtime
-                          {n(p.overtimeHours) > 0 && <span className="text-xs text-muted-foreground ml-1">({formatNumber(n(p.overtimeHours))} hrs)</span>}
+                          {n(p.overtimeHours) > 0 && (
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({formatNumber(n(p.overtimeHours))} hrs)
+                            </span>
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right font-mono">${formatNumber(n(p.overtimePay))}</td>
                       </tr>
@@ -863,13 +1019,17 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                     {n(p.deductions) > 0 && (
                       <tr className="border-b">
                         <td className="px-3 py-2 text-destructive">Deductions</td>
-                        <td className="px-3 py-2 text-right font-mono text-destructive">−${formatNumber(n(p.deductions))}</td>
+                        <td className="px-3 py-2 text-right font-mono text-destructive">
+                          −${formatNumber(n(p.deductions))}
+                        </td>
                       </tr>
                     )}
                     {n(p.advances) > 0 && (
                       <tr className="border-b">
                         <td className="px-3 py-2 text-destructive">Advance Recovery</td>
-                        <td className="px-3 py-2 text-right font-mono text-destructive">−${formatNumber(n(p.advances))}</td>
+                        <td className="px-3 py-2 text-right font-mono text-destructive">
+                          −${formatNumber(n(p.advances))}
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -903,9 +1063,7 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
               )}
 
               {p.notes && (
-                <div className="rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-                  {p.notes}
-                </div>
+                <div className="rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">{p.notes}</div>
               )}
             </>
           )}
@@ -950,11 +1108,16 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">{mb.status}</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {mb.status}
+                    </Badge>
                     <Button
                       size="sm"
                       variant="default"
-                      onClick={() => { onClose(); onNavigate(`/factory/mix-batches`); }}
+                      onClick={() => {
+                        onClose();
+                        onNavigate(`/factory/mix-batches`);
+                      }}
                       data-testid="button-open-mix-batch"
                     >
                       Open
@@ -983,19 +1146,30 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
           {/* Sources breakdown */}
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-              Mixed From ({mixBatchSources.length} source{mixBatchSources.length !== 1 ? "s" : ""}{sourcesTotalKg > 0 ? ` · ${formatNumber(sourcesTotalKg)} kg total` : ""})
+              Mixed From ({mixBatchSources.length} source{mixBatchSources.length !== 1 ? "s" : ""}
+              {sourcesTotalKg > 0 ? ` · ${formatNumber(sourcesTotalKg)} kg total` : ""})
             </p>
             {mixBatchSources.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4 rounded-md border">No source records found</p>
+              <p className="text-sm text-muted-foreground text-center py-4 rounded-md border">
+                No source records found
+              </p>
             ) : (
               <div className="rounded-md border overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-muted/40 border-b">
-                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Source</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Weight</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">$/kg</th>
-                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Total</th>
+                      <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Source
+                      </th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Weight
+                      </th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        $/kg
+                      </th>
+                      <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        Total
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1023,13 +1197,13 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                         <tr key={src.id ?? i} className="border-b last:border-0">
                           <td className="px-3 py-2.5">
                             <p className="font-medium">{sourceLabel}</p>
-                            {sourceSubLabel && (
-                              <p className="text-xs text-muted-foreground mt-0.5">{sourceSubLabel}</p>
-                            )}
+                            {sourceSubLabel && <p className="text-xs text-muted-foreground mt-0.5">{sourceSubLabel}</p>}
                             <p className="text-xs text-muted-foreground mt-0.5">{pct.toFixed(1)}% of batch</p>
                           </td>
                           <td className="px-3 py-2.5 text-right font-mono">{formatNumber(srcKg)} kg</td>
-                          <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">${formatNumber(srcCpk)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">
+                            ${formatNumber(srcCpk)}
+                          </td>
                           <td className="px-3 py-2.5 text-right font-mono font-medium">${formatNumber(srcTotal)}</td>
                         </tr>
                       );
@@ -1039,10 +1213,15 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                     <tfoot>
                       <tr className="bg-muted/30 border-t">
                         <td className="px-3 py-2 text-xs font-medium text-muted-foreground">Total</td>
-                        <td className="px-3 py-2 text-right font-mono font-medium">{formatNumber(sourcesTotalKg)} kg</td>
+                        <td className="px-3 py-2 text-right font-mono font-medium">
+                          {formatNumber(sourcesTotalKg)} kg
+                        </td>
                         <td />
                         <td className="px-3 py-2 text-right font-mono font-medium">
-                          ${formatNumber(mixBatchSources.reduce((s: number, src: any) => s + parseFloat(src.totalCost || "0"), 0))}
+                          $
+                          {formatNumber(
+                            mixBatchSources.reduce((s: number, src: any) => s + parseFloat(src.totalCost || "0"), 0)
+                          )}
                         </td>
                       </tr>
                     </tfoot>
@@ -1075,7 +1254,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <DialogTitle>Loading Started</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>Loading Started</Badge>
+            <Badge variant={badgeVariant} className={badgeClass}>
+              Loading Started
+            </Badge>
           </div>
           <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
         </DialogHeader>
@@ -1091,17 +1272,24 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                   <div>
                     <p className="font-semibold text-base">{lo.customerName || `Customer #${lo.customerId}`}</p>
                     {lo.customerCode && <p className="text-xs text-muted-foreground font-mono">{lo.customerCode}</p>}
-                    {lo.destination && <p className="text-xs text-muted-foreground mt-0.5">Destination: {lo.destination}</p>}
+                    {lo.destination && (
+                      <p className="text-xs text-muted-foreground mt-0.5">Destination: {lo.destination}</p>
+                    )}
                     {lo.containerNotes && (
                       <p className="text-xs text-muted-foreground mt-0.5 italic">{lo.containerNotes}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary" className="text-xs">{lo.status}</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {lo.status}
+                    </Badge>
                     <Button
                       size="sm"
                       variant="default"
-                      onClick={() => { onClose(); onNavigate(`/factory/customer-orders`); }}
+                      onClick={() => {
+                        onClose();
+                        onNavigate(`/factory/customer-orders`);
+                      }}
                       data-testid="button-open-loading-order"
                     >
                       Open
@@ -1109,10 +1297,14 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                   </div>
                 </div>
                 {lo.proformaName && (
-                  <p className="text-xs text-muted-foreground">Proforma: <span className="font-medium text-foreground">{lo.proformaName}</span></p>
+                  <p className="text-xs text-muted-foreground">
+                    Proforma: <span className="font-medium text-foreground">{lo.proformaName}</span>
+                  </p>
                 )}
                 {lo.loadingStartedAt && (
-                  <p className="text-xs text-muted-foreground">Loading started: {formatDisplayDate(lo.loadingStartedAt)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Loading started: {formatDisplayDate(lo.loadingStartedAt)}
+                  </p>
                 )}
               </div>
 
@@ -1128,7 +1320,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                 </div>
                 <div className="rounded-md bg-muted/40 px-3 py-2 text-center">
                   <p className="text-xs text-muted-foreground">Total Weight</p>
-                  <p className="font-semibold font-mono text-lg">{totalWeightKg > 0 ? `${formatNumber(totalWeightKg)} kg` : "—"}</p>
+                  <p className="font-semibold font-mono text-lg">
+                    {totalWeightKg > 0 ? `${formatNumber(totalWeightKg)} kg` : "—"}
+                  </p>
                 </div>
               </div>
 
@@ -1142,10 +1336,18 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-muted/40 border-b">
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Article</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Qty (bales)</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Price / bale</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Total</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Article
+                          </th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Qty (bales)
+                          </th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Price / bale
+                          </th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Total
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1197,9 +1399,15 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-muted/40 border-b">
-                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Item</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Bales</th>
-                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Weight (kg)</th>
+                          <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Item
+                          </th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Bales
+                          </th>
+                          <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Weight (kg)
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1211,20 +1419,29 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                             acc[key].weight += parseFloat(b.weight || b.weightKg || "0");
                             return acc;
                           }, {})
-                        ).sort(([a], [b]) => a.localeCompare(b)).map(([name, stats]) => (
-                          <tr key={name} className="border-b last:border-0">
-                            <td className="px-3 py-2 font-medium">{name}</td>
-                            <td className="px-3 py-2 text-right font-mono">{stats.count}</td>
-                            <td className="px-3 py-2 text-right font-mono text-muted-foreground">{formatNumber(stats.weight)}</td>
-                          </tr>
-                        ))}
+                        )
+                          .sort(([a], [b]) => a.localeCompare(b))
+                          .map(([name, stats]) => (
+                            <tr key={name} className="border-b last:border-0">
+                              <td className="px-3 py-2 font-medium">{name}</td>
+                              <td className="px-3 py-2 text-right font-mono">{stats.count}</td>
+                              <td className="px-3 py-2 text-right font-mono text-muted-foreground">
+                                {formatNumber(stats.weight)}
+                              </td>
+                            </tr>
+                          ))}
                       </tbody>
                       <tfoot>
                         <tr className="bg-muted/50 border-t font-semibold">
                           <td className="px-3 py-2 text-xs">Total</td>
                           <td className="px-3 py-2 text-right font-mono">{balesList.length}</td>
                           <td className="px-3 py-2 text-right font-mono text-muted-foreground">
-                            {formatNumber(balesList.reduce((sum: number, b: any) => sum + parseFloat(b.weight || b.weightKg || "0"), 0))}
+                            {formatNumber(
+                              balesList.reduce(
+                                (sum: number, b: any) => sum + parseFloat(b.weight || b.weightKg || "0"),
+                                0
+                              )
+                            )}
                           </td>
                         </tr>
                       </tfoot>
@@ -1284,7 +1501,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <DialogTitle>Bale Stock Entry</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>Bale Stock Entry</Badge>
+            <Badge variant={badgeVariant} className={badgeClass}>
+              Bale Stock Entry
+            </Badge>
           </div>
           <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
         </DialogHeader>
@@ -1293,9 +1512,15 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-muted/40 border-b">
-                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Item</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Qty</th>
-                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Amount</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Item
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Qty
+                  </th>
+                  <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Total Amount
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1303,7 +1528,10 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                   <tr key={name} className="border-b last:border-0">
                     <td className="px-3 py-2 font-medium">{name}</td>
                     <td className="px-3 py-2 text-right font-mono">{stats.count}</td>
-                    <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(stats.totalAmount)}</td>
+                    <td className="px-3 py-2 text-right font-mono">
+                      {sym}
+                      {formatNumber(stats.totalAmount)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1311,7 +1539,10 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                 <tr className="bg-muted/50 border-t font-semibold">
                   <td className="px-3 py-2 text-xs">Total</td>
                   <td className="px-3 py-2 text-right font-mono">{bales.length}</td>
-                  <td className="px-3 py-2 text-right font-mono">{sym}{formatNumber(totalAmt)}</td>
+                  <td className="px-3 py-2 text-right font-mono">
+                    {sym}
+                    {formatNumber(totalAmt)}
+                  </td>
                 </tr>
               </tfoot>
             </table>
@@ -1329,7 +1560,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <DialogTitle>Offload Raw Stock</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>Offload Raw Stock</Badge>
+            <Badge variant={badgeVariant} className={badgeClass}>
+              Offload Raw Stock
+            </Badge>
           </div>
           <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
         </DialogHeader>
@@ -1341,21 +1574,35 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div>
                   <p className="font-semibold text-base">{c.supplierName || "Unknown Supplier"}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Container: <span className="font-mono">{c.containerNumber}</span></p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Container: <span className="font-mono">{c.containerNumber}</span>
+                  </p>
                   {c.origin && <p className="text-xs text-muted-foreground">Origin: {c.origin}</p>}
                 </div>
-                <Button size="sm" variant="default"
-                  onClick={() => { onClose(); onNavigate(`/factory/containers?edit=${metaContainerId}`); }}
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => {
+                    onClose();
+                    onNavigate(`/factory/containers?edit=${metaContainerId}`);
+                  }}
                   data-testid="button-open-container"
-                >Open Container</Button>
+                >
+                  Open Container
+                </Button>
               </div>
             ) : null}
           </div>
           <div className="rounded-md border px-4 py-3 space-y-1">
             <p className="text-xs text-muted-foreground">Amount</p>
-            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+            <p className="text-lg font-bold font-mono">
+              {sym}
+              {formatNumber(amt)}
+            </p>
             {entry.currencyCode !== "USD" && parseFloat(entry.fxRateToUsd || "1") !== 1 && (
-              <p className="text-xs font-mono text-muted-foreground">${formatNumber(parseFloat(entry.amountUsd || "0"))} USD</p>
+              <p className="text-xs font-mono text-muted-foreground">
+                ${formatNumber(parseFloat(entry.amountUsd || "0"))} USD
+              </p>
             )}
             {entry.description && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
           </div>
@@ -1372,7 +1619,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <DialogTitle>Commission</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>Commission</Badge>
+            <Badge variant={badgeVariant} className={badgeClass}>
+              Commission
+            </Badge>
           </div>
           <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
         </DialogHeader>
@@ -1386,16 +1635,26 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                   <p className="font-semibold text-base">{c.containerNumber}</p>
                   {c.supplierName && <p className="text-xs text-muted-foreground">Supplier: {c.supplierName}</p>}
                 </div>
-                <Button size="sm" variant="default"
-                  onClick={() => { onClose(); onNavigate(`/factory/containers?edit=${metaContainerId}`); }}
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => {
+                    onClose();
+                    onNavigate(`/factory/containers?edit=${metaContainerId}`);
+                  }}
                   data-testid="button-open-container"
-                >Open Container</Button>
+                >
+                  Open Container
+                </Button>
               </div>
             ) : null}
           </div>
           <div className="rounded-md border px-4 py-3 space-y-1">
             <p className="text-xs text-muted-foreground">Commission Amount</p>
-            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+            <p className="text-lg font-bold font-mono">
+              {sym}
+              {formatNumber(amt)}
+            </p>
             {entry.description && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
           </div>
         </div>
@@ -1410,7 +1669,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <DialogTitle>Waste Disposal</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>Waste Disposal</Badge>
+            <Badge variant={badgeVariant} className={badgeClass}>
+              Waste Disposal
+            </Badge>
           </div>
           <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
         </DialogHeader>
@@ -1422,7 +1683,10 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
           )}
           <div className="rounded-md border px-4 py-3">
             <p className="text-xs text-muted-foreground">Written Off Value</p>
-            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+            <p className="text-lg font-bold font-mono">
+              {sym}
+              {formatNumber(amt)}
+            </p>
           </div>
         </div>
       </>
@@ -1437,7 +1701,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <DialogTitle>Other Charge</DialogTitle>
-            <Badge variant={badgeVariant} className={badgeClass}>Other Charge</Badge>
+            <Badge variant={badgeVariant} className={badgeClass}>
+              Other Charge
+            </Badge>
           </div>
           <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
         </DialogHeader>
@@ -1447,18 +1713,30 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
               <div className="flex items-start justify-between gap-2 flex-wrap">
                 <div>
                   <p className="font-semibold text-base">{c.supplierName || c.containerNumber}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Container: <span className="font-mono">{c.containerNumber}</span></p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Container: <span className="font-mono">{c.containerNumber}</span>
+                  </p>
                 </div>
-                <Button size="sm" variant="default"
-                  onClick={() => { onClose(); onNavigate(`/factory/containers?edit=${entry.referenceId}`); }}
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => {
+                    onClose();
+                    onNavigate(`/factory/containers?edit=${entry.referenceId}`);
+                  }}
                   data-testid="button-open-container"
-                >Open Container</Button>
+                >
+                  Open Container
+                </Button>
               </div>
             </div>
           )}
           <div className="rounded-md border px-4 py-3 space-y-1">
             <p className="text-xs text-muted-foreground">Amount</p>
-            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+            <p className="text-lg font-bold font-mono">
+              {sym}
+              {formatNumber(amt)}
+            </p>
             {entry.description && <p className="text-sm text-muted-foreground mt-1">{entry.description}</p>}
           </div>
         </div>
@@ -1471,7 +1749,9 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
       <DialogHeader>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <DialogTitle>Transaction Details</DialogTitle>
-          <Badge variant={badgeVariant} className={badgeClass}>{formatTxType(entry.txType)}</Badge>
+          <Badge variant={badgeVariant} className={badgeClass}>
+            {formatTxType(entry.txType)}
+          </Badge>
         </div>
         <DialogDescription>{formatDisplayDate(entry.txDate + "T00:00:00")}</DialogDescription>
       </DialogHeader>
@@ -1483,7 +1763,10 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
         <div className="rounded-md border px-4 py-3 flex items-center justify-between gap-4">
           <div>
             <p className="text-xs text-muted-foreground">Amount</p>
-            <p className="text-lg font-bold font-mono">{sym}{formatNumber(amt)}</p>
+            <p className="text-lg font-bold font-mono">
+              {sym}
+              {formatNumber(amt)}
+            </p>
           </div>
           {entry.currencyCode !== "USD" && parseFloat(entry.fxRateToUsd) !== 1 && (
             <div className="text-right">
@@ -1507,7 +1790,10 @@ function ViewEntryModal({ entry, onClose, onNavigate, formatDisplayDate }: {
                 <div
                   key={bale.ref}
                   className="flex items-center justify-between rounded-md border px-3 py-2 text-sm hover-elevate cursor-pointer"
-                  onClick={() => { onClose(); onNavigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.ref)}`); }}
+                  onClick={() => {
+                    onClose();
+                    onNavigate(`/factory/barcode-lookup?ref=${encodeURIComponent(bale.ref)}`);
+                  }}
                   data-testid={`view-bale-row-${bale.ref}`}
                 >
                   <div>
@@ -1539,7 +1825,8 @@ export default function FactoryDaybook() {
   const routePrefix = appMode === "properties" ? "/properties" : "/factory";
 
   const { data: currentUser } = useQuery<any>({ queryKey: ["/api/auth/me"] });
-  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
+  const isAdminOrOwner =
+    currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("today"));
@@ -1673,10 +1960,11 @@ export default function FactoryDaybook() {
     else if (statusFilter === "only") result = result.filter((e) => e.optional);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      result = result.filter((e) =>
-        formatDaybookDescription(e).toLowerCase().includes(q) ||
-        formatTxType(e.txType).toLowerCase().includes(q) ||
-        e.txType.toLowerCase().includes(q)
+      result = result.filter(
+        (e) =>
+          formatDaybookDescription(e).toLowerCase().includes(q) ||
+          formatTxType(e.txType).toLowerCase().includes(q) ||
+          e.txType.toLowerCase().includes(q)
       );
     }
     const minAmt = minAmount ? parseFloat(minAmount) : null;
@@ -1698,15 +1986,32 @@ export default function FactoryDaybook() {
 
   // ── Condensed grouped rows ────────────────────────────────────────────────
   const condensedRows = useMemo(() => {
-    const grouped: Record<string, {
-      date: string; txType: string; currencyCode: string;
-      count: number; totalAmountCurrency: number;
-      fxRateToUsd: string | null; totalAmountUsd: number; key: string;
-    }> = {};
+    const grouped: Record<
+      string,
+      {
+        date: string;
+        txType: string;
+        currencyCode: string;
+        count: number;
+        totalAmountCurrency: number;
+        fxRateToUsd: string | null;
+        totalAmountUsd: number;
+        key: string;
+      }
+    > = {};
     filteredEntries.forEach((e) => {
       const key = `${e.txDate}|${e.txType}|${e.currencyCode}`;
       if (!grouped[key]) {
-        grouped[key] = { date: e.txDate, txType: e.txType, currencyCode: e.currencyCode, count: 0, totalAmountCurrency: 0, fxRateToUsd: e.fxRateToUsd, totalAmountUsd: 0, key };
+        grouped[key] = {
+          date: e.txDate,
+          txType: e.txType,
+          currencyCode: e.currencyCode,
+          count: 0,
+          totalAmountCurrency: 0,
+          fxRateToUsd: e.fxRateToUsd,
+          totalAmountUsd: 0,
+          key,
+        };
       }
       // Count individual bales for BALE_STOCK_ENTRY so the count reflects bales not batches
       const baleCount = e.txType === "BALE_STOCK_ENTRY" ? Math.max(parseBalesMeta(e).length, 1) : 1;
@@ -1723,9 +2028,11 @@ export default function FactoryDaybook() {
 
   const getEntriesForCondensedRow = (rowKey: string): DisplayEntry[] => {
     const [date, txType, currencyCode] = rowKey.split("|");
-    const raw = filteredEntries.filter((e) => e.txDate === date && e.txType === txType && e.currencyCode === currencyCode);
+    const raw = filteredEntries.filter(
+      (e) => e.txDate === date && e.txType === txType && e.currencyCode === currencyCode
+    );
     if (txType === "BALE_STOCK_ENTRY") {
-      return raw.map(e => ({ ...e, _vKey: String(e.id), _source: e } as DisplayEntry));
+      return raw.map((e) => ({ ...e, _vKey: String(e.id), _source: e }) as DisplayEntry);
     }
     return expandBaleEntries(raw);
   };
@@ -1765,7 +2072,7 @@ export default function FactoryDaybook() {
     requestAnimationFrame(() => {
       window.scrollTo({ top: scrollY, behavior: "instant" as ScrollBehavior });
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Session persistence: save on every state change ───────────────────────
@@ -1804,7 +2111,11 @@ export default function FactoryDaybook() {
   useEffect(() => {
     return () => {
       const path = window.location.pathname;
-      const isDaybookFlow = path.includes("/factory/daybook") || path.includes("/factory/vouchers") || path.includes("/properties/daybook") || path.includes("/properties/vouchers");
+      const isDaybookFlow =
+        path.includes("/factory/daybook") ||
+        path.includes("/factory/vouchers") ||
+        path.includes("/properties/daybook") ||
+        path.includes("/properties/vouchers");
       if (!isDaybookFlow) sessionStorage.removeItem(FACTORY_DAYBOOK_STATE_KEY);
     };
   }, []);
@@ -1812,7 +2123,11 @@ export default function FactoryDaybook() {
   // ── Excel export: summary ─────────────────────────────────────────────────
   const handleExportToExcel = async () => {
     if (filteredEntries.length === 0) {
-      toast({ title: "No data to export", description: "No entries found for the current filters.", variant: "destructive" });
+      toast({
+        title: "No data to export",
+        description: "No entries found for the current filters.",
+        variant: "destructive",
+      });
       return;
     }
     const exportData = filteredEntries.map((e) => ({
@@ -1827,27 +2142,48 @@ export default function FactoryDaybook() {
     }));
     const worksheet = utils.json_to_sheet(exportData);
     worksheet["!cols"] = [
-      { wch: 12 }, { wch: 22 }, { wch: 40 }, { wch: 10 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 10 },
+      { wch: 12 },
+      { wch: 22 },
+      { wch: 40 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 10 },
+      { wch: 15 },
+      { wch: 10 },
     ];
     const workbook = utils.book_new();
     utils.book_append_sheet(workbook, worksheet, "Factory Daybook");
     const fileName = `FactoryDaybook_${format(new Date(), "yyyy-MM-dd")}.xlsx`;
     await writeFile(workbook, fileName);
-    toast({ title: "Export successful", description: `Downloaded ${fileName} with ${filteredEntries.length} entries.` });
+    toast({
+      title: "Export successful",
+      description: `Downloaded ${fileName} with ${filteredEntries.length} entries.`,
+    });
   };
 
   // ── Excel export: detailed (with voucher debit/credit entries) ────────────
   const handleExportDetailedToExcel = async () => {
     if (filteredEntries.length === 0) {
-      toast({ title: "No data to export", description: "No entries found for the current filters.", variant: "destructive" });
+      toast({
+        title: "No data to export",
+        description: "No entries found for the current filters.",
+        variant: "destructive",
+      });
       return;
     }
     setIsExportingDetailed(true);
     try {
       type DetailRow = {
-        Date: string; Type: string; Description: string;
-        Currency: string; Amount: number; "Amount (USD)": number;
-        Optional: string; "Account Name": string; Debit: string; Credit: string;
+        Date: string;
+        Type: string;
+        Description: string;
+        Currency: string;
+        Amount: number;
+        "Amount (USD)": number;
+        Optional: string;
+        "Account Name": string;
+        Debit: string;
+        Credit: string;
       };
       const detailedData: DetailRow[] = [];
 
@@ -1867,7 +2203,7 @@ export default function FactoryDaybook() {
             const res = await fetch(`/api/vouchers/${entry.referenceId}/view-entries`, { credentials: "include" });
             if (res.ok) {
               const raw = await res.json();
-              const vEntries: any[] = Array.isArray(raw) ? raw : (raw.entries || []);
+              const vEntries: any[] = Array.isArray(raw) ? raw : raw.entries || [];
               if (vEntries.length > 0) {
                 for (const ve of vEntries) {
                   detailedData.push({
@@ -1894,7 +2230,16 @@ export default function FactoryDaybook() {
       for (const type of Object.keys(dataByType).sort()) {
         const ws = utils.json_to_sheet(dataByType[type]);
         ws["!cols"] = [
-          { wch: 12 }, { wch: 22 }, { wch: 40 }, { wch: 10 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 30 }, { wch: 15 }, { wch: 15 },
+          { wch: 12 },
+          { wch: 22 },
+          { wch: 40 },
+          { wch: 10 },
+          { wch: 15 },
+          { wch: 15 },
+          { wch: 10 },
+          { wch: 30 },
+          { wch: 15 },
+          { wch: 15 },
         ];
         const sheetName = type.substring(0, 31).replace(/[\\/*?[\]:]/g, "_");
         utils.book_append_sheet(workbook, ws, sheetName);
@@ -2045,7 +2390,6 @@ export default function FactoryDaybook() {
     });
   };
 
-
   // ── JSX ───────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -2127,7 +2471,13 @@ export default function FactoryDaybook() {
               </SelectContent>
             </Select>
             {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters" className="gap-1 h-8 text-sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                data-testid="button-clear-filters"
+                className="gap-1 h-8 text-sm"
+              >
                 <X className="w-3.5 h-3.5" />
                 Clear
               </Button>
@@ -2155,7 +2505,9 @@ export default function FactoryDaybook() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="space-y-2 p-6">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
           ) : filteredEntries.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
@@ -2178,15 +2530,21 @@ export default function FactoryDaybook() {
             /* ── CONDENSED VIEW — matches ERP Daybook: Date/Type | Count | Total ── */
             <div className="w-full">
               {/* Header */}
-              <div className={cn(
-                "sticky top-0 z-30 bg-background border-b grid w-full px-4 py-2",
-                showAmounts
-                  ? "grid-cols-[minmax(0,1fr)_100px_180px]"
-                  : "grid-cols-[minmax(0,1fr)_100px]",
-              )}>
+              <div
+                className={cn(
+                  "sticky top-0 z-30 bg-background border-b grid w-full px-4 py-2",
+                  showAmounts ? "grid-cols-[minmax(0,1fr)_100px_180px]" : "grid-cols-[minmax(0,1fr)_100px]"
+                )}
+              >
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Date / Type</span>
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">Count</span>
-                {showAmounts && <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">Total</span>}
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-center">
+                  Count
+                </span>
+                {showAmounts && (
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider text-right">
+                    Total
+                  </span>
+                )}
               </div>
 
               {/* Group condensedRows by date for date-separator rows */}
@@ -2210,7 +2568,8 @@ export default function FactoryDaybook() {
                         <span />
                         {showAmounts && (
                           <span className="font-mono font-medium text-sm text-right">
-                            {currencySymbol(dayCcy)}{formatNumber(dayTotal)}
+                            {currencySymbol(dayCcy)}
+                            {formatNumber(dayTotal)}
                           </span>
                         )}
                       </div>
@@ -2226,18 +2585,26 @@ export default function FactoryDaybook() {
                             <div
                               data-testid={`row-condensed-${row.date}-${row.txType}`}
                               onClick={() => setExpandedRowKey(isExpanded ? null : row.key)}
-                              className={cn("grid w-full pl-6 pr-4 py-3 cursor-pointer hover-elevate items-center", colsClass)}
+                              className={cn(
+                                "grid w-full pl-6 pr-4 py-3 cursor-pointer hover-elevate items-center",
+                                colsClass
+                              )}
                             >
                               <div className="flex items-center gap-2 min-w-0">
-                                {isExpanded
-                                  ? <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
-                                  : <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />}
-                                <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>{formatTxType(row.txType)}</Badge>
+                                {isExpanded ? (
+                                  <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                ) : (
+                                  <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                                )}
+                                <Badge variant={bv} className={cn(bc, "whitespace-nowrap")}>
+                                  {formatTxType(row.txType)}
+                                </Badge>
                               </div>
                               <div className="text-center text-muted-foreground text-sm font-mono">{row.count}</div>
                               {showAmounts && (
                                 <div className="text-right font-mono font-medium text-sm">
-                                  {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
+                                  {currencySymbol(row.currencyCode)}
+                                  {formatNumber(row.totalAmountCurrency)}
                                   {row.currencyCode !== "USD" && (
                                     <div className="text-xs text-muted-foreground font-mono">{row.currencyCode}</div>
                                   )}
@@ -2246,126 +2613,222 @@ export default function FactoryDaybook() {
                             </div>
 
                             {/* Expanded entry sub-rows */}
-                            {isExpanded && row.txType === "BALE_STOCK_ENTRY" && (() => {
-                              const hasEntries = expandedEntries.length > 0;
-                              const mergedEntry = hasEntries
-                                ? mergeBaleEntries(expandedEntries.map(e => (e as DisplayEntry)._source ?? e as DaybookEntry))
-                                : undefined;
-                              return (
-                                <div
-                                  className={cn("grid w-full bg-muted/20 border-t items-center", colsClass)}
-                                >
-                                  <div className="pl-14 pr-2 py-2 min-w-0">
-                                    <span className="text-sm text-foreground">{row.count} bale{row.count !== 1 ? "s" : ""}</span>
+                            {isExpanded &&
+                              row.txType === "BALE_STOCK_ENTRY" &&
+                              (() => {
+                                const hasEntries = expandedEntries.length > 0;
+                                const mergedEntry = hasEntries
+                                  ? mergeBaleEntries(
+                                      expandedEntries.map((e) => (e as DisplayEntry)._source ?? (e as DaybookEntry))
+                                    )
+                                  : undefined;
+                                return (
+                                  <div className={cn("grid w-full bg-muted/20 border-t items-center", colsClass)}>
+                                    <div className="pl-14 pr-2 py-2 min-w-0">
+                                      <span className="text-sm text-foreground">
+                                        {row.count} bale{row.count !== 1 ? "s" : ""}
+                                      </span>
+                                    </div>
+                                    <div />
+                                    {showAmounts ? (
+                                      <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                        <span className="text-sm font-mono font-medium">
+                                          {currencySymbol(row.currencyCode)}
+                                          {formatNumber(row.totalAmountCurrency)}
+                                        </span>
+                                        {mergedEntry && (
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            title="View details"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setViewEntry(mergedEntry);
+                                            }}
+                                            data-testid="button-view-bale-summary"
+                                          >
+                                            <Eye className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                        {mergedEntry && (
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            title="View details"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setViewEntry(mergedEntry);
+                                            }}
+                                            data-testid="button-view-bale-summary"
+                                          >
+                                            <Eye className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                  <div />
-                                  {showAmounts ? (
-                                    <div className="flex items-center justify-end gap-1 pr-2 py-2">
-                                      <span className="text-sm font-mono font-medium">
-                                        {currencySymbol(row.currencyCode)}{formatNumber(row.totalAmountCurrency)}
-                                      </span>
-                                      {mergedEntry && (
-                                        <Button size="icon" variant="ghost" title="View details"
-                                          onClick={(e) => { e.stopPropagation(); setViewEntry(mergedEntry); }}
-                                          data-testid="button-view-bale-summary"
-                                        ><Eye className="h-3 w-3" /></Button>
-                                      )}
+                                );
+                              })()}
+                            {isExpanded &&
+                              row.txType !== "BALE_STOCK_ENTRY" &&
+                              expandedEntries.map((entry) => {
+                                const de = entry as DisplayEntry;
+                                const isBaleTransfer = entry.txType === "BALE_TRANSFER";
+                                const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
+                                const canEdit =
+                                  !!VOUCHER_TX_TYPES[entry.txType] &&
+                                  !!entry.referenceId &&
+                                  entry.txType !== "BALE_STOCK_ENTRY";
+                                const inlineMeta = (() => {
+                                  try {
+                                    return JSON.parse(entry.metaJson || "{}");
+                                  } catch {
+                                    return {};
+                                  }
+                                })();
+                                let pencilTarget: string | null = null;
+                                if (entry.txType === "CONTAINER_IMPORT" && entry.referenceId)
+                                  pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
+                                else if (entry.txType === "OFFLOAD_RAW_STOCK" && inlineMeta.containerId)
+                                  pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
+                                else if (entry.txType === "COMMISSION" && inlineMeta.containerId)
+                                  pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
+                                else if (entry.txType === "OTHER_CHARGE" && entry.referenceId)
+                                  pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
+                                const showPencil = pencilTarget && isAdminOrOwner;
+                                return (
+                                  <div
+                                    key={de._vKey ?? entry.id}
+                                    data-testid={`row-expanded-${entry.id}`}
+                                    onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
+                                    className={cn(
+                                      "grid w-full bg-muted/20 border-t items-center",
+                                      colsClass,
+                                      isBaleTransfer && "cursor-pointer"
+                                    )}
+                                  >
+                                    {/* Description — deep indent to align under badge */}
+                                    <div className="pl-14 pr-2 py-2 min-w-0">
+                                      <div className="flex items-center gap-1.5 min-w-0">
+                                        <span
+                                          className="text-sm text-foreground truncate"
+                                          title={formatDaybookDescription(entry)}
+                                        >
+                                          {formatDaybookDescription(entry)}
+                                        </span>
+                                        {entry.optional && (
+                                          <Badge
+                                            variant="outline"
+                                            className="text-muted-foreground text-xs shrink-0"
+                                            data-testid={`badge-optional-${entry.id}`}
+                                          >
+                                            Optional
+                                          </Badge>
+                                        )}
+                                      </div>
                                     </div>
-                                  ) : (
-                                    <div className="flex items-center justify-end gap-1 pr-2 py-2">
-                                      {mergedEntry && (
-                                        <Button size="icon" variant="ghost" title="View details"
-                                          onClick={(e) => { e.stopPropagation(); setViewEntry(mergedEntry); }}
-                                          data-testid="button-view-bale-summary"
-                                        ><Eye className="h-3 w-3" /></Button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                            {isExpanded && row.txType !== "BALE_STOCK_ENTRY" && expandedEntries.map((entry) => {
-                              const de = entry as DisplayEntry;
-                              const isBaleTransfer = entry.txType === "BALE_TRANSFER";
-                              const isVoucherBacked = entry.referenceTable === "vouchers" && !!entry.referenceId;
-                              const canEdit = !!VOUCHER_TX_TYPES[entry.txType] && !!entry.referenceId && entry.txType !== "BALE_STOCK_ENTRY";
-                              const inlineMeta = (() => { try { return JSON.parse(entry.metaJson || "{}"); } catch { return {}; } })();
-                              let pencilTarget: string | null = null;
-                              if (entry.txType === "CONTAINER_IMPORT" && entry.referenceId) pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
-                              else if (entry.txType === "OFFLOAD_RAW_STOCK" && inlineMeta.containerId) pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
-                              else if (entry.txType === "COMMISSION" && inlineMeta.containerId) pencilTarget = `/factory/containers?edit=${inlineMeta.containerId}`;
-                              else if (entry.txType === "OTHER_CHARGE" && entry.referenceId) pencilTarget = `/factory/containers?edit=${entry.referenceId}`;
-                              const showPencil = pencilTarget && isAdminOrOwner;
-                              return (
-                                <div
-                                  key={de._vKey ?? entry.id}
-                                  data-testid={`row-expanded-${entry.id}`}
-                                  onClick={isBaleTransfer ? (e) => handleEntryClick(entry, e) : undefined}
-                                  className={cn(
-                                    "grid w-full bg-muted/20 border-t items-center",
-                                    colsClass,
-                                    isBaleTransfer && "cursor-pointer",
-                                  )}
-                                >
-                                  {/* Description — deep indent to align under badge */}
-                                  <div className="pl-14 pr-2 py-2 min-w-0">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      <span className="text-sm text-foreground truncate" title={formatDaybookDescription(entry)}>
-                                        {formatDaybookDescription(entry)}
-                                      </span>
-                                      {entry.optional && (
-                                        <Badge variant="outline" className="text-muted-foreground text-xs shrink-0" data-testid={`badge-optional-${entry.id}`}>Optional</Badge>
-                                      )}
-                                    </div>
+                                    {/* Empty count cell */}
+                                    <div />
+                                    {/* Amount + actions */}
+                                    {showAmounts ? (
+                                      <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                        <span className="text-sm font-mono font-medium">
+                                          {currencySymbol(entry.currencyCode)}
+                                          {formatNumber(parseFloat(entry.amountCurrency))}
+                                        </span>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          title="View details"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setViewEntry((de._source ?? entry) as DaybookEntry);
+                                          }}
+                                          data-testid={`button-view-${entry.id}`}
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                        {showPencil && (
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            title="Go to container"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              navigate(pencilTarget!);
+                                            }}
+                                            data-testid={`button-pencil-${entry.id}`}
+                                          >
+                                            <Pencil className="h-3 w-3 text-amber-500" />
+                                          </Button>
+                                        )}
+                                        {canEdit && (
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            title="Edit"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              editSourceRecord(entry);
+                                            }}
+                                            data-testid={`button-edit-source-${entry.id}`}
+                                          >
+                                            <ExternalLink className="h-3 w-3" />
+                                          </Button>
+                                        )}
+                                        {isAdminOrOwner &&
+                                          isVoucherBacked &&
+                                          ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              title="Void"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setVoidEntry(entry);
+                                              }}
+                                              data-testid={`button-void-voucher-${entry.id}`}
+                                            >
+                                              <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                          )}
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-end gap-1 pr-2 py-2">
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          title="View details"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setViewEntry((de._source ?? entry) as DaybookEntry);
+                                          }}
+                                          data-testid={`button-view-${entry.id}`}
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                        {showPencil && (
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            title="Go to container"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              navigate(pencilTarget!);
+                                            }}
+                                            data-testid={`button-pencil-${entry.id}`}
+                                          >
+                                            <Pencil className="h-3 w-3 text-amber-500" />
+                                          </Button>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                  {/* Empty count cell */}
-                                  <div />
-                                  {/* Amount + actions */}
-                                  {showAmounts ? (
-                                    <div className="flex items-center justify-end gap-1 pr-2 py-2">
-                                      <span className="text-sm font-mono font-medium">
-                                        {currencySymbol(entry.currencyCode)}{formatNumber(parseFloat(entry.amountCurrency))}
-                                      </span>
-                                      <Button size="icon" variant="ghost" title="View details"
-                                        onClick={(e) => { e.stopPropagation(); setViewEntry((de._source ?? entry) as DaybookEntry); }}
-                                        data-testid={`button-view-${entry.id}`}
-                                      ><Eye className="h-3 w-3" /></Button>
-                                      {showPencil && (
-                                        <Button size="icon" variant="ghost" title="Go to container"
-                                          onClick={(e) => { e.stopPropagation(); navigate(pencilTarget!); }}
-                                          data-testid={`button-pencil-${entry.id}`}
-                                        ><Pencil className="h-3 w-3 text-amber-500" /></Button>
-                                      )}
-                                      {canEdit && (
-                                        <Button size="icon" variant="ghost" title="Edit"
-                                          onClick={(e) => { e.stopPropagation(); editSourceRecord(entry); }}
-                                          data-testid={`button-edit-source-${entry.id}`}
-                                        ><ExternalLink className="h-3 w-3" /></Button>
-                                      )}
-                                      {isAdminOrOwner && isVoucherBacked && ["PAYMENT", "RECEIPT", "JOURNAL"].includes(entry.txType) && (
-                                        <Button size="icon" variant="ghost" title="Void"
-                                          onClick={(e) => { e.stopPropagation(); setVoidEntry(entry); }}
-                                          data-testid={`button-void-voucher-${entry.id}`}
-                                        ><Trash2 className="h-3 w-3" /></Button>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-center justify-end gap-1 pr-2 py-2">
-                                      <Button size="icon" variant="ghost" title="View details"
-                                        onClick={(e) => { e.stopPropagation(); setViewEntry((de._source ?? entry) as DaybookEntry); }}
-                                        data-testid={`button-view-${entry.id}`}
-                                      ><Eye className="h-3 w-3" /></Button>
-                                      {showPencil && (
-                                        <Button size="icon" variant="ghost" title="Go to container"
-                                          onClick={(e) => { e.stopPropagation(); navigate(pencilTarget!); }}
-                                          data-testid={`button-pencil-${entry.id}`}
-                                        ><Pencil className="h-3 w-3 text-amber-500" /></Button>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
                           </div>
                         );
                       })}
@@ -2379,66 +2842,128 @@ export default function FactoryDaybook() {
       </Card>
 
       {/* Edit Dialog */}
-      <Dialog open={editEntry !== null} onOpenChange={(open) => { if (!open) setEditEntry(null); }}>
+      <Dialog
+        open={editEntry !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditEntry(null);
+        }}
+      >
         <DialogContent data-testid="dialog-edit-daybook">
           <DialogHeader>
             <DialogTitle>Edit Daybook Entry</DialogTitle>
             <DialogDescription>Modify the entry details. A reason is required for the audit trail.</DialogDescription>
           </DialogHeader>
-          {editEntry && (() => {
-            const isVoucherBacked = editEntry.referenceTable === "vouchers" || editEntry.id < 0;
-            return (
-              <div className="space-y-4">
-                {isVoucherBacked && (
-                  <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="note-voucher-sync">
-                    Saving will update the description on the linked voucher, so Accounts statements stay in sync. To change amounts, use the source record edit button.
-                  </div>
-                )}
-                <div>
-                  <Label className="text-sm font-medium">Description</Label>
-                  <Textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} data-testid="input-edit-description" />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Date</Label>
-                  <Input type="date" value={editTxDate} onChange={(e) => setEditTxDate(e.target.value)} data-testid="input-edit-tx-date" />
-                </div>
-                {!isVoucherBacked && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="text-sm font-medium">Amount ({editEntry.currencyCode})</Label>
-                      <Input type="number" step="0.01" value={editAmountCurrency} onChange={(e) => setEditAmountCurrency(e.target.value)} data-testid="input-edit-amount-currency" />
+          {editEntry &&
+            (() => {
+              const isVoucherBacked = editEntry.referenceTable === "vouchers" || editEntry.id < 0;
+              return (
+                <div className="space-y-4">
+                  {isVoucherBacked && (
+                    <div
+                      className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+                      data-testid="note-voucher-sync"
+                    >
+                      Saving will update the description on the linked voucher, so Accounts statements stay in sync. To
+                      change amounts, use the source record edit button.
                     </div>
-                    <div>
-                      <Label className="text-sm font-medium">Amount (USD)</Label>
-                      <Input type="number" step="0.01" value={editAmountUsd} onChange={(e) => setEditAmountUsd(e.target.value)} data-testid="input-edit-amount-usd" />
-                    </div>
+                  )}
+                  <div>
+                    <Label className="text-sm font-medium">Description</Label>
+                    <Textarea
+                      value={editDescription}
+                      onChange={(e) => setEditDescription(e.target.value)}
+                      data-testid="input-edit-description"
+                    />
                   </div>
-                )}
-                <div>
-                  <Label className="text-sm font-medium">Reason for edit *</Label>
-                  <Textarea value={editReason} onChange={(e) => setEditReason(e.target.value)} placeholder="Why is this change needed?" data-testid="input-edit-reason" />
+                  <div>
+                    <Label className="text-sm font-medium">Date</Label>
+                    <Input
+                      type="date"
+                      value={editTxDate}
+                      onChange={(e) => setEditTxDate(e.target.value)}
+                      data-testid="input-edit-tx-date"
+                    />
+                  </div>
+                  {!isVoucherBacked && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-sm font-medium">Amount ({editEntry.currencyCode})</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editAmountCurrency}
+                          onChange={(e) => setEditAmountCurrency(e.target.value)}
+                          data-testid="input-edit-amount-currency"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">Amount (USD)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={editAmountUsd}
+                          onChange={(e) => setEditAmountUsd(e.target.value)}
+                          data-testid="input-edit-amount-usd"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <Label className="text-sm font-medium">Reason for edit *</Label>
+                    <Textarea
+                      value={editReason}
+                      onChange={(e) => setEditReason(e.target.value)}
+                      placeholder="Why is this change needed?"
+                      data-testid="input-edit-reason"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => setEditEntry(null)} data-testid="button-cancel-edit">
+                      Cancel
+                    </Button>
+                    <Button
+                      disabled={!editReason.trim() || editMutation.isPending}
+                      onClick={() => wrapAdminAction(handleEditSubmit, "Edit Entry")}
+                      data-testid="button-submit-edit"
+                    >
+                      {editMutation.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setEditEntry(null)} data-testid="button-cancel-edit">Cancel</Button>
-                  <Button disabled={!editReason.trim() || editMutation.isPending} onClick={() => wrapAdminAction(handleEditSubmit, "Edit Entry")} data-testid="button-submit-edit">
-                    {editMutation.isPending ? "Saving..." : "Save Changes"}
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
         </DialogContent>
       </Dialog>
 
       {/* View Details Modal */}
-      <Dialog open={viewEntry !== null} onOpenChange={(open) => { if (!open) setViewEntry(null); }}>
-        <DialogContent className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto" data-testid="dialog-view-entry">
-          {viewEntry && <ViewEntryModal entry={viewEntry} onClose={() => setViewEntry(null)} onNavigate={navigate} formatDisplayDate={formatDisplayDate} />}
+      <Dialog
+        open={viewEntry !== null}
+        onOpenChange={(open) => {
+          if (!open) setViewEntry(null);
+        }}
+      >
+        <DialogContent
+          className="w-full max-w-[95vw] md:max-w-4xl max-h-[90vh] overflow-y-auto"
+          data-testid="dialog-view-entry"
+        >
+          {viewEntry && (
+            <ViewEntryModal
+              entry={viewEntry}
+              onClose={() => setViewEntry(null)}
+              onNavigate={navigate}
+              formatDisplayDate={formatDisplayDate}
+            />
+          )}
         </DialogContent>
       </Dialog>
 
       {/* Void Alert */}
-      <AlertDialog open={voidEntry !== null} onOpenChange={(open) => { if (!open) setVoidEntry(null); }}>
+      <AlertDialog
+        open={voidEntry !== null}
+        onOpenChange={(open) => {
+          if (!open) setVoidEntry(null);
+        }}
+      >
         <AlertDialogContent data-testid="dialog-void-voucher">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this voucher?</AlertDialogTitle>
@@ -2461,13 +2986,20 @@ export default function FactoryDaybook() {
         </AlertDialogContent>
       </AlertDialog>
       {/* Hard Delete Alert */}
-      <AlertDialog open={deleteEntry !== null} onOpenChange={(open) => { if (!open) setDeleteEntry(null); }}>
+      <AlertDialog
+        open={deleteEntry !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeleteEntry(null);
+        }}
+      >
         <AlertDialogContent data-testid="dialog-delete-entry">
           <AlertDialogHeader>
             <AlertDialogTitle>Permanently delete this entry?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently remove the daybook entry. This action cannot be undone.
-              {deleteEntry && <span className="block mt-2 font-medium text-foreground">{formatDaybookDescription(deleteEntry)}</span>}
+              {deleteEntry && (
+                <span className="block mt-2 font-medium text-foreground">{formatDaybookDescription(deleteEntry)}</span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2485,7 +3017,12 @@ export default function FactoryDaybook() {
       </AlertDialog>
 
       {/* Cost Edit Dialog */}
-      <Dialog open={costEditEntry !== null} onOpenChange={(open) => { if (!open) setCostEditEntry(null); }}>
+      <Dialog
+        open={costEditEntry !== null}
+        onOpenChange={(open) => {
+          if (!open) setCostEditEntry(null);
+        }}
+      >
         <DialogContent className="max-w-md" data-testid="dialog-cost-edit-daybook">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -2493,83 +3030,94 @@ export default function FactoryDaybook() {
               Edit Container Cost
             </DialogTitle>
             <DialogDescription>
-              {costEditEntry && (() => {
-                const txLabels: Record<string, string> = {
-                  OFFLOAD_RAW_STOCK: "Total inclusive cost (base material)",
-                  FREIGHT: "Freight charge",
-                  COMMISSION: "Commission",
-                  DUTY: "Duty",
-                  OTHER_CHARGE: "Other charge / additional charge",
-                };
-                return `${txLabels[costEditEntry.txType] || costEditEntry.txType} — ${costEditEntry.description}`;
-              })()}
+              {costEditEntry &&
+                (() => {
+                  const txLabels: Record<string, string> = {
+                    OFFLOAD_RAW_STOCK: "Total inclusive cost (base material)",
+                    FREIGHT: "Freight charge",
+                    COMMISSION: "Commission",
+                    DUTY: "Duty",
+                    OTHER_CHARGE: "Other charge / additional charge",
+                  };
+                  return `${txLabels[costEditEntry.txType] || costEditEntry.txType} — ${costEditEntry.description}`;
+                })()}
             </DialogDescription>
           </DialogHeader>
-          {costEditEntry && (() => {
-            const isDuty = costEditEntry.txType === "DUTY";
-            const isBaseMaterial = costEditEntry.txType === "OFFLOAD_RAW_STOCK";
-            return (
-              <div className="space-y-4 py-1">
-                <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3 text-sm space-y-1">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
-                    <div className="space-y-1">
-                      <p className="font-medium">This will cascade to inventory costs.</p>
-                      <p>Saving updates the raw stock cost per kg and recalculates the weighted-average cost of all mix batches that used this container.</p>
-                      {isBaseMaterial && <p>Editing the total cost will back-calculate a new base rate per kg.</p>}
-                      {isDuty && <p>Only confirmed duty can be edited here. A duty audit log entry will be written.</p>}
+          {costEditEntry &&
+            (() => {
+              const isDuty = costEditEntry.txType === "DUTY";
+              const isBaseMaterial = costEditEntry.txType === "OFFLOAD_RAW_STOCK";
+              return (
+                <div className="space-y-4 py-1">
+                  <div className="rounded-md border bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3 text-sm space-y-1">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                      <div className="space-y-1">
+                        <p className="font-medium">This will cascade to inventory costs.</p>
+                        <p>
+                          Saving updates the raw stock cost per kg and recalculates the weighted-average cost of all mix
+                          batches that used this container.
+                        </p>
+                        {isBaseMaterial && <p>Editing the total cost will back-calculate a new base rate per kg.</p>}
+                        {isDuty && (
+                          <p>Only confirmed duty can be edited here. A duty audit log entry will be written.</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Current amount ({costEditEntry.currencyCode})</Label>
-                  <div className="text-sm text-muted-foreground font-mono mt-0.5">
-                    {formatNumber(parseFloat(costEditEntry.amountCurrency || "0"), 2)} {costEditEntry.currencyCode}
+                  <div>
+                    <Label className="text-sm font-medium">Current amount ({costEditEntry.currencyCode})</Label>
+                    <div className="text-sm text-muted-foreground font-mono mt-0.5">
+                      {formatNumber(parseFloat(costEditEntry.amountCurrency || "0"), 2)} {costEditEntry.currencyCode}
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">New amount ({costEditEntry.currencyCode}) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={costEditAmount}
+                      onChange={(e) => setCostEditAmount(e.target.value)}
+                      placeholder="Enter corrected amount"
+                      data-testid="input-cost-edit-amount"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Reason for edit *</Label>
+                    <Textarea
+                      value={costEditReason}
+                      onChange={(e) => setCostEditReason(e.target.value)}
+                      placeholder="Why is this correction needed?"
+                      data-testid="input-cost-edit-reason"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCostEditEntry(null)}
+                      data-testid="button-cancel-cost-edit"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      disabled={!costEditReason.trim() || !costEditAmount || costEditMutation.isPending}
+                      onClick={() => {
+                        if (!costEditEntry) return;
+                        costEditMutation.mutate({
+                          entryId: costEditEntry.id,
+                          newAmount: costEditAmount,
+                          reason: costEditReason.trim(),
+                        });
+                      }}
+                      data-testid="button-submit-cost-edit"
+                    >
+                      {costEditMutation.isPending ? "Saving..." : "Save & Recalculate"}
+                    </Button>
                   </div>
                 </div>
-                <div>
-                  <Label className="text-sm font-medium">New amount ({costEditEntry.currencyCode}) *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={costEditAmount}
-                    onChange={(e) => setCostEditAmount(e.target.value)}
-                    placeholder="Enter corrected amount"
-                    data-testid="input-cost-edit-amount"
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium">Reason for edit *</Label>
-                  <Textarea
-                    value={costEditReason}
-                    onChange={(e) => setCostEditReason(e.target.value)}
-                    placeholder="Why is this correction needed?"
-                    data-testid="input-cost-edit-reason"
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setCostEditEntry(null)} data-testid="button-cancel-cost-edit">
-                    Cancel
-                  </Button>
-                  <Button
-                    disabled={!costEditReason.trim() || !costEditAmount || costEditMutation.isPending}
-                    onClick={() => {
-                      if (!costEditEntry) return;
-                      costEditMutation.mutate({
-                        entryId: costEditEntry.id,
-                        newAmount: costEditAmount,
-                        reason: costEditReason.trim(),
-                      });
-                    }}
-                    data-testid="button-submit-cost-edit"
-                  >
-                    {costEditMutation.isPending ? "Saving..." : "Save & Recalculate"}
-                  </Button>
-                </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
         </DialogContent>
       </Dialog>
 

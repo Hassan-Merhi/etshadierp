@@ -1,21 +1,8 @@
 import { format } from "date-fns";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { UseFormReturn } from "react-hook-form";
 import { Loader2 } from "lucide-react";
@@ -49,9 +36,7 @@ export function VoucherForm({
           <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold">
-                  {voucherNumber ? `#${voucherNumber}` : "New Entry"}
-                </p>
+                <p className="text-sm font-semibold">{voucherNumber ? `#${voucherNumber}` : "New Entry"}</p>
               </div>
               <FormField
                 control={form.control}
@@ -66,13 +51,11 @@ export function VoucherForm({
                           field.value instanceof Date
                             ? format(field.value, "yyyy-MM-dd")
                             : typeof field.value === "string"
-                            ? field.value
-                            : ""
+                              ? field.value
+                              : ""
                         }
                         onChange={(e) =>
-                          field.onChange(
-                            e.target.value ? new Date(e.target.value + "T00:00:00") : new Date()
-                          )
+                          field.onChange(e.target.value ? new Date(e.target.value + "T00:00:00") : new Date())
                         }
                         className="w-[180px]"
                         data-testid="input-voucher-date"

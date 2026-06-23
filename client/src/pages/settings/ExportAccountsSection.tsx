@@ -1,100 +1,128 @@
-  import { useState, useEffect, useRef } from "react";
-  import { useConnectivity } from "@/contexts/ConnectivityContext";
-  import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
-  import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
-  import { useForm } from "react-hook-form";
-  import { zodResolver } from "@hookform/resolvers/zod";
-  import { z } from "zod";
-  import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-  import { Button } from "@/components/ui/button";
-  import { Input } from "@/components/ui/input";
-  import { Label } from "@/components/ui/label";
-  import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-  } from "@/components/ui/dialog";
-  import { Alert, AlertDescription } from "@/components/ui/alert";
-  import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-  } from "@/components/ui/alert-dialog";
-  import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-  } from "@/components/ui/form";
-  import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-  } from "@/components/ui/select";
-  import { Checkbox } from "@/components/ui/checkbox";
-  import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from "@/components/ui/table";
-  import { Badge } from "@/components/ui/badge";
-  import { Skeleton } from "@/components/ui/skeleton";
-  import { Switch } from "@/components/ui/switch";
-  
-  import { useToast } from "@/hooks/use-toast";
-  import { useMutation, useQuery } from "@tanstack/react-query";
-  import { queryClient, apiRequest } from "@/lib/queryClient";
-  import { useAppMode } from "@/contexts/AppModeContext";
-  import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
-  import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers } from "lucide-react";
-import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
-  import { Link } from "wouter";
-  import { useDateFormat } from "@/contexts/DateFormatContext";
-  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, FEATURE_PAGE_INFO, type FeatureKey } from "@shared/schema";
-  import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
-  import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
-  import { useCompany } from "@/contexts/CompanyContext";
-  import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
-  import { formatNumber } from "@/lib/formatNumber";
-  
-  const userFormSchema = insertUserSchema;
-  const companyFormSchema = insertCompanySchema;
-  const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
-    (data) => {
-      // If role is POS, assignedLocationId must be present
-      if (data.role === "POS" && !data.assignedLocationId) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "POS roles require an assigned location",
-      path: ["assignedLocationId"],
-    }
-  );
-  
-  type UserFormData = z.infer<typeof userFormSchema>;
-  type CompanyFormData = z.infer<typeof companyFormSchema>;
-  type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+import { useState, useEffect, useRef } from "react";
+import { useConnectivity } from "@/contexts/ConnectivityContext";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Plus,
+  Edit,
+  Building2,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  CalendarRange,
+  Settings2,
+  Wrench,
+  MapPin,
+  ChevronRight,
+  Bot,
+  MessageCircle,
+  RefreshCw,
+  Calculator,
+  Loader2,
+  Shield,
+  AlertTriangle,
+  PieChart,
+  Key,
+  Lock,
+  Package,
+  Eye,
+  History,
+  Clock,
+  Upload,
+  Download,
+  Database,
+  TrendingUp,
+  ShoppingCart,
+  Check,
+  X,
+  Copy,
+  ExternalLink,
+  ArrowLeftRight,
+  WifiOff,
+  Wifi,
+  CheckCircle2,
+  Printer,
+  Layers,
+} from "lucide-react";
+import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
+import { Link } from "wouter";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import {
+  insertUserSchema,
+  insertCompanySchema,
+  insertUserCompanyRoleSchema,
+  FEATURE_KEYS,
+  FEATURE_PAGE_INFO,
+  type FeatureKey,
+} from "@shared/schema";
+import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
+import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
+import { useCompany } from "@/contexts/CompanyContext";
+import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
+import { formatNumber } from "@/lib/formatNumber";
+
+const userFormSchema = insertUserSchema;
+const companyFormSchema = insertCompanySchema;
+const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+  (data) => {
+    // If role is POS, assignedLocationId must be present
+    if (data.role === "POS" && !data.assignedLocationId) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "POS roles require an assigned location",
+    path: ["assignedLocationId"],
+  }
+);
+
+type UserFormData = z.infer<typeof userFormSchema>;
+type CompanyFormData = z.infer<typeof companyFormSchema>;
+type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export function ExportAccountsSection() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -119,11 +147,18 @@ export function ExportAccountsSection() {
     factorySupplier: "Factory Suppliers",
   };
 
-  const typeOrder = ["ledger", "bank", "fixed asset", "supplier", "customer", "employee", "factoryWorker", "factorySupplier"];
+  const typeOrder = [
+    "ledger",
+    "bank",
+    "fixed asset",
+    "supplier",
+    "customer",
+    "employee",
+    "factoryWorker",
+    "factorySupplier",
+  ];
 
-  const filtered = allAccounts.filter((a: any) =>
-    a.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = allAccounts.filter((a: any) => a.name.toLowerCase().includes(search.toLowerCase()));
 
   const grouped = filtered.reduce<Record<string, any[]>>((acc, account: any) => {
     const type = account.type || "ledger";
@@ -133,11 +168,13 @@ export function ExportAccountsSection() {
   }, {});
 
   const sortedGroupKeys = [...Object.keys(grouped)].sort(
-    (a, b) => (typeOrder.indexOf(a) === -1 ? 99 : typeOrder.indexOf(a)) - (typeOrder.indexOf(b) === -1 ? 99 : typeOrder.indexOf(b))
+    (a, b) =>
+      (typeOrder.indexOf(a) === -1 ? 99 : typeOrder.indexOf(a)) -
+      (typeOrder.indexOf(b) === -1 ? 99 : typeOrder.indexOf(b))
   );
 
   const toggleAccount = (id: number) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -145,11 +182,14 @@ export function ExportAccountsSection() {
     });
   };
 
-  const selectAll = () => setSelectedIds(new Set(
-    filtered
-      .filter((a: any) => a.type !== "customer" && parseFloat(a.balance ?? "0") !== 0)
-      .map((a: any) => a.accountId)
-  ));
+  const selectAll = () =>
+    setSelectedIds(
+      new Set(
+        filtered
+          .filter((a: any) => a.type !== "customer" && parseFloat(a.balance ?? "0") !== 0)
+          .map((a: any) => a.accountId)
+      )
+    );
   const clearAll = () => setSelectedIds(new Set());
 
   const getTransactionUrl = (acc: any): string => {
@@ -166,7 +206,14 @@ export function ExportAccountsSection() {
 
   const MAX_ROWS_PER_SHEET = 60000;
 
-  const addSheetForChunk = (wb: ExcelJS.Workbook, baseName: string, part: number, totalParts: number, txnsChunk: any[], startBalance: number) => {
+  const addSheetForChunk = (
+    wb: ExcelJS.Workbook,
+    baseName: string,
+    part: number,
+    totalParts: number,
+    txnsChunk: any[],
+    startBalance: number
+  ) => {
     const suffix = totalParts > 1 ? ` ${part}` : "";
     const rawName = `${baseName}${suffix}`;
     const sheetName = rawName.replace(/[\\\/\?\*\[\]:]/g, "").substring(0, 31);
@@ -206,7 +253,10 @@ export function ExportAccountsSection() {
 
     if (txnsChunk.length > 0) {
       const totalRow = ws.addRow({
-        date: "", voucherNo: "", type: "", description: "TOTAL",
+        date: "",
+        voucherNo: "",
+        type: "",
+        description: "TOTAL",
         debit: { formula: `SUM(E2:E${txnsChunk.length + 1})` },
         credit: { formula: `SUM(F2:F${txnsChunk.length + 1})` },
         balance: "",
@@ -215,8 +265,8 @@ export function ExportAccountsSection() {
       totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } };
     }
 
-    ["debit", "credit", "balance"].forEach(key => {
-      ws.getColumn(key).numFmt = '#,##0.00';
+    ["debit", "credit", "balance"].forEach((key) => {
+      ws.getColumn(key).numFmt = "#,##0.00";
       ws.getColumn(key).alignment = { horizontal: "right" };
     });
 
@@ -225,7 +275,11 @@ export function ExportAccountsSection() {
 
   const handleExport = async () => {
     if (selectedIds.size === 0) {
-      toast({ title: "No accounts selected", description: "Please select at least one account.", variant: "destructive" });
+      toast({
+        title: "No accounts selected",
+        description: "Please select at least one account.",
+        variant: "destructive",
+      });
       return;
     }
     setExporting(true);
@@ -263,10 +317,13 @@ export function ExportAccountsSection() {
       const dlUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = dlUrl;
-      a.download = `Account_Export_${new Date().toLocaleDateString('en-CA')}.xlsx`;
+      a.download = `Account_Export_${new Date().toLocaleDateString("en-CA")}.xlsx`;
       a.click();
       URL.revokeObjectURL(dlUrl);
-      toast({ title: "Export complete", description: `${selectedIds.size} account${selectedIds.size !== 1 ? "s" : ""} exported successfully.` });
+      toast({
+        title: "Export complete",
+        description: `${selectedIds.size} account${selectedIds.size !== 1 ? "s" : ""} exported successfully.`,
+      });
     } catch (err: any) {
       toast({ title: "Export failed", description: err.message, variant: "destructive" });
     } finally {
@@ -289,9 +346,15 @@ export function ExportAccountsSection() {
             <CardTitle className="text-base flex items-center justify-between flex-wrap gap-2">
               <span>Select Accounts</span>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" data-testid="badge-selected-count">{selectedIds.size} selected</Badge>
-                <Button variant="ghost" size="sm" onClick={selectAll} data-testid="button-select-all-accounts">Select All</Button>
-                <Button variant="ghost" size="sm" onClick={clearAll} data-testid="button-clear-accounts">Clear</Button>
+                <Badge variant="secondary" data-testid="badge-selected-count">
+                  {selectedIds.size} selected
+                </Badge>
+                <Button variant="ghost" size="sm" onClick={selectAll} data-testid="button-select-all-accounts">
+                  Select All
+                </Button>
+                <Button variant="ghost" size="sm" onClick={clearAll} data-testid="button-clear-accounts">
+                  Clear
+                </Button>
               </div>
             </CardTitle>
           </CardHeader>
@@ -299,14 +362,14 @@ export function ExportAccountsSection() {
             <Input
               placeholder="Search accounts..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               data-testid="input-account-search"
             />
             <div className="border rounded-md overflow-y-auto max-h-80 divide-y">
               {sortedGroupKeys.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-8">No accounts found</p>
               )}
-              {sortedGroupKeys.map(type => (
+              {sortedGroupKeys.map((type) => (
                 <div key={type}>
                   <div className="text-xs font-semibold text-muted-foreground px-3 py-2 bg-muted/40 uppercase tracking-wide sticky top-0">
                     {typeLabels[type] || type}
@@ -325,7 +388,8 @@ export function ExportAccountsSection() {
                       <span className="text-sm flex-1">{acc.name}</span>
                       {acc.balance !== undefined && (
                         <span className="text-xs text-muted-foreground tabular-nums">
-                          {acc.balanceSide} {Math.abs(acc.balance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          {acc.balanceSide}{" "}
+                          {Math.abs(acc.balance).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                         </span>
                       )}
                     </label>
@@ -347,7 +411,7 @@ export function ExportAccountsSection() {
                 <Input
                   type="date"
                   value={fromDate}
-                  onChange={e => setFromDate(e.target.value)}
+                  onChange={(e) => setFromDate(e.target.value)}
                   data-testid="input-export-from-date"
                 />
               </div>
@@ -356,7 +420,7 @@ export function ExportAccountsSection() {
                 <Input
                   type="date"
                   value={toDate}
-                  onChange={e => setToDate(e.target.value)}
+                  onChange={(e) => setToDate(e.target.value)}
                   data-testid="input-export-to-date"
                 />
               </div>
@@ -395,9 +459,15 @@ export function ExportAccountsSection() {
                 data-testid="button-export-accounts"
               >
                 {exporting ? (
-                  <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Exporting…</>
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Exporting…
+                  </>
                 ) : (
-                  <><Download className="h-4 w-4 mr-2" />Export to Excel</>
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export to Excel
+                  </>
                 )}
               </Button>
             </CardContent>
@@ -407,4 +477,3 @@ export function ExportAccountsSection() {
     </div>
   );
 }
-

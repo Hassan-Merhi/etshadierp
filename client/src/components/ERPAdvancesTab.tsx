@@ -11,14 +11,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -121,13 +122,13 @@ function AdvancesView() {
   const [bulkAmounts, setBulkAmounts] = useState<Record<number, string>>({});
   const [bulkSelected, setBulkSelected] = useState<Set<number>>(new Set());
   const [bulkForm, setBulkForm] = useState({
-    advanceDate: new Date().toLocaleDateString('en-CA'),
+    advanceDate: new Date().toLocaleDateString("en-CA"),
     notes: "",
     cashAccountId: "",
   });
   const [form, setForm] = useState({
     employeeId: "",
-    advanceDate: new Date().toLocaleDateString('en-CA'),
+    advanceDate: new Date().toLocaleDateString("en-CA"),
     amount: "",
     notes: "",
     cashAccountId: "",
@@ -146,10 +147,7 @@ function AdvancesView() {
   });
   const cashAccounts = (ledgerAccounts || []).filter((a) => a.accountType === "Cash");
 
-  const workers = useMemo(
-    () => (allEmployees || []).filter((e) => e.employeeType === "Worker"),
-    [allEmployees],
-  );
+  const workers = useMemo(() => (allEmployees || []).filter((e) => e.employeeType === "Worker"), [allEmployees]);
 
   const workerById = useMemo(() => {
     const map: Record<number, Employee> = {};
@@ -172,14 +170,20 @@ function AdvancesView() {
 
   const stats = useMemo(() => {
     const totalGiven = workerAdvances.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
-    const totalOutstanding = workerAdvances.filter((a) => !a.fullyPaid).reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
+    const totalOutstanding = workerAdvances
+      .filter((a) => !a.fullyPaid)
+      .reduce((s, a) => s + parseFloat(a.remainingBalance || "0"), 0);
     const outstandingCount = workerAdvances.filter((a) => !a.fullyPaid).length;
     return { totalGiven, totalOutstanding, outstandingCount };
   }, [workerAdvances]);
 
   const fmtDate = (val: string | null | undefined) => {
     if (!val) return "—";
-    try { return formatDisplayDate(val); } catch { return "—"; }
+    try {
+      return formatDisplayDate(val);
+    } catch {
+      return "—";
+    }
   };
 
   const getWorkerName = (employeeId: number) => {
@@ -210,7 +214,13 @@ function AdvancesView() {
       queryClient.invalidateQueries({ queryKey: ["/api/salary-advances"] });
       toast({ title: "Advance recorded" });
       setAddOpen(false);
-      setForm({ employeeId: "", advanceDate: new Date().toLocaleDateString('en-CA'), amount: "", notes: "", cashAccountId: "" });
+      setForm({
+        employeeId: "",
+        advanceDate: new Date().toLocaleDateString("en-CA"),
+        amount: "",
+        notes: "",
+        cashAccountId: "",
+      });
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -218,7 +228,10 @@ function AdvancesView() {
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/salary-advances/${id}`, { method: "DELETE", credentials: "include" });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to delete"); }
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to delete");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -246,8 +259,8 @@ function AdvancesView() {
             notes: bulkForm.notes || undefined,
             isOpeningBalance: false,
             cashAccountId: parseInt(bulkForm.cashAccountId),
-          }),
-        ),
+          })
+        )
       );
       const failed = results.filter((r) => !r.ok);
       if (failed.length > 0) throw new Error(`${failed.length} advance(s) failed to create`);
@@ -259,7 +272,7 @@ function AdvancesView() {
       setBulkOpen(false);
       setBulkAmounts({});
       setBulkSelected(new Set());
-      setBulkForm({ advanceDate: new Date().toLocaleDateString('en-CA'), notes: "", cashAccountId: "" });
+      setBulkForm({ advanceDate: new Date().toLocaleDateString("en-CA"), notes: "", cashAccountId: "" });
     },
     onError: (err: Error) => toast({ title: "Error", description: err.message, variant: "destructive" }),
   });
@@ -283,7 +296,9 @@ function AdvancesView() {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-md" />)}
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-md" />
+          ))}
         </div>
         <Skeleton className="h-64 rounded-md" />
       </div>
@@ -362,20 +377,24 @@ function AdvancesView() {
 
         <div className="ml-auto flex items-center gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setBulkOpen(true)} data-testid="button-erp-bulk-advance">
-            <Users className="h-4 w-4 mr-2" />Bulk Advance
+            <Users className="h-4 w-4 mr-2" />
+            Bulk Advance
           </Button>
           <Button onClick={() => setAddOpen(true)} data-testid="button-erp-add-advance">
-            <Plus className="h-4 w-4 mr-2" />Add Advance
+            <Plus className="h-4 w-4 mr-2" />
+            Add Advance
           </Button>
         </div>
       </div>
 
       {(() => {
-        const outstanding = filtered.filter(a => !a.fullyPaid);
-        const paid        = filtered.filter(a => a.fullyPaid);
+        const outstanding = filtered.filter((a) => !a.fullyPaid);
+        const paid = filtered.filter((a) => a.fullyPaid);
 
         const renderRow = (adv: AdvanceRecord) => (
-          <TableRow key={adv.id} data-testid={`row-erp-advance-${adv.id}`}
+          <TableRow
+            key={adv.id}
+            data-testid={`row-erp-advance-${adv.id}`}
             className={adv.fullyPaid ? "opacity-60" : ""}
           >
             <TableCell className="font-medium" data-testid={`text-erp-advance-worker-${adv.id}`}>
@@ -390,20 +409,26 @@ function AdvancesView() {
               </Badge>
             </TableCell>
             <TableCell>
-              <Badge variant="outline" className={adv.fullyPaid
-                ? "border-green-500 text-green-700 dark:text-green-400"
-                : "border-amber-400 text-amber-700 dark:text-amber-400"
-              }>
+              <Badge
+                variant="outline"
+                className={
+                  adv.fullyPaid
+                    ? "border-green-500 text-green-700 dark:text-green-400"
+                    : "border-amber-400 text-amber-700 dark:text-amber-400"
+                }
+              >
                 {adv.fullyPaid ? "Paid" : "Outstanding"}
               </Badge>
             </TableCell>
-            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-              {adv.notes || "—"}
-            </TableCell>
+            <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">{adv.notes || "—"}</TableCell>
             <TableCell>
               {!adv.fullyPaid && (
-                <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(adv)}
-                  data-testid={`button-delete-erp-advance-${adv.id}`}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setDeleteTarget(adv)}
+                  data-testid={`button-delete-erp-advance-${adv.id}`}
+                >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
               )}
@@ -446,15 +471,12 @@ function AdvancesView() {
                         <>
                           <TableRow
                             className="cursor-pointer hover-elevate bg-muted/30"
-                            onClick={() => setShowPaid(p => !p)}
+                            onClick={() => setShowPaid((p) => !p)}
                             data-testid="row-toggle-paid"
                           >
                             <TableCell colSpan={8} className="py-2">
                               <span className="flex items-center gap-2 text-sm text-muted-foreground select-none">
-                                {showPaid
-                                  ? <ChevronDown className="h-4 w-4" />
-                                  : <ChevronRight className="h-4 w-4" />
-                                }
+                                {showPaid ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                 {paid.length} paid advance{paid.length !== 1 ? "s" : ""}
                               </span>
                             </TableCell>
@@ -519,16 +541,15 @@ function AdvancesView() {
             </div>
             <div className="space-y-2">
               <Label>Cash Account</Label>
-              <Select
-                value={form.cashAccountId}
-                onValueChange={(v) => setForm((p) => ({ ...p, cashAccountId: v }))}
-              >
+              <Select value={form.cashAccountId} onValueChange={(v) => setForm((p) => ({ ...p, cashAccountId: v }))}>
                 <SelectTrigger data-testid="select-erp-advance-cash-account">
                   <SelectValue placeholder="Select cash account" />
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.length === 0 ? (
-                    <SelectItem value="none" disabled>No cash accounts available</SelectItem>
+                    <SelectItem value="none" disabled>
+                      No cash accounts available
+                    </SelectItem>
                   ) : (
                     cashAccounts.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
@@ -552,20 +573,38 @@ function AdvancesView() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => createMutation.mutate()}
               disabled={createMutation.isPending}
               data-testid="button-submit-erp-advance"
             >
-              {createMutation.isPending ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</> : "Record Advance"}
+              {createMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Record Advance"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Bulk Advance Dialog */}
-      <Dialog open={bulkOpen} onOpenChange={(open) => { if (!open) { setBulkOpen(false); setBulkAmounts({}); setBulkSelected(new Set()); } }}>
+      <Dialog
+        open={bulkOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBulkOpen(false);
+            setBulkAmounts({});
+            setBulkSelected(new Set());
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-erp-bulk-advance">
           <DialogHeader>
             <DialogTitle>Bulk Advance</DialogTitle>
@@ -604,7 +643,9 @@ function AdvancesView() {
                 </SelectTrigger>
                 <SelectContent>
                   {cashAccounts.length === 0 ? (
-                    <SelectItem value="none" disabled>No cash accounts available</SelectItem>
+                    <SelectItem value="none" disabled>
+                      No cash accounts available
+                    </SelectItem>
                   ) : (
                     cashAccounts.map((acc) => (
                       <SelectItem key={acc.id} value={String(acc.id)}>
@@ -654,66 +695,84 @@ function AdvancesView() {
                           No workers found
                         </TableCell>
                       </TableRow>
-                    ) : workers.map((w) => {
-                      const selected = bulkSelected.has(w.id);
-                      return (
-                        <TableRow
-                          key={w.id}
-                          className={`cursor-pointer hover-elevate ${selected ? "bg-primary/5" : ""}`}
-                          onClick={() => setBulkSelected((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(w.id)) next.delete(w.id); else next.add(w.id);
-                            return next;
-                          })}
-                          data-testid={`row-erp-bulk-worker-${w.id}`}
-                        >
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Checkbox
-                              checked={selected}
-                              onCheckedChange={() => setBulkSelected((prev) => {
+                    ) : (
+                      workers.map((w) => {
+                        const selected = bulkSelected.has(w.id);
+                        return (
+                          <TableRow
+                            key={w.id}
+                            className={`cursor-pointer hover-elevate ${selected ? "bg-primary/5" : ""}`}
+                            onClick={() =>
+                              setBulkSelected((prev) => {
                                 const next = new Set(prev);
-                                if (next.has(w.id)) next.delete(w.id); else next.add(w.id);
+                                if (next.has(w.id)) next.delete(w.id);
+                                else next.add(w.id);
                                 return next;
-                              })}
-                              data-testid={`checkbox-erp-bulk-${w.id}`}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">{`${w.firstName} ${w.lastName}`.trim()}</TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="h-8 text-sm"
-                              value={bulkAmounts[w.id] || ""}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setBulkAmounts((prev) => ({ ...prev, [w.id]: val }));
-                                if (val && parseFloat(val) > 0) {
-                                  setBulkSelected((prev) => { const n = new Set(prev); n.add(w.id); return n; });
+                              })
+                            }
+                            data-testid={`row-erp-bulk-worker-${w.id}`}
+                          >
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Checkbox
+                                checked={selected}
+                                onCheckedChange={() =>
+                                  setBulkSelected((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(w.id)) next.delete(w.id);
+                                    else next.add(w.id);
+                                    return next;
+                                  })
                                 }
-                              }}
-                              data-testid={`input-erp-bulk-amount-${w.id}`}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                                data-testid={`checkbox-erp-bulk-${w.id}`}
+                              />
+                            </TableCell>
+                            <TableCell className="font-medium">{`${w.firstName} ${w.lastName}`.trim()}</TableCell>
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="0.00"
+                                className="h-8 text-sm"
+                                value={bulkAmounts[w.id] || ""}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  setBulkAmounts((prev) => ({ ...prev, [w.id]: val }));
+                                  if (val && parseFloat(val) > 0) {
+                                    setBulkSelected((prev) => {
+                                      const n = new Set(prev);
+                                      n.add(w.id);
+                                      return n;
+                                    });
+                                  }
+                                }}
+                                data-testid={`input-erp-bulk-amount-${w.id}`}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
                   </TableBody>
                 </Table>
               </div>
               {bulkSelected.size > 0 && (
                 <p className="text-xs text-muted-foreground text-right">
-                  {Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length} worker(s) with valid amounts
+                  {Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length} worker(s)
+                  with valid amounts
                   {" — "}
-                  Total: {formatAmount(Array.from(bulkSelected).reduce((s, wid) => s + parseFloat(bulkAmounts[wid] || "0"), 0))}
+                  Total:{" "}
+                  {formatAmount(
+                    Array.from(bulkSelected).reduce((s, wid) => s + parseFloat(bulkAmounts[wid] || "0"), 0)
+                  )}
                 </p>
               )}
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setBulkOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setBulkOpen(false)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => bulkMutation.mutate()}
               disabled={
@@ -722,10 +781,14 @@ function AdvancesView() {
               }
               data-testid="button-submit-erp-bulk-advance"
             >
-              {bulkMutation.isPending
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving...</>
-                : `Record ${Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length || ""} Advance(s)`
-              }
+              {bulkMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                `Record ${Array.from(bulkSelected).filter((wid) => parseFloat(bulkAmounts[wid] || "0") > 0).length || ""} Advance(s)`
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -737,7 +800,8 @@ function AdvancesView() {
           <DialogHeader>
             <DialogTitle>Reconcile Advance Balances</DialogTitle>
             <DialogDescription>
-              This will recalculate every worker's advance remaining balance from scratch based on all recorded payroll deductions. Use this if balances look incorrect after running a payroll. No data will be deleted.
+              This will recalculate every worker's advance remaining balance from scratch based on all recorded payroll
+              deductions. Use this if balances look incorrect after running a payroll. No data will be deleted.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
@@ -756,16 +820,25 @@ function AdvancesView() {
       </Dialog>
 
       {/* Delete confirmation */}
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Advance</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete the advance of {deleteTarget ? fmt(deleteTarget.amount, formatAmount) : ""} for {deleteTarget ? getWorkerName(deleteTarget.employeeId) : ""}? This cannot be undone.
+              Are you sure you want to delete the advance of{" "}
+              {deleteTarget ? fmt(deleteTarget.amount, formatAmount) : ""} for{" "}
+              {deleteTarget ? getWorkerName(deleteTarget.employeeId) : ""}? This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
@@ -858,14 +931,20 @@ function WorkerDeductionsView() {
 
   const fmtDate = (val: string | null | undefined) => {
     if (!val) return "—";
-    try { return formatDisplayDate(val); } catch { return "—"; }
+    try {
+      return formatDisplayDate(val);
+    } catch {
+      return "—";
+    }
   };
 
   if (isLoading) {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-24 rounded-md" />)}
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-md" />
+          ))}
         </div>
         <Skeleton className="h-64 rounded-md" />
       </div>
@@ -904,7 +983,9 @@ function WorkerDeductionsView() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Pending Entries</p>
-              <p className="text-lg font-bold">{stats.pending} of {stats.total}</p>
+              <p className="text-lg font-bold">
+                {stats.pending} of {stats.total}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -957,37 +1038,33 @@ function WorkerDeductionsView() {
                     No deductions found
                   </TableCell>
                 </TableRow>
-              ) : filtered.map((d) => (
-                <TableRow key={d.id} data-testid={`row-worker-deduction-${d.id}`}>
-                  <TableCell className="font-medium">{d.workerName || "—"}</TableCell>
-                  <TableCell>{fmtDate(d.deductionDate)}</TableCell>
-                  <TableCell className="text-muted-foreground">{d.reason || "—"}</TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatAmount(parseFloat(d.amount || "0"))}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={d.applied ? "secondary" : "outline"}>
-                      {d.applied ? "Applied" : "Pending"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {fmtDate(d.createdAt)}
-                  </TableCell>
-                  <TableCell>
-                    {!d.applied && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        data-testid={`button-delete-deduction-${d.id}`}
-                        disabled={deleteMutation.isPending}
-                        onClick={() => deleteMutation.mutate({ workerId: d.workerId, id: d.id })}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
+              ) : (
+                filtered.map((d) => (
+                  <TableRow key={d.id} data-testid={`row-worker-deduction-${d.id}`}>
+                    <TableCell className="font-medium">{d.workerName || "—"}</TableCell>
+                    <TableCell>{fmtDate(d.deductionDate)}</TableCell>
+                    <TableCell className="text-muted-foreground">{d.reason || "—"}</TableCell>
+                    <TableCell className="text-right font-mono">{formatAmount(parseFloat(d.amount || "0"))}</TableCell>
+                    <TableCell>
+                      <Badge variant={d.applied ? "secondary" : "outline"}>{d.applied ? "Applied" : "Pending"}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{fmtDate(d.createdAt)}</TableCell>
+                    <TableCell>
+                      {!d.applied && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          data-testid={`button-delete-deduction-${d.id}`}
+                          disabled={deleteMutation.isPending}
+                          onClick={() => deleteMutation.mutate({ workerId: d.workerId, id: d.id })}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -1010,10 +1087,7 @@ function RepaymentsView() {
     queryKey: ["/api/employees"],
   });
 
-  const workers = useMemo(
-    () => (allEmployees || []).filter((e) => e.employeeType === "Worker"),
-    [allEmployees],
-  );
+  const workers = useMemo(() => (allEmployees || []).filter((e) => e.employeeType === "Worker"), [allEmployees]);
 
   const filtered = useMemo(() => {
     if (!deductions) return [];
@@ -1029,14 +1103,20 @@ function RepaymentsView() {
 
   const fmtDate = (val: string | null | undefined) => {
     if (!val) return "—";
-    try { return formatDisplayDate(val); } catch { return "—"; }
+    try {
+      return formatDisplayDate(val);
+    } catch {
+      return "—";
+    }
   };
 
   if (isLoading) {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2].map((i) => <Skeleton key={i} className="h-24 rounded-md" />)}
+          {[1, 2].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-md" />
+          ))}
         </div>
         <Skeleton className="h-64 rounded-md" />
       </div>
@@ -1110,22 +1190,22 @@ function RepaymentsView() {
                     No deduction records found
                   </TableCell>
                 </TableRow>
-              ) : filtered.map((d) => (
-                <TableRow key={d.id} data-testid={`row-erp-deduction-${d.id}`}>
-                  <TableCell className="font-medium">{d.workerName}</TableCell>
-                  <TableCell>{d.payrollMonth}</TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatAmount(parseFloat(d.deductionAmount || "0"))}
-                  </TableCell>
-                  <TableCell>{fmtDate(d.advanceDate)}</TableCell>
-                  <TableCell className="text-right font-mono">
-                    {formatAmount(parseFloat(d.advanceAmount || "0"))}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {fmtDate(d.createdAt)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              ) : (
+                filtered.map((d) => (
+                  <TableRow key={d.id} data-testid={`row-erp-deduction-${d.id}`}>
+                    <TableCell className="font-medium">{d.workerName}</TableCell>
+                    <TableCell>{d.payrollMonth}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatAmount(parseFloat(d.deductionAmount || "0"))}
+                    </TableCell>
+                    <TableCell>{fmtDate(d.advanceDate)}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatAmount(parseFloat(d.advanceAmount || "0"))}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{fmtDate(d.createdAt)}</TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

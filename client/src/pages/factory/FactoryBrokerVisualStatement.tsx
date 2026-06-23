@@ -9,12 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileText, TrendingUp, CreditCard, DollarSign } from "lucide-react";
 
@@ -63,20 +59,21 @@ export default function FactoryBrokerVisualStatement() {
     }
     return ids;
   }, [suppliers]);
-  const brokers = useMemo(() =>
-    (suppliers as any[]).filter((s: any) => parentIds.has(s.id)),
-    [suppliers, parentIds]
-  );
+  const brokers = useMemo(() => (suppliers as any[]).filter((s: any) => parentIds.has(s.id)), [suppliers, parentIds]);
 
   // Visual statement data
   const queryParams = useMemo(() => {
     const p = new URLSearchParams();
     if (from) p.set("from", from);
-    if (to)   p.set("to", to);
+    if (to) p.set("to", to);
     return p.toString();
   }, [from, to]);
 
-  const { data: statement, isLoading, error } = useQuery<any>({
+  const {
+    data: statement,
+    isLoading,
+    error,
+  } = useQuery<any>({
     queryKey: ["/api/factory/suppliers", brokerId, "broker-visual-statement", from, to],
     queryFn: async () => {
       const qs = queryParams ? `?${queryParams}` : "";
@@ -97,8 +94,8 @@ export default function FactoryBrokerVisualStatement() {
       totals[cc][field] += amt;
     };
     for (const c of statement.containers) {
-      if (c.goodsAmount)      add(c.goodsCurrency, "goods", c.goodsAmount);
-      if (c.freightAmount)    add(c.freightCurrency, "freight", c.freightAmount);
+      if (c.goodsAmount) add(c.goodsCurrency, "goods", c.goodsAmount);
+      if (c.freightAmount) add(c.freightCurrency, "freight", c.freightAmount);
       if (c.commissionAmount) add(c.commissionCurrency, "commission", c.commissionAmount);
     }
     return totals;
@@ -120,15 +117,17 @@ export default function FactoryBrokerVisualStatement() {
     for (const cc of Object.keys(paymentTotals)) set.add(cc);
     // Preferred order
     const order = ["EUR", "AUD", "USD"];
-    return [...order.filter(c => set.has(c)), ...[...set].filter(c => !order.includes(c))];
+    return [...order.filter((c) => set.has(c)), ...[...set].filter((c) => !order.includes(c))];
   }, [containerTotals, paymentTotals]);
 
   // Per-container grand total by currency
   function containerGrandTotal(c: any): Partial<Record<string, number>> {
     const out: Record<string, number> = {};
-    const add = (cc: string, amt: number) => { out[cc] = (out[cc] || 0) + amt; };
-    if (c.goodsAmount)      add(c.goodsCurrency,      c.goodsAmount);
-    if (c.freightAmount)    add(c.freightCurrency,    c.freightAmount);
+    const add = (cc: string, amt: number) => {
+      out[cc] = (out[cc] || 0) + amt;
+    };
+    if (c.goodsAmount) add(c.goodsCurrency, c.goodsAmount);
+    if (c.freightAmount) add(c.freightCurrency, c.freightAmount);
     if (c.commissionAmount) add(c.commissionCurrency, c.commissionAmount);
     return out;
   }
@@ -141,7 +140,10 @@ export default function FactoryBrokerVisualStatement() {
       <div className="flex items-center gap-3 flex-wrap">
         <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
         <div>
-          <PageHeader title="Broker Statement" subtitle="Container-level view of goods cost, freight, commission, and payments" />
+          <PageHeader
+            title="Broker Statement"
+            subtitle="Container-level view of goods cost, freight, commission, and payments"
+          />
         </div>
       </div>
 
@@ -151,17 +153,15 @@ export default function FactoryBrokerVisualStatement() {
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1 min-w-[220px]">
               <Label>Broker</Label>
-              <Select
-                value={brokerId}
-                onValueChange={setBrokerId}
-                disabled={brokers.length === 0}
-              >
+              <Select value={brokerId} onValueChange={setBrokerId} disabled={brokers.length === 0}>
                 <SelectTrigger data-testid="select-broker">
                   <SelectValue placeholder={brokers.length === 0 ? "No brokers found" : "Select broker…"} />
                 </SelectTrigger>
                 <SelectContent>
                   {brokers.map((b: any) => (
-                    <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -189,8 +189,15 @@ export default function FactoryBrokerVisualStatement() {
             </div>
 
             {(from || to) && (
-              <Button variant="ghost" size="sm" onClick={() => { setFrom(""); setTo(""); }}
-                data-testid="button-clear-dates">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setFrom("");
+                  setTo("");
+                }}
+                data-testid="button-clear-dates"
+              >
                 Clear dates
               </Button>
             )}
@@ -198,35 +205,36 @@ export default function FactoryBrokerVisualStatement() {
         </CardContent>
       </Card>
 
-      {!brokerId && (
-        <p className="text-sm text-muted-foreground">Select a broker to view the statement.</p>
-      )}
+      {!brokerId && <p className="text-sm text-muted-foreground">Select a broker to view the statement.</p>}
 
       {brokerId && isLoading && (
         <div className="space-y-3">
-          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-10 w-full" />
+          ))}
         </div>
       )}
 
-      {brokerId && error && (
-        <p className="text-sm text-destructive">Failed to load statement. Please try again.</p>
-      )}
+      {brokerId && error && <p className="text-sm text-destructive">Failed to load statement. Please try again.</p>}
 
       {statement && (
         <div className="space-y-6">
-
           {/* ── Section 1: Container Table ───────────────────────────────── */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <TrendingUp className="h-4 w-4" />
                 Containers — {statement.broker?.name}
-                <Badge variant="secondary" className="ml-1">{statement.containers?.length ?? 0}</Badge>
+                <Badge variant="secondary" className="ml-1">
+                  {statement.containers?.length ?? 0}
+                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 overflow-x-auto">
               {statement.containers?.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No containers found for this broker{from || to ? " in the selected date range" : ""}.</p>
+                <p className="text-sm text-muted-foreground">
+                  No containers found for this broker{from || to ? " in the selected date range" : ""}.
+                </p>
               ) : (
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
@@ -237,25 +245,34 @@ export default function FactoryBrokerVisualStatement() {
                       <TableHead className="h-8 text-right whitespace-nowrap">Unit Price</TableHead>
                       <TableHead className="h-8 text-right whitespace-nowrap">Weight (kg)</TableHead>
                       {/* Goods Cost */}
-                      {allCurrencies.map(cc => (
-                        <TableHead key={`g-${cc}`} className="h-8 text-right whitespace-nowrap text-blue-700 dark:text-blue-400">
+                      {allCurrencies.map((cc) => (
+                        <TableHead
+                          key={`g-${cc}`}
+                          className="h-8 text-right whitespace-nowrap text-blue-700 dark:text-blue-400"
+                        >
                           Goods {cc === "USD" ? "$" : ccySymbol(cc)}
                         </TableHead>
                       ))}
                       {/* Freight */}
-                      {allCurrencies.map(cc => (
-                        <TableHead key={`f-${cc}`} className="h-8 text-right whitespace-nowrap text-orange-700 dark:text-orange-400">
+                      {allCurrencies.map((cc) => (
+                        <TableHead
+                          key={`f-${cc}`}
+                          className="h-8 text-right whitespace-nowrap text-orange-700 dark:text-orange-400"
+                        >
                           Freight {cc === "USD" ? "$" : ccySymbol(cc)}
                         </TableHead>
                       ))}
                       {/* Commission */}
-                      {allCurrencies.map(cc => (
-                        <TableHead key={`c-${cc}`} className="h-8 text-right whitespace-nowrap text-purple-700 dark:text-purple-400">
+                      {allCurrencies.map((cc) => (
+                        <TableHead
+                          key={`c-${cc}`}
+                          className="h-8 text-right whitespace-nowrap text-purple-700 dark:text-purple-400"
+                        >
                           Comm. {cc === "USD" ? "$" : ccySymbol(cc)}
                         </TableHead>
                       ))}
                       {/* Grand Total */}
-                      {allCurrencies.map(cc => (
+                      {allCurrencies.map((cc) => (
                         <TableHead key={`t-${cc}`} className="h-8 text-right whitespace-nowrap font-bold">
                           Total {cc === "USD" ? "$" : ccySymbol(cc)}
                         </TableHead>
@@ -272,28 +289,39 @@ export default function FactoryBrokerVisualStatement() {
                           <TableCell className="py-1.5 whitespace-nowrap text-muted-foreground">
                             {c.arrivalDate ? formatDisplayDate(c.arrivalDate) : "—"}
                           </TableCell>
-                          <TableCell className="py-1.5 text-right tabular-nums">{c.ratePerKg > 0 ? c.ratePerKg : "—"}</TableCell>
+                          <TableCell className="py-1.5 text-right tabular-nums">
+                            {c.ratePerKg > 0 ? c.ratePerKg : "—"}
+                          </TableCell>
                           <TableCell className="py-1.5 text-right tabular-nums">{fmt(c.weight, 0)}</TableCell>
                           {/* Goods */}
-                          {allCurrencies.map(cc => (
-                            <TableCell key={`g-${cc}`} className="py-1.5 text-right tabular-nums text-blue-700 dark:text-blue-400">
+                          {allCurrencies.map((cc) => (
+                            <TableCell
+                              key={`g-${cc}`}
+                              className="py-1.5 text-right tabular-nums text-blue-700 dark:text-blue-400"
+                            >
                               {c.goodsCurrency === cc && c.goodsAmount > 0 ? fmt(c.goodsAmount) : ""}
                             </TableCell>
                           ))}
                           {/* Freight */}
-                          {allCurrencies.map(cc => (
-                            <TableCell key={`f-${cc}`} className="py-1.5 text-right tabular-nums text-orange-700 dark:text-orange-400">
+                          {allCurrencies.map((cc) => (
+                            <TableCell
+                              key={`f-${cc}`}
+                              className="py-1.5 text-right tabular-nums text-orange-700 dark:text-orange-400"
+                            >
                               {c.freightCurrency === cc && c.freightAmount > 0 ? fmt(c.freightAmount) : ""}
                             </TableCell>
                           ))}
                           {/* Commission */}
-                          {allCurrencies.map(cc => (
-                            <TableCell key={`c-${cc}`} className="py-1.5 text-right tabular-nums text-purple-700 dark:text-purple-400">
+                          {allCurrencies.map((cc) => (
+                            <TableCell
+                              key={`c-${cc}`}
+                              className="py-1.5 text-right tabular-nums text-purple-700 dark:text-purple-400"
+                            >
                               {c.commissionCurrency === cc && c.commissionAmount > 0 ? fmt(c.commissionAmount) : ""}
                             </TableCell>
                           ))}
                           {/* Grand Total */}
-                          {allCurrencies.map(cc => (
+                          {allCurrencies.map((cc) => (
                             <TableCell key={`t-${cc}`} className="py-1.5 text-right tabular-nums font-semibold">
                               {grandTotal[cc] ? fmt(grandTotal[cc]!) : ""}
                             </TableCell>
@@ -308,27 +336,36 @@ export default function FactoryBrokerVisualStatement() {
                         TOTAL — {statement.containers?.length} containers
                       </TableCell>
                       {/* Goods totals */}
-                      {allCurrencies.map(cc => (
-                        <TableCell key={`gt-g-${cc}`} className="py-2 text-right tabular-nums text-blue-700 dark:text-blue-400">
+                      {allCurrencies.map((cc) => (
+                        <TableCell
+                          key={`gt-g-${cc}`}
+                          className="py-2 text-right tabular-nums text-blue-700 dark:text-blue-400"
+                        >
                           {containerTotals[cc]?.goods ? fmt(containerTotals[cc].goods) : ""}
                         </TableCell>
                       ))}
                       {/* Freight totals */}
-                      {allCurrencies.map(cc => (
-                        <TableCell key={`gt-f-${cc}`} className="py-2 text-right tabular-nums text-orange-700 dark:text-orange-400">
+                      {allCurrencies.map((cc) => (
+                        <TableCell
+                          key={`gt-f-${cc}`}
+                          className="py-2 text-right tabular-nums text-orange-700 dark:text-orange-400"
+                        >
                           {containerTotals[cc]?.freight ? fmt(containerTotals[cc].freight) : ""}
                         </TableCell>
                       ))}
                       {/* Commission totals */}
-                      {allCurrencies.map(cc => (
-                        <TableCell key={`gt-c-${cc}`} className="py-2 text-right tabular-nums text-purple-700 dark:text-purple-400">
+                      {allCurrencies.map((cc) => (
+                        <TableCell
+                          key={`gt-c-${cc}`}
+                          className="py-2 text-right tabular-nums text-purple-700 dark:text-purple-400"
+                        >
                           {containerTotals[cc]?.commission ? fmt(containerTotals[cc].commission) : ""}
                         </TableCell>
                       ))}
                       {/* Grand totals */}
-                      {allCurrencies.map(cc => {
+                      {allCurrencies.map((cc) => {
                         const t = containerTotals[cc];
-                        const grand = t ? (t.goods + t.freight + t.commission) : 0;
+                        const grand = t ? t.goods + t.freight + t.commission : 0;
                         return (
                           <TableCell key={`gt-t-${cc}`} className="py-2 text-right tabular-nums font-bold">
                             {grand > 0 ? fmt(grand) : ""}
@@ -348,7 +385,9 @@ export default function FactoryBrokerVisualStatement() {
               <CardTitle className="text-base flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
                 Payments &amp; Conversions
-                <Badge variant="secondary" className="ml-1">{statement.payments?.length ?? 0}</Badge>
+                <Badge variant="secondary" className="ml-1">
+                  {statement.payments?.length ?? 0}
+                </Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 overflow-x-auto">
@@ -372,10 +411,16 @@ export default function FactoryBrokerVisualStatement() {
                     {(statement.payments as any[]).map((p: any) => {
                       const isNeg = p.fromAmount < 0 || p.usdAmount < 0;
                       const typeLabel: Record<string, string> = {
-                        payment: "Payment", fx_in: "FX In", fx_out: "FX Out", voucher: "Voucher",
+                        payment: "Payment",
+                        fx_in: "FX In",
+                        fx_out: "FX Out",
+                        voucher: "Voucher",
                       };
                       const typeBadge: Record<string, "outline" | "secondary" | "default" | "destructive"> = {
-                        payment: "secondary", fx_in: "default", fx_out: "outline", voucher: "outline",
+                        payment: "secondary",
+                        fx_in: "default",
+                        fx_out: "outline",
+                        voucher: "outline",
                       };
                       const amtColor = isNeg
                         ? "text-green-600 dark:text-green-400"
@@ -392,11 +437,11 @@ export default function FactoryBrokerVisualStatement() {
                               {typeLabel[p.type] || p.type}
                             </Badge>
                           </TableCell>
-                          <TableCell className="py-1.5 max-w-[180px] truncate">
-                            {p.supplierName || "—"}
-                          </TableCell>
+                          <TableCell className="py-1.5 max-w-[180px] truncate">{p.supplierName || "—"}</TableCell>
                           <TableCell className="py-1.5">
-                            <Badge variant="outline" className="font-mono text-xs py-0">{p.fromCurrency}</Badge>
+                            <Badge variant="outline" className="font-mono text-xs py-0">
+                              {p.fromCurrency}
+                            </Badge>
                           </TableCell>
                           <TableCell className={`py-1.5 text-right tabular-nums font-medium ${amtColor}`}>
                             {p.fromCurrency === "USD" ? "" : ccySymbol(p.fromCurrency)}
@@ -417,11 +462,18 @@ export default function FactoryBrokerVisualStatement() {
 
                     {/* Payment totals */}
                     <TableRow className="bg-muted/60 font-semibold text-xs border-t-2">
-                      <TableCell colSpan={4} className="py-2">TOTAL PAID</TableCell>
+                      <TableCell colSpan={4} className="py-2">
+                        TOTAL PAID
+                      </TableCell>
                       <TableCell className="py-2 text-right tabular-nums" colSpan={2}>
-                        {Object.entries(paymentTotals).filter(([, v]) => v !== 0).map(([cc, v]) => (
-                          <span key={cc} className="block">{ccySymbol(cc)}{fmt(v)}</span>
-                        ))}
+                        {Object.entries(paymentTotals)
+                          .filter(([, v]) => v !== 0)
+                          .map(([cc, v]) => (
+                            <span key={cc} className="block">
+                              {ccySymbol(cc)}
+                              {fmt(v)}
+                            </span>
+                          ))}
                       </TableCell>
                       <TableCell className="py-2 text-right tabular-nums font-bold">
                         {fmt((statement.payments as any[]).reduce((s: number, p: any) => s + p.usdAmount, 0))}
@@ -448,8 +500,10 @@ export default function FactoryBrokerVisualStatement() {
                   <TableHeader className="sticky top-0 z-30 bg-background">
                     <TableRow className="bg-muted/50 text-xs">
                       <TableHead className="h-8">Item</TableHead>
-                      {allCurrencies.map(cc => (
-                        <TableHead key={cc} className="h-8 text-right">{cc}</TableHead>
+                      {allCurrencies.map((cc) => (
+                        <TableHead key={cc} className="h-8 text-right">
+                          {cc}
+                        </TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
@@ -457,7 +511,7 @@ export default function FactoryBrokerVisualStatement() {
                     {/* Total Credit */}
                     <TableRow className="text-xs">
                       <TableCell className="py-2 font-medium">Total Credit (owed to broker)</TableCell>
-                      {allCurrencies.map(cc => {
+                      {allCurrencies.map((cc) => {
                         const t = containerTotals[cc];
                         const total = t ? t.goods + t.freight + t.commission : 0;
                         return (
@@ -469,11 +523,16 @@ export default function FactoryBrokerVisualStatement() {
                     </TableRow>
                     {/* Total Paid */}
                     <TableRow className="text-xs">
-                      <TableCell className="py-2 font-medium text-green-700 dark:text-green-400">Operations (payments made)</TableCell>
-                      {allCurrencies.map(cc => {
+                      <TableCell className="py-2 font-medium text-green-700 dark:text-green-400">
+                        Operations (payments made)
+                      </TableCell>
+                      {allCurrencies.map((cc) => {
                         const paid = paymentTotals[cc] || 0;
                         return (
-                          <TableCell key={cc} className="py-2 text-right tabular-nums font-medium text-green-700 dark:text-green-400">
+                          <TableCell
+                            key={cc}
+                            className="py-2 text-right tabular-nums font-medium text-green-700 dark:text-green-400"
+                          >
                             {paid !== 0 ? `${paid < 0 ? "−" : ""}${ccySymbol(cc)}${fmt(paid)}` : "—"}
                           </TableCell>
                         );
@@ -482,7 +541,7 @@ export default function FactoryBrokerVisualStatement() {
                     {/* Remaining Balance */}
                     <TableRow className="text-xs bg-muted/40 font-semibold">
                       <TableCell className="py-2">Remaining Balance</TableCell>
-                      {allCurrencies.map(cc => {
+                      {allCurrencies.map((cc) => {
                         const t = containerTotals[cc];
                         const credit = t ? t.goods + t.freight + t.commission : 0;
                         const paid = paymentTotals[cc] || 0;
@@ -503,12 +562,11 @@ export default function FactoryBrokerVisualStatement() {
               </div>
 
               <p className="text-xs text-muted-foreground mt-3">
-                Balances shown in original currencies. Use the exchange rates in the existing broker ledger for USD conversion.
-                Red = still owed to broker. Green = overpaid.
+                Balances shown in original currencies. Use the exchange rates in the existing broker ledger for USD
+                conversion. Red = still owed to broker. Green = overpaid.
               </p>
             </CardContent>
           </Card>
-
         </div>
       )}
     </div>

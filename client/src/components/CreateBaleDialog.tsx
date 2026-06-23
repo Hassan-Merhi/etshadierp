@@ -4,30 +4,11 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Barcode, Printer, ToggleLeft } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -57,10 +38,11 @@ interface CreateBaleDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const HMD_LOGO_BASE64 = 'data:image/png;base64,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';
+const HMD_LOGO_BASE64 =
+  "data:image/png;base64,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";
 
 function formatLabelNum(val: string | number): string {
-  const n = typeof val === 'string' ? parseFloat(val) : val;
+  const n = typeof val === "string" ? parseFloat(val) : val;
   if (isNaN(n)) return String(val);
   return n % 1 === 0 ? n.toFixed(0) : parseFloat(n.toFixed(3)).toString();
 }
@@ -93,14 +75,17 @@ function generateFullLabelHtml(label: {
     </div>`;
 }
 
-function generateLabelHtml(labels: Array<{
-  referenceNumber: string;
-  articleCode: string;
-  pieces: number;
-  approxWeightKg: string;
-  productName: string;
-}>, dualLabel: boolean) {
-  let labelsHtml = '';
+function generateLabelHtml(
+  labels: Array<{
+    referenceNumber: string;
+    articleCode: string;
+    pieces: number;
+    approxWeightKg: string;
+    productName: string;
+  }>,
+  dualLabel: boolean
+) {
+  let labelsHtml = "";
 
   for (const label of labels) {
     const fullLabel = generateFullLabelHtml(label);
@@ -123,7 +108,7 @@ function generateLabelHtml(labels: Array<{
     }
   }
 
-  const pageSize = dualLabel ? 'size: 3in 3.94in;' : 'size: 3in 1.97in;';
+  const pageSize = dualLabel ? "size: 3in 3.94in;" : "size: 3in 1.97in;";
 
   return `
     <html>
@@ -285,10 +270,7 @@ function generateLabelHtml(labels: Array<{
   `;
 }
 
-export function CreateBaleDialog({
-  open,
-  onOpenChange,
-}: CreateBaleDialogProps) {
+export function CreateBaleDialog({ open, onOpenChange }: CreateBaleDialogProps) {
   const { toast } = useToast();
   const [dualLabel, setDualLabel] = useState(true);
 
@@ -307,9 +289,7 @@ export function CreateBaleDialog({
     enabled: open,
   });
 
-  const activeBatches = mixBatches?.filter(
-    (b) => b.status === "ACTIVE"
-  );
+  const activeBatches = mixBatches?.filter((b) => b.status === "ACTIVE");
 
   const activeProducts = baleProducts?.filter((p) => p.active);
   const activeLocations = locations?.filter((l) => l.active);
@@ -328,9 +308,7 @@ export function CreateBaleDialog({
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
-      const product = activeProducts?.find(
-        (p) => p.id.toString() === data.productId
-      );
+      const product = activeProducts?.find((p) => p.id.toString() === data.productId);
       if (!product) throw new Error("Product not found");
 
       const baleData = {
@@ -409,8 +387,12 @@ export function CreateBaleDialog({
           await printRawZpl(zpl);
           toast({ title: "Labels sent to Zebra printer" });
         } catch (err: any) {
-          toast({ title: "Zebra print failed — falling back to browser", description: err.message, variant: "destructive" });
-          const printWindow = window.open('', '_blank');
+          toast({
+            title: "Zebra print failed — falling back to browser",
+            description: err.message,
+            variant: "destructive",
+          });
+          const printWindow = window.open("", "_blank");
           if (printWindow) {
             printWindow.document.write(generateLabelHtml(labels, dualLabel));
             printWindow.document.close();
@@ -419,7 +401,7 @@ export function CreateBaleDialog({
           }
         }
       } else {
-        const printWindow = window.open('', '_blank');
+        const printWindow = window.open("", "_blank");
         if (!printWindow) {
           toast({ title: "Error", description: "Please allow pop-ups to print labels", variant: "destructive" });
           return;
@@ -452,117 +434,116 @@ export function CreateBaleDialog({
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>Create Production Bales</DialogTitle>
-          <DialogDescription>
-            Select a mix batch and specify how many bales to create
-          </DialogDescription>
+          <DialogDescription>Select a mix batch and specify how many bales to create</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
-              <FormField
-                control={form.control}
-                name="mixBatchId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Mix Batch *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-mix-batch">
-                          <SelectValue placeholder="Select mix batch" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {activeBatches?.map((batch) => (
-                          <SelectItem
-                            key={batch.id}
-                            value={batch.id.toString()}
-                          >
-                            {batch.batchCode} - {parseFloat(batch.totalWeightKg).toLocaleString()} kg @ ${parseFloat(batch.costPerKg).toFixed(4)}/kg
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+            <FormField
+              control={form.control}
+              name="mixBatchId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Mix Batch *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-mix-batch">
+                        <SelectValue placeholder="Select mix batch" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {activeBatches?.map((batch) => (
+                        <SelectItem key={batch.id} value={batch.id.toString()}>
+                          {batch.batchCode} - {parseFloat(batch.totalWeightKg).toLocaleString()} kg @ $
+                          {parseFloat(batch.costPerKg).toFixed(4)}/kg
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="productId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product Type *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-product">
-                          <SelectValue placeholder="Select product type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {activeProducts?.map((product) => (
-                          <SelectItem
-                            key={product.id}
-                            value={product.id.toString()}
-                          >
-                            {product.articleCode || product.code} - {product.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={form.control}
+              name="productId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Type *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-product">
+                        <SelectValue placeholder="Select product type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {activeProducts?.map((product) => (
+                        <SelectItem key={product.id} value={product.id.toString()}>
+                          {product.articleCode || product.code} - {product.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="locationId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Warehouse Location *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-location">
-                          <SelectValue placeholder="Select location" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {activeLocations?.map((location) => (
-                          <SelectItem
-                            key={location.id}
-                            value={location.id.toString()}
-                          >
-                            {location.code} - {location.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={form.control}
+              name="locationId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Warehouse Location *</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-location">
+                        <SelectValue placeholder="Select location" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {activeLocations?.map((location) => (
+                        <SelectItem key={location.id} value={location.id.toString()}>
+                          {location.code} - {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
+            <FormField
+              control={form.control}
+              name="pressDate"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Pressing Date *</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="date" data-testid="input-press-date" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="pressDate"
+                name="quantity"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Pressing Date *</FormLabel>
+                    <FormLabel>Quantity (Number of Bales) *</FormLabel>
                     <FormControl>
                       <Input
                         {...field}
-                        type="date"
-                        data-testid="input-press-date"
+                        type="number"
+                        placeholder="100"
+                        min="1"
+                        max="1000"
+                        data-testid="input-quantity"
                       />
                     </FormControl>
                     <FormMessage />
@@ -570,84 +551,55 @@ export function CreateBaleDialog({
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="quantity"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Quantity (Number of Bales) *</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          placeholder="100"
-                          min="1"
-                          max="1000"
-                          data-testid="input-quantity"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <FormField
+                control={form.control}
+                name="weightPerBale"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Weight per Bale (kg) *</FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        type="number"
+                        placeholder="25"
+                        step="0.01"
+                        min="1"
+                        max="500"
+                        data-testid="input-weight-per-bale"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-                <FormField
-                  control={form.control}
-                  name="weightPerBale"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Weight per Bale (kg) *</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          placeholder="25"
-                          step="0.01"
-                          min="1"
-                          max="500"
-                          data-testid="input-weight-per-bale"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+            <div className="flex items-center gap-3 rounded-md border p-3">
+              <Switch
+                id="dual-label-toggle"
+                checked={dualLabel}
+                onCheckedChange={setDualLabel}
+                data-testid="switch-dual-label"
+              />
+              <Label htmlFor="dual-label-toggle" className="flex flex-col gap-0.5 cursor-pointer">
+                <span className="text-sm font-medium">Print name label too</span>
+                <span className="text-xs text-muted-foreground">
+                  {dualLabel
+                    ? "Two stickers per bale: full HMD label + name label with barcode"
+                    : "Single full HMD label per bale"}
+                </span>
+              </Label>
+            </div>
 
-              <div className="flex items-center gap-3 rounded-md border p-3">
-                <Switch
-                  id="dual-label-toggle"
-                  checked={dualLabel}
-                  onCheckedChange={setDualLabel}
-                  data-testid="switch-dual-label"
-                />
-                <Label htmlFor="dual-label-toggle" className="flex flex-col gap-0.5 cursor-pointer">
-                  <span className="text-sm font-medium">Print name label too</span>
-                  <span className="text-xs text-muted-foreground">
-                    {dualLabel ? "Two stickers per bale: full HMD label + name label with barcode" : "Single full HMD label per bale"}
-                  </span>
-                </Label>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleClose}
-                  data-testid="button-cancel"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createMutation.isPending}
-                  data-testid="button-submit"
-                >
-                  {createMutation.isPending ? "Creating..." : "Create Bales"}
-                </Button>
-              </div>
-            </form>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={handleClose} data-testid="button-cancel">
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit">
+                {createMutation.isPending ? "Creating..." : "Create Bales"}
+              </Button>
+            </div>
+          </form>
         </Form>
       </DialogContent>
     </Dialog>

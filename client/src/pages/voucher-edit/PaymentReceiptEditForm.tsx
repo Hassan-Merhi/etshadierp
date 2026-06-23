@@ -21,7 +21,7 @@ export function PaymentReceiptEditForm({
   formatDisplayDate,
   formatAmount,
   total,
-  focusByTestId
+  focusByTestId,
 }: {
   form: UseFormReturn<any>;
   voucherType: string;
@@ -54,9 +54,7 @@ export function PaymentReceiptEditForm({
                 name="paymentAccountId"
                 render={({ field }) => (
                   <FormItem className="flex-1">
-                    <FormLabel>
-                      {voucherType === "Payment" ? "Pay From" : "Receive In"}
-                    </FormLabel>
+                    <FormLabel>{voucherType === "Payment" ? "Pay From" : "Receive In"}</FormLabel>
                     <FormControl>
                       <AccountAutocomplete
                         value={
@@ -69,7 +67,12 @@ export function PaymentReceiptEditForm({
                             : null
                         }
                         onChange={(type, id, name) => {
-                          if (type === "ledger" || type === "bank" || type === "supplier" || type === "factorySupplier") {
+                          if (
+                            type === "ledger" ||
+                            type === "bank" ||
+                            type === "supplier" ||
+                            type === "factorySupplier"
+                          ) {
                             form.setValue("paymentAccountType", type);
                             form.setValue("paymentAccountId", id);
                             form.setValue("paymentAccountName", name);
@@ -108,12 +111,7 @@ export function PaymentReceiptEditForm({
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="end">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
+                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -128,10 +126,7 @@ export function PaymentReceiptEditForm({
                   <FormItem>
                     <FormLabel>Currency</FormLabel>
                     <FormControl>
-                      <CurrencySelector
-                        value={field.value}
-                        onChange={field.onChange}
-                      />
+                      <CurrencySelector value={field.value} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -145,7 +140,13 @@ export function PaymentReceiptEditForm({
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-muted-foreground">Entry {index + 1}</span>
                     {fields.length > 1 && (
-                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} data-testid={`button-remove-payment-mobile-${index}`}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => remove(index)}
+                        data-testid={`button-remove-payment-mobile-${index}`}
+                      >
                         <X className="h-4 w-4" />
                       </Button>
                     )}
@@ -158,9 +159,22 @@ export function PaymentReceiptEditForm({
                         <FormLabel className="text-xs">Account</FormLabel>
                         <FormControl>
                           <AccountAutocomplete
-                            value={form.watch(`entries.${index}.accountId`) > 0 ? { type: form.watch(`entries.${index}.accountType`), id: form.watch(`entries.${index}.accountId`), name: form.watch(`entries.${index}.accountName`) } : null}
+                            value={
+                              form.watch(`entries.${index}.accountId`) > 0
+                                ? {
+                                    type: form.watch(`entries.${index}.accountType`),
+                                    id: form.watch(`entries.${index}.accountId`),
+                                    name: form.watch(`entries.${index}.accountName`),
+                                  }
+                                : null
+                            }
                             onChange={(type, id, name) => {
-                              if (type === "ledger" || type === "bank" || type === "supplier" || type === "factorySupplier") {
+                              if (
+                                type === "ledger" ||
+                                type === "bank" ||
+                                type === "supplier" ||
+                                type === "factorySupplier"
+                              ) {
                                 form.setValue(`entries.${index}.accountType`, type);
                                 form.setValue(`entries.${index}.accountId`, id);
                                 form.setValue(`entries.${index}.accountName`, name);
@@ -182,7 +196,14 @@ export function PaymentReceiptEditForm({
                       <FormItem>
                         <FormLabel className="text-xs">Amount</FormLabel>
                         <FormControl>
-                          <Input {...field} type="number" step="0.01" placeholder="0.00" className="font-mono" data-testid={`input-amount-payment-mobile-${index}`} />
+                          <Input
+                            {...field}
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            className="font-mono"
+                            data-testid={`input-amount-payment-mobile-${index}`}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -191,7 +212,13 @@ export function PaymentReceiptEditForm({
                 </div>
               ))}
               <div className="flex items-center justify-between gap-2 pt-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ accountType: "ledger", accountId: 0, accountName: "", amount: "" })} data-testid="button-add-row-payment-mobile">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => append({ accountType: "ledger", accountId: 0, accountName: "", amount: "" })}
+                  data-testid="button-add-row-payment-mobile"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Row
                 </Button>
@@ -232,7 +259,12 @@ export function PaymentReceiptEditForm({
                                       : null
                                   }
                                   onChange={(type, id, name) => {
-                                    if (type === "ledger" || type === "bank" || type === "supplier" || type === "factorySupplier") {
+                                    if (
+                                      type === "ledger" ||
+                                      type === "bank" ||
+                                      type === "supplier" ||
+                                      type === "factorySupplier"
+                                    ) {
                                       form.setValue(`entries.${index}.accountType`, type);
                                       form.setValue(`entries.${index}.accountId`, id);
                                       form.setValue(`entries.${index}.accountName`, name);
@@ -242,7 +274,9 @@ export function PaymentReceiptEditForm({
                                   rowIndex={index}
                                   testId={`input-account-${index}`}
                                   onArrowUp={() => index > 0 && focusByTestId(`input-account-${index - 1}`)}
-                                  onArrowDown={() => index < fields.length - 1 && focusByTestId(`input-account-${index + 1}`)}
+                                  onArrowDown={() =>
+                                    index < fields.length - 1 && focusByTestId(`input-account-${index + 1}`)
+                                  }
                                   onArrowRight={() => focusByTestId(`input-amount-${index}`, true)}
                                 />
                               </FormControl>
@@ -266,9 +300,16 @@ export function PaymentReceiptEditForm({
                                   className="font-mono"
                                   data-testid={`input-amount-${index}`}
                                   onKeyDown={(e) => {
-                                    if (e.key === "ArrowUp" && index > 0) { e.preventDefault(); focusByTestId(`input-amount-${index - 1}`, true); }
-                                    else if (e.key === "ArrowDown" && index < fields.length - 1) { e.preventDefault(); focusByTestId(`input-amount-${index + 1}`, true); }
-                                    else if (e.key === "ArrowLeft") { e.preventDefault(); focusByTestId(`input-account-${index}`); }
+                                    if (e.key === "ArrowUp" && index > 0) {
+                                      e.preventDefault();
+                                      focusByTestId(`input-amount-${index - 1}`, true);
+                                    } else if (e.key === "ArrowDown" && index < fields.length - 1) {
+                                      e.preventDefault();
+                                      focusByTestId(`input-amount-${index + 1}`, true);
+                                    } else if (e.key === "ArrowLeft") {
+                                      e.preventDefault();
+                                      focusByTestId(`input-account-${index}`);
+                                    }
                                   }}
                                 />
                               </FormControl>
@@ -315,9 +356,7 @@ export function PaymentReceiptEditForm({
                       </Button>
                     </td>
                     <td className="p-3">
-                      <div className="text-right font-bold font-mono">
-                        {formatAmount(total)}
-                      </div>
+                      <div className="text-right font-bold font-mono">{formatAmount(total)}</div>
                     </td>
                     <td></td>
                   </tr>
@@ -332,12 +371,7 @@ export function PaymentReceiptEditForm({
                 <FormItem>
                   <FormLabel>Notes</FormLabel>
                   <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Additional notes..."
-                      rows={3}
-                      data-testid="input-notes"
-                    />
+                    <Textarea {...field} placeholder="Additional notes..." rows={3} data-testid="input-notes" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -354,11 +388,7 @@ export function PaymentReceiptEditForm({
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={isPending || total === 0}
-                data-testid="button-save-changes"
-              >
+              <Button type="submit" disabled={isPending || total === 0} data-testid="button-save-changes">
                 {isPending ? "Saving..." : "Save Changes"}
               </Button>
             </div>

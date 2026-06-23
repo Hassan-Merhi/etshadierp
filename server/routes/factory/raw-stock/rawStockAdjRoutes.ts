@@ -6,43 +6,109 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
   factorySupplierCategories,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
@@ -52,35 +118,37 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-
 export function registerRawStockAdjRoutes(app: Express) {
   app.get("/api/factory/raw-stock/adjustments", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const rows = await db.select({
-        id: factoryRawMaterialAdjustments.id,
-        companyId: factoryRawMaterialAdjustments.companyId,
-        date: factoryRawMaterialAdjustments.date,
-        type: factoryRawMaterialAdjustments.type,
-        kg: factoryRawMaterialAdjustments.kg,
-        costPerKg: factoryRawMaterialAdjustments.costPerKg,
-        currencyCode: factoryRawMaterialAdjustments.currencyCode,
-        supplierId: factoryRawMaterialAdjustments.supplierId,
-        supplierName: factorySuppliers.name,
-        materialLabel: factoryRawMaterialAdjustments.materialLabel,
-        notes: factoryRawMaterialAdjustments.notes,
-        createdAt: factoryRawMaterialAdjustments.createdAt,
-      })
+      const rows = await db
+        .select({
+          id: factoryRawMaterialAdjustments.id,
+          companyId: factoryRawMaterialAdjustments.companyId,
+          date: factoryRawMaterialAdjustments.date,
+          type: factoryRawMaterialAdjustments.type,
+          kg: factoryRawMaterialAdjustments.kg,
+          costPerKg: factoryRawMaterialAdjustments.costPerKg,
+          currencyCode: factoryRawMaterialAdjustments.currencyCode,
+          supplierId: factoryRawMaterialAdjustments.supplierId,
+          supplierName: factorySuppliers.name,
+          materialLabel: factoryRawMaterialAdjustments.materialLabel,
+          notes: factoryRawMaterialAdjustments.notes,
+          createdAt: factoryRawMaterialAdjustments.createdAt,
+        })
         .from(factoryRawMaterialAdjustments)
-        .leftJoin(factorySuppliers, and(
-          eq(factoryRawMaterialAdjustments.supplierId, factorySuppliers.id),
-          eq(factorySuppliers.companyId, companyId)
-        ))
-        .where(and(
-          eq(factoryRawMaterialAdjustments.companyId, companyId),
-          isNull(factoryRawMaterialAdjustments.deletedAt),
-        ))
+        .leftJoin(
+          factorySuppliers,
+          and(
+            eq(factoryRawMaterialAdjustments.supplierId, factorySuppliers.id),
+            eq(factorySuppliers.companyId, companyId)
+          )
+        )
+        .where(
+          and(eq(factoryRawMaterialAdjustments.companyId, companyId), isNull(factoryRawMaterialAdjustments.deletedAt))
+        )
         .orderBy(desc(factoryRawMaterialAdjustments.createdAt));
       res.json(rows);
     } catch (error: any) {
@@ -99,43 +167,44 @@ export function registerRawStockAdjRoutes(app: Express) {
       if (!supplierId) return res.status(400).json({ message: "supplierId required" });
 
       // 1. Manual adjustments for this supplier
-      const adjRows = await db.select({
-        id: factoryRawMaterialAdjustments.id,
-        date: factoryRawMaterialAdjustments.date,
-        type: factoryRawMaterialAdjustments.type,
-        kg: factoryRawMaterialAdjustments.kg,
-        costPerKg: factoryRawMaterialAdjustments.costPerKg,
-        currencyCode: factoryRawMaterialAdjustments.currencyCode,
-        notes: factoryRawMaterialAdjustments.notes,
-        reference: factoryRawMaterialAdjustments.reference,
-        materialLabel: factoryRawMaterialAdjustments.materialLabel,
-        createdAt: factoryRawMaterialAdjustments.createdAt,
-      })
+      const adjRows = await db
+        .select({
+          id: factoryRawMaterialAdjustments.id,
+          date: factoryRawMaterialAdjustments.date,
+          type: factoryRawMaterialAdjustments.type,
+          kg: factoryRawMaterialAdjustments.kg,
+          costPerKg: factoryRawMaterialAdjustments.costPerKg,
+          currencyCode: factoryRawMaterialAdjustments.currencyCode,
+          notes: factoryRawMaterialAdjustments.notes,
+          reference: factoryRawMaterialAdjustments.reference,
+          materialLabel: factoryRawMaterialAdjustments.materialLabel,
+          createdAt: factoryRawMaterialAdjustments.createdAt,
+        })
         .from(factoryRawMaterialAdjustments)
-        .where(and(
-          eq(factoryRawMaterialAdjustments.companyId, companyId),
-          eq(factoryRawMaterialAdjustments.supplierId, supplierId),
-          isNull(factoryRawMaterialAdjustments.deletedAt),
-        ))
+        .where(
+          and(
+            eq(factoryRawMaterialAdjustments.companyId, companyId),
+            eq(factoryRawMaterialAdjustments.supplierId, supplierId),
+            isNull(factoryRawMaterialAdjustments.deletedAt)
+          )
+        )
         .orderBy(desc(factoryRawMaterialAdjustments.createdAt));
 
       // 2. Mix batch usage: batch sources referencing this supplier (aggregate per batch)
-      const batchSourceRows = await db.select({
-        batchId: factoryMixBatches.id,
-        batchCode: factoryMixBatches.batchCode,
-        batchName: factoryMixBatches.name,
-        batchStatus: factoryMixBatches.status,
-        batchDate: factoryMixBatches.batchDate,
-        createdAt: factoryMixBatches.createdAt,
-        weightKg: factoryMixBatchSources.weightKg,
-        costPerKg: factoryMixBatchSources.costPerKg,
-      })
+      const batchSourceRows = await db
+        .select({
+          batchId: factoryMixBatches.id,
+          batchCode: factoryMixBatches.batchCode,
+          batchName: factoryMixBatches.name,
+          batchStatus: factoryMixBatches.status,
+          batchDate: factoryMixBatches.batchDate,
+          createdAt: factoryMixBatches.createdAt,
+          weightKg: factoryMixBatchSources.weightKg,
+          costPerKg: factoryMixBatchSources.costPerKg,
+        })
         .from(factoryMixBatchSources)
         .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
-        .where(and(
-          eq(factoryMixBatches.companyId, companyId),
-          eq(factoryMixBatchSources.supplierId, supplierId),
-        ))
+        .where(and(eq(factoryMixBatches.companyId, companyId), eq(factoryMixBatchSources.supplierId, supplierId)))
         .orderBy(desc(factoryMixBatches.createdAt));
 
       // Aggregate multiple source rows for the same batch into one timeline entry
@@ -163,26 +232,29 @@ export function registerRawStockAdjRoutes(app: Express) {
       const batches = Array.from(batchAggMap.values());
 
       // 3. Container-based raw stock receipts for this supplier
-      const containerRows = await db.select({
-        id: factoryRawStock.id,
-        receivedKg: factoryRawStock.receivedKg,
-        usedKg: factoryRawStock.usedKg,
-        costPerKg: factoryRawStock.costPerKg,
-        offloadedAt: factoryRawStock.offloadedAt,
-        containerNumber: factoryContainers.containerNumber,
-        origin: factoryContainers.origin,
-        currencyCode: factoryContainers.currencyCode,
-      })
+      const containerRows = await db
+        .select({
+          id: factoryRawStock.id,
+          receivedKg: factoryRawStock.receivedKg,
+          usedKg: factoryRawStock.usedKg,
+          costPerKg: factoryRawStock.costPerKg,
+          offloadedAt: factoryRawStock.offloadedAt,
+          containerNumber: factoryContainers.containerNumber,
+          origin: factoryContainers.origin,
+          currencyCode: factoryContainers.currencyCode,
+        })
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-        .where(and(
-          eq(factoryRawStock.companyId, companyId),
-          eq(factoryContainers.supplierId, supplierId),
-          sql`${factoryContainers.status} != 'DELETED'`,
-        ))
+        .where(
+          and(
+            eq(factoryRawStock.companyId, companyId),
+            eq(factoryContainers.supplierId, supplierId),
+            sql`${factoryContainers.status} != 'DELETED'`
+          )
+        )
         .orderBy(desc(factoryRawStock.offloadedAt));
 
-      const receipts = containerRows.map(r => ({
+      const receipts = containerRows.map((r) => ({
         kind: "receipt" as const,
         date: r.offloadedAt,
         createdAt: r.offloadedAt,
@@ -200,7 +272,7 @@ export function registerRawStockAdjRoutes(app: Express) {
       }));
 
       // Also expose adjId on adjustments
-      const adjustmentsWithId = adjRows.map(r => ({
+      const adjustmentsWithId = adjRows.map((r) => ({
         kind: "adjustment" as const,
         adjId: r.id,
         date: r.date || r.createdAt,
@@ -215,8 +287,9 @@ export function registerRawStockAdjRoutes(app: Express) {
         ref: r.reference ? r.reference : `ADJ-${r.id}`,
       }));
 
-      const all = [...adjustmentsWithId, ...batches, ...receipts]
-        .sort((a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime());
+      const all = [...adjustmentsWithId, ...batches, ...receipts].sort(
+        (a, b) => new Date(b.createdAt as any).getTime() - new Date(a.createdAt as any).getTime()
+      );
 
       res.json(all);
     } catch (error: any) {
@@ -230,8 +303,10 @@ export function registerRawStockAdjRoutes(app: Express) {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const { type, kg, costPerKg, currencyCode, supplierId, materialLabel, notes, reference, date, createVoucher } = req.body;
-      if (!type || !["ADD", "REMOVE"].includes(type)) return res.status(400).json({ message: "type must be ADD or REMOVE" });
+      const { type, kg, costPerKg, currencyCode, supplierId, materialLabel, notes, reference, date, createVoucher } =
+        req.body;
+      if (!type || !["ADD", "REMOVE"].includes(type))
+        return res.status(400).json({ message: "type must be ADD or REMOVE" });
       if (!kg || parseFloat(kg) <= 0) return res.status(400).json({ message: "kg must be > 0" });
       if (!date) return res.status(400).json({ message: "date is required" });
 
@@ -244,50 +319,66 @@ export function registerRawStockAdjRoutes(app: Express) {
       // Pre-fetch ledger account IDs before transaction (getOrCreateLedgerAccount must run outside tx)
       let rawMaterialAcctId: number | null = null;
       if (createVoucher && resolvedSupplierId && type === "ADD" && costNum > 0) {
-        rawMaterialAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_RAW_MATERIAL_STOCK", "Factory Raw Material Stock", "ASSET");
+        rawMaterialAcctId = await getOrCreateLedgerAccount(
+          companyId,
+          "FACTORY_RAW_MATERIAL_STOCK",
+          "Factory Raw Material Stock",
+          "ASSET"
+        );
       }
 
       let fxRate = 1;
       if (ccy !== "USD") {
-        try { fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, ccy, date)); } catch { fxRate = 1; }
+        try {
+          fxRate = parseFloat(await getOrFetchFxRateToUsd(companyId, ccy, date));
+        } catch {
+          fxRate = 1;
+        }
       }
 
       let inserted: any;
       await db.transaction(async (tx) => {
-        [inserted] = await tx.insert(factoryRawMaterialAdjustments).values({
-          companyId,
-          date,
-          type,
-          kg: String(kgNum),
-          costPerKg: costNum > 0 ? String(costNum) : "0",
-          currencyCode: ccy,
-          supplierId: resolvedSupplierId,
-          materialLabel: materialLabel || null,
-          notes: notes || null,
-          reference: reference || null,
-        }).returning();
+        [inserted] = await tx
+          .insert(factoryRawMaterialAdjustments)
+          .values({
+            companyId,
+            date,
+            type,
+            kg: String(kgNum),
+            costPerKg: costNum > 0 ? String(costNum) : "0",
+            currencyCode: ccy,
+            supplierId: resolvedSupplierId,
+            materialLabel: materialLabel || null,
+            notes: notes || null,
+            reference: reference || null,
+          })
+          .returning();
 
         // Accounting voucher: Dr Raw Material Stock / Cr Supplier Account
         if (createVoucher && resolvedSupplierId && rawMaterialAcctId && totalAmount > 0) {
           // Look up supplier name for description
-          const [sup] = await tx.select({ name: factorySuppliers.name })
+          const [sup] = await tx
+            .select({ name: factorySuppliers.name })
             .from(factorySuppliers)
             .where(and(eq(factorySuppliers.id, resolvedSupplierId), eq(factorySuppliers.companyId, companyId)))
             .limit(1);
           const supplierName = sup?.name || `Supplier #${resolvedSupplierId}`;
 
           const voucherNum = `FACTORY-MANUAL-${inserted.id}-${Date.now()}`;
-          const [voucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherType: "Journal",
-            voucherNumber: voucherNum,
-            voucherDate: date,
-            description: `Manual raw material purchase: ${kgNum} kg @ ${costNum}/${ccy} — ${supplierName}`,
-            totalAmount: String(totalAmount),
-            currency: ccy,
-            exchangeRate: String(fxRate),
-            sourceModule: "FACTORY",
-          }).returning();
+          const [voucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: voucherNum,
+              voucherDate: date,
+              description: `Manual raw material purchase: ${kgNum} kg @ ${costNum}/${ccy} — ${supplierName}`,
+              totalAmount: String(totalAmount),
+              currency: ccy,
+              exchangeRate: String(fxRate),
+              sourceModule: "FACTORY",
+            })
+            .returning();
 
           // Dr Raw Material Stock
           await tx.insert(voucherEntries).values({
@@ -337,8 +428,16 @@ export function registerRawStockAdjRoutes(app: Express) {
       if (isNaN(id)) return res.status(400).json({ message: "Invalid id" });
 
       // Fetch the adjustment to know whether it has linked accounting
-      const [adj] = await db.select().from(factoryRawMaterialAdjustments)
-        .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId), isNull(factoryRawMaterialAdjustments.deletedAt)))
+      const [adj] = await db
+        .select()
+        .from(factoryRawMaterialAdjustments)
+        .where(
+          and(
+            eq(factoryRawMaterialAdjustments.id, id),
+            eq(factoryRawMaterialAdjustments.companyId, companyId),
+            isNull(factoryRawMaterialAdjustments.deletedAt)
+          )
+        )
         .limit(1);
       if (!adj) return res.status(404).json({ message: "Adjustment not found" });
 
@@ -349,11 +448,13 @@ export function registerRawStockAdjRoutes(app: Express) {
           .select({ id: factoryRawStock.id, receivedKg: factoryRawStock.receivedKg })
           .from(factoryRawStock)
           .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-          .where(and(
-            eq(factoryRawStock.companyId, companyId),
-            eq(factoryContainers.supplierId, adj.supplierId),
-            sql`${factoryContainers.status} != 'DELETED'`,
-          ))
+          .where(
+            and(
+              eq(factoryRawStock.companyId, companyId),
+              eq(factoryContainers.supplierId, adj.supplierId),
+              sql`${factoryContainers.status} != 'DELETED'`
+            )
+          )
           .orderBy(desc(factoryRawStock.offloadedAt));
 
         await db.transaction(async (tx) => {
@@ -362,38 +463,51 @@ export function registerRawStockAdjRoutes(app: Express) {
             if (remaining <= 0.001) break;
             const received = parseFloat(String(row.receivedKg));
             // Add back all remaining to this row (newest first)
-            await tx.update(factoryRawStock)
+            await tx
+              .update(factoryRawStock)
               .set({ receivedKg: String((received + remaining).toFixed(3)) })
               .where(eq(factoryRawStock.id, row.id));
             remaining = 0;
           }
           // Hard-delete the DEDUCT record
-          await tx.delete(factoryRawMaterialAdjustments)
-            .where(and(
-              eq(factoryRawMaterialAdjustments.id, id),
-              eq(factoryRawMaterialAdjustments.companyId, companyId),
-            ));
+          await tx
+            .delete(factoryRawMaterialAdjustments)
+            .where(
+              and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId))
+            );
         });
       } else {
         // For ADD / REMOVE: soft-delete + clean up linked daybook entries and vouchers
         await db.transaction(async (tx: any) => {
-          await tx.update(factoryRawMaterialAdjustments)
+          await tx
+            .update(factoryRawMaterialAdjustments)
             .set({ deletedAt: new Date() })
-            .where(and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId)));
+            .where(
+              and(eq(factoryRawMaterialAdjustments.id, id), eq(factoryRawMaterialAdjustments.companyId, companyId))
+            );
 
           // Delete linked OFFLOAD_RAW_STOCK daybook entry (referenceId = adjustment id)
-          await tx.delete(factoryDaybookEntries).where(and(
-            eq(factoryDaybookEntries.companyId, companyId),
-            eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
-            eq(factoryDaybookEntries.referenceId, id)
-          ));
+          await tx
+            .delete(factoryDaybookEntries)
+            .where(
+              and(
+                eq(factoryDaybookEntries.companyId, companyId),
+                eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+                eq(factoryDaybookEntries.referenceId, id)
+              )
+            );
 
           // Delete linked voucher (pattern: FACTORY-MANUAL-{id}-*)
-          const linkedVouchers = await tx.select({ id: vouchers.id }).from(vouchers).where(and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.sourceModule, "FACTORY"),
-            ilike(vouchers.voucherNumber, `FACTORY-MANUAL-${id}-%`)
-          ));
+          const linkedVouchers = await tx
+            .select({ id: vouchers.id })
+            .from(vouchers)
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                eq(vouchers.sourceModule, "FACTORY"),
+                ilike(vouchers.voucherNumber, `FACTORY-MANUAL-${id}-%`)
+              )
+            );
           if (linkedVouchers.length > 0) {
             const vIds = linkedVouchers.map((v: any) => v.id);
             await tx.delete(voucherEntries).where(inArray(voucherEntries.voucherId, vIds));
@@ -417,21 +531,25 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       const batchId = parseId(req.body.batchId) ?? -1;
       const supplierId = parseId(req.body.supplierId) ?? -1;
-      if (isNaN(batchId) || isNaN(supplierId)) return res.status(400).json({ message: "batchId and supplierId are required" });
+      if (isNaN(batchId) || isNaN(supplierId))
+        return res.status(400).json({ message: "batchId and supplierId are required" });
 
       await db.transaction(async (tx: any) => {
         // Verify batch belongs to this company
-        const [batch] = await tx.select().from(factoryMixBatches)
+        const [batch] = await tx
+          .select()
+          .from(factoryMixBatches)
           .where(and(eq(factoryMixBatches.id, batchId), eq(factoryMixBatches.companyId, companyId)))
           .limit(1);
         if (!batch) throw new Error("Batch not found");
 
         // Find all source records for this supplier in this batch
-        const sources = await tx.select().from(factoryMixBatchSources)
-          .where(and(
-            eq(factoryMixBatchSources.mixBatchId, batchId),
-            eq(factoryMixBatchSources.supplierId, supplierId),
-          ));
+        const sources = await tx
+          .select()
+          .from(factoryMixBatchSources)
+          .where(
+            and(eq(factoryMixBatchSources.mixBatchId, batchId), eq(factoryMixBatchSources.supplierId, supplierId))
+          );
         if (sources.length === 0) throw new Error("No source records found for this supplier in this batch");
 
         let totalKgToReverse = 0;
@@ -445,28 +563,27 @@ export function registerRawStockAdjRoutes(app: Express) {
 
           // If this source references a container raw stock row, reverse usedKg
           if (src.containerId) {
-            await tx.update(factoryRawStock)
+            await tx
+              .update(factoryRawStock)
               .set({ usedKg: sql`GREATEST(0, ${factoryRawStock.usedKg} - ${srcKg})` })
-              .where(and(
-                eq(factoryRawStock.companyId, companyId),
-                eq(factoryRawStock.containerId, src.containerId),
-              ));
+              .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryRawStock.containerId, src.containerId)));
           }
         }
 
         // Delete all source records for this supplier in this batch
-        await tx.delete(factoryMixBatchSources)
-          .where(and(
-            eq(factoryMixBatchSources.mixBatchId, batchId),
-            eq(factoryMixBatchSources.supplierId, supplierId),
-          ));
+        await tx
+          .delete(factoryMixBatchSources)
+          .where(
+            and(eq(factoryMixBatchSources.mixBatchId, batchId), eq(factoryMixBatchSources.supplierId, supplierId))
+          );
 
         // Update the batch totals
         const newTotalKg = Math.max(0, parseFloat(batch.totalWeightKg as string) - totalKgToReverse);
         const newTotalCost = Math.max(0, parseFloat(batch.totalCost as string) - totalCostToReverse);
         const newCostPerKg = newTotalKg > 0 ? newTotalCost / newTotalKg : 0;
 
-        await tx.update(factoryMixBatches)
+        await tx
+          .update(factoryMixBatches)
           .set({
             totalWeightKg: String(newTotalKg),
             totalCost: String(newTotalCost),
@@ -494,7 +611,9 @@ export function registerRawStockAdjRoutes(app: Express) {
       if (rawStockId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(rawStockId)) return res.status(400).json({ message: "Invalid rawStockId" });
 
-      const [row] = await db.select().from(factoryRawStock)
+      const [row] = await db
+        .select()
+        .from(factoryRawStock)
         .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)))
         .limit(1);
       if (!row) return res.status(404).json({ message: "Raw stock record not found" });
@@ -508,16 +627,21 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       await db.transaction(async (tx: any) => {
         // Soft-delete the raw stock record
-        await tx.update(factoryRawStock)
+        await tx
+          .update(factoryRawStock)
           .set({ deletedAt: new Date() })
           .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)));
 
         // Delete linked OFFLOAD_RAW_STOCK daybook entry
-        await tx.delete(factoryDaybookEntries).where(and(
-          eq(factoryDaybookEntries.companyId, companyId),
-          eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
-          eq(factoryDaybookEntries.referenceId, rawStockId)
-        ));
+        await tx
+          .delete(factoryDaybookEntries)
+          .where(
+            and(
+              eq(factoryDaybookEntries.companyId, companyId),
+              eq(factoryDaybookEntries.txType, "OFFLOAD_RAW_STOCK"),
+              eq(factoryDaybookEntries.referenceId, rawStockId)
+            )
+          );
       });
 
       res.json({ success: true });
@@ -540,9 +664,12 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       const { receivedKg } = req.body;
       const newKg = parseFloat(receivedKg);
-      if (isNaN(newKg) || newKg < 0) return res.status(400).json({ message: "receivedKg must be a non-negative number" });
+      if (isNaN(newKg) || newKg < 0)
+        return res.status(400).json({ message: "receivedKg must be a non-negative number" });
 
-      const [row] = await db.select().from(factoryRawStock)
+      const [row] = await db
+        .select()
+        .from(factoryRawStock)
         .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)))
         .limit(1);
       if (!row) return res.status(404).json({ message: "Raw stock record not found" });
@@ -554,7 +681,8 @@ export function registerRawStockAdjRoutes(app: Express) {
         });
       }
 
-      await db.update(factoryRawStock)
+      await db
+        .update(factoryRawStock)
         .set({ receivedKg: String(newKg) })
         .where(and(eq(factoryRawStock.id, rawStockId), eq(factoryRawStock.companyId, companyId)));
 
@@ -590,12 +718,14 @@ export function registerRawStockAdjRoutes(app: Express) {
         .from(factoryRawStock)
         .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
         .leftJoin(factorySuppliers, eq(factoryContainers.supplierId, factorySuppliers.id))
-        .where(and(
-          eq(factoryRawStock.companyId, companyId),
-          sql`${factoryContainers.status} != 'DELETED'`,
-          isNull(factoryRawStock.deletedAt),
-          isNull(factoryContainers.deletedAt),
-        ));
+        .where(
+          and(
+            eq(factoryRawStock.companyId, companyId),
+            sql`${factoryContainers.status} != 'DELETED'`,
+            isNull(factoryRawStock.deletedAt),
+            isNull(factoryContainers.deletedAt)
+          )
+        );
 
       const enriched = results.map((r: any) => {
         const received = parseFloat(r.receivedKg) || 0;
@@ -631,7 +761,10 @@ export function registerRawStockAdjRoutes(app: Express) {
 
       if (offloadedIds.length > 0) {
         baseConditions.push(
-          sql`${factoryContainers.id} NOT IN (${sql.join(offloadedIds.map((id: number) => sql`${id}`), sql`, `)})`
+          sql`${factoryContainers.id} NOT IN (${sql.join(
+            offloadedIds.map((id: number) => sql`${id}`),
+            sql`, `
+          )})`
         );
       }
 
@@ -646,5 +779,4 @@ export function registerRawStockAdjRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 }

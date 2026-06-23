@@ -1,11 +1,4 @@
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,7 +40,13 @@ interface SupplierStatementProps {
   statementReturnToParent: boolean;
   setStatementSupplierId: (id: number | null) => void;
   setStatementReturnToParent: (val: boolean) => void;
-  openFxConversionDialog: (fromSupplierId: number, toSupplierId: number, currencyCode: string, netPayable: string, totalCommission?: string) => void;
+  openFxConversionDialog: (
+    fromSupplierId: number,
+    toSupplierId: number,
+    currencyCode: string,
+    netPayable: string,
+    totalCommission?: string
+  ) => void;
   formatNum: (val: string) => string;
   formatDate: (val: string) => string;
   formatKg: (val: string) => string;
@@ -152,7 +151,10 @@ export function SupplierStatement({
 
   const activeSt = (statementData.statement || []).filter((c: any) => c.status !== "OFFLOADED");
   const activeContainerCount = activeSt.length;
-  const activeKg = activeSt.reduce((sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"), 0);
+  const activeKg = activeSt.reduce(
+    (sum: number, c: any) => sum + parseFloat(c.actualReceivedKg || c.totalKg || "0"),
+    0
+  );
   const currencyGroups = statementData.currencyGroups || [];
 
   const ownMap: Record<string, { own: number; totalFreight: number }> = {};
@@ -169,22 +171,33 @@ export function SupplierStatement({
     const ccPrefix = cc !== "USD" ? `${cc} ` : "$";
     return (
       <div key={`${testId}-${cc}`} className="rounded-xl border p-4">
-        <div className="text-xs text-muted-foreground font-medium">{cc} {label}</div>
+        <div className="text-xs text-muted-foreground font-medium">
+          {cc} {label}
+        </div>
         <div
           className={`text-xl font-bold mt-1 tabular-nums ${isSettled ? "text-muted-foreground" : isOverpaid ? "text-green-600 dark:text-green-400" : ""}`}
           data-testid={`${testId}-${cc}`}
         >
           {isSettled ? (
-            <>{ccPrefix}— <span className="text-sm font-normal">Settled</span></>
+            <>
+              {ccPrefix}— <span className="text-sm font-normal">Settled</span>
+            </>
           ) : isOverpaid ? (
-            <>{ccPrefix}{formatNum(String(Math.abs(bal).toFixed(2)))} <span className="text-sm font-normal">CR</span></>
+            <>
+              {ccPrefix}
+              {formatNum(String(Math.abs(bal).toFixed(2)))} <span className="text-sm font-normal">CR</span>
+            </>
           ) : (
-            <>{ccPrefix}{formatNum(String(bal.toFixed(2)))}</>
+            <>
+              {ccPrefix}
+              {formatNum(String(bal.toFixed(2)))}
+            </>
           )}
         </div>
         {freight && freight > 0.005 && (
           <div className="text-xs text-orange-600 dark:text-orange-400 mt-1">
-            incl. {ccPrefix}{formatNum(String(freight.toFixed(2)))} freight
+            incl. {ccPrefix}
+            {formatNum(String(freight.toFixed(2)))} freight
           </div>
         )}
       </div>
@@ -217,7 +230,9 @@ export function SupplierStatement({
                 <Link2 className="h-3 w-3 mr-1" />
                 Linked Supplier
               </Badge>
-            ) : statementData?.supplier && !statementData.supplier.parentId && subAccountsByParent[statementData.supplier.id]?.length ? (
+            ) : statementData?.supplier &&
+              !statementData.supplier.parentId &&
+              subAccountsByParent[statementData.supplier.id]?.length ? (
               <Badge variant="secondary" className="text-xs">
                 <Building2 className="h-3 w-3 mr-1" />
                 Broker
@@ -227,7 +242,10 @@ export function SupplierStatement({
           <p className="text-muted-foreground text-sm">Settlement Statement</p>
         </div>
         {!isBrokerStatement && (
-          <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-supplier-include-otw">
+          <label
+            className="flex items-center gap-2 cursor-pointer select-none"
+            data-testid="label-supplier-include-otw"
+          >
             <Switch
               checked={supplierIncludeOtw}
               onCheckedChange={setSupplierIncludeOtw}
@@ -246,7 +264,9 @@ export function SupplierStatement({
               <div className="text-xl font-bold mt-1" data-testid="text-statement-total-containers">
                 {activeContainerCount}
                 {statementData.summary.totalContainers > activeContainerCount && (
-                  <span className="text-sm font-normal text-muted-foreground ml-1">/ {statementData.summary.totalContainers} total</span>
+                  <span className="text-sm font-normal text-muted-foreground ml-1">
+                    / {statementData.summary.totalContainers} total
+                  </span>
                 )}
               </div>
             </div>
@@ -270,60 +290,66 @@ export function SupplierStatement({
             onClick={() => toggleStmtSection("supplierDetails")}
           >
             <span className="text-sm font-semibold">Supplier Details</span>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("supplierDetails") ? "" : "rotate-180"}`} />
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("supplierDetails") ? "" : "rotate-180"}`}
+            />
           </div>
-          {!collapsedStmtSections.has("supplierDetails") && <div className="p-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-              {statementData.supplier.contactPerson && (
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span>{statementData.supplier.contactPerson}</span>
-                </div>
-              )}
-              {statementData.supplier.phone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span>{statementData.supplier.phone}</span>
-                </div>
-              )}
-              {statementData.supplier.email && (
-                <div className="flex items-center gap-2">
-                  <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span>{statementData.supplier.email}</span>
-                </div>
-              )}
-              {statementData.supplier.address && (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span>{statementData.supplier.address}</span>
-                </div>
-              )}
-              {statementData.supplier.notes && (
-                <div className="flex items-start gap-2 sm:col-span-2">
-                  <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                  <span className="text-muted-foreground">{statementData.supplier.notes}</span>
-                </div>
-              )}
+          {!collapsedStmtSections.has("supplierDetails") && (
+            <div className="p-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                {statementData.supplier.contactPerson && (
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span>{statementData.supplier.contactPerson}</span>
+                  </div>
+                )}
+                {statementData.supplier.phone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span>{statementData.supplier.phone}</span>
+                  </div>
+                )}
+                {statementData.supplier.email && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span>{statementData.supplier.email}</span>
+                  </div>
+                )}
+                {statementData.supplier.address && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span>{statementData.supplier.address}</span>
+                  </div>
+                )}
+                {statementData.supplier.notes && (
+                  <div className="flex items-start gap-2 sm:col-span-2">
+                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                    <span className="text-muted-foreground">{statementData.supplier.notes}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>}
+          )}
         </div>
       )}
 
-      {statementData.currencyGroups && (statementData.currencyGroups.length > 1 || (statementData.currencyGroups.length === 1 && statementData.currencyGroups[0].currencyCode !== "USD")) && (
-        <CurrencyPools
-          statementData={statementData}
-          statementSupplierId={statementSupplierId}
-          collapsedStmtSections={collapsedStmtSections}
-          toggleStmtSection={toggleStmtSection}
-          today={today}
-          formatKg={formatKg}
-          formatNum={formatNum}
-          setFxSourceType={setFxSourceType}
-          setFxConversionForm={setFxConversionForm}
-          setFxConversionOpen={setFxConversionOpen}
-          openFxConversionDialog={openFxConversionDialog}
-        />
-      )}
+      {statementData.currencyGroups &&
+        (statementData.currencyGroups.length > 1 ||
+          (statementData.currencyGroups.length === 1 && statementData.currencyGroups[0].currencyCode !== "USD")) && (
+          <CurrencyPools
+            statementData={statementData}
+            statementSupplierId={statementSupplierId}
+            collapsedStmtSections={collapsedStmtSections}
+            toggleStmtSection={toggleStmtSection}
+            today={today}
+            formatKg={formatKg}
+            formatNum={formatNum}
+            setFxSourceType={setFxSourceType}
+            setFxConversionForm={setFxConversionForm}
+            setFxConversionOpen={setFxConversionOpen}
+            openFxConversionDialog={openFxConversionDialog}
+          />
+        )}
 
       {isBrokerStatement && (
         <LinkedSupplierExposure
@@ -345,56 +371,69 @@ export function SupplierStatement({
           className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 cursor-pointer hover-elevate"
           onClick={() => toggleStmtSection("paymentsList")}
         >
-            <span className="flex items-center gap-2 flex-1">
-              <DollarSign className="h-4 w-4" />
-              <span className="text-sm font-semibold">Payment History</span>
-              <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("paymentsList") ? "" : "rotate-180"}`} />
-            </span>
+          <span className="flex items-center gap-2 flex-1">
+            <DollarSign className="h-4 w-4" />
+            <span className="text-sm font-semibold">Payment History</span>
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("paymentsList") ? "" : "rotate-180"}`}
+            />
+          </span>
         </div>
-        {!collapsedStmtSections.has("paymentsList") && <div>
-          {statementData.payments && statementData.payments.length > 0 ? (
-            <div className="table-responsive">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="w-32">Date</TableHead>
-                    <TableHead>Account</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right w-24">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {statementData.payments.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
-                      <TableCell className="text-sm">
-                        {subAccountsByParent[statementSupplierId]?.find(c => c.id === p.supplierId)?.name || "Primary Account"}
-                      </TableCell>
-                      <TableCell className="text-right text-sm font-medium tabular-nums">
-                        {p.currencyCode !== "USD" ? `${p.currencyCode} ` : "$"}{formatNum(p.amount)}
-                        {p.currencyCode !== "USD" && (
-                          <div className="text-[10px] text-muted-foreground">
-                            @ {parseFloat(p.fxRateToUsd).toFixed(4)} = ${formatNum(p.amountUsd)}
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => onEditPayment(p)}><Pencil className="h-3.5 w-3.5" /></Button>
-                          <Button variant="ghost" size="icon" className="text-destructive" onClick={() => onDeletePayment(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                        </div>
-                      </TableCell>
+        {!collapsedStmtSections.has("paymentsList") && (
+          <div>
+            {statementData.payments && statementData.payments.length > 0 ? (
+              <div className="table-responsive">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-32">Date</TableHead>
+                      <TableHead>Account</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right w-24">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="text-center py-10 text-muted-foreground italic text-sm">
-              No payments recorded yet.
-            </div>
-          )}
-        </div>}
+                  </TableHeader>
+                  <TableBody>
+                    {statementData.payments.map((p) => (
+                      <TableRow key={p.id}>
+                        <TableCell className="text-sm">{formatDate(p.date)}</TableCell>
+                        <TableCell className="text-sm">
+                          {subAccountsByParent[statementSupplierId]?.find((c) => c.id === p.supplierId)?.name ||
+                            "Primary Account"}
+                        </TableCell>
+                        <TableCell className="text-right text-sm font-medium tabular-nums">
+                          {p.currencyCode !== "USD" ? `${p.currencyCode} ` : "$"}
+                          {formatNum(p.amount)}
+                          {p.currencyCode !== "USD" && (
+                            <div className="text-[10px] text-muted-foreground">
+                              @ {parseFloat(p.fxRateToUsd).toFixed(4)} = ${formatNum(p.amountUsd)}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => onEditPayment(p)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              onClick={() => onDeletePayment(p.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-10 text-muted-foreground italic text-sm">No payments recorded yet.</div>
+            )}
+          </div>
+        )}
       </div>
 
       {statementData.fxTransfers && statementData.fxTransfers.length > 0 && (
@@ -403,54 +442,65 @@ export function SupplierStatement({
             className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-muted/20 cursor-pointer hover-elevate"
             onClick={() => toggleStmtSection("fxTransfers")}
           >
-              <span className="flex items-center gap-2 flex-1">
-                <ArrowRightLeft className="h-4 w-4" />
-                <span className="text-sm font-semibold">FX Settlement Log</span>
-                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("fxTransfers") ? "" : "rotate-180"}`} />
-              </span>
+            <span className="flex items-center gap-2 flex-1">
+              <ArrowRightLeft className="h-4 w-4" />
+              <span className="text-sm font-semibold">FX Settlement Log</span>
+              <ChevronDown
+                className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("fxTransfers") ? "" : "rotate-180"}`}
+              />
+            </span>
           </div>
-          {!collapsedStmtSections.has("fxTransfers") && <div>
-            <div className="table-responsive">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="w-32">Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">From</TableHead>
-                    <TableHead className="text-right">Cost (USD)</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {statementData.fxTransfers.map((f) => {
-                    const isSelf = f.toSupplierId === f.fromSupplierId;
-                    const isIncoming = f.toSupplierId === statementSupplierId;
-                    const displayRate = parseFloat(f.fxRateToUsd) > 0 ? (1 / parseFloat(f.fxRateToUsd)) : 0;
-                    return (
-                    <TableRow key={f.id}>
-                      <TableCell className="text-sm">{formatDate(f.date)}</TableCell>
-                      <TableCell className="text-sm">
-                        {isSelf ? "Internal Settlement" : isIncoming ? "Transfer In" : "Transfer Out"}
-                        {f.sourceType && <span className="ml-1 opacity-60">({f.sourceType})</span>}
-                      </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">
-                        {f.fromCurrencyCode} {formatNum(f.fromAmount)} @ {displayRate.toFixed(4)}
-                      </TableCell>
-                      <TableCell className="text-right text-sm font-bold tabular-nums">
-                        ${formatNum(f.toAmountUsd)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" className="text-destructive" onClick={() => wrapAdminAction(() => deleteFxTransferMutation.mutate(f.id), "Delete FX Transfer")}>
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
+          {!collapsedStmtSections.has("fxTransfers") && (
+            <div>
+              <div className="table-responsive">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-32">Date</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead className="text-right">From</TableHead>
+                      <TableHead className="text-right">Cost (USD)</TableHead>
+                      <TableHead className="w-12"></TableHead>
                     </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {statementData.fxTransfers.map((f) => {
+                      const isSelf = f.toSupplierId === f.fromSupplierId;
+                      const isIncoming = f.toSupplierId === statementSupplierId;
+                      const displayRate = parseFloat(f.fxRateToUsd) > 0 ? 1 / parseFloat(f.fxRateToUsd) : 0;
+                      return (
+                        <TableRow key={f.id}>
+                          <TableCell className="text-sm">{formatDate(f.date)}</TableCell>
+                          <TableCell className="text-sm">
+                            {isSelf ? "Internal Settlement" : isIncoming ? "Transfer In" : "Transfer Out"}
+                            {f.sourceType && <span className="ml-1 opacity-60">({f.sourceType})</span>}
+                          </TableCell>
+                          <TableCell className="text-right text-sm tabular-nums">
+                            {f.fromCurrencyCode} {formatNum(f.fromAmount)} @ {displayRate.toFixed(4)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-bold tabular-nums">
+                            ${formatNum(f.toAmountUsd)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive"
+                              onClick={() =>
+                                wrapAdminAction(() => deleteFxTransferMutation.mutate(f.id), "Delete FX Transfer")
+                              }
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
             </div>
-          </div>}
+          )}
         </div>
       )}
 
@@ -462,7 +512,9 @@ export function SupplierStatement({
           <span className="flex items-center gap-2 flex-1">
             <BookOpen className="h-4 w-4" />
             <span className="text-sm font-semibold">Account Ledger</span>
-            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("allActivity") ? "" : "rotate-180"}`} />
+            <ChevronDown
+              className={`h-4 w-4 text-muted-foreground transition-transform ${collapsedStmtSections.has("allActivity") ? "" : "rotate-180"}`}
+            />
           </span>
         </div>
         {!collapsedStmtSections.has("allActivity") && (

@@ -2,43 +2,114 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
 import {
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, insertVoucherSchema, insertVoucherEntrySchema,
+  upload,
+  logAudit,
+  getCurrentExchangeRate,
+  calculateHistoricalLocationInventory,
+  syncEmployeeBalancesFromEntries,
+} from "./_helpers";
+import {
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  insertVoucherSchema,
+  insertVoucherEntrySchema,
   insertSalesItemSchema,
-  suppliers, customers, customerBalances, locations, employees, userLocations,
-  auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
-  ledgerAccounts, insertLedgerAccountSchema, 
-  companies, users, userCompanyRoles, companySettings,
-  FEATURE_KEYS, fiscalPeriodClosures,
-  wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
-  bales, baleProducts, baleProductCategories, baleTransfers,
-  insertBaleSchema, insertBaleTransferSchema,
-  
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  suppliers,
+  customers,
+  customerBalances,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  companies,
+  users,
+  userCompanyRoles,
+  companySettings,
+  FEATURE_KEYS,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  insertWasteDispatchSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  baleTransfers,
+  insertBaleSchema,
+  insertBaleTransferSchema,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, 
-  pendingBarcodes, insertPendingBarcodeSchema,
-  storedFiles, spreadsheets, liveSpreadsheets,
-  agentAccounts, insertAgentAccountSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  storedFiles,
+  spreadsheets,
+  liveSpreadsheets,
+  agentAccounts,
+  insertAgentAccountSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
   chatMessages,
   exchangeRates,
   factoryRawStock,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -49,8 +120,17 @@ import path from "path";
 import fs from "fs";
 
 const _npsCache = new Map<string, { data: any; expiresAt: number }>();
-function _npsCached(key: string) { const c = _npsCache.get(key); return (c && Date.now() < c.expiresAt) ? c.data : null; }
-function _npsSetCache(key: string, data: any) { _npsCache.set(key, { data, expiresAt: Date.now() + 30_000 }); if (_npsCache.size > 500) { const now = Date.now(); for (const [k, v] of _npsCache) if (now >= v.expiresAt) _npsCache.delete(k); } }
+function _npsCached(key: string) {
+  const c = _npsCache.get(key);
+  return c && Date.now() < c.expiresAt ? c.data : null;
+}
+function _npsSetCache(key: string, data: any) {
+  _npsCache.set(key, { data, expiresAt: Date.now() + 30_000 });
+  if (_npsCache.size > 500) {
+    const now = Date.now();
+    for (const [k, v] of _npsCache) if (now >= v.expiresAt) _npsCache.delete(k);
+  }
+}
 
 export function registerReportsRoutes(app: Express) {
   app.get("/api/reports/net-profit-statement", requireAuth, requireNonPOS, async (req, res) => {
@@ -61,20 +141,25 @@ export function registerReportsRoutes(app: Express) {
       }
       const isAdminOrDev = req.user?.role === "Admin" || req.user?.role === "Developer";
       const requestedCompanyId = req.query.companyId ? parseInt(req.query.companyId as string) : null;
-      const companyId = (isAdminOrDev && requestedCompanyId) ? requestedCompanyId : sessionCompanyId;
+      const companyId = isAdminOrDev && requestedCompanyId ? requestedCompanyId : sessionCompanyId;
 
       // Get date range filters (optional)
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : null;
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : null;
 
       // 30-second TTL cache (keyed by companyId + date range)
-      const npsCacheKey = `net-profit:${companyId}:${req.query.startDate || ''}:${req.query.endDate || ''}`;
+      const npsCacheKey = `net-profit:${companyId}:${req.query.startDate || ""}:${req.query.endDate || ""}`;
       const npsCachedResult = _npsCached(npsCacheKey);
       if (npsCachedResult) return res.json(npsCachedResult);
 
       // Phase 1: metadata + accounts + stock items (all independent, run in parallel)
       const [companyRecord, companyAccounts, allStockItems] = await Promise.all([
-        db.select({ companyType: companies.companyType }).from(companies).where(eq(companies.id, companyId)).execute().then((r) => r[0] ?? null),
+        db
+          .select({ companyType: companies.companyType })
+          .from(companies)
+          .where(eq(companies.id, companyId))
+          .execute()
+          .then((r) => r[0] ?? null),
         storage.getAllLedgerAccounts(companyId, true),
         storage.getAllStockItems(companyId),
       ]);
@@ -87,10 +172,10 @@ export function registerReportsRoutes(app: Express) {
         eq(vouchers.optional, false),
       ];
       if (startDate) {
-        voucherConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
+        voucherConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split("T")[0]));
       }
       if (endDate) {
-        voucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+        voucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
       }
 
       // allTime conditions: same but without startDate filter
@@ -100,35 +185,39 @@ export function registerReportsRoutes(app: Express) {
         eq(vouchers.optional, false),
       ];
       if (endDate) {
-        allTimeVoucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+        allTimeVoucherConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
       }
 
       // Phase 2: period entries + all-time entries via JOINs (eliminates 2 intermediate ID round-trips)
       const [periodEntries, allTimeEntries] = await Promise.all([
-        db.select({
-          ledgerAccountId: voucherEntries.ledgerAccountId,
-          debitAmount: voucherEntries.debitAmount,
-          creditAmount: voucherEntries.creditAmount,
-          voucherId: voucherEntries.voucherId,
-        })
-        .from(voucherEntries)
-        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(and(...voucherConditions))
-        .execute(),
-        db.select({
-          ledgerAccountId: voucherEntries.ledgerAccountId,
-          debitAmount: voucherEntries.debitAmount,
-          creditAmount: voucherEntries.creditAmount,
-          supplierId: voucherEntries.supplierId,
-        })
-        .from(voucherEntries)
-        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(and(...allTimeVoucherConditions))
-        .execute(),
+        db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+            voucherId: voucherEntries.voucherId,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(...voucherConditions))
+          .execute(),
+        db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+            supplierId: voucherEntries.supplierId,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(...allTimeVoucherConditions))
+          .execute(),
       ]);
 
       const companyEntries = periodEntries;
-      const companyVoucherIds = [...new Set(periodEntries.map((e) => e.voucherId).filter((id): id is number => id != null))];
+      const companyVoucherIds = [
+        ...new Set(periodEntries.map((e) => e.voucherId).filter((id): id is number => id != null)),
+      ];
 
       // Calculate balances for each account (credit - debit for normal P&L view)
       // accountBalances = period-filtered (used for P&L: purchases, sales, expenses, incomes)
@@ -172,7 +261,14 @@ export function registerReportsRoutes(app: Express) {
         (acc) => acc.code === "PURCHASES" || acc.code?.startsWith("PURCHASES-")
       );
       let purchaseAccountsTotal = 0;
-      const purchaseAccountsDetails: { id: number; code: string; name: string; debit: number; credit: number; balance: number }[] = purchaseAccounts.map((acc) => {
+      const purchaseAccountsDetails: {
+        id: number;
+        code: string;
+        name: string;
+        debit: number;
+        credit: number;
+        balance: number;
+      }[] = purchaseAccounts.map((acc) => {
         const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
         const netBalance = balance.debit - balance.credit; // Purchases are debits
         purchaseAccountsTotal += netBalance;
@@ -247,10 +343,11 @@ export function registerReportsRoutes(app: Express) {
       // 3. Direct Incomes - accounts with accountType="Income" AND subType="Direct Income"
       // EXCLUDE sales-related accounts because Sales is already counted from salesItems table
       const directIncomeAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Income" && 
-                 acc.subType === "Direct Income" &&
-                 !acc.code?.includes("SALES") && // Exclude SALES_REV, SALES, etc.
-                 !acc.name?.toLowerCase().includes("sales") // Exclude any sales-named accounts
+        (acc) =>
+          acc.accountType === "Income" &&
+          acc.subType === "Direct Income" &&
+          !acc.code?.includes("SALES") && // Exclude SALES_REV, SALES, etc.
+          !acc.name?.toLowerCase().includes("sales") // Exclude any sales-named accounts
       );
       let directIncomesTotal = 0;
       const directIncomesDetails = directIncomeAccounts.map((acc) => {
@@ -269,27 +366,26 @@ export function registerReportsRoutes(app: Express) {
 
       // 4. Direct Expenses - include accounts that are Direct Expenses in any form:
       // - accountType === "Direct Expense"
-      // - accountType === "Expense" AND subType === "Direct Expense"  
+      // - accountType === "Expense" AND subType === "Direct Expense"
       // - IMPORT_CHARGES parent and its children (import costs that reduce profit)
-      const importChargesParent = companyAccounts.find(
-        (acc) => acc.code === "IMPORT_CHARGES"
-      );
+      const importChargesParent = companyAccounts.find((acc) => acc.code === "IMPORT_CHARGES");
       const importChargesAccountIds = new Set<number>();
       if (importChargesParent) {
         importChargesAccountIds.add(importChargesParent.id);
-        companyAccounts.forEach(acc => {
+        companyAccounts.forEach((acc) => {
           if (acc.parentId === importChargesParent.id) {
             importChargesAccountIds.add(acc.id);
           }
         });
       }
-      
+
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.code !== "PURCHASES" && !acc.code?.startsWith("PURCHASES") && (
-                   acc.accountType === "Direct Expense" || 
-                   (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
-                   importChargesAccountIds.has(acc.id)
-                 )
+        (acc) =>
+          acc.code !== "PURCHASES" &&
+          !acc.code?.startsWith("PURCHASES") &&
+          (acc.accountType === "Direct Expense" ||
+            (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+            importChargesAccountIds.has(acc.id))
       );
       let directExpensesTotal = 0;
       const directExpensesDetails = directExpenseAccounts.map((acc) => {
@@ -311,15 +407,15 @@ export function registerReportsRoutes(app: Express) {
       const salesConditions = [
         eq(vouchers.companyId, companyId),
         isNull(vouchers.deletedAt),
-        eq(vouchers.optional, false)
+        eq(vouchers.optional, false),
       ];
       if (startDate) {
-        salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split('T')[0]));
+        salesConditions.push(gte(vouchers.voucherDate, startDate.toISOString().split("T")[0]));
       }
       if (endDate) {
-        salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split('T')[0]));
+        salesConditions.push(lte(vouchers.voucherDate, endDate.toISOString().split("T")[0]));
       }
-      
+
       const salesData = await db
         .select({
           total: sql<string>`COALESCE(SUM(${salesItems.totalSales}), 0)`,
@@ -345,12 +441,20 @@ export function registerReportsRoutes(app: Express) {
           acc.subType === "Direct Income" &&
           !acc.code?.includes("SALES") &&
           !acc.name?.toLowerCase().includes("sales")
-        ) return false; // already in directIncomesTotal
+        )
+          return false; // already in directIncomesTotal
         return true;
       });
 
       let erpSalesTotal = 0;
-      const erpSalesAccountsDetails: { id: number; code: string; name: string; debit: number; credit: number; balance: number }[] = [];
+      const erpSalesAccountsDetails: {
+        id: number;
+        code: string;
+        name: string;
+        debit: number;
+        credit: number;
+        balance: number;
+      }[] = [];
       const missedAccountIds = missedIncomeAccounts.map((a) => a.id);
       if (missedAccountIds.length > 0) {
         // Single JOIN query: ERP (non-POS) voucher entries for missed income accounts.
@@ -364,13 +468,15 @@ export function registerReportsRoutes(app: Express) {
           })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(and(
-            eq(vouchers.companyId, companyId),
-            eq(vouchers.optional, false),
-            isNull(vouchers.deletedAt),
-            inArray(voucherEntries.ledgerAccountId, missedAccountIds),
-            sql`NOT EXISTS (SELECT 1 FROM sales_items si WHERE si.voucher_id = voucher_entries.voucher_id)`,
-          ))
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              eq(vouchers.optional, false),
+              isNull(vouchers.deletedAt),
+              inArray(voucherEntries.ledgerAccountId, missedAccountIds),
+              sql`NOT EXISTS (SELECT 1 FROM sales_items si WHERE si.voucher_id = voucher_entries.voucher_id)`
+            )
+          )
           .execute();
 
         const erpSalesByAccount = new Map<number, { debit: number; credit: number }>();
@@ -410,11 +516,7 @@ export function registerReportsRoutes(app: Express) {
           })
           .from(inventory)
           .innerJoin(locations, eq(inventory.locationId, locations.id))
-          .where(and(
-            eq(locations.companyId, companyId),
-            eq(locations.active, true),
-            isNull(locations.deletedAt),
-          ))
+          .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt)))
           .execute();
         for (const inv of inventoryData) {
           closingStockValue += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
@@ -445,11 +547,12 @@ export function registerReportsRoutes(app: Express) {
       // is already captured in stockOnFloor (closing stock), showing them would double-count.
       // Also exclude PURCHASES accounts — those belong in the Trading Account, not Indirect Expenses.
       const indirectExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Indirect Expense" &&
-                 acc.code !== "PRODUCTION_ADJUSTMENT" &&
-                 acc.code !== "CONSUMPTION_EXPENSE" &&
-                 acc.code !== "PURCHASES" &&
-                 !acc.code?.startsWith("PURCHASES")
+        (acc) =>
+          acc.accountType === "Indirect Expense" &&
+          acc.code !== "PRODUCTION_ADJUSTMENT" &&
+          acc.code !== "CONSUMPTION_EXPENSE" &&
+          acc.code !== "PURCHASES" &&
+          !acc.code?.startsWith("PURCHASES")
       );
       let indirectExpensesTotal = 0;
       const indirectExpensesDetails = indirectExpenseAccounts.map((acc) => {
@@ -500,28 +603,57 @@ export function registerReportsRoutes(app: Express) {
       const stmtSupplierBals = new Map<number, { debit: number; credit: number }>();
       for (const e of allTimeEntries) {
         if (e.supplierId) {
-          const d = parseFloat(e.debitAmount || '0'), c = parseFloat(e.creditAmount || '0');
+          const d = parseFloat(e.debitAmount || "0"),
+            c = parseFloat(e.creditAmount || "0");
           const cur = stmtSupplierBals.get(e.supplierId) || { debit: 0, credit: 0 };
           stmtSupplierBals.set(e.supplierId, { debit: cur.debit + d, credit: cur.credit + c });
         }
       }
 
       // Account exclusion rules matching dashboard
-      const stmtExcludedTypes = ['Income', 'Profit', 'Equity', 'EQUITY', 'Fixed Asset'];
-      const stmtExpenseTypes = ['Expense', 'Direct Expense', 'Indirect Expense'];
-      const stmtAssetTypes = ['Asset', 'Current Asset', 'Fixed Asset', 'Bank', 'Cash'];
-      const stmtStockPatterns = ['closing stock', 'opening stock', 'stock in hand', 'stock on hand', 'inventory', 'stock account', 'goods in stock', 'merchandise'];
-      const stmtStockCodes = ['CLOSING_STOCK', 'OPENING_STOCK', 'STOCK', 'INVENTORY', 'STOCK_IN_HAND'];
-      const stmtFixedAssetNames = ['rover', 'toyota', 'mercedes', 'vehicle', 'car', 'truck', 'land', 'property', 'building', 'house', 'rolex', 'watch', 'luxury', 'jewelry', 'guarantee', 'deposit', 'caution'];
-      const isExcludedFromStmtNp = (acc: typeof companyAccounts[0]) => {
-        if (stmtExcludedTypes.includes(acc.accountType || '')) return true;
-        if (acc.code === 'PRODUCTION_ADJUSTMENT' || acc.code === 'CONSUMPTION_EXPENSE') return true;
-        const nameLower = (acc.name || '').toLowerCase();
-        const codeLower = (acc.code || '').toLowerCase();
-        if (stmtAssetTypes.includes(acc.accountType || '')) {
-          if (stmtStockPatterns.some(p => nameLower.includes(p))) return true;
-          if (stmtStockCodes.some(c => codeLower === c.toLowerCase() || codeLower.startsWith(c.toLowerCase() + '_'))) return true;
-          if (stmtFixedAssetNames.some(p => nameLower.includes(p))) return true;
+      const stmtExcludedTypes = ["Income", "Profit", "Equity", "EQUITY", "Fixed Asset"];
+      const stmtExpenseTypes = ["Expense", "Direct Expense", "Indirect Expense"];
+      const stmtAssetTypes = ["Asset", "Current Asset", "Fixed Asset", "Bank", "Cash"];
+      const stmtStockPatterns = [
+        "closing stock",
+        "opening stock",
+        "stock in hand",
+        "stock on hand",
+        "inventory",
+        "stock account",
+        "goods in stock",
+        "merchandise",
+      ];
+      const stmtStockCodes = ["CLOSING_STOCK", "OPENING_STOCK", "STOCK", "INVENTORY", "STOCK_IN_HAND"];
+      const stmtFixedAssetNames = [
+        "rover",
+        "toyota",
+        "mercedes",
+        "vehicle",
+        "car",
+        "truck",
+        "land",
+        "property",
+        "building",
+        "house",
+        "rolex",
+        "watch",
+        "luxury",
+        "jewelry",
+        "guarantee",
+        "deposit",
+        "caution",
+      ];
+      const isExcludedFromStmtNp = (acc: (typeof companyAccounts)[0]) => {
+        if (stmtExcludedTypes.includes(acc.accountType || "")) return true;
+        if (acc.code === "PRODUCTION_ADJUSTMENT" || acc.code === "CONSUMPTION_EXPENSE") return true;
+        const nameLower = (acc.name || "").toLowerCase();
+        const codeLower = (acc.code || "").toLowerCase();
+        if (stmtAssetTypes.includes(acc.accountType || "")) {
+          if (stmtStockPatterns.some((p) => nameLower.includes(p))) return true;
+          if (stmtStockCodes.some((c) => codeLower === c.toLowerCase() || codeLower.startsWith(c.toLowerCase() + "_")))
+            return true;
+          if (stmtFixedAssetNames.some((p) => nameLower.includes(p))) return true;
         }
         return false;
       };
@@ -529,29 +661,33 @@ export function registerReportsRoutes(app: Express) {
       // CFA revaluation: fetch the latest USD→CFA rate for this company (if any).
       // Cash accounts hold physical CFA units — their USD worth changes with the rate.
       // Expenses, loans and all other accounts are locked at historical values.
-      const stmtCfaRateRows = await db.select()
+      const stmtCfaRateRows = await db
+        .select()
         .from(exchangeRates)
-        .where(and(
-          eq(exchangeRates.companyId, companyId),
-          eq(exchangeRates.fromCurrency, "USD"),
-          eq(exchangeRates.toCurrency, "CFA"),
-        ))
+        .where(
+          and(
+            eq(exchangeRates.companyId, companyId),
+            eq(exchangeRates.fromCurrency, "USD"),
+            eq(exchangeRates.toCurrency, "CFA")
+          )
+        )
         .orderBy(desc(exchangeRates.effectiveDate))
         .limit(1);
       const stmtCurrentCfaRate = stmtCfaRateRows.length > 0 ? parseFloat(stmtCfaRateRows[0].rate) : 0;
 
-      let stmtNpForUs = 0, stmtNpOnUs = 0;
-      const stmtLiabilityTypes = ['Liability', 'Duty Agent', 'Transporter Agent', 'Loan'];
+      let stmtNpForUs = 0,
+        stmtNpOnUs = 0;
+      const stmtLiabilityTypes = ["Liability", "Duty Agent", "Transporter Agent", "Loan"];
       for (const acc of companyAccounts) {
-        if (stmtExpenseTypes.includes(acc.accountType || '')) continue;
-        if (acc.accountType === 'Income') continue;
+        if (stmtExpenseTypes.includes(acc.accountType || "")) continue;
+        if (acc.accountType === "Income") continue;
         if (isExcludedFromStmtNp(acc)) continue;
-        const opening = parseFloat(acc.openingBalance || '0');
-        const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
+        const opening = parseFloat(acc.openingBalance || "0");
+        const openingSigned = acc.openingBalanceSide === "Dr" ? opening : -opening;
         const bal = allTimeAccountBalances.get(acc.id) || { debit: 0, credit: 0 };
         let net = openingSigned + bal.debit - bal.credit;
         // Revalue Cash accounts by the current CFA rate (amounts stored in CFA, convert to USD)
-        if (stmtCurrentCfaRate > 0 && acc.accountType === 'Cash') {
+        if (stmtCurrentCfaRate > 0 && acc.accountType === "Cash") {
           net = net / stmtCurrentCfaRate;
         }
         if (net > 0) stmtNpForUs += net;
@@ -573,18 +709,24 @@ export function registerReportsRoutes(app: Express) {
         stmtNpForUs += closingStockValue;
 
         // Add worker/employee liabilities
-        const stmtEmployees = await db.select().from(employees)
-          .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt))).execute();
+        const stmtEmployees = await db
+          .select()
+          .from(employees)
+          .where(and(eq(employees.companyId, companyId), eq(employees.active, true), isNull(employees.deletedAt)))
+          .execute();
         let stmtWorkerBal = 0;
-        for (const emp of stmtEmployees) stmtWorkerBal += parseFloat((emp as any).currentBalance || '0');
+        for (const emp of stmtEmployees) stmtWorkerBal += parseFloat((emp as any).currentBalance || "0");
         if (stmtWorkerBal > 0) stmtNpOnUs += stmtWorkerBal;
         else if (stmtWorkerBal < 0) stmtNpForUs += Math.abs(stmtWorkerBal);
 
         // Add OTW containers as assets
-        const stmtOtwContainers = await db.select().from(containers)
-          .where(and(eq(containers.companyId, companyId), eq(containers.status, 'OTW'))).execute();
+        const stmtOtwContainers = await db
+          .select()
+          .from(containers)
+          .where(and(eq(containers.companyId, companyId), eq(containers.status, "OTW")))
+          .execute();
         for (const c of stmtOtwContainers) {
-          stmtNpForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || '0');
+          stmtNpForUs += parseFloat((c as any).grandTotal || (c as any).itemsTotal || "0");
         }
       }
 
@@ -597,26 +739,32 @@ export function registerReportsRoutes(app: Express) {
         for (const sup of stmtAllSuppliers) {
           const balance = stmtSupplierBals.get(sup.id);
           if (balance) {
-            const opening = parseFloat((sup as any).openingBalance || '0');
+            const opening = parseFloat((sup as any).openingBalance || "0");
             const netBalance = opening + balance.credit - balance.debit;
-            if (netBalance > 0) { stmtNpOnUs += netBalance; stmtSupplierTotal += netBalance; }
-            else if (netBalance < 0) { stmtNpForUs += Math.abs(netBalance); stmtSupplierTotal -= Math.abs(netBalance); }
+            if (netBalance > 0) {
+              stmtNpOnUs += netBalance;
+              stmtSupplierTotal += netBalance;
+            } else if (netBalance < 0) {
+              stmtNpForUs += Math.abs(netBalance);
+              stmtSupplierTotal -= Math.abs(netBalance);
+            }
           }
         }
       }
 
       // Debug: log net position components so discrepancies can be traced
-      const stmtAccountsForUs: string[] = [], stmtAccountsOnUs: string[] = [];
+      const stmtAccountsForUs: string[] = [],
+        stmtAccountsOnUs: string[] = [];
       for (const acc of companyAccounts) {
-        if (stmtExpenseTypes.includes(acc.accountType || '')) continue;
-        if (acc.accountType === 'Income') continue;
+        if (stmtExpenseTypes.includes(acc.accountType || "")) continue;
+        if (acc.accountType === "Income") continue;
         if (isExcludedFromStmtNp(acc)) continue;
-        const opening = parseFloat(acc.openingBalance || '0');
-        const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
+        const opening = parseFloat(acc.openingBalance || "0");
+        const openingSigned = acc.openingBalanceSide === "Dr" ? opening : -opening;
         const bal = allTimeAccountBalances.get(acc.id) || { debit: 0, credit: 0 };
         const net = openingSigned + bal.debit - bal.credit;
         if (Math.abs(net) > 0.01) {
-          const entry = `${acc.name} (${acc.code}/${acc.accountType}): ${net > 0 ? '+' : ''}${net.toFixed(2)}`;
+          const entry = `${acc.name} (${acc.code}/${acc.accountType}): ${net > 0 ? "+" : ""}${net.toFixed(2)}`;
           if (net > 0) stmtAccountsForUs.push(entry);
           else stmtAccountsOnUs.push(entry);
         }
@@ -626,14 +774,14 @@ export function registerReportsRoutes(app: Express) {
       // Opening Balances Net — the net worth of the business before any voucher transactions.
       // Computed as sum of all non-income/non-expense account opening balances (Dr positive, Cr negative).
       // Shown in the All Time P&L so that: Opening Balances + Sum(monthly P&Ls) ≈ Net Position.
-      const skipTypesForOB = ['Income', 'Expense', 'Direct Expense', 'Indirect Expense', 'Profit'];
+      const skipTypesForOB = ["Income", "Expense", "Direct Expense", "Indirect Expense", "Profit"];
       let openingBalancesNet = 0;
       for (const acc of companyAccounts) {
-        if (skipTypesForOB.includes(acc.accountType || '')) continue;
+        if (skipTypesForOB.includes(acc.accountType || "")) continue;
         if (isExcludedFromStmtNp(acc)) continue;
-        const opening = parseFloat(acc.openingBalance || '0');
+        const opening = parseFloat(acc.openingBalance || "0");
         if (opening === 0) continue;
-        const openingSigned = acc.openingBalanceSide === 'Dr' ? opening : -opening;
+        const openingSigned = acc.openingBalanceSide === "Dr" ? opening : -opening;
         openingBalancesNet += openingSigned;
       }
 
@@ -645,7 +793,7 @@ export function registerReportsRoutes(app: Express) {
 
       // === RIGHT PANE DATA ===
       // Note: salesAccountsTotal, closingStockValue, directIncomesTotal already calculated above for Gross Profit
-      
+
       // Gross Profit b/f - Same as gross profit from Trading Account
       const grossProfitBf = grossProfit;
 
@@ -654,8 +802,8 @@ export function registerReportsRoutes(app: Express) {
 
       const npsResult = {
         dateRange: {
-          startDate: startDate ? startDate.toISOString().split('T')[0] : null,
-          endDate: endDate ? endDate.toISOString().split('T')[0] : null,
+          startDate: startDate ? startDate.toISOString().split("T")[0] : null,
+          endDate: endDate ? endDate.toISOString().split("T")[0] : null,
         },
         netPosition: netPositionValue,
         openingBalancesNet: startDate ? null : openingBalancesNet,
@@ -734,10 +882,10 @@ export function registerReportsRoutes(app: Express) {
 
       // Get all stock groups for the company
       const allStockGroups = await storage.getAllStockGroups(companyId);
-      
+
       // Get all stock items for the company
       const allStockItems = await storage.getAllStockItems(companyId);
-      
+
       // Get inventory data from active locations only
       const inventoryData = await db
         .select({
@@ -747,22 +895,16 @@ export function registerReportsRoutes(app: Express) {
         })
         .from(inventory)
         .innerJoin(locations, eq(inventory.locationId, locations.id))
-        .where(
-          and(
-            eq(inventory.companyId, companyId),
-            eq(locations.active, true),
-            isNull(locations.deletedAt)
-          )
-        )
+        .where(and(eq(inventory.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt)))
         .execute();
-      
+
       // Aggregate inventory by stock item - calculate value dynamically as qty * rate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
       for (const inv of inventoryData) {
         const qty = parseFloat(inv.quantity) || 0;
         const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
-        
+
         if (inventoryByItem.has(inv.stockItemId)) {
           const existing = inventoryByItem.get(inv.stockItemId)!;
           existing.quantity += qty;
@@ -774,43 +916,45 @@ export function registerReportsRoutes(app: Express) {
           });
         }
       }
-      
+
       // Build stock groups summary
-      const stockGroupSummary = allStockGroups.map((group) => {
-        const groupItems = allStockItems.filter((item) => item.stockGroupId === group.id);
-        
-        let closingQuantity = 0;
-        let closingValue = 0;
-        
-        for (const item of groupItems) {
-          const invData = inventoryByItem.get(item.id);
-          if (invData) {
-            closingQuantity += invData.quantity;
-            closingValue += invData.totalValue;
+      const stockGroupSummary = allStockGroups
+        .map((group) => {
+          const groupItems = allStockItems.filter((item) => item.stockGroupId === group.id);
+
+          let closingQuantity = 0;
+          let closingValue = 0;
+
+          for (const item of groupItems) {
+            const invData = inventoryByItem.get(item.id);
+            if (invData) {
+              closingQuantity += invData.quantity;
+              closingValue += invData.totalValue;
+            }
           }
-        }
-        
-        const closingRate = closingQuantity > 0 ? closingValue / closingQuantity : 0;
-        
-        return {
-          id: group.id,
-          code: group.code,
-          name: group.name,
-          closing: {
-            quantity: closingQuantity,
-            rate: closingRate,
-            value: closingValue,
-          },
-          itemCount: groupItems.length,
-        };
-      }).filter((g) => g.closing.quantity > 0 || g.closing.value > 0);
-      
+
+          const closingRate = closingQuantity > 0 ? closingValue / closingQuantity : 0;
+
+          return {
+            id: group.id,
+            code: group.code,
+            name: group.name,
+            closing: {
+              quantity: closingQuantity,
+              rate: closingRate,
+              value: closingValue,
+            },
+            itemCount: groupItems.length,
+          };
+        })
+        .filter((g) => g.closing.quantity > 0 || g.closing.value > 0);
+
       // Calculate grand totals
       const grandTotal = {
         quantity: stockGroupSummary.reduce((sum, g) => sum + g.closing.quantity, 0),
         value: stockGroupSummary.reduce((sum, g) => sum + g.closing.value, 0),
       };
-      
+
       const grandTotalRate = grandTotal.quantity > 0 ? grandTotal.value / grandTotal.quantity : 0;
 
       res.json({
@@ -838,8 +982,8 @@ export function registerReportsRoutes(app: Express) {
       if (!rawTargetId) {
         return res.status(400).json({ message: "Target company is required" });
       }
-      
-      const targetCompanyId = typeof rawTargetId === 'string' ? parseInt(rawTargetId, 10) : rawTargetId;
+
+      const targetCompanyId = typeof rawTargetId === "string" ? parseInt(rawTargetId, 10) : rawTargetId;
       if (isNaN(targetCompanyId)) {
         return res.status(400).json({ message: "Invalid target company ID" });
       }
@@ -850,7 +994,7 @@ export function registerReportsRoutes(app: Express) {
 
       // Verify user has access to target company
       const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
-      const hasAccessToTarget = userCompanies.some(uc => uc.companyId === targetCompanyId);
+      const hasAccessToTarget = userCompanies.some((uc) => uc.companyId === targetCompanyId);
       if (!hasAccessToTarget) {
         return res.status(403).json({ message: "You don't have access to the target company" });
       }
@@ -864,13 +1008,7 @@ export function registerReportsRoutes(app: Express) {
         })
         .from(inventory)
         .innerJoin(locations, eq(inventory.locationId, locations.id))
-        .where(
-          and(
-            eq(inventory.companyId, sourceCompanyId),
-            eq(locations.active, true),
-            isNull(locations.deletedAt)
-          )
-        )
+        .where(and(eq(inventory.companyId, sourceCompanyId), eq(locations.active, true), isNull(locations.deletedAt)))
         .execute();
 
       if (sourceInventory.length === 0) {
@@ -883,7 +1021,7 @@ export function registerReportsRoutes(app: Express) {
         const qty = parseFloat(inv.quantity) || 0;
         const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
-        
+
         if (aggregatedInventory.has(inv.stockItemId)) {
           const existing = aggregatedInventory.get(inv.stockItemId)!;
           existing.quantity += qty;
@@ -907,29 +1045,26 @@ export function registerReportsRoutes(app: Express) {
       // Get the first location in target company (or create a default one)
       let targetLocations = await storage.getAllLocations(targetCompanyId);
       if (targetLocations.length === 0) {
-        return res.status(400).json({ message: "Target company has no locations. Please create at least one location first." });
+        return res
+          .status(400)
+          .json({ message: "Target company has no locations. Please create at least one location first." });
       }
       const defaultLocation = targetLocations[0];
 
       // Get stock items that exist in source - we need to ensure they exist in target
       const sourceStockItemIds = Array.from(aggregatedInventory.keys());
-      const sourceStockItems = await db
-        .select()
-        .from(stockItems)
-        .where(inArray(stockItems.id, sourceStockItemIds));
+      const sourceStockItems = await db.select().from(stockItems).where(inArray(stockItems.id, sourceStockItemIds));
 
       // Map source stock item codes to target stock items — single batch query (was N queries)
       const sourceCodes = sourceStockItems.map((i) => i.code).filter(Boolean) as string[];
-      const targetItemsInBatch = sourceCodes.length > 0
-        ? await db
-            .select({ id: stockItems.id, code: stockItems.code })
-            .from(stockItems)
-            .where(and(
-              eq(stockItems.companyId, targetCompanyId),
-              inArray(stockItems.code, sourceCodes),
-            ))
-            .execute()
-        : [];
+      const targetItemsInBatch =
+        sourceCodes.length > 0
+          ? await db
+              .select({ id: stockItems.id, code: stockItems.code })
+              .from(stockItems)
+              .where(and(eq(stockItems.companyId, targetCompanyId), inArray(stockItems.code, sourceCodes)))
+              .execute()
+          : [];
       const targetItemsByCode = new Map(targetItemsInBatch.map((i) => [i.code, i.id]));
 
       const stockItemMapping = new Map<number, number>();
@@ -989,7 +1124,7 @@ export function registerReportsRoutes(app: Express) {
 
       const { asOfDate } = req.body;
       const targetDate = asOfDate ? new Date(asOfDate) : new Date();
-      const targetDateStr = targetDate.toISOString().split('T')[0];
+      const targetDateStr = targetDate.toISOString().split("T")[0];
 
       // Get current inventory from active locations, aggregated by stock item
       const currentInventory = await db
@@ -1000,13 +1135,7 @@ export function registerReportsRoutes(app: Express) {
         })
         .from(inventory)
         .innerJoin(locations, eq(inventory.locationId, locations.id))
-        .where(
-          and(
-            eq(inventory.companyId, companyId),
-            eq(locations.active, true),
-            isNull(locations.deletedAt)
-          )
-        )
+        .where(and(eq(inventory.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt)))
         .execute();
 
       // Aggregate by stock item (combine quantities from multiple locations)
@@ -1015,7 +1144,7 @@ export function registerReportsRoutes(app: Express) {
         const qty = parseFloat(inv.quantity) || 0;
         const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
-        
+
         if (aggregatedInventory.has(inv.stockItemId)) {
           const existing = aggregatedInventory.get(inv.stockItemId)!;
           existing.quantity += qty;
@@ -1048,7 +1177,7 @@ export function registerReportsRoutes(app: Express) {
         const qty = parseFloat(sale.quantity) || 0;
         const cost = parseFloat(sale.costPrice) || 0;
         const val = qty * cost;
-        
+
         if (aggregatedInventory.has(sale.stockItemId)) {
           const existing = aggregatedInventory.get(sale.stockItemId)!;
           existing.quantity += qty;
@@ -1083,17 +1212,17 @@ export function registerReportsRoutes(app: Express) {
         const qty = parseFloat(adj.quantity) || 0;
         const rate = parseFloat(adj.rate) || 0;
         const val = Math.abs(qty) * rate;
-        
+
         if (aggregatedInventory.has(adj.stockItemId)) {
           const existing = aggregatedInventory.get(adj.stockItemId)!;
           // Reverse the adjustment: subtract what was added (production), add back what was consumed
           existing.quantity -= qty;
-          existing.totalValue -= (qty >= 0 ? val : -val);
+          existing.totalValue -= qty >= 0 ? val : -val;
         } else {
           // If no current inventory, create with reversed values
-          aggregatedInventory.set(adj.stockItemId, { 
-            quantity: -qty, 
-            totalValue: qty >= 0 ? -val : val 
+          aggregatedInventory.set(adj.stockItemId, {
+            quantity: -qty,
+            totalValue: qty >= 0 ? -val : val,
           });
         }
       }
@@ -1109,19 +1238,14 @@ export function registerReportsRoutes(app: Express) {
         .from(containerOffloadItems)
         .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
         .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
-        .where(
-          and(
-            eq(containers.companyId, companyId),
-            sql`${containerOffloads.offloadedAt} > ${targetDate}`
-          )
-        )
+        .where(and(eq(containers.companyId, companyId), sql`${containerOffloads.offloadedAt} > ${targetDate}`))
         .execute();
 
       for (const offload of offloadsAfterDate) {
         const qty = parseFloat(offload.quantity) || 0;
         const rate = parseFloat(offload.rate) || 0;
         const val = qty * rate;
-        
+
         if (aggregatedInventory.has(offload.stockItemId)) {
           const existing = aggregatedInventory.get(offload.stockItemId)!;
           // Subtract offloaded items to reverse the inbound transaction
@@ -1148,13 +1272,7 @@ export function registerReportsRoutes(app: Express) {
       const allStockItems = await db
         .select({ id: stockItems.id })
         .from(stockItems)
-        .where(
-          and(
-            eq(stockItems.companyId, companyId),
-            eq(stockItems.active, true),
-            isNull(stockItems.deletedAt)
-          )
-        )
+        .where(and(eq(stockItems.companyId, companyId), eq(stockItems.active, true), isNull(stockItems.deletedAt)))
         .execute();
 
       let itemsUpdated = 0;
@@ -1165,7 +1283,8 @@ export function registerReportsRoutes(app: Express) {
         // First, reset all stock items opening to zero
         for (const item of allStockItems) {
           if (!aggregatedInventory.has(item.id)) {
-            await tx.update(stockItems)
+            await tx
+              .update(stockItems)
               .set({
                 openingQty: "0",
                 openingRate: "0",
@@ -1178,15 +1297,16 @@ export function registerReportsRoutes(app: Express) {
         // Then update items that have historical inventory
         for (const [stockItemId, data] of Array.from(aggregatedInventory)) {
           const avgRate = data.quantity > 0 ? data.totalValue / data.quantity : 0;
-          
-          await tx.update(stockItems)
+
+          await tx
+            .update(stockItems)
             .set({
               openingQty: data.quantity.toFixed(3),
               openingRate: avgRate.toFixed(2),
               openingValue: data.totalValue.toFixed(2),
             })
             .where(eq(stockItems.id, stockItemId));
-          
+
           itemsUpdated++;
           totalValue += data.totalValue;
         }
@@ -1232,26 +1352,27 @@ export function registerReportsRoutes(app: Express) {
 
       // Get inventory for these items from active locations
       const itemIds = groupItems.map((i) => i.id);
-      
-      const inventoryData = itemIds.length > 0
-        ? await db
-            .select({
-              stockItemId: inventory.stockItemId,
-              quantity: inventory.quantity,
-              averageRate: inventory.averageRate,
-            })
-            .from(inventory)
-            .innerJoin(locations, eq(inventory.locationId, locations.id))
-            .where(
-              and(
-                eq(inventory.companyId, companyId),
-                inArray(inventory.stockItemId, itemIds),
-                eq(locations.active, true),
-                isNull(locations.deletedAt)
+
+      const inventoryData =
+        itemIds.length > 0
+          ? await db
+              .select({
+                stockItemId: inventory.stockItemId,
+                quantity: inventory.quantity,
+                averageRate: inventory.averageRate,
+              })
+              .from(inventory)
+              .innerJoin(locations, eq(inventory.locationId, locations.id))
+              .where(
+                and(
+                  eq(inventory.companyId, companyId),
+                  inArray(inventory.stockItemId, itemIds),
+                  eq(locations.active, true),
+                  isNull(locations.deletedAt)
+                )
               )
-            )
-            .execute()
-        : [];
+              .execute()
+          : [];
 
       // Aggregate by stock item - calculate value dynamically as qty * rate
       const inventoryByItem = new Map<number, { quantity: number; totalValue: number }>();
@@ -1259,7 +1380,7 @@ export function registerReportsRoutes(app: Express) {
         const qty = parseFloat(inv.quantity) || 0;
         const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
-        
+
         if (inventoryByItem.has(inv.stockItemId)) {
           const existing = inventoryByItem.get(inv.stockItemId)!;
           existing.quantity += qty;
@@ -1273,20 +1394,22 @@ export function registerReportsRoutes(app: Express) {
       }
 
       // Build items list
-      const items = groupItems.map((item) => {
-        const invData = inventoryByItem.get(item.id) || { quantity: 0, totalValue: 0 };
-        const rate = invData.quantity > 0 ? invData.totalValue / invData.quantity : 0;
-        return {
-          id: item.id,
-          code: item.code,
-          name: item.name,
-          closing: {
-            quantity: invData.quantity,
-            rate: rate,
-            value: invData.totalValue,
-          },
-        };
-      }).filter((i) => i.closing.quantity > 0 || i.closing.value > 0);
+      const items = groupItems
+        .map((item) => {
+          const invData = inventoryByItem.get(item.id) || { quantity: 0, totalValue: 0 };
+          const rate = invData.quantity > 0 ? invData.totalValue / invData.quantity : 0;
+          return {
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            closing: {
+              quantity: invData.quantity,
+              rate: rate,
+              value: invData.totalValue,
+            },
+          };
+        })
+        .filter((i) => i.closing.quantity > 0 || i.closing.value > 0);
 
       // Calculate totals
       const totals = {
@@ -1326,23 +1449,26 @@ export function registerReportsRoutes(app: Express) {
       );
 
       const accountIds = purchaseAccounts.map((a) => a.id);
-      const entries = accountIds.length > 0
-        ? await db
-            .select({
-              ledgerAccountId: voucherEntries.ledgerAccountId,
-              debitAmount: voucherEntries.debitAmount,
-              creditAmount: voucherEntries.creditAmount,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-            .where(and(
-              eq(vouchers.companyId, companyId),
-              eq(vouchers.optional, false),
-              isNull(vouchers.deletedAt),
-              inArray(voucherEntries.ledgerAccountId, accountIds),
-            ))
-            .execute()
-        : [];
+      const entries =
+        accountIds.length > 0
+          ? await db
+              .select({
+                ledgerAccountId: voucherEntries.ledgerAccountId,
+                debitAmount: voucherEntries.debitAmount,
+                creditAmount: voucherEntries.creditAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  eq(vouchers.companyId, companyId),
+                  eq(vouchers.optional, false),
+                  isNull(vouchers.deletedAt),
+                  inArray(voucherEntries.ledgerAccountId, accountIds)
+                )
+              )
+              .execute()
+          : [];
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       for (const entry of entries) {
@@ -1354,10 +1480,19 @@ export function registerReportsRoutes(app: Express) {
         }
       }
 
-      const accounts = purchaseAccounts.map((acc) => {
-        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        return { id: acc.id, code: acc.code, name: acc.name, debit: balance.debit, credit: balance.credit, balance: balance.debit - balance.credit };
-      }).filter((a) => a.debit > 0 || a.credit > 0);
+      const accounts = purchaseAccounts
+        .map((acc) => {
+          const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+          return {
+            id: acc.id,
+            code: acc.code,
+            name: acc.name,
+            debit: balance.debit,
+            credit: balance.credit,
+            balance: balance.debit - balance.credit,
+          };
+        })
+        .filter((a) => a.debit > 0 || a.credit > 0);
 
       const total = accounts.reduce((sum, a) => sum + a.balance, 0);
       const result = { accounts, total };
@@ -1386,23 +1521,26 @@ export function registerReportsRoutes(app: Express) {
       );
 
       const accountIds = directIncomeAccounts.map((a) => a.id);
-      const entries = accountIds.length > 0
-        ? await db
-            .select({
-              ledgerAccountId: voucherEntries.ledgerAccountId,
-              debitAmount: voucherEntries.debitAmount,
-              creditAmount: voucherEntries.creditAmount,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-            .where(and(
-              eq(vouchers.companyId, companyId),
-              eq(vouchers.optional, false),
-              isNull(vouchers.deletedAt),
-              inArray(voucherEntries.ledgerAccountId, accountIds),
-            ))
-            .execute()
-        : [];
+      const entries =
+        accountIds.length > 0
+          ? await db
+              .select({
+                ledgerAccountId: voucherEntries.ledgerAccountId,
+                debitAmount: voucherEntries.debitAmount,
+                creditAmount: voucherEntries.creditAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  eq(vouchers.companyId, companyId),
+                  eq(vouchers.optional, false),
+                  isNull(vouchers.deletedAt),
+                  inArray(voucherEntries.ledgerAccountId, accountIds)
+                )
+              )
+              .execute()
+          : [];
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       for (const entry of entries) {
@@ -1414,10 +1552,19 @@ export function registerReportsRoutes(app: Express) {
         }
       }
 
-      const accounts = directIncomeAccounts.map((acc) => {
-        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        return { id: acc.id, code: acc.code, name: acc.name, debit: balance.debit, credit: balance.credit, balance: balance.credit - balance.debit };
-      }).filter((a) => a.debit > 0 || a.credit > 0);
+      const accounts = directIncomeAccounts
+        .map((acc) => {
+          const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+          return {
+            id: acc.id,
+            code: acc.code,
+            name: acc.name,
+            debit: balance.debit,
+            credit: balance.credit,
+            balance: balance.credit - balance.debit,
+          };
+        })
+        .filter((a) => a.debit > 0 || a.credit > 0);
 
       const total = accounts.reduce((sum, a) => sum + a.balance, 0);
       const result = { accounts, total };
@@ -1450,35 +1597,41 @@ export function registerReportsRoutes(app: Express) {
       const importChargesAccountIds = new Set<number>();
       if (importChargesParent) {
         importChargesAccountIds.add(importChargesParent.id);
-        companyAccounts.forEach(acc => { if (acc.parentId === importChargesParent.id) importChargesAccountIds.add(acc.id); });
+        companyAccounts.forEach((acc) => {
+          if (acc.parentId === importChargesParent.id) importChargesAccountIds.add(acc.id);
+        });
       }
 
       const directExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.code !== "PURCHASES" && !acc.code?.startsWith("PURCHASES") && (
-                   acc.accountType === "Direct Expense" ||
-                   (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
-                   importChargesAccountIds.has(acc.id)
-                 )
+        (acc) =>
+          acc.code !== "PURCHASES" &&
+          !acc.code?.startsWith("PURCHASES") &&
+          (acc.accountType === "Direct Expense" ||
+            (acc.accountType === "Expense" && acc.subType === "Direct Expense") ||
+            importChargesAccountIds.has(acc.id))
       );
 
       const accountIds = directExpenseAccounts.map((a) => a.id);
-      const entries = accountIds.length > 0
-        ? await db
-            .select({
-              ledgerAccountId: voucherEntries.ledgerAccountId,
-              debitAmount: voucherEntries.debitAmount,
-              creditAmount: voucherEntries.creditAmount,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-            .where(and(
-              eq(vouchers.companyId, companyId),
-              eq(vouchers.optional, false),
-              isNull(vouchers.deletedAt),
-              inArray(voucherEntries.ledgerAccountId, accountIds),
-            ))
-            .execute()
-        : [];
+      const entries =
+        accountIds.length > 0
+          ? await db
+              .select({
+                ledgerAccountId: voucherEntries.ledgerAccountId,
+                debitAmount: voucherEntries.debitAmount,
+                creditAmount: voucherEntries.creditAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  eq(vouchers.companyId, companyId),
+                  eq(vouchers.optional, false),
+                  isNull(vouchers.deletedAt),
+                  inArray(voucherEntries.ledgerAccountId, accountIds)
+                )
+              )
+              .execute()
+          : [];
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       for (const entry of entries) {
@@ -1490,10 +1643,19 @@ export function registerReportsRoutes(app: Express) {
         }
       }
 
-      const accounts = directExpenseAccounts.map((acc) => {
-        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        return { id: acc.id, code: acc.code, name: acc.name, debit: balance.debit, credit: balance.credit, balance: balance.debit - balance.credit };
-      }).filter((a) => a.debit > 0 || a.credit > 0);
+      const accounts = directExpenseAccounts
+        .map((acc) => {
+          const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+          return {
+            id: acc.id,
+            code: acc.code,
+            name: acc.name,
+            debit: balance.debit,
+            credit: balance.credit,
+            balance: balance.debit - balance.credit,
+          };
+        })
+        .filter((a) => a.debit > 0 || a.credit > 0);
 
       const total = accounts.reduce((sum, a) => sum + a.balance, 0);
       const result = { accounts, total };
@@ -1518,31 +1680,35 @@ export function registerReportsRoutes(app: Express) {
 
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true);
       const indirectExpenseAccounts = companyAccounts.filter(
-        (acc) => acc.accountType === "Indirect Expense" &&
-                 acc.code !== "PRODUCTION_ADJUSTMENT" &&
-                 acc.code !== "CONSUMPTION_EXPENSE" &&
-                 acc.code !== "PURCHASES" &&
-                 !acc.code?.startsWith("PURCHASES")
+        (acc) =>
+          acc.accountType === "Indirect Expense" &&
+          acc.code !== "PRODUCTION_ADJUSTMENT" &&
+          acc.code !== "CONSUMPTION_EXPENSE" &&
+          acc.code !== "PURCHASES" &&
+          !acc.code?.startsWith("PURCHASES")
       );
 
       const accountIds = indirectExpenseAccounts.map((a) => a.id);
-      const entries = accountIds.length > 0
-        ? await db
-            .select({
-              ledgerAccountId: voucherEntries.ledgerAccountId,
-              debitAmount: voucherEntries.debitAmount,
-              creditAmount: voucherEntries.creditAmount,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-            .where(and(
-              eq(vouchers.companyId, companyId),
-              eq(vouchers.optional, false),
-              isNull(vouchers.deletedAt),
-              inArray(voucherEntries.ledgerAccountId, accountIds),
-            ))
-            .execute()
-        : [];
+      const entries =
+        accountIds.length > 0
+          ? await db
+              .select({
+                ledgerAccountId: voucherEntries.ledgerAccountId,
+                debitAmount: voucherEntries.debitAmount,
+                creditAmount: voucherEntries.creditAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  eq(vouchers.companyId, companyId),
+                  eq(vouchers.optional, false),
+                  isNull(vouchers.deletedAt),
+                  inArray(voucherEntries.ledgerAccountId, accountIds)
+                )
+              )
+              .execute()
+          : [];
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
       for (const entry of entries) {
@@ -1554,10 +1720,19 @@ export function registerReportsRoutes(app: Express) {
         }
       }
 
-      const accounts = indirectExpenseAccounts.map((acc) => {
-        const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
-        return { id: acc.id, code: acc.code, name: acc.name, debit: balance.debit, credit: balance.credit, balance: balance.debit - balance.credit };
-      }).filter((a) => a.debit > 0 || a.credit > 0);
+      const accounts = indirectExpenseAccounts
+        .map((acc) => {
+          const balance = accountBalances.get(acc.id) || { debit: 0, credit: 0 };
+          return {
+            id: acc.id,
+            code: acc.code,
+            name: acc.name,
+            debit: balance.debit,
+            credit: balance.credit,
+            balance: balance.debit - balance.credit,
+          };
+        })
+        .filter((a) => a.debit > 0 || a.credit > 0);
 
       const total = accounts.reduce((sum, a) => sum + a.balance, 0);
       const result = { accounts, total };
@@ -1647,11 +1822,22 @@ export function registerReportsRoutes(app: Express) {
 
       // Group by month
       const monthNames = [
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
       ];
 
-      const monthlyData: { month: number; monthName: string; debit: number; credit: number; closingBalance: number }[] = [];
+      const monthlyData: { month: number; monthName: string; debit: number; credit: number; closingBalance: number }[] =
+        [];
       let runningBalance = openingBalance;
 
       for (let month = 0; month < 12; month++) {
@@ -1715,7 +1901,8 @@ export function registerReportsRoutes(app: Express) {
       const accountId = parseInt(req.params.accountId);
       const year = parseInt(req.params.year);
       const month = parseInt(req.params.month);
-      if (isNaN(accountId) || isNaN(year) || isNaN(month)) return res.status(400).json({ message: "Invalid parameters" });
+      if (isNaN(accountId) || isNaN(year) || isNaN(month))
+        return res.status(400).json({ message: "Invalid parameters" });
 
       // Get the ledger account
       const account = await db
@@ -1730,8 +1917,19 @@ export function registerReportsRoutes(app: Express) {
       }
 
       const monthNames = [
-        "", "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December"
+        "",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
       ];
 
       // Calculate date range for the month
@@ -1798,7 +1996,7 @@ export function registerReportsRoutes(app: Express) {
       const vouchersWithDetails = await Promise.all(
         voucherEntriesData.map(async (entry) => {
           let particulars = "";
-          
+
           if (entry.supplierId) {
             const supplierData = await db
               .select({ legalName: suppliers.legalName })
@@ -1823,12 +2021,7 @@ export function registerReportsRoutes(app: Express) {
               .select({ accountName: ledgerAccounts.name })
               .from(voucherEntries)
               .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
-              .where(
-                and(
-                  eq(voucherEntries.voucherId, entry.voucherId),
-                  ne(voucherEntries.ledgerAccountId, accountId)
-                )
-              )
+              .where(and(eq(voucherEntries.voucherId, entry.voucherId), ne(voucherEntries.ledgerAccountId, accountId)))
               .execute();
             particulars = contraEntries[0]?.accountName || "Multiple Accounts";
           }
@@ -1908,7 +2101,7 @@ export function registerReportsRoutes(app: Express) {
         .where(and(eq(voucherEntries.voucherId, voucherId), isNotNull(voucherEntries.supplierId)))
         .execute()
         .then((rows) => rows[0]);
-      
+
       if (supplierEntry?.supplierId) {
         const supplier = await db
           .select({ legalName: suppliers.legalName })
@@ -1931,10 +2124,7 @@ export function registerReportsRoutes(app: Express) {
         .where(
           and(
             eq(voucherEntries.voucherId, voucherId),
-            or(
-              eq(ledgerAccounts.code, "PURCHASES"),
-              sql`${ledgerAccounts.code} LIKE 'PURCHASES-%'`
-            )
+            or(eq(ledgerAccounts.code, "PURCHASES"), sql`${ledgerAccounts.code} LIKE 'PURCHASES-%'`)
           )
         )
         .execute()
@@ -2072,60 +2262,70 @@ export function registerReportsRoutes(app: Express) {
 
       // Get all companies the user has access to
       const userCompanyRoles = await storage.getUserCompaniesWithRoles(userId);
-      const companyIds = userCompanyRoles.map(r => r.companyId);
+      const companyIds = userCompanyRoles.map((r) => r.companyId);
 
       if (companyIds.length === 0) {
-        return res.json({ containers: [], byRoute: {}, byAgent: {}, byLocation: {}, byTransporter: {}, totals: { count: 0, amount: 0 } });
+        return res.json({
+          containers: [],
+          byRoute: {},
+          byAgent: {},
+          byLocation: {},
+          byTransporter: {},
+          totals: { count: 0, amount: 0 },
+        });
       }
 
       // Get all companies for names
       const allCompanies = await storage.getAllCompanies();
-      const companyMap = new Map(allCompanies.map(c => [c.id, c]));
+      const companyMap = new Map(allCompanies.map((c) => [c.id, c]));
 
       // Get all suppliers for names
       const allSuppliers = await storage.getAllSuppliers();
-      const supplierMap = new Map(allSuppliers.map(s => [s.id, s]));
+      const supplierMap = new Map(allSuppliers.map((s) => [s.id, s]));
 
       // Fetch ALL containers (OTW and Offloaded) from all accessible companies
       const otwContainers: any[] = [];
       const offloadedContainers: any[] = [];
-      
+
       // Pre-fetch item counts for all containers
       const containerItemCounts: Record<number, number> = {};
-      
+
       for (const companyId of companyIds) {
         const containers = await storage.getAllContainers(companyId);
-        const containerIds = containers.map(c => c.id);
-        
+        const containerIds = containers.map((c) => c.id);
+
         if (containerIds.length > 0) {
           // Get PO counts per container
           const posByContainer = await db
             .select({ containerId: purchaseOrders.containerId, poId: purchaseOrders.id })
             .from(purchaseOrders)
             .where(inArray(purchaseOrders.containerId, containerIds));
-          
-          const poIds = posByContainer.map(p => p.poId);
+
+          const poIds = posByContainer.map((p) => p.poId);
           if (poIds.length > 0) {
             // Get line item counts per PO
             const lineItemCounts = await db
-              .select({ 
+              .select({
                 purchaseOrderId: poLineItems.poId,
-                count: sql`count(*)`
+                count: sql`count(*)`,
               })
               .from(poLineItems)
               .where(inArray(poLineItems.poId, poIds))
               .groupBy(poLineItems.poId);
-            
+
             // Map PO counts to containers
-            const poCountMap = new Map(lineItemCounts.filter(l => l.purchaseOrderId != null).map(l => [l.purchaseOrderId, Number(l.count)]));
+            const poCountMap = new Map(
+              lineItemCounts.filter((l) => l.purchaseOrderId != null).map((l) => [l.purchaseOrderId, Number(l.count)])
+            );
             for (const po of posByContainer) {
               const containerId = po.containerId as number;
-              containerItemCounts[containerId] = (containerItemCounts[containerId] || 0) + (poCountMap.get(po.poId) || 0);
+              containerItemCounts[containerId] =
+                (containerItemCounts[containerId] || 0) + (poCountMap.get(po.poId) || 0);
             }
           }
         }
-        
-        containers.forEach(c => {
+
+        containers.forEach((c) => {
           const enrichedContainer = {
             ...c,
             companyName: companyMap.get(c.companyId)?.name || "Unknown",
@@ -2138,14 +2338,13 @@ export function registerReportsRoutes(app: Express) {
           } else if (c.status === "OTW") {
             otwContainers.push(enrichedContainer);
           }
-          
         });
       }
 
       // Fetch agent ledger account balances from all companies
       const agentBalances: Record<string, number> = {};
       const uniqueAgents = new Set<string>();
-      otwContainers.forEach(c => {
+      otwContainers.forEach((c) => {
         if (c.agent) uniqueAgents.add(c.agent);
       });
 
@@ -2154,9 +2353,10 @@ export function registerReportsRoutes(app: Express) {
         const ledgerAccounts = await storage.getAllLedgerAccounts(companyId);
         for (const agent of Array.from(uniqueAgents)) {
           // Match agent name to ledger account (case-insensitive, partial match)
-          const agentAccount = ledgerAccounts.find(acc => 
-            (acc.name || '').toLowerCase().includes((agent || '').toLowerCase()) ||
-            (agent || '').toLowerCase().includes((acc.name || '').toLowerCase())
+          const agentAccount = ledgerAccounts.find(
+            (acc) =>
+              (acc.name || "").toLowerCase().includes((agent || "").toLowerCase()) ||
+              (agent || "").toLowerCase().includes((acc.name || "").toLowerCase())
           );
           if (agentAccount) {
             // Calculate balance from voucher entries
@@ -2174,14 +2374,14 @@ export function registerReportsRoutes(app: Express) {
                   eq(vouchers.optional, false)
                 )
               );
-            
+
             let balance = parseFloat(agentAccount.openingBalance || "0");
             if (agentAccount.openingBalanceSide === "Cr") balance = -balance;
-            
+
             for (const entry of entries) {
               balance += parseFloat(entry.debitAmount || "0") - parseFloat(entry.creditAmount || "0");
             }
-            
+
             agentBalances[agent] = (agentBalances[agent] || 0) + balance;
           }
         }
@@ -2189,15 +2389,25 @@ export function registerReportsRoutes(app: Express) {
 
       // Group OTW containers by shopName (route)
       const byRoute: Record<string, any[]> = {};
-      const byAgent: Record<string, { containers: any[], offloadedContainers: any[], total: number, offloadedTotal: number, balance: number }> = {};
-      const byLocation: Record<string, { count: number, total: number }> = {};
+      const byAgent: Record<
+        string,
+        { containers: any[]; offloadedContainers: any[]; total: number; offloadedTotal: number; balance: number }
+      > = {};
+      const byLocation: Record<string, { count: number; total: number }> = {};
 
       let totalAmount = 0;
 
       // First, group offloaded containers by agent
       for (const container of offloadedContainers) {
         const agent = container.agent || "Unassigned";
-        if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+        if (!byAgent[agent])
+          byAgent[agent] = {
+            containers: [],
+            offloadedContainers: [],
+            total: 0,
+            offloadedTotal: 0,
+            balance: agentBalances[agent] || 0,
+          };
         byAgent[agent].offloadedContainers.push(container);
         byAgent[agent].offloadedTotal += parseFloat(container.dutyFee || "0");
       }
@@ -2216,7 +2426,14 @@ export function registerReportsRoutes(app: Express) {
 
         // Group by agent with balance - only for containers with plate numbers
         if (hasPlate) {
-          if (!byAgent[agent]) byAgent[agent] = { containers: [], offloadedContainers: [], total: 0, offloadedTotal: 0, balance: agentBalances[agent] || 0 };
+          if (!byAgent[agent])
+            byAgent[agent] = {
+              containers: [],
+              offloadedContainers: [],
+              total: 0,
+              offloadedTotal: 0,
+              balance: agentBalances[agent] || 0,
+            };
           byAgent[agent].containers.push(container);
           byAgent[agent].total += amount;
         }
@@ -2230,8 +2447,9 @@ export function registerReportsRoutes(app: Express) {
       }
 
       // Group by transporter (both OTW and offloaded)
-      const byTransporter: Record<string, { otw: any[], offloaded: any[], otwTotal: number, offloadedTotal: number }> = {};
-      
+      const byTransporter: Record<string, { otw: any[]; offloaded: any[]; otwTotal: number; offloadedTotal: number }> =
+        {};
+
       for (const container of otwContainers) {
         // For Statement of Accounts (byAgent), only include OTW containers with plate numbers
         const hasPlate = container.numberPlate && container.numberPlate.trim() !== "";
@@ -2242,7 +2460,7 @@ export function registerReportsRoutes(app: Express) {
         byTransporter[transporter].otw.push(container);
         byTransporter[transporter].otwTotal += parseFloat(container.transportFee || "0");
       }
-      
+
       for (const container of offloadedContainers) {
         const transporter = container.transporter || "Unassigned";
         if (!byTransporter[transporter]) {
@@ -2286,53 +2504,65 @@ export function registerReportsRoutes(app: Express) {
 
       if (accounts.length === 0) return res.json([]);
 
-      const ledgerIds = accounts.filter(a => a.accountType === "ledger").map(a => a.accountId);
-      const bankIds   = accounts.filter(a => a.accountType === "bank").map(a => a.accountId);
+      const ledgerIds = accounts.filter((a) => a.accountType === "ledger").map((a) => a.accountId);
+      const bankIds = accounts.filter((a) => a.accountType === "bank").map((a) => a.accountId);
 
       // Batch-fetch all account details and aggregate entry sums in parallel (4 queries total regardless of account count)
       const [ledgerRows, bankRows, ledgerSums, bankSums] = await Promise.all([
-        ledgerIds.length > 0 ? db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, ledgerIds)).execute() : [],
-        bankIds.length   > 0 ? db.select().from(bankAccounts).where(inArray(bankAccounts.id, bankIds)).execute()     : [],
         ledgerIds.length > 0
-          ? db.select({
-              accountId:   voucherEntries.ledgerAccountId,
-              totalDebit:  sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
-              totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-            .where(and(
-              inArray(voucherEntries.ledgerAccountId, ledgerIds),
-              eq(vouchers.companyId, companyId),
-              isNull(vouchers.deletedAt),
-              eq(vouchers.optional, false)
-            ))
-            .groupBy(voucherEntries.ledgerAccountId)
-            .execute()
+          ? db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, ledgerIds)).execute()
+          : [],
+        bankIds.length > 0 ? db.select().from(bankAccounts).where(inArray(bankAccounts.id, bankIds)).execute() : [],
+        ledgerIds.length > 0
+          ? db
+              .select({
+                accountId: voucherEntries.ledgerAccountId,
+                totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+                totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  inArray(voucherEntries.ledgerAccountId, ledgerIds),
+                  eq(vouchers.companyId, companyId),
+                  isNull(vouchers.deletedAt),
+                  eq(vouchers.optional, false)
+                )
+              )
+              .groupBy(voucherEntries.ledgerAccountId)
+              .execute()
           : [],
         bankIds.length > 0
-          ? db.select({
-              accountId:   voucherEntries.bankAccountId,
-              totalDebit:  sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
-              totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
-            })
-            .from(voucherEntries)
-            .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-            .where(and(
-              inArray(voucherEntries.bankAccountId, bankIds),
-              eq(vouchers.companyId, companyId),
-              isNull(vouchers.deletedAt),
-              eq(vouchers.optional, false)
-            ))
-            .groupBy(voucherEntries.bankAccountId)
-            .execute()
+          ? db
+              .select({
+                accountId: voucherEntries.bankAccountId,
+                totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+                totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  inArray(voucherEntries.bankAccountId, bankIds),
+                  eq(vouchers.companyId, companyId),
+                  isNull(vouchers.deletedAt),
+                  eq(vouchers.optional, false)
+                )
+              )
+              .groupBy(voucherEntries.bankAccountId)
+              .execute()
           : [],
       ]);
 
-      const ledgerMap    = new Map(ledgerRows.map(l => [l.id, l]));
-      const bankMap      = new Map(bankRows.map(b => [b.id, b]));
-      const ledgerBalMap = new Map(ledgerSums.map(r => [Number(r.accountId), { d: Number(r.totalDebit), c: Number(r.totalCredit) }]));
-      const bankBalMap   = new Map(bankSums.map(r => [Number(r.accountId),   { d: Number(r.totalDebit), c: Number(r.totalCredit) }]));
+      const ledgerMap = new Map(ledgerRows.map((l) => [l.id, l]));
+      const bankMap = new Map(bankRows.map((b) => [b.id, b]));
+      const ledgerBalMap = new Map(
+        ledgerSums.map((r) => [Number(r.accountId), { d: Number(r.totalDebit), c: Number(r.totalCredit) }])
+      );
+      const bankBalMap = new Map(
+        bankSums.map((r) => [Number(r.accountId), { d: Number(r.totalDebit), c: Number(r.totalCredit) }])
+      );
 
       const calcBal = (opening: string, side: string | null, sums?: { d: number; c: number }) => {
         let bal = parseFloat(opening || "0");
@@ -2341,22 +2571,34 @@ export function registerReportsRoutes(app: Express) {
         return bal;
       };
 
-      const enrichedAccounts = accounts.map(account => {
+      const enrichedAccounts = accounts.map((account) => {
         if (account.accountType === "ledger") {
           const ledger = ledgerMap.get(account.accountId);
           if (!ledger) return null;
           const balance = calcBal(ledger.openingBalance || "0", ledger.openingBalanceSide, ledgerBalMap.get(ledger.id));
-          return { id: account.id, accountType: account.accountType, accountId: account.accountId, displayOrder: account.displayOrder, account: { ...ledger, type: "Ledger", balance, currentBalance: balance } };
+          return {
+            id: account.id,
+            accountType: account.accountType,
+            accountId: account.accountId,
+            displayOrder: account.displayOrder,
+            account: { ...ledger, type: "Ledger", balance, currentBalance: balance },
+          };
         } else if (account.accountType === "bank") {
           const bank = bankMap.get(account.accountId);
           if (!bank) return null;
           const balance = calcBal(bank.openingBalance || "0", bank.openingBalanceSide, bankBalMap.get(bank.id));
-          return { id: account.id, accountType: account.accountType, accountId: account.accountId, displayOrder: account.displayOrder, account: { ...bank, type: "Bank", balance, currentBalance: balance } };
+          return {
+            id: account.id,
+            accountType: account.accountType,
+            accountId: account.accountId,
+            displayOrder: account.displayOrder,
+            account: { ...bank, type: "Bank", balance, currentBalance: balance },
+          };
         }
         return null;
       });
 
-      res.json(enrichedAccounts.filter(a => a !== null));
+      res.json(enrichedAccounts.filter((a) => a !== null));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2368,7 +2610,7 @@ export function registerReportsRoutes(app: Express) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      
+
       const data = insertDashboardCashAccountSchema.parse({
         ...req.body,
         companyId,
@@ -2378,11 +2620,13 @@ export function registerReportsRoutes(app: Express) {
       const existing = await db
         .select()
         .from(dashboardCashAccounts)
-        .where(and(
-          eq(dashboardCashAccounts.companyId, companyId),
-          eq(dashboardCashAccounts.accountType, data.accountType),
-          eq(dashboardCashAccounts.accountId, data.accountId),
-        ))
+        .where(
+          and(
+            eq(dashboardCashAccounts.companyId, companyId),
+            eq(dashboardCashAccounts.accountType, data.accountType),
+            eq(dashboardCashAccounts.accountId, data.accountId)
+          )
+        )
         .limit(1)
         .execute();
 
@@ -2390,11 +2634,7 @@ export function registerReportsRoutes(app: Express) {
         return res.json(existing[0]);
       }
 
-      const [account] = await db
-        .insert(dashboardCashAccounts)
-        .values(data)
-        .returning()
-        .execute();
+      const [account] = await db.insert(dashboardCashAccounts).values(data).returning().execute();
 
       res.json(account);
     } catch (error: any) {
@@ -2413,12 +2653,7 @@ export function registerReportsRoutes(app: Express) {
 
       await db
         .delete(dashboardCashAccounts)
-        .where(
-          and(
-            eq(dashboardCashAccounts.id, id),
-            eq(dashboardCashAccounts.companyId, companyId)
-          )
-        )
+        .where(and(eq(dashboardCashAccounts.id, id), eq(dashboardCashAccounts.companyId, companyId)))
         .execute();
 
       res.json({ success: true });
@@ -2434,12 +2669,15 @@ export function registerReportsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { orderedIds } = req.body as { orderedIds: number[] };
       if (!Array.isArray(orderedIds)) return res.status(400).json({ message: "orderedIds must be an array" });
-      await Promise.all(orderedIds.map((id, index) =>
-        db.update(dashboardCashAccounts)
-          .set({ displayOrder: index })
-          .where(and(eq(dashboardCashAccounts.id, id), eq(dashboardCashAccounts.companyId, companyId)))
-          .execute()
-      ));
+      await Promise.all(
+        orderedIds.map((id, index) =>
+          db
+            .update(dashboardCashAccounts)
+            .set({ displayOrder: index })
+            .where(and(eq(dashboardCashAccounts.id, id), eq(dashboardCashAccounts.companyId, companyId)))
+            .execute()
+        )
+      );
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2463,32 +2701,37 @@ export function registerReportsRoutes(app: Express) {
 
       if (accounts.length === 0) return res.json([]);
 
-      const ledgerIds = accounts.map(a => a.accountId);
+      const ledgerIds = accounts.map((a) => a.accountId);
 
       // Batch-fetch account details and aggregate sums in parallel (2 queries total regardless of account count)
       const [ledgerRows, ledgerSums] = await Promise.all([
         db.select().from(ledgerAccounts).where(inArray(ledgerAccounts.id, ledgerIds)).execute(),
-        db.select({
-            accountId:   voucherEntries.ledgerAccountId,
-            totalDebit:  sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
+        db
+          .select({
+            accountId: voucherEntries.ledgerAccountId,
+            totalDebit: sql<string>`COALESCE(SUM(${voucherEntries.debitAmount}::numeric), 0)`,
             totalCredit: sql<string>`COALESCE(SUM(${voucherEntries.creditAmount}::numeric), 0)`,
           })
           .from(voucherEntries)
           .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-          .where(and(
-            inArray(voucherEntries.ledgerAccountId, ledgerIds),
-            eq(vouchers.companyId, companyId),
-            isNull(vouchers.deletedAt),
-            eq(vouchers.optional, false)
-          ))
+          .where(
+            and(
+              inArray(voucherEntries.ledgerAccountId, ledgerIds),
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              eq(vouchers.optional, false)
+            )
+          )
           .groupBy(voucherEntries.ledgerAccountId)
           .execute(),
       ]);
 
-      const ledgerMap    = new Map(ledgerRows.map(l => [l.id, l]));
-      const ledgerBalMap = new Map(ledgerSums.map(r => [Number(r.accountId), { d: Number(r.totalDebit), c: Number(r.totalCredit) }]));
+      const ledgerMap = new Map(ledgerRows.map((l) => [l.id, l]));
+      const ledgerBalMap = new Map(
+        ledgerSums.map((r) => [Number(r.accountId), { d: Number(r.totalDebit), c: Number(r.totalCredit) }])
+      );
 
-      const enrichedAccounts = accounts.map(account => {
+      const enrichedAccounts = accounts.map((account) => {
         const ledger = ledgerMap.get(account.accountId);
         if (!ledger) return null;
         let balance = parseFloat(ledger.openingBalance || "0");
@@ -2505,7 +2748,7 @@ export function registerReportsRoutes(app: Express) {
         };
       });
 
-      res.json(enrichedAccounts.filter(a => a !== null));
+      res.json(enrichedAccounts.filter((a) => a !== null));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2517,7 +2760,7 @@ export function registerReportsRoutes(app: Express) {
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      
+
       const data = insertDashboardPayableAccountSchema.parse({
         ...req.body,
         companyId,
@@ -2527,10 +2770,9 @@ export function registerReportsRoutes(app: Express) {
       const existing = await db
         .select()
         .from(dashboardPayableAccounts)
-        .where(and(
-          eq(dashboardPayableAccounts.companyId, companyId),
-          eq(dashboardPayableAccounts.accountId, data.accountId),
-        ))
+        .where(
+          and(eq(dashboardPayableAccounts.companyId, companyId), eq(dashboardPayableAccounts.accountId, data.accountId))
+        )
         .limit(1)
         .execute();
 
@@ -2538,11 +2780,7 @@ export function registerReportsRoutes(app: Express) {
         return res.json(existing[0]);
       }
 
-      const [account] = await db
-        .insert(dashboardPayableAccounts)
-        .values(data)
-        .returning()
-        .execute();
+      const [account] = await db.insert(dashboardPayableAccounts).values(data).returning().execute();
 
       res.json(account);
     } catch (error: any) {
@@ -2562,10 +2800,7 @@ export function registerReportsRoutes(app: Express) {
       await db
         .delete(dashboardPayableAccounts)
         .where(
-          and(
-            eq(dashboardPayableAccounts.accountId, accountId),
-            eq(dashboardPayableAccounts.companyId, companyId)
-          )
+          and(eq(dashboardPayableAccounts.accountId, accountId), eq(dashboardPayableAccounts.companyId, companyId))
         )
         .execute();
 
@@ -2582,12 +2817,15 @@ export function registerReportsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { orderedIds } = req.body as { orderedIds: number[] };
       if (!Array.isArray(orderedIds)) return res.status(400).json({ message: "orderedIds must be an array" });
-      await Promise.all(orderedIds.map((id, index) =>
-        db.update(dashboardPayableAccounts)
-          .set({ displayOrder: index })
-          .where(and(eq(dashboardPayableAccounts.id, id), eq(dashboardPayableAccounts.companyId, companyId)))
-          .execute()
-      ));
+      await Promise.all(
+        orderedIds.map((id, index) =>
+          db
+            .update(dashboardPayableAccounts)
+            .set({ displayOrder: index })
+            .where(and(eq(dashboardPayableAccounts.id, id), eq(dashboardPayableAccounts.companyId, companyId)))
+            .execute()
+        )
+      );
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2626,9 +2864,9 @@ export function registerReportsRoutes(app: Express) {
       const accounts = [];
       if (selection.accountIds && selection.accountIds.length > 0) {
         const allLedgerAccounts = await storage.getAllLedgerAccounts(companyId);
-        
+
         for (const accountId of selection.accountIds) {
-          const account = allLedgerAccounts.find(a => a.id === accountId);
+          const account = allLedgerAccounts.find((a) => a.id === accountId);
           if (account) {
             // Calculate current balance from voucher entries (excluding optional vouchers)
             const entries = await db
@@ -2658,7 +2896,7 @@ export function registerReportsRoutes(app: Express) {
             // Add opening balance
             const openingBalance = parseFloat(account.openingBalance || "0");
             const openingSign = account.openingBalanceSide === "Cr" ? -1 : 1;
-            const balance = (openingBalance * openingSign) + totalDebits - totalCredits;
+            const balance = openingBalance * openingSign + totalDebits - totalCredits;
 
             accounts.push({
               id: account.id,

@@ -72,17 +72,11 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
     queryKey: ["/api/containers"],
   });
 
-  const {
-    data: suppliers = [],
-    error: suppliersError,
-  } = useQuery<Supplier[]>({
+  const { data: suppliers = [], error: suppliersError } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
 
-  const otwContainers = useMemo(
-    () => containers.filter((c) => c.status === "OTW"),
-    [containers],
-  );
+  const otwContainers = useMemo(() => containers.filter((c) => c.status === "OTW"), [containers]);
 
   const containerDetailsQueries = useQueries({
     queries: otwContainers.map((container) => ({
@@ -149,9 +143,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       if (!group.categoryName && item.categoryName) group.categoryName = item.categoryName;
       group.totalQuantity += isNaN(qty) ? 0 : qty;
       group.totalCost += isNaN(cost) ? 0 : cost;
-      const existingContainer = group.containers.find(
-        (c) => c.containerNumber === item.containerNumber,
-      );
+      const existingContainer = group.containers.find((c) => c.containerNumber === item.containerNumber);
       const itemRate = parseFloat(item.rate || "0");
       if (existingContainer) {
         existingContainer.quantity += isNaN(qty) ? 0 : qty;
@@ -169,9 +161,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
     grouped.forEach((group) => {
       group.containerCount = group.containers.length;
     });
-    return Array.from(grouped.values()).sort((a, b) =>
-      a.stockItemName.localeCompare(b.stockItemName)
-    );
+    return Array.from(grouped.values()).sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
   }, [stockItems]);
 
   const gradeOptions = useMemo(() => {
@@ -193,7 +183,9 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
   const supplierOptions = useMemo(() => {
     const seen = new Set<string>();
     groupedItems.forEach((item) => {
-      item.containers.forEach((c) => { if (c.supplierName) seen.add(c.supplierName); });
+      item.containers.forEach((c) => {
+        if (c.supplierName) seen.add(c.supplierName);
+      });
     });
     return Array.from(seen).sort();
   }, [groupedItems]);
@@ -209,9 +201,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       (item.gradeName?.toLowerCase().includes(search) ?? false) ||
       (item.categoryName?.toLowerCase().includes(search) ?? false) ||
       item.containers.some(
-        (c) =>
-          c.containerNumber.toLowerCase().includes(search) ||
-          c.supplierName.toLowerCase().includes(search),
+        (c) => c.containerNumber.toLowerCase().includes(search) || c.supplierName.toLowerCase().includes(search)
       )
     );
   });
@@ -232,14 +222,13 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
   const totalValue = filteredItems.reduce((sum, item) => sum + item.totalCost, 0);
   const uniqueItemCount = filteredItems.length;
 
-  const containerGrandTotal = otwContainers.reduce(
-    (sum, c) => sum + parseFloat((c as any).grandTotal || "0"),
-    0,
-  );
-  const isFiltered = searchTerm.trim() !== "" || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all";
+  const containerGrandTotal = otwContainers.reduce((sum, c) => sum + parseFloat((c as any).grandTotal || "0"), 0);
+  const isFiltered =
+    searchTerm.trim() !== "" || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all";
   const displayTotal = isFiltered ? totalValue : containerGrandTotal;
 
-  const hasActiveFilters = searchTerm !== "" || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all";
+  const hasActiveFilters =
+    searchTerm !== "" || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all";
 
   const clearFilters = () => {
     setSearchTerm("");
@@ -256,32 +245,34 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       const ws = wb.addWorksheet("Stock OTW");
 
       const COLS = 8;
-      const BLUE_DARK  = "1D4ED8";
-      const BLUE_MID   = "DBEAFE";
+      const BLUE_DARK = "1D4ED8";
+      const BLUE_MID = "DBEAFE";
       const BLUE_LIGHT = "EFF6FF";
       const GRAY_LIGHT = "F9FAFB";
-      const WHITE      = "FFFFFF";
+      const WHITE = "FFFFFF";
 
       const hFill = (argb: string): ExcelJS.Fill => ({
-        type: "pattern", pattern: "solid", fgColor: { argb },
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb },
       });
-      const bold  = (size = 11): Partial<ExcelJS.Font> => ({ bold: true, size });
+      const bold = (size = 11): Partial<ExcelJS.Font> => ({ bold: true, size });
       const right: Partial<ExcelJS.Alignment> = { horizontal: "right", vertical: "middle" };
-      const mid:   Partial<ExcelJS.Alignment> = { horizontal: "left",  vertical: "middle" };
+      const mid: Partial<ExcelJS.Alignment> = { horizontal: "left", vertical: "middle" };
       const numFmt = "#,##0.##";
 
       // ── Title ──────────────────────────────────────────────────────────────
       ws.mergeCells(1, 1, 1, COLS);
       const titleCell = ws.getCell("A1");
       titleCell.value = "Stock On The Way";
-      titleCell.font  = { bold: true, size: 16, color: { argb: "1E3A5F" } };
+      titleCell.font = { bold: true, size: 16, color: { argb: "1E3A5F" } };
       titleCell.alignment = { horizontal: "left", vertical: "middle" };
       ws.getRow(1).height = 28;
 
       ws.mergeCells(2, 1, 2, COLS);
       const subCell = ws.getCell("A2");
       subCell.value = `Exported: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`;
-      subCell.font  = { italic: true, size: 10, color: { argb: "6B7280" } };
+      subCell.font = { italic: true, size: 10, color: { argb: "6B7280" } };
       subCell.alignment = mid;
       ws.getRow(2).height = 18;
 
@@ -299,13 +290,10 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       ws.mergeCells(4, 1, 4, COLS);
       const statsCell = ws.getCell("A4");
       statsCell.value = statsText;
-      statsCell.font  = { size: 10, color: { argb: "374151" } };
+      statsCell.font = { size: 10, color: { argb: "374151" } };
       statsCell.alignment = mid;
 
-      if (
-        searchTerm || selectedGrade !== "all" ||
-        selectedCategory !== "all" || selectedSupplier !== "all"
-      ) {
+      if (searchTerm || selectedGrade !== "all" || selectedCategory !== "all" || selectedSupplier !== "all") {
         const filters: string[] = [];
         if (searchTerm) filters.push(`Search: "${searchTerm}"`);
         if (selectedGrade !== "all") filters.push(`Grade: ${selectedGrade}`);
@@ -315,7 +303,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
         ws.mergeCells(5, 1, 5, COLS);
         const fCell = ws.getCell("A5");
         fCell.value = `Active filters: ${filters.join(" | ")}`;
-        fCell.font  = { italic: true, size: 9, color: { argb: "9CA3AF" } };
+        fCell.font = { italic: true, size: 9, color: { argb: "9CA3AF" } };
         fCell.alignment = mid;
       }
 
@@ -323,17 +311,14 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
 
       // ── Column headers ─────────────────────────────────────────────────────
       const HDR_ROW = 7;
-      const headers = [
-        "Item Name", "Grade", "Category", "Container #", "Supplier",
-        "Quantity", "Rate", "Total Cost",
-      ];
+      const headers = ["Item Name", "Grade", "Category", "Container #", "Supplier", "Quantity", "Rate", "Total Cost"];
       const hRow = ws.getRow(HDR_ROW);
       hRow.height = 22;
       headers.forEach((h, i) => {
         const cell = hRow.getCell(i + 1);
         cell.value = h;
-        cell.font  = { ...bold(11), color: { argb: WHITE } };
-        cell.fill  = hFill(BLUE_DARK);
+        cell.font = { ...bold(11), color: { argb: WHITE } };
+        cell.fill = hFill(BLUE_DARK);
         cell.alignment = i >= 5 ? right : mid;
         cell.border = {
           bottom: { style: "thin", color: { argb: "FFFFFF" } },
@@ -344,7 +329,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       let rowIdx = HDR_ROW + 1;
 
       for (const item of filteredItems) {
-        const uniqueSuppliers = Array.from(new Set(item.containers.map(c => c.supplierName)));
+        const uniqueSuppliers = Array.from(new Set(item.containers.map((c) => c.supplierName)));
 
         // Summary row
         const sRow = ws.getRow(rowIdx++);
@@ -362,8 +347,8 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
         sCells.forEach((v, i) => {
           const cell = sRow.getCell(i + 1);
           cell.value = v;
-          cell.fill  = hFill(BLUE_LIGHT);
-          cell.font  = bold(10);
+          cell.fill = hFill(BLUE_LIGHT);
+          cell.font = bold(10);
           cell.alignment = i >= 5 ? right : mid;
           if (i === 5 || i === 7) cell.numFmt = numFmt;
         });
@@ -385,8 +370,8 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
           cCells.forEach((v, i) => {
             const cell = cRow.getCell(i + 1);
             cell.value = v;
-            cell.fill  = hFill(i % 2 === 0 ? WHITE : GRAY_LIGHT);
-            cell.font  = { size: 9, color: { argb: "374151" } };
+            cell.fill = hFill(i % 2 === 0 ? WHITE : GRAY_LIGHT);
+            cell.font = { size: 9, color: { argb: "374151" } };
             cell.alignment = i >= 5 ? right : mid;
             if (i >= 5) cell.numFmt = numFmt;
           });
@@ -401,14 +386,20 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
       const totRow = ws.getRow(rowIdx);
       totRow.height = 22;
       const totCells: (string | number | null)[] = [
-        `Total — ${filteredItems.length} items`, "", "", "", "",
-        totalQuantity, null, displayTotal,
+        `Total — ${filteredItems.length} items`,
+        "",
+        "",
+        "",
+        "",
+        totalQuantity,
+        null,
+        displayTotal,
       ];
       totCells.forEach((v, i) => {
         const cell = totRow.getCell(i + 1);
         cell.value = v;
-        cell.fill  = hFill(BLUE_MID);
-        cell.font  = bold(11);
+        cell.fill = hFill(BLUE_MID);
+        cell.font = bold(11);
         cell.alignment = i >= 5 ? right : mid;
         if (i === 5 || i === 7) cell.numFmt = numFmt;
       });
@@ -437,11 +428,15 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
     return (
       <div className="p-3 sm:p-0 space-y-4 sm:space-y-6">
         <div className="flex flex-wrap gap-3">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-32 rounded-lg" />)}
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-10 w-32 rounded-lg" />
+          ))}
         </div>
         <Skeleton className="h-10 w-full rounded-md" />
         <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-xl" />
+          ))}
         </div>
       </div>
     );
@@ -519,14 +514,19 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
         <div className="flex flex-wrap gap-3">
           <div className="flex items-center gap-2 bg-blue-500/10 rounded-lg px-3 py-2">
             <Ship className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-sm font-semibold text-blue-700 dark:text-blue-300" data-testid="text-containers-count">
+            <span
+              className="text-sm font-semibold text-blue-700 dark:text-blue-300"
+              data-testid="text-containers-count"
+            >
               {otwContainers.length}
             </span>
             <span className="text-xs text-muted-foreground">Containers OTW</span>
           </div>
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
             <Package className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-semibold" data-testid="text-total-items">{groupedItems.length}</span>
+            <span className="text-sm font-semibold" data-testid="text-total-items">
+              {groupedItems.length}
+            </span>
             <span className="text-xs text-muted-foreground">Unique Items</span>
           </div>
           <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
@@ -565,7 +565,9 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
               <SelectContent>
                 <SelectItem value="all">All Grades</SelectItem>
                 {gradeOptions.map((g) => (
-                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                  <SelectItem key={g} value={g}>
+                    {g}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -578,7 +580,9 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
                 {categoryOptions.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -591,7 +595,9 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
               <SelectContent>
                 <SelectItem value="all">All Suppliers</SelectItem>
                 {supplierOptions.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -644,11 +650,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
                       >
                         <TableCell className="pl-4">
                           <Button variant="ghost" size="icon" data-testid={`button-expand-${index}`}>
-                            {isExpanded ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
+                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                           </Button>
                         </TableCell>
                         <TableCell className="font-medium">
@@ -672,9 +674,7 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
                         <TableCell className="text-right font-mono font-semibold">
                           {Math.round(item.totalQuantity).toLocaleString()}
                         </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatAmount(item.totalCost)}
-                        </TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(item.totalCost)}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {uniqueSuppliers.length === 1
                             ? uniqueSuppliers[0]
@@ -798,7 +798,9 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
               <span className="text-sm font-semibold">Total ({uniqueItemCount} items)</span>
               <div className="text-right">
                 <p className="text-sm font-mono font-semibold">{formatAmount(displayTotal)}</p>
-                <p className="text-xs text-muted-foreground font-mono">{Math.round(totalQuantity).toLocaleString()} units</p>
+                <p className="text-xs text-muted-foreground font-mono">
+                  {Math.round(totalQuantity).toLocaleString()} units
+                </p>
               </div>
             </div>
           </div>
@@ -810,10 +812,5 @@ function StockOTWContent({ showCombined, onToggleCombined }: { showCombined: boo
 
 export default function StockOTW() {
   const [showCombined, setShowCombined] = useState(false);
-  return (
-    <StockOTWContent
-      showCombined={showCombined}
-      onToggleCombined={() => setShowCombined((v) => !v)}
-    />
-  );
+  return <StockOTWContent showCombined={showCombined} onToggleCombined={() => setShowCombined((v) => !v)} />;
 }

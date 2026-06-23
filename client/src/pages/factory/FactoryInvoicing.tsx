@@ -27,9 +27,9 @@ export default function FactoryInvoicing() {
 
   const allTabs: { key: InvoicingTab; label: string }[] = [
     { key: "proformas", label: "Proformas" },
-    { key: "invoices",  label: "Invoices"  },
+    { key: "invoices", label: "Invoices" },
   ];
-  const tabs = allTabs.filter(t => !(t.key === "proformas" && hideProformasTab));
+  const tabs = allTabs.filter((t) => !(t.key === "proformas" && hideProformasTab));
 
   const goTo = (tab: InvoicingTab) => {
     navigate(`/factory/invoicing?tab=${tab}`);

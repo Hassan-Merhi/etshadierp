@@ -27,20 +27,14 @@ const CREATE_ROLES = new Set(["Developer", "Admin", "Owner", "Manager", "Normal 
  * Returns null when allowed, or { code, message } when denied.
  * Always call this at the top of the route handler, before any work is done.
  */
-export async function requireAIActionPermission(
-  req: Request,
-  actionType: AIActionType,
-): Promise<Denial | null> {
+export async function requireAIActionPermission(req: Request, actionType: AIActionType): Promise<Denial | null> {
   const userId = req.session.userId;
   const role = req.session.currentRole ?? "";
 
   if (!userId) return { code: 401, message: "Unauthorized" };
 
   // One DB query — chatbotEnabled is not cached in session yet.
-  const [user] = await db
-    .select({ chatbotEnabled: users.chatbotEnabled })
-    .from(users)
-    .where(eq(users.id, userId));
+  const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled }).from(users).where(eq(users.id, userId));
 
   if (!user?.chatbotEnabled) {
     return {
@@ -95,9 +89,9 @@ export async function logAIAction(params: {
       companyId,
       actionType: params.actionType,
       actionName: params.actionName,
-      inputJson:  params.inputJson  ?? null,
+      inputJson: params.inputJson ?? null,
       outputJson: params.outputJson ?? null,
-      status:     params.status,
+      status: params.status,
       createdRecordId: params.createdRecordId ?? null,
     } as any);
   } catch (err) {

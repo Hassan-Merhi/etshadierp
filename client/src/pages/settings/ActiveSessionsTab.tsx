@@ -52,7 +52,11 @@ function parseOS(ua: string | null) {
 export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
   const { toast } = useToast();
 
-  const { data: sessions = [], isLoading, refetch } = useQuery<ActiveSession[]>({
+  const {
+    data: sessions = [],
+    isLoading,
+    refetch,
+  } = useQuery<ActiveSession[]>({
     queryKey: ["/api/sessions"],
   });
 
@@ -82,7 +86,7 @@ export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
     },
   });
 
-  const otherSessions = sessions.filter(s => !s.isCurrent);
+  const otherSessions = sessions.filter((s) => !s.isCurrent);
   const groupedByUser = isAdmin
     ? sessions.reduce<Record<string, ActiveSession[]>>((acc, s) => {
         const key = s.username || s.userId || "unknown";
@@ -128,13 +132,13 @@ export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
 
       {isLoading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-20 w-full" />
+          ))}
         </div>
       ) : sessions.length === 0 ? (
         <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">
-            No active sessions found.
-          </CardContent>
+          <CardContent className="py-8 text-center text-muted-foreground">No active sessions found.</CardContent>
         </Card>
       ) : isAdmin ? (
         <div className="space-y-6">
@@ -144,7 +148,7 @@ export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
                 {username}
               </p>
               <div className="space-y-2">
-                {userSessions.map(session => (
+                {userSessions.map((session) => (
                   <SessionRow
                     key={session.sid}
                     session={session}
@@ -158,7 +162,7 @@ export function ActiveSessionsTab({ isAdmin }: { isAdmin: boolean }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {sessions.map(session => (
+          {sessions.map((session) => (
             <SessionRow
               key={session.sid}
               session={session}
@@ -184,12 +188,8 @@ function SessionRow({
   const DeviceIcon = getDeviceIcon(session.userAgent);
   const browser = parseBrowser(session.userAgent);
   const os = parseOS(session.userAgent);
-  const expiresIn = session.expires
-    ? formatDistanceToNow(new Date(session.expires), { addSuffix: true })
-    : "unknown";
-  const loginAtFormatted = session.loginAt
-    ? format(new Date(session.loginAt), "MMM d, yyyy 'at' h:mm a")
-    : null;
+  const expiresIn = session.expires ? formatDistanceToNow(new Date(session.expires), { addSuffix: true }) : "unknown";
+  const loginAtFormatted = session.loginAt ? format(new Date(session.loginAt), "MMM d, yyyy 'at' h:mm a") : null;
 
   const location = [session.city, session.country].filter(Boolean).join(", ");
 
@@ -203,7 +203,8 @@ function SessionRow({
           <div className="min-w-0 space-y-0.5">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium">
-                {browser}{os ? ` on ${os}` : ""}
+                {browser}
+                {os ? ` on ${os}` : ""}
               </span>
               {session.isCurrent && (
                 <Badge variant="secondary" data-testid="badge-current-session">
@@ -217,9 +218,7 @@ function SessionRow({
               )}
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              {session.ip && (
-                <span className="text-xs text-muted-foreground font-mono">{session.ip}</span>
-              )}
+              {session.ip && <span className="text-xs text-muted-foreground font-mono">{session.ip}</span>}
               {location && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <MapPin className="h-3 w-3" />

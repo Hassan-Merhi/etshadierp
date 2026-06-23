@@ -6,9 +6,24 @@ import { PageHeader } from "@/components/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Search, Plus, Package, Edit, FileSpreadsheet, Trash2, Download,
-  PlusCircle, MinusCircle, ChevronDown, Settings, ChevronLeft, ChevronRight,
-  Tag, Layers, Pencil, Check, X,
+  Search,
+  Plus,
+  Package,
+  Edit,
+  FileSpreadsheet,
+  Trash2,
+  Download,
+  PlusCircle,
+  MinusCircle,
+  ChevronDown,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  Tag,
+  Layers,
+  Pencil,
+  Check,
+  X,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -40,13 +55,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -153,11 +162,20 @@ export default function StockItems() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  useEffect(() => { setCurrentPage(1); }, [selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter]);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedGroupFilter, selectedGradeFilter, selectedCategoryFilter]);
 
   const pagedQueryKey = [
     "/api/stock-items",
-    { page: currentPage, pageSize: PAGE_SIZE, search: debouncedSearch, stockGroupId: selectedGroupFilter, gradeId: selectedGradeFilter, categoryId: selectedCategoryFilter },
+    {
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      search: debouncedSearch,
+      stockGroupId: selectedGroupFilter,
+      gradeId: selectedGradeFilter,
+      categoryId: selectedCategoryFilter,
+    },
   ];
   const { data: pagedData, isLoading } = useQuery<PagedStockItemsResponse>({
     queryKey: pagedQueryKey,
@@ -203,8 +221,8 @@ export default function StockItems() {
   }
 
   // Derived stats
-  const activeCount = displayItems.filter(i => i.active).length;
-  const inactiveCount = displayItems.filter(i => !i.active).length;
+  const activeCount = displayItems.filter((i) => i.active).length;
+  const inactiveCount = displayItems.filter((i) => !i.active).length;
 
   // ─── Mutations: stock items ───────────────────────────────────────────────
   const deleteMutation = useMutation({
@@ -228,7 +246,10 @@ export default function StockItems() {
       queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       setAdjustDialogOpen(false);
-      setAdjustStockItemId(""); setAdjustLocationId(""); setAdjustQuantity(""); setAdjustType("add");
+      setAdjustStockItemId("");
+      setAdjustLocationId("");
+      setAdjustQuantity("");
+      setAdjustType("add");
       toast({ title: "Success", description: data.message || "Stock adjusted successfully" });
     },
     onError: (error: Error) => {
@@ -242,7 +263,9 @@ export default function StockItems() {
       apiRequest("POST", "/api/stock-items/bulk-assign-category", { ids, categoryId }),
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
-      setSelectedIds([]); setAssignCategoryDialogOpen(false); setPendingCategoryId("");
+      setSelectedIds([]);
+      setAssignCategoryDialogOpen(false);
+      setPendingCategoryId("");
       toast({ title: "Success", description: data.message || "Category assigned successfully" });
     },
     onError: (error: Error) => {
@@ -270,7 +293,8 @@ export default function StockItems() {
       apiRequest("PATCH", `/api/stock-grades/${id}`, { name }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-grades"] });
-      setEditingGradeId(null); setEditingGradeName("");
+      setEditingGradeId(null);
+      setEditingGradeName("");
       toast({ title: "Grade updated" });
     },
     onError: (error: Error) => {
@@ -311,7 +335,8 @@ export default function StockItems() {
       apiRequest("PATCH", `/api/stock-categories/${id}`, { name }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
-      setEditingCategoryId(null); setEditingCategoryName("");
+      setEditingCategoryId(null);
+      setEditingCategoryName("");
       toast({ title: "Category updated" });
     },
     onError: (error: Error) => {
@@ -336,67 +361,99 @@ export default function StockItems() {
   // ─── Handlers ─────────────────────────────────────────────────────────────
   const handleAdjustStock = async () => {
     if (!adjustStockItemId || !adjustLocationId || !adjustQuantity) {
-      toast({ title: "Error", description: "Please fill in all fields", variant: "destructive" }); return;
+      toast({ title: "Error", description: "Please fill in all fields", variant: "destructive" });
+      return;
     }
     const qty = parseFloat(adjustQuantity);
     if (isNaN(qty) || qty <= 0) {
-      toast({ title: "Error", description: "Please enter a valid quantity greater than 0", variant: "destructive" }); return;
+      toast({ title: "Error", description: "Please enter a valid quantity greater than 0", variant: "destructive" });
+      return;
     }
-    adjustStockMutation.mutate({ stockItemId: parseInt(adjustStockItemId), locationId: parseInt(adjustLocationId), quantity: qty, type: adjustType });
+    adjustStockMutation.mutate({
+      stockItemId: parseInt(adjustStockItemId),
+      locationId: parseInt(adjustLocationId),
+      quantity: qty,
+      type: adjustType,
+    });
   };
 
   const handleSelectAll = (checked: boolean) => {
-    setSelectedIds(checked ? displayItems.map(item => item.id) : []);
+    setSelectedIds(checked ? displayItems.map((item) => item.id) : []);
   };
 
   const handleSelectItem = (id: number, checked: boolean) => {
-    setSelectedIds(prev => checked ? [...prev, id] : prev.filter(i => i !== id));
+    setSelectedIds((prev) => (checked ? [...prev, id] : prev.filter((i) => i !== id)));
   };
 
-  const allPageSelected = displayItems.length > 0 && displayItems.every(item => selectedIds.includes(item.id));
+  const allPageSelected = displayItems.length > 0 && displayItems.every((item) => selectedIds.includes(item.id));
 
   const getStockGroupName = (stockGroupId: number | null) => {
     if (!stockGroupId) return null;
-    return stockGroups.find(g => g.id === stockGroupId)?.name ?? null;
+    return stockGroups.find((g) => g.id === stockGroupId)?.name ?? null;
   };
   const getGradeName = (gradeId: number | null) => {
     if (!gradeId) return null;
-    return stockGrades.find(g => g.id === gradeId)?.name ?? null;
+    return stockGrades.find((g) => g.id === gradeId)?.name ?? null;
   };
   const getCategoryName = (categoryId: number | null) => {
     if (!categoryId) return null;
-    return stockCategories.find(c => c.id === categoryId)?.name ?? null;
+    return stockCategories.find((c) => c.id === categoryId)?.name ?? null;
   };
 
   const handleStockItemClick = (id: number, name: string) => {
-    setSelectedStockItemId(id); setSelectedStockItemName(name); setDetailsDialogOpen(true);
+    setSelectedStockItemId(id);
+    setSelectedStockItemName(name);
+    setDetailsDialogOpen(true);
   };
   const handleEditClick = (id: number, e: React.MouseEvent) => {
-    e.stopPropagation(); setEditStockItemId(id); setEditDialogOpen(true);
+    e.stopPropagation();
+    setEditStockItemId(id);
+    setEditDialogOpen(true);
   };
 
   const exportSalesHistory = async () => {
-    if (!navigator.onLine) { toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" }); return; }
+    if (!navigator.onLine) {
+      toast({ title: "Not available offline", description: "Exports require a connection", variant: "destructive" });
+      return;
+    }
     try {
       const res = await fetch("/api/stock-items/last-sales-export", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch sales history");
       const rows: {
-        stockItemId: number; itemCode: string; itemName: string; voucherNumber: string;
-        voucherDate: string; locationName: string; quantity: string; rate: string; amount: string; rn: number;
+        stockItemId: number;
+        itemCode: string;
+        itemName: string;
+        voucherNumber: string;
+        voucherDate: string;
+        locationName: string;
+        quantity: string;
+        rate: string;
+        amount: string;
+        rn: number;
       }[] = await res.json();
-      if (rows.length === 0) { toast({ title: "No sales data", description: "No sales history found for any item." }); return; }
+      if (rows.length === 0) {
+        toast({ title: "No sales data", description: "No sales history found for any item." });
+        return;
+      }
       const data: Record<string, string>[] = [];
       let lastItemId: number | null = null;
       for (const row of rows) {
         if (lastItemId !== null && row.stockItemId !== lastItemId) data.push({});
         lastItemId = row.stockItemId;
         data.push({
-          "Item Code": row.itemCode, "Item Name": row.itemName, "Sale #": String(row.rn),
-          "Voucher No.": row.voucherNumber || "", "Date": row.voucherDate ? new Date(row.voucherDate).toLocaleDateString() : "",
-          "Location": row.locationName || "",
-          "Qty": row.quantity ? parseFloat(row.quantity).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "",
-          "Rate": row.rate ? parseFloat(row.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
-          "Amount": row.amount ? parseFloat(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "",
+          "Item Code": row.itemCode,
+          "Item Name": row.itemName,
+          "Sale #": String(row.rn),
+          "Voucher No.": row.voucherNumber || "",
+          Date: row.voucherDate ? new Date(row.voucherDate).toLocaleDateString() : "",
+          Location: row.locationName || "",
+          Qty: row.quantity ? parseFloat(row.quantity).toLocaleString(undefined, { maximumFractionDigits: 2 }) : "",
+          Rate: row.rate
+            ? parseFloat(row.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : "",
+          Amount: row.amount
+            ? parseFloat(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+            : "",
         });
       }
       const worksheet = utils.json_to_sheet(data);
@@ -417,8 +474,11 @@ export default function StockItems() {
         fetch("/api/stock-items/all-code-aliases", { credentials: "include" }),
       ]);
       const allItems: StockItem[] = allRes.ok ? await allRes.json() : [];
-      const locationPrices: { stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[] = pricesRes.ok ? await pricesRes.json() : [];
-      const costDubaiData: { stockItemId: number; costDubai: string }[] = costDubaiRes.ok ? await costDubaiRes.json() : [];
+      const locationPrices: { stockItemId: number; locationId: number; locationName: string; sellingPrice: string }[] =
+        pricesRes.ok ? await pricesRes.json() : [];
+      const costDubaiData: { stockItemId: number; costDubai: string }[] = costDubaiRes.ok
+        ? await costDubaiRes.json()
+        : [];
       const aliasData: { stockItemId: number; aliasCode: string }[] = aliasesRes.ok ? await aliasesRes.json() : [];
 
       const costDubaiMap = new Map<number, string>();
@@ -436,18 +496,20 @@ export default function StockItems() {
         aliasMap.get(a.stockItemId)!.push(a.aliasCode);
       }
 
-      const sortedLocations = locations.map(l => l.name).sort();
-      const data = allItems.map(item => {
+      const sortedLocations = locations.map((l) => l.name).sort();
+      const data = allItems.map((item) => {
         const costDubai = costDubaiMap.get(item.id);
         const defaultPrice = item.sellingPrice || "0";
         const itemAliases = aliasMap.get(item.id) ?? [];
         const row: Record<string, string> = {
-          Code: item.code, Name: item.name, Barcode: item.barcode || "",
+          Code: item.code,
+          Name: item.name,
+          Barcode: item.barcode || "",
           "Alias Codes": itemAliases.join(", "),
           UOM: item.uom,
           "Stock Group": getStockGroupName(item.stockGroupId) ?? "— No Group —",
-          "Grade": getGradeName(item.gradeId) || "",
-          "Category": getCategoryName(item.categoryId) || "",
+          Grade: getGradeName(item.gradeId) || "",
+          Category: getCategoryName(item.categoryId) || "",
           "Default Selling Price": formatAmount(defaultPrice),
           "Cost Dubai": costDubai ? formatAmount(costDubai) : "",
         };
@@ -477,13 +539,18 @@ export default function StockItems() {
               <Button
                 variant="outline"
                 className="gap-2"
-                onClick={() => { setPendingCategoryId(""); setAssignCategoryDialogOpen(true); }}
+                onClick={() => {
+                  setPendingCategoryId("");
+                  setAssignCategoryDialogOpen(true);
+                }}
                 data-testid="button-assign-category"
               >
                 <Package className="h-4 w-4" />
                 <span className="hidden sm:inline">Assign Category</span>
                 <span className="sm:hidden">Category</span>
-                <Badge variant="secondary" className="ml-1">{selectedIds.length}</Badge>
+                <Badge variant="secondary" className="ml-1">
+                  {selectedIds.length}
+                </Badge>
               </Button>
               <Button
                 variant="destructive"
@@ -496,11 +563,7 @@ export default function StockItems() {
               </Button>
             </>
           )}
-          <Button
-            className="gap-2"
-            onClick={() => setCreateDialogOpen(true)}
-            data-testid="button-add-item"
-          >
+          <Button className="gap-2" onClick={() => setCreateDialogOpen(true)} data-testid="button-add-item">
             <Plus className="h-4 w-4" />
             Add Item
           </Button>
@@ -517,7 +580,13 @@ export default function StockItems() {
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Import
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { refetchAllItems(); setAdjustDialogOpen(true); }} data-testid="menu-adjust-stock">
+              <DropdownMenuItem
+                onClick={() => {
+                  refetchAllItems();
+                  setAdjustDialogOpen(true);
+                }}
+                data-testid="menu-adjust-stock"
+              >
                 <Edit className="h-4 w-4 mr-2" />
                 Adjust Stock
               </DropdownMenuItem>
@@ -530,11 +599,25 @@ export default function StockItems() {
                 Export Sales History
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => { setNewGradeName(""); setEditingGradeId(null); setManageGradesOpen(true); }} data-testid="menu-manage-grades">
+              <DropdownMenuItem
+                onClick={() => {
+                  setNewGradeName("");
+                  setEditingGradeId(null);
+                  setManageGradesOpen(true);
+                }}
+                data-testid="menu-manage-grades"
+              >
                 <Tag className="h-4 w-4 mr-2" />
                 Manage Grades
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => { setNewCategoryName(""); setEditingCategoryId(null); setManageCategoriesOpen(true); }} data-testid="menu-manage-categories">
+              <DropdownMenuItem
+                onClick={() => {
+                  setNewCategoryName("");
+                  setEditingCategoryId(null);
+                  setManageCategoriesOpen(true);
+                }}
+                data-testid="menu-manage-categories"
+              >
                 <Layers className="h-4 w-4 mr-2" />
                 Manage Categories
               </DropdownMenuItem>
@@ -595,8 +678,10 @@ export default function StockItems() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Groups</SelectItem>
-            {stockGroups.map(g => (
-              <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+            {stockGroups.map((g) => (
+              <SelectItem key={g.id} value={String(g.id)}>
+                {g.name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -610,8 +695,10 @@ export default function StockItems() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Grades</SelectItem>
-              {stockGrades.map(g => (
-                <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+              {stockGrades.map((g) => (
+                <SelectItem key={g.id} value={String(g.id)}>
+                  {g.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -627,8 +714,10 @@ export default function StockItems() {
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               <SelectItem value="none">No Category</SelectItem>
-              {stockCategories.map(c => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+              {stockCategories.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -694,30 +783,42 @@ export default function StockItems() {
                       </td>
                       <td className="px-3 py-3" data-testid={`name-${item.id}`}>
                         <div className="font-medium leading-tight">{item.name}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{item.code} · {item.uom}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {item.code} · {item.uom}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-sm text-muted-foreground" data-testid={`group-${item.id}`}>
                         {getStockGroupName(item.stockGroupId) ?? <span className="text-xs">—</span>}
                       </td>
                       {stockGrades.length > 0 && (
                         <td className="px-3 py-3" data-testid={`grade-${item.id}`}>
-                          {getGradeName(item.gradeId)
-                            ? <Badge variant="outline" className="text-xs font-normal">{getGradeName(item.gradeId)}</Badge>
-                            : <span className="text-xs text-muted-foreground">—</span>}
+                          {getGradeName(item.gradeId) ? (
+                            <Badge variant="outline" className="text-xs font-normal">
+                              {getGradeName(item.gradeId)}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </td>
                       )}
                       {stockCategories.length > 0 && (
                         <td className="px-3 py-3" data-testid={`category-${item.id}`}>
-                          {getCategoryName(item.categoryId)
-                            ? <Badge variant="secondary" className="text-xs">{getCategoryName(item.categoryId)}</Badge>
-                            : <span className="text-xs text-muted-foreground">—</span>}
+                          {getCategoryName(item.categoryId) ? (
+                            <Badge variant="secondary" className="text-xs">
+                              {getCategoryName(item.categoryId)}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </td>
                       )}
                       <td className="px-3 py-3 max-w-[180px]" data-testid={`aliases-${item.id}`}>
                         {(aliasMap.get(item.id) ?? []).length > 0 ? (
                           <div className="flex flex-wrap gap-1">
-                            {(aliasMap.get(item.id) ?? []).map(code => (
-                              <Badge key={code} variant="outline" className="text-xs font-mono font-normal">{code}</Badge>
+                            {(aliasMap.get(item.id) ?? []).map((code) => (
+                              <Badge key={code} variant="outline" className="text-xs font-mono font-normal">
+                                {code}
+                              </Badge>
                             ))}
                           </div>
                         ) : (
@@ -748,17 +849,35 @@ export default function StockItems() {
               {totalItems > 0 && (
                 <tfoot>
                   <tr className="border-t bg-muted/40">
-                    <td colSpan={5 + (stockGrades.length > 0 ? 1 : 0) + (stockCategories.length > 0 ? 1 : 0)} className="px-3 py-2">
+                    <td
+                      colSpan={5 + (stockGrades.length > 0 ? 1 : 0) + (stockCategories.length > 0 ? 1 : 0)}
+                      className="px-3 py-2"
+                    >
                       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
                         <span>
-                          Showing {((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems.toLocaleString()} items
+                          Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} of{" "}
+                          {totalItems.toLocaleString()} items
                         </span>
                         <div className="flex items-center gap-1">
-                          <Button size="icon" variant="outline" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} data-testid="button-prev-page">
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={currentPage <= 1}
+                            data-testid="button-prev-page"
+                          >
                             <ChevronLeft className="h-4 w-4" />
                           </Button>
-                          <span className="px-2 text-sm">Page {currentPage} of {totalPages}</span>
-                          <Button size="icon" variant="outline" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} data-testid="button-next-page">
+                          <span className="px-2 text-sm">
+                            Page {currentPage} of {totalPages}
+                          </span>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={currentPage >= totalPages}
+                            data-testid="button-next-page"
+                          >
                             <ChevronRight className="h-4 w-4" />
                           </Button>
                         </div>
@@ -773,7 +892,11 @@ export default function StockItems() {
           {/* Mobile card view */}
           <div className="md:hidden space-y-2">
             <div className="flex items-center gap-2 pb-2 border-b">
-              <Checkbox checked={allPageSelected} onCheckedChange={handleSelectAll} data-testid="checkbox-select-all-mobile" />
+              <Checkbox
+                checked={allPageSelected}
+                onCheckedChange={handleSelectAll}
+                data-testid="checkbox-select-all-mobile"
+              />
               <span className="text-sm text-muted-foreground">Select All</span>
             </div>
             {displayItems.length === 0 ? (
@@ -791,15 +914,30 @@ export default function StockItems() {
                         data-testid={`checkbox-mobile-${item.id}`}
                       />
                     </div>
-                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleStockItemClick(item.id, item.name)}>
-                      <div className="font-medium truncate" data-testid={`name-mobile-${item.id}`}>{item.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{item.code} · {item.uom}</div>
+                    <div
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => handleStockItemClick(item.id, item.name)}
+                    >
+                      <div className="font-medium truncate" data-testid={`name-mobile-${item.id}`}>
+                        {item.name}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {item.code} · {item.uom}
+                      </div>
                       <div className="flex flex-wrap gap-1.5 mt-2">
-                        <Badge variant={item.active ? "default" : "secondary"} className="text-xs" data-testid={`status-mobile-${item.id}`}>
+                        <Badge
+                          variant={item.active ? "default" : "secondary"}
+                          className="text-xs"
+                          data-testid={`status-mobile-${item.id}`}
+                        >
                           {item.active ? "Active" : "Inactive"}
                         </Badge>
                         {getGradeName(item.gradeId) && (
-                          <Badge variant="outline" className="text-xs font-normal" data-testid={`grade-mobile-${item.id}`}>
+                          <Badge
+                            variant="outline"
+                            className="text-xs font-normal"
+                            data-testid={`grade-mobile-${item.id}`}
+                          >
                             {getGradeName(item.gradeId)}
                           </Badge>
                         )}
@@ -808,8 +946,15 @@ export default function StockItems() {
                             {getCategoryName(item.categoryId)}
                           </Badge>
                         )}
-                        {(aliasMap.get(item.id) ?? []).map(code => (
-                          <Badge key={code} variant="outline" className="text-xs font-mono font-normal" data-testid={`alias-mobile-${item.id}`}>{code}</Badge>
+                        {(aliasMap.get(item.id) ?? []).map((code) => (
+                          <Badge
+                            key={code}
+                            variant="outline"
+                            className="text-xs font-mono font-normal"
+                            data-testid={`alias-mobile-${item.id}`}
+                          >
+                            {code}
+                          </Badge>
                         ))}
                       </div>
                       {!hideStockRates && (
@@ -817,7 +962,8 @@ export default function StockItems() {
                       )}
                     </div>
                     <Button
-                      size="sm" variant="ghost"
+                      size="sm"
+                      variant="ghost"
                       onClick={(e) => handleEditClick(item.id, e)}
                       data-testid={`button-edit-mobile-${item.id}`}
                       className="gap-1 shrink-0"
@@ -831,12 +977,26 @@ export default function StockItems() {
             )}
             {totalItems > PAGE_SIZE && (
               <div className="flex items-center justify-between pt-2 text-sm text-muted-foreground">
-                <span>{((currentPage - 1) * PAGE_SIZE) + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems}</span>
+                <span>
+                  {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, totalItems)} of {totalItems}
+                </span>
                 <div className="flex gap-1">
-                  <Button size="icon" variant="outline" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage <= 1} data-testid="button-prev-page-mobile">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                    data-testid="button-prev-page-mobile"
+                  >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="outline" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} data-testid="button-next-page-mobile">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                    data-testid="button-next-page-mobile"
+                  >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -862,13 +1022,17 @@ export default function StockItems() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {selectedIds.length} stock {selectedIds.length === 1 ? "item" : "items"}? This cannot be undone.
+              Are you sure you want to delete {selectedIds.length} stock {selectedIds.length === 1 ? "item" : "items"}?
+              This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => { deleteMutation.mutate(selectedIds); setDeleteDialogOpen(false); }}
+              onClick={() => {
+                deleteMutation.mutate(selectedIds);
+                setDeleteDialogOpen(false);
+              }}
               className="bg-destructive hover:bg-destructive/90"
               data-testid="button-confirm-delete"
             >
@@ -883,7 +1047,8 @@ export default function StockItems() {
           <DialogHeader>
             <DialogTitle>Assign Category</DialogTitle>
             <DialogDescription>
-              Choose a category to assign to the {selectedIds.length} selected {selectedIds.length === 1 ? "item" : "items"}.
+              Choose a category to assign to the {selectedIds.length} selected{" "}
+              {selectedIds.length === 1 ? "item" : "items"}.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -893,14 +1058,22 @@ export default function StockItems() {
                 <SelectValue placeholder="Select a category..." />
               </SelectTrigger>
               <SelectContent>
-                {stockCategories.map(cat => (
-                  <SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>
+                {stockCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id.toString()}>
+                    {cat.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignCategoryDialogOpen(false)} data-testid="button-cancel-assign-category">Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => setAssignCategoryDialogOpen(false)}
+              data-testid="button-cancel-assign-category"
+            >
+              Cancel
+            </Button>
             <Button
               onClick={() => {
                 const categoryId = pendingCategoryId === "" ? null : parseInt(pendingCategoryId);
@@ -930,8 +1103,10 @@ export default function StockItems() {
                   <SelectValue placeholder="Select stock item..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {allStockItems.map(item => (
-                    <SelectItem key={item.id} value={item.id.toString()}>{item.code} - {item.name}</SelectItem>
+                  {allStockItems.map((item) => (
+                    <SelectItem key={item.id} value={item.id.toString()}>
+                      {item.code} - {item.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -943,8 +1118,10 @@ export default function StockItems() {
                   <SelectValue placeholder="Select location..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map(loc => (
-                    <SelectItem key={loc.id} value={loc.id.toString()}>{loc.code} - {loc.name}</SelectItem>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id.toString()}>
+                      {loc.code} - {loc.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -952,22 +1129,48 @@ export default function StockItems() {
             <div className="space-y-2">
               <Label>Adjustment Type</Label>
               <div className="flex gap-2">
-                <Button type="button" variant={adjustType === "add" ? "default" : "outline"} className="flex-1 gap-2" onClick={() => setAdjustType("add")} data-testid="button-adjust-add">
+                <Button
+                  type="button"
+                  variant={adjustType === "add" ? "default" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => setAdjustType("add")}
+                  data-testid="button-adjust-add"
+                >
                   <PlusCircle className="h-4 w-4" /> Add (+)
                 </Button>
-                <Button type="button" variant={adjustType === "subtract" ? "destructive" : "outline"} className="flex-1 gap-2" onClick={() => setAdjustType("subtract")} data-testid="button-adjust-subtract">
+                <Button
+                  type="button"
+                  variant={adjustType === "subtract" ? "destructive" : "outline"}
+                  className="flex-1 gap-2"
+                  onClick={() => setAdjustType("subtract")}
+                  data-testid="button-adjust-subtract"
+                >
                   <MinusCircle className="h-4 w-4" /> Subtract (-)
                 </Button>
               </div>
             </div>
             <div className="space-y-2">
               <Label>Quantity</Label>
-              <Input type="number" min="0" step="0.01" value={adjustQuantity} onChange={(e) => setAdjustQuantity(e.target.value)} placeholder="Enter quantity..." data-testid="input-adjust-quantity" />
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={adjustQuantity}
+                onChange={(e) => setAdjustQuantity(e.target.value)}
+                placeholder="Enter quantity..."
+                data-testid="input-adjust-quantity"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAdjustDialogOpen(false)} data-testid="button-adjust-cancel">Cancel</Button>
-            <Button onClick={handleAdjustStock} disabled={adjustStockMutation.isPending} data-testid="button-adjust-confirm">
+            <Button variant="outline" onClick={() => setAdjustDialogOpen(false)} data-testid="button-adjust-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAdjustStock}
+              disabled={adjustStockMutation.isPending}
+              data-testid="button-adjust-confirm"
+            >
               {adjustStockMutation.isPending ? "Adjusting..." : `${adjustType === "add" ? "Add" : "Subtract"} Stock`}
             </Button>
           </DialogFooter>
@@ -978,14 +1181,16 @@ export default function StockItems() {
       <Dialog open={manageGradesOpen} onOpenChange={setManageGradesOpen}>
         <DialogContent className="max-w-md" data-testid="dialog-manage-grades">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Tag className="h-4 w-4" /> Manage Grades</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-4 w-4" /> Manage Grades
+            </DialogTitle>
             <DialogDescription>Add, rename, or remove stock grades.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2 max-h-72 overflow-y-auto pr-1">
             {stockGrades.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No grades yet. Add one below.</p>
             )}
-            {stockGrades.map(grade => (
+            {stockGrades.map((grade) => (
               <div key={grade.id} className="flex items-center gap-2 group">
                 {editingGradeId === grade.id ? (
                   <>
@@ -995,25 +1200,62 @@ export default function StockItems() {
                       className="flex-1 h-8 text-sm"
                       autoFocus
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" && editingGradeName.trim()) updateGradeMutation.mutate({ id: grade.id, name: editingGradeName.trim() });
-                        if (e.key === "Escape") { setEditingGradeId(null); setEditingGradeName(""); }
+                        if (e.key === "Enter" && editingGradeName.trim())
+                          updateGradeMutation.mutate({ id: grade.id, name: editingGradeName.trim() });
+                        if (e.key === "Escape") {
+                          setEditingGradeId(null);
+                          setEditingGradeName("");
+                        }
                       }}
                       data-testid={`input-edit-grade-${grade.id}`}
                     />
-                    <Button size="icon" variant="ghost" onClick={() => { if (editingGradeName.trim()) updateGradeMutation.mutate({ id: grade.id, name: editingGradeName.trim() }); }} disabled={updateGradeMutation.isPending} data-testid={`button-save-grade-${grade.id}`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        if (editingGradeName.trim())
+                          updateGradeMutation.mutate({ id: grade.id, name: editingGradeName.trim() });
+                      }}
+                      disabled={updateGradeMutation.isPending}
+                      data-testid={`button-save-grade-${grade.id}`}
+                    >
                       <Check className="h-4 w-4 text-green-600" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => { setEditingGradeId(null); setEditingGradeName(""); }} data-testid={`button-cancel-grade-${grade.id}`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingGradeId(null);
+                        setEditingGradeName("");
+                      }}
+                      data-testid={`button-cancel-grade-${grade.id}`}
+                    >
                       <X className="h-4 w-4" />
                     </Button>
                   </>
                 ) : (
                   <>
-                    <span className="flex-1 text-sm px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-default">{grade.name}</span>
-                    <Button size="icon" variant="ghost" onClick={() => { setEditingGradeId(grade.id); setEditingGradeName(grade.name); }} data-testid={`button-edit-grade-${grade.id}`}>
+                    <span className="flex-1 text-sm px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-default">
+                      {grade.name}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingGradeId(grade.id);
+                        setEditingGradeName(grade.name);
+                      }}
+                      data-testid={`button-edit-grade-${grade.id}`}
+                    >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteGradeMutation.mutate(grade.id)} disabled={deleteGradeMutation.isPending} data-testid={`button-delete-grade-${grade.id}`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => deleteGradeMutation.mutate(grade.id)}
+                      disabled={deleteGradeMutation.isPending}
+                      data-testid={`button-delete-grade-${grade.id}`}
+                    >
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
                   </>
@@ -1026,12 +1268,16 @@ export default function StockItems() {
               placeholder="New grade name..."
               value={newGradeName}
               onChange={(e) => setNewGradeName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && newGradeName.trim()) createGradeMutation.mutate(newGradeName.trim()); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newGradeName.trim()) createGradeMutation.mutate(newGradeName.trim());
+              }}
               className="flex-1"
               data-testid="input-new-grade"
             />
             <Button
-              onClick={() => { if (newGradeName.trim()) createGradeMutation.mutate(newGradeName.trim()); }}
+              onClick={() => {
+                if (newGradeName.trim()) createGradeMutation.mutate(newGradeName.trim());
+              }}
               disabled={!newGradeName.trim() || createGradeMutation.isPending}
               className="gap-1.5"
               data-testid="button-add-grade"
@@ -1047,14 +1293,16 @@ export default function StockItems() {
       <Dialog open={manageCategoriesOpen} onOpenChange={setManageCategoriesOpen}>
         <DialogContent className="max-w-md" data-testid="dialog-manage-categories">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Layers className="h-4 w-4" /> Manage Categories</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-4 w-4" /> Manage Categories
+            </DialogTitle>
             <DialogDescription>Add, rename, or remove stock categories.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 py-2 max-h-72 overflow-y-auto pr-1">
             {stockCategories.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">No categories yet. Add one below.</p>
             )}
-            {stockCategories.map(cat => (
+            {stockCategories.map((cat) => (
               <div key={cat.id} className="flex items-center gap-2 group">
                 {editingCategoryId === cat.id ? (
                   <>
@@ -1064,25 +1312,62 @@ export default function StockItems() {
                       className="flex-1 h-8 text-sm"
                       autoFocus
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" && editingCategoryName.trim()) updateCategoryMutation.mutate({ id: cat.id, name: editingCategoryName.trim() });
-                        if (e.key === "Escape") { setEditingCategoryId(null); setEditingCategoryName(""); }
+                        if (e.key === "Enter" && editingCategoryName.trim())
+                          updateCategoryMutation.mutate({ id: cat.id, name: editingCategoryName.trim() });
+                        if (e.key === "Escape") {
+                          setEditingCategoryId(null);
+                          setEditingCategoryName("");
+                        }
                       }}
                       data-testid={`input-edit-category-${cat.id}`}
                     />
-                    <Button size="icon" variant="ghost" onClick={() => { if (editingCategoryName.trim()) updateCategoryMutation.mutate({ id: cat.id, name: editingCategoryName.trim() }); }} disabled={updateCategoryMutation.isPending} data-testid={`button-save-category-${cat.id}`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        if (editingCategoryName.trim())
+                          updateCategoryMutation.mutate({ id: cat.id, name: editingCategoryName.trim() });
+                      }}
+                      disabled={updateCategoryMutation.isPending}
+                      data-testid={`button-save-category-${cat.id}`}
+                    >
                       <Check className="h-4 w-4 text-green-600" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => { setEditingCategoryId(null); setEditingCategoryName(""); }} data-testid={`button-cancel-category-${cat.id}`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingCategoryId(null);
+                        setEditingCategoryName("");
+                      }}
+                      data-testid={`button-cancel-category-${cat.id}`}
+                    >
                       <X className="h-4 w-4" />
                     </Button>
                   </>
                 ) : (
                   <>
-                    <span className="flex-1 text-sm px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-default">{cat.name}</span>
-                    <Button size="icon" variant="ghost" onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }} data-testid={`button-edit-category-${cat.id}`}>
+                    <span className="flex-1 text-sm px-2 py-1.5 rounded-md hover:bg-muted/50 cursor-default">
+                      {cat.name}
+                    </span>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setEditingCategoryId(cat.id);
+                        setEditingCategoryName(cat.name);
+                      }}
+                      data-testid={`button-edit-category-${cat.id}`}
+                    >
                       <Pencil className="h-3.5 w-3.5" />
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => deleteCategoryMutation.mutate(cat.id)} disabled={deleteCategoryMutation.isPending} data-testid={`button-delete-category-${cat.id}`}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => deleteCategoryMutation.mutate(cat.id)}
+                      disabled={deleteCategoryMutation.isPending}
+                      data-testid={`button-delete-category-${cat.id}`}
+                    >
                       <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
                   </>
@@ -1095,12 +1380,16 @@ export default function StockItems() {
               placeholder="New category name..."
               value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && newCategoryName.trim()) createCategoryMutation.mutate(newCategoryName.trim()); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newCategoryName.trim()) createCategoryMutation.mutate(newCategoryName.trim());
+              }}
               className="flex-1"
               data-testid="input-new-category"
             />
             <Button
-              onClick={() => { if (newCategoryName.trim()) createCategoryMutation.mutate(newCategoryName.trim()); }}
+              onClick={() => {
+                if (newCategoryName.trim()) createCategoryMutation.mutate(newCategoryName.trim());
+              }}
               disabled={!newCategoryName.trim() || createCategoryMutation.isPending}
               className="gap-1.5"
               data-testid="button-add-category"

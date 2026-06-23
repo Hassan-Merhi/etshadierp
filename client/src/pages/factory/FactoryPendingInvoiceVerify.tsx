@@ -16,7 +16,23 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import { ArrowLeft, Check, ChevronsUpDown, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, DollarSign, RefreshCw, FileText } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronsUpDown,
+  RotateCcw,
+  Ship,
+  Truck,
+  AlertTriangle,
+  CheckCircle,
+  Package,
+  Trash2,
+  Plus,
+  Wrench,
+  DollarSign,
+  RefreshCw,
+  FileText,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -162,7 +178,9 @@ export default function FactoryPendingInvoiceVerify() {
   const { data: verification, isLoading: verificationLoading } = useQuery<VerificationSummary>({
     queryKey: ["/api/factory/customer-orders", orderId, "verification"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/customer-orders/${orderId}/verification-summary`, { credentials: "include" });
+      const res = await fetch(`/api/factory/customer-orders/${orderId}/verification-summary`, {
+        credentials: "include",
+      });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         throw new Error(errBody.message || `Server error ${res.status} on verification-summary`);
@@ -189,7 +207,8 @@ export default function FactoryPendingInvoiceVerify() {
     queryKey: ["/api/auth/me"],
     retry: false,
   });
-  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
+  const isAdminOrOwner =
+    currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
   const isDeveloper = currentUser?.role === "Developer";
 
   const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string; accountType: string }[]>({
@@ -197,11 +216,25 @@ export default function FactoryPendingInvoiceVerify() {
     enabled: true,
   });
 
-  const { data: proformas = [] } = useQuery<{ id: number; name: string; lines: { articleCode: string; pricePerBale: string; pricingMode?: string | null; pricePerKg?: string | null; weightPerBaleKg?: string | null }[] }[]>({
+  const { data: proformas = [] } = useQuery<
+    {
+      id: number;
+      name: string;
+      lines: {
+        articleCode: string;
+        pricePerBale: string;
+        pricingMode?: string | null;
+        pricePerKg?: string | null;
+        weightPerBaleKg?: string | null;
+      }[];
+    }[]
+  >({
     queryKey: ["/api/factory/customer-proformas", orderDetail?.customerId],
     queryFn: async () => {
       if (!orderDetail?.customerId) return [];
-      const res = await fetch(`/api/factory/customer-proformas?customerId=${orderDetail.customerId}`, { credentials: "include" });
+      const res = await fetch(`/api/factory/customer-proformas?customerId=${orderDetail.customerId}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch proformas");
       return res.json();
     },
@@ -248,7 +281,12 @@ export default function FactoryPendingInvoiceVerify() {
   });
 
   const assignContainerMutation = useMutation({
-    mutationFn: async (data: { containerNumber: string; shippingCompany: string; containerNotes: string; destination: string }) => {
+    mutationFn: async (data: {
+      containerNumber: string;
+      shippingCompany: string;
+      containerNotes: string;
+      destination: string;
+    }) => {
       await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/assign-container`, data);
     },
     onSuccess: () => {
@@ -326,15 +364,18 @@ export default function FactoryPendingInvoiceVerify() {
 
   const recoverBalesMutation = useMutation({
     mutationFn: async (baleReferences: string[]) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/recover-bales`, { baleReferences });
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/recover-bales`, {
+        baleReferences,
+      });
       return res.json();
     },
     onSuccess: (data: { message: string; linked: number; notFound: string[] }) => {
       toast({
         title: `${data.linked} bale(s) recovered`,
-        description: data.notFound.length > 0
-          ? `Not found: ${data.notFound.slice(0, 5).join(", ")}${data.notFound.length > 5 ? ` (+${data.notFound.length - 5} more)` : ""}`
-          : data.message,
+        description:
+          data.notFound.length > 0
+            ? `Not found: ${data.notFound.slice(0, 5).join(", ")}${data.notFound.length > 5 ? ` (+${data.notFound.length - 5} more)` : ""}`
+            : data.message,
       });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       setShowRecoverDialog(false);
@@ -351,10 +392,14 @@ export default function FactoryPendingInvoiceVerify() {
       const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/auto-recover-bales`, {});
       return res.json();
     },
-    onSuccess: (data: { message: string; linked: number; summary: { articleCode: string; linked: number; needed: number }[] }) => {
+    onSuccess: (data: {
+      message: string;
+      linked: number;
+      summary: { articleCode: string; linked: number; needed: number }[];
+    }) => {
       toast({
         title: `${data.linked} bale(s) auto-linked`,
-        description: data.summary.map(s => `${s.articleCode}: ${s.linked}/${s.needed}`).join(", "),
+        description: data.summary.map((s) => `${s.articleCode}: ${s.linked}/${s.needed}`).join(", "),
       });
       queryClient.invalidateQueries({ predicate: keyStartsWith("/api/factory/customer-orders") });
       setShowRecoverDialog(false);
@@ -367,7 +412,9 @@ export default function FactoryPendingInvoiceVerify() {
 
   const applyProformaMutation = useMutation({
     mutationFn: async (proformaId: number) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/apply-proforma-prices`, { proformaId });
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/apply-proforma-prices`, {
+        proformaId,
+      });
       return res;
     },
     onSuccess: (data: any) => {
@@ -388,12 +435,18 @@ export default function FactoryPendingInvoiceVerify() {
       const res = await modeApiRequest("POST", "/api/factory/repair-perkg-prices", {});
       return res.json();
     },
-    onSuccess: (data: { ordersScanned: number; balesRepaired: number; changedOrderIds: number[]; errors: string[] }) => {
+    onSuccess: (data: {
+      ordersScanned: number;
+      balesRepaired: number;
+      changedOrderIds: number[];
+      errors: string[];
+    }) => {
       toast({
         title: `Repair complete: ${data.balesRepaired} bale(s) fixed`,
-        description: data.changedOrderIds.length > 0
-          ? `Orders updated: ${data.changedOrderIds.join(", ")}`
-          : "No bales needed repair.",
+        description:
+          data.changedOrderIds.length > 0
+            ? `Orders updated: ${data.changedOrderIds.join(", ")}`
+            : "No bales needed repair.",
       });
       if (data.errors.length > 0) {
         toast({ title: "Repair errors", description: data.errors.join("; "), variant: "destructive" });
@@ -419,9 +472,8 @@ export default function FactoryPendingInvoiceVerify() {
         const totalPrice = item.totalPrice ?? 0;
         const priceKg = item.pricePerKg ?? 0;
         // Also estimate per-kg total in case bales were loaded before repricing
-        const estimatedTotal = item.pricingMode === "per_kg" && priceKg > 0 && item.totalWeight > 0
-          ? priceKg * item.totalWeight
-          : 0;
+        const estimatedTotal =
+          item.pricingMode === "per_kg" && priceKg > 0 && item.totalWeight > 0 ? priceKg * item.totalWeight : 0;
         return totalPrice === 0 && estimatedTotal === 0;
       });
 
@@ -470,15 +522,48 @@ export default function FactoryPendingInvoiceVerify() {
   const getStatusBadge = (status: ComparisonItem["status"]) => {
     switch (status) {
       case "LOADED_NOT_IN_PROFORMA":
-        return <Badge variant="destructive" data-testid="badge-loaded-not-in-proforma">Not in Proforma</Badge>;
+        return (
+          <Badge variant="destructive" data-testid="badge-loaded-not-in-proforma">
+            Not in Proforma
+          </Badge>
+        );
       case "MISSING_FROM_LOADED":
-        return <Badge variant="destructive" data-testid="badge-missing-from-loaded">Missing</Badge>;
+        return (
+          <Badge variant="destructive" data-testid="badge-missing-from-loaded">
+            Missing
+          </Badge>
+        );
       case "UNDER_LOADED":
-        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-under-loaded">Under Loaded</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
+            data-testid="badge-under-loaded"
+          >
+            Under Loaded
+          </Badge>
+        );
       case "OVER_LOADED":
-        return <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-over-loaded">Over Loaded</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+            data-testid="badge-over-loaded"
+          >
+            Over Loaded
+          </Badge>
+        );
       case "MATCH":
-        return <Badge variant="outline" className="text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-match"><CheckCircle className="h-3 w-3 mr-1" />Match</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+            data-testid="badge-match"
+          >
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Match
+          </Badge>
+        );
       default:
         return null;
     }
@@ -527,23 +612,37 @@ export default function FactoryPendingInvoiceVerify() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Verify Order #{orderId}</h1>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+              Verify Order #{orderId}
+            </h1>
             <p className="text-muted-foreground text-sm">Review loaded bales against proforma</p>
           </div>
         </div>
         <div>
           {isLoadingStatus && (
-            <Badge variant="outline" className="border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-400" data-testid="badge-order-status">
+            <Badge
+              variant="outline"
+              className="border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-400"
+              data-testid="badge-order-status"
+            >
               Loading
             </Badge>
           )}
           {isPending && (
-            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-order-status">
+            <Badge
+              variant="outline"
+              className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
+              data-testid="badge-order-status"
+            >
               Pending Verification
             </Badge>
           )}
           {isVerified && (
-            <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-order-status">
+            <Badge
+              variant="outline"
+              className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+              data-testid="badge-order-status"
+            >
               Verified
             </Badge>
           )}
@@ -552,14 +651,19 @@ export default function FactoryPendingInvoiceVerify() {
 
       {/* Fallback notice — shown only to Developer role when bale records are missing but order lines cover the data */}
       {!verificationLoading && verification?.dataSource === "order_lines" && currentUser?.role === "Developer" && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-4" data-testid="panel-order-lines-fallback">
+        <div
+          className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-4"
+          data-testid="panel-order-lines-fallback"
+        >
           <div className="flex items-start gap-3">
             <Package className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">Bale counts sourced from order summary</p>
+              <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                Bale counts sourced from order summary
+              </p>
               <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
-                Individual bale scan records are unavailable, but per-article totals are intact. All counts and weights shown are accurate.
-                If you need individual bale-level detail, use <strong>Recover Bales</strong>.
+                Individual bale scan records are unavailable, but per-article totals are intact. All counts and weights
+                shown are accurate. If you need individual bale-level detail, use <strong>Recover Bales</strong>.
               </p>
             </div>
           </div>
@@ -579,29 +683,38 @@ export default function FactoryPendingInvoiceVerify() {
       )}
 
       {/* Recovery banner — shown when the order has 0 linked bales, no fallback, and the user is admin */}
-      {!verificationLoading && (verification?.totalLoadedBales ?? 0) === 0 && verification?.dataSource !== "order_lines" && isAdminOrOwner && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 p-4" data-testid="panel-zero-bales-warning">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">No bale records found for this order</p>
-              <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
-                Bale scans may have failed while the database columns were missing. If you have the bale reference numbers,
-                use <strong>Recover Bales</strong> to re-link them. Otherwise use <strong>Return to Loading</strong> to re-scan.
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => setShowRecoverDialog(true)}
-            className="border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-200"
-            data-testid="button-recover-bales"
+      {!verificationLoading &&
+        (verification?.totalLoadedBales ?? 0) === 0 &&
+        verification?.dataSource !== "order_lines" &&
+        isAdminOrOwner && (
+          <div
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 p-4"
+            data-testid="panel-zero-bales-warning"
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Recover Bales
-          </Button>
-        </div>
-      )}
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  No bale records found for this order
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                  Bale scans may have failed while the database columns were missing. If you have the bale reference
+                  numbers, use <strong>Recover Bales</strong> to re-link them. Otherwise use{" "}
+                  <strong>Return to Loading</strong> to re-scan.
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setShowRecoverDialog(true)}
+              className="border-amber-400 dark:border-amber-600 text-amber-800 dark:text-amber-200"
+              data-testid="button-recover-bales"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Recover Bales
+            </Button>
+          </div>
+        )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         <Card>
@@ -632,7 +745,10 @@ export default function FactoryPendingInvoiceVerify() {
             <Package className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400" data-testid="text-total-not-loaded-bales">
+            <div
+              className="text-2xl font-bold text-amber-600 dark:text-amber-400"
+              data-testid="text-total-not-loaded-bales"
+            >
               {totalNotLoadedBales} bales
             </div>
           </CardContent>
@@ -643,7 +759,10 @@ export default function FactoryPendingInvoiceVerify() {
             <Truck className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400" data-testid="text-total-not-loaded-weight">
+            <div
+              className="text-2xl font-bold text-amber-600 dark:text-amber-400"
+              data-testid="text-total-not-loaded-weight"
+            >
               {fmtNum(totalNotLoadedWeight)} kg
             </div>
           </CardContent>
@@ -664,10 +783,14 @@ export default function FactoryPendingInvoiceVerify() {
                   LOADED_NOT_IN_PROFORMA: "Not Requested",
                 };
                 const colors: Record<string, string> = {
-                  OVER_LOADED: "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700",
-                  UNDER_LOADED: "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700",
-                  MISSING_FROM_LOADED: "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700",
-                  LOADED_NOT_IN_PROFORMA: "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700",
+                  OVER_LOADED:
+                    "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700",
+                  UNDER_LOADED:
+                    "bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700",
+                  MISSING_FROM_LOADED:
+                    "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700",
+                  LOADED_NOT_IN_PROFORMA:
+                    "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700",
                 };
                 const activeColors: Record<string, string> = {
                   OVER_LOADED: "bg-green-600 text-white border-green-600",
@@ -682,7 +805,8 @@ export default function FactoryPendingInvoiceVerify() {
                     onClick={() => {
                       setStatusFilter((prev) => {
                         const next = new Set(prev);
-                        if (next.has(s)) next.delete(s); else next.add(s);
+                        if (next.has(s)) next.delete(s);
+                        else next.add(s);
                         return next;
                       });
                     }}
@@ -723,7 +847,11 @@ export default function FactoryPendingInvoiceVerify() {
             );
 
             type LeftRow =
-              | { kind: "proforma"; line: typeof mismatchedProformaLines[0]; status: ComparisonItem["status"] | undefined }
+              | {
+                  kind: "proforma";
+                  line: (typeof mismatchedProformaLines)[0];
+                  status: ComparisonItem["status"] | undefined;
+                }
               | { kind: "extra"; cmp: ComparisonItem };
 
             const statusSortOrder = (s: string | undefined) => {
@@ -757,8 +885,7 @@ export default function FactoryPendingInvoiceVerify() {
               if (!cmp) return "";
               if (cmp.status === "UNDER_LOADED" || cmp.status === "MISSING_FROM_LOADED")
                 return "bg-red-50 dark:bg-red-950";
-              if (cmp.status === "OVER_LOADED")
-                return "bg-green-50 dark:bg-green-950";
+              if (cmp.status === "OVER_LOADED") return "bg-green-50 dark:bg-green-950";
               return "";
             };
 
@@ -766,8 +893,7 @@ export default function FactoryPendingInvoiceVerify() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
                   <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">
-                    Proforma Expected{" "}
-                    <span className="text-muted-foreground font-normal">(mismatches only)</span>
+                    Proforma Expected <span className="text-muted-foreground font-normal">(mismatches only)</span>
                   </h3>
                   {allLeftRows.length > 0 ? (
                     <Table wrapperClassName="max-h-[50vh] overflow-auto">
@@ -817,7 +943,10 @@ export default function FactoryPendingInvoiceVerify() {
                               className={getProformaRowClass(line.articleCode)}
                               data-testid={`row-proforma-${line.articleCode}`}
                             >
-                              <TableCell className="font-mono text-sm" data-testid={`text-proforma-article-${line.articleCode}`}>
+                              <TableCell
+                                className="font-mono text-sm"
+                                data-testid={`text-proforma-article-${line.articleCode}`}
+                              >
                                 {line.articleCode}
                               </TableCell>
                               <TableCell className="text-sm">{line.productName}</TableCell>
@@ -825,15 +954,22 @@ export default function FactoryPendingInvoiceVerify() {
                               <TableCell className="text-right font-mono">{loaded}</TableCell>
                               <TableCell className="text-right font-mono">
                                 {remaining > 0 ? (
-                                  <span className="text-red-600 dark:text-red-400 font-medium">{fmtNum(remaining)}</span>
+                                  <span className="text-red-600 dark:text-red-400 font-medium">
+                                    {fmtNum(remaining)}
+                                  </span>
                                 ) : remaining < 0 ? (
-                                  <span className="text-green-600 dark:text-green-400 font-medium">+{fmtNum(Math.abs(remaining))}</span>
+                                  <span className="text-green-600 dark:text-green-400 font-medium">
+                                    +{fmtNum(Math.abs(remaining))}
+                                  </span>
                                 ) : (
                                   <span className="text-muted-foreground">0</span>
                                 )}
                               </TableCell>
                               <TableCell>{cmp ? getStatusBadge(cmp.status) : null}</TableCell>
-                              <TableCell className="text-right font-mono" data-testid={`text-stock-${line.articleCode}`}>
+                              <TableCell
+                                className="text-right font-mono"
+                                data-testid={`text-stock-${line.articleCode}`}
+                              >
                                 {(line.stockQty ?? 0) > 0 ? (
                                   <button
                                     className="underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 text-foreground font-medium"
@@ -866,7 +1002,9 @@ export default function FactoryPendingInvoiceVerify() {
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-sm mb-3" data-testid="text-loaded-header">Loaded Bales</h3>
+                  <h3 className="font-semibold text-sm mb-3" data-testid="text-loaded-header">
+                    Loaded Bales
+                  </h3>
                   {verification?.loadedItems && verification.loadedItems.length > 0 ? (
                     <Table wrapperClassName="max-h-[50vh] overflow-auto">
                       <TableHeader className="sticky top-0 z-30 bg-background">
@@ -875,68 +1013,83 @@ export default function FactoryPendingInvoiceVerify() {
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
                           <TableHead className="text-right">Weight (kg)</TableHead>
-                          {isAdminOrOwner && <TableHead className="text-right">
-                            {verification.loadedItems.some(g => g.pricingMode === 'per_kg') ? "Price/KG" : "Price"}
-                          </TableHead>}
+                          {isAdminOrOwner && (
+                            <TableHead className="text-right">
+                              {verification.loadedItems.some((g) => g.pricingMode === "per_kg") ? "Price/KG" : "Price"}
+                            </TableHead>
+                          )}
                           {isAdminOrOwner && <TableHead className="text-right">Total Price</TableHead>}
                           <TableHead className="text-right text-teal-500 dark:text-teal-400">Stock</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {verification.loadedItems.map((group, i) => {
-                          const isPerKg = group.pricingMode === 'per_kg';
+                          const isPerKg = group.pricingMode === "per_kg";
                           const pkgRate = group.pricePerKg || 0;
                           // For per-kg: derive rate from actual bale prices if available,
                           // otherwise fall back to the proforma's price_per_kg so the
                           // column never shows 0 when bales were loaded before repricing.
                           const unitRate = isPerKg
-                            ? (group.totalPrice > 0 && group.totalWeight > 0
-                                ? group.totalPrice / group.totalWeight
-                                : pkgRate)
-                            : (parseFloat(group.pricePerBale || "0") ||
-                               (group.totalPrice > 0 && group.qty > 0
-                                 ? group.totalPrice / group.qty
-                                 : 0));
-                          const displayTotal = isPerKg && group.totalPrice === 0 && pkgRate > 0 && group.totalWeight > 0
-                            ? pkgRate * group.totalWeight
-                            : group.totalPrice;
+                            ? group.totalPrice > 0 && group.totalWeight > 0
+                              ? group.totalPrice / group.totalWeight
+                              : pkgRate
+                            : parseFloat(group.pricePerBale || "0") ||
+                              (group.totalPrice > 0 && group.qty > 0 ? group.totalPrice / group.qty : 0);
+                          const displayTotal =
+                            isPerKg && group.totalPrice === 0 && pkgRate > 0 && group.totalWeight > 0
+                              ? pkgRate * group.totalWeight
+                              : group.totalPrice;
                           return (
-                          <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
-                            <TableCell className="font-mono text-sm" data-testid={`text-loaded-article-${group.articleCode}`}>
-                              {group.articleCode}
-                            </TableCell>
-                            <TableCell className="text-sm">{group.productName}</TableCell>
-                            <TableCell className="text-right font-mono">{group.qty}</TableCell>
-                            <TableCell className="text-right font-mono">{fmtNum(group.totalWeight || 0)}</TableCell>
-                            {isAdminOrOwner && <TableCell className="text-right font-mono">{fmtNum(unitRate)}</TableCell>}
-                            {isAdminOrOwner && <TableCell className="text-right font-mono font-semibold">{fmtNum(displayTotal)}</TableCell>}
-                            <TableCell className="text-right font-mono text-teal-600 dark:text-teal-400" data-testid={`text-loaded-stock-${group.articleCode}`}>
-                              {(group.stockQty ?? 0) > 0 ? (
-                                <button
-                                  className="underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 text-teal-600 dark:text-teal-400 font-medium"
-                                  onClick={() => {
-                                    const p = new URLSearchParams({
-                                      articleCode: group.articleCode,
-                                      productName: group.productName,
-                                      back: window.location.pathname + window.location.search,
-                                    });
-                                    navigate(`/factory/stock-bale-list?${p}`);
-                                  }}
-                                  data-testid={`button-loaded-stock-detail-${group.articleCode}`}
-                                >
-                                  {group.stockQty}
-                                </button>
-                              ) : (
-                                <span className="text-muted-foreground">0</span>
+                            <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
+                              <TableCell
+                                className="font-mono text-sm"
+                                data-testid={`text-loaded-article-${group.articleCode}`}
+                              >
+                                {group.articleCode}
+                              </TableCell>
+                              <TableCell className="text-sm">{group.productName}</TableCell>
+                              <TableCell className="text-right font-mono">{group.qty}</TableCell>
+                              <TableCell className="text-right font-mono">{fmtNum(group.totalWeight || 0)}</TableCell>
+                              {isAdminOrOwner && (
+                                <TableCell className="text-right font-mono">{fmtNum(unitRate)}</TableCell>
                               )}
-                            </TableCell>
-                          </TableRow>
+                              {isAdminOrOwner && (
+                                <TableCell className="text-right font-mono font-semibold">
+                                  {fmtNum(displayTotal)}
+                                </TableCell>
+                              )}
+                              <TableCell
+                                className="text-right font-mono text-teal-600 dark:text-teal-400"
+                                data-testid={`text-loaded-stock-${group.articleCode}`}
+                              >
+                                {(group.stockQty ?? 0) > 0 ? (
+                                  <button
+                                    className="underline underline-offset-2 cursor-pointer hover-elevate rounded px-0.5 text-teal-600 dark:text-teal-400 font-medium"
+                                    onClick={() => {
+                                      const p = new URLSearchParams({
+                                        articleCode: group.articleCode,
+                                        productName: group.productName,
+                                        back: window.location.pathname + window.location.search,
+                                      });
+                                      navigate(`/factory/stock-bale-list?${p}`);
+                                    }}
+                                    data-testid={`button-loaded-stock-detail-${group.articleCode}`}
+                                  >
+                                    {group.stockQty}
+                                  </button>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
                           );
                         })}
                       </TableBody>
                     </Table>
                   ) : (
-                    <p className="text-sm text-muted-foreground" data-testid="text-no-loaded">No loaded bales</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-loaded">
+                      No loaded bales
+                    </p>
                   )}
                 </div>
               </div>
@@ -993,7 +1146,9 @@ export default function FactoryPendingInvoiceVerify() {
           </div>
           <Button
             variant="outline"
-            onClick={() => assignContainerMutation.mutate({ containerNumber, shippingCompany, containerNotes, destination })}
+            onClick={() =>
+              assignContainerMutation.mutate({ containerNumber, shippingCompany, containerNotes, destination })
+            }
             disabled={assignContainerMutation.isPending}
             data-testid="button-save-container"
           >
@@ -1007,7 +1162,9 @@ export default function FactoryPendingInvoiceVerify() {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-sm">Freight &amp; Charges</CardTitle>
-            <p className="text-xs text-muted-foreground">These will be billed to the customer and posted to the selected account</p>
+            <p className="text-xs text-muted-foreground">
+              These will be billed to the customer and posted to the selected account
+            </p>
           </CardHeader>
           <CardContent className="space-y-3">
             {charges.length > 0 && (
@@ -1015,13 +1172,19 @@ export default function FactoryPendingInvoiceVerify() {
                 {charges.map((charge) => {
                   const acct = ledgerAccounts.find((a) => a.id === charge.ledgerAccountId);
                   return (
-                    <div key={charge.id} className="flex items-center justify-between gap-2" data-testid={`row-charge-${charge.id}`}>
+                    <div
+                      key={charge.id}
+                      className="flex items-center justify-between gap-2"
+                      data-testid={`row-charge-${charge.id}`}
+                    >
                       <div className="flex flex-col min-w-0">
                         <span className="text-sm font-medium">{charge.name}</span>
                         {acct && <span className="text-xs text-muted-foreground">{acct.name}</span>}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{fmtNum(parseFloat(charge.amount))}</span>
+                        <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>
+                          {fmtNum(parseFloat(charge.amount))}
+                        </span>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1070,8 +1233,11 @@ export default function FactoryPendingInvoiceVerify() {
                   >
                     <span className="truncate text-left">
                       {chargeLedgerAccountId
-                        ? (ledgerAccounts.find((a) => String(a.id) === chargeLedgerAccountId)?.name ?? "Select account...")
-                        : (chargeType !== "FREIGHT" ? "Select account (required)..." : "Select account (optional)...")}
+                        ? (ledgerAccounts.find((a) => String(a.id) === chargeLedgerAccountId)?.name ??
+                          "Select account...")
+                        : chargeType !== "FREIGHT"
+                          ? "Select account (required)..."
+                          : "Select account (optional)..."}
                     </span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -1104,7 +1270,9 @@ export default function FactoryPendingInvoiceVerify() {
                 </PopoverContent>
               </Popover>
               {chargeType !== "FREIGHT" && !chargeLedgerAccountId && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">A ledger account is required so the charge posts to accounting.</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  A ledger account is required so the charge posts to accounting.
+                </p>
               )}
 
               <div className="flex items-center gap-2">
@@ -1119,7 +1287,9 @@ export default function FactoryPendingInvoiceVerify() {
                 <Button
                   variant="outline"
                   onClick={handleAddCharge}
-                  disabled={!chargeAmount || (chargeType !== "FREIGHT" && !chargeLedgerAccountId) || addChargeMutation.isPending}
+                  disabled={
+                    !chargeAmount || (chargeType !== "FREIGHT" && !chargeLedgerAccountId) || addChargeMutation.isPending
+                  }
                   data-testid="button-add-charge"
                 >
                   <Plus className="h-4 w-4" />
@@ -1141,11 +1311,7 @@ export default function FactoryPendingInvoiceVerify() {
             <RotateCcw className="mr-2 h-4 w-4" />
             Return to Loading
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => setShowViewProformaDialog(true)}
-            data-testid="button-view-proforma"
-          >
+          <Button variant="outline" onClick={() => setShowViewProformaDialog(true)} data-testid="button-view-proforma">
             <FileText className="mr-2 h-4 w-4" />
             View Proforma
           </Button>
@@ -1326,11 +1492,15 @@ export default function FactoryPendingInvoiceVerify() {
               <div className="flex flex-wrap items-center gap-4">
                 <div className="text-sm">
                   <span className="text-muted-foreground">Bales in order:</span>{" "}
-                  <span className="font-semibold" data-testid="text-preview-total">{finalizePreview.totalBalesInOrder}</span>
+                  <span className="font-semibold" data-testid="text-preview-total">
+                    {finalizePreview.totalBalesInOrder}
+                  </span>
                 </div>
                 <div className="text-sm">
                   <span className="text-muted-foreground">Will be removed from stock:</span>{" "}
-                  <span className="font-semibold" data-testid="text-preview-removable">{finalizePreview.baleCount}</span>
+                  <span className="font-semibold" data-testid="text-preview-removable">
+                    {finalizePreview.baleCount}
+                  </span>
                 </div>
               </div>
 
@@ -1383,7 +1553,11 @@ export default function FactoryPendingInvoiceVerify() {
                   />
                 </div>
                 <div className="flex items-center justify-end gap-2">
-                  <Button variant="outline" onClick={() => setShowFinalizePreview(false)} data-testid="button-cancel-finalize">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowFinalizePreview(false)}
+                    data-testid="button-cancel-finalize"
+                  >
                     Cancel
                   </Button>
                   <Button
@@ -1411,7 +1585,8 @@ export default function FactoryPendingInvoiceVerify() {
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Select a proforma to apply its article prices to all matching bales in this order. Only bales with a matching article code will be updated.
+              Select a proforma to apply its article prices to all matching bales in this order. Only bales with a
+              matching article code will be updated.
             </p>
             {proformas.length === 0 ? (
               <p className="text-sm text-muted-foreground italic">No proformas found for this customer.</p>
@@ -1429,41 +1604,42 @@ export default function FactoryPendingInvoiceVerify() {
                 </SelectContent>
               </Select>
             )}
-            {selectedProformaId && (() => {
-              const pf = proformas.find(p => String(p.id) === selectedProformaId);
-              if (!pf || pf.lines.length === 0) return null;
-              return (
-                <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
-                  {pf.lines.map((l, i) => {
-                    const isPerKg = l.pricingMode === "per_kg" && l.pricePerKg;
-                    const wt = parseFloat(l.weightPerBaleKg ?? "0");
-                    const pkgKgRate = isPerKg ? parseFloat(l.pricePerKg!) : 0;
-                    // Show weight × rate when weight is known; otherwise just show the rate
-                    const effectivePrice = isPerKg
-                      ? (wt > 0 ? wt * pkgKgRate : 0)
-                      : parseFloat(l.pricePerBale) || 0;
-                    return (
-                      <div key={i} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">{l.articleCode}</span>
-                        <div className="text-right">
-                          {isPerKg ? (
-                            <>
-                              <span className="font-medium">${fmtNum(pkgKgRate)}/kg</span>
-                              {wt > 0 && (
-                                <span className="text-xs text-muted-foreground ml-1">(≈${fmtNum(effectivePrice)}/bale)</span>
-                              )}
-                            </>
-                          ) : (
-                            <span className="font-medium">${fmtNum(effectivePrice)}</span>
-                          )}
+            {selectedProformaId &&
+              (() => {
+                const pf = proformas.find((p) => String(p.id) === selectedProformaId);
+                if (!pf || pf.lines.length === 0) return null;
+                return (
+                  <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
+                    {pf.lines.map((l, i) => {
+                      const isPerKg = l.pricingMode === "per_kg" && l.pricePerKg;
+                      const wt = parseFloat(l.weightPerBaleKg ?? "0");
+                      const pkgKgRate = isPerKg ? parseFloat(l.pricePerKg!) : 0;
+                      // Show weight × rate when weight is known; otherwise just show the rate
+                      const effectivePrice = isPerKg ? (wt > 0 ? wt * pkgKgRate : 0) : parseFloat(l.pricePerBale) || 0;
+                      return (
+                        <div key={i} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">{l.articleCode}</span>
+                          <div className="text-right">
+                            {isPerKg ? (
+                              <>
+                                <span className="font-medium">${fmtNum(pkgKgRate)}/kg</span>
+                                {wt > 0 && (
+                                  <span className="text-xs text-muted-foreground ml-1">
+                                    (≈${fmtNum(effectivePrice)}/bale)
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="font-medium">${fmtNum(effectivePrice)}</span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             <div className="flex items-center justify-end gap-2">
               <Button
                 variant="outline"
@@ -1498,9 +1674,7 @@ export default function FactoryPendingInvoiceVerify() {
           <Dialog open={showViewProformaDialog} onOpenChange={setShowViewProformaDialog}>
             <DialogContent className="max-w-lg" data-testid="dialog-view-proforma">
               <DialogHeader>
-                <DialogTitle>
-                  {activeProformaName ? `Proforma: ${activeProformaName}` : "Linked Proforma"}
-                </DialogTitle>
+                <DialogTitle>{activeProformaName ? `Proforma: ${activeProformaName}` : "Linked Proforma"}</DialogTitle>
               </DialogHeader>
               {!activeProformaId ? (
                 <p className="text-sm text-muted-foreground italic" data-testid="text-no-proforma-linked">
@@ -1555,17 +1729,14 @@ export default function FactoryPendingInvoiceVerify() {
           <AlertDialogHeader>
             <AlertDialogTitle>Fix Bale Statuses</AlertDialogTitle>
             <AlertDialogDescription>
-              This will mark all bales attached to this order as SOLD, removing them from inventory.
-              Use this only if bales were accidentally returned to stock after a previous finalization.
-              This does not create invoices or customer balance entries.
+              This will mark all bales attached to this order as SOLD, removing them from inventory. Use this only if
+              bales were accidentally returned to stock after a previous finalization. This does not create invoices or
+              customer balance entries.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-fix-bales">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => forceSyncMutation.mutate()}
-              data-testid="button-confirm-fix-bales"
-            >
+            <AlertDialogAction onClick={() => forceSyncMutation.mutate()} data-testid="button-confirm-fix-bales">
               <Wrench className="mr-2 h-4 w-4" />
               Fix Bale Statuses
             </AlertDialogAction>
@@ -1573,7 +1744,13 @@ export default function FactoryPendingInvoiceVerify() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={showRecoverDialog} onOpenChange={(open) => { setShowRecoverDialog(open); if (!open) setRecoverTab("auto"); }}>
+      <Dialog
+        open={showRecoverDialog}
+        onOpenChange={(open) => {
+          setShowRecoverDialog(open);
+          if (!open) setRecoverTab("auto");
+        }}
+      >
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Recover Bales (Admin)</DialogTitle>
@@ -1600,16 +1777,19 @@ export default function FactoryPendingInvoiceVerify() {
             {recoverTab === "auto" && (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Automatically finds bales from stock that match the proforma article codes for this order
-                  and links them — up to the expected quantity per article. Bales claimed by other active
-                  orders will be skipped.
+                  Automatically finds bales from stock that match the proforma article codes for this order and links
+                  them — up to the expected quantity per article. Bales claimed by other active orders will be skipped.
                 </p>
                 <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                  <strong>Important:</strong> This picks bales by article code in insertion order (oldest first).
-                  Verify the results afterwards and use manual recovery if specific bale references are needed.
+                  <strong>Important:</strong> This picks bales by article code in insertion order (oldest first). Verify
+                  the results afterwards and use manual recovery if specific bale references are needed.
                 </div>
                 <div className="flex items-center justify-end gap-2">
-                  <Button variant="outline" onClick={() => setShowRecoverDialog(false)} data-testid="button-cancel-recover">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowRecoverDialog(false)}
+                    data-testid="button-cancel-recover"
+                  >
                     Cancel
                   </Button>
                   <Button
@@ -1627,9 +1807,8 @@ export default function FactoryPendingInvoiceVerify() {
             {recoverTab === "manual" && (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Paste the bale reference numbers that should be linked to this order — one per line.
-                  Each reference will be looked up and re-linked here.
-                  Bales already linked to another active order will be skipped.
+                  Paste the bale reference numbers that should be linked to this order — one per line. Each reference
+                  will be looked up and re-linked here. Bales already linked to another active order will be skipped.
                 </p>
                 <Textarea
                   value={recoverInput}
@@ -1646,12 +1825,19 @@ export default function FactoryPendingInvoiceVerify() {
                   </code>
                 </p>
                 <div className="flex items-center justify-end gap-2">
-                  <Button variant="outline" onClick={() => setShowRecoverDialog(false)} data-testid="button-cancel-recover">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowRecoverDialog(false)}
+                    data-testid="button-cancel-recover"
+                  >
                     Cancel
                   </Button>
                   <Button
                     onClick={() => {
-                      const refs = recoverInput.split("\n").map((r) => r.trim()).filter(Boolean);
+                      const refs = recoverInput
+                        .split("\n")
+                        .map((r) => r.trim())
+                        .filter(Boolean);
                       if (refs.length === 0) return;
                       recoverBalesMutation.mutate(refs);
                     }}
@@ -1659,7 +1845,9 @@ export default function FactoryPendingInvoiceVerify() {
                     data-testid="button-confirm-recover"
                   >
                     <RefreshCw className={`mr-2 h-4 w-4 ${recoverBalesMutation.isPending ? "animate-spin" : ""}`} />
-                    {recoverBalesMutation.isPending ? "Recovering…" : `Recover ${recoverInput.split("\n").filter((r) => r.trim()).length} Bale(s)`}
+                    {recoverBalesMutation.isPending
+                      ? "Recovering…"
+                      : `Recover ${recoverInput.split("\n").filter((r) => r.trim()).length} Bale(s)`}
                   </Button>
                 </div>
               </>

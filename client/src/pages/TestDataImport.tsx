@@ -14,29 +14,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -50,7 +30,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Trash2, FlaskConical, ToggleLeft, ToggleRight, AlertTriangle, Check, X, Play, Pause } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  FlaskConical,
+  ToggleLeft,
+  ToggleRight,
+  AlertTriangle,
+  Check,
+  X,
+  Play,
+  Pause,
+} from "lucide-react";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 
 interface LedgerAccount {
@@ -77,10 +68,10 @@ const entryFormSchema = z.object({
   date: z.string().min(1, "Date is required"),
   debitAccountId: z.string().min(1, "Debit account is required"),
   creditAccountId: z.string().min(1, "Credit account is required"),
-  amount: z.string().min(1, "Amount is required").refine(
-    (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
-    "Amount must be a positive number"
-  ),
+  amount: z
+    .string()
+    .min(1, "Amount is required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Amount must be a positive number"),
   description: z.string().optional(),
 });
 
@@ -116,13 +107,13 @@ export default function TestDataImport() {
 
   // Filter to only test data vouchers
   const testVouchers = useMemo(() => {
-    return allVouchers.filter(v => v.voucherNumber.startsWith(TEST_DATA_PREFIX));
+    return allVouchers.filter((v) => v.voucherNumber.startsWith(TEST_DATA_PREFIX));
   }, [allVouchers]);
 
   // Group accounts by type for easier selection
   const accountsByType = useMemo(() => {
     const grouped: Record<string, LedgerAccount[]> = {};
-    accounts.forEach(acc => {
+    accounts.forEach((acc) => {
       const key = acc.accountType;
       if (!grouped[key]) grouped[key] = [];
       grouped[key].push(acc);
@@ -132,8 +123,8 @@ export default function TestDataImport() {
 
   // Stats
   const stats = useMemo(() => {
-    const applied = testVouchers.filter(v => !v.optional).length;
-    const draft = testVouchers.filter(v => v.optional).length;
+    const applied = testVouchers.filter((v) => !v.optional).length;
+    const draft = testVouchers.filter((v) => v.optional).length;
     const total = testVouchers.reduce((sum, v) => sum + parseFloat(v.totalAmount || "0"), 0);
     return { applied, draft, total, count: testVouchers.length };
   }, [testVouchers]);
@@ -151,7 +142,10 @@ export default function TestDataImport() {
       return await res.json();
     },
     onSuccess: () => {
-      toast({ title: "Test Entry Created", description: "Entry created as optional (draft). Toggle to apply to calculations." });
+      toast({
+        title: "Test Entry Created",
+        description: "Entry created as optional (draft). Toggle to apply to calculations.",
+      });
       form.reset({
         date: format(new Date(), "yyyy-MM-dd"),
         debitAccountId: "",
@@ -202,7 +196,7 @@ export default function TestDataImport() {
   const handleApplyAll = async () => {
     setIsApplyingAll(true);
     try {
-      const drafts = testVouchers.filter(v => v.optional);
+      const drafts = testVouchers.filter((v) => v.optional);
       for (const v of drafts) {
         await apiRequest("PATCH", `/api/vouchers/${v.id}/optional`, { optional: false });
       }
@@ -220,7 +214,7 @@ export default function TestDataImport() {
   const handleRemoveAll = async () => {
     setIsRemovingAll(true);
     try {
-      const applied = testVouchers.filter(v => !v.optional);
+      const applied = testVouchers.filter((v) => !v.optional);
       for (const v of applied) {
         await apiRequest("PATCH", `/api/vouchers/${v.id}/optional`, { optional: true });
       }
@@ -256,7 +250,7 @@ export default function TestDataImport() {
   };
 
   const getAccountName = (id: number | string) => {
-    const acc = accounts.find(a => a.id === (typeof id === "string" ? parseInt(id) : id));
+    const acc = accounts.find((a) => a.id === (typeof id === "string" ? parseInt(id) : id));
     return acc ? `${acc.name} (${acc.code})` : "Unknown";
   };
 
@@ -266,7 +260,10 @@ export default function TestDataImport() {
         <div className="flex items-center gap-3">
           <FlaskConical className="h-8 w-8 text-muted-foreground" />
           <div>
-            <PageHeader title="Test Data Import" subtitle="Add historical data to test Net Profit calculations - easily removable" />
+            <PageHeader
+              title="Test Data Import"
+              subtitle="Add historical data to test Net Profit calculations - easily removable"
+            />
           </div>
         </div>
       </div>
@@ -313,7 +310,13 @@ export default function TestDataImport() {
               className="gap-2"
               data-testid="button-apply-all"
             >
-              {isApplyingAll ? "Applying..." : <><Play className="h-4 w-4" /> Apply All ({stats.draft})</>}
+              {isApplyingAll ? (
+                "Applying..."
+              ) : (
+                <>
+                  <Play className="h-4 w-4" /> Apply All ({stats.draft})
+                </>
+              )}
             </Button>
             <Button
               variant="outline"
@@ -322,12 +325,18 @@ export default function TestDataImport() {
               className="gap-2"
               data-testid="button-remove-all"
             >
-              {isRemovingAll ? "Removing..." : <><Pause className="h-4 w-4" /> Remove All ({stats.applied})</>}
+              {isRemovingAll ? (
+                "Removing..."
+              ) : (
+                <>
+                  <Pause className="h-4 w-4" /> Remove All ({stats.applied})
+                </>
+              )}
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button 
-                  variant="destructive" 
+                <Button
+                  variant="destructive"
                   className="gap-2"
                   disabled={isDeletingAll || testVouchers.length === 0}
                   data-testid="button-delete-all"
@@ -360,9 +369,7 @@ export default function TestDataImport() {
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle>Add Test Entry</CardTitle>
-            <CardDescription>
-              Create a journal entry as a draft. Toggle to include in calculations.
-            </CardDescription>
+            <CardDescription>Create a journal entry as a draft. Toggle to include in calculations.</CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -402,7 +409,7 @@ export default function TestDataImport() {
                           {Object.entries(accountsByType).map(([type, accs]) => (
                             <div key={type}>
                               <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{type}</div>
-                              {accs.map(acc => (
+                              {accs.map((acc) => (
                                 <SelectItem key={acc.id} value={acc.id.toString()}>
                                   {acc.name} ({acc.code})
                                 </SelectItem>
@@ -432,7 +439,7 @@ export default function TestDataImport() {
                           {Object.entries(accountsByType).map(([type, accs]) => (
                             <div key={type}>
                               <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{type}</div>
-                              {accs.map(acc => (
+                              {accs.map((acc) => (
                                 <SelectItem key={acc.id} value={acc.id.toString()}>
                                   {acc.name} ({acc.code})
                                 </SelectItem>
@@ -453,11 +460,11 @@ export default function TestDataImport() {
                     <FormItem>
                       <FormLabel>Amount</FormLabel>
                       <FormControl>
-                        <Input 
-                          type="number" 
-                          step="0.01" 
-                          placeholder="0.00" 
-                          {...field} 
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          {...field}
                           data-testid="input-test-amount"
                         />
                       </FormControl>
@@ -473,9 +480,9 @@ export default function TestDataImport() {
                     <FormItem>
                       <FormLabel>Description (Optional)</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="e.g., Electricity Jan 2025" 
-                          {...field} 
+                        <Textarea
+                          placeholder="e.g., Electricity Jan 2025"
+                          {...field}
                           data-testid="input-test-description"
                         />
                       </FormControl>
@@ -484,8 +491,8 @@ export default function TestDataImport() {
                   )}
                 />
 
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   className="w-full gap-2"
                   disabled={createMutation.isPending}
                   data-testid="button-add-test-entry"
@@ -508,9 +515,7 @@ export default function TestDataImport() {
           </CardHeader>
           <CardContent>
             {testVouchers.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No test entries yet. Add one using the form.
-              </div>
+              <div className="text-center py-8 text-muted-foreground">No test entries yet. Add one using the form.</div>
             ) : (
               <Table>
                 <TableHeader>
@@ -577,8 +582,13 @@ export default function TestDataImport() {
               <h3 className="font-medium mb-1">How Test Data Works</h3>
               <ul className="text-sm text-muted-foreground space-y-1">
                 <li>Test entries are created as "optional" journal vouchers with a TEST- prefix</li>
-                <li>Optional vouchers are <strong>excluded</strong> from all financial calculations (Net Profit, Balance Sheet, etc.)</li>
-                <li>Click "Apply" to include an entry in calculations - this helps you test if your totals match Tally</li>
+                <li>
+                  Optional vouchers are <strong>excluded</strong> from all financial calculations (Net Profit, Balance
+                  Sheet, etc.)
+                </li>
+                <li>
+                  Click "Apply" to include an entry in calculations - this helps you test if your totals match Tally
+                </li>
                 <li>Click "Remove" to exclude an entry from calculations without deleting it</li>
                 <li>Use "Delete All Test Data" to permanently remove all test entries when you're done testing</li>
               </ul>

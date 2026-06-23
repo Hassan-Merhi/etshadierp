@@ -48,11 +48,7 @@ function isAllowedFactoryPath(url: string): boolean {
   return ALLOWED_SHARED_PREFIXES.some((p) => url.startsWith(p));
 }
 
-export async function factoryApiRequest(
-  method: string,
-  url: string,
-  data?: unknown,
-): Promise<Response> {
+export async function factoryApiRequest(method: string, url: string, data?: unknown): Promise<Response> {
   if (!isAllowedFactoryPath(url)) {
     const msg = `[factoryApi] BLOCKED: Factory mode attempted non-factory endpoint: ${method} ${url}`;
     console.error(msg);
@@ -66,11 +62,7 @@ export async function factoryApiRequest(
 
 export const factoryQueryClient = queryClient;
 
-export function resolveApiPath(
-  erpPath: string,
-  factoryPath: string,
-  mode: AppMode,
-): string {
+export function resolveApiPath(erpPath: string, factoryPath: string, mode: AppMode): string {
   return mode === "factory" ? factoryPath : erpPath;
 }
 

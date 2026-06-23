@@ -70,9 +70,7 @@ export function DaybookTable({
   navigate,
 }: DaybookTableProps) {
   const rowId = (row: DaybookRow): string => {
-    return row._type === "voucher"
-      ? `voucher-${(row.data as Voucher).id}`
-      : `offload-${row.data.id}`;
+    return row._type === "voucher" ? `voucher-${(row.data as Voucher).id}` : `offload-${row.data.id}`;
   };
 
   if (viewMode === "condensed") {
@@ -81,7 +79,10 @@ export function DaybookTable({
       const type = row._type === "voucher" ? row.data.voucherType : "Offload";
       if (!groups[type]) groups[type] = { total: 0, rows: [] };
       groups[type].rows.push(row);
-      const amt = row._type === "voucher" ? parseFloat(String(row.data.totalAmount || "0")) : parseFloat(String(row.data.itemsTotal || "0"));
+      const amt =
+        row._type === "voucher"
+          ? parseFloat(String(row.data.totalAmount || "0"))
+          : parseFloat(String(row.data.itemsTotal || "0"));
       groups[type].total += amt;
     }
 
@@ -98,88 +99,128 @@ export function DaybookTable({
           {Object.entries(groups).map(([type, g]) => {
             const groupKey = `group-${type}`;
             const isGroupExpanded = expandedCondensedGroups.has(groupKey);
-            const badge = type === "Offload" ? { className: "bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30" } : getVoucherTypeBadge(type);
+            const badge =
+              type === "Offload"
+                ? { className: "bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30" }
+                : getVoucherTypeBadge(type);
             return (
               <div key={groupKey} style={{ display: "contents" }}>
                 <TableRow
                   className="cursor-pointer hover:bg-muted/50 font-medium"
-                  onClick={() => setExpandedCondensedGroups((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(groupKey)) next.delete(groupKey);
-                    else next.add(groupKey);
-                    return next;
-                  })}
+                  onClick={() =>
+                    setExpandedCondensedGroups((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(groupKey)) next.delete(groupKey);
+                      else next.add(groupKey);
+                      return next;
+                    })
+                  }
                 >
                   <TableCell className="sticky left-0 bg-background z-10 pl-6">
                     <div className="flex items-center gap-2">
-                      {isGroupExpanded
-                        ? <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
-                        : <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />}
+                      {isGroupExpanded ? (
+                        <ChevronDown className="w-3 h-3 text-muted-foreground shrink-0" />
+                      ) : (
+                        <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
+                      )}
                       <Badge {...badge}>{type}</Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground text-sm font-mono">
-                    {g.rows.length}
-                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground text-sm font-mono">{g.rows.length}</TableCell>
                   {!hideAmounts && (
-                    <TableCell className="text-right font-mono font-medium">
-                      {formatAmount(g.total)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono font-medium">{formatAmount(g.total)}</TableCell>
                   )}
                 </TableRow>
-                {isGroupExpanded && g.rows.map((row) => {
-                  if (row._type === "offload") {
-                    const o = row.data;
-                    const offloadDesc = [o.containerNumber, o.locationName].filter(Boolean).join(" — ");
-                    return (
-                      <TableRow key={`${groupKey}-offload-${o.id}`} className="bg-muted/20">
-                        <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14 max-w-0 w-full overflow-hidden">
-                          <div className="truncate text-sm text-foreground" title={offloadDesc || "—"}>{offloadDesc || "—"}</div>
-                        </TableCell>
-                        <TableCell />
-                        {!hideAmounts && (
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="text-sm font-mono font-medium">{formatAmount(Number(o.itemsTotal))}</span>
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); navigate(`/offloads/${o.id}`); }} title="View">
-                                <Eye className="w-3 h-3" />
-                              </Button>
+                {isGroupExpanded &&
+                  g.rows.map((row) => {
+                    if (row._type === "offload") {
+                      const o = row.data;
+                      const offloadDesc = [o.containerNumber, o.locationName].filter(Boolean).join(" — ");
+                      return (
+                        <TableRow key={`${groupKey}-offload-${o.id}`} className="bg-muted/20">
+                          <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14 max-w-0 w-full overflow-hidden">
+                            <div className="truncate text-sm text-foreground" title={offloadDesc || "—"}>
+                              {offloadDesc || "—"}
                             </div>
                           </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  } else {
-                    const voucher = row.data as Voucher;
-                    const vDesc = voucher.description ||
-                      ((voucher.voucherType === "Payment" || voucher.voucherType === "Receipt" || voucher.voucherType === "Journal") && accountNameCache[voucher.id]
-                        ? accountNameCache[voucher.id]
-                        : null);
-                    return (
-                      <TableRow key={`${groupKey}-v-${voucher.id}`} className="bg-muted/20">
-                        <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14 max-w-0 w-full overflow-hidden">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className="truncate text-sm text-foreground" title={vDesc || voucher.voucherNumber}>{vDesc || voucher.voucherNumber}</div>
-                            {voucher.optional && (
-                              <Badge variant="outline" className="text-xs text-muted-foreground shrink-0" data-testid={`badge-optional-condensed-${voucher.id}`}>Optional</Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell />
-                        {!hideAmounts && (
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="text-sm font-mono font-medium">{formatAmount(voucher.totalAmount)}</span>
-                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); handleView(voucher); }} title="View">
-                                <Eye className="w-3 h-3" />
-                              </Button>
+                          <TableCell />
+                          {!hideAmounts && (
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <span className="text-sm font-mono font-medium">
+                                  {formatAmount(Number(o.itemsTotal))}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/offloads/${o.id}`);
+                                  }}
+                                  title="View"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    } else {
+                      const voucher = row.data as Voucher;
+                      const vDesc =
+                        voucher.description ||
+                        ((voucher.voucherType === "Payment" ||
+                          voucher.voucherType === "Receipt" ||
+                          voucher.voucherType === "Journal") &&
+                        accountNameCache[voucher.id]
+                          ? accountNameCache[voucher.id]
+                          : null);
+                      return (
+                        <TableRow key={`${groupKey}-v-${voucher.id}`} className="bg-muted/20">
+                          <TableCell className="sticky left-0 bg-muted/20 z-10 pl-14 max-w-0 w-full overflow-hidden">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="truncate text-sm text-foreground" title={vDesc || voucher.voucherNumber}>
+                                {vDesc || voucher.voucherNumber}
+                              </div>
+                              {voucher.optional && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs text-muted-foreground shrink-0"
+                                  data-testid={`badge-optional-condensed-${voucher.id}`}
+                                >
+                                  Optional
+                                </Badge>
+                              )}
                             </div>
                           </TableCell>
-                        )}
-                      </TableRow>
-                    );
-                  }
-                })}
+                          <TableCell />
+                          {!hideAmounts && (
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <span className="text-sm font-mono font-medium">
+                                  {formatAmount(voucher.totalAmount)}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleView(voucher);
+                                  }}
+                                  title="View"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      );
+                    }
+                  })}
               </div>
             );
           })}
@@ -199,9 +240,10 @@ export function DaybookTable({
         return d === rowDate;
       });
       const dayTotal = dayRows.reduce((sum, r) => {
-        const amt = r._type === "voucher"
-          ? parseFloat(String(r.data.totalAmount || "0"))
-          : parseFloat(String(r.data.itemsTotal || "0"));
+        const amt =
+          r._type === "voucher"
+            ? parseFloat(String(r.data.totalAmount || "0"))
+            : parseFloat(String(r.data.itemsTotal || "0"));
         return sum + amt;
       }, 0);
       tableRows.push(
@@ -219,7 +261,7 @@ export function DaybookTable({
               )}
             </div>
           </TableCell>
-        </TableRow>,
+        </TableRow>
       );
       lastDate = rowDate;
     }
@@ -245,24 +287,33 @@ export function DaybookTable({
             </Badge>
           </TableCell>
           <TableCell className="max-w-md truncate">
-            {o.containerNumber}{o.locationName ? ` — ${o.locationName}` : ""}
+            {o.containerNumber}
+            {o.locationName ? ` — ${o.locationName}` : ""}
           </TableCell>
           {!hideAmounts && (
-            <TableCell className="text-right font-mono font-medium">
-              {formatAmount(Number(o.itemsTotal))}
-            </TableCell>
+            <TableCell className="text-right font-mono font-medium">{formatAmount(Number(o.itemsTotal))}</TableCell>
           )}
           <TableCell className="text-right">
             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-              <Button variant="ghost" size="icon" onClick={() => navigate(`/offloads/${o.id}`)} data-testid={`button-view-offload-${o.id}`}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(`/offloads/${o.id}`)}
+                data-testid={`button-view-offload-${o.id}`}
+              >
                 <Eye className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => navigate(`/containers/${o.containerId}`)} data-testid={`button-goto-container-${o.id}`}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(`/containers/${o.containerId}`)}
+                data-testid={`button-goto-container-${o.id}`}
+              >
                 <ExternalLink className="w-4 h-4" />
               </Button>
             </div>
           </TableCell>
-        </TableRow>,
+        </TableRow>
       );
     } else {
       const voucher = row.data as Voucher;
@@ -283,7 +334,7 @@ export function DaybookTable({
             selectedRowId === dvid && "bg-accent/30",
             isDvHidden && showHidden && "opacity-50",
             isExpanded && "bg-accent/20",
-            !isDvPendingSync && !isExpanded && selectedRowId !== dvid && "hover:bg-muted/40",
+            !isDvPendingSync && !isExpanded && selectedRowId !== dvid && "hover:bg-muted/40"
           )}
           onClick={() => {
             if (isDvPendingSync) return;
@@ -313,91 +364,119 @@ export function DaybookTable({
                 </Badge>
               )}
               {isDvHidden && (
-                <Badge variant="outline" className="text-xs text-muted-foreground">Hidden</Badge>
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  Hidden
+                </Badge>
               )}
             </div>
           </TableCell>
           <TableCell className="max-w-md">
             <div className="flex items-center gap-1">
-              <ChevronRight className={cn("w-3 h-3 text-muted-foreground shrink-0 transition-transform", isExpanded && "rotate-90")} />
+              <ChevronRight
+                className={cn("w-3 h-3 text-muted-foreground shrink-0 transition-transform", isExpanded && "rotate-90")}
+              />
               <span className="truncate">
                 {voucher.description ||
-                  (voucher.voucherType === "Payment" || voucher.voucherType === "Receipt" || voucher.voucherType === "Journal"
+                  (voucher.voucherType === "Payment" ||
+                  voucher.voucherType === "Receipt" ||
+                  voucher.voucherType === "Journal"
                     ? `${voucher.voucherType}${accountNameCache[voucher.id] ? ` (${accountNameCache[voucher.id]})` : ""}`
                     : "-")}
               </span>
             </div>
           </TableCell>
           {!hideAmounts && (
-            <TableCell className="text-right font-mono font-medium">
-              {formatAmount(voucher.totalAmount)}
-            </TableCell>
+            <TableCell className="text-right font-mono font-medium">{formatAmount(voucher.totalAmount)}</TableCell>
           )}
           <TableCell className="text-right">
             {isDvPendingSync ? (
               <span className="text-xs text-amber-600 dark:text-amber-400 italic">Pending sync</span>
             ) : (
-            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => { e.stopPropagation(); handleView(voucher); }}
-                data-testid={`button-view-${voucher.id}`}
-                title="View detail"
-              >
-                <Eye className="w-4 h-4" />
-              </Button>
-              {isLockedType ? (
+              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={(e) => { e.stopPropagation(); handleEdit(voucher); }}
-                  data-testid={`button-edit-${voucher.id}`}
-                  title={`Edit in ${voucher.voucherType === "Sales" ? "Sales" : "Containers"}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleView(voucher);
+                  }}
+                  data-testid={`button-view-${voucher.id}`}
+                  title="View detail"
                 >
-                  <Lock className="w-4 h-4 text-muted-foreground" />
+                  <Eye className="w-4 h-4" />
                 </Button>
-              ) : canEdit(voucher) ? (
+                {isLockedType ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(voucher);
+                    }}
+                    data-testid={`button-edit-${voucher.id}`}
+                    title={`Edit in ${voucher.voucherType === "Sales" ? "Sales" : "Containers"}`}
+                  >
+                    <Lock className="w-4 h-4 text-muted-foreground" />
+                  </Button>
+                ) : canEdit(voucher) ? (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(voucher);
+                    }}
+                    data-testid={`button-edit-${voucher.id}`}
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                ) : null}
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={(e) => { e.stopPropagation(); handleEdit(voucher); }}
-                  data-testid={`button-edit-${voucher.id}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isDvHidden) {
+                      setHiddenRowIds((prev) => {
+                        const next = new Set(prev);
+                        next.delete(dvid);
+                        return next;
+                      });
+                    } else {
+                      setHiddenRowIds((prev) => {
+                        const next = new Set(prev);
+                        next.add(dvid);
+                        return next;
+                      });
+                      if (selectedRowId === dvid) setSelectedRowId(null);
+                    }
+                  }}
+                  data-testid={isDvHidden ? `button-unhide-${voucher.id}` : `button-hide-${voucher.id}`}
+                  title={isDvHidden ? "Unhide row" : "Hide row"}
                 >
-                  <Edit className="w-4 h-4" />
+                  {isDvHidden ? (
+                    <Eye className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <EyeOff className="w-4 h-4 text-muted-foreground" />
+                  )}
                 </Button>
-              ) : null}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (isDvHidden) {
-                    setHiddenRowIds((prev) => { const next = new Set(prev); next.delete(dvid); return next; });
-                  } else {
-                    setHiddenRowIds((prev) => { const next = new Set(prev); next.add(dvid); return next; });
-                    if (selectedRowId === dvid) setSelectedRowId(null);
-                  }
-                }}
-                data-testid={isDvHidden ? `button-unhide-${voucher.id}` : `button-hide-${voucher.id}`}
-                title={isDvHidden ? "Unhide row" : "Hide row"}
-              >
-                {isDvHidden ? <Eye className="w-4 h-4 text-muted-foreground" /> : <EyeOff className="w-4 h-4 text-muted-foreground" />}
-              </Button>
-              {canDelete() && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={(e) => { e.stopPropagation(); handleDelete(voucher); }}
-                  data-testid={`button-delete-${voucher.id}`}
-                >
-                  <Trash2 className="w-4 h-4 text-destructive" />
-                </Button>
-              )}
-            </div>
+                {canDelete() && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(voucher);
+                    }}
+                    data-testid={`button-delete-${voucher.id}`}
+                  >
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </Button>
+                )}
+              </div>
             )}
           </TableCell>
-        </TableRow>,
+        </TableRow>
       );
       if (isExpanded) {
         tableRows.push(
@@ -418,7 +497,11 @@ export function DaybookTable({
                       .map((e: ViewVoucherEntry, idx: number) => (
                         <div key={idx} className="flex items-center justify-between text-sm py-0.5">
                           <span className="text-muted-foreground truncate max-w-xs">
-                            {e.accountName || (e as any).supplierName || (e as any).employeeName || (e as any).assetName || "—"}
+                            {e.accountName ||
+                              (e as any).supplierName ||
+                              (e as any).employeeName ||
+                              (e as any).assetName ||
+                              "—"}
                             {e.narration && (
                               <span className="ml-2 text-xs italic text-muted-foreground/60">{e.narration}</span>
                             )}
@@ -441,7 +524,7 @@ export function DaybookTable({
                 )}
               </div>
             </TableCell>
-          </TableRow>,
+          </TableRow>
         );
       }
     }
@@ -459,15 +542,13 @@ export function DaybookTable({
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
-        <TableBody>
-          {tableRows}
-        </TableBody>
+        <TableBody>{tableRows}</TableBody>
       </Table>
       {displayedRows.length < visibleRows.length && (
         <div className="flex justify-center pt-3 pb-1">
           <Button
             variant="outline"
-            onClick={() => setDaybookRowLimit(prev => prev + DAYBOOK_PAGE_SIZE)}
+            onClick={() => setDaybookRowLimit((prev) => prev + DAYBOOK_PAGE_SIZE)}
             data-testid="button-daybook-load-more"
           >
             Show {Math.min(DAYBOOK_PAGE_SIZE, visibleRows.length - displayedRows.length)} more

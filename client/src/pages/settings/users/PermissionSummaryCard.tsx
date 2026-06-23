@@ -135,9 +135,7 @@ export function PermissionSummaryCard({
             ) : (
               <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
             )}
-            <span className={p.dangerous ? "text-amber-700 dark:text-amber-300" : ""}>
-              {p.label}
-            </span>
+            <span className={p.dangerous ? "text-amber-700 dark:text-amber-300" : ""}>{p.label}</span>
           </li>
         ))}
       </ul>

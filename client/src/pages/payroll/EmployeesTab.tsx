@@ -10,9 +10,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
-  Receipt, Plus, ChevronDown, ArrowDownCircle, Gift, ArrowUpCircle, 
-  TrendingUp, DollarSign, TrendingDown, Pencil, Trash2 
+import {
+  Receipt,
+  Plus,
+  ChevronDown,
+  ArrowDownCircle,
+  Gift,
+  ArrowUpCircle,
+  TrendingUp,
+  DollarSign,
+  TrendingDown,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -123,7 +132,10 @@ export function EmployeesTab({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onClick={() => { setBulkDepositSelections({}); setBulkDepositDialogOpen(true); }}
+                  onClick={() => {
+                    setBulkDepositSelections({});
+                    setBulkDepositDialogOpen(true);
+                  }}
                   data-testid="button-open-bulk-deposit"
                 >
                   <ArrowDownCircle className="h-4 w-4 mr-2" /> Bulk Deposit
@@ -148,7 +160,11 @@ export function EmployeesTab({
                   )}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => { setBulkWithdrawalAmounts({}); setBulkWithdrawalAccountId(""); setBulkWithdrawalDialogOpen(true); }}
+                  onClick={() => {
+                    setBulkWithdrawalAmounts({});
+                    setBulkWithdrawalAccountId("");
+                    setBulkWithdrawalDialogOpen(true);
+                  }}
                   data-testid="button-open-bulk-withdrawal"
                 >
                   <ArrowUpCircle className="h-4 w-4 mr-2" /> Bulk Withdrawal
@@ -180,9 +196,7 @@ export function EmployeesTab({
                       {/* Avatar + Name — fixed width so stats align across all cards */}
                       <div className="flex items-center gap-3 w-56 shrink-0 min-w-0">
                         <Avatar className="h-10 w-10 shrink-0">
-                          <AvatarFallback className={`text-sm font-bold ${avatarColor}`}>
-                            {initials}
-                          </AvatarFallback>
+                          <AvatarFallback className={`text-sm font-bold ${avatarColor}`}>{initials}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -194,7 +208,9 @@ export function EmployeesTab({
                               {employee.firstName} {employee.lastName}
                             </button>
                             {!employee.active && (
-                              <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                              <Badge variant="secondary" className="text-xs">
+                                Inactive
+                              </Badge>
                             )}
                           </div>
                           {employee.department && (
@@ -207,21 +223,29 @@ export function EmployeesTab({
                       <div className="grid grid-cols-4 flex-1 min-w-0">
                         <div>
                           <p className="text-xs text-muted-foreground">Salary</p>
-                          <p className="font-mono text-sm font-medium">{formatAmount(parseFloat(employee.monthlySalary))}</p>
+                          <p className="font-mono text-sm font-medium">
+                            {formatAmount(parseFloat(employee.monthlySalary))}
+                          </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Balance</p>
-                          <p className={`font-mono text-sm font-bold ${balance >= 0 ? "text-green-500 dark:text-green-400" : "text-destructive"}`}>
+                          <p
+                            className={`font-mono text-sm font-bold ${balance >= 0 ? "text-green-500 dark:text-green-400" : "text-destructive"}`}
+                          >
                             {formatAmount(balance)}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Deposits</p>
-                          <p className="font-mono text-sm text-muted-foreground">{formatAmount(parseFloat(employee.totalDeposits || "0"))}</p>
+                          <p className="font-mono text-sm text-muted-foreground">
+                            {formatAmount(parseFloat(employee.totalDeposits || "0"))}
+                          </p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground">Withdrawals</p>
-                          <p className="font-mono text-sm text-muted-foreground">{formatAmount(parseFloat(employee.totalWithdrawals || "0"))}</p>
+                          <p className="font-mono text-sm text-muted-foreground">
+                            {formatAmount(parseFloat(employee.totalWithdrawals || "0"))}
+                          </p>
                         </div>
                       </div>
 
@@ -234,23 +258,45 @@ export function EmployeesTab({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDeposit(employee)} data-testid={`button-deposit-${employee.id}`}>
+                            <DropdownMenuItem
+                              onClick={() => handleDeposit(employee)}
+                              data-testid={`button-deposit-${employee.id}`}
+                            >
                               <TrendingUp className="h-4 w-4 mr-2" /> Deposit
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleBonus(employee)} data-testid={`button-bonus-${employee.id}`}>
+                            <DropdownMenuItem
+                              onClick={() => handleBonus(employee)}
+                              data-testid={`button-bonus-${employee.id}`}
+                            >
                               <DollarSign className="h-4 w-4 mr-2" /> Bonus
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleWithdrawal(employee)} data-testid={`button-withdraw-${employee.id}`}>
+                            <DropdownMenuItem
+                              onClick={() => handleWithdrawal(employee)}
+                              data-testid={`button-withdraw-${employee.id}`}
+                            >
                               <TrendingDown className="h-4 w-4 mr-2" /> Withdraw
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                        <Button size="icon" variant="ghost" onClick={() => { setEditingEmployee(employee); setEditEmployeeDialogOpen(true); }} data-testid={`button-edit-${employee.id}`}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingEmployee(employee);
+                            setEditEmployeeDialogOpen(true);
+                          }}
+                          data-testid={`button-edit-${employee.id}`}
+                        >
                           <Pencil className="h-4 w-4" />
                         </Button>
                         <ConfirmationDialog
                           trigger={
-                            <Button size="icon" variant="ghost" className="text-destructive" data-testid={`button-delete-${employee.id}`}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-destructive"
+                              data-testid={`button-delete-${employee.id}`}
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           }

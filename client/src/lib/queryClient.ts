@@ -54,8 +54,7 @@ export function resetCsrfToken() {
 /* ── Capacitor API base URL ──────────────────────────────────────────────── */
 // Set VITE_API_BASE_URL at Capacitor build time, e.g. "https://your-server.com".
 // Empty string in all web builds — every code path below falls back unchanged.
-const _CAPACITOR_API_BASE: string =
-  ((import.meta as any).env?.VITE_API_BASE_URL as string) || "";
+const _CAPACITOR_API_BASE: string = ((import.meta as any).env?.VITE_API_BASE_URL as string) || "";
 
 /* ── Global fetch interceptor ────────────────────────────────────────────── */
 // Wraps window.fetch so that ALL state-changing requests to /api/* (including
@@ -72,15 +71,11 @@ const _CAPACITOR_API_BASE: string =
 //   • Falls through cleanly if the token cannot be fetched
 //   • Auto-retries once on CSRF_TOKEN_MISMATCH (stale cached token after
 //     server restart / session regeneration on Render)
-if (typeof window !== "undefined" && !((window as any).__csrfFetchPatched)) {
+if (typeof window !== "undefined" && !(window as any).__csrfFetchPatched) {
   (window as any).__csrfFetchPatched = true;
   const originalFetch = window.fetch.bind(window);
 
-  async function fetchWithCsrf(
-    input: RequestInfo | URL,
-    init?: RequestInit,
-    isRetry = false,
-  ): Promise<Response> {
+  async function fetchWithCsrf(input: RequestInfo | URL, init?: RequestInit, isRetry = false): Promise<Response> {
     try {
       // Capacitor: prefix relative /api/* paths with the remote server base URL.
       // No-op when VITE_API_BASE_URL is unset (all web builds — zero behavior change).
@@ -92,15 +87,15 @@ if (typeof window !== "undefined" && !((window as any).__csrfFetchPatched)) {
       let pathname: string | null = null;
       try {
         if (typeof input === "string") {
-          pathname = input.startsWith("/")
-            ? input.split("?")[0]
-            : new URL(input, window.location.origin).pathname;
+          pathname = input.startsWith("/") ? input.split("?")[0] : new URL(input, window.location.origin).pathname;
         } else if (input instanceof URL) {
           pathname = input.pathname;
         } else if (input instanceof Request) {
           pathname = new URL(input.url, window.location.origin).pathname;
         }
-      } catch { /* opaque URL — skip */ }
+      } catch {
+        /* opaque URL — skip */
+      }
 
       const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
       const isStateChanging = method !== "GET" && method !== "HEAD" && method !== "OPTIONS";
@@ -126,7 +121,9 @@ if (typeof window !== "undefined" && !((window as any).__csrfFetchPatched)) {
                   resetCsrfToken();
                   return fetchWithCsrf(input, init, true);
                 }
-              } catch { /* not JSON — not a CSRF error */ }
+              } catch {
+                /* not JSON — not a CSRF error */
+              }
             }
             return res;
           }
@@ -138,8 +135,7 @@ if (typeof window !== "undefined" && !((window as any).__csrfFetchPatched)) {
     return originalFetch(input, init);
   }
 
-  window.fetch = (input: RequestInfo | URL, init?: RequestInit) =>
-    fetchWithCsrf(input, init);
+  window.fetch = (input: RequestInfo | URL, init?: RequestInit) => fetchWithCsrf(input, init);
 }
 
 /**
@@ -172,7 +168,7 @@ async function throwIfResNotOk(res: Response) {
     } catch {
       errorData = { message: text || res.statusText };
     }
-    
+
     // Create error with structured data for proper handling
     const error: any = new Error(errorData.message || res.statusText);
     error.status = res.status;
@@ -203,7 +199,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
   _isRetry = false,
-  timeoutMs = 300000,
+  timeoutMs = 300000
 ): Promise<Response> {
   const controller = new AbortController();
   let intentionalAbort = false;
@@ -211,13 +207,13 @@ export async function apiRequest(
     intentionalAbort = true;
     controller.abort();
   }, timeoutMs);
-  
+
   try {
     let body: string | undefined;
     if (data) {
       body = JSON.stringify(data);
     }
-    
+
     // Attach CSRF token for state-changing methods.
     const upMethod = method.toUpperCase();
     const isStateChanging = upMethod !== "GET" && upMethod !== "HEAD" && upMethod !== "OPTIONS";
@@ -249,7 +245,9 @@ export async function apiRequest(
           resetCsrfToken();
           return apiRequest(method, url, data, true);
         }
-      } catch { /* not JSON — fall through to normal error handling */ }
+      } catch {
+        /* not JSON — fall through to normal error handling */
+      }
     }
 
     await throwIfResNotOk(res);
@@ -259,9 +257,7 @@ export async function apiRequest(
     if (error.name === "AbortError" && intentionalAbort) {
       throw new Error(`Request timeout after ${Math.round(timeoutMs / 1000)} seconds for ${method} ${url}`);
     }
-    const networkFail = error.name === "AbortError"
-      ? true
-      : isNetworkError(error);
+    const networkFail = error.name === "AbortError" ? true : isNetworkError(error);
     if (OFFLINE_MODE_ENABLED && networkFail && isSafeToQueue(method, url)) {
       const description = getDescriptionForRequest(url);
       const body = data ? JSON.stringify(data) : "";
@@ -276,9 +272,7 @@ export async function apiRequest(
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
+export const getQueryFn: <T>(options: { on401: UnauthorizedBehavior }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey, signal: querySignal }) => {
     // The queryKey is expected to be a single URL string as the first element
@@ -352,8 +346,7 @@ const globalMutationCache = new MutationCache({
  */
 export function keyStartsWith(prefix: string) {
   return (query: { queryKey: readonly unknown[] }) =>
-    typeof query.queryKey[0] === "string" &&
-    (query.queryKey[0] as string).startsWith(prefix);
+    typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith(prefix);
 }
 
 /**

@@ -43,7 +43,9 @@ function getChromiumPath(): string | null {
     try {
       const p = execSync(`which ${cmd} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim();
       if (p && existsSync(p)) return p;
-    } catch { /* not found, try next */ }
+    } catch {
+      /* not found, try next */
+    }
   }
 
   // 3. Puppeteer bundled Chrome
@@ -51,7 +53,9 @@ function getChromiumPath(): string | null {
     const puppeteer = _require("puppeteer");
     const p: string = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
     if (p && existsSync(p)) return p;
-  } catch { /* puppeteer not installed */ }
+  } catch {
+    /* puppeteer not installed */
+  }
 
   return null;
 }
@@ -66,8 +70,8 @@ export interface ScraperResult {
 }
 
 const SCRAPER_TIMEOUT_MS = 90_000;
-const NAV_TIMEOUT_MS     = 60_000;
-const DATA_WAIT_MS       = 25_000;
+const NAV_TIMEOUT_MS = 60_000;
+const DATA_WAIT_MS = 25_000;
 
 // ── Availability check ────────────────────────────────────────────────────────
 
@@ -95,10 +99,7 @@ export async function ensureChromiumInstalled(): Promise<void> {
 
   try {
     const puppeteer = _require("puppeteer");
-    const p: string =
-      typeof puppeteer.executablePath === "function"
-        ? puppeteer.executablePath()
-        : "";
+    const p: string = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
     if (p && existsSync(p)) return;
 
     console.log("[Puppeteer] Chrome not found — downloading…");
@@ -155,7 +156,7 @@ async function getSharedBrowser(): Promise<any> {
       "--disable-accelerated-2d-canvas",
       "--no-first-run",
       "--no-zygote",
-      "--renderer-process-limit=1",       // cap renderer processes
+      "--renderer-process-limit=1", // cap renderer processes
       "--js-flags=--max-old-space-size=256",
       // Anti-detection
       "--disable-blink-features=AutomationControlled",
@@ -208,7 +209,11 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
   let page: any = null;
   const hardStop = setTimeout(() => {
     console.warn(`[ParcelsAppScraper] ${containerNumber}: hard timeout — closing page`);
-    try { page?.close(); } catch { /* ignore */ }
+    try {
+      page?.close();
+    } catch {
+      /* ignore */
+    }
   }, SCRAPER_TIMEOUT_MS);
 
   try {
@@ -218,7 +223,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-      "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     );
 
     let capturedData: unknown = null;
@@ -229,14 +234,12 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
       const url: string = response.url();
       if (
         url.includes("parcelsapp.com") &&
-        (
-          url.includes("/api/v2/parcel") ||
+        (url.includes("/api/v2/parcel") ||
           url.includes("/api/v2/shipment") ||
           url.includes("/api/v3/shipment") ||
           url.includes("/api/v3/shipments") ||
           url.includes("/api/v3/track") ||
-          url.includes("/api/v3/parcel")
-        )
+          url.includes("/api/v3/parcel"))
       ) {
         try {
           const json = await response.json().catch(() => null);
@@ -275,7 +278,11 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
     }
 
     clearTimeout(hardStop);
-    try { await page.close(); } catch { /* ignore */ }
+    try {
+      await page.close();
+    } catch {
+      /* ignore */
+    }
     page = null;
     release();
 
@@ -300,9 +307,7 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
     const data = capturedData as any;
     const all: ParcelsAppShipment[] = data.shipments ?? data.parcels ?? [];
     const shipment =
-      all.find((s: any) => s.trackingId === containerNumber || s.id === containerNumber) ??
-      all[0] ??
-      null;
+      all.find((s: any) => s.trackingId === containerNumber || s.id === containerNumber) ?? all[0] ?? null;
 
     return {
       success: !!shipment,
@@ -314,7 +319,11 @@ export async function scrapeTracking(containerNumber: string): Promise<ScraperRe
   } catch (err: any) {
     clearTimeout(hardStop);
     if (page) {
-      try { await page.close(); } catch { /* ignore */ }
+      try {
+        await page.close();
+      } catch {
+        /* ignore */
+      }
     }
     release();
     return {

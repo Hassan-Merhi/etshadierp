@@ -9,7 +9,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, MapPin, Tag, AlertCircle, Check, X, Pencil, Layers, EyeOff, Eye, Download, Upload, FileSpreadsheet } from "lucide-react";
+import {
+  Search,
+  MapPin,
+  Tag,
+  AlertCircle,
+  Check,
+  X,
+  Pencil,
+  Layers,
+  EyeOff,
+  Eye,
+  Download,
+  Upload,
+  FileSpreadsheet,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -70,13 +84,17 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [groupFilter, setGroupFilter] = useState<string>("all");
-  const [editingItem, setEditingItem] = useState<{ stockItemId: number; locationId: number; value: string } | null>(null);
+  const [editingItem, setEditingItem] = useState<{ stockItemId: number; locationId: number; value: string } | null>(
+    null
+  );
   const [showUnpriced, setShowUnpriced] = useState(false);
   const [hiddenUnpricedGroups, setHiddenUnpricedGroups] = useState<Set<string>>(new Set());
   const [hiddenLocations, setHiddenLocations] = useState<Set<number>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const editingItemRef = useRef(editingItem);
-  useEffect(() => { editingItemRef.current = editingItem; }, [editingItem]);
+  useEffect(() => {
+    editingItemRef.current = editingItem;
+  }, [editingItem]);
   useEffect(() => {
     if (editingItem) {
       inputRef.current?.focus();
@@ -166,10 +184,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const locationPricedList = useMemo(() => {
     if (isAllMode) return masterItems as any[];
     if (!posUser) return priceList;
-    return priceList.filter((item) =>
-      item.hasCustomPrice &&
-      item.sellingPrice !== null &&
-      parseFloat(item.quantity) > 0
+    return priceList.filter(
+      (item) => item.hasCustomPrice && item.sellingPrice !== null && parseFloat(item.quantity) > 0
     );
   }, [priceList, masterItems, posUser, isAllMode]);
 
@@ -193,7 +209,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
     return !item.sellingPrice || parseFloat(item.sellingPrice) === 0;
   };
 
-  const unpricedCount = useMemo(() => locationPricedList.filter(isItemUnpriced).length, [locationPricedList, isAllMode]);
+  const unpricedCount = useMemo(
+    () => locationPricedList.filter(isItemUnpriced).length,
+    [locationPricedList, isAllMode]
+  );
 
   // Groups that have at least one unpriced item, with their counts — used for the chip picker
   const unpricedByGroup = useMemo<{ name: string; count: number }[]>(() => {
@@ -228,7 +247,15 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const selectedLocation = locations.find((l) => l.id === selectedLocationId);
 
   const updatePriceMutation = useMutation({
-    mutationFn: async ({ stockItemId, locationId, sellingPrice }: { stockItemId: number; locationId: number; sellingPrice: string }) => {
+    mutationFn: async ({
+      stockItemId,
+      locationId,
+      sellingPrice,
+    }: {
+      stockItemId: number;
+      locationId: number;
+      sellingPrice: string;
+    }) => {
       const res = await apiRequest("POST", `/api/stock-items/${stockItemId}/location-prices`, {
         locationId,
         sellingPrice,
@@ -248,7 +275,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       toast({ title: "Price updated" });
       const current = editingItemRef.current;
       const lastSaved = lastSavedRef.current;
-      if (current && lastSaved && current.stockItemId === lastSaved.stockItemId && current.locationId === lastSaved.locationId) {
+      if (
+        current &&
+        lastSaved &&
+        current.stockItemId === lastSaved.stockItemId &&
+        current.locationId === lastSaved.locationId
+      ) {
         setEditingItem(null);
       }
       lastSavedRef.current = null;
@@ -278,7 +310,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       ? (nextItem.masterPrices?.[current.locationId] ?? nextItem.baseSellingPrice ?? null)
       : nextItem.sellingPrice;
     const hasValue = nextPrice && parseFloat(nextPrice) > 0;
-    setEditingItem({ stockItemId: nextItem.stockItemId, locationId: current.locationId, value: hasValue ? nextPrice : "" });
+    setEditingItem({
+      stockItemId: nextItem.stockItemId,
+      locationId: current.locationId,
+      value: hasValue ? nextPrice : "",
+    });
   };
 
   const navigateHorizontal = (direction: "left" | "right") => {
@@ -346,12 +382,44 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   const cancelEdit = () => setEditingItem(null);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") { e.preventDefault(); commitEdit(); return; }
-    if (e.key === "Escape") { e.preventDefault(); cancelEdit(); return; }
-    if (e.key === "ArrowUp") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateEdit("up"); return; }
-    if (e.key === "ArrowDown") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateEdit("down"); return; }
-    if (e.key === "ArrowLeft") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateHorizontal("left"); return; }
-    if (e.key === "ArrowRight") { e.preventDefault(); skipBlurSaveRef.current = true; commitEdit(); navigateHorizontal("right"); return; }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      commitEdit();
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      cancelEdit();
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      skipBlurSaveRef.current = true;
+      commitEdit();
+      navigateEdit("up");
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      skipBlurSaveRef.current = true;
+      commitEdit();
+      navigateEdit("down");
+      return;
+    }
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      skipBlurSaveRef.current = true;
+      commitEdit();
+      navigateHorizontal("left");
+      return;
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      skipBlurSaveRef.current = true;
+      commitEdit();
+      navigateHorizontal("right");
+      return;
+    }
   };
 
   const handleBlur = () => {
@@ -382,7 +450,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
   // ── Import state ─────────────────────────────────────────────────────────────
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [importPreview, setImportPreview] = useState<{ barcode: string; name: string; changes: { locationId: number; locationName: string; price: string }[] }[]>([]);
+  const [importPreview, setImportPreview] = useState<
+    { barcode: string; name: string; changes: { locationId: number; locationName: string; price: string }[] }[]
+  >([]);
   const [importError, setImportError] = useState<string | null>(null);
   const importFileRef = useRef<HTMLInputElement>(null);
 
@@ -428,7 +498,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       for (const m of masters) nameToId.set(m.name.toLowerCase().trim(), m.id);
       const locationCols = Object.keys(rawRows[0]).filter((col) => nameToId.has(col.toLowerCase().trim()));
       if (locationCols.length === 0) {
-        toast({ title: "No location columns found", description: "Make sure you're uploading the template downloaded from this page.", variant: "destructive" });
+        toast({
+          title: "No location columns found",
+          description: "Make sure you're uploading the template downloaded from this page.",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -442,19 +516,31 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           const raw = row[col];
           const parsed = parseFloat(String(raw));
           if (!isNaN(parsed) && parsed > 0) {
-            changes.push({ locationId: nameToId.get(col.toLowerCase().trim())!, locationName: col, price: parsed.toFixed(2) });
+            changes.push({
+              locationId: nameToId.get(col.toLowerCase().trim())!,
+              locationName: col,
+              price: parsed.toFixed(2),
+            });
           }
         }
         if (changes.length > 0) preview.push({ barcode, name, changes });
       }
       if (preview.length === 0) {
-        toast({ title: "No prices to update", description: "All price cells in the file are blank. Fill in at least one price and try again.", variant: "destructive" });
+        toast({
+          title: "No prices to update",
+          description: "All price cells in the file are blank. Fill in at least one price and try again.",
+          variant: "destructive",
+        });
         return;
       }
       setImportPreview(preview);
       setImportDialogOpen(true);
     } catch (err: any) {
-      toast({ title: "Could not read file", description: err?.message || "Make sure it is a valid .xlsx file.", variant: "destructive" });
+      toast({
+        title: "Could not read file",
+        description: err?.message || "Make sure it is a valid .xlsx file.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -496,9 +582,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         };
 
         if (showCostPrice) {
-          row["Cost Price"] = item.costPrice && parseFloat(item.costPrice) > 0
-            ? parseFloat(item.costPrice)
-            : "";
+          row["Cost Price"] = item.costPrice && parseFloat(item.costPrice) > 0 ? parseFloat(item.costPrice) : "";
           const offloadTotal = parseFloat(item.costPrice ?? "0") + parseFloat(item.offloadingCost ?? "0");
           row["Cost + Offloading"] = offloadTotal > 0 ? offloadTotal : "";
         }
@@ -509,14 +593,13 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
             row[m.name] = price && parseFloat(price) > 0 ? parseFloat(price) : "";
           }
         } else {
-          row["Selling Price"] = item.sellingPrice && parseFloat(item.sellingPrice) > 0
-            ? parseFloat(item.sellingPrice)
-            : item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0
-              ? parseFloat(item.baseSellingPrice)
-              : "";
-          row["Qty in Stock"] = item.quantity && parseFloat(item.quantity) > 0
-            ? parseFloat(item.quantity)
-            : "";
+          row["Selling Price"] =
+            item.sellingPrice && parseFloat(item.sellingPrice) > 0
+              ? parseFloat(item.sellingPrice)
+              : item.baseSellingPrice && parseFloat(item.baseSellingPrice) > 0
+                ? parseFloat(item.baseSellingPrice)
+                : "";
+          row["Qty in Stock"] = item.quantity && parseFloat(item.quantity) > 0 ? parseFloat(item.quantity) : "";
         }
 
         return row;
@@ -526,11 +609,13 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Price List");
 
-      const locationLabel = isAllMode
-        ? "All_Locations"
-        : selectedLocation?.name.replace(/\s+/g, "_") ?? "Unknown";
+      const locationLabel = isAllMode ? "All_Locations" : (selectedLocation?.name.replace(/\s+/g, "_") ?? "Unknown");
       const dateStr = new Date().toLocaleDateString("en-CA");
-      const filterPart = showUnpriced ? "_unpriced" : groupFilter !== "all" ? `_${groupFilter.replace(/\s+/g, "_")}` : "";
+      const filterPart = showUnpriced
+        ? "_unpriced"
+        : groupFilter !== "all"
+          ? `_${groupFilter.replace(/\s+/g, "_")}`
+          : "";
       const searchPart = search.trim() ? `_search-${search.trim().replace(/\s+/g, "_")}` : "";
 
       await XLSX.writeFile(wb, `price_list_${locationLabel}${filterPart}${searchPart}_${dateStr}.xlsx`);
@@ -565,7 +650,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
         <div className="flex-1 overflow-y-auto py-1">
           {locationsLoading ? (
             <div className="flex flex-col gap-1 px-2 py-2">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-8 w-full rounded-md" />)}
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-8 w-full rounded-md" />
+              ))}
             </div>
           ) : locations.length === 0 ? (
             <p className="text-xs text-muted-foreground px-3 py-4">No locations.</p>
@@ -609,12 +696,13 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
       {/* ── Main content ── */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-
         {/* ── Mobile location selector (phones only) ── */}
         <div className="sm:hidden border-b shrink-0 bg-sidebar">
           {locationsLoading ? (
             <div className="flex gap-2 px-3 py-2 overflow-x-auto">
-              {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-24 shrink-0 rounded-md" />)}
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-8 w-24 shrink-0 rounded-md" />
+              ))}
             </div>
           ) : (
             <div className="flex gap-2 px-3 py-2 overflow-x-auto">
@@ -633,7 +721,7 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                   All
                 </button>
               )}
-              {locations.map(loc => (
+              {locations.map((loc) => (
                 <button
                   key={loc.id}
                   data-testid={`button-mobile-location-${loc.id}`}
@@ -688,7 +776,10 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     variant="ghost"
                     size="sm"
                     data-testid="button-upload-price-list"
-                    onClick={() => { setImportError(null); importFileRef.current?.click(); }}
+                    onClick={() => {
+                      setImportError(null);
+                      importFileRef.current?.click();
+                    }}
                     className="gap-1.5 text-muted-foreground"
                   >
                     <Upload className="w-3.5 h-3.5" />
@@ -760,7 +851,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 onClick={() => setHiddenLocations(new Set())}
                 data-testid="button-show-all-locations"
               >
-                <Eye className="w-3 h-3 mr-1" />Show All
+                <Eye className="w-3 h-3 mr-1" />
+                Show All
               </Button>
               <Button
                 variant="ghost"
@@ -769,7 +861,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 onClick={() => setHiddenLocations(new Set(masters.map((m) => m.id)))}
                 data-testid="button-hide-all-locations"
               >
-                <EyeOff className="w-3 h-3 mr-1" />Hide All
+                <EyeOff className="w-3 h-3 mr-1" />
+                Hide All
               </Button>
             </div>
           </div>
@@ -796,7 +889,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 <SelectContent>
                   <SelectItem value="all">All groups</SelectItem>
                   {stockGroups.map((g) => (
-                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                    <SelectItem key={g} value={g}>
+                      {g}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -819,10 +914,14 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 <EyeOff className="w-3.5 h-3.5" />
                 Unpriced
                 {unpricedCount > 0 && (
-                  <span className={cn(
-                    "inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded text-[11px] font-semibold",
-                    showUnpriced ? "bg-primary-foreground/20 text-primary-foreground" : "bg-foreground/10 text-foreground"
-                  )}>
+                  <span
+                    className={cn(
+                      "inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded text-[11px] font-semibold",
+                      showUnpriced
+                        ? "bg-primary-foreground/20 text-primary-foreground"
+                        : "bg-foreground/10 text-foreground"
+                    )}
+                  >
                     {unpricedCount}
                   </span>
                 )}
@@ -859,10 +958,14 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     )}
                   >
                     <span>{name}</span>
-                    <span className={cn(
-                      "inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 rounded text-[10px] font-bold",
-                      isHidden ? "bg-muted-foreground/15 text-muted-foreground" : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
-                    )}>
+                    <span
+                      className={cn(
+                        "inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 rounded text-[10px] font-bold",
+                        isHidden
+                          ? "bg-muted-foreground/15 text-muted-foreground"
+                          : "bg-amber-500/20 text-amber-700 dark:text-amber-400"
+                      )}
+                    >
                       {count}
                     </span>
                   </button>
@@ -877,7 +980,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 onClick={() => setHiddenUnpricedGroups(new Set())}
                 data-testid="button-show-all-unpriced-groups"
               >
-                <Eye className="w-3 h-3 mr-1" />Show All
+                <Eye className="w-3 h-3 mr-1" />
+                Show All
               </Button>
               <Button
                 variant="ghost"
@@ -886,7 +990,8 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                 onClick={() => setHiddenUnpricedGroups(new Set(unpricedByGroup.map((g) => g.name)))}
                 data-testid="button-hide-all-unpriced-groups"
               >
-                <EyeOff className="w-3 h-3 mr-1" />Hide All
+                <EyeOff className="w-3 h-3 mr-1" />
+                Hide All
               </Button>
             </div>
           </div>
@@ -945,7 +1050,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                     <Check className="w-4 h-4 text-muted-foreground shrink-0" />
                     <div>
                       <p className="text-xs text-muted-foreground leading-none mb-0.5">Priced</p>
-                      <p className="text-base font-semibold leading-none">{locationPricedList.length - unpricedCount}</p>
+                      <p className="text-base font-semibold leading-none">
+                        {locationPricedList.length - unpricedCount}
+                      </p>
                     </div>
                   </div>
                   {unpricedCount > 0 && (
@@ -953,7 +1060,9 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                       <EyeOff className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                       <div>
                         <p className="text-xs text-amber-700 dark:text-amber-400 leading-none mb-0.5">Unpriced</p>
-                        <p className="text-base font-semibold leading-none text-amber-700 dark:text-amber-400">{unpricedCount}</p>
+                        <p className="text-base font-semibold leading-none text-amber-700 dark:text-amber-400">
+                          {unpricedCount}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -973,7 +1082,16 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                           : "No items found."}
                   </p>
                   {(search || groupFilter !== "all" || showUnpriced) && (
-                    <Button variant="ghost" size="sm" onClick={() => { setSearch(""); setGroupFilter("all"); setShowUnpriced(false); setHiddenUnpricedGroups(new Set()); }}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSearch("");
+                        setGroupFilter("all");
+                        setShowUnpriced(false);
+                        setHiddenUnpricedGroups(new Set());
+                      }}
+                    >
                       Clear filters
                     </Button>
                   )}
@@ -991,18 +1109,21 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                             <TableHead className="text-xs text-right hidden sm:table-cell w-32">Cost Price</TableHead>
                           )}
                           {showCostPrice && (
-                            <TableHead className="text-xs text-right hidden sm:table-cell w-32">Offloading Cost</TableHead>
+                            <TableHead className="text-xs text-right hidden sm:table-cell w-32">
+                              Offloading Cost
+                            </TableHead>
                           )}
 
                           {/* All-mode: one column per visible master */}
-                          {isAllMode && visibleMasters.map((m) => (
-                            <TableHead key={m.id} className="text-xs text-right w-40">{m.name}</TableHead>
-                          ))}
+                          {isAllMode &&
+                            visibleMasters.map((m) => (
+                              <TableHead key={m.id} className="text-xs text-right w-40">
+                                {m.name}
+                              </TableHead>
+                            ))}
 
                           {/* Single-location mode: one Selling Price column */}
-                          {!isAllMode && (
-                            <TableHead className="text-xs text-right w-48">Selling Price</TableHead>
-                          )}
+                          {!isAllMode && <TableHead className="text-xs text-right w-48">Selling Price</TableHead>}
 
                           {!isAllMode && (
                             <TableHead className="text-xs text-right hidden sm:table-cell w-28">Qty in Stock</TableHead>
@@ -1011,8 +1132,17 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                       </TableHeader>
                       <TableBody>
                         {filteredItems.map((item: any) => (
-                          <TableRow key={item.stockItemId} data-testid={`row-price-${item.stockItemId}`} className={cn(canEdit && !isAllMode && "group", isItemUnpriced(item) && "bg-amber-50/50 dark:bg-amber-950/20")}>
-                            <TableCell className="font-mono text-sm text-muted-foreground">{item.code || "—"}</TableCell>
+                          <TableRow
+                            key={item.stockItemId}
+                            data-testid={`row-price-${item.stockItemId}`}
+                            className={cn(
+                              canEdit && !isAllMode && "group",
+                              isItemUnpriced(item) && "bg-amber-50/50 dark:bg-amber-950/20"
+                            )}
+                          >
+                            <TableCell className="font-mono text-sm text-muted-foreground">
+                              {item.code || "—"}
+                            </TableCell>
                             <TableCell>
                               <div className="font-medium">{item.name}</div>
                               {item.stockGroupName && (
@@ -1024,115 +1154,174 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                             </TableCell>
 
                             {showCostPrice && (
-                              <TableCell className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground" data-testid={`text-cost-${item.stockItemId}`}>
-                                {item.costPrice && parseFloat(item.costPrice) > 0 ? formatAmount(parseFloat(item.costPrice)) : "—"}
+                              <TableCell
+                                className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground"
+                                data-testid={`text-cost-${item.stockItemId}`}
+                              >
+                                {item.costPrice && parseFloat(item.costPrice) > 0
+                                  ? formatAmount(parseFloat(item.costPrice))
+                                  : "—"}
                               </TableCell>
                             )}
                             {showCostPrice && (
-                              <TableCell className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground" data-testid={`text-offloading-cost-${item.stockItemId}`}>
+                              <TableCell
+                                className="text-right hidden sm:table-cell text-sm tabular-nums text-muted-foreground"
+                                data-testid={`text-offloading-cost-${item.stockItemId}`}
+                              >
                                 {(() => {
-                                  const total = parseFloat(item.costPrice ?? "0") + parseFloat(item.offloadingCost ?? "0");
+                                  const total =
+                                    parseFloat(item.costPrice ?? "0") + parseFloat(item.offloadingCost ?? "0");
                                   return total > 0 ? formatAmount(total) : "—";
                                 })()}
                               </TableCell>
                             )}
 
                             {/* All-mode: editable price per visible master location */}
-                            {isAllMode && visibleMasters.map((m) => {
-                              const price = item.masterPrices?.[m.id] ?? item.baseSellingPrice ?? null;
-                              const isEditing = editingItem?.stockItemId === item.stockItemId && editingItem?.locationId === m.id;
-                              const isSaving = updatePriceMutation.isPending && editingItem?.stockItemId === item.stockItemId && editingItem?.locationId === m.id;
-                              return (
-                                <TableCell key={m.id} className="text-right">
-                                  {isEditing ? (
-                                    <div className="flex items-center justify-end gap-1">
-                                      <Input
-                                        ref={inputRef}
-                                        data-testid={`input-price-${item.stockItemId}-${m.id}`}
-                                        type="number"
-                                        step="0.01"
-                                        className="w-24 h-8 text-right tabular-nums"
-                                        value={editingItem.value}
-                                        onChange={(e) => setEditingItem((prev) => prev ? { ...prev, value: e.target.value } : null)}
-                                        onKeyDown={handleKeyDown}
-                                        onBlur={handleBlur}
-                                        disabled={isSaving}
-                                      />
-                                      <Button size="icon" variant="ghost" onClick={commitEdit} disabled={isSaving} data-testid={`button-save-price-${item.stockItemId}-${m.id}`}>
-                                        <Check className="w-3.5 h-3.5 text-green-600" />
-                                      </Button>
-                                      <Button size="icon" variant="ghost" onClick={cancelEdit} disabled={isSaving} data-testid={`button-cancel-price-${item.stockItemId}-${m.id}`}>
-                                        <X className="w-3.5 h-3.5 text-muted-foreground" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <div
-                                      className={cn("flex items-center justify-end gap-1.5 group/cell", canEdit && "cursor-pointer rounded-md px-2 py-1 hover-elevate")}
-                                      onClick={() => canEdit && startEdit(item.stockItemId, m.id, price)}
-                                      title={canEdit ? `Click to edit ${m.name} price` : undefined}
-                                      data-testid={`cell-price-${item.stockItemId}-${m.id}`}
-                                    >
-                                      <span className="font-semibold tabular-nums">
-                                        {price && parseFloat(price) > 0 ? formatAmount(parseFloat(price)) : "—"}
-                                      </span>
-                                      {canEdit && <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover/cell:opacity-60 transition-opacity shrink-0" />}
-                                    </div>
-                                  )}
-                                </TableCell>
-                              );
-                            })}
+                            {isAllMode &&
+                              visibleMasters.map((m) => {
+                                const price = item.masterPrices?.[m.id] ?? item.baseSellingPrice ?? null;
+                                const isEditing =
+                                  editingItem?.stockItemId === item.stockItemId && editingItem?.locationId === m.id;
+                                const isSaving =
+                                  updatePriceMutation.isPending &&
+                                  editingItem?.stockItemId === item.stockItemId &&
+                                  editingItem?.locationId === m.id;
+                                return (
+                                  <TableCell key={m.id} className="text-right">
+                                    {isEditing ? (
+                                      <div className="flex items-center justify-end gap-1">
+                                        <Input
+                                          ref={inputRef}
+                                          data-testid={`input-price-${item.stockItemId}-${m.id}`}
+                                          type="number"
+                                          step="0.01"
+                                          className="w-24 h-8 text-right tabular-nums"
+                                          value={editingItem.value}
+                                          onChange={(e) =>
+                                            setEditingItem((prev) => (prev ? { ...prev, value: e.target.value } : null))
+                                          }
+                                          onKeyDown={handleKeyDown}
+                                          onBlur={handleBlur}
+                                          disabled={isSaving}
+                                        />
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={commitEdit}
+                                          disabled={isSaving}
+                                          data-testid={`button-save-price-${item.stockItemId}-${m.id}`}
+                                        >
+                                          <Check className="w-3.5 h-3.5 text-green-600" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={cancelEdit}
+                                          disabled={isSaving}
+                                          data-testid={`button-cancel-price-${item.stockItemId}-${m.id}`}
+                                        >
+                                          <X className="w-3.5 h-3.5 text-muted-foreground" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div
+                                        className={cn(
+                                          "flex items-center justify-end gap-1.5 group/cell",
+                                          canEdit && "cursor-pointer rounded-md px-2 py-1 hover-elevate"
+                                        )}
+                                        onClick={() => canEdit && startEdit(item.stockItemId, m.id, price)}
+                                        title={canEdit ? `Click to edit ${m.name} price` : undefined}
+                                        data-testid={`cell-price-${item.stockItemId}-${m.id}`}
+                                      >
+                                        <span className="font-semibold tabular-nums">
+                                          {price && parseFloat(price) > 0 ? formatAmount(parseFloat(price)) : "—"}
+                                        </span>
+                                        {canEdit && (
+                                          <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover/cell:opacity-60 transition-opacity shrink-0" />
+                                        )}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                );
+                              })}
 
                             {/* Single-location mode: editable Selling Price */}
-                            {!isAllMode && (() => {
-                              const isEditing = editingItem?.stockItemId === item.stockItemId;
-                              const isSaving = updatePriceMutation.isPending && editingItem?.stockItemId === item.stockItemId;
-                              return (
-                                <TableCell className="text-right">
-                                  {isEditing ? (
-                                    <div className="flex items-center justify-end gap-1">
-                                      <Input
-                                        ref={inputRef}
-                                        data-testid={`input-price-${item.stockItemId}`}
-                                        type="number"
-                                        step="0.01"
-                                        className="w-28 h-8 text-right tabular-nums"
-                                        value={editingItem!.value}
-                                        onChange={(e) => setEditingItem((prev) => prev ? { ...prev, value: e.target.value } : null)}
-                                        onKeyDown={handleKeyDown}
-                                        onBlur={handleBlur}
-                                        disabled={isSaving}
-                                      />
-                                      <Button size="icon" variant="ghost" data-testid={`button-save-price-${item.stockItemId}`} onClick={commitEdit} disabled={isSaving}>
-                                        <Check className="w-3.5 h-3.5 text-green-600" />
-                                      </Button>
-                                      <Button size="icon" variant="ghost" data-testid={`button-cancel-price-${item.stockItemId}`} onClick={cancelEdit} disabled={isSaving}>
-                                        <X className="w-3.5 h-3.5 text-muted-foreground" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <div
-                                      className={cn("flex items-center justify-end gap-1.5", canEdit && "group cursor-pointer rounded-md px-2 py-1 hover-elevate")}
-                                      data-testid={`cell-price-${item.stockItemId}`}
-                                      onClick={() => canEdit && startEdit(item.stockItemId, selectedLocationId!, item.sellingPrice)}
-                                      title={canEdit ? "Click to edit price" : undefined}
-                                    >
-                                      <span className="font-semibold tabular-nums">
-                                        {item.sellingPrice ? formatAmount(parseFloat(item.sellingPrice)) : "—"}
-                                      </span>
-                                      {!item.hasCustomPrice && item.sellingPrice && (
-                                        <Badge variant="secondary" className="text-xs hidden sm:inline-flex">base</Badge>
-                                      )}
-                                      {canEdit && (
-                                        <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover:opacity-60 transition-opacity shrink-0" />
-                                      )}
-                                    </div>
-                                  )}
-                                </TableCell>
-                              );
-                            })()}
+                            {!isAllMode &&
+                              (() => {
+                                const isEditing = editingItem?.stockItemId === item.stockItemId;
+                                const isSaving =
+                                  updatePriceMutation.isPending && editingItem?.stockItemId === item.stockItemId;
+                                return (
+                                  <TableCell className="text-right">
+                                    {isEditing ? (
+                                      <div className="flex items-center justify-end gap-1">
+                                        <Input
+                                          ref={inputRef}
+                                          data-testid={`input-price-${item.stockItemId}`}
+                                          type="number"
+                                          step="0.01"
+                                          className="w-28 h-8 text-right tabular-nums"
+                                          value={editingItem!.value}
+                                          onChange={(e) =>
+                                            setEditingItem((prev) => (prev ? { ...prev, value: e.target.value } : null))
+                                          }
+                                          onKeyDown={handleKeyDown}
+                                          onBlur={handleBlur}
+                                          disabled={isSaving}
+                                        />
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          data-testid={`button-save-price-${item.stockItemId}`}
+                                          onClick={commitEdit}
+                                          disabled={isSaving}
+                                        >
+                                          <Check className="w-3.5 h-3.5 text-green-600" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          data-testid={`button-cancel-price-${item.stockItemId}`}
+                                          onClick={cancelEdit}
+                                          disabled={isSaving}
+                                        >
+                                          <X className="w-3.5 h-3.5 text-muted-foreground" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div
+                                        className={cn(
+                                          "flex items-center justify-end gap-1.5",
+                                          canEdit && "group cursor-pointer rounded-md px-2 py-1 hover-elevate"
+                                        )}
+                                        data-testid={`cell-price-${item.stockItemId}`}
+                                        onClick={() =>
+                                          canEdit && startEdit(item.stockItemId, selectedLocationId!, item.sellingPrice)
+                                        }
+                                        title={canEdit ? "Click to edit price" : undefined}
+                                      >
+                                        <span className="font-semibold tabular-nums">
+                                          {item.sellingPrice ? formatAmount(parseFloat(item.sellingPrice)) : "—"}
+                                        </span>
+                                        {!item.hasCustomPrice && item.sellingPrice && (
+                                          <Badge variant="secondary" className="text-xs hidden sm:inline-flex">
+                                            base
+                                          </Badge>
+                                        )}
+                                        {canEdit && (
+                                          <Pencil className="w-3 h-3 text-muted-foreground opacity-40 md:opacity-0 md:group-hover:opacity-60 transition-opacity shrink-0" />
+                                        )}
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                );
+                              })()}
 
                             {!isAllMode && (
-                              <TableCell className="text-right hidden sm:table-cell text-sm text-muted-foreground tabular-nums" data-testid={`text-qty-${item.stockItemId}`}>
+                              <TableCell
+                                className="text-right hidden sm:table-cell text-sm text-muted-foreground tabular-nums"
+                                data-testid={`text-qty-${item.stockItemId}`}
+                              >
                                 {formatQty(item.quantity)}
                               </TableCell>
                             )}
@@ -1144,7 +1333,11 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
 
                   <p className="text-xs text-muted-foreground text-right mt-2" data-testid="text-item-count">
                     Showing {filteredItems.length} of {locationPricedList.length} items
-                    {canEdit && <span className="ml-1">· Click any price to edit it{isAllMode && masters.length > 0 ? " (cascades to followers)" : ""}</span>}
+                    {canEdit && (
+                      <span className="ml-1">
+                        · Click any price to edit it{isAllMode && masters.length > 0 ? " (cascades to followers)" : ""}
+                      </span>
+                    )}
                   </p>
                 </>
               ) : null}
@@ -1154,7 +1347,15 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
       </div>
 
       {/* ── Import preview dialog ── */}
-      <Dialog open={importDialogOpen} onOpenChange={(open) => { if (!importing) { setImportDialogOpen(open); if (!open) setImportPreview([]); } }}>
+      <Dialog
+        open={importDialogOpen}
+        onOpenChange={(open) => {
+          if (!importing) {
+            setImportDialogOpen(open);
+            if (!open) setImportPreview([]);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1173,11 +1374,12 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           {importPreview.length > 0 && (
             <>
               <p className="text-sm text-muted-foreground">
-                Ready to update <span className="font-semibold text-foreground">{importPreview.length} items</span> across{" "}
+                Ready to update <span className="font-semibold text-foreground">{importPreview.length} items</span>{" "}
+                across{" "}
                 <span className="font-semibold text-foreground">
                   {new Set(importPreview.flatMap((r) => r.changes.map((c) => c.locationId))).size} location(s)
-                </span>.
-                Review the changes below before confirming.
+                </span>
+                . Review the changes below before confirming.
               </p>
               <ScrollArea className="h-72 rounded-md border">
                 <Table>
@@ -1195,12 +1397,18 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
                         <TableRow key={`${item.barcode}-${c.locationId}`}>
                           {i === 0 ? (
                             <>
-                              <TableCell className="font-mono text-xs" rowSpan={item.changes.length}>{item.barcode}</TableCell>
-                              <TableCell className="text-sm" rowSpan={item.changes.length}>{item.name}</TableCell>
+                              <TableCell className="font-mono text-xs" rowSpan={item.changes.length}>
+                                {item.barcode}
+                              </TableCell>
+                              <TableCell className="text-sm" rowSpan={item.changes.length}>
+                                {item.name}
+                              </TableCell>
                             </>
                           ) : null}
                           <TableCell>
-                            <Badge variant="secondary" className="text-xs">{c.locationName}</Badge>
+                            <Badge variant="secondary" className="text-xs">
+                              {c.locationName}
+                            </Badge>
                           </TableCell>
                           <TableCell className="text-right font-semibold tabular-nums">{c.price}</TableCell>
                         </TableRow>
@@ -1216,10 +1424,22 @@ export default function POSPriceList({ posUser }: POSPriceListProps) {
           )}
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => { setImportDialogOpen(false); setImportPreview([]); }} disabled={importing} data-testid="button-import-cancel">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setImportDialogOpen(false);
+                setImportPreview([]);
+              }}
+              disabled={importing}
+              data-testid="button-import-cancel"
+            >
               Cancel
             </Button>
-            <Button onClick={handleImportSubmit} disabled={importing || importPreview.length === 0} data-testid="button-import-confirm">
+            <Button
+              onClick={handleImportSubmit}
+              disabled={importing || importPreview.length === 0}
+              data-testid="button-import-confirm"
+            >
               {importing ? "Uploading…" : `Confirm Upload (${importPreview.length} items)`}
             </Button>
           </DialogFooter>

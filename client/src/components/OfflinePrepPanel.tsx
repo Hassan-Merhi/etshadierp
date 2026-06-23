@@ -1,9 +1,21 @@
 import { useState, useEffect, useCallback } from "react";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 import {
-  Download, CheckCircle2, XCircle, AlertCircle, Clock,
-  WifiOff, RefreshCw, Shield, Package, ShoppingCart, Factory,
-  Globe, ChevronDown, ChevronUp, Loader2
+  Download,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Clock,
+  WifiOff,
+  RefreshCw,
+  Shield,
+  Package,
+  ShoppingCart,
+  Factory,
+  Globe,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -29,7 +41,12 @@ function formatRelativeTime(ts: number | null): string {
   if (diff < 60) return "Just now";
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(ts).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 const PACK_ICONS: Record<string, React.ElementType> = {
@@ -65,7 +82,11 @@ export function OfflinePrepPanel() {
 
   const handlePrepare = async () => {
     if (!isOnline) {
-      toast({ title: "You're offline", description: "Connect to the internet first to prepare offline data.", variant: "destructive" });
+      toast({
+        title: "You're offline",
+        description: "Connect to the internet first to prepare offline data.",
+        variant: "destructive",
+      });
       return;
     }
     setRunning(true);
@@ -94,11 +115,40 @@ export function OfflinePrepPanel() {
 
   // Summarise readiness
   const statusBadge = () => {
-    if (running) return <Badge variant="outline" className="gap-1"><Loader2 className="h-3 w-3 animate-spin" />Preparing…</Badge>;
-    if (!readiness || readiness.preparedAt === null) return <Badge variant="outline" className="gap-1 text-muted-foreground"><WifiOff className="h-3 w-3" />Not prepared</Badge>;
-    if (readiness.ready) return <Badge className="gap-1 bg-green-600 dark:bg-green-700 text-white"><CheckCircle2 className="h-3 w-3" />Offline Ready</Badge>;
-    if (readiness.partial) return <Badge className="gap-1 bg-amber-500 dark:bg-amber-600 text-white"><AlertCircle className="h-3 w-3" />Partially Ready</Badge>;
-    return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />Not Ready</Badge>;
+    if (running)
+      return (
+        <Badge variant="outline" className="gap-1">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Preparing…
+        </Badge>
+      );
+    if (!readiness || readiness.preparedAt === null)
+      return (
+        <Badge variant="outline" className="gap-1 text-muted-foreground">
+          <WifiOff className="h-3 w-3" />
+          Not prepared
+        </Badge>
+      );
+    if (readiness.ready)
+      return (
+        <Badge className="gap-1 bg-green-600 dark:bg-green-700 text-white">
+          <CheckCircle2 className="h-3 w-3" />
+          Offline Ready
+        </Badge>
+      );
+    if (readiness.partial)
+      return (
+        <Badge className="gap-1 bg-amber-500 dark:bg-amber-600 text-white">
+          <AlertCircle className="h-3 w-3" />
+          Partially Ready
+        </Badge>
+      );
+    return (
+      <Badge variant="destructive" className="gap-1">
+        <XCircle className="h-3 w-3" />
+        Not Ready
+      </Badge>
+    );
   };
 
   return (
@@ -118,7 +168,10 @@ export function OfflinePrepPanel() {
       {readiness && readiness.preparedAt && (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Clock className="h-3.5 w-3.5" />
-          <span>Last prepared: <span className="text-foreground font-medium">{formatRelativeTime(readiness.preparedAt)}</span></span>
+          <span>
+            Last prepared:{" "}
+            <span className="text-foreground font-medium">{formatRelativeTime(readiness.preparedAt)}</span>
+          </span>
           {readiness.completedDatasets > 0 && (
             <span className="text-muted-foreground">
               · {readiness.completedDatasets}/{readiness.totalDatasets} datasets
@@ -130,7 +183,7 @@ export function OfflinePrepPanel() {
       {/* Pack status grid (show after first prep) */}
       {readiness && readiness.preparedAt && Object.keys(readiness.packSummary).length > 0 && (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {packs.map(pack => {
+          {packs.map((pack) => {
             const summary = readiness.packSummary[pack.id];
             const Icon = PACK_ICONS[pack.id] ?? Package;
             const ok = !!summary && summary.count >= 0;
@@ -138,7 +191,9 @@ export function OfflinePrepPanel() {
               <Card key={pack.id} className="bg-muted/30">
                 <CardContent className="p-3 flex flex-col gap-1">
                   <div className="flex items-center gap-1.5">
-                    <Icon className={`h-3.5 w-3.5 ${ok ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`} />
+                    <Icon
+                      className={`h-3.5 w-3.5 ${ok ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}`}
+                    />
                     <span className="text-xs font-medium">{pack.label.split(" (")[0]}</span>
                   </div>
                   <div className="text-xs text-muted-foreground">
@@ -165,22 +220,32 @@ export function OfflinePrepPanel() {
         data-testid="button-prepare-offline"
       >
         {running ? (
-          <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Preparing…</>
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Preparing…
+          </>
         ) : readiness?.ready ? (
-          <><RefreshCw className="h-4 w-4 mr-2" />Update offline data</>
+          <>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Update offline data
+          </>
         ) : (
-          <><Download className="h-4 w-4 mr-2" />Prepare this device for offline use</>
+          <>
+            <Download className="h-4 w-4 mr-2" />
+            Prepare this device for offline use
+          </>
         )}
       </Button>
 
       {!isOnline && (
         <p className="text-xs text-muted-foreground flex items-center gap-1">
-          <WifiOff className="h-3 w-3" />You must be online to download offline data.
+          <WifiOff className="h-3 w-3" />
+          You must be online to download offline data.
         </p>
       )}
 
       {/* Progress section */}
-      {progress && (progress.phase !== "idle") && (
+      {progress && progress.phase !== "idle" && (
         <div className="space-y-3 rounded-md border p-4">
           {/* Progress bar */}
           <div className="space-y-1.5">
@@ -200,14 +265,18 @@ export function OfflinePrepPanel() {
 
           {/* Final status banner */}
           {(progress.phase === "done" || progress.phase === "error") && (
-            <div className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
-              progress.failedDatasets === 0
-                ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300"
-                : "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300"
-            }`}>
-              {progress.failedDatasets === 0
-                ? <CheckCircle2 className="h-4 w-4 shrink-0" />
-                : <AlertCircle className="h-4 w-4 shrink-0" />}
+            <div
+              className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
+                progress.failedDatasets === 0
+                  ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-300"
+                  : "bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300"
+              }`}
+            >
+              {progress.failedDatasets === 0 ? (
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+              ) : (
+                <AlertCircle className="h-4 w-4 shrink-0" />
+              )}
               <span>
                 {progress.failedDatasets === 0
                   ? "Device is offline-ready. All datasets downloaded."
@@ -227,8 +296,8 @@ export function OfflinePrepPanel() {
               </CollapsibleTrigger>
               <CollapsibleContent>
                 <div className="mt-2 space-y-1 max-h-60 overflow-y-auto pr-1">
-                  {packs.map(pack => {
-                    const packResults = progress.results.filter(r => r.packId === pack.id);
+                  {packs.map((pack) => {
+                    const packResults = progress.results.filter((r) => r.packId === pack.id);
                     if (packResults.length === 0) return null;
                     const Icon = PACK_ICONS[pack.id] ?? Package;
                     return (
@@ -237,16 +306,18 @@ export function OfflinePrepPanel() {
                           <Icon className="h-3 w-3" />
                           {pack.label}
                         </div>
-                        {packResults.map(r => (
+                        {packResults.map((r) => (
                           <div key={r.datasetId} className="flex items-center justify-between text-xs py-0.5 pl-4">
                             <div className="flex items-center gap-1.5">
-                              {r.success
-                                ? <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
-                                : <XCircle className="h-3 w-3 text-destructive shrink-0" />}
+                              {r.success ? (
+                                <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 shrink-0" />
+                              ) : (
+                                <XCircle className="h-3 w-3 text-destructive shrink-0" />
+                              )}
                               <span className={r.success ? "text-foreground" : "text-muted-foreground"}>{r.label}</span>
                             </div>
                             <span className="text-muted-foreground tabular-nums">
-                              {r.success ? `${r.count.toLocaleString()} records` : r.error ?? "failed"}
+                              {r.success ? `${r.count.toLocaleString()} records` : (r.error ?? "failed")}
                             </span>
                           </div>
                         ))}
@@ -263,7 +334,9 @@ export function OfflinePrepPanel() {
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 space-y-1">
               <p className="text-xs font-semibold text-destructive">Errors ({progress.errors.length})</p>
               {progress.errors.map((e, i) => (
-                <p key={i} className="text-xs text-muted-foreground">{e}</p>
+                <p key={i} className="text-xs text-muted-foreground">
+                  {e}
+                </p>
               ))}
             </div>
           )}
@@ -282,7 +355,10 @@ export function OfflinePrepPanel() {
           <div className="mt-2 rounded-md border bg-muted/30 p-3 space-y-3 text-xs text-muted-foreground">
             <div>
               <p className="font-medium text-foreground mb-1">Forms &amp; write operations — work offline</p>
-              <p>Recording payments, container entries, daybook entries, vouchers, and other form submissions are saved locally and auto-synced the moment WiFi returns. The banner at the top shows how many are queued.</p>
+              <p>
+                Recording payments, container entries, daybook entries, vouchers, and other form submissions are saved
+                locally and auto-synced the moment WiFi returns. The banner at the top shows how many are queued.
+              </p>
             </div>
             <div>
               <p className="font-medium text-foreground mb-1">Features that truly require internet:</p>

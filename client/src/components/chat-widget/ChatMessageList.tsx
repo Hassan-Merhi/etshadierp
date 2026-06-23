@@ -6,11 +6,31 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ChatMessage, VoucherDraft, StockTransferDraft, StockAdjustmentDraft, VoucherSearchResult, StockItemDraft, PriceUpdateDraft, AccountQueryResult, POImportDraft, POImportResult, VerifyContainerDraft, DataQueryResult, FilePatchDraft, PushResult } from "./chatWidgetTypes";
+import {
+  ChatMessage,
+  VoucherDraft,
+  StockTransferDraft,
+  StockAdjustmentDraft,
+  VoucherSearchResult,
+  StockItemDraft,
+  PriceUpdateDraft,
+  AccountQueryResult,
+  POImportDraft,
+  POImportResult,
+  VerifyContainerDraft,
+  DataQueryResult,
+  FilePatchDraft,
+  PushResult,
+} from "./chatWidgetTypes";
 import { CodeBlock, PROVIDER_LABELS } from "./FileDiffCard";
 import { VoucherConfirmCard, AccountQueryResultCard } from "./AccountVoucherCards";
 import { StockTransferConfirmCard, VerifyContainerCard, DataQueryResultCard } from "./TransferContainerCards";
-import { StockAdjustmentConfirmCard, VoucherSearchResultsCard, StockItemConfirmCard, PriceUpdateConfirmCard } from "./ConfirmCards";
+import {
+  StockAdjustmentConfirmCard,
+  VoucherSearchResultsCard,
+  StockItemConfirmCard,
+  PriceUpdateConfirmCard,
+} from "./ConfirmCards";
 import { POImportDraftCard } from "./POImportDraftCard";
 import { FileDiffCard } from "./FileDiffCard";
 
@@ -166,10 +186,7 @@ export function ChatMessageList({
         {history.map((msg) => (
           <div
             key={msg.id}
-            className={cn(
-              "flex gap-2.5",
-              msg.role === "user" ? "justify-end" : "justify-start"
-            )}
+            className={cn("flex gap-2.5", msg.role === "user" ? "justify-end" : "justify-start")}
             data-testid={`chat-message-${msg.id}`}
           >
             {msg.role === "assistant" && (
@@ -180,7 +197,8 @@ export function ChatMessageList({
             <div className="flex flex-col max-w-[83%]">
               <div className={cn("flex items-center gap-1.5 mb-1 px-0.5", msg.role === "user" ? "justify-end" : "")}>
                 <span className="text-[11px] text-muted-foreground">
-                  {msg.role === "assistant" ? "Assistant" : "You"}{msg.createdAt ? ` · ${formatMsgTime(msg.createdAt)}` : ""}
+                  {msg.role === "assistant" ? "Assistant" : "You"}
+                  {msg.createdAt ? ` · ${formatMsgTime(msg.createdAt)}` : ""}
                 </span>
               </div>
               <div
@@ -198,49 +216,27 @@ export function ChatMessageList({
                       components={{
                         table: ({ children }) => (
                           <div className="overflow-x-auto my-2">
-                            <table className="min-w-full text-xs border-collapse">
-                              {children}
-                            </table>
+                            <table className="min-w-full text-xs border-collapse">{children}</table>
                           </div>
                         ),
                         th: ({ children }) => (
-                          <th className="border border-border px-2 py-1 bg-muted font-medium text-left">
-                            {children}
-                          </th>
+                          <th className="border border-border px-2 py-1 bg-muted font-medium text-left">{children}</th>
                         ),
-                        td: ({ children }) => (
-                          <td className="border border-border px-2 py-1">{children}</td>
-                        ),
-                        p: ({ children }) => (
-                          <p className="mb-2 last:mb-0">{children}</p>
-                        ),
-                        ul: ({ children }) => (
-                          <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>
-                        ),
-                        ol: ({ children }) => (
-                          <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>
-                        ),
-                        li: ({ children }) => (
-                          <li className="text-sm">{children}</li>
-                        ),
+                        td: ({ children }) => <td className="border border-border px-2 py-1">{children}</td>,
+                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1">{children}</ol>,
+                        li: ({ children }) => <li className="text-sm">{children}</li>,
                         code: ({ children, className }) => {
                           const isInline = !className;
                           if (isInline) {
-                            return (
-                              <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">
-                                {children}
-                              </code>
-                            );
+                            return <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono">{children}</code>;
                           }
                           const lang = (className ?? "").replace("language-", "");
-                          const codeStr = Array.isArray(children)
-                            ? children.join("")
-                            : String(children ?? "");
+                          const codeStr = Array.isArray(children) ? children.join("") : String(children ?? "");
                           return <CodeBlock code={codeStr.replace(/\n$/, "")} lang={lang} />;
                         },
-                        strong: ({ children }) => (
-                          <strong className="font-semibold">{children}</strong>
-                        ),
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
                       }}
                     >
                       {msg.message}
@@ -256,10 +252,7 @@ export function ChatMessageList({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={cn(
-                      "h-6 w-6",
-                      feedbackGiven[msg.id] === "positive" && "text-green-500"
-                    )}
+                    className={cn("h-6 w-6", feedbackGiven[msg.id] === "positive" && "text-green-500")}
                     onClick={() => handleFeedback(msg.id, "positive")}
                     disabled={!!feedbackGiven[msg.id]}
                     data-testid={`feedback-positive-${msg.id}`}
@@ -269,10 +262,7 @@ export function ChatMessageList({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className={cn(
-                      "h-6 w-6",
-                      feedbackGiven[msg.id] === "negative" && "text-red-500"
-                    )}
+                    className={cn("h-6 w-6", feedbackGiven[msg.id] === "negative" && "text-red-500")}
                     onClick={() => handleFeedback(msg.id, "negative")}
                     disabled={!!feedbackGiven[msg.id]}
                     data-testid={`feedback-negative-${msg.id}`}
@@ -341,10 +331,7 @@ export function ChatMessageList({
         )}
 
         {voucherSearchResults && voucherSearchResults.length > 0 && !isPending && (
-          <VoucherSearchResultsCard
-            results={voucherSearchResults}
-            onDismiss={() => setVoucherSearchResults(null)}
-          />
+          <VoucherSearchResultsCard results={voucherSearchResults} onDismiss={() => setVoucherSearchResults(null)} />
         )}
 
         {pendingStockItem && !isPending && (
@@ -366,17 +353,19 @@ export function ChatMessageList({
         )}
 
         {accountQueryResult && !isPending && (
-          <AccountQueryResultCard
-            result={accountQueryResult}
-            onDismiss={() => setAccountQueryResult(null)}
-          />
+          <AccountQueryResultCard result={accountQueryResult} onDismiss={() => setAccountQueryResult(null)} />
         )}
 
         {poDraft && (
           <POImportDraftCard
             draft={poDraft}
             onConfirm={handleConfirmPOImport}
-            onDismiss={() => { setPoDraft(null); setPoDraftResult(null); setPoDraftError(null); setVerifyContainerDraft(null); }}
+            onDismiss={() => {
+              setPoDraft(null);
+              setPoDraftResult(null);
+              setPoDraftError(null);
+              setVerifyContainerDraft(null);
+            }}
             isSubmitting={poDraftSubmitting}
             result={poDraftResult}
             importError={poDraftError}
@@ -384,17 +373,11 @@ export function ChatMessageList({
         )}
 
         {verifyContainerDraft && !isPending && (
-          <VerifyContainerCard
-            draft={verifyContainerDraft}
-            onDismiss={() => setVerifyContainerDraft(null)}
-          />
+          <VerifyContainerCard draft={verifyContainerDraft} onDismiss={() => setVerifyContainerDraft(null)} />
         )}
 
         {dataQueryResult && !isPending && (
-          <DataQueryResultCard
-            result={dataQueryResult}
-            onDismiss={() => setDataQueryResult(null)}
-          />
+          <DataQueryResultCard result={dataQueryResult} onDismiss={() => setDataQueryResult(null)} />
         )}
 
         {pendingFilePatches.length > 0 && !isPending && (
@@ -408,27 +391,39 @@ export function ChatMessageList({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => { setPendingFilePatches([]); setAppliedPatchFiles(new Set()); setPerFilePushResult({}); }}
+                    onClick={() => {
+                      setPendingFilePatches([]);
+                      setAppliedPatchFiles(new Set());
+                      setPerFilePushResult({});
+                    }}
                   >
                     Cancel All
                   </Button>
                   <Button
                     size="sm"
                     onClick={handleApplyAllPatches}
-                    disabled={patchApplying !== null || pendingFilePatches.every(p => appliedPatchFiles.has(p.filePath))}
+                    disabled={
+                      patchApplying !== null || pendingFilePatches.every((p) => appliedPatchFiles.has(p.filePath))
+                    }
                   >
-                    {patchApplying !== null ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Check className="h-3 w-3 mr-1" />}
+                    {patchApplying !== null ? (
+                      <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <Check className="h-3 w-3 mr-1" />
+                    )}
                     Apply All
                   </Button>
                 </div>
               </div>
             )}
-            {pendingFilePatches.map(draft => (
+            {pendingFilePatches.map((draft) => (
               <FileDiffCard
                 key={draft.filePath}
                 draft={draft}
                 onApply={handleApplyPatch}
-                onCancel={(fp: string) => setPendingFilePatches(pendingFilePatches.filter((p: FilePatchDraft) => p.filePath !== fp))}
+                onCancel={(fp: string) =>
+                  setPendingFilePatches(pendingFilePatches.filter((p: FilePatchDraft) => p.filePath !== fp))
+                }
                 isApplying={patchApplying === draft.filePath}
                 isApplied={appliedPatchFiles.has(draft.filePath)}
                 onGitPush={handleGitPush}
@@ -442,9 +437,7 @@ export function ChatMessageList({
 
       {history.length > 0 && displaySuggestions.length > 0 && !isPending && (
         <div className="mt-4 pt-3 border-t">
-          <p className="text-xs font-medium text-muted-foreground mb-2">
-            Suggested questions:
-          </p>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Suggested questions:</p>
           <div className="flex flex-wrap gap-2">
             {displaySuggestions.slice(0, 3).map((suggestion, index) => (
               <Badge

@@ -8,8 +8,8 @@ import Containers from "@/pages/ContainersPage";
 
 const TABS = [
   { value: "by-location", label: "By Location", icon: MapPin },
-  { value: "on-the-way",  label: "On The Way",  icon: Ship },
-  { value: "containers",  label: "Containers",   icon: Package },
+  { value: "on-the-way", label: "On The Way", icon: Ship },
+  { value: "containers", label: "Containers", icon: Package },
 ];
 
 export default function InventoryHub() {

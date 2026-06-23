@@ -29,7 +29,7 @@ export function StockEntryCart({
   allCustomers,
   logoPickerOpen,
   onLogoPickerOpenChange,
-  filteredWorkers
+  filteredWorkers,
 }: {
   cart: CartItem[];
   workers: any[];
@@ -59,18 +59,28 @@ export function StockEntryCart({
         </TableHeader>
         <TableBody>
           {cart.map((item) => (
-            <TableRow key={item.productId} className="hover:bg-muted/30 transition-colors" data-testid={`row-cart-${item.productId}`}>
+            <TableRow
+              key={item.productId}
+              className="hover:bg-muted/30 transition-colors"
+              data-testid={`row-cart-${item.productId}`}
+            >
               <TableCell>
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <span className="text-[10px] font-bold text-primary">{item.product?.grade || "STK"}</span>
                   </div>
                   <div className="min-w-0">
-                    <div className="font-bold text-sm truncate" data-testid={`text-cart-name-${item.productId}`}>{item.product?.name}</div>
+                    <div className="font-bold text-sm truncate" data-testid={`text-cart-name-${item.productId}`}>
+                      {item.product?.name}
+                    </div>
                     <div className="flex items-center gap-1.5">
-                      <code className="text-[10px] text-muted-foreground bg-muted px-1 rounded font-mono">{item.product?.articleCode || item.product?.code}</code>
+                      <code className="text-[10px] text-muted-foreground bg-muted px-1 rounded font-mono">
+                        {item.product?.articleCode || item.product?.code}
+                      </code>
                       {item.product?.categoryName && (
-                        <Badge variant="outline" className="text-[9px] py-0 h-3.5 px-1 font-medium">{item.product.categoryName}</Badge>
+                        <Badge variant="outline" className="text-[9px] py-0 h-3.5 px-1 font-medium">
+                          {item.product.categoryName}
+                        </Badge>
                       )}
                     </div>
                   </div>
@@ -130,7 +140,9 @@ export function StockEntryCart({
                     <SelectContent>
                       <SelectItem value="none">Unassigned</SelectItem>
                       {filteredWorkers.map((w: any) => (
-                        <SelectItem key={w.id} value={String(w.id)}>{w.fullName || w.name}</SelectItem>
+                        <SelectItem key={w.id} value={String(w.id)}>
+                          {w.fullName || w.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

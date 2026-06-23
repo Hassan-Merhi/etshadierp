@@ -9,20 +9,34 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
-  TrendingUp, Send, ChevronDown, ChevronRight, Loader2,
-  Users, Clock, Calendar, CheckCircle2, Info,
+  TrendingUp,
+  Send,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Users,
+  Clock,
+  Calendar,
+  CheckCircle2,
+  Info,
 } from "lucide-react";
 
-interface Recipient { id: number; chatId: string; name: string; isGroup: boolean; active: boolean; }
+interface Recipient {
+  id: number;
+  chatId: string;
+  name: string;
+  isGroup: boolean;
+  active: boolean;
+}
 
 interface NpSettings {
-  recipientId:   number | null;
-  frequency:     string;
-  sendHour:      number;
+  recipientId: number | null;
+  frequency: string;
+  sendHour: number;
   sendDayOfWeek: number;
-  enabled:       boolean;
-  autoSend:      boolean;
-  lastSentAt:    string | null;
+  enabled: boolean;
+  autoSend: boolean;
+  lastSentAt: string | null;
 }
 
 const DAYS = [
@@ -36,8 +50,8 @@ const DAYS = [
 ];
 
 function formatHour(h: number): string {
-  if (h === 0)  return "12:00 AM";
-  if (h < 12)   return `${h}:00 AM`;
+  if (h === 0) return "12:00 AM";
+  if (h < 12) return `${h}:00 AM`;
   if (h === 12) return "12:00 PM";
   return `${h - 12}:00 PM`;
 }
@@ -47,7 +61,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => ({ value: String(i), label: f
 function scheduleLabel(cfg: NpSettings | undefined): string {
   if (!cfg?.autoSend || !cfg?.enabled) return "";
   const time = formatHour(cfg.sendHour ?? 18);
-  if (cfg.frequency === "daily")   return `Daily at ${time} EST`;
+  if (cfg.frequency === "daily") return `Daily at ${time} EST`;
   if (cfg.frequency === "monthly") return `Monthly (1st) at ${time} EST`;
   if (cfg.frequency === "weekly") {
     const day = DAYS.find((d) => d.value === String(cfg.sendDayOfWeek))?.label ?? "Monday";
@@ -79,26 +93,26 @@ export function NetPositionExportSection() {
   const groups = recipients.filter((r) => r.isGroup && r.active);
 
   // Local state — null means "not changed by user, use cfg value"
-  const [recipientId,   setRecipientId]   = useState<number | null | undefined>(undefined);
-  const [frequency,     setFrequency]     = useState<string | null>(null);
-  const [sendHour,      setSendHour]      = useState<number | null>(null);
+  const [recipientId, setRecipientId] = useState<number | null | undefined>(undefined);
+  const [frequency, setFrequency] = useState<string | null>(null);
+  const [sendHour, setSendHour] = useState<number | null>(null);
   const [sendDayOfWeek, setSendDayOfWeek] = useState<number | null>(null);
 
   // Effective values: user-changed local state wins, otherwise use saved config
   const eff = {
-    recipientId:   recipientId   !== undefined ? recipientId   : (cfg?.recipientId   ?? null),
-    frequency:     frequency     !== null      ? frequency     : (cfg?.frequency     ?? "daily"),
-    sendHour:      sendHour      !== null      ? sendHour      : (cfg?.sendHour      ?? 18),
-    sendDayOfWeek: sendDayOfWeek !== null      ? sendDayOfWeek : (cfg?.sendDayOfWeek ?? 1),
+    recipientId: recipientId !== undefined ? recipientId : (cfg?.recipientId ?? null),
+    frequency: frequency !== null ? frequency : (cfg?.frequency ?? "daily"),
+    sendHour: sendHour !== null ? sendHour : (cfg?.sendHour ?? 18),
+    sendDayOfWeek: sendDayOfWeek !== null ? sendDayOfWeek : (cfg?.sendDayOfWeek ?? 1),
   };
 
   const buildPayload = (overrides?: Partial<NpSettings & { recipientId: number | null }>) => ({
-    recipientId:   eff.recipientId,
-    frequency:     eff.frequency,
-    sendHour:      eff.sendHour,
+    recipientId: eff.recipientId,
+    frequency: eff.frequency,
+    sendHour: eff.sendHour,
     sendDayOfWeek: eff.sendDayOfWeek,
-    enabled:       cfg?.enabled  ?? false,
-    autoSend:      cfg?.autoSend ?? false,
+    enabled: cfg?.enabled ?? false,
+    autoSend: cfg?.autoSend ?? false,
     ...overrides,
   });
 
@@ -112,22 +126,19 @@ export function NetPositionExportSection() {
   });
 
   const toggleEnabled = useMutation({
-    mutationFn: (value: boolean) =>
-      apiRequest("PUT", "/api/whatsapp/np-settings", buildPayload({ enabled: value })),
+    mutationFn: (value: boolean) => apiRequest("PUT", "/api/whatsapp/np-settings", buildPayload({ enabled: value })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/np-settings"] }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const toggleAutoSend = useMutation({
-    mutationFn: (value: boolean) =>
-      apiRequest("PUT", "/api/whatsapp/np-settings", buildPayload({ autoSend: value })),
+    mutationFn: (value: boolean) => apiRequest("PUT", "/api/whatsapp/np-settings", buildPayload({ autoSend: value })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/whatsapp/np-settings"] }),
     onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const sendNow = useMutation({
-    mutationFn: () =>
-      apiRequest("POST", "/api/whatsapp/send-np-all-now", { recipientId: eff.recipientId }),
+    mutationFn: () => apiRequest("POST", "/api/whatsapp/send-np-all-now", { recipientId: eff.recipientId }),
     onSuccess: (data: any) => {
       toast({ title: "Net Position Export Sent", description: data?.message || "Done" });
     },
@@ -167,14 +178,13 @@ export function NetPositionExportSection() {
 
       {expanded && (
         <div className="border-t p-4 space-y-5">
-
           {/* ── Date range note ─────────────────────────────────────── */}
           <div className="flex items-start gap-2 rounded-md bg-muted/50 border p-3">
             <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
             <div className="text-xs text-muted-foreground">
               <span className="font-medium text-foreground">Date range: </span>
-              Jan 1, {new Date().getFullYear()} → today ({npEnd}).
-              Every send covers from the start of the current year up to the date the export runs.
+              Jan 1, {new Date().getFullYear()} → today ({npEnd}). Every send covers from the start of the current year
+              up to the date the export runs.
             </div>
           </div>
 
@@ -185,8 +195,8 @@ export function NetPositionExportSection() {
               WhatsApp Group
             </Label>
             <p className="text-xs text-muted-foreground">
-              A ZIP containing one net position Excel per company will be sent to this group.
-              Manage groups in the WhatsApp Export section above.
+              A ZIP containing one net position Excel per company will be sent to this group. Manage groups in the
+              WhatsApp Export section above.
             </p>
             {groups.length === 0 ? (
               <p className="text-xs text-muted-foreground italic">
@@ -227,10 +237,7 @@ export function NetPositionExportSection() {
               {/* Frequency */}
               <div className="space-y-1">
                 <Label className="text-xs">Frequency</Label>
-                <Select
-                  value={eff.frequency}
-                  onValueChange={(v) => setFrequency(v)}
-                >
+                <Select value={eff.frequency} onValueChange={(v) => setFrequency(v)}>
                   <SelectTrigger data-testid="select-np-frequency">
                     <SelectValue />
                   </SelectTrigger>
@@ -245,16 +252,15 @@ export function NetPositionExportSection() {
               {/* Send hour */}
               <div className="space-y-1">
                 <Label className="text-xs">Send Time (EST)</Label>
-                <Select
-                  value={String(eff.sendHour)}
-                  onValueChange={(v) => setSendHour(parseInt(v))}
-                >
+                <Select value={String(eff.sendHour)} onValueChange={(v) => setSendHour(parseInt(v))}>
                   <SelectTrigger data-testid="select-np-hour">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {HOURS.map((h) => (
-                      <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>
+                      <SelectItem key={h.value} value={h.value}>
+                        {h.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -267,16 +273,15 @@ export function NetPositionExportSection() {
                     <Calendar className="h-3 w-3" />
                     Day of Week
                   </Label>
-                  <Select
-                    value={String(eff.sendDayOfWeek)}
-                    onValueChange={(v) => setSendDayOfWeek(parseInt(v))}
-                  >
+                  <Select value={String(eff.sendDayOfWeek)} onValueChange={(v) => setSendDayOfWeek(parseInt(v))}>
                     <SelectTrigger data-testid="select-np-day">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {DAYS.map((d) => (
-                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                        <SelectItem key={d.value} value={d.value}>
+                          {d.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -305,15 +310,13 @@ export function NetPositionExportSection() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">Auto-Send</p>
-                <p className="text-xs text-muted-foreground">
-                  Run automatically on the configured schedule
-                </p>
+                <p className="text-xs text-muted-foreground">Run automatically on the configured schedule</p>
               </div>
               <Switch
                 data-testid="switch-np-autosend"
                 checked={cfg?.autoSend ?? false}
                 onCheckedChange={(v) => toggleAutoSend.mutate(v)}
-                disabled={!(cfg?.enabled) || toggleAutoSend.isPending}
+                disabled={!cfg?.enabled || toggleAutoSend.isPending}
               />
             </div>
           </div>
@@ -335,9 +338,14 @@ export function NetPositionExportSection() {
               disabled={saveSettings.isPending}
               data-testid="button-np-save"
             >
-              {saveSettings.isPending
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
-                : "Save Settings"}
+              {saveSettings.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save Settings"
+              )}
             </Button>
 
             <Button
@@ -346,15 +354,23 @@ export function NetPositionExportSection() {
               disabled={sendNow.isPending}
               data-testid="button-np-send-now"
             >
-              {sendNow.isPending
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending…</>
-                : <><Send className="h-4 w-4 mr-2" />Send Now</>}
+              {sendNow.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Now
+                </>
+              )}
             </Button>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            "Send Now" immediately sends the ZIP ({npStart} → {npEnd}) to the selected WhatsApp group and all email recipients.
-            The scheduler checks every hour and sends automatically when the time matches.
+            "Send Now" immediately sends the ZIP ({npStart} → {npEnd}) to the selected WhatsApp group and all email
+            recipients. The scheduler checks every hour and sends automatically when the time matches.
           </p>
         </div>
       )}

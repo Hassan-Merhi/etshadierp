@@ -10,18 +10,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Package, Send, ChevronDown, ChevronRight, Loader2, Users, Clock, Calendar } from "lucide-react";
 
-interface Company    { id: number; name: string; }
-interface Recipient  { id: number; chatId: string; name: string; isGroup: boolean; active: boolean; }
+interface Company {
+  id: number;
+  name: string;
+}
+interface Recipient {
+  id: number;
+  chatId: string;
+  name: string;
+  isGroup: boolean;
+  active: boolean;
+}
 
 interface StockSettings {
-  companyId:     number | null;
-  recipientId:   number | null;
-  autoSend:      boolean;
-  enabled:       boolean;
-  frequency:     string;
-  sendHour:      number;
+  companyId: number | null;
+  recipientId: number | null;
+  autoSend: boolean;
+  enabled: boolean;
+  frequency: string;
+  sendHour: number;
   sendDayOfWeek: number;
-  lastSentAt:    string | null;
+  lastSentAt: string | null;
 }
 
 const DAYS = [
@@ -35,8 +44,8 @@ const DAYS = [
 ];
 
 function formatHour(h: number): string {
-  if (h === 0)  return "12:00 AM";
-  if (h < 12)   return `${h}:00 AM`;
+  if (h === 0) return "12:00 AM";
+  if (h < 12) return `${h}:00 AM`;
   if (h === 12) return "12:00 PM";
   return `${h - 12}:00 PM`;
 }
@@ -46,7 +55,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => ({ value: String(i), label: f
 function scheduleLabel(cfg: StockSettings | undefined): string {
   if (!cfg?.autoSend) return "";
   const time = formatHour(cfg.sendHour ?? 18);
-  if (cfg.frequency === "daily")   return `Daily at ${time} EST`;
+  if (cfg.frequency === "daily") return `Daily at ${time} EST`;
   if (cfg.frequency === "monthly") return `Monthly (1st) at ${time} EST`;
   if (cfg.frequency === "weekly") {
     const day = DAYS.find((d) => d.value === String(cfg.sendDayOfWeek))?.label ?? "Monday";
@@ -77,27 +86,27 @@ export function StockReportSection() {
   const groups = recipients.filter((r) => r.isGroup && r.active);
 
   // Local state for all editable fields
-  const [companyId,     setCompanyId]     = useState<number | null>(null);
-  const [recipientId,   setRecipientId]   = useState<number | null>(null);
-  const [frequency,     setFrequency]     = useState<string | null>(null);
-  const [sendHour,      setSendHour]      = useState<number | null>(null);
+  const [companyId, setCompanyId] = useState<number | null>(null);
+  const [recipientId, setRecipientId] = useState<number | null>(null);
+  const [frequency, setFrequency] = useState<string | null>(null);
+  const [sendHour, setSendHour] = useState<number | null>(null);
   const [sendDayOfWeek, setSendDayOfWeek] = useState<number | null>(null);
 
   // Resolved values (local state overrides server state)
-  const rCompanyId     = companyId     ?? cfg?.companyId     ?? null;
-  const rRecipientId   = recipientId   ?? cfg?.recipientId   ?? null;
-  const rFrequency     = frequency     ?? cfg?.frequency     ?? "daily";
-  const rSendHour      = sendHour      ?? cfg?.sendHour      ?? 18;
+  const rCompanyId = companyId ?? cfg?.companyId ?? null;
+  const rRecipientId = recipientId ?? cfg?.recipientId ?? null;
+  const rFrequency = frequency ?? cfg?.frequency ?? "daily";
+  const rSendHour = sendHour ?? cfg?.sendHour ?? 18;
   const rSendDayOfWeek = sendDayOfWeek ?? cfg?.sendDayOfWeek ?? 1;
 
   const buildPayload = (patch?: Partial<StockSettings>) => ({
-    companyId:     rCompanyId,
-    recipientId:   rRecipientId,
-    frequency:     rFrequency,
-    sendHour:      rSendHour,
+    companyId: rCompanyId,
+    recipientId: rRecipientId,
+    frequency: rFrequency,
+    sendHour: rSendHour,
     sendDayOfWeek: rSendDayOfWeek,
-    autoSend:      cfg?.autoSend  ?? false,
-    enabled:       cfg?.enabled   ?? false,
+    autoSend: cfg?.autoSend ?? false,
+    enabled: cfg?.enabled ?? false,
     ...patch,
   });
 
@@ -114,7 +123,8 @@ export function StockReportSection() {
   const sendNow = useMutation({
     mutationFn: () =>
       apiRequest("POST", "/api/whatsapp/send-stock-report", {
-        companyId: rCompanyId, recipientId: rRecipientId,
+        companyId: rCompanyId,
+        recipientId: rRecipientId,
       }),
     onSuccess: (data: any) => {
       toast({ title: "Reports sent", description: data?.message || "Done" });
@@ -123,7 +133,7 @@ export function StockReportSection() {
   });
 
   const canSend = !!(rCompanyId && rRecipientId);
-  const label   = scheduleLabel(cfg);
+  const label = scheduleLabel(cfg);
 
   return (
     <div className="border rounded-md">
@@ -153,15 +163,11 @@ export function StockReportSection() {
 
       {expanded && (
         <div className="border-t p-4 space-y-5">
-
           {/* ── Company ──────────────────────────────────────────────────── */}
           <div className="space-y-1">
             <Label className="text-sm font-medium">Company</Label>
             <p className="text-xs text-muted-foreground">Which company's stock and net position to report on</p>
-            <Select
-              value={String(rCompanyId ?? "")}
-              onValueChange={(v) => setCompanyId(v ? parseInt(v) : null)}
-            >
+            <Select value={String(rCompanyId ?? "")} onValueChange={(v) => setCompanyId(v ? parseInt(v) : null)}>
               <SelectTrigger data-testid="select-stock-company" className="w-full sm:w-72">
                 <SelectValue placeholder="Select a company…" />
               </SelectTrigger>
@@ -186,10 +192,7 @@ export function StockReportSection() {
                 No active WhatsApp groups found. Add a group recipient in the WhatsApp Export section above.
               </p>
             ) : (
-              <Select
-                value={String(rRecipientId ?? "")}
-                onValueChange={(v) => setRecipientId(v ? parseInt(v) : null)}
-              >
+              <Select value={String(rRecipientId ?? "")} onValueChange={(v) => setRecipientId(v ? parseInt(v) : null)}>
                 <SelectTrigger data-testid="select-stock-recipient" className="w-full sm:w-72">
                   <SelectValue placeholder="Select a group…" />
                 </SelectTrigger>
@@ -220,10 +223,7 @@ export function StockReportSection() {
               {/* Frequency */}
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Frequency</Label>
-                <Select
-                  value={rFrequency}
-                  onValueChange={(v) => setFrequency(v)}
-                >
+                <Select value={rFrequency} onValueChange={(v) => setFrequency(v)}>
                   <SelectTrigger data-testid="select-stock-frequency">
                     <SelectValue />
                   </SelectTrigger>
@@ -239,16 +239,15 @@ export function StockReportSection() {
               {rFrequency === "weekly" && (
                 <div className="space-y-1">
                   <Label className="text-xs text-muted-foreground">Day of Week</Label>
-                  <Select
-                    value={String(rSendDayOfWeek)}
-                    onValueChange={(v) => setSendDayOfWeek(parseInt(v))}
-                  >
+                  <Select value={String(rSendDayOfWeek)} onValueChange={(v) => setSendDayOfWeek(parseInt(v))}>
                     <SelectTrigger data-testid="select-stock-day">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {DAYS.map((d) => (
-                        <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                        <SelectItem key={d.value} value={d.value}>
+                          {d.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -258,18 +257,20 @@ export function StockReportSection() {
               {/* Time */}
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><Clock className="h-3 w-3" />Send Time (EST)</span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Send Time (EST)
+                  </span>
                 </Label>
-                <Select
-                  value={String(rSendHour)}
-                  onValueChange={(v) => setSendHour(parseInt(v))}
-                >
+                <Select value={String(rSendHour)} onValueChange={(v) => setSendHour(parseInt(v))}>
                   <SelectTrigger data-testid="select-stock-hour">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
                     {HOURS.map((h) => (
-                      <SelectItem key={h.value} value={h.value}>{h.label}</SelectItem>
+                      <SelectItem key={h.value} value={h.value}>
+                        {h.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -279,8 +280,9 @@ export function StockReportSection() {
             {/* Preview label */}
             {rCompanyId && rRecipientId && (
               <p className="text-xs text-muted-foreground">
-                {rFrequency === "daily"   && `Sends every day at ${formatHour(rSendHour)} EST`}
-                {rFrequency === "weekly"  && `Sends every ${DAYS.find((d) => d.value === String(rSendDayOfWeek))?.label ?? "Monday"} at ${formatHour(rSendHour)} EST`}
+                {rFrequency === "daily" && `Sends every day at ${formatHour(rSendHour)} EST`}
+                {rFrequency === "weekly" &&
+                  `Sends every ${DAYS.find((d) => d.value === String(rSendDayOfWeek))?.label ?? "Monday"} at ${formatHour(rSendHour)} EST`}
                 {rFrequency === "monthly" && `Sends on the 1st of each month at ${formatHour(rSendHour)} EST`}
               </p>
             )}
@@ -292,9 +294,7 @@ export function StockReportSection() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium">Auto-Send</p>
-              <p className="text-xs text-muted-foreground">
-                Automatically send reports on the schedule above
-              </p>
+              <p className="text-xs text-muted-foreground">Automatically send reports on the schedule above</p>
             </div>
             <Switch
               data-testid="switch-stock-auto-send"
@@ -305,9 +305,7 @@ export function StockReportSection() {
           </div>
 
           {cfg?.lastSentAt && (
-            <p className="text-xs text-muted-foreground">
-              Last sent: {new Date(cfg.lastSentAt).toLocaleString()}
-            </p>
+            <p className="text-xs text-muted-foreground">Last sent: {new Date(cfg.lastSentAt).toLocaleString()}</p>
           )}
 
           <Separator />
@@ -320,9 +318,14 @@ export function StockReportSection() {
               disabled={!canSend || saveSettings.isPending}
               data-testid="button-stock-save"
             >
-              {saveSettings.isPending
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
-                : "Save Settings"}
+              {saveSettings.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Save Settings"
+              )}
             </Button>
 
             <Button
@@ -330,14 +333,20 @@ export function StockReportSection() {
               disabled={!canSend || sendNow.isPending}
               data-testid="button-stock-send-now"
             >
-              {sendNow.isPending
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending…</>
-                : <><Send className="h-4 w-4 mr-2" />Send Now</>}
+              {sendNow.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Now
+                </>
+              )}
             </Button>
 
-            {!canSend && (
-              <p className="text-xs text-muted-foreground">Select a company and group first.</p>
-            )}
+            {!canSend && <p className="text-xs text-muted-foreground">Select a company and group first.</p>}
           </div>
 
           {/* ── What gets sent ───────────────────────────────────────────── */}
@@ -345,16 +354,15 @@ export function StockReportSection() {
             <p className="text-xs font-medium text-muted-foreground">What gets sent:</p>
             <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
               <li>
-                <span className="font-medium text-foreground">Stock PDF</span> — current inventory with cost
-                (code, name, group, location, qty, unit cost, total value)
+                <span className="font-medium text-foreground">Stock PDF</span> — current inventory with cost (code,
+                name, group, location, qty, unit cost, total value)
               </li>
               <li>
-                <span className="font-medium text-foreground">Net Position Excel</span> — 01 Jan {new Date().getFullYear()} → today
-                (revenue, expenses, net profit by month)
+                <span className="font-medium text-foreground">Net Position Excel</span> — 01 Jan{" "}
+                {new Date().getFullYear()} → today (revenue, expenses, net profit by month)
               </li>
             </ul>
           </div>
-
         </div>
       )}
     </div>

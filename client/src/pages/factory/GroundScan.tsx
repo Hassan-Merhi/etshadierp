@@ -1,19 +1,32 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ScanLine, Trash2, Download, AlertCircle, X, Package, Loader2, MapPin, Upload, ServerCrash } from "lucide-react";
+import {
+  ScanLine,
+  Trash2,
+  Download,
+  AlertCircle,
+  X,
+  Package,
+  Loader2,
+  MapPin,
+  Upload,
+  ServerCrash,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -54,15 +67,15 @@ interface GroundScanItem {
 
 function rowToScannedBale(r: GroundScanItem): ScannedBale {
   return {
-    refCode:          r.reference_number,
-    articleCode:      r.article_code  || "",
-    productName:      r.product_name  || "Unknown",
-    weightKg:         parseFloat(r.weight_kg || "0"),
-    status:           r.status        || "",
+    refCode: r.reference_number,
+    articleCode: r.article_code || "",
+    productName: r.product_name || "Unknown",
+    weightKg: parseFloat(r.weight_kg || "0"),
+    status: r.status || "",
     isInLoadingOrder: r.is_in_loading_order,
-    scannedAt:        new Date(r.scanned_at),
+    scannedAt: new Date(r.scanned_at),
     dateBaleProduced: r.date_bale_produced ?? null,
-    workerName:       r.worker_name ?? null,
+    workerName: r.worker_name ?? null,
   };
 }
 
@@ -78,7 +91,7 @@ function StatusBadge({ status, isInLoadingOrder }: { status: string; isInLoading
   return <Badge variant="outline">{status}</Badge>;
 }
 
-const STORAGE_KEY  = "ground_scan_bales";
+const STORAGE_KEY = "ground_scan_bales";
 const LOCATION_KEY = "ground_scan_locationId";
 
 function loadLocalBales(): ScannedBale[] {
@@ -93,14 +106,14 @@ function loadLocalBales(): ScannedBale[] {
 }
 
 export default function GroundScan() {
-  const [scanInput, setScanInput]   = useState("");
-  const [scanning, setScanning]     = useState(false);
-  const [exporting, setExporting]   = useState(false);
-  const [scanError, setScanError]   = useState("");
-  const [uploading, setUploading]   = useState(false);
+  const [scanInput, setScanInput] = useState("");
+  const [scanning, setScanning] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const [selectedLocationId, setSelectedLocationId] = useState<string>(
-    () => localStorage.getItem(LOCATION_KEY) ?? "all",
+    () => localStorage.getItem(LOCATION_KEY) ?? "all"
   );
 
   const [localBales, setLocalBales] = useState<ScannedBale[]>(() => loadLocalBales());
@@ -118,8 +131,9 @@ export default function GroundScan() {
   const { data: serverItems = [], isLoading } = useQuery<GroundScanItem[]>({
     queryKey: ["/api/factory/ground-scan-items", selectedLocationId],
     queryFn: () =>
-      fetch(`/api/factory/ground-scan-items?locationId=${selectedLocationId}`, { credentials: "include" })
-        .then((r) => r.json()),
+      fetch(`/api/factory/ground-scan-items?locationId=${selectedLocationId}`, { credentials: "include" }).then((r) =>
+        r.json()
+      ),
     refetchInterval: 4000,
   });
 
@@ -161,7 +175,12 @@ export default function GroundScan() {
       apiRequest("DELETE", `/api/factory/ground-scan-items?locationId=${selectedLocationId}`).then((r) => {
         if (!r.ok) throw new Error("Clear failed");
       }),
-    onSuccess: () => { invalidate(); setScanError(""); setScanInput(""); setTimeout(() => scanRef.current?.focus(), 50); },
+    onSuccess: () => {
+      invalidate();
+      setScanError("");
+      setScanInput("");
+      setTimeout(() => scanRef.current?.focus(), 50);
+    },
   });
 
   async function handleScan() {
@@ -185,7 +204,11 @@ export default function GroundScan() {
       if (!res.ok) {
         if (res.status === 404) {
           setScanError(`Not found: ${value}`);
-          toast({ title: "Bale not found", description: `No bale with ref code "${value}" found.`, variant: "destructive" });
+          toast({
+            title: "Bale not found",
+            description: `No bale with ref code "${value}" found.`,
+            variant: "destructive",
+          });
         } else {
           setScanError("Lookup failed — try again");
         }
@@ -194,14 +217,14 @@ export default function GroundScan() {
       }
 
       const data = await res.json();
-      const baleInfo   = data.baleInfo;
-      const product    = data.product;
+      const baleInfo = data.baleInfo;
+      const product = data.product;
       const labelPrint = data.labelPrint;
 
-      const articleCode    = product?.articleCode || labelPrint?.articleCode || baleInfo?.articleCode || "";
-      const productName    = baleInfo?.productName || product?.name || "Unknown";
-      const weightKg       = parseFloat(baleInfo?.weightKg || labelPrint?.approxWeightKg || "0");
-      const status         = baleInfo?.status || "";
+      const articleCode = product?.articleCode || labelPrint?.articleCode || baleInfo?.articleCode || "";
+      const productName = baleInfo?.productName || product?.name || "Unknown";
+      const weightKg = parseFloat(baleInfo?.weightKg || labelPrint?.approxWeightKg || "0");
+      const status = baleInfo?.status || "";
       const isInLoadingOrder = baleInfo?.isInLoadingOrder === true;
 
       const saveRes = await apiRequest("POST", "/api/factory/ground-scan-items", {
@@ -275,24 +298,55 @@ export default function GroundScan() {
       const locParam = selectedLocationId && selectedLocationId !== "all" ? `?locationId=${selectedLocationId}` : "";
       const res = await fetch(`/api/factory/stock-entry/in-stock${locParam}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch system stock");
-      const allFetched: { referenceNumber: string; articleCode: string; productName?: string; weightKg: string; isInLoadingOrder?: boolean; stockEntryDate?: string | null; workerName?: string | null; }[] = await res.json();
+      const allFetched: {
+        referenceNumber: string;
+        articleCode: string;
+        productName?: string;
+        weightKg: string;
+        isInLoadingOrder?: boolean;
+        stockEntryDate?: string | null;
+        workerName?: string | null;
+      }[] = await res.json();
       const systemBales = allFetched.filter((b) => !b.isInLoadingOrder);
 
       const scannedRefs = new Set(scannedBales.map((b) => b.refCode.toUpperCase()));
-      const systemRefs  = new Set(systemBales.map((b) => (b.referenceNumber || "").toUpperCase()));
+      const systemRefs = new Set(systemBales.map((b) => (b.referenceNumber || "").toUpperCase()));
 
-      type ArticleRow = { articleCode: string; productName: string; systemQty: number; systemWt: number; scannedQty: number; scannedWt: number };
+      type ArticleRow = {
+        articleCode: string;
+        productName: string;
+        systemQty: number;
+        systemWt: number;
+        scannedQty: number;
+        scannedWt: number;
+      };
       const articleMap = new Map<string, ArticleRow>();
       const ensure = (key: string, name: string) => {
-        if (!articleMap.has(key)) articleMap.set(key, { articleCode: key, productName: name, systemQty: 0, systemWt: 0, scannedQty: 0, scannedWt: 0 });
+        if (!articleMap.has(key))
+          articleMap.set(key, {
+            articleCode: key,
+            productName: name,
+            systemQty: 0,
+            systemWt: 0,
+            scannedQty: 0,
+            scannedWt: 0,
+          });
         return articleMap.get(key)!;
       };
-      for (const b of systemBales) { const r = ensure(b.articleCode || "UNKNOWN", b.productName || ""); r.systemQty++; r.systemWt += parseFloat(b.weightKg || "0"); }
-      for (const b of scannedBales) { const r = ensure(b.articleCode || "UNKNOWN", b.productName || ""); r.scannedQty++; r.scannedWt += b.weightKg; }
+      for (const b of systemBales) {
+        const r = ensure(b.articleCode || "UNKNOWN", b.productName || "");
+        r.systemQty++;
+        r.systemWt += parseFloat(b.weightKg || "0");
+      }
+      for (const b of scannedBales) {
+        const r = ensure(b.articleCode || "UNKNOWN", b.productName || "");
+        r.scannedQty++;
+        r.scannedWt += b.weightKg;
+      }
 
-      const missingBales   = systemBales.filter((b) => !scannedRefs.has((b.referenceNumber || "").toUpperCase()));
-      const extraBales     = scannedBales.filter((b) => !systemRefs.has(b.refCode.toUpperCase()));
-      const totalSystemWt  = systemBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
+      const missingBales = systemBales.filter((b) => !scannedRefs.has((b.referenceNumber || "").toUpperCase()));
+      const extraBales = scannedBales.filter((b) => !systemRefs.has(b.refCode.toUpperCase()));
+      const totalSystemWt = systemBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
       const totalMissingWt = missingBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
       const summaryArticles = [...articleMap.values()].sort((a, b) => a.articleCode.localeCompare(b.articleCode));
 
@@ -304,21 +358,21 @@ export default function GroundScan() {
       wb.creator = "HMD ERP";
       wb.created = new Date();
 
-      const NAVY    = "FF1B2A4A";
-      const BLUE    = "FF2D5A8E";
-      const GREEN   = "FF1A7A3C";
-      const LGREEN  = "FFD4EDDA";
-      const RED     = "FFC0392B";
-      const LRED    = "FFFCE8E8";
-      const AMBER   = "FFB7860B";
-      const LAMBER  = "FFFEF3CD";
-      const GRAY    = "FF6C757D";
-      const LGRAY   = "FFF5F7FA";
-      const WHITE   = "FFFFFFFF";
-      const BLACK   = "FF1A1A1A";
+      const NAVY = "FF1B2A4A";
+      const BLUE = "FF2D5A8E";
+      const GREEN = "FF1A7A3C";
+      const LGREEN = "FFD4EDDA";
+      const RED = "FFC0392B";
+      const LRED = "FFFCE8E8";
+      const AMBER = "FFB7860B";
+      const LAMBER = "FFFEF3CD";
+      const GRAY = "FF6C757D";
+      const LGRAY = "FFF5F7FA";
+      const WHITE = "FFFFFFFF";
+      const BLACK = "FF1A1A1A";
       const TOTALBG = "FFE8F0F8";
 
-      const solidFill  = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
+      const solidFill = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
       const thinBorder = { style: "thin" as const, color: { argb: "FFD0D7E0" } };
       const allBorders = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
 
@@ -327,35 +381,51 @@ export default function GroundScan() {
         row.fill = solidFill(bgArgb);
         row.alignment = { vertical: "middle" as const, horizontal: "center" as const, wrapText: false };
         row.height = 22;
-        row.eachCell((cell: any) => { cell.border = allBorders; });
+        row.eachCell((cell: any) => {
+          cell.border = allBorders;
+        });
       };
 
       const styleDataRow = (row: any, even: boolean, highlight?: { argb: string }) => {
-        const bg = highlight ? highlight.argb : (even ? LGRAY : WHITE);
+        const bg = highlight ? highlight.argb : even ? LGRAY : WHITE;
         row.fill = solidFill(bg);
         row.font = { size: 10, name: "Calibri", color: { argb: BLACK } };
         row.height = 18;
-        row.eachCell({ includeEmpty: true }, (cell: any) => { cell.border = allBorders; });
+        row.eachCell({ includeEmpty: true }, (cell: any) => {
+          cell.border = allBorders;
+        });
       };
 
       const styleTotals = (row: any) => {
         row.fill = solidFill(TOTALBG);
         row.font = { bold: true, size: 10, name: "Calibri", color: { argb: NAVY } };
         row.height = 20;
-        row.eachCell({ includeEmpty: true }, (cell: any) => { cell.border = { ...allBorders, top: { style: "medium" as const, color: { argb: NAVY } }, bottom: { style: "medium" as const, color: { argb: NAVY } } }; });
+        row.eachCell({ includeEmpty: true }, (cell: any) => {
+          cell.border = {
+            ...allBorders,
+            top: { style: "medium" as const, color: { argb: NAVY } },
+            bottom: { style: "medium" as const, color: { argb: NAVY } },
+          };
+        });
       };
 
       // ══ Sheet 1 — Summary ══════════════════════════════════════════════════
       const ws1 = wb.addWorksheet("Summary");
       ws1.columns = [
-        { key: "a", width: 18 }, { key: "b", width: 34 }, { key: "c", width: 14 },
-        { key: "d", width: 17 }, { key: "e", width: 14 }, { key: "f", width: 17 },
-        { key: "g", width: 14 }, { key: "h", width: 17 },
+        { key: "a", width: 18 },
+        { key: "b", width: 34 },
+        { key: "c", width: 14 },
+        { key: "d", width: 17 },
+        { key: "e", width: 14 },
+        { key: "f", width: 17 },
+        { key: "g", width: 14 },
+        { key: "h", width: 17 },
       ];
 
-      const locationLabel = selectedLocationId !== "all"
-        ? (stockLocations?.find((l) => String(l.id) === selectedLocationId)?.name ?? `Location ${selectedLocationId}`)
-        : "All Locations";
+      const locationLabel =
+        selectedLocationId !== "all"
+          ? (stockLocations?.find((l) => String(l.id) === selectedLocationId)?.name ?? `Location ${selectedLocationId}`)
+          : "All Locations";
 
       ws1.addRow([`Ground Stock Verification Report — ${locationLabel}`]);
       const titleRow = ws1.lastRow!;
@@ -404,19 +474,36 @@ export default function GroundScan() {
 
       ws1.addRow([]);
 
-      const artHdrRow = ws1.addRow(["Article Code", "Product Name", "System Qty", "System Wt (kg)", "Scanned Qty", "Scanned Wt (kg)", "Missing Qty", "Missing Wt (kg)"]);
+      const artHdrRow = ws1.addRow([
+        "Article Code",
+        "Product Name",
+        "System Qty",
+        "System Wt (kg)",
+        "Scanned Qty",
+        "Scanned Wt (kg)",
+        "Missing Qty",
+        "Missing Wt (kg)",
+      ]);
       styleHeader(artHdrRow, NAVY);
-      artHdrRow.eachCell((cell, col) => { if (col >= 3) cell.alignment = { horizontal: "center", vertical: "middle" }; });
+      artHdrRow.eachCell((cell, col) => {
+        if (col >= 3) cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
 
       summaryArticles.forEach((r, idx) => {
         const missingQty = Math.max(0, r.systemQty - r.scannedQty);
-        const missingWt  = missingBales.filter((b) => (b.articleCode || "UNKNOWN") === r.articleCode).reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
+        const missingWt = missingBales
+          .filter((b) => (b.articleCode || "UNKNOWN") === r.articleCode)
+          .reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0);
         const hasMissing = missingQty > 0;
         const dataRow = ws1.addRow([
-          r.articleCode, r.productName,
-          r.systemQty, +r.systemWt.toFixed(3),
-          r.scannedQty, +r.scannedWt.toFixed(3),
-          missingQty, +missingWt.toFixed(3),
+          r.articleCode,
+          r.productName,
+          r.systemQty,
+          +r.systemWt.toFixed(3),
+          r.scannedQty,
+          +r.scannedWt.toFixed(3),
+          missingQty,
+          +missingWt.toFixed(3),
         ]);
         styleDataRow(dataRow, idx % 2 === 0, hasMissing ? { argb: LRED } : undefined);
         [3, 4, 5, 6, 7, 8].forEach((col) => {
@@ -431,10 +518,14 @@ export default function GroundScan() {
       });
 
       const totalsRow = ws1.addRow([
-        "TOTAL", "",
-        systemBales.length, +totalSystemWt.toFixed(3),
-        scannedBales.length, +totalWeight.toFixed(3),
-        missingBales.length, +totalMissingWt.toFixed(3),
+        "TOTAL",
+        "",
+        systemBales.length,
+        +totalSystemWt.toFixed(3),
+        scannedBales.length,
+        +totalWeight.toFixed(3),
+        missingBales.length,
+        +totalMissingWt.toFixed(3),
       ]);
       styleTotals(totalsRow);
       [3, 4, 5, 6, 7, 8].forEach((col) => {
@@ -451,9 +542,12 @@ export default function GroundScan() {
       // ══ Sheet 2 — Missing Bales ════════════════════════════════════════════
       const ws2 = wb.addWorksheet("Missing Bales");
       ws2.columns = [
-        { key: "a", width: 20 }, { key: "b", width: 18 },
-        { key: "c", width: 36 }, { key: "d", width: 15 },
-        { key: "e", width: 16 }, { key: "f", width: 22 },
+        { key: "a", width: 20 },
+        { key: "b", width: 18 },
+        { key: "c", width: 36 },
+        { key: "d", width: 15 },
+        { key: "e", width: 16 },
+        { key: "f", width: 22 },
       ];
       ws2.addRow(["Missing Bales"]);
       const m_titleRow = ws2.lastRow!;
@@ -469,7 +563,14 @@ export default function GroundScan() {
       ws2.mergeCells("A2:F2");
       ws2.addRow([]);
 
-      const m_hdrRow = ws2.addRow(["Reference Number", "Article Code", "Product Name", "Weight (kg)", "Date Produced", "Worker"]);
+      const m_hdrRow = ws2.addRow([
+        "Reference Number",
+        "Article Code",
+        "Product Name",
+        "Weight (kg)",
+        "Date Produced",
+        "Worker",
+      ]);
       styleHeader(m_hdrRow, RED);
       m_hdrRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
 
@@ -481,7 +582,9 @@ export default function GroundScan() {
       } else {
         missingBales.forEach((b, idx) => {
           const dr = ws2.addRow([
-            b.referenceNumber, b.articleCode || "—", b.productName || "—",
+            b.referenceNumber,
+            b.articleCode || "—",
+            b.productName || "—",
             +parseFloat(b.weightKg || "0").toFixed(3),
             b.stockEntryDate || "—",
             b.workerName || "—",
@@ -494,7 +597,14 @@ export default function GroundScan() {
       }
 
       ws2.addRow([]);
-      const m_totRow = ws2.addRow([`Total missing: ${missingBales.length} bales`, "", "", +totalMissingWt.toFixed(3), "", ""]);
+      const m_totRow = ws2.addRow([
+        `Total missing: ${missingBales.length} bales`,
+        "",
+        "",
+        +totalMissingWt.toFixed(3),
+        "",
+        "",
+      ]);
       styleTotals(m_totRow);
       m_totRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
       m_totRow.getCell(4).numFmt = "#,##0.000";
@@ -505,9 +615,13 @@ export default function GroundScan() {
       if (extraBales.length > 0) {
         const ws3 = wb.addWorksheet("Extra Bales");
         ws3.columns = [
-          { key: "a", width: 20 }, { key: "b", width: 18 },
-          { key: "c", width: 36 }, { key: "d", width: 15 },
-          { key: "e", width: 18 }, { key: "f", width: 16 }, { key: "g", width: 22 },
+          { key: "a", width: 20 },
+          { key: "b", width: 18 },
+          { key: "c", width: 36 },
+          { key: "d", width: 15 },
+          { key: "e", width: 18 },
+          { key: "f", width: 16 },
+          { key: "g", width: 22 },
         ];
         ws3.addRow(["Extra Bales"]);
         const e_titleRow = ws3.lastRow!;
@@ -522,14 +636,25 @@ export default function GroundScan() {
         ws3.mergeCells("A2:G2");
         ws3.addRow([]);
 
-        const e_hdrRow = ws3.addRow(["Ref Code", "Article Code", "Product Name", "Weight (kg)", "Status", "Date Produced", "Worker"]);
+        const e_hdrRow = ws3.addRow([
+          "Ref Code",
+          "Article Code",
+          "Product Name",
+          "Weight (kg)",
+          "Status",
+          "Date Produced",
+          "Worker",
+        ]);
         styleHeader(e_hdrRow, BLUE);
         e_hdrRow.getCell(4).alignment = { horizontal: "right", vertical: "middle" };
 
         extraBales.forEach((b, idx) => {
           const dr = ws3.addRow([
-            b.refCode, b.articleCode || "—", b.productName || "—",
-            +b.weightKg.toFixed(3), b.status,
+            b.refCode,
+            b.articleCode || "—",
+            b.productName || "—",
+            +b.weightKg.toFixed(3),
+            b.status,
             b.dateBaleProduced || "—",
             b.workerName || "—",
           ]);
@@ -551,14 +676,14 @@ export default function GroundScan() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-
       {/* ── Migration banner ── */}
       {hasMigrationData && (
         <div className="flex items-start gap-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3">
           <ServerCrash className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-              You have {localBales.length} locally stored scan{localBales.length !== 1 ? "s" : ""} from a previous session
+              You have {localBales.length} locally stored scan{localBales.length !== 1 ? "s" : ""} from a previous
+              session
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Upload them so the whole team can see them, or discard them.
@@ -590,14 +715,16 @@ export default function GroundScan() {
       <div className="flex items-center gap-2 text-sm flex-wrap">
         <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
         <span className="text-muted-foreground shrink-0">Scanning location:</span>
-        <Select value={selectedLocationId} onValueChange={setSelectedLocationId} data-testid="select-ground-scan-location">
+        <Select
+          value={selectedLocationId}
+          onValueChange={setSelectedLocationId}
+          data-testid="select-ground-scan-location"
+        >
           <SelectTrigger className="w-60" data-testid="trigger-ground-scan-location">
             <SelectValue placeholder="All locations" />
           </SelectTrigger>
           <SelectContent>
-            {(stockLocations ?? []).length > 1 && (
-              <SelectItem value="all">All locations</SelectItem>
-            )}
+            {(stockLocations ?? []).length > 1 && <SelectItem value="all">All locations</SelectItem>}
             {(stockLocations ?? []).map((loc) => (
               <SelectItem key={loc.id} value={String(loc.id)}>
                 {loc.name} ({loc.count} bales)
@@ -605,14 +732,16 @@ export default function GroundScan() {
             ))}
           </SelectContent>
         </Select>
-        {selectedLocationId !== "all" && stockLocations && (() => {
-          const loc = stockLocations.find((l) => String(l.id) === selectedLocationId);
-          return loc ? (
-            <span className="text-xs text-muted-foreground">
-              — verifying against <strong>{loc.name}</strong> ({loc.count} system bales)
-            </span>
-          ) : null;
-        })()}
+        {selectedLocationId !== "all" &&
+          stockLocations &&
+          (() => {
+            const loc = stockLocations.find((l) => String(l.id) === selectedLocationId);
+            return loc ? (
+              <span className="text-xs text-muted-foreground">
+                — verifying against <strong>{loc.name}</strong> ({loc.count} system bales)
+              </span>
+            ) : null;
+          })()}
       </div>
 
       {/* ── Scan bar ── */}
@@ -623,7 +752,10 @@ export default function GroundScan() {
             <Input
               ref={scanRef}
               value={scanInput}
-              onChange={(e) => { setScanInput(e.target.value); setScanError(""); }}
+              onChange={(e) => {
+                setScanInput(e.target.value);
+                setScanError("");
+              }}
               onKeyDown={(e) => e.key === "Enter" && handleScan()}
               placeholder="Scan ref code / barcode..."
               className="pl-9"
@@ -669,14 +801,13 @@ export default function GroundScan() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Clear all scans?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This will remove all {scannedBales.length} scanned bales from the shared list for everyone. This cannot be undone.
+                    This will remove all {scannedBales.length} scanned bales from the shared list for everyone. This
+                    cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => clearMutation.mutate()}>
-                    Clear All
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={() => clearMutation.mutate()}>Clear All</AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
@@ -688,8 +819,8 @@ export default function GroundScan() {
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span data-testid="text-ground-scan-count">
-            <span className="font-semibold text-foreground">{scannedBales.length}</span>{" "}
-            bale{scannedBales.length !== 1 ? "s" : ""} scanned
+            <span className="font-semibold text-foreground">{scannedBales.length}</span> bale
+            {scannedBales.length !== 1 ? "s" : ""} scanned
           </span>
           <span data-testid="text-ground-scan-weight">
             <span className="font-semibold text-foreground">{formatNumber(totalWeight, 2)} kg</span> total weight
@@ -723,9 +854,7 @@ export default function GroundScan() {
             <TableBody>
               {scannedBales.map((bale, idx) => (
                 <TableRow key={bale.refCode} data-testid={`row-ground-scan-${bale.refCode}`}>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {scannedBales.length - idx}
-                  </TableCell>
+                  <TableCell className="text-muted-foreground text-xs">{scannedBales.length - idx}</TableCell>
                   <TableCell className="font-mono text-sm" data-testid={`text-ground-scan-ref-${bale.refCode}`}>
                     {bale.refCode}
                   </TableCell>
@@ -736,21 +865,30 @@ export default function GroundScan() {
                       <span className="text-muted-foreground text-xs">—</span>
                     )}
                   </TableCell>
-                  <TableCell data-testid={`text-ground-scan-product-${bale.refCode}`}>
-                    {bale.productName}
-                  </TableCell>
+                  <TableCell data-testid={`text-ground-scan-product-${bale.refCode}`}>{bale.productName}</TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-ground-scan-weight-${bale.refCode}`}>
                     {formatNumber(bale.weightKg, 2)}
                   </TableCell>
                   <TableCell data-testid={`text-ground-scan-status-${bale.refCode}`}>
                     <StatusBadge status={bale.status} isInLoadingOrder={bale.isInLoadingOrder} />
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-ground-scan-date-produced-${bale.refCode}`}>
-                    {bale.dateBaleProduced
-                      ? (() => { const [y,m,d] = bale.dateBaleProduced.split("-"); return `${d}/${m}/${y}`; })()
-                      : <span className="text-muted-foreground">—</span>}
+                  <TableCell
+                    className="text-sm text-muted-foreground"
+                    data-testid={`text-ground-scan-date-produced-${bale.refCode}`}
+                  >
+                    {bale.dateBaleProduced ? (
+                      (() => {
+                        const [y, m, d] = bale.dateBaleProduced.split("-");
+                        return `${d}/${m}/${y}`;
+                      })()
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground" data-testid={`text-ground-scan-worker-${bale.refCode}`}>
+                  <TableCell
+                    className="text-sm text-muted-foreground"
+                    data-testid={`text-ground-scan-worker-${bale.refCode}`}
+                  >
                     {bale.workerName ?? <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell>

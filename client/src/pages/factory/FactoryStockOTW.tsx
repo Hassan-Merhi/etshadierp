@@ -13,10 +13,14 @@ import { PageHeader } from "@/components/PageHeader";
 
 // ── localStorage helpers ────────────────────────────────────────────────────
 const NOTES_KEY = "factory-otw-row-notes";
-const DOCS_KEY  = "factory-otw-row-docs";
+const DOCS_KEY = "factory-otw-row-docs";
 
 function loadMap(key: string): Record<string, string | boolean> {
-  try { return JSON.parse(localStorage.getItem(key) ?? "{}"); } catch { return {}; }
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? "{}");
+  } catch {
+    return {};
+  }
 }
 function saveMap(key: string, map: Record<string, any>) {
   localStorage.setItem(key, JSON.stringify(map));
@@ -51,8 +55,17 @@ interface FactoryContainer {
 const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
 
 const CCY_SYMBOLS: Record<string, string> = {
-  USD: "$", EUR: "€", GBP: "£", AUD: "A$", CAD: "C$",
-  CHF: "CHF", JPY: "¥", CNY: "¥", AED: "AED", SAR: "SAR", LBP: "LL",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
+  AUD: "A$",
+  CAD: "C$",
+  CHF: "CHF",
+  JPY: "¥",
+  CNY: "¥",
+  AED: "AED",
+  SAR: "SAR",
+  LBP: "LL",
 };
 
 function ccySym(code: string | null | undefined): string {
@@ -81,14 +94,16 @@ function fmtDate(d: string | null | undefined): string {
 function containerCost(c: FactoryContainer): { symbol: string; amount: number } {
   const ccy = c.currencyCode || "USD";
   const symbol = ccySym(ccy);
-  const amount = num(c.finalPayableAmount) > 0
-    ? num(c.finalPayableAmount)
-    : num(c.ratePerKg) * num(c.totalKg);
+  const amount = num(c.finalPayableAmount) > 0 ? num(c.finalPayableAmount) : num(c.ratePerKg) * num(c.totalKg);
   return { symbol, amount };
 }
 
 // ── Inline editable notes cell ───────────────────────────────────────────────
-function NotesCell({ containerId, notes, onSave }: {
+function NotesCell({
+  containerId,
+  notes,
+  onSave,
+}: {
   containerId: number;
   notes: Record<string, string>;
   onSave: (id: number, val: string) => void;
@@ -142,17 +157,14 @@ export default function FactoryStockOTW() {
   const [search, setSearch] = useState("");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
 
-  const [notes, setNotes]   = useState<Record<string, string>>(() => loadMap(NOTES_KEY) as Record<string, string>);
-  const [docs,  setDocs]    = useState<Record<string, boolean>>(() => loadMap(DOCS_KEY) as Record<string, boolean>);
+  const [notes, setNotes] = useState<Record<string, string>>(() => loadMap(NOTES_KEY) as Record<string, string>);
+  const [docs, setDocs] = useState<Record<string, boolean>>(() => loadMap(DOCS_KEY) as Record<string, boolean>);
 
   const { data: containers = [], isLoading } = useQuery<FactoryContainer[]>({
     queryKey: ["/api/factory/containers"],
   });
 
-  const otwContainers = useMemo(
-    () => containers.filter((c) => STATUS_ACTIVE.has(c.status)),
-    [containers],
-  );
+  const otwContainers = useMemo(() => containers.filter((c) => STATUS_ACTIVE.has(c.status)), [containers]);
 
   const suppliers = useMemo(() => {
     const seen = new Map<string, string>();
@@ -170,10 +182,11 @@ export default function FactoryStockOTW() {
     }
     if (search.trim()) {
       const q = search.toLowerCase();
-      rows = rows.filter((c) =>
-        c.containerNumber?.toLowerCase().includes(q) ||
-        c.supplierName?.toLowerCase().includes(q) ||
-        c.origin?.toLowerCase().includes(q),
+      rows = rows.filter(
+        (c) =>
+          c.containerNumber?.toLowerCase().includes(q) ||
+          c.supplierName?.toLowerCase().includes(q) ||
+          c.origin?.toLowerCase().includes(q)
       );
     }
     return rows;
@@ -215,9 +228,12 @@ export default function FactoryStockOTW() {
   function fmtTotals(map: Record<string, number>): string {
     const entries = Object.entries(map).filter(([, v]) => v > 0);
     if (!entries.length) return "—";
-    return entries.map(([sym, amt]) =>
-      `${sym} ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-    ).join(" · ");
+    return entries
+      .map(
+        ([sym, amt]) =>
+          `${sym} ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      )
+      .join(" · ");
   }
 
   const docsReceived = filtered.filter((c) => docs[String(c.id)]).length;
@@ -252,7 +268,9 @@ export default function FactoryStockOTW() {
           <SelectContent>
             <SelectItem value="all">All suppliers</SelectItem>
             {suppliers.map(([key, name]) => (
-              <SelectItem key={key} value={key}>{name}</SelectItem>
+              <SelectItem key={key} value={key}>
+                {name}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -260,7 +278,10 @@ export default function FactoryStockOTW() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => { setSearch(""); setSupplierFilter("all"); }}
+            onClick={() => {
+              setSearch("");
+              setSupplierFilter("all");
+            }}
             data-testid="button-clear-filters"
           >
             <X className="h-4 w-4" />
@@ -285,9 +306,7 @@ export default function FactoryStockOTW() {
         <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-2">
           <Ship className="h-12 w-12 opacity-30" />
           <p className="text-sm">
-            {otwContainers.length === 0
-              ? "No containers currently in transit."
-              : "No containers match your search."}
+            {otwContainers.length === 0 ? "No containers currently in transit." : "No containers match your search."}
           </p>
         </div>
       ) : (
@@ -308,21 +327,15 @@ export default function FactoryStockOTW() {
             </TableHeader>
             <TableBody>
               {filtered.map((c, idx) => {
-                const cost    = containerCost(c);
-                const frSym   = ccySym(c.freightCurrencyCode || c.currencyCode);
+                const cost = containerCost(c);
+                const frSym = ccySym(c.freightCurrencyCode || c.currencyCode);
                 const commSym = ccySym(c.commissionCurrencyCode || "USD");
                 const docDone = !!docs[String(c.id)];
 
                 return (
-                  <TableRow
-                    key={c.id}
-                    className="hover-elevate"
-                    data-testid={`row-container-${c.id}`}
-                  >
+                  <TableRow key={c.id} className="hover-elevate" data-testid={`row-container-${c.id}`}>
                     {/* # */}
-                    <TableCell className="text-center text-muted-foreground text-sm">
-                      {idx + 1}
-                    </TableCell>
+                    <TableCell className="text-center text-muted-foreground text-sm">{idx + 1}</TableCell>
 
                     {/* Container # — clickable */}
                     <TableCell
@@ -340,30 +353,47 @@ export default function FactoryStockOTW() {
 
                     {/* ETA */}
                     <TableCell className="text-sm whitespace-nowrap font-medium" data-testid={`text-eta-${c.id}`}>
-                      {c.arrivalDate
-                        ? <span>{fmtDate(c.arrivalDate)}</span>
-                        : <span className="text-muted-foreground">—</span>}
+                      {c.arrivalDate ? (
+                        <span>{fmtDate(c.arrivalDate)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
 
                     {/* Cost */}
-                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap" data-testid={`text-cost-${c.id}`}>
-                      {cost.amount > 0
-                        ? <span className="font-medium">{fmtAmt(cost.symbol, cost.amount)}</span>
-                        : <span className="text-muted-foreground">—</span>}
+                    <TableCell
+                      className="text-right text-sm tabular-nums whitespace-nowrap"
+                      data-testid={`text-cost-${c.id}`}
+                    >
+                      {cost.amount > 0 ? (
+                        <span className="font-medium">{fmtAmt(cost.symbol, cost.amount)}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
 
                     {/* Freight */}
-                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap" data-testid={`text-freight-${c.id}`}>
-                      {num(c.freight) > 0
-                        ? fmtAmt(frSym, num(c.freight))
-                        : <span className="text-muted-foreground">—</span>}
+                    <TableCell
+                      className="text-right text-sm tabular-nums whitespace-nowrap"
+                      data-testid={`text-freight-${c.id}`}
+                    >
+                      {num(c.freight) > 0 ? (
+                        fmtAmt(frSym, num(c.freight))
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
 
                     {/* Commission */}
-                    <TableCell className="text-right text-sm tabular-nums whitespace-nowrap" data-testid={`text-commission-${c.id}`}>
-                      {num(c.commissionAmount) > 0
-                        ? fmtAmt(commSym, num(c.commissionAmount))
-                        : <span className="text-muted-foreground">—</span>}
+                    <TableCell
+                      className="text-right text-sm tabular-nums whitespace-nowrap"
+                      data-testid={`text-commission-${c.id}`}
+                    >
+                      {num(c.commissionAmount) > 0 ? (
+                        fmtAmt(commSym, num(c.commissionAmount))
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
 
                     {/* Docs checkbox */}
@@ -390,10 +420,7 @@ export default function FactoryStockOTW() {
 
       {/* Sticky totals bar */}
       {filtered.length > 0 && (
-        <div
-          className="sticky bottom-0 z-50 rounded-md border bg-background shadow-md"
-          data-testid="div-totals-bar"
-        >
+        <div className="sticky bottom-0 z-50 rounded-md border bg-background shadow-md" data-testid="div-totals-bar">
           <div className="flex flex-wrap items-center gap-6 px-4 py-3">
             <div className="flex items-center gap-2">
               <Package className="h-4 w-4 text-muted-foreground shrink-0" />

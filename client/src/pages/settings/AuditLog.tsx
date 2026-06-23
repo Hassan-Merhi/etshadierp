@@ -31,7 +31,17 @@ export function AuditLog() {
   const [selectedLog, setSelectedLog] = useState<any>(null);
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ["/api/audit-log", { action: filterAction, module: filterModule, search: filterSearch, from: filterDateFrom, to: filterDateTo, page }],
+    queryKey: [
+      "/api/audit-log",
+      {
+        action: filterAction,
+        module: filterModule,
+        search: filterSearch,
+        from: filterDateFrom,
+        to: filterDateTo,
+        page,
+      },
+    ],
     queryFn: async () => {
       const params = new URLSearchParams({
         action: filterAction,
@@ -60,7 +70,7 @@ export function AuditLog() {
           <Input
             placeholder="Search by ID or details..."
             value={filterSearch}
-            onChange={e => setFilterSearch(e.target.value)}
+            onChange={(e) => setFilterSearch(e.target.value)}
             className="pl-9 h-8 text-sm"
           />
         </div>
@@ -75,34 +85,44 @@ export function AuditLog() {
             <SelectItem value="delete">Delete only</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={filterModule || "all"} onValueChange={v => setFilterModule(v === "all" ? "" : v)}>
+        <Select value={filterModule || "all"} onValueChange={(v) => setFilterModule(v === "all" ? "" : v)}>
           <SelectTrigger className="h-8 w-36 text-sm">
             <SelectValue placeholder="Module" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All modules</SelectItem>
             {knownModules.map((m: string) => (
-              <SelectItem key={m} value={m}>{tableShortName(m)}</SelectItem>
+              <SelectItem key={m} value={m}>
+                {tableShortName(m)}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
         <Input
           type="date"
           value={filterDateFrom}
-          onChange={e => setFilterDateFrom(e.target.value)}
+          onChange={(e) => setFilterDateFrom(e.target.value)}
           className="h-8 w-36 text-sm"
         />
         <Input
           type="date"
           value={filterDateTo}
-          onChange={e => setFilterDateTo(e.target.value)}
+          onChange={(e) => setFilterDateTo(e.target.value)}
           className="h-8 w-36 text-sm"
         />
         {(filterAction !== "update,delete" || filterModule || filterSearch || filterDateFrom || filterDateTo) && (
-          <Button variant="ghost" size="sm" className="h-8 text-muted-foreground" onClick={() => {
-            setFilterAction("update,delete"); setFilterModule(""); setFilterSearch("");
-            setFilterDateFrom(""); setFilterDateTo("");
-          }}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-muted-foreground"
+            onClick={() => {
+              setFilterAction("update,delete");
+              setFilterModule("");
+              setFilterSearch("");
+              setFilterDateFrom("");
+              setFilterDateTo("");
+            }}
+          >
             <X className="h-3 w-3 mr-1" /> Reset
           </Button>
         )}
@@ -113,7 +133,9 @@ export function AuditLog() {
 
       {isLoading ? (
         <div className="space-y-2">
-          {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
         </div>
       ) : error ? (
         <div className="p-4 text-destructive bg-destructive/10 rounded-md">Error loading audit logs.</div>
@@ -141,9 +163,16 @@ export function AuditLog() {
                   onClick={() => setSelectedLog(log)}
                 >
                   <TableCell className="text-xs font-mono text-muted-foreground">{fmtDate(log.createdAt)}</TableCell>
-                  <TableCell className="text-sm font-medium">{log.username || `User #${log.userId?.slice(0, 8)}` || "Unknown"}</TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {log.username || `User #${log.userId?.slice(0, 8)}` || "Unknown"}
+                  </TableCell>
                   <TableCell>
-                    <Badge variant={log.action === "delete" ? "destructive" : log.action === "create" ? "default" : "secondary"} className="capitalize text-[10px] h-5">
+                    <Badge
+                      variant={
+                        log.action === "delete" ? "destructive" : log.action === "create" ? "default" : "secondary"
+                      }
+                      className="capitalize text-[10px] h-5"
+                    >
                       {log.action}
                     </Badge>
                   </TableCell>
@@ -163,19 +192,24 @@ export function AuditLog() {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">
-          <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
+          <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>
             <ChevronLeft className="h-4 w-4 mr-1" /> Previous
           </Button>
-          <span className="text-sm font-medium px-4">Page {page} of {totalPages}</span>
-          <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
+          <span className="text-sm font-medium px-4">
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
             Next <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         </div>
       )}
 
-      {selectedLog && (
-        <AuditLogDialog log={selectedLog} onClose={() => setSelectedLog(null)} />
-      )}
+      {selectedLog && <AuditLogDialog log={selectedLog} onClose={() => setSelectedLog(null)} />}
     </div>
   );
 }

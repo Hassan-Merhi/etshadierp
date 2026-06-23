@@ -5,12 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Trash2, Package, Users, ChevronDown, ChevronUp, Ship, TrendingUp,
-  TrendingDown, Boxes, CalendarCheck,
+  Trash2,
+  Package,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  Ship,
+  TrendingUp,
+  TrendingDown,
+  Boxes,
+  CalendarCheck,
 } from "lucide-react";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { PageHeader } from "@/components/PageHeader";
 import { SectionCard } from "@/components/SectionCard";
 import { FactoryKpiCard } from "@/components/FactoryKpiCard";
@@ -30,7 +36,16 @@ interface KpiData {
   kgsUsedToday: string;
   totalBaleWeightToday: string;
   categories: Array<{ name: string; count: number; totalKg: number }>;
-  balesDetail: Array<{ id: number; baleCode: string; productName: string; category: string; weightKg: string; pressedAt: string; status: string; quantity: number }>;
+  balesDetail: Array<{
+    id: number;
+    baleCode: string;
+    productName: string;
+    category: string;
+    weightKg: string;
+    pressedAt: string;
+    status: string;
+    quantity: number;
+  }>;
 }
 
 interface Container {
@@ -46,12 +61,12 @@ interface Container {
 
 const STATUS_ORDER = ["PENDING", "IN_TRANSIT", "ARRIVED", "OFFLOADED", "PARTIALLY_RECEIVED", "RECEIVED"];
 const STATUS_LABEL: Record<string, string> = {
-  PENDING:            "Pending",
-  IN_TRANSIT:         "Pending",
-  ARRIVED:            "Pending",
-  OFFLOADED:          "Offloaded",
+  PENDING: "Pending",
+  IN_TRANSIT: "Pending",
+  ARRIVED: "Pending",
+  OFFLOADED: "Offloaded",
   PARTIALLY_RECEIVED: "Pending",
-  RECEIVED:           "Pending",
+  RECEIVED: "Pending",
 };
 const STATUS_ACTIVE = new Set(["PENDING", "IN_TRANSIT", "ARRIVED", "RECEIVED", "PARTIALLY_RECEIVED"]);
 
@@ -63,7 +78,9 @@ const WASTE_TYPE_LABEL: Record<string, string> = {
 
 function fmt(n: number | string, decimals = 0) {
   const v = typeof n === "string" ? parseFloat(n) : n;
-  return isNaN(v) ? "0" : v.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return isNaN(v)
+    ? "0"
+    : v.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
 
 function CollapsiblePane({ open, children }: { open: boolean; children: React.ReactNode }) {
@@ -75,7 +92,7 @@ function CollapsiblePane({ open, children }: { open: boolean; children: React.Re
 }
 
 export default function FactoryDashboard() {
-  const today = new Date().toLocaleDateString('en-CA');
+  const today = new Date().toLocaleDateString("en-CA");
   const [date, setDate] = useState(today);
   const [showBalesPane, setShowBalesPane] = useState(false);
 
@@ -97,25 +114,22 @@ export default function FactoryDashboard() {
   });
 
   const containersOtw = (containers || [])
-    .filter(c => STATUS_ACTIVE.has(c.status))
+    .filter((c) => STATUS_ACTIVE.has(c.status))
     .sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
 
   const wasteHint = (data?.waste?.breakdown ?? [])
-    .map(b => `${WASTE_TYPE_LABEL[b.wasteType] ?? b.wasteType}: ${fmt(b.kg, 1)} kg`)
+    .map((b) => `${WASTE_TYPE_LABEL[b.wasteType] ?? b.wasteType}: ${fmt(b.kg, 1)} kg`)
     .join(" · ");
 
   return (
     <div>
-      <PageHeader
-        title="Factory Dashboard"
-        subtitle="Production overview and operations"
-      >
+      <PageHeader title="Factory Dashboard" subtitle="Production overview and operations">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Date</Label>
           <Input
             type="date"
             value={date}
-            onChange={e => setDate(e.target.value)}
+            onChange={(e) => setDate(e.target.value)}
             className="w-44"
             data-testid="input-date"
           />
@@ -186,15 +200,12 @@ export default function FactoryDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {containersOtw.map(c => (
+                    {containersOtw.map((c) => (
                       <TableRow key={c.id} data-testid={`row-container-otw-${c.id}`}>
                         <TableCell className="font-mono text-sm font-medium">{c.containerNumber}</TableCell>
                         <TableCell className="text-sm">{c.supplierName || "—"}</TableCell>
                         <TableCell>
-                          <StatusBadge
-                            status={c.status.toLowerCase()}
-                            label={STATUS_LABEL[c.status] || c.status}
-                          />
+                          <StatusBadge status={c.status.toLowerCase()} label={STATUS_LABEL[c.status] || c.status} />
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{c.origin || "—"}</TableCell>
                         <TableCell className="text-right font-mono text-sm">{fmt(c.totalKg, 0)}</TableCell>
@@ -216,7 +227,7 @@ export default function FactoryDashboard() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowBalesPane(v => !v)}
+                onClick={() => setShowBalesPane((v) => !v)}
                 data-testid="button-toggle-bales-pane"
                 aria-label={showBalesPane ? "Hide bale details" : "Show bale details"}
               >
@@ -229,7 +240,7 @@ export default function FactoryDashboard() {
               {kpis?.balesPressedToday ?? 0}
             </div>
             <CollapsiblePane open={showBalesPane}>
-              {(!kpis?.balesDetail || kpis.balesDetail.length === 0) ? (
+              {!kpis?.balesDetail || kpis.balesDetail.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No bales pressed today</p>
               ) : (
                 <div className="max-h-64 overflow-y-auto">

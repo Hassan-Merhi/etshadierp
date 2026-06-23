@@ -6,43 +6,109 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
   factorySupplierCategories,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
@@ -51,8 +117,6 @@ import CryptoJS from "crypto-js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-
-
 
 export function registerRawStockContainerRoutes(app: Express) {
   app.patch("/api/factory/containers/:id/confirm-duty", requireAuth, async (req: any, res: any) => {
@@ -104,13 +168,23 @@ export function registerRawStockContainerRoutes(app: Express) {
       const additionalChargesRows = await db
         .select()
         .from(factoryOffloadAdditionalCharges)
-        .where(and(eq(factoryOffloadAdditionalCharges.containerId, containerId), eq(factoryOffloadAdditionalCharges.companyId, companyId)));
-      const additionalChargesTotal = additionalChargesRows.reduce((sum: number, c: any) => sum + parseFloat(c.amount || "0"), 0);
+        .where(
+          and(
+            eq(factoryOffloadAdditionalCharges.containerId, containerId),
+            eq(factoryOffloadAdditionalCharges.companyId, companyId)
+          )
+        );
+      const additionalChargesTotal = additionalChargesRows.reduce(
+        (sum: number, c: any) => sum + parseFloat(c.amount || "0"),
+        0
+      );
 
-      const totalCost = basePayable + freightVal + otherChargesVal + additionalChargesTotal + commissionVal + newDutyAmount;
+      const totalCost =
+        basePayable + freightVal + otherChargesVal + additionalChargesTotal + commissionVal + newDutyAmount;
       const newInclusiveCostPerKg = actualKg > 0 ? totalCost / actualKg : 0;
       const fxRate = parseFloat(container.fxRateToUsd || "1");
-      const costPerKgUsd = (container.currencyCode || "USD") === "USD" ? newInclusiveCostPerKg : newInclusiveCostPerKg * fxRate;
+      const costPerKgUsd =
+        (container.currencyCode || "USD") === "USD" ? newInclusiveCostPerKg : newInclusiveCostPerKg * fxRate;
       const finalPayableAmountUsd = String(actualKg * costPerKgUsd);
 
       await db
@@ -245,11 +319,21 @@ export function registerRawStockContainerRoutes(app: Express) {
             .from(ledgerAccounts)
             .where(eq(ledgerAccounts.id, lid));
           const voucherCompanyId = acctRow?.companyId ?? companyId;
-          const cpAcctId = await getOrCreateLedgerAccount(voucherCompanyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
-          console.log(`[POC diag] chargeDesc="${charge.description}" ledgerAccountId=${lid} acctCompanyId=${acctRow?.companyId ?? "NOT FOUND"} voucherCompanyId=${voucherCompanyId} chargesPayableAcctId=${cpAcctId} container=${container.containerNumber}`);
+          const cpAcctId = await getOrCreateLedgerAccount(
+            voucherCompanyId,
+            "FACTORY_CHARGES_PAYABLE",
+            "Factory Charges Payable"
+          );
+          console.log(
+            `[POC diag] chargeDesc="${charge.description}" ledgerAccountId=${lid} acctCompanyId=${acctRow?.companyId ?? "NOT FOUND"} voucherCompanyId=${voucherCompanyId} chargesPayableAcctId=${cpAcctId} container=${container.containerNumber}`
+          );
           chargeCtxs.push({ voucherCompanyId, chargesPayableAcctId: cpAcctId });
         } else if (charge.supplierId) {
-          const cpAcctId = await getOrCreateLedgerAccount(companyId, "FACTORY_CHARGES_PAYABLE", "Factory Charges Payable");
+          const cpAcctId = await getOrCreateLedgerAccount(
+            companyId,
+            "FACTORY_CHARGES_PAYABLE",
+            "Factory Charges Payable"
+          );
           chargeCtxs.push({ voucherCompanyId: companyId, chargesPayableAcctId: cpAcctId });
         } else {
           chargeCtxs.push({ voucherCompanyId: companyId, chargesPayableAcctId: 0 });
@@ -260,10 +344,21 @@ export function registerRawStockContainerRoutes(app: Express) {
       const existingCharges = await db
         .select()
         .from(factoryOffloadAdditionalCharges)
-        .where(and(eq(factoryOffloadAdditionalCharges.containerId, containerId), eq(factoryOffloadAdditionalCharges.companyId, companyId)));
+        .where(
+          and(
+            eq(factoryOffloadAdditionalCharges.containerId, containerId),
+            eq(factoryOffloadAdditionalCharges.companyId, companyId)
+          )
+        );
 
       let newRawStock: any;
-      let affectedBatches: { batchId: number; batchCode: string; oldCostPerKg: number; newCostPerKg: number; weightKg: number }[] = [];
+      let affectedBatches: {
+        batchId: number;
+        batchCode: string;
+        oldCostPerKg: number;
+        newCostPerKg: number;
+        weightKg: number;
+      }[] = [];
 
       await db.transaction(async (tx) => {
         // 1. Insert new additional charge rows
@@ -295,7 +390,8 @@ export function registerRawStockContainerRoutes(app: Express) {
         const freightCcy = (container as any).freightCurrencyCode || containerCcy;
         const freightFxVal = parseFloat((container as any).fxRateToUsdOffload || String(fxRate));
         const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFxVal;
-        const freightInContainerCcy = freightCcy === containerCcy ? freightVal : (fxRate > 0 ? freightUsd / fxRate : freightVal);
+        const freightInContainerCcy =
+          freightCcy === containerCcy ? freightVal : fxRate > 0 ? freightUsd / fxRate : freightVal;
         const ocVal = parseFloat(container.otherCharges || "0");
         const commissionVal = parseFloat(container.commissionAmount || "0");
         const dutyVal = container.dutyStatus === "CONFIRMED" ? parseFloat(container.dutyAmount || "0") : 0;
@@ -306,7 +402,7 @@ export function registerRawStockContainerRoutes(app: Express) {
           const cfx = parseFloat(c.fxRateToUsd || String(fxRate));
           if (ccy === containerCcy) return sum + amt;
           const amtUsd = ccy === "USD" ? amt : amt * cfx;
-          return sum + (containerCcy === "USD" ? amtUsd : (fxRate > 0 ? amtUsd / fxRate : amtUsd));
+          return sum + (containerCcy === "USD" ? amtUsd : fxRate > 0 ? amtUsd / fxRate : amtUsd);
         }, 0);
 
         const totalCost = basePayable + freightInContainerCcy + ocVal + commissionVal + dutyVal + additionalTotal;
@@ -338,7 +434,11 @@ export function registerRawStockContainerRoutes(app: Express) {
         }
         // Expose first row in response (for UI feedback)
         if (rawStockRows.length > 0) {
-          newRawStock = { ...rawStockRows[0], costPerKg: String(newInclusiveCostPerKg), costPerKgUsd: String(newCostPerKgUsd) };
+          newRawStock = {
+            ...rawStockRows[0],
+            costPerKg: String(newInclusiveCostPerKg),
+            costPerKgUsd: String(newCostPerKgUsd),
+          };
         }
 
         // 5. Cascade to mix batch sources → recalculate affected batch weighted averages → cascade to bales
@@ -360,29 +460,47 @@ export function registerRawStockContainerRoutes(app: Express) {
           for (const batchId of affectedBatchIds) {
             const [batch] = await tx.select().from(factoryMixBatches).where(eq(factoryMixBatches.id, batchId));
             const oldCostPerKg = batch ? parseFloat(batch.costPerKg || "0") : 0;
-            const allSources = await tx.select().from(factoryMixBatchSources).where(eq(factoryMixBatchSources.mixBatchId, batchId));
+            const allSources = await tx
+              .select()
+              .from(factoryMixBatchSources)
+              .where(eq(factoryMixBatchSources.mixBatchId, batchId));
             const batchTotalCost = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.totalCost || "0"), 0);
             const batchTotalWeight = allSources.reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
             const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
             await tx
               .update(factoryMixBatches)
-              .set({ costPerKg: String(batchCostPerKg.toFixed(4)), totalCost: String(batchTotalCost.toFixed(2)), updatedAt: new Date() })
+              .set({
+                costPerKg: String(batchCostPerKg.toFixed(4)),
+                totalCost: String(batchTotalCost.toFixed(2)),
+                updatedAt: new Date(),
+              })
               .where(eq(factoryMixBatches.id, batchId));
-            const srcWeight = mixSources.filter((s: any) => s.mixBatchId === batchId).reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
-            affectedBatches.push({ batchId, batchCode: batch?.batchCode || `#${batchId}`, oldCostPerKg, newCostPerKg: batchCostPerKg, weightKg: srcWeight });
+            const srcWeight = mixSources
+              .filter((s: any) => s.mixBatchId === batchId)
+              .reduce((sum: number, s: any) => sum + parseFloat(s.weightKg || "0"), 0);
+            affectedBatches.push({
+              batchId,
+              batchCode: batch?.batchCode || `#${batchId}`,
+              oldCostPerKg,
+              newCostPerKg: batchCostPerKg,
+              weightKg: srcWeight,
+            });
 
             // 5b. Cascade blended cost down to all bales already pressed from this batch
             const balesInBatch = await tx
               .select({ id: factoryBales.id, weightKg: factoryBales.weightKg })
               .from(factoryBales)
-              .where(and(
-                eq(factoryBales.mixBatchId, batchId),
-                eq(factoryBales.companyId, companyId),
-                sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
-              ));
+              .where(
+                and(
+                  eq(factoryBales.mixBatchId, batchId),
+                  eq(factoryBales.companyId, companyId),
+                  sql`${factoryBales.status} NOT IN ('DELETED','REMOVED')`
+                )
+              );
             for (const bale of balesInBatch) {
               const baleWt = parseFloat(bale.weightKg as string) || 0;
-              await tx.update(factoryBales)
+              await tx
+                .update(factoryBales)
                 .set({
                   costPerKg: String(batchCostPerKg.toFixed(4)),
                   totalCost: String((baleWt * batchCostPerKg).toFixed(2)),
@@ -417,18 +535,23 @@ export function registerRawStockContainerRoutes(app: Express) {
             // account's own companyId so the voucher appears in the correct ledger view.
             const { voucherCompanyId, chargesPayableAcctId: voucherChargesPayableAcctId } = chargeCtxs[ci];
             const voucherNum = `FACTORY-POC-${containerId}-${charge.id}-${Date.now()}`;
-            console.log(`[POC diag] inserting voucher chargeId=${charge.id} voucherCompanyId=${voucherCompanyId} chargesPayableAcctId=${voucherChargesPayableAcctId} container=${container.containerNumber}`);
-            const [voucher] = await tx.insert(vouchers).values({
-              companyId: voucherCompanyId,
-              voucherType: "Journal",
-              voucherNumber: voucherNum,
-              voucherDate: txDate,
-              description: `${charge.description} (post-offload) — container ${container.containerNumber}`,
-              totalAmount: String(chargeAmt),
-              currency: chargeCcy,
-              exchangeRate: String(chargeFx),
-              sourceModule: "FACTORY",
-            }).returning();
+            console.log(
+              `[POC diag] inserting voucher chargeId=${charge.id} voucherCompanyId=${voucherCompanyId} chargesPayableAcctId=${voucherChargesPayableAcctId} container=${container.containerNumber}`
+            );
+            const [voucher] = await tx
+              .insert(vouchers)
+              .values({
+                companyId: voucherCompanyId,
+                voucherType: "Journal",
+                voucherNumber: voucherNum,
+                voucherDate: txDate,
+                description: `${charge.description} (post-offload) — container ${container.containerNumber}`,
+                totalAmount: String(chargeAmt),
+                currency: chargeCcy,
+                exchangeRate: String(chargeFx),
+                sourceModule: "FACTORY",
+              })
+              .returning();
             console.log(`[POC diag] voucherId=${voucher.id} inserted`);
             await tx.insert(voucherEntries).values({
               voucherId: voucher.id,
@@ -501,7 +624,12 @@ export function registerRawStockContainerRoutes(app: Express) {
       const results = await db
         .select()
         .from(factoryContainerCommissions)
-        .where(and(eq(factoryContainerCommissions.companyId, companyId), eq(factoryContainerCommissions.containerId, containerId)));
+        .where(
+          and(
+            eq(factoryContainerCommissions.companyId, companyId),
+            eq(factoryContainerCommissions.containerId, containerId)
+          )
+        );
 
       res.json(results);
     } catch (error: any) {
@@ -509,5 +637,4 @@ export function registerRawStockContainerRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 }

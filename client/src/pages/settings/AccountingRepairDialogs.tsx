@@ -3,7 +3,16 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatNumber } from "@/lib/formatNumber";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -53,7 +62,9 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
     },
   });
 
-  const nonZeroAccounts = accounts.filter((a: any) => !a.deletedAt && a.active && parseFloat(a.openingBalance || "0") !== 0);
+  const nonZeroAccounts = accounts.filter(
+    (a: any) => !a.deletedAt && a.active && parseFloat(a.openingBalance || "0") !== 0
+  );
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -66,9 +77,10 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
           <AlertDialogDescription asChild>
             <div className="space-y-4 text-foreground">
               <p className="text-muted-foreground">
-                Select accounts to zero their opening balances. This gives you a fresh start for a new period while keeping all historical vouchers intact.
+                Select accounts to zero their opening balances. This gives you a fresh start for a new period while
+                keeping all historical vouchers intact.
               </p>
-              
+
               <div className="flex items-center justify-between border-b pb-2">
                 <div className="flex items-center gap-4">
                   <Checkbox
@@ -96,7 +108,9 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
                   <TableBody>
                     {accounts
                       .filter((account: any) => !account.deletedAt && account.active)
-                      .sort((a: any, b: any) => a.accountType.localeCompare(b.accountType) || a.name.localeCompare(b.name))
+                      .sort(
+                        (a: any, b: any) => a.accountType.localeCompare(b.accountType) || a.name.localeCompare(b.name)
+                      )
                       .map((account: any) => {
                         const balance = parseFloat(account.openingBalance || "0");
                         const hasBalance = balance !== 0;
@@ -108,12 +122,14 @@ export function ZeroBalancesDialog({ open, onOpenChange, companyId }: ZeroBalanc
                                 disabled={!hasBalance}
                                 onCheckedChange={(checked) => {
                                   if (checked) setSelected([...selected, account.id]);
-                                  else setSelected(selected.filter(id => id !== account.id));
+                                  else setSelected(selected.filter((id) => id !== account.id));
                                 }}
                               />
                             </TableCell>
                             <TableCell className="font-medium">{account.name}</TableCell>
-                            <TableCell><Badge variant="outline">{account.accountType}</Badge></TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{account.accountType}</Badge>
+                            </TableCell>
                             <TableCell className="text-right">{formatNumber(balance)}</TableCell>
                           </TableRow>
                         );
@@ -169,14 +185,23 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
   });
 
   return (
-    <AlertDialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setResult(null); }}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(v) => {
+        onOpenChange(v);
+        if (!v) setResult(null);
+      }}
+    >
       <AlertDialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle>Initialize Accounting Balances</AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="text-foreground">
               {!result ? (
-                <p className="text-muted-foreground">This will create Owner's Capital accounts for each company to balance the Import Cycle. This action cannot be easily undone.</p>
+                <p className="text-muted-foreground">
+                  This will create Owner's Capital accounts for each company to balance the Import Cycle. This action
+                  cannot be easily undone.
+                </p>
               ) : (
                 <div className="space-y-4 mt-4">
                   <div className="font-medium">{result.message}</div>
@@ -185,7 +210,7 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
                       <div className="font-medium">{r.companyName}</div>
                       <div className="text-sm">Imbalance: ${formatNumber(r.imbalance || 0)}</div>
                       <div className="text-sm">{r.message}</div>
-                      
+
                       {r.components && (
                         <div className="text-sm mt-3 border-t pt-2">
                           <Button
@@ -196,12 +221,18 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
                             onClick={() => setExpandedId(expandedId === r.companyId ? null : r.companyId)}
                           >
                             <span>View Calculation Breakdown</span>
-                            {expandedId === r.companyId ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            {expandedId === r.companyId ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
                           </Button>
                           {expandedId === r.companyId && (
                             <div className="mt-2 grid grid-cols-2 gap-4 p-2 bg-muted/50 rounded">
                               <div>
-                                <div className="font-medium text-green-600 dark:text-green-400 mb-1">Assets (Debit)</div>
+                                <div className="font-medium text-green-600 dark:text-green-400 mb-1">
+                                  Assets (Debit)
+                                </div>
                                 {r.components.assets?.map((c: any, i: number) => (
                                   <div key={i} className="flex justify-between text-xs">
                                     <span>{c.name}</span>
@@ -210,7 +241,9 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
                                 ))}
                               </div>
                               <div>
-                                <div className="font-medium text-red-600 dark:text-red-400 mb-1">Liabilities (Credit)</div>
+                                <div className="font-medium text-red-600 dark:text-red-400 mb-1">
+                                  Liabilities (Credit)
+                                </div>
                                 {r.components.liabilities?.map((c: any, i: number) => (
                                   <div key={i} className="flex justify-between text-xs">
                                     <span>{c.name}</span>
@@ -232,10 +265,7 @@ export function InitializeBalancesDialog({ open, onOpenChange }: InitializeBalan
         <AlertDialogFooter>
           <AlertDialogCancel>Close</AlertDialogCancel>
           {!result && (
-            <AlertDialogAction
-              onClick={() => mutation.mutate()}
-              disabled={mutation.isPending}
-            >
+            <AlertDialogAction onClick={() => mutation.mutate()} disabled={mutation.isPending}>
               {mutation.isPending ? "Processing..." : "Initialize All Companies"}
             </AlertDialogAction>
           )}

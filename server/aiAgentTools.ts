@@ -120,12 +120,12 @@ export const TOOL_REGISTRY: ToolDef[] = [
     type: "draft",
     requiresApproval: true,
     paramSchema: {
-      voucherType:     "Receipt | Payment | Journal",
-      date:            "YYYY-MM-DD",
-      description:     "Voucher memo",
-      debitAccountId:  "Debit ledger account ID",
+      voucherType: "Receipt | Payment | Journal",
+      date: "YYYY-MM-DD",
+      description: "Voucher memo",
+      debitAccountId: "Debit ledger account ID",
       creditAccountId: "Credit ledger account ID",
-      amount:          "Decimal amount",
+      amount: "Decimal amount",
     },
   },
   {
@@ -135,9 +135,9 @@ export const TOOL_REGISTRY: ToolDef[] = [
     type: "draft",
     requiresApproval: true,
     paramSchema: {
-      supplierId:  "Supplier ID",
+      supplierId: "Supplier ID",
       description: "PO description or reference",
-      items:       "JSON array of {stockItemId, quantity, rate}",
+      items: "JSON array of {stockItemId, quantity, rate}",
     },
   },
   {
@@ -158,9 +158,9 @@ export const TOOL_REGISTRY: ToolDef[] = [
     requiresApproval: true,
     paramSchema: {
       stockItemId: "Stock item ID",
-      locationId:  "Warehouse/location ID",
-      quantity:    "Quantity delta (positive = add, negative = remove)",
-      reason:      "Reason for adjustment",
+      locationId: "Warehouse/location ID",
+      quantity: "Quantity delta (positive = add, negative = remove)",
+      reason: "Reason for adjustment",
     },
   },
   {
@@ -175,7 +175,7 @@ export const TOOL_REGISTRY: ToolDef[] = [
   },
 ];
 
-export const TOOL_REGISTRY_MAP = new Map(TOOL_REGISTRY.map(t => [t.name, t]));
+export const TOOL_REGISTRY_MAP = new Map(TOOL_REGISTRY.map((t) => [t.name, t]));
 
 // ── Executor ──────────────────────────────────────────────────────────────────
 
@@ -183,7 +183,7 @@ export async function runTool(
   companyId: number,
   _userId: string,
   toolName: string,
-  params: Record<string, any>,
+  params: Record<string, any>
 ): Promise<ToolResult> {
   try {
     switch (toolName) {
@@ -216,7 +216,7 @@ export async function runTool(
       case "validateItemCodes": {
         const rawCodes = String(params.codes || "")
           .split(/[,\n;]/)
-          .map(c => c.trim())
+          .map((c) => c.trim())
           .filter(Boolean);
 
         if (rawCodes.length === 0) {
@@ -225,27 +225,29 @@ export async function runTool(
 
         const found = await db
           .select({
-            id:   schema.stockItems.id,
+            id: schema.stockItems.id,
             code: schema.stockItems.code,
             name: schema.stockItems.name,
           })
           .from(schema.stockItems)
-          .where(and(
-            eq(schema.stockItems.companyId, companyId),
-            eq(schema.stockItems.active, true),
-            isNull(schema.stockItems.deletedAt),
-            inArray(schema.stockItems.code, rawCodes),
-          ));
+          .where(
+            and(
+              eq(schema.stockItems.companyId, companyId),
+              eq(schema.stockItems.active, true),
+              isNull(schema.stockItems.deletedAt),
+              inArray(schema.stockItems.code, rawCodes)
+            )
+          );
 
-        const foundCodes = new Set(found.map(f => f.code));
+        const foundCodes = new Set(found.map((f) => f.code));
         return {
           ok: true,
           data: {
-            valid:        found.map(f => ({ code: f.code, name: f.name, id: f.id })),
-            invalid:      rawCodes.filter(c => !foundCodes.has(c)),
+            valid: found.map((f) => ({ code: f.code, name: f.name, id: f.id })),
+            invalid: rawCodes.filter((c) => !foundCodes.has(c)),
             totalChecked: rawCodes.length,
-            validCount:   found.length,
-            invalidCount: rawCodes.filter(c => !foundCodes.has(c)).length,
+            validCount: found.length,
+            invalidCount: rawCodes.filter((c) => !foundCodes.has(c)).length,
           },
         };
       }
@@ -259,12 +261,12 @@ export async function runTool(
         return {
           ok: true,
           data: {
-            today:          summary.today,
-            thisMonth:      summary.thisMonth,
-            openPOs:        summary.openPurchaseOrders,
-            topItems:       summary.topItemsThisMonth,
+            today: summary.today,
+            thisMonth: summary.thisMonth,
+            openPOs: summary.openPurchaseOrders,
+            topItems: summary.topItemsThisMonth,
             lowStock,
-            pricingIssues:  pricing.filter(i => i.status === "LOSING"),
+            pricingIssues: pricing.filter((i) => i.status === "LOSING"),
           },
         };
       }
@@ -275,18 +277,15 @@ export async function runTool(
 
         const [job] = await db
           .select({
-            id:         schema.aiImportJobs.id,
-            status:     schema.aiImportJobs.status,
+            id: schema.aiImportJobs.id,
+            status: schema.aiImportJobs.status,
             importType: schema.aiImportJobs.importType,
-            totalRows:  schema.aiImportJobs.totalRows,
-            validRows:  schema.aiImportJobs.validRows,
-            errorRows:  schema.aiImportJobs.errorRows,
+            totalRows: schema.aiImportJobs.totalRows,
+            validRows: schema.aiImportJobs.validRows,
+            errorRows: schema.aiImportJobs.errorRows,
           })
           .from(schema.aiImportJobs)
-          .where(and(
-            eq(schema.aiImportJobs.id, jobId),
-            eq(schema.aiImportJobs.companyId, companyId),
-          ));
+          .where(and(eq(schema.aiImportJobs.id, jobId), eq(schema.aiImportJobs.companyId, companyId)));
 
         if (!job) return { ok: false, error: `Import job ${jobId} not found` };
         return { ok: true, data: job };
@@ -296,7 +295,8 @@ export async function runTool(
         return {
           ok: true,
           data: {
-            message: "File comparison is available via the AI Import page. Upload both Excel files there to compare datasets.",
+            message:
+              "File comparison is available via the AI Import page. Upload both Excel files there to compare datasets.",
             suggestion: "/ai-import",
           },
         };
@@ -305,45 +305,45 @@ export async function runTool(
       // ── Draft tools ───────────────────────────────────────────────────────
       case "prepareVoucherDraft": {
         const preview = {
-          voucherType:     params.voucherType || "Journal",
-          date:            params.date || new Date().toISOString().split("T")[0],
-          description:     params.description || "",
-          debitAccountId:  params.debitAccountId ?? null,
+          voucherType: params.voucherType || "Journal",
+          date: params.date || new Date().toISOString().split("T")[0],
+          description: params.description || "",
+          debitAccountId: params.debitAccountId ?? null,
           creditAccountId: params.creditAccountId ?? null,
-          amount:          parseFloat(String(params.amount || "0")).toFixed(2),
+          amount: parseFloat(String(params.amount || "0")).toFixed(2),
         };
         return {
-          ok:               true,
+          ok: true,
           requiresApproval: true,
-          actionType:       "post_voucher",
-          actionLabel:      `Post ${preview.voucherType} voucher — ${preview.description || "No description"} (${preview.amount})`,
-          previewJson:      preview,
-          payloadJson:      preview,
-          data:             { message: "Voucher draft prepared — awaiting your approval." },
+          actionType: "post_voucher",
+          actionLabel: `Post ${preview.voucherType} voucher — ${preview.description || "No description"} (${preview.amount})`,
+          previewJson: preview,
+          payloadJson: preview,
+          data: { message: "Voucher draft prepared — awaiting your approval." },
         };
       }
 
       case "preparePurchaseOrderDraft": {
-        const items: any[]  = Array.isArray(params.items) ? params.items : [];
+        const items: any[] = Array.isArray(params.items) ? params.items : [];
         const totalAmount = items.reduce(
           (s, i) => s + parseFloat(String(i.rate || "0")) * parseFloat(String(i.quantity || "0")),
-          0,
+          0
         );
         const preview = {
-          supplierId:  params.supplierId ?? null,
+          supplierId: params.supplierId ?? null,
           description: params.description || "",
           items,
           totalAmount: totalAmount.toFixed(2),
-          itemCount:   items.length,
+          itemCount: items.length,
         };
         return {
-          ok:               true,
+          ok: true,
           requiresApproval: true,
-          actionType:       "create_purchase_order",
-          actionLabel:      `Create Purchase Order — ${items.length} item(s), total ${totalAmount.toFixed(2)}`,
-          previewJson:      preview,
-          payloadJson:      preview,
-          data:             { message: "Purchase order draft prepared — awaiting your approval." },
+          actionType: "create_purchase_order",
+          actionLabel: `Create Purchase Order — ${items.length} item(s), total ${totalAmount.toFixed(2)}`,
+          previewJson: preview,
+          payloadJson: preview,
+          data: { message: "Purchase order draft prepared — awaiting your approval." },
         };
       }
 
@@ -351,13 +351,13 @@ export async function runTool(
         const updates: any[] = Array.isArray(params.updates) ? params.updates : [];
         const preview = { updates, count: updates.length };
         return {
-          ok:               true,
+          ok: true,
           requiresApproval: true,
-          actionType:       "update_prices",
-          actionLabel:      `Update selling prices for ${updates.length} item(s)`,
-          previewJson:      preview,
-          payloadJson:      preview,
-          data:             { message: `Price update draft for ${updates.length} items — awaiting your approval.` },
+          actionType: "update_prices",
+          actionLabel: `Update selling prices for ${updates.length} item(s)`,
+          previewJson: preview,
+          payloadJson: preview,
+          data: { message: `Price update draft for ${updates.length} items — awaiting your approval.` },
         };
       }
 
@@ -365,18 +365,18 @@ export async function runTool(
         const qty = parseFloat(String(params.quantity || "0"));
         const preview = {
           stockItemId: params.stockItemId ?? null,
-          locationId:  params.locationId  ?? null,
-          quantity:    qty,
-          reason:      params.reason || "",
+          locationId: params.locationId ?? null,
+          quantity: qty,
+          reason: params.reason || "",
         };
         return {
-          ok:               true,
+          ok: true,
           requiresApproval: true,
-          actionType:       "post_stock_adjustment",
-          actionLabel:      `${qty >= 0 ? "Add" : "Remove"} ${Math.abs(qty)} units${params.reason ? ` — ${params.reason}` : ""}`,
-          previewJson:      preview,
-          payloadJson:      preview,
-          data:             { message: "Stock adjustment draft prepared — awaiting your approval." },
+          actionType: "post_stock_adjustment",
+          actionLabel: `${qty >= 0 ? "Add" : "Remove"} ${Math.abs(qty)} units${params.reason ? ` — ${params.reason}` : ""}`,
+          previewJson: preview,
+          payloadJson: preview,
+          data: { message: "Stock adjustment draft prepared — awaiting your approval." },
         };
       }
 

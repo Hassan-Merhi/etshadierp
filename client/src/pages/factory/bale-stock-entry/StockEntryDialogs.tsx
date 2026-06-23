@@ -1,6 +1,13 @@
 import { Printer, CalendarDays, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -29,7 +36,7 @@ export function ConfirmStockEntryDialog({
   totalKg,
   selectedLogoId,
   isPending,
-  onConfirm
+  onConfirm,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,14 +54,17 @@ export function ConfirmStockEntryDialog({
         <DialogHeader>
           <DialogTitle>Confirm Stock Entry</DialogTitle>
           <DialogDescription>
-            {totalQty} bale(s) will be entered into stock. Labels ({getPaperFormat()} format) and sticker labels will print for each bale.
+            {totalQty} bale(s) will be entered into stock. Labels ({getPaperFormat()} format) and sticker labels will
+            print for each bale.
           </DialogDescription>
         </DialogHeader>
         <div className="text-sm space-y-3 overflow-y-auto flex-1 pr-1">
-          {entryDate !== new Date().toLocaleDateString('en-CA') && (
+          {entryDate !== new Date().toLocaleDateString("en-CA") && (
             <div className="flex items-center gap-2 rounded-md bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2 text-amber-800 dark:text-amber-200 text-xs">
               <CalendarDays className="h-3.5 w-3.5 shrink-0" />
-              <span>Backdated entry — will be recorded on <strong>{entryDate}</strong></span>
+              <span>
+                Backdated entry — will be recorded on <strong>{entryDate}</strong>
+              </span>
             </div>
           )}
           <Table>
@@ -71,11 +81,15 @@ export function ConfirmStockEntryDialog({
                 <TableRow key={item.productId}>
                   <TableCell>
                     <div className="font-medium">{item.product?.name}</div>
-                    <div className="text-xs text-muted-foreground font-mono">{item.product?.articleCode || item.product?.code}</div>
+                    <div className="text-xs text-muted-foreground font-mono">
+                      {item.product?.articleCode || item.product?.code}
+                    </div>
                   </TableCell>
                   <TableCell className="text-center font-medium">{item.qty}</TableCell>
                   <TableCell className="text-right">{formatNumber(item.weightPerBaleKg)} kg</TableCell>
-                  <TableCell className="text-right font-medium">{formatNumber(item.qty * item.weightPerBaleKg)} kg</TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatNumber(item.qty * item.weightPerBaleKg)} kg
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -86,18 +100,20 @@ export function ConfirmStockEntryDialog({
           </div>
           {selectedLogoId && (
             <div className="border-t pt-2 flex items-center gap-2 text-xs text-muted-foreground">
-              <img src={`/api/factory/customer-logos/${selectedLogoId}/image`} alt="Selected logo" className="h-6 w-10 object-contain rounded" />
+              <img
+                src={`/api/factory/customer-logos/${selectedLogoId}/image`}
+                alt="Selected logo"
+                className="h-6 w-10 object-contain rounded"
+              />
               <span>Custom logo will be used on labels</span>
             </div>
           )}
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button
-            onClick={onConfirm}
-            disabled={isPending}
-            data-testid="button-dialog-confirm-entry"
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} disabled={isPending} data-testid="button-dialog-confirm-entry">
             <Printer className="h-4 w-4 mr-2" />
             {isPending ? "Processing..." : "Enter Stock & Print"}
           </Button>
@@ -120,7 +136,7 @@ export function QuickCreateProductDialog({
   onWeightChange,
   activeCategories,
   isPending,
-  onSubmit
+  onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -200,7 +216,9 @@ export function QuickCreateProductDialog({
           </div>
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
             onClick={onSubmit}
             disabled={!name.trim() || !grade || isPending}
@@ -219,7 +237,7 @@ export function DesignPickerDialog({
   onOpenChange,
   designColors,
   onSelect,
-  onNoDesign
+  onNoDesign,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -242,22 +260,16 @@ export function DesignPickerDialog({
               className="flex flex-col items-center gap-2 p-3 rounded-md border hover-elevate cursor-pointer"
               onClick={() => onSelect(opt.value)}
             >
-              <img
-                src={opt.previewUrl}
-                className="w-full h-16 rounded-md object-cover"
-                alt={opt.label}
-              />
+              <img src={opt.previewUrl} className="w-full h-16 rounded-md object-cover" alt={opt.label} />
               <span className="text-sm font-medium">{opt.label}</span>
             </button>
           ))}
         </div>
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button
-            variant="secondary"
-            data-testid="button-design-none"
-            onClick={onNoDesign}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button variant="secondary" data-testid="button-design-none" onClick={onNoDesign}>
             No Design
           </Button>
         </DialogFooter>

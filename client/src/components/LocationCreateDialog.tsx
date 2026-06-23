@@ -1,22 +1,9 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -37,10 +24,7 @@ const formSchema = insertLocationSchema.omit({ companyId: true, active: true }).
 
 type FormValues = z.infer<typeof formSchema>;
 
-export function LocationCreateDialog({
-  open,
-  onOpenChange,
-}: LocationCreateDialogProps) {
+export function LocationCreateDialog({ open, onOpenChange }: LocationCreateDialogProps) {
   const { toast } = useToast();
   const { selectedCompany } = useCompany();
 
@@ -105,9 +89,7 @@ export function LocationCreateDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Create Location</DialogTitle>
-          <DialogDescription>
-            Add a new location to your company
-          </DialogDescription>
+          <DialogDescription>Add a new location to your company</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
@@ -119,11 +101,7 @@ export function LocationCreateDialog({
                   <FormItem>
                     <FormLabel>Code *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="LOC001"
-                        data-testid="input-code"
-                      />
+                      <Input {...field} placeholder="LOC001" data-testid="input-code" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -137,11 +115,7 @@ export function LocationCreateDialog({
                   <FormItem>
                     <FormLabel>Name *</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Location name"
-                        data-testid="input-name"
-                      />
+                      <Input {...field} placeholder="Location name" data-testid="input-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -156,11 +130,7 @@ export function LocationCreateDialog({
                 <FormItem>
                   <FormLabel>City</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="City"
-                      data-testid="input-city"
-                    />
+                    <Input {...field} placeholder="City" data-testid="input-city" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -175,11 +145,7 @@ export function LocationCreateDialog({
                   <FormItem>
                     <FormLabel>State</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="State"
-                        data-testid="input-state"
-                      />
+                      <Input {...field} placeholder="State" data-testid="input-state" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -193,11 +159,7 @@ export function LocationCreateDialog({
                   <FormItem>
                     <FormLabel>Country</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="Country"
-                        data-testid="input-country"
-                      />
+                      <Input {...field} placeholder="Country" data-testid="input-country" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -206,19 +168,10 @@ export function LocationCreateDialog({
             </div>
 
             <div className="flex gap-2 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleCancel}
-                data-testid="button-cancel"
-              >
+              <Button type="button" variant="outline" onClick={handleCancel} data-testid="button-cancel">
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending}
-                data-testid="button-submit"
-              >
+              <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit">
                 {createMutation.isPending ? "Creating..." : "Create Location"}
               </Button>
             </div>

@@ -65,10 +65,11 @@ export async function track(containerNumber: string): Promise<CarrierTrackResult
         Accept: "application/json, text/javascript, */*; q=0.01",
         "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
         "X-Requested-With": "XMLHttpRequest",
-        "Referer": "https://www.cma-cgm.com/ebusiness/tracking",
-        "Origin": "https://www.cma-cgm.com",
+        Referer: "https://www.cma-cgm.com/ebusiness/tracking",
+        Origin: "https://www.cma-cgm.com",
         "Sec-Fetch-Dest": "empty",
         "Sec-Fetch-Mode": "cors",
         "Sec-Fetch-Site": "same-origin",
@@ -110,11 +111,7 @@ function parseDate(raw: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
-function parseResponse(
-  containerNumber: string,
-  data: unknown,
-  base: CarrierTrackResult,
-): CarrierTrackResult {
+function parseResponse(containerNumber: string, data: unknown, base: CarrierTrackResult): CarrierTrackResult {
   if (!data || typeof data !== "object") {
     return { ...base, noData: true, error: "empty_response" };
   }
@@ -129,24 +126,18 @@ function parseResponse(
     (Array.isArray(d) ? d[0] : null) ??
     d;
 
-  const rawEvents: unknown[] =
-    shipment?.events ??
-    shipment?.milestones ??
-    shipment?.containerEvents ??
-    d.events ??
-    [];
+  const rawEvents: unknown[] = shipment?.events ?? shipment?.milestones ?? shipment?.containerEvents ?? d.events ?? [];
 
   const events: TrackingEvent[] = (Array.isArray(rawEvents) ? rawEvents : [])
-    .map((e: any): TrackingEvent => ({
-      date: parseDate(e.eventDateTime ?? e.actualDate ?? e.timestamp ?? e.date ?? null),
-      status: e.typeCode ?? e.eventCode ?? e.activityCode ?? e.status ?? null,
-      location:
-        e.location?.portName ??
-        e.locationName ??
-        e.portName ??
-        (typeof e.location === "string" ? e.location : null),
-      description: e.description ?? e.eventCode ?? e.typeCode ?? null,
-    }))
+    .map(
+      (e: any): TrackingEvent => ({
+        date: parseDate(e.eventDateTime ?? e.actualDate ?? e.timestamp ?? e.date ?? null),
+        status: e.typeCode ?? e.eventCode ?? e.activityCode ?? e.status ?? null,
+        location:
+          e.location?.portName ?? e.locationName ?? e.portName ?? (typeof e.location === "string" ? e.location : null),
+        description: e.description ?? e.eventCode ?? e.typeCode ?? null,
+      })
+    )
     .filter((e) => e.date !== null || e.status !== null)
     .sort((a, b) => {
       if (!a.date) return 1;
@@ -171,9 +162,7 @@ function parseResponse(
     return { ...base, noData: true, error: "no_useful_data", raw: data };
   }
 
-  console.log(
-    `[CMAPublic] ${containerNumber}: success — status=${latest?.status ?? "?"} events=${events.length}`,
-  );
+  console.log(`[CMAPublic] ${containerNumber}: success — status=${latest?.status ?? "?"} events=${events.length}`);
 
   return {
     ...base,

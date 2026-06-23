@@ -4,11 +4,14 @@ import { PlusCircle, Plus, X, CheckCircle2, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
@@ -55,9 +58,23 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
   };
 
   const postOffloadMutation = useMutation({
-    mutationFn: async ({ containerId, charges: c, txDate: d }: { containerId: number; charges: any[]; txDate: string }) => {
-      const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/post-offload-charges`, { charges: c, txDate: d });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.message || "Failed to save charges"); }
+    mutationFn: async ({
+      containerId,
+      charges: c,
+      txDate: d,
+    }: {
+      containerId: number;
+      charges: any[];
+      txDate: string;
+    }) => {
+      const res = await factoryApiRequest("POST", `/api/factory/containers/${containerId}/post-offload-charges`, {
+        charges: c,
+        txDate: d,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Failed to save charges");
+      }
       return res.json();
     },
     onSuccess: (data) => {
@@ -76,7 +93,12 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
 
   return (
     <>
-      <Dialog open={!!container} onOpenChange={(v) => { if (!v) handleClose(); }}>
+      <Dialog
+        open={!!container}
+        onOpenChange={(v) => {
+          if (!v) handleClose();
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -84,7 +106,8 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
               Add Post-Offload Charges
             </DialogTitle>
             <DialogDescription>
-              Container <strong>{container?.containerNumber}</strong> — charges added here will update the cost per kg and retroactively adjust all mix batches made from this container.
+              Container <strong>{container?.containerNumber}</strong> — charges added here will update the cost per kg
+              and retroactively adjust all mix batches made from this container.
             </DialogDescription>
           </DialogHeader>
 
@@ -95,7 +118,9 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                   <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
                   <div>
                     <p className="font-semibold">Charges saved successfully</p>
-                    <p className="text-xs mt-0.5 opacity-80">The container cost per kg and all related mix batch costs have been updated.</p>
+                    <p className="text-xs mt-0.5 opacity-80">
+                      The container cost per kg and all related mix batch costs have been updated.
+                    </p>
                   </div>
                 </div>
                 {result.affectedBatches.length > 0 ? (
@@ -103,14 +128,21 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                     <p className="text-sm font-semibold">Affected Mix Batches</p>
                     <div className="border rounded-md divide-y text-sm">
                       <div className="grid grid-cols-4 gap-2 px-3 py-1.5 text-xs text-muted-foreground font-medium">
-                        <span>Batch</span><span className="text-right">Old Cost/kg</span><span className="text-right">New Cost/kg</span><span className="text-right">Weight from this container</span>
+                        <span>Batch</span>
+                        <span className="text-right">Old Cost/kg</span>
+                        <span className="text-right">New Cost/kg</span>
+                        <span className="text-right">Weight from this container</span>
                       </div>
                       {result.affectedBatches.map((b) => (
                         <div key={b.batchId} className="grid grid-cols-4 gap-2 px-3 py-2 items-center">
                           <span className="font-mono font-medium">{b.batchCode}</span>
-                          <span className="text-right font-mono text-muted-foreground">${b.oldCostPerKg.toFixed(4)}</span>
+                          <span className="text-right font-mono text-muted-foreground">
+                            ${b.oldCostPerKg.toFixed(4)}
+                          </span>
                           <span className="text-right font-mono font-semibold">${b.newCostPerKg.toFixed(4)}</span>
-                          <span className="text-right font-mono text-muted-foreground">{formatNumber(b.weightKg)} kg</span>
+                          <span className="text-right font-mono text-muted-foreground">
+                            {formatNumber(b.weightKg)} kg
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -126,21 +158,50 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
               <div className="space-y-5">
                 <div className="flex items-start gap-3 p-3 rounded-md bg-blue-50 dark:bg-blue-950/20 text-blue-800 dark:text-blue-300 text-sm">
                   <Info className="h-4 w-4 mt-0.5 shrink-0" />
-                  <p>Enter any charges that arrived after the original offload — port fees, duties, handling, etc. Each charge will be added to the container's cost and will cascade into any mix batches already made from it.</p>
+                  <p>
+                    Enter any charges that arrived after the original offload — port fees, duties, handling, etc. Each
+                    charge will be added to the container's cost and will cascade into any mix batches already made from
+                    it.
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm font-medium">Date</label>
-                  <Input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} className="w-48" data-testid="input-post-offload-date" />
+                  <Input
+                    type="date"
+                    value={txDate}
+                    onChange={(e) => setTxDate(e.target.value)}
+                    className="w-48"
+                    data-testid="input-post-offload-date"
+                  />
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between flex-wrap gap-1">
                     <label className="text-sm font-medium">Charges</label>
-                    <Button variant="outline" size="sm" onClick={() => setCharges(prev => [...prev, { id: Date.now().toString(), description: "", amount: "", currencyCode: (container as any)?.currencyCode || "USD", ledgerAccountId: "", supplierId: "" }])} data-testid="button-add-post-offload-charge-row">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCharges((prev) => [
+                          ...prev,
+                          {
+                            id: Date.now().toString(),
+                            description: "",
+                            amount: "",
+                            currencyCode: (container as any)?.currencyCode || "USD",
+                            ledgerAccountId: "",
+                            supplierId: "",
+                          },
+                        ])
+                      }
+                      data-testid="button-add-post-offload-charge-row"
+                    >
                       <Plus className="h-3 w-3 mr-1" /> Add Row
                     </Button>
                   </div>
                   {charges.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center border rounded-md">No charges added yet — click "Add Row" to begin.</p>
+                    <p className="text-sm text-muted-foreground py-4 text-center border rounded-md">
+                      No charges added yet — click "Add Row" to begin.
+                    </p>
                   ) : (
                     <div className="space-y-1">
                       <div className="grid grid-cols-[2fr_1fr_auto_2fr_auto] gap-x-2 gap-y-1 items-center">
@@ -151,21 +212,74 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
                         <div />
                         {charges.map((charge, idx) => (
                           <Fragment key={charge.id}>
-                            <Input value={charge.description} onChange={(e) => setCharges(prev => prev.map(c => c.id === charge.id ? { ...c, description: e.target.value } : c))} placeholder="e.g. Port duty" data-testid={`input-poc-description-${idx}`} />
-                            <Input type="number" value={charge.amount} onChange={(e) => setCharges(prev => prev.map(c => c.id === charge.id ? { ...c, amount: e.target.value } : c))} placeholder="0.00" step="0.01" data-testid={`input-poc-amount-${idx}`} />
-                            <Select value={charge.currencyCode || "USD"} onValueChange={(v) => setCharges(prev => prev.map(c => c.id === charge.id ? { ...c, currencyCode: v } : c))}>
-                              <SelectTrigger className="w-20" data-testid={`select-poc-currency-${idx}`}><SelectValue /></SelectTrigger>
+                            <Input
+                              value={charge.description}
+                              onChange={(e) =>
+                                setCharges((prev) =>
+                                  prev.map((c) => (c.id === charge.id ? { ...c, description: e.target.value } : c))
+                                )
+                              }
+                              placeholder="e.g. Port duty"
+                              data-testid={`input-poc-description-${idx}`}
+                            />
+                            <Input
+                              type="number"
+                              value={charge.amount}
+                              onChange={(e) =>
+                                setCharges((prev) =>
+                                  prev.map((c) => (c.id === charge.id ? { ...c, amount: e.target.value } : c))
+                                )
+                              }
+                              placeholder="0.00"
+                              step="0.01"
+                              data-testid={`input-poc-amount-${idx}`}
+                            />
+                            <Select
+                              value={charge.currencyCode || "USD"}
+                              onValueChange={(v) =>
+                                setCharges((prev) =>
+                                  prev.map((c) => (c.id === charge.id ? { ...c, currencyCode: v } : c))
+                                )
+                              }
+                            >
+                              <SelectTrigger className="w-20" data-testid={`select-poc-currency-${idx}`}>
+                                <SelectValue />
+                              </SelectTrigger>
                               <SelectContent>
-                                {["USD","EUR","GBP","AUD","LBP"].map(ccy => <SelectItem key={ccy} value={ccy}>{ccy}</SelectItem>)}
+                                {["USD", "EUR", "GBP", "AUD", "LBP"].map((ccy) => (
+                                  <SelectItem key={ccy} value={ccy}>
+                                    {ccy}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
-                            <Select value={charge.ledgerAccountId || ""} onValueChange={(v) => setCharges(prev => prev.map(c => c.id === charge.id ? { ...c, ledgerAccountId: v, supplierId: "" } : c))}>
-                              <SelectTrigger data-testid={`select-poc-account-${idx}`}><SelectValue placeholder="Select account (optional)" /></SelectTrigger>
+                            <Select
+                              value={charge.ledgerAccountId || ""}
+                              onValueChange={(v) =>
+                                setCharges((prev) =>
+                                  prev.map((c) =>
+                                    c.id === charge.id ? { ...c, ledgerAccountId: v, supplierId: "" } : c
+                                  )
+                                )
+                              }
+                            >
+                              <SelectTrigger data-testid={`select-poc-account-${idx}`}>
+                                <SelectValue placeholder="Select account (optional)" />
+                              </SelectTrigger>
                               <SelectContent>
-                                {ledgerAccounts.map((a: any) => <SelectItem key={a.id} value={String(a.id)}>{a.code ? `${a.code} - ${a.name}` : a.name}</SelectItem>)}
+                                {ledgerAccounts.map((a: any) => (
+                                  <SelectItem key={a.id} value={String(a.id)}>
+                                    {a.code ? `${a.code} - ${a.name}` : a.name}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
-                            <Button variant="ghost" size="icon" onClick={() => setCharges(prev => prev.filter(c => c.id !== charge.id))} data-testid={`button-remove-poc-${idx}`}>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setCharges((prev) => prev.filter((c) => c.id !== charge.id))}
+                              data-testid={`button-remove-poc-${idx}`}
+                            >
                               <X className="h-4 w-4" />
                             </Button>
                           </Fragment>
@@ -179,29 +293,39 @@ export function PostOffloadDialog({ container, ledgerAccounts, onClose }: PostOf
           </div>
 
           <DialogFooter className="gap-2 pt-2 border-t">
-            <Button variant="outline" onClick={handleClose}>{result ? "Close" : "Cancel"}</Button>
+            <Button variant="outline" onClick={handleClose}>
+              {result ? "Close" : "Cancel"}
+            </Button>
             {!result && (
               <Button
                 onClick={() => {
                   if (!container) return;
-                  const valid = charges.filter(c => parseFloat(c.amount || "0") > 0);
+                  const valid = charges.filter((c) => parseFloat(c.amount || "0") > 0);
                   if (valid.length === 0) {
-                    toast({ title: "No charges", description: "Add at least one charge with an amount.", variant: "destructive" });
+                    toast({
+                      title: "No charges",
+                      description: "Add at least one charge with an amount.",
+                      variant: "destructive",
+                    });
                     return;
                   }
-                  wrapAdminAction(() => postOffloadMutation.mutate({
-                    containerId: container.id,
-                    txDate: txDate || new Date().toLocaleDateString("en-CA"),
-                    charges: valid.map(c => ({
-                      description: c.description || "Post-offload charge",
-                      amount: c.amount,
-                      currencyCode: c.currencyCode || "USD",
-                      ledgerAccountId: c.ledgerAccountId ? parseInt(c.ledgerAccountId) : null,
-                      supplierId: c.supplierId ? parseInt(c.supplierId) : null,
-                    })),
-                  }), "Add Post-Offload Charges");
+                  wrapAdminAction(
+                    () =>
+                      postOffloadMutation.mutate({
+                        containerId: container.id,
+                        txDate: txDate || new Date().toLocaleDateString("en-CA"),
+                        charges: valid.map((c) => ({
+                          description: c.description || "Post-offload charge",
+                          amount: c.amount,
+                          currencyCode: c.currencyCode || "USD",
+                          ledgerAccountId: c.ledgerAccountId ? parseInt(c.ledgerAccountId) : null,
+                          supplierId: c.supplierId ? parseInt(c.supplierId) : null,
+                        })),
+                      }),
+                    "Add Post-Offload Charges"
+                  );
                 }}
-                disabled={postOffloadMutation.isPending || charges.every(c => parseFloat(c.amount || "0") <= 0)}
+                disabled={postOffloadMutation.isPending || charges.every((c) => parseFloat(c.amount || "0") <= 0)}
                 data-testid="button-confirm-post-offload-charges"
               >
                 {postOffloadMutation.isPending ? "Saving..." : "Save Charges"}

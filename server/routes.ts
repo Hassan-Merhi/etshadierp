@@ -8,7 +8,13 @@ import { createHash } from "crypto";
 import CryptoJS from "crypto-js";
 import { storage } from "./storage";
 import { db } from "./db";
-import { chat, saveMessage, getConversationHistory, getConversationHistoryForAI, getAllChatHistory } from "./chatService";
+import {
+  chat,
+  saveMessage,
+  getConversationHistory,
+  getConversationHistoryForAI,
+  getAllChatHistory,
+} from "./chatService";
 import { adjustInventory, reverseInventoryByExactValue } from "./inventoryHelper";
 import { classifyNetPositionAccounts, getAccountNetBalance } from "./netPositionHelper";
 import { registerFactoryRoutes } from "./routes/factoryRoutes";
@@ -79,18 +85,8 @@ import { registerBusinessAlertRoutes } from "./routes/businessAlertsRoutes";
 import { registerIntercompanyNotificationRoutes } from "./routes/intercompanyNotificationRoutes";
 import { registerNotificationRoutes } from "./routes/notificationRoutes";
 import { registerTransporterStatementRoutes } from "./routes/transporterStatementRoutes";
-import {
-  requireAuth,
-  requireRole,
-  canDelete,
-  checkPOSLocation,
-  requireNonPOS,
-} from "./auth";
-import {
-  requireModuleAccess,
-  requireActionAccess,
-  requireExportAccess,
-} from "./lib/permissionMiddleware";
+import { requireAuth, requireRole, canDelete, checkPOSLocation, requireNonPOS } from "./auth";
+import { requireModuleAccess, requireActionAccess, requireExportAccess } from "./lib/permissionMiddleware";
 import {
   insertLocationSchema,
   insertLedgerAccountSchema,
@@ -221,7 +217,24 @@ import {
   employeeGroupMembers,
 } from "@shared/schema";
 import { z } from "zod";
-import { eq, and, inArray, sql, like, ne, desc, or, isNotNull, lt, gte, lte, not, isNull, gt, ilike } from "drizzle-orm";
+import {
+  eq,
+  and,
+  inArray,
+  sql,
+  like,
+  ne,
+  desc,
+  or,
+  isNotNull,
+  lt,
+  gte,
+  lte,
+  not,
+  isNull,
+  gt,
+  ilike,
+} from "drizzle-orm";
 import { format } from "date-fns";
 
 // Helper function to get current exchange rate for a company
@@ -231,11 +244,7 @@ async function getCurrentExchangeRate(companyId: number): Promise<string | null>
     if (!company || !company.displayCurrency || !company.baseCurrency) {
       return null;
     }
-    const rate = await storage.getLatestExchangeRate(
-      companyId,
-      company.baseCurrency,
-      company.displayCurrency
-    );
+    const rate = await storage.getLatestExchangeRate(companyId, company.baseCurrency, company.displayCurrency);
     return rate?.rate || null;
   } catch (error) {
     console.error("Error fetching exchange rate:", error);
@@ -257,9 +266,9 @@ async function getCurrentExchangeRate(companyId: number): Promise<string | null>
 //
 async function runIntercompanyPosTransfer(
   sourceCompanyId: number,
-  cashAccountId: number,    // ledger account id used as cash in the POS sale
+  cashAccountId: number, // ledger account id used as cash in the POS sale
   saleAmount: number,
-  saleDateStr: string,       // "YYYY-MM-DD"
+  saleDateStr: string // "YYYY-MM-DD"
 ) {
   try {
     // 1. Load config for the source company
@@ -293,23 +302,13 @@ async function runIntercompanyPosTransfer(
     let destCashAccounts = await db
       .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
       .from(ledgerAccounts)
-      .where(
-        and(
-          eq(ledgerAccounts.companyId, config.destCompanyId),
-          eq(ledgerAccounts.name, cashName),
-        )
-      );
+      .where(and(eq(ledgerAccounts.companyId, config.destCompanyId), eq(ledgerAccounts.name, cashName)));
     if (destCashAccounts.length === 0) {
       // try case-insensitive
       destCashAccounts = await db
         .select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
         .from(ledgerAccounts)
-        .where(
-          and(
-            eq(ledgerAccounts.companyId, config.destCompanyId),
-            ilike(ledgerAccounts.name, cashName),
-          )
-        );
+        .where(and(eq(ledgerAccounts.companyId, config.destCompanyId), ilike(ledgerAccounts.name, cashName)));
     }
     const destCashAccount = destCashAccounts[0] ?? null;
 
@@ -321,8 +320,8 @@ async function runIntercompanyPosTransfer(
       voucherNumber: srcVoucherNum,
       date: saleDateStr,
       narration: srcNarration,
-      debitAccountId: config.sourceIntercoAccountId,   // interco receivable
-      creditAccountId: cashAccountId,                   // cash outlet
+      debitAccountId: config.sourceIntercoAccountId, // interco receivable
+      creditAccountId: cashAccountId, // cash outlet
       amount: saleAmount,
     });
 
@@ -335,13 +334,15 @@ async function runIntercompanyPosTransfer(
         voucherNumber: dstVoucherNum,
         date: saleDateStr,
         narration: dstNarration,
-        debitAccountId: destCashAccount.id,             // cash outlet in dest (per-sale)
-        creditAccountId: config.destIntercoAccountId,   // interco payable (running total)
+        debitAccountId: destCashAccount.id, // cash outlet in dest (per-sale)
+        creditAccountId: config.destIntercoAccountId, // interco payable (running total)
         amount: saleAmount,
-        debitIsRunningTotal: false,  // DEST: CR is running total, DR is per-sale cash outlet
+        debitIsRunningTotal: false, // DEST: CR is running total, DR is per-sale cash outlet
       });
     } else {
-      console.warn(`[IntercompanyPOS] Could not find cash account "${cashName}" in company ${config.destCompanyId}. Dest voucher skipped.`);
+      console.warn(
+        `[IntercompanyPOS] Could not find cash account "${cashName}" in company ${config.destCompanyId}. Dest voucher skipped.`
+      );
     }
   } catch (err: any) {
     console.error("[IntercompanyPOS] Auto-transfer failed:", err?.message ?? err);
@@ -366,36 +367,22 @@ async function upsertIntercompanyVoucher(opts: {
   debitAccountId: number;
   creditAccountId: number;
   amount: number;
-  debitIsRunningTotal?: boolean;   // true = SOURCE (default), false = DEST
+  debitIsRunningTotal?: boolean; // true = SOURCE (default), false = DEST
 }) {
-  const {
-    companyId, voucherNumber, date, narration,
-    debitAccountId, creditAccountId, amount,
-  } = opts;
+  const { companyId, voucherNumber, date, narration, debitAccountId, creditAccountId, amount } = opts;
   const debitIsRunningTotal = opts.debitIsRunningTotal ?? true;
 
   // Find existing daily voucher
   const [existing] = await db
     .select()
     .from(vouchers)
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.voucherNumber, voucherNumber),
-      )
-    );
+    .where(and(eq(vouchers.companyId, companyId), eq(vouchers.voucherNumber, voucherNumber)));
 
   if (existing) {
     // Update description in case narration format changed
-    await db
-      .update(vouchers)
-      .set({ description: narration })
-      .where(eq(vouchers.id, existing.id));
+    await db.update(vouchers).set({ description: narration }).where(eq(vouchers.id, existing.id));
 
-    const entries = await db
-      .select()
-      .from(voucherEntries)
-      .where(eq(voucherEntries.voucherId, existing.id));
+    const entries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
 
     if (debitIsRunningTotal) {
       // ── SOURCE MODE ───────────────────────────────────────────────────────
@@ -408,10 +395,7 @@ async function upsertIntercompanyVoucher(opts: {
       );
       if (existingCrEntry) {
         const newCr = (parseFloat(existingCrEntry.creditAmount ?? "0") + amount).toFixed(2);
-        await db
-          .update(voucherEntries)
-          .set({ creditAmount: newCr })
-          .where(eq(voucherEntries.id, existingCrEntry.id));
+        await db.update(voucherEntries).set({ creditAmount: newCr }).where(eq(voucherEntries.id, existingCrEntry.id));
       } else {
         await db.insert(voucherEntries).values({
           voucherId: existing.id,
@@ -423,10 +407,7 @@ async function upsertIntercompanyVoucher(opts: {
       }
 
       // 2. Re-fetch and recalculate running total, then update the single DR entry
-      const refreshed = await db
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, existing.id));
+      const refreshed = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
       const totalCr = refreshed
         .filter((e) => e.ledgerAccountId !== debitAccountId)
         .reduce((s, e) => s + parseFloat(e.creditAmount ?? "0"), 0);
@@ -449,7 +430,10 @@ async function upsertIntercompanyVoucher(opts: {
         });
       }
       // Keep voucher totalAmount in sync with the running total
-      await db.update(vouchers).set({ totalAmount: totalCr.toFixed(2) }).where(eq(vouchers.id, existing.id));
+      await db
+        .update(vouchers)
+        .set({ totalAmount: totalCr.toFixed(2) })
+        .where(eq(vouchers.id, existing.id));
     } else {
       // ── DEST MODE ─────────────────────────────────────────────────────────
       // DR side = per-sale cash outlet (many accounts, one entry each, specific amount)
@@ -461,10 +445,7 @@ async function upsertIntercompanyVoucher(opts: {
       );
       if (existingDrEntry) {
         const newDr = (parseFloat(existingDrEntry.debitAmount ?? "0") + amount).toFixed(2);
-        await db
-          .update(voucherEntries)
-          .set({ debitAmount: newDr })
-          .where(eq(voucherEntries.id, existingDrEntry.id));
+        await db.update(voucherEntries).set({ debitAmount: newDr }).where(eq(voucherEntries.id, existingDrEntry.id));
       } else {
         await db.insert(voucherEntries).values({
           voucherId: existing.id,
@@ -476,10 +457,7 @@ async function upsertIntercompanyVoucher(opts: {
       }
 
       // 2. Re-fetch and recalculate running total, then update the single CR entry
-      const refreshed = await db
-        .select()
-        .from(voucherEntries)
-        .where(eq(voucherEntries.voucherId, existing.id));
+      const refreshed = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, existing.id));
       const totalDr = refreshed
         .filter((e) => e.ledgerAccountId !== creditAccountId)
         .reduce((s, e) => s + parseFloat(e.debitAmount ?? "0"), 0);
@@ -502,7 +480,10 @@ async function upsertIntercompanyVoucher(opts: {
         });
       }
       // Keep voucher totalAmount in sync with the running total
-      await db.update(vouchers).set({ totalAmount: totalDr.toFixed(2) }).where(eq(vouchers.id, existing.id));
+      await db
+        .update(vouchers)
+        .set({ totalAmount: totalDr.toFixed(2) })
+        .where(eq(vouchers.id, existing.id));
     }
   } else {
     // ── CREATE new voucher with initial two entries ────────────────────────
@@ -545,8 +526,8 @@ async function calculateHistoricalLocationInventory(
   // Use the date string directly for DATE column comparisons
   // Use Date object only for TIMESTAMP columns (offloadedAt)
   const cutoffDateStr = asOfDate; // For vouchers.voucherDate (DATE type)
-  const cutoffTimestamp = new Date(asOfDate + 'T23:59:59.999'); // For containerOffloads.offloadedAt (TIMESTAMP type)
-  
+  const cutoffTimestamp = new Date(asOfDate + "T23:59:59.999"); // For containerOffloads.offloadedAt (TIMESTAMP type)
+
   // STEP 1: Build seed set of ALL stockItemIds that ever existed at this location
   const seedStockItemIds = new Set<number>();
 
@@ -558,12 +539,7 @@ async function calculateHistoricalLocationInventory(
       averageRate: inventory.averageRate,
     })
     .from(inventory)
-    .where(
-      and(
-        eq(inventory.locationId, locationId),
-        eq(inventory.companyId, companyId)
-      )
-    )
+    .where(and(eq(inventory.locationId, locationId), eq(inventory.companyId, companyId)))
     .execute();
 
   for (const inv of currentInventory) {
@@ -575,12 +551,7 @@ async function calculateHistoricalLocationInventory(
     .selectDistinct({ stockItemId: salesItems.stockItemId })
     .from(salesItems)
     .innerJoin(vouchers, eq(salesItems.voucherId, vouchers.id))
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(vouchers.locationId, locationId)
-      )
-    )
+    .where(and(eq(vouchers.companyId, companyId), eq(vouchers.locationId, locationId)))
     .execute();
 
   for (const item of salesStockItems) {
@@ -593,12 +564,7 @@ async function calculateHistoricalLocationInventory(
     .from(containerOffloadItems)
     .innerJoin(containerOffloads, eq(containerOffloadItems.offloadId, containerOffloads.id))
     .innerJoin(containers, eq(containerOffloads.containerId, containers.id))
-    .where(
-      and(
-        eq(containers.companyId, companyId),
-        eq(containerOffloads.locationId, locationId)
-      )
-    )
+    .where(and(eq(containers.companyId, companyId), eq(containerOffloads.locationId, locationId)))
     .execute();
 
   for (const item of offloadStockItems) {
@@ -611,12 +577,7 @@ async function calculateHistoricalLocationInventory(
     .from(stockAdjustmentItems)
     .innerJoin(stockAdjustmentVouchers, eq(stockAdjustmentItems.adjustmentId, stockAdjustmentVouchers.id))
     .innerJoin(vouchers, eq(stockAdjustmentVouchers.voucherId, vouchers.id))
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(stockAdjustmentVouchers.locationId, locationId)
-      )
-    )
+    .where(and(eq(vouchers.companyId, companyId), eq(stockAdjustmentVouchers.locationId, locationId)))
     .execute();
 
   for (const item of adjustmentStockItems) {
@@ -629,12 +590,7 @@ async function calculateHistoricalLocationInventory(
     .from(stockTransferItems)
     .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
     .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(stockTransferVouchers.destinationLocationId, locationId)
-      )
-    )
+    .where(and(eq(vouchers.companyId, companyId), eq(stockTransferVouchers.destinationLocationId, locationId)))
     .execute();
 
   for (const item of transfersInStockItems) {
@@ -647,12 +603,7 @@ async function calculateHistoricalLocationInventory(
     .from(stockTransferItems)
     .innerJoin(stockTransferVouchers, eq(stockTransferItems.transferId, stockTransferVouchers.id))
     .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
-    .where(
-      and(
-        eq(vouchers.companyId, companyId),
-        eq(stockTransferItems.sourceLocationId, locationId)
-      )
-    )
+    .where(and(eq(vouchers.companyId, companyId), eq(stockTransferItems.sourceLocationId, locationId)))
     .execute();
 
   for (const item of transfersOutStockItems) {
@@ -667,7 +618,7 @@ async function calculateHistoricalLocationInventory(
 
   // STEP 2: Initialize inventoryMap with all seeded items at zero
   const inventoryMap = new Map<number, { quantity: number; totalValue: number; rate: number }>();
-  
+
   for (const stockItemId of Array.from(seedStockItemIds)) {
     inventoryMap.set(stockItemId, { quantity: 0, totalValue: 0, rate: 0 });
   }
@@ -733,9 +684,9 @@ async function calculateHistoricalLocationInventory(
     const qty = parseFloat(adj.quantity) || 0;
     const rate = parseFloat(adj.rate) || 0;
     const existing = inventoryMap.get(adj.stockItemId) || { quantity: 0, totalValue: 0, rate: 0 };
-    const adjType = (adj.adjustmentType || '').toLowerCase().trim();
-    
-    if (adjType === 'production' || adjType === 'produce') {
+    const adjType = (adj.adjustmentType || "").toLowerCase().trim();
+
+    if (adjType === "production" || adjType === "produce") {
       existing.quantity -= qty;
       existing.totalValue -= qty * rate;
     } else {
@@ -858,7 +809,7 @@ async function calculateHistoricalLocationInventory(
     .where(eq(stockItems.companyId, companyId))
     .execute();
 
-  const stockItemMap = new Map(stockItemDetails.map(item => [item.id, item]));
+  const stockItemMap = new Map(stockItemDetails.map((item) => [item.id, item]));
 
   const result: any[] = [];
   for (const [stockItemId, data] of Array.from(inventoryMap)) {
@@ -913,11 +864,11 @@ async function logAudit(params: {
 }
 
 // Configure multer with file size limit (10MB) to prevent memory exhaustion
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
-  }
+  },
 });
 
 // Bcrypt configuration
@@ -959,10 +910,10 @@ async function verifyPassword(password: string, hash: string): Promise<{ valid: 
 // 2. Entries with employeeId set directly
 // When debited, decrease balance; when credited, increase balance
 async function syncEmployeeBalancesFromEntries(
-  entries: Array<{ 
-    ledgerAccountId: number | null; 
+  entries: Array<{
+    ledgerAccountId: number | null;
     employeeId?: number | null;
-    debitAmount: string | null; 
+    debitAmount: string | null;
     creditAmount: string | null;
   }>,
   companyId: number,
@@ -970,7 +921,7 @@ async function syncEmployeeBalancesFromEntries(
 ): Promise<void> {
   // Get all ledger accounts for the company to find EMP-* accounts
   const allAccounts = await storage.getAllLedgerAccounts(companyId);
-  
+
   // Find employee accounts (code starts with EMP-)
   const employeeAccountMap = new Map<number, { code: string; employeeCode: string }>();
   for (const account of allAccounts) {
@@ -979,16 +930,16 @@ async function syncEmployeeBalancesFromEntries(
       employeeAccountMap.set(account.id, { code: account.code, employeeCode });
     }
   }
-  
+
   // Track balance changes AND deposits/withdrawals per employee
   // deposits = sum of credits, withdrawals = sum of debits
   const employeeChangesById = new Map<number, { balanceChange: number; deposits: number; withdrawals: number }>();
   const employeeChangesByCode = new Map<string, { balanceChange: number; deposits: number; withdrawals: number }>();
-  
+
   for (const entry of entries) {
     const debit = parseFloat(entry.debitAmount || "0");
     const credit = parseFloat(entry.creditAmount || "0");
-    
+
     // Balance change:
     // - Debit to employee account = decrease balance (money going out/payment to employee)
     // - Credit to employee account = increase balance (owed to employee)
@@ -997,87 +948,91 @@ async function syncEmployeeBalancesFromEntries(
     if (reverse) {
       balanceChange = -balanceChange;
     }
-    
+
     // Deposits/Withdrawals track raw amounts:
     // - Forward: deposits += credit, withdrawals += debit
     // - Reverse: deposits -= credit, withdrawals -= debit
     const depositChange = reverse ? -credit : credit;
     const withdrawalChange = reverse ? -debit : debit;
-    
+
     // Check if entry has direct employeeId
     if (entry.employeeId) {
       const current = employeeChangesById.get(entry.employeeId) || { balanceChange: 0, deposits: 0, withdrawals: 0 };
       employeeChangesById.set(entry.employeeId, {
         balanceChange: current.balanceChange + balanceChange,
         deposits: current.deposits + depositChange,
-        withdrawals: current.withdrawals + withdrawalChange
+        withdrawals: current.withdrawals + withdrawalChange,
       });
       continue;
     }
-    
+
     // Check if entry has ledgerAccountId pointing to EMP-* account
     if (entry.ledgerAccountId) {
       const employeeAccount = employeeAccountMap.get(entry.ledgerAccountId);
       if (employeeAccount) {
-        const current = employeeChangesByCode.get(employeeAccount.employeeCode) || { balanceChange: 0, deposits: 0, withdrawals: 0 };
+        const current = employeeChangesByCode.get(employeeAccount.employeeCode) || {
+          balanceChange: 0,
+          deposits: 0,
+          withdrawals: 0,
+        };
         employeeChangesByCode.set(employeeAccount.employeeCode, {
           balanceChange: current.balanceChange + balanceChange,
           deposits: current.deposits + depositChange,
-          withdrawals: current.withdrawals + withdrawalChange
+          withdrawals: current.withdrawals + withdrawalChange,
         });
       }
     }
   }
-  
+
   // Apply balance changes for direct employee entries (by ID)
   for (const [employeeId, changes] of Array.from(employeeChangesById.entries())) {
     if (changes.balanceChange === 0 && changes.deposits === 0 && changes.withdrawals === 0) continue;
-    
+
     const employee = await storage.getEmployeeById(employeeId);
     if (!employee) continue;
-    
+
     const currentBalance = parseFloat(employee.currentBalance || "0");
     const newBalance = currentBalance + changes.balanceChange;
-    
+
     const currentDeposits = parseFloat(employee.totalDeposits || "0");
     const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
-    
+
     // Apply changes - use Math.max(0, ...) only to prevent floating point errors from causing negatives
     const newDeposits = Math.max(0, currentDeposits + changes.deposits);
     const newWithdrawals = Math.max(0, currentWithdrawals + changes.withdrawals);
-    
-    const updateData: any = { 
+
+    const updateData: any = {
       currentBalance: newBalance.toFixed(2),
       totalDeposits: newDeposits.toFixed(2),
-      totalWithdrawals: newWithdrawals.toFixed(2)
+      totalWithdrawals: newWithdrawals.toFixed(2),
     };
-    
+
     await db.update(employees).set(updateData).where(eq(employees.id, employee.id));
   }
-  
+
   // Apply balance changes for ledger account entries (by code)
   for (const [employeeCode, changes] of Array.from(employeeChangesByCode.entries())) {
     if (changes.balanceChange === 0 && changes.deposits === 0 && changes.withdrawals === 0) continue;
-    
+
     const employee = await storage.getEmployeeByCode(employeeCode);
     if (!employee) continue;
-    
+
     const currentBalance = parseFloat(employee.currentBalance || "0");
     const newBalance = currentBalance + changes.balanceChange;
-    
+
     const currentDeposits = parseFloat(employee.totalDeposits || "0");
     const currentWithdrawals = parseFloat(employee.totalWithdrawals || "0");
-    
+
     // Apply changes - use Math.max(0, ...) only to prevent floating point errors from causing negatives
     const newDeposits = Math.max(0, currentDeposits + changes.deposits);
     const newWithdrawals = Math.max(0, currentWithdrawals + changes.withdrawals);
-    
-    const updateData: any = { 
+
+    const updateData: any = {
       currentBalance: newBalance.toFixed(2),
       totalDeposits: newDeposits.toFixed(2),
-      totalWithdrawals: newWithdrawals.toFixed(2)
+      totalWithdrawals: newWithdrawals.toFixed(2),
     };
-    
+
     await db.update(employees).set(updateData).where(eq(employees.id, employee.id));
   }
 }
@@ -1115,17 +1070,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/properties", requireModuleAccess("mod_properties"));
 
   // ERP module: customers, suppliers, employees, purchase orders, ERP rental
-  for (const p of ["/api/customers", "/api/suppliers", "/api/employees",
-                   "/api/purchase-orders", "/api/erp"]) {
+  for (const p of ["/api/customers", "/api/suppliers", "/api/employees", "/api/purchase-orders", "/api/erp"]) {
     app.use(p, requireModuleAccess("mod_erp"));
   }
 
   // Accounting module: vouchers, accounts, ledger, bank accounts, fiscal
   for (const p of [
-    "/api/vouchers", "/api/voucher-entries", "/api/voucher-detail",
-    "/api/accounts",  "/api/ledger-accounts",
-    "/api/bank-accounts", "/api/fixed-assets",
-    "/api/fiscal-period", "/api/financial",
+    "/api/vouchers",
+    "/api/voucher-entries",
+    "/api/voucher-detail",
+    "/api/accounts",
+    "/api/ledger-accounts",
+    "/api/bank-accounts",
+    "/api/fixed-assets",
+    "/api/fiscal-period",
+    "/api/financial",
     "/api/credit-notes",
   ]) {
     app.use(p, requireModuleAccess("mod_accounting"));
@@ -1133,21 +1092,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Inventory module: stock, bales, containers, locations, transfers
   for (const p of [
-    "/api/inventory", "/api/stock-items", "/api/stock-groups",
-    "/api/bales", "/api/containers",
-    "/api/locations", "/api/pending-barcodes",
-    "/api/stock-transfers", "/api/stock-transfer-revisions",
-    "/api/stock-summary", "/api/offload-item-search",
+    "/api/inventory",
+    "/api/stock-items",
+    "/api/stock-groups",
+    "/api/bales",
+    "/api/containers",
+    "/api/locations",
+    "/api/pending-barcodes",
+    "/api/stock-transfers",
+    "/api/stock-transfer-revisions",
+    "/api/stock-summary",
+    "/api/offload-item-search",
     "/api/location-price-groups",
   ]) {
     app.use(p, requireModuleAccess("mod_inventory"));
   }
 
   // Analytics module: reports, stats, dashboard data
-  for (const p of [
-    "/api/reports", "/api/stats",
-    "/api/dashboard", "/api/sales-report",
-  ]) {
+  for (const p of ["/api/reports", "/api/stats", "/api/dashboard", "/api/sales-report"]) {
     app.use(p, requireModuleAccess("mod_analytics"));
   }
 
@@ -1156,8 +1118,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // The action middleware calls next() on success, so the real handler still runs.
 
   // Create / edit vouchers (journals, purchases, payments)
-  app.post("/api/vouchers",          requireActionAccess("act_create_voucher"));
-  app.put( "/api/vouchers/:id/with-entries", requireActionAccess("act_create_voucher"));
+  app.post("/api/vouchers", requireActionAccess("act_create_voucher"));
+  app.put("/api/vouchers/:id/with-entries", requireActionAccess("act_create_voucher"));
 
   // Void / cancel sales
   app.patch("/api/vouchers/:id/sales", requireActionAccess("act_void_sale"));
@@ -1257,7 +1219,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const [config] = await db.select().from(intercompanyPosConfigs).where(eq(intercompanyPosConfigs.sourceCompanyId, companyId));
+      const [config] = await db
+        .select()
+        .from(intercompanyPosConfigs)
+        .where(eq(intercompanyPosConfigs.sourceCompanyId, companyId));
       res.json(config || null);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1270,28 +1235,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { destCompanyId, sourceIntercoAccountId, destIntercoAccountId, enabled, skipSourceVoucher } = req.body;
       if (!destCompanyId || !sourceIntercoAccountId || !destIntercoAccountId) {
-        return res.status(400).json({ message: "destCompanyId, sourceIntercoAccountId, and destIntercoAccountId are required" });
+        return res
+          .status(400)
+          .json({ message: "destCompanyId, sourceIntercoAccountId, and destIntercoAccountId are required" });
       }
-      const [existing] = await db.select().from(intercompanyPosConfigs).where(eq(intercompanyPosConfigs.sourceCompanyId, companyId));
+      const [existing] = await db
+        .select()
+        .from(intercompanyPosConfigs)
+        .where(eq(intercompanyPosConfigs.sourceCompanyId, companyId));
       if (existing) {
-        const [updated] = await db.update(intercompanyPosConfigs).set({
-          destCompanyId: parseInt(destCompanyId),
-          sourceIntercoAccountId: parseInt(sourceIntercoAccountId),
-          destIntercoAccountId: parseInt(destIntercoAccountId),
-          enabled: enabled !== false,
-          skipSourceVoucher: skipSourceVoucher === true,
-          updatedAt: new Date(),
-        }).where(eq(intercompanyPosConfigs.sourceCompanyId, companyId)).returning();
+        const [updated] = await db
+          .update(intercompanyPosConfigs)
+          .set({
+            destCompanyId: parseInt(destCompanyId),
+            sourceIntercoAccountId: parseInt(sourceIntercoAccountId),
+            destIntercoAccountId: parseInt(destIntercoAccountId),
+            enabled: enabled !== false,
+            skipSourceVoucher: skipSourceVoucher === true,
+            updatedAt: new Date(),
+          })
+          .where(eq(intercompanyPosConfigs.sourceCompanyId, companyId))
+          .returning();
         return res.json(updated);
       } else {
-        const [created] = await db.insert(intercompanyPosConfigs).values({
-          sourceCompanyId: companyId,
-          destCompanyId: parseInt(destCompanyId),
-          sourceIntercoAccountId: parseInt(sourceIntercoAccountId),
-          destIntercoAccountId: parseInt(destIntercoAccountId),
-          enabled: enabled !== false,
-          skipSourceVoucher: skipSourceVoucher === true,
-        }).returning();
+        const [created] = await db
+          .insert(intercompanyPosConfigs)
+          .values({
+            sourceCompanyId: companyId,
+            destCompanyId: parseInt(destCompanyId),
+            sourceIntercoAccountId: parseInt(sourceIntercoAccountId),
+            destIntercoAccountId: parseInt(destIntercoAccountId),
+            enabled: enabled !== false,
+            skipSourceVoucher: skipSourceVoucher === true,
+          })
+          .returning();
         return res.status(201).json(created);
       }
     } catch (error: any) {
@@ -1320,9 +1297,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const employeeId = parseInt(req.params.id);
       if (isNaN(employeeId)) return res.status(400).json({ message: "Invalid employee ID" });
       const docs = await db
-        .select({ id: erpWorkerDocs.id, employeeId: erpWorkerDocs.employeeId, companyId: erpWorkerDocs.companyId,
-          fileName: erpWorkerDocs.fileName, fileType: erpWorkerDocs.fileType, fileSize: erpWorkerDocs.fileSize,
-          description: erpWorkerDocs.description, uploadedBy: erpWorkerDocs.uploadedBy, uploadedAt: erpWorkerDocs.uploadedAt })
+        .select({
+          id: erpWorkerDocs.id,
+          employeeId: erpWorkerDocs.employeeId,
+          companyId: erpWorkerDocs.companyId,
+          fileName: erpWorkerDocs.fileName,
+          fileType: erpWorkerDocs.fileType,
+          fileSize: erpWorkerDocs.fileSize,
+          description: erpWorkerDocs.description,
+          uploadedBy: erpWorkerDocs.uploadedBy,
+          uploadedAt: erpWorkerDocs.uploadedAt,
+        })
         .from(erpWorkerDocs)
         .where(and(eq(erpWorkerDocs.companyId, companyId), eq(erpWorkerDocs.employeeId, employeeId)))
         .orderBy(desc(erpWorkerDocs.uploadedAt));
@@ -1352,10 +1337,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const docId = parseInt(req.params.id);
       if (isNaN(docId)) return res.status(400).json({ message: "Invalid doc ID" });
-      const [existing] = await db.select().from(erpWorkerDocs).where(and(eq(erpWorkerDocs.id, docId), eq(erpWorkerDocs.companyId, companyId)));
+      const [existing] = await db
+        .select()
+        .from(erpWorkerDocs)
+        .where(and(eq(erpWorkerDocs.id, docId), eq(erpWorkerDocs.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Document not found" });
       const { description, fileName } = req.body;
-      const [updated] = await db.update(erpWorkerDocs).set({ description, fileName }).where(eq(erpWorkerDocs.id, docId)).returning();
+      const [updated] = await db
+        .update(erpWorkerDocs)
+        .set({ description, fileName })
+        .where(eq(erpWorkerDocs.id, docId))
+        .returning();
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1368,7 +1360,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const docId = parseInt(req.params.id);
       if (isNaN(docId)) return res.status(400).json({ message: "Invalid doc ID" });
-      const [existing] = await db.select().from(erpWorkerDocs).where(and(eq(erpWorkerDocs.id, docId), eq(erpWorkerDocs.companyId, companyId)));
+      const [existing] = await db
+        .select()
+        .from(erpWorkerDocs)
+        .where(and(eq(erpWorkerDocs.id, docId), eq(erpWorkerDocs.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Document not found" });
       await db.delete(erpWorkerDocs).where(eq(erpWorkerDocs.id, docId));
       res.json({ message: "Document deleted" });
@@ -1383,7 +1378,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const docId = parseInt(req.params.id);
       if (isNaN(docId)) return res.status(400).json({ message: "Invalid doc ID" });
-      const [doc] = await db.select().from(erpWorkerDocs).where(and(eq(erpWorkerDocs.id, docId), eq(erpWorkerDocs.companyId, companyId)));
+      const [doc] = await db
+        .select()
+        .from(erpWorkerDocs)
+        .where(and(eq(erpWorkerDocs.id, docId), eq(erpWorkerDocs.companyId, companyId)));
       if (!doc) return res.status(404).json({ message: "Document not found" });
       const base64Data = doc.fileData.split(",").pop() || doc.fileData;
       const buffer = Buffer.from(base64Data, "base64");
@@ -1398,219 +1396,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─────────────────────────────────────────────────────────────────────────────
 
   // Salary Advances
-  app.get(
-    "/api/salary-advances",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-        const advances = await storage.getAllSalaryAdvances(
-          req.session.currentCompanyId,
-        );
-        res.json(advances);
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+  app.get("/api/salary-advances", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
-    },
-  );
+      const advances = await storage.getAllSalaryAdvances(req.session.currentCompanyId);
+      res.json(advances);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
-  app.get(
-    "/api/salary-advances/employee/:employeeId",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const employeeId = parseInt(req.params.employeeId);
-        if (isNaN(employeeId)) {
-          return res.status(400).json({ message: "Invalid employee ID" });
-        }
-
-        const advances = await storage.getSalaryAdvancesByEmployee(employeeId);
-        res.json(advances);
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+  app.get("/api/salary-advances/employee/:employeeId", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const employeeId = parseInt(req.params.employeeId);
+      if (isNaN(employeeId)) {
+        return res.status(400).json({ message: "Invalid employee ID" });
       }
-    },
-  );
 
-  app.post(
-    "/api/salary-advances",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
+      const advances = await storage.getSalaryAdvancesByEmployee(employeeId);
+      res.json(advances);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
-        // Inject companyId before schema validation
-        const dataWithCompany = {
-          ...req.body,
-          companyId: req.session.currentCompanyId,
-          remainingBalance: req.body.amount, // Initially, remaining balance equals full amount
-          isOpeningBalance: req.body.isOpeningBalance || false,
-        };
-
-        const parsed = insertSalaryAdvanceSchema.parse(dataWithCompany);
-
-        // Verify employee exists and belongs to current company
-        const employee = await db
-          .select()
-          .from(employees)
-          .where(eq(employees.id, parsed.employeeId))
-          .limit(1);
-
-        if (!employee || employee.length === 0) {
-          return res.status(404).json({ message: "Employee not found" });
-        }
-
-        if (employee[0].companyId !== req.session.currentCompanyId) {
-          return res
-            .status(403)
-            .json({ message: "Employee belongs to a different company" });
-        }
-
-        let voucherId: number | null = null;
-
-        // Only create cash voucher if NOT an opening balance
-        if (!parsed.isOpeningBalance) {
-          // Get default cash account from request or use a default one
-          const cashAccountId =
-            req.body.cashAccountId || req.session.cashAccountId;
-          if (!cashAccountId) {
-            return res.status(400).json({ message: "Cash account is required" });
-          }
-
-          // Create voucher for the salary advance
-          const voucherNumber = `SA-${Date.now()}`;
-          const [voucher] = await db
-            .insert(vouchers)
-            .values({
-              companyId: req.session.currentCompanyId,
-              voucherNumber,
-              voucherType: "Payment",
-              voucherDate: parsed.advanceDate,
-              description:
-                parsed.notes ||
-                `Salary advance for ${employee[0].firstName} ${employee[0].lastName}`,
-              totalAmount: parsed.amount,
-            })
-            .returning();
-
-          voucherId = voucher.id;
-
-          // Create voucher entries (double-entry)
-          // Debit: Employee (using employeeId field directly - they owe us)
-          await db.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: null,
-            employeeId: employee[0].id,
-            debitAmount: parsed.amount,
-            creditAmount: "0",
-            narration: `Salary advance - ${voucherNumber}`,
-          });
-
-          // Credit: Cash Account
-          await db.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: cashAccountId,
-            debitAmount: "0",
-            creditAmount: parsed.amount,
-            narration: `Salary advance - ${voucherNumber}`,
-          });
-        }
-
-        // Create salary advance record
-        const advance = await storage.createSalaryAdvance({
-          ...parsed,
-          voucherId,
-        });
-
-        res.status(201).json(advance);
-      } catch (error: any) {
-        res.status(400).json({ message: error.message });
+  app.post("/api/salary-advances", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
-    },
-  );
 
-  app.post(
-    "/api/salary-advances/:id/deduction",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
+      // Inject companyId before schema validation
+      const dataWithCompany = {
+        ...req.body,
+        companyId: req.session.currentCompanyId,
+        remainingBalance: req.body.amount, // Initially, remaining balance equals full amount
+        isOpeningBalance: req.body.isOpeningBalance || false,
+      };
+
+      const parsed = insertSalaryAdvanceSchema.parse(dataWithCompany);
+
+      // Verify employee exists and belongs to current company
+      const employee = await db.select().from(employees).where(eq(employees.id, parsed.employeeId)).limit(1);
+
+      if (!employee || employee.length === 0) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      if (employee[0].companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Employee belongs to a different company" });
+      }
+
+      let voucherId: number | null = null;
+
+      // Only create cash voucher if NOT an opening balance
+      if (!parsed.isOpeningBalance) {
+        // Get default cash account from request or use a default one
+        const cashAccountId = req.body.cashAccountId || req.session.cashAccountId;
+        if (!cashAccountId) {
+          return res.status(400).json({ message: "Cash account is required" });
         }
 
-        const advanceId = parseInt(req.params.id);
-        if (isNaN(advanceId)) {
-          return res.status(400).json({ message: "Invalid salary advance ID" });
-        }
-
-        const parsed = insertSalaryAdvanceDeductionSchema.parse(req.body);
-
-        // Verify salary advance exists and belongs to current company
-        const advance = await storage.getSalaryAdvanceById(advanceId);
-        if (!advance) {
-          return res.status(404).json({ message: "Salary advance not found" });
-        }
-
-        if (advance.companyId !== req.session.currentCompanyId) {
-          return res
-            .status(403)
-            .json({ message: "Salary advance belongs to a different company" });
-        }
-
-        if (advance.fullyPaid) {
-          return res
-            .status(400)
-            .json({ message: "Salary advance is already fully paid" });
-        }
-
-        const deductionAmount = parseFloat(parsed.deductionAmount);
-        const remainingBalance = parseFloat(advance.remainingBalance);
-
-        if (deductionAmount > remainingBalance) {
-          return res
-            .status(400)
-            .json({
-              message: `Deduction amount cannot exceed remaining balance of ${remainingBalance}`,
-            });
-        }
-
-        // Create salary advance deduction record
-        await db.insert(salaryAdvanceDeductions).values({
-          salaryAdvanceId: advanceId,
-          payrollMonth: parsed.payrollMonth,
-          deductionAmount: parsed.deductionAmount,
-        });
-
-        // Update salary advance remaining balance
-        const newRemainingBalance = remainingBalance - deductionAmount;
-        const isFullyPaid = newRemainingBalance <= 0.01; // Use small threshold for floating point comparison
-
-        await db
-          .update(salaryAdvances)
-          .set({
-            remainingBalance: newRemainingBalance.toFixed(2),
-            fullyPaid: isFullyPaid,
+        // Create voucher for the salary advance
+        const voucherNumber = `SA-${Date.now()}`;
+        const [voucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId: req.session.currentCompanyId,
+            voucherNumber,
+            voucherType: "Payment",
+            voucherDate: parsed.advanceDate,
+            description: parsed.notes || `Salary advance for ${employee[0].firstName} ${employee[0].lastName}`,
+            totalAmount: parsed.amount,
           })
-          .where(eq(salaryAdvances.id, advanceId));
+          .returning();
 
-        res.json({
-          message: "Deduction recorded successfully",
-          newRemainingBalance: newRemainingBalance.toFixed(2),
-          fullyPaid: isFullyPaid,
+        voucherId = voucher.id;
+
+        // Create voucher entries (double-entry)
+        // Debit: Employee (using employeeId field directly - they owe us)
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: null,
+          employeeId: employee[0].id,
+          debitAmount: parsed.amount,
+          creditAmount: "0",
+          narration: `Salary advance - ${voucherNumber}`,
         });
-      } catch (error: any) {
-        res.status(400).json({ message: error.message });
+
+        // Credit: Cash Account
+        await db.insert(voucherEntries).values({
+          voucherId: voucher.id,
+          ledgerAccountId: cashAccountId,
+          debitAmount: "0",
+          creditAmount: parsed.amount,
+          narration: `Salary advance - ${voucherNumber}`,
+        });
       }
-    },
-  );
+
+      // Create salary advance record
+      const advance = await storage.createSalaryAdvance({
+        ...parsed,
+        voucherId,
+      });
+
+      res.status(201).json(advance);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/salary-advances/:id/deduction", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const advanceId = parseInt(req.params.id);
+      if (isNaN(advanceId)) {
+        return res.status(400).json({ message: "Invalid salary advance ID" });
+      }
+
+      const parsed = insertSalaryAdvanceDeductionSchema.parse(req.body);
+
+      // Verify salary advance exists and belongs to current company
+      const advance = await storage.getSalaryAdvanceById(advanceId);
+      if (!advance) {
+        return res.status(404).json({ message: "Salary advance not found" });
+      }
+
+      if (advance.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Salary advance belongs to a different company" });
+      }
+
+      if (advance.fullyPaid) {
+        return res.status(400).json({ message: "Salary advance is already fully paid" });
+      }
+
+      const deductionAmount = parseFloat(parsed.deductionAmount);
+      const remainingBalance = parseFloat(advance.remainingBalance);
+
+      if (deductionAmount > remainingBalance) {
+        return res.status(400).json({
+          message: `Deduction amount cannot exceed remaining balance of ${remainingBalance}`,
+        });
+      }
+
+      // Create salary advance deduction record
+      await db.insert(salaryAdvanceDeductions).values({
+        salaryAdvanceId: advanceId,
+        payrollMonth: parsed.payrollMonth,
+        deductionAmount: parsed.deductionAmount,
+      });
+
+      // Update salary advance remaining balance
+      const newRemainingBalance = remainingBalance - deductionAmount;
+      const isFullyPaid = newRemainingBalance <= 0.01; // Use small threshold for floating point comparison
+
+      await db
+        .update(salaryAdvances)
+        .set({
+          remainingBalance: newRemainingBalance.toFixed(2),
+          fullyPaid: isFullyPaid,
+        })
+        .where(eq(salaryAdvances.id, advanceId));
+
+      res.json({
+        message: "Deduction recorded successfully",
+        newRemainingBalance: newRemainingBalance.toFixed(2),
+        fullyPaid: isFullyPaid,
+      });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 
   app.delete("/api/salary-advances/:id", requireAuth, requireNonPOS, async (req, res) => {
     try {
@@ -1651,7 +1612,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(salaryAdvanceDeductions)
         .where(
           allAdvances.length > 0
-            ? inArray(salaryAdvanceDeductions.salaryAdvanceId, allAdvances.map((a) => a.id))
+            ? inArray(
+                salaryAdvanceDeductions.salaryAdvanceId,
+                allAdvances.map((a) => a.id)
+              )
             : sql`false`
         );
 
@@ -1674,7 +1638,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const paidItems = await db
           .select({ employeeId: erpPayrollRunItems.employeeId, deduction: erpPayrollRunItems.deduction })
           .from(erpPayrollRunItems)
-          .where(inArray(erpPayrollRunItems.runId, paidRuns.map((r) => r.id)));
+          .where(
+            inArray(
+              erpPayrollRunItems.runId,
+              paidRuns.map((r) => r.id)
+            )
+          );
 
         for (const item of paidItems) {
           const amt = parseFloat(item.deduction || "0");
@@ -1723,7 +1692,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const adv = advances[i];
             const currentBal = parseFloat(adv.remainingBalance || "0");
             if (Math.abs(currentBal - newBal) > 0.01 || adv.fullyPaid !== fullyPaid) {
-              await tx.update(salaryAdvances)
+              await tx
+                .update(salaryAdvances)
                 .set({ remainingBalance: newBal.toFixed(2), fullyPaid })
                 .where(eq(salaryAdvances.id, adv.id));
               fixed++;
@@ -1761,10 +1731,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .innerJoin(employees, eq(salaryAdvances.employeeId, employees.id))
         .where(eq(salaryAdvances.companyId, companyId))
         .orderBy(sql`${salaryAdvanceDeductions.createdAt} DESC`);
-      res.json(rows.map((r) => ({
-        ...r,
-        workerName: `${r.employeeFirstName} ${r.employeeLastName}`.trim(),
-      })));
+      res.json(
+        rows.map((r) => ({
+          ...r,
+          workerName: `${r.employeeFirstName} ${r.employeeLastName}`.trim(),
+        }))
+      );
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

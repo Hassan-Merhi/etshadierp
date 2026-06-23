@@ -5,22 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertTriangle,
-  Info,
-  AlertCircle,
-  CheckCircle2,
-  EyeOff,
-  RefreshCw,
-  BellRing,
-} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertTriangle, Info, AlertCircle, CheckCircle2, EyeOff, RefreshCw, BellRing } from "lucide-react";
 import type { BusinessAlert } from "@shared/schema";
 
 const SEVERITY_META: Record<
@@ -41,7 +27,8 @@ const SEVERITY_META: Record<
   warning: {
     label: "Warning",
     icon: AlertTriangle,
-    badgeClass: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border-amber-200 dark:border-amber-800",
+    badgeClass:
+      "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300 border-amber-200 dark:border-amber-800",
     rowClass: "border-l-2 border-l-amber-500",
   },
   info: {
@@ -118,10 +105,7 @@ interface AlertCardProps {
 function AlertCard({ alert, isAdmin, onDismiss, onResolve, onReopen }: AlertCardProps) {
   const m = SEVERITY_META[alert.severity] ?? SEVERITY_META["info"];
   return (
-    <div
-      className={`rounded-md border bg-card p-3 space-y-1 ${m.rowClass}`}
-      data-testid={`alert-card-${alert.id}`}
-    >
+    <div className={`rounded-md border bg-card p-3 space-y-1 ${m.rowClass}`} data-testid={`alert-card-${alert.id}`}>
       <div className="flex items-start justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
           <SeverityBadge severity={alert.severity} />
@@ -166,8 +150,7 @@ function AlertCard({ alert, isAdmin, onDismiss, onResolve, onReopen }: AlertCard
       <p className="text-xs text-muted-foreground">{alert.message}</p>
       <p className="text-xs text-muted-foreground/60">
         Raised {fmtDate(alert.createdAt)}
-        {alert.status === "resolved" && alert.resolvedAt &&
-          ` · Resolved ${fmtDate(alert.resolvedAt)}`}
+        {alert.status === "resolved" && alert.resolvedAt && ` · Resolved ${fmtDate(alert.resolvedAt)}`}
         {alert.status === "dismissed" && " · Dismissed"}
       </p>
     </div>
@@ -197,38 +180,32 @@ export function BusinessAlertsPage({ currentUser }: Props) {
   });
 
   const dismissMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest("POST", `/api/business-alerts/${id}/dismiss`, {}),
+    mutationFn: (id: number) => apiRequest("POST", `/api/business-alerts/${id}/dismiss`, {}),
     onSuccess: () => {
       toast({ title: "Alert dismissed" });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
     },
-    onError: (e: any) =>
-      toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const resolveMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest("POST", `/api/business-alerts/${id}/resolve`, {}),
+    mutationFn: (id: number) => apiRequest("POST", `/api/business-alerts/${id}/resolve`, {}),
     onSuccess: () => {
       toast({ title: "Alert resolved" });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts/summary"] });
     },
-    onError: (e: any) =>
-      toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const reopenMutation = useMutation({
-    mutationFn: (id: number) =>
-      apiRequest("POST", `/api/business-alerts/${id}/reopen`, {}),
+    mutationFn: (id: number) => apiRequest("POST", `/api/business-alerts/${id}/reopen`, {}),
     onSuccess: () => {
       toast({ title: "Alert reopened" });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts/summary"] });
     },
-    onError: (e: any) =>
-      toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const runChecksMutation = useMutation({
@@ -238,8 +215,7 @@ export function BusinessAlertsPage({ currentUser }: Props) {
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/business-alerts/summary"] });
     },
-    onError: (e: any) =>
-      toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
   const alerts = Array.isArray(alertsQuery.data) ? alertsQuery.data : [];

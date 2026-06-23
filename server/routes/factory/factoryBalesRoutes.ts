@@ -11,56 +11,129 @@ const _kpiCache = new Map<string, { data: any; expiresAt: number }>();
 function _getKpiCached(key: string): any | null {
   const e = _kpiCache.get(key);
   if (!e) return null;
-  if (Date.now() > e.expiresAt) { _kpiCache.delete(key); return null; }
+  if (Date.now() > e.expiresAt) {
+    _kpiCache.delete(key);
+    return null;
+  }
   return e.data;
 }
 function _setKpiCached(key: string, data: any, ttlMs = 30_000): void {
   _kpiCache.set(key, { data, expiresAt: Date.now() + ttlMs });
   if (_kpiCache.size > 200) {
     const now = Date.now();
-    for (const [k, v] of _kpiCache) { if (v.expiresAt < now) _kpiCache.delete(k); }
+    for (const [k, v] of _kpiCache) {
+      if (v.expiresAt < now) _kpiCache.delete(k);
+    }
   }
 }
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, getUserHideAllCosts, checkFactoryAdmin,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  getUserHideAllCosts,
+  checkFactoryAdmin,
 } from "./_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
   factoryBaleImportBatches,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
@@ -127,7 +200,7 @@ export function registerFactoryBalesRoutes(app: Express) {
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `REF${String(nextNumber + i).padStart(6, '0')}`;
+          const refNum = `REF${String(nextNumber + i).padStart(6, "0")}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -224,7 +297,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           if (!product) throw new Error(`Product ID ${item.productId} not found`);
 
           for (let i = 0; i < qty; i++) {
-            const refNum = `REF${String(nextNumber + baleIndex).padStart(6, '0')}`;
+            const refNum = `REF${String(nextNumber + baleIndex).padStart(6, "0")}`;
             const [bale] = await tx
               .insert(factoryBales)
               .values({
@@ -315,7 +388,7 @@ export function registerFactoryBalesRoutes(app: Express) {
 
         const bales: any[] = [];
         for (let i = 0; i < quantity; i++) {
-          const refNum = `REF${String(nextNumber + i).padStart(6, '0')}`;
+          const refNum = `REF${String(nextNumber + i).padStart(6, "0")}`;
           const [bale] = await tx
             .insert(factoryBales)
             .values({
@@ -439,7 +512,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const { pressingBatchId, scannedBaleIds, erpLocationId, mixBatchId } = req.body;
 
       if (!pressingBatchId || !scannedBaleIds || !erpLocationId || !mixBatchId) {
-        return res.status(400).json({ message: "pressingBatchId, scannedBaleIds, erpLocationId, and mixBatchId are required" });
+        return res
+          .status(400)
+          .json({ message: "pressingBatchId, scannedBaleIds, erpLocationId, and mixBatchId are required" });
       }
 
       const result = await db.transaction(async (tx: any) => {
@@ -483,7 +558,9 @@ export function registerFactoryBalesRoutes(app: Express) {
         }
 
         if (totalWeight > mixRemaining + 0.001) {
-          throw new Error(`Not enough mix batch remaining. Need ${totalWeight.toFixed(3)} kg but only ${mixRemaining.toFixed(3)} kg available`);
+          throw new Error(
+            `Not enough mix batch remaining. Need ${totalWeight.toFixed(3)} kg but only ${mixRemaining.toFixed(3)} kg available`
+          );
         }
 
         // Derive bale cost from raw stock source prices (not mix batch blended cost).
@@ -514,9 +591,10 @@ export function registerFactoryBalesRoutes(app: Express) {
           let sourceTotalWeight = 0;
           for (const src of mixSources) {
             const w = parseFloat(src.weightKg);
-            const c = src.containerId && rawStockCostMap[src.containerId] !== undefined
-              ? rawStockCostMap[src.containerId]
-              : parseFloat(src.costPerKg);
+            const c =
+              src.containerId && rawStockCostMap[src.containerId] !== undefined
+                ? rawStockCostMap[src.containerId]
+                : parseFloat(src.costPerKg);
             sourceTotalCost += w * c;
             sourceTotalWeight += w;
           }
@@ -569,18 +647,22 @@ export function registerFactoryBalesRoutes(app: Express) {
         for (const b of balesToFinalize) {
           if (b.productId && !productIds.includes(b.productId)) productIds.push(b.productId);
         }
-        const factoryProducts = productIds.length > 0
-          ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
-          : [];
+        const factoryProducts =
+          productIds.length > 0
+            ? await tx.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+            : [];
 
         const productMap = new Map<number, any>(factoryProducts.map((p: any) => [p.id, p]));
 
         const categoryIdSet = new Set<number>();
-        factoryProducts.forEach((p: any) => { if (p.categoryId) categoryIdSet.add(p.categoryId); });
+        factoryProducts.forEach((p: any) => {
+          if (p.categoryId) categoryIdSet.add(p.categoryId);
+        });
         const categoryIds = Array.from(categoryIdSet);
-        const factoryCats = categoryIds.length > 0
-          ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
-          : [];
+        const factoryCats =
+          categoryIds.length > 0
+            ? await tx.select().from(factoryCategories).where(inArray(factoryCategories.id, categoryIds))
+            : [];
         const categoryMap = new Map<number, any>(factoryCats.map((c: any) => [c.id, c]));
 
         const stockGroupCache = new Map<string, number>();
@@ -614,7 +696,13 @@ export function registerFactoryBalesRoutes(app: Express) {
                   stockGroupId = existingGroup.id;
                 } else {
                   // Use the category's own ID for a collision-free code
-                  const groupCode = catId ? `FCAT-${catId}` : "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
+                  const groupCode = catId
+                    ? `FCAT-${catId}`
+                    : "F-" +
+                      catName
+                        .replace(/[^A-Z0-9]/gi, "")
+                        .substring(0, 10)
+                        .toUpperCase();
                   const [created] = await tx
                     .insert(stockGroups)
                     .values({ companyId, name: catName, code: groupCode })
@@ -687,7 +775,10 @@ export function registerFactoryBalesRoutes(app: Express) {
       });
 
       const today = req.body.txDate || getClientDate(req);
-      const [finalizeLocation] = await db.select({ name: locations.name }).from(locations).where(eq(locations.id, erpLocationId));
+      const [finalizeLocation] = await db
+        .select({ name: locations.name })
+        .from(locations)
+        .where(eq(locations.id, erpLocationId));
       await writeDaybookEntry(db, {
         companyId,
         txDate: today,
@@ -718,11 +809,13 @@ export function registerFactoryBalesRoutes(app: Express) {
           articleCode: factoryBales.articleCode,
         })
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.status, "IN_STOCK"),
-          sql`${factoryBales.mixBatchId} IS NOT NULL`
-        ));
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.status, "IN_STOCK"),
+            sql`${factoryBales.mixBatchId} IS NOT NULL`
+          )
+        );
 
       if (balesWithMix.length === 0) return res.json({ updated: 0 });
 
@@ -754,12 +847,14 @@ export function registerFactoryBalesRoutes(app: Express) {
       for (const mixId of uniqueMixIds) {
         const sources = allSources.filter((s: any) => s.mixBatchId === mixId);
         if (sources.length === 0) continue;
-        let totalCost = 0, totalWt = 0;
+        let totalCost = 0,
+          totalWt = 0;
         for (const src of sources) {
           const w = parseFloat(src.weightKg);
-          const c = src.containerId && rawStockCostMap[src.containerId] !== undefined
-            ? rawStockCostMap[src.containerId]
-            : parseFloat(src.costPerKg);
+          const c =
+            src.containerId && rawStockCostMap[src.containerId] !== undefined
+              ? rawStockCostMap[src.containerId]
+              : parseFloat(src.costPerKg);
           totalCost += w * c;
           totalWt += w;
         }
@@ -816,12 +911,14 @@ export function registerFactoryBalesRoutes(app: Express) {
       }
 
       const locIds = [...new Set(bales.map((b: any) => b.erpLocationId).filter(Boolean))];
-      const locs = locIds.length > 0
-        ? await db.select().from(locations).where(inArray(locations.id, locIds))
-        : [];
+      const locs = locIds.length > 0 ? await db.select().from(locations).where(inArray(locations.id, locIds)) : [];
       const locMap = new Map(locs.map((l: any) => [l.id, l]));
 
-      const [fCfgBale] = await db.select({ hideAvgCost: factorySettings.hideAvgCost }).from(factorySettings).where(eq(factorySettings.companyId, companyId)).limit(1);
+      const [fCfgBale] = await db
+        .select({ hideAvgCost: factorySettings.hideAvgCost })
+        .from(factorySettings)
+        .where(eq(factorySettings.companyId, companyId))
+        .limit(1);
       const userHideAllCosts = await getUserHideAllCosts(req);
       const showCostBale = !fCfgBale?.hideAvgCost && !userHideAllCosts;
 
@@ -847,7 +944,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         { header: "Mix Batch ID", key: "mixBatchId", width: 14 },
         { header: "Bale Code", key: "baleCode", width: 18 },
         { header: "Grade", key: "grade", width: 12 },
-        { header: "Finalized At", key: "finalizedAt", width: 22 },
+        { header: "Finalized At", key: "finalizedAt", width: 22 }
       );
       sheet.columns = baleCols;
 
@@ -902,8 +999,12 @@ export function registerFactoryBalesRoutes(app: Express) {
         eq(factoryBales.companyId, companyId),
         not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
       ];
-      if (from) conditions.push(sql`COALESCE(${factoryBales.stockEntryDate}, ${factoryBales.createdAt}::date) >= ${from}::date`);
-      if (to)   conditions.push(sql`COALESCE(${factoryBales.stockEntryDate}, ${factoryBales.createdAt}::date) <= ${to}::date`);
+      if (from)
+        conditions.push(
+          sql`COALESCE(${factoryBales.stockEntryDate}, ${factoryBales.createdAt}::date) >= ${from}::date`
+        );
+      if (to)
+        conditions.push(sql`COALESCE(${factoryBales.stockEntryDate}, ${factoryBales.createdAt}::date) <= ${to}::date`);
 
       const bales = await db
         .select()
@@ -921,53 +1022,53 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       sheet.columns = [
         { header: "Reference Number", key: "referenceNumber", width: 24 },
-        { header: "Article Code",     key: "articleCode",     width: 18 },
-        { header: "Product Name",     key: "productName",     width: 30 },
-        { header: "Category",         key: "category",        width: 18 },
-        { header: "Bale Code",        key: "baleCode",        width: 18 },
-        { header: "Grade",            key: "grade",           width: 12 },
-        { header: "Weight (KG)",      key: "weightKg",        width: 14 },
-        { header: "Status",           key: "status",          width: 18 },
-        { header: "Stock Entry Date", key: "stockEntryDate",  width: 18 },
-        { header: "Created At",       key: "createdAt",       width: 22 },
-        { header: "Pressed At",       key: "pressedAt",       width: 22 },
-        { header: "Finalized At",     key: "finalizedAt",     width: 22 },
+        { header: "Article Code", key: "articleCode", width: 18 },
+        { header: "Product Name", key: "productName", width: 30 },
+        { header: "Category", key: "category", width: 18 },
+        { header: "Bale Code", key: "baleCode", width: 18 },
+        { header: "Grade", key: "grade", width: 12 },
+        { header: "Weight (KG)", key: "weightKg", width: 14 },
+        { header: "Status", key: "status", width: 18 },
+        { header: "Stock Entry Date", key: "stockEntryDate", width: 18 },
+        { header: "Created At", key: "createdAt", width: 22 },
+        { header: "Pressed At", key: "pressedAt", width: 22 },
+        { header: "Finalized At", key: "finalizedAt", width: 22 },
       ];
 
       // Style header row
       const headerRow = sheet.getRow(1);
       headerRow.eachCell((cell) => {
-        cell.font  = { bold: true, color: { argb: "FFFFFFFF" } };
-        cell.fill  = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E3A5F" } };
         cell.alignment = { vertical: "middle", horizontal: "center" };
       });
       sheet.getRow(1).height = 22;
 
       // Status → background colour map
       const statusColors: Record<string, string> = {
-        IN_STOCK:         "FFD1FAE5",
-        SOLD:             "FFDBEAFE",
-        FINALIZED:        "FFDBEAFE",
-        DISPATCHED:       "FFE0E7FF",
-        DELETED:          "FFFEE2E2",
-        REMOVED:          "FFFEE2E2",
+        IN_STOCK: "FFD1FAE5",
+        SOLD: "FFDBEAFE",
+        FINALIZED: "FFDBEAFE",
+        DISPATCHED: "FFE0E7FF",
+        DELETED: "FFFEE2E2",
+        REMOVED: "FFFEE2E2",
         PENDING_PRESSING: "FFFFF9C4",
       };
 
       for (const bale of bales) {
         const row = sheet.addRow({
           referenceNumber: bale.referenceNumber,
-          articleCode:     bale.articleCode ?? "",
-          productName:     bale.productName ?? "",
-          category:        bale.category ?? "",
-          baleCode:        bale.baleCode ?? "",
-          grade:           bale.grade ?? "",
-          weightKg:        parseFloat(bale.weightKg || "0"),
-          status:          bale.status ?? "",
-          stockEntryDate:  bale.stockEntryDate ? new Date(bale.stockEntryDate).toLocaleDateString() : "",
-          createdAt:       bale.createdAt ? new Date(bale.createdAt).toLocaleString() : "",
-          pressedAt:       bale.pressedAt ? new Date(bale.pressedAt).toLocaleString() : "",
-          finalizedAt:     bale.finalizedAt ? new Date(bale.finalizedAt).toLocaleString() : "",
+          articleCode: bale.articleCode ?? "",
+          productName: bale.productName ?? "",
+          category: bale.category ?? "",
+          baleCode: bale.baleCode ?? "",
+          grade: bale.grade ?? "",
+          weightKg: parseFloat(bale.weightKg || "0"),
+          status: bale.status ?? "",
+          stockEntryDate: bale.stockEntryDate ? new Date(bale.stockEntryDate).toLocaleDateString() : "",
+          createdAt: bale.createdAt ? new Date(bale.createdAt).toLocaleString() : "",
+          pressedAt: bale.pressedAt ? new Date(bale.pressedAt).toLocaleString() : "",
+          finalizedAt: bale.finalizedAt ? new Date(bale.finalizedAt).toLocaleString() : "",
         });
 
         const bgColor = statusColors[bale.status ?? ""] ?? "FFFFFFFF";
@@ -977,19 +1078,19 @@ export function registerFactoryBalesRoutes(app: Express) {
       }
 
       // Weight column — numeric format
-      sheet.getColumn("weightKg").numFmt = '#,##0.000';
+      sheet.getColumn("weightKg").numFmt = "#,##0.000";
 
       // Auto-filter
       sheet.autoFilter = {
         from: { row: 1, column: 1 },
-        to:   { row: 1, column: sheet.columns.length },
+        to: { row: 1, column: sheet.columns.length },
       };
 
       // ── Sheet 2: Summary by Status ──
       const summarySheet = workbook.addWorksheet("Summary");
       summarySheet.columns = [
-        { header: "Status",        key: "status",  width: 22 },
-        { header: "Bale Count",    key: "count",   width: 14 },
+        { header: "Status", key: "status", width: 22 },
+        { header: "Bale Count", key: "count", width: 14 },
         { header: "Total Weight (KG)", key: "weight", width: 20 },
       ];
       const sumHeader = summarySheet.getRow(1);
@@ -1025,7 +1126,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         cell.font = { bold: true };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
       });
-      summarySheet.getColumn("weight").numFmt = '#,##0.000';
+      summarySheet.getColumn("weight").numFmt = "#,##0.000";
 
       const dateSuffix = from && to ? `_${from}_to_${to}` : `_all`;
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -1057,25 +1158,29 @@ export function registerFactoryBalesRoutes(app: Express) {
 
         const headers: string[] = [];
         sheet.getRow(1).eachCell((cell, colNumber) => {
-          headers[colNumber] = String(cell.value || "").trim().toLowerCase();
+          headers[colNumber] = String(cell.value || "")
+            .trim()
+            .toLowerCase();
         });
 
-        const refIdx = headers.findIndex(h => h.includes("reference"));
-        const articleIdx = headers.findIndex(h => h.includes("article"));
-        const nameIdx = headers.findIndex(h => h.includes("product name"));
-        const catIdx = headers.findIndex(h => h.includes("category"));
-        const weightIdx = headers.findIndex(h => h.includes("weight"));
-        const costPerKgIdx = headers.findIndex(h => h.includes("cost per kg"));
-        const totalCostIdx = headers.findIndex(h => h.includes("total cost"));
-        const locIdIdx = headers.findIndex(h => h.includes("location id"));
-        const statusIdx = headers.findIndex(h => h.includes("status"));
-        const mixBatchIdx = headers.findIndex(h => h.includes("mix batch"));
-        const baleCodeIdx = headers.findIndex(h => h.includes("bale code"));
-        const gradeIdx = headers.findIndex(h => h.includes("grade"));
-        const finalizedIdx = headers.findIndex(h => h.includes("finalized"));
+        const refIdx = headers.findIndex((h) => h.includes("reference"));
+        const articleIdx = headers.findIndex((h) => h.includes("article"));
+        const nameIdx = headers.findIndex((h) => h.includes("product name"));
+        const catIdx = headers.findIndex((h) => h.includes("category"));
+        const weightIdx = headers.findIndex((h) => h.includes("weight"));
+        const costPerKgIdx = headers.findIndex((h) => h.includes("cost per kg"));
+        const totalCostIdx = headers.findIndex((h) => h.includes("total cost"));
+        const locIdIdx = headers.findIndex((h) => h.includes("location id"));
+        const statusIdx = headers.findIndex((h) => h.includes("status"));
+        const mixBatchIdx = headers.findIndex((h) => h.includes("mix batch"));
+        const baleCodeIdx = headers.findIndex((h) => h.includes("bale code"));
+        const gradeIdx = headers.findIndex((h) => h.includes("grade"));
+        const finalizedIdx = headers.findIndex((h) => h.includes("finalized"));
 
         if (refIdx < 0 || nameIdx < 0 || weightIdx < 0) {
-          return res.status(400).json({ message: "Excel must have at least: Reference Number, Product Name, Weight (kg) columns" });
+          return res
+            .status(400)
+            .json({ message: "Excel must have at least: Reference Number, Product Name, Weight (kg) columns" });
         }
 
         const rows: any[] = [];
@@ -1098,8 +1203,10 @@ export function registerFactoryBalesRoutes(app: Express) {
             productName: nameIdx >= 0 ? String(row.getCell(nameIdx + 1).value || "").trim() : "",
             category: catIdx >= 0 ? String(row.getCell(catIdx + 1).value || "").trim() : "",
             weightKg: weightIdx >= 0 ? String(parseFloat(String(row.getCell(weightIdx + 1).value || "0")) || "0") : "0",
-            costPerKg: costPerKgIdx >= 0 ? String(parseFloat(String(row.getCell(costPerKgIdx + 1).value || "0")) || "0") : "0",
-            totalCost: totalCostIdx >= 0 ? String(parseFloat(String(row.getCell(totalCostIdx + 1).value || "0")) || "0") : "0",
+            costPerKg:
+              costPerKgIdx >= 0 ? String(parseFloat(String(row.getCell(costPerKgIdx + 1).value || "0")) || "0") : "0",
+            totalCost:
+              totalCostIdx >= 0 ? String(parseFloat(String(row.getCell(totalCostIdx + 1).value || "0")) || "0") : "0",
             erpLocationId: locIdIdx >= 0 ? parseInt(String(row.getCell(locIdIdx + 1).value || "0")) || null : null,
             status: statusIdx >= 0 ? String(row.getCell(statusIdx + 1).value || "IN_STOCK").trim() : "IN_STOCK",
             mixBatchId: mixBatchIdx >= 0 ? parseInt(String(row.getCell(mixBatchIdx + 1).value || "0")) || null : null,
@@ -1114,7 +1221,9 @@ export function registerFactoryBalesRoutes(app: Express) {
         }
 
         if (fileDuplicates.length > 0) {
-          return res.status(400).json({ message: `Duplicate reference numbers within the file: ${fileDuplicates.slice(0, 10).join(", ")}` });
+          return res.status(400).json({
+            message: `Duplicate reference numbers within the file: ${fileDuplicates.slice(0, 10).join(", ")}`,
+          });
         }
 
         const result = await db.transaction(async (tx: any) => {
@@ -1124,18 +1233,31 @@ export function registerFactoryBalesRoutes(app: Express) {
             .where(eq(factoryBales.companyId, companyId));
           const existingRefSet = new Set(existingBarcodes.map((b: any) => b.referenceNumber));
 
-          const duplicates = rows.filter(r => existingRefSet.has(r.referenceNumber));
+          const duplicates = rows.filter((r) => existingRefSet.has(r.referenceNumber));
           if (duplicates.length > 0) {
-            throw new Error(`These reference numbers already exist: ${duplicates.slice(0, 10).map(d => d.referenceNumber).join(", ")}${duplicates.length > 10 ? ` and ${duplicates.length - 10} more` : ""}`);
+            throw new Error(
+              `These reference numbers already exist: ${duplicates
+                .slice(0, 10)
+                .map((d) => d.referenceNumber)
+                .join(", ")}${duplicates.length > 10 ? ` and ${duplicates.length - 10} more` : ""}`
+            );
           }
 
           const validLocIds = new Set<number>();
-          const allLocs = await tx.select({ id: locations.id }).from(locations).where(eq(locations.companyId, companyId));
+          const allLocs = await tx
+            .select({ id: locations.id })
+            .from(locations)
+            .where(eq(locations.companyId, companyId));
           allLocs.forEach((l: any) => validLocIds.add(l.id));
 
-          const invalidLocRows = rows.filter(r => r.erpLocationId && !validLocIds.has(r.erpLocationId));
+          const invalidLocRows = rows.filter((r) => r.erpLocationId && !validLocIds.has(r.erpLocationId));
           if (invalidLocRows.length > 0) {
-            throw new Error(`Invalid location IDs found: ${invalidLocRows.map(r => `${r.referenceNumber} (loc ${r.erpLocationId})`).slice(0, 5).join(", ")}`);
+            throw new Error(
+              `Invalid location IDs found: ${invalidLocRows
+                .map((r) => `${r.referenceNumber} (loc ${r.erpLocationId})`)
+                .slice(0, 5)
+                .join(", ")}`
+            );
           }
 
           const allProducts = await tx
@@ -1145,25 +1267,41 @@ export function registerFactoryBalesRoutes(app: Express) {
           const productByName = new Map(allProducts.map((p: any) => [p.name.toLowerCase(), p]));
           const productByArticle = new Map(allProducts.map((p: any) => [p.articleCode?.toLowerCase(), p]));
 
-          const allCategories = await tx.select().from(factoryCategories).where(eq(factoryCategories.companyId, companyId));
+          const allCategories = await tx
+            .select()
+            .from(factoryCategories)
+            .where(eq(factoryCategories.companyId, companyId));
           const categoryByName = new Map(allCategories.map((c: any) => [c.name?.toLowerCase(), c]));
 
           const createdBales: any[] = [];
           let totalWeight = 0;
 
           for (const row of rows) {
-            let product = (row.articleCode ? productByArticle.get(row.articleCode.toLowerCase()) : null) || productByName.get(row.productName.toLowerCase());
+            let product =
+              (row.articleCode ? productByArticle.get(row.articleCode.toLowerCase()) : null) ||
+              productByName.get(row.productName.toLowerCase());
             if (!product) {
-              const autoCode = row.articleCode || ("IMP-" + row.productName.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 20) + "-" + Date.now().toString(36).slice(-4).toUpperCase());
+              const autoCode =
+                row.articleCode ||
+                "IMP-" +
+                  row.productName
+                    .replace(/[^a-zA-Z0-9]/g, "")
+                    .toUpperCase()
+                    .substring(0, 20) +
+                  "-" +
+                  Date.now().toString(36).slice(-4).toUpperCase();
               const categoryObj = row.category ? categoryByName.get(row.category.toLowerCase()) : null;
-              const [newProduct] = await tx.insert(factoryBaleProducts).values({
-                companyId,
-                code: autoCode,
-                articleCode: row.articleCode || autoCode,
-                name: row.productName,
-                active: true,
-                ...(categoryObj ? { categoryId: categoryObj.id } : {}),
-              }).returning();
+              const [newProduct] = await tx
+                .insert(factoryBaleProducts)
+                .values({
+                  companyId,
+                  code: autoCode,
+                  articleCode: row.articleCode || autoCode,
+                  name: row.productName,
+                  active: true,
+                  ...(categoryObj ? { categoryId: categoryObj.id } : {}),
+                })
+                .returning();
               product = newProduct;
               productByName.set(row.productName.toLowerCase(), product);
               if (row.articleCode) productByArticle.set(row.articleCode.toLowerCase(), product);
@@ -1232,7 +1370,13 @@ export function registerFactoryBalesRoutes(app: Express) {
                   stockGroupId = existingGroup.id;
                 } else {
                   // Use the category's own ID for a collision-free code
-                  const groupCode = catId ? `FCAT-${catId}` : "F-" + catName.replace(/[^A-Z0-9]/gi, "").substring(0, 10).toUpperCase();
+                  const groupCode = catId
+                    ? `FCAT-${catId}`
+                    : "F-" +
+                      catName
+                        .replace(/[^A-Z0-9]/gi, "")
+                        .substring(0, 10)
+                        .toUpperCase();
                   const [created] = await tx
                     .insert(stockGroups)
                     .values({ companyId, name: catName, code: groupCode })
@@ -1389,15 +1533,25 @@ export function registerFactoryBalesRoutes(app: Express) {
           const id = parseInt(row["ID (do not edit)"] ?? row["id"] ?? row["ID"]);
           const productName = String(row["Product Name"] ?? row["productName"] ?? "").trim();
 
-          if (!id || isNaN(id)) { skipped++; continue; }
-          if (!productName) { skipped++; continue; }
+          if (!id || isNaN(id)) {
+            skipped++;
+            continue;
+          }
+          if (!productName) {
+            skipped++;
+            continue;
+          }
 
           const [bale] = await db
             .select()
             .from(factoryBales)
             .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
 
-          if (!bale) { errors.push(`Bale ID ${id} not found`); skipped++; continue; }
+          if (!bale) {
+            errors.push(`Bale ID ${id} not found`);
+            skipped++;
+            continue;
+          }
 
           if (bale.productId) {
             await db
@@ -1406,10 +1560,7 @@ export function registerFactoryBalesRoutes(app: Express) {
               .where(and(eq(factoryBaleProducts.id, bale.productId), eq(factoryBaleProducts.companyId, companyId)));
           }
 
-          await db
-            .update(factoryBales)
-            .set({ productName, updatedAt: new Date() })
-            .where(eq(factoryBales.id, id));
+          await db.update(factoryBales).set({ productName, updatedAt: new Date() }).where(eq(factoryBales.id, id));
 
           updated++;
         }
@@ -1457,12 +1608,14 @@ export function registerFactoryBalesRoutes(app: Express) {
       const productIds: number[] = Array.from(new Set(bales.map((b: any) => b.productId).filter(Boolean)));
       const batchIds: number[] = Array.from(new Set(bales.map((b: any) => b.mixBatchId).filter(Boolean)));
 
-      const products = productIds.length > 0
-        ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
-        : [];
-      const batches = batchIds.length > 0
-        ? await db.select().from(factoryMixBatches).where(inArray(factoryMixBatches.id, batchIds))
-        : [];
+      const products =
+        productIds.length > 0
+          ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds))
+          : [];
+      const batches =
+        batchIds.length > 0
+          ? await db.select().from(factoryMixBatches).where(inArray(factoryMixBatches.id, batchIds))
+          : [];
 
       const productMap = new Map(products.map((p: any) => [p.id, p]));
       const batchMap = new Map(batches.map((b: any) => [b.id, b]));
@@ -1505,11 +1658,25 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { ids, status } = req.body;
-      if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids must be a non-empty array" });
+      if (!Array.isArray(ids) || ids.length === 0)
+        return res.status(400).json({ message: "ids must be a non-empty array" });
       if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
 
-      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED","DISPATCHED"];
-      if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
+      const ALLOWED = [
+        "PENDING_PRESSING",
+        "LABEL_PRINTED",
+        "PRESSED",
+        "IN_STOCK",
+        "RESERVED",
+        "RESERVED_FOR_ORDER",
+        "SOLD",
+        "REPACKED",
+        "REMOVED",
+        "DELETED",
+        "DISPATCHED",
+      ];
+      if (!ALLOWED.includes(status))
+        return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
       const result = await db
         .update(factoryBales)
@@ -1536,8 +1703,21 @@ export function registerFactoryBalesRoutes(app: Express) {
       const { status } = req.body;
       if (!status || typeof status !== "string") return res.status(400).json({ message: "status is required" });
 
-      const ALLOWED = ["PENDING_PRESSING","LABEL_PRINTED","PRESSED","IN_STOCK","RESERVED","RESERVED_FOR_ORDER","SOLD","REPACKED","REMOVED","DELETED","DISPATCHED"];
-      if (!ALLOWED.includes(status)) return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
+      const ALLOWED = [
+        "PENDING_PRESSING",
+        "LABEL_PRINTED",
+        "PRESSED",
+        "IN_STOCK",
+        "RESERVED",
+        "RESERVED_FOR_ORDER",
+        "SOLD",
+        "REPACKED",
+        "REMOVED",
+        "DELETED",
+        "DISPATCHED",
+      ];
+      if (!ALLOWED.includes(status))
+        return res.status(400).json({ message: `Invalid status. Allowed: ${ALLOWED.join(", ")}` });
 
       const [updated] = await db
         .update(factoryBales)
@@ -1622,11 +1802,22 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { workerId } = req.body;
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
-      const [bale] = await db.select().from(factoryBales).where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
+      const [bale] = await db
+        .select()
+        .from(factoryBales)
+        .where(and(eq(factoryBales.id, id), eq(factoryBales.companyId, companyId)));
       if (!bale) return res.status(404).json({ message: "Bale not found" });
       const numericWorkerId = parseInt(workerId);
-      const [worker] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, numericWorkerId)).limit(1);
-      const [updated] = await db.update(factoryBales).set({ finalizedBy: numericWorkerId, workerName: worker?.fullName ?? null, updatedAt: new Date() }).where(eq(factoryBales.id, id)).returning();
+      const [worker] = await db
+        .select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers)
+        .where(eq(factoryWorkers.id, numericWorkerId))
+        .limit(1);
+      const [updated] = await db
+        .update(factoryBales)
+        .set({ finalizedBy: numericWorkerId, workerName: worker?.fullName ?? null, updatedAt: new Date() })
+        .where(eq(factoryBales.id, id))
+        .returning();
       res.json(updated);
     } catch (error: any) {
       console.error("Error assigning worker to bale:", error);
@@ -1640,12 +1831,18 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { baleIds, workerId } = req.body;
-      if (!Array.isArray(baleIds) || baleIds.length === 0) return res.status(400).json({ message: "baleIds array is required" });
+      if (!Array.isArray(baleIds) || baleIds.length === 0)
+        return res.status(400).json({ message: "baleIds array is required" });
       if (!workerId) return res.status(400).json({ message: "workerId is required" });
-      const numericIds = baleIds.map(Number).filter(n => !isNaN(n));
+      const numericIds = baleIds.map(Number).filter((n) => !isNaN(n));
       const numericWorkerId = parseInt(workerId);
-      const [worker] = await db.select({ fullName: factoryWorkers.fullName }).from(factoryWorkers).where(eq(factoryWorkers.id, numericWorkerId)).limit(1);
-      await db.update(factoryBales)
+      const [worker] = await db
+        .select({ fullName: factoryWorkers.fullName })
+        .from(factoryWorkers)
+        .where(eq(factoryWorkers.id, numericWorkerId))
+        .limit(1);
+      await db
+        .update(factoryBales)
         .set({ finalizedBy: numericWorkerId, workerName: worker?.fullName ?? null, updatedAt: new Date() })
         .where(and(eq(factoryBales.companyId, companyId), inArray(factoryBales.id, numericIds)));
       res.json({ updated: numericIds.length, workerId: numericWorkerId });
@@ -1695,7 +1892,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           });
         }
 
-        const newRefNum = `REF${String(nextNumber).padStart(6, '0')}`;
+        const newRefNum = `REF${String(nextNumber).padStart(6, "0")}`;
 
         const [newBale] = await tx
           .insert(factoryBales)
@@ -1719,10 +1916,7 @@ export function registerFactoryBalesRoutes(app: Express) {
           })
           .returning();
 
-        await tx
-          .update(factoryBales)
-          .set({ status: "REPACKED", updatedAt: new Date() })
-          .where(eq(factoryBales.id, id));
+        await tx.update(factoryBales).set({ status: "REPACKED", updatedAt: new Date() }).where(eq(factoryBales.id, id));
 
         return { originalBale, newBale, newRefNum };
       });
@@ -1766,10 +1960,12 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const userRole = (req.session as any).currentRole as string || (req.session as any).factoryRole as string || "";
+      const userRole =
+        ((req.session as any).currentRole as string) || ((req.session as any).factoryRole as string) || "";
       const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
-      const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } = req.query as Record<string, string>;
+      const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } =
+        req.query as Record<string, string>;
 
       const today = getClientDate(req);
       const effectiveStart = startDate || today;
@@ -1779,10 +1975,12 @@ export function registerFactoryBalesRoutes(app: Express) {
       const productFilter = productId ? sql`AND fb.product_id = ${parseInt(productId)}` : sql``;
       const locationFilter = locationId ? sql`AND fb.erp_location_id = ${parseInt(locationId)}` : sql``;
       const statusFilter = status ? sql`AND fb.status = ${status}` : sql``;
-      const searchFilter = search ? sql`AND LOWER(fb.reference_number) LIKE ${'%' + search.toLowerCase() + '%'}` : sql``;
-      const unassignedFilter = includeUnassigned === 'false' ? sql`AND fb.finalized_by IS NOT NULL` : sql``;
+      const searchFilter = search
+        ? sql`AND LOWER(fb.reference_number) LIKE ${"%" + search.toLowerCase() + "%"}`
+        : sql``;
+      const unassignedFilter = includeUnassigned === "false" ? sql`AND fb.finalized_by IS NOT NULL` : sql``;
       // Privileged users can see deleted bales when searching by ref code
-      const deletedFilter = (isPrivileged && search) ? sql`` : sql`AND fb.deleted_at IS NULL`;
+      const deletedFilter = isPrivileged && search ? sql`` : sql`AND fb.deleted_at IS NULL`;
 
       const rows = await db.execute(sql`
         SELECT
@@ -1843,10 +2041,12 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const userRole = (req.session as any).currentRole as string || (req.session as any).factoryRole as string || "";
+      const userRole =
+        ((req.session as any).currentRole as string) || ((req.session as any).factoryRole as string) || "";
       const isPrivileged = ["Admin", "Owner", "Manager", "Developer"].includes(userRole);
 
-      const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } = req.query as Record<string, string>;
+      const { startDate, endDate, workerId, productId, locationId, status, search, includeUnassigned } =
+        req.query as Record<string, string>;
 
       const today = getClientDate(req);
       const effectiveStart = startDate || today;
@@ -1856,9 +2056,11 @@ export function registerFactoryBalesRoutes(app: Express) {
       const productFilter = productId ? sql`AND fb.product_id = ${parseInt(productId)}` : sql``;
       const locationFilter = locationId ? sql`AND fb.erp_location_id = ${parseInt(locationId)}` : sql``;
       const statusFilter = status ? sql`AND fb.status = ${status}` : sql``;
-      const searchFilter = search ? sql`AND LOWER(fb.reference_number) LIKE ${'%' + search.toLowerCase() + '%'}` : sql``;
-      const unassignedFilter = includeUnassigned === 'false' ? sql`AND fb.finalized_by IS NOT NULL` : sql``;
-      const deletedFilter = (isPrivileged && search) ? sql`` : sql`AND fb.deleted_at IS NULL`;
+      const searchFilter = search
+        ? sql`AND LOWER(fb.reference_number) LIKE ${"%" + search.toLowerCase() + "%"}`
+        : sql``;
+      const unassignedFilter = includeUnassigned === "false" ? sql`AND fb.finalized_by IS NOT NULL` : sql``;
+      const deletedFilter = isPrivileged && search ? sql`` : sql`AND fb.deleted_at IS NULL`;
 
       const rows = await db.execute(sql`
         SELECT
@@ -1913,10 +2115,14 @@ export function registerFactoryBalesRoutes(app: Express) {
       const PDFDocument = (await import("pdfkit")).default;
       const doc = new PDFDocument({ margin: 40, size: "A4" });
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="stock-entry-history-${effectiveStart}-to-${effectiveEnd}.pdf"`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="stock-entry-history-${effectiveStart}-to-${effectiveEnd}.pdf"`
+      );
       doc.pipe(res);
 
-      const fmtN = (v: any, dec = 3) => parseFloat(v || "0").toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+      const fmtN = (v: any, dec = 3) =>
+        parseFloat(v || "0").toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
       const NAVY = "#1F3864";
       const LIGHT_BLUE = "#EFF3FB";
       const STRIPE = "#F8F8F8";
@@ -1926,15 +2132,15 @@ export function registerFactoryBalesRoutes(app: Express) {
       // ── Logo above header ────────────────────────────────────────────────
       const sehLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
       if (fs.existsSync(sehLogoPath)) {
-        try { doc.image(sehLogoPath, (doc.page.width - 200) / 2, 10, { width: 200 }); } catch {}
+        try {
+          doc.image(sehLogoPath, (doc.page.width - 200) / 2, 10, { width: 200 });
+        } catch {}
       }
 
       // ── Header bar ──────────────────────────────────────────────────────
       doc.rect(40, 100, pageW, 44).fill(NAVY);
-      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(13)
-        .text("Stock Entry History", 44, 105, { width: 340 });
-      doc.font("Helvetica").fontSize(8)
-        .text("Factory Bales Report", 44, 120, { width: 300 });
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(13).text("Stock Entry History", 44, 105, { width: 340 });
+      doc.font("Helvetica").fontSize(8).text("Factory Bales Report", 44, 120, { width: 300 });
       const generatedStr = `Generated: ${new Date().toLocaleDateString("en-GB")}`;
       doc.fontSize(8).text(generatedStr, 400, 120, { width: 155, align: "right" });
 
@@ -1942,17 +2148,27 @@ export function registerFactoryBalesRoutes(app: Express) {
       const subY = 154;
       doc.fillColor("#000000").font("Helvetica").fontSize(9);
       doc.text(`Period: ${effectiveStart}  →  ${effectiveEnd}`, 40, subY);
-      doc.font("Helvetica-Bold")
-        .text(`${groups.length} groups   |   ${totalBales} bales   |   ${fmtN(totalWeight, 2)} kg total`, 40, subY + 13);
-      if (search) doc.font("Helvetica").fontSize(8).fillColor("#555555").text(`Search filter: "${search}"`, 40, subY + 26);
+      doc
+        .font("Helvetica-Bold")
+        .text(
+          `${groups.length} groups   |   ${totalBales} bales   |   ${fmtN(totalWeight, 2)} kg total`,
+          40,
+          subY + 13
+        );
+      if (search)
+        doc
+          .font("Helvetica")
+          .fontSize(8)
+          .fillColor("#555555")
+          .text(`Search filter: "${search}"`, 40, subY + 26);
       doc.fillColor("#000000");
 
       // ── Column layout ────────────────────────────────────────────────────
       // Date | Location | Worker | Product | Bales | Total KG | Avg KG
-      const colX =   [40,   118,  218,  318,  420,  458,  500];
-      const colW =   [78,   100,  100,  102,   38,   42,   55];
+      const colX = [40, 118, 218, 318, 420, 458, 500];
+      const colW = [78, 100, 100, 102, 38, 42, 55];
       const colHdr = ["Date", "Location", "Worker", "Product", "Bales", "Total KG", "Avg KG"];
-      const colAln: Array<"left"|"right"> = ["left","left","left","left","right","right","right"];
+      const colAln: Array<"left" | "right"> = ["left", "left", "left", "left", "right", "right", "right"];
 
       const tableTop = subY + (search ? 44 : 32);
 
@@ -1969,7 +2185,10 @@ export function registerFactoryBalesRoutes(app: Express) {
       let rowIdx = 0;
       for (const g of groups) {
         // page break check — need room for group row + at least one bale row
-        if (y > 780) { doc.addPage(); y = 40; }
+        if (y > 780) {
+          doc.addPage();
+          y = 40;
+        }
 
         // group summary row
         doc.rect(40, y, pageW, 14).fill(GROUP_BG);
@@ -1987,9 +2206,15 @@ export function registerFactoryBalesRoutes(app: Express) {
         // bale detail rows
         const bales: any[] = g.bales || [];
         for (let bi = 0; bi < bales.length; bi++) {
-          if (y > 790) { doc.addPage(); y = 40; }
+          if (y > 790) {
+            doc.addPage();
+            y = 40;
+          }
           const b = bales[bi];
-          if (bi % 2 === 1) { doc.rect(40, y, pageW, 12).fill(STRIPE); doc.fillColor("#000000"); }
+          if (bi % 2 === 1) {
+            doc.rect(40, y, pageW, 12).fill(STRIPE);
+            doc.fillColor("#000000");
+          }
 
           // indent indicator stripe on left
           doc.rect(40, y, 3, 12).fill("#9CB2D8");
@@ -2014,7 +2239,10 @@ export function registerFactoryBalesRoutes(app: Express) {
       }
 
       // ── Totals footer ─────────────────────────────────────────────────────
-      if (y > 770) { doc.addPage(); y = 40; }
+      if (y > 770) {
+        doc.addPage();
+        y = 40;
+      }
       y += 4;
       doc.moveTo(40, y).lineTo(555, y).lineWidth(0.5).strokeColor("#888888").stroke();
       y += 5;
@@ -2039,7 +2267,12 @@ export function registerFactoryBalesRoutes(app: Express) {
       const barcode = req.params.barcode.toUpperCase();
       const batchId = req.query.batchId ? parseOptionalId(req.query.batchId) : null;
       const excludeIdsStr = req.query.excludeIds as string;
-      const excludeIds = excludeIdsStr ? excludeIdsStr.split(",").map(Number).filter(n => !isNaN(n)) : [];
+      const excludeIds = excludeIdsStr
+        ? excludeIdsStr
+            .split(",")
+            .map(Number)
+            .filter((n) => !isNaN(n))
+        : [];
 
       let results: any[] = [];
 
@@ -2058,7 +2291,9 @@ export function registerFactoryBalesRoutes(app: Express) {
         // General scan lookup — never surface deleted or removed bales
         baseConditions.push(not(inArray(factoryBales.status, ["DELETED", "REMOVED"])));
       }
-      results = await db.select().from(factoryBales)
+      results = await db
+        .select()
+        .from(factoryBales)
         .where(and(...baseConditions))
         .orderBy(factoryBales.id);
 
@@ -2066,12 +2301,7 @@ export function registerFactoryBalesRoutes(app: Express) {
         const labelResults = await db
           .select()
           .from(baleLabelPrints)
-          .where(
-            and(
-              eq(baleLabelPrints.companyId, companyId),
-              eq(baleLabelPrints.referenceNumber, barcode)
-            )
-          );
+          .where(and(eq(baleLabelPrints.companyId, companyId), eq(baleLabelPrints.referenceNumber, barcode)));
 
         if (labelResults.length > 0 && labelResults[0].productionBaleId) {
           const labelBale = await db
@@ -2185,49 +2415,42 @@ export function registerFactoryBalesRoutes(app: Express) {
 
       // Fire all three independent DB queries in parallel
       const [rawStockTotals, todayMixBatches, todayBales] = await Promise.all([
-        db.select({
-          totalReceived: sql<string>`COALESCE(SUM(${factoryRawStock.receivedKg}), 0)`,
-          totalUsed: sql<string>`COALESCE(SUM(${factoryRawStock.usedKg}), 0)`,
-        })
+        db
+          .select({
+            totalReceived: sql<string>`COALESCE(SUM(${factoryRawStock.receivedKg}), 0)`,
+            totalUsed: sql<string>`COALESCE(SUM(${factoryRawStock.usedKg}), 0)`,
+          })
           .from(factoryRawStock)
           .where(eq(factoryRawStock.companyId, companyId)),
 
-        db.select({ totalWeightKg: factoryMixBatches.totalWeightKg })
+        db
+          .select({ totalWeightKg: factoryMixBatches.totalWeightKg })
           .from(factoryMixBatches)
-          .where(and(
-            eq(factoryMixBatches.companyId, companyId),
-            sql`${factoryMixBatches.createdAt} >= ${todayStart}`,
-          )),
+          .where(and(eq(factoryMixBatches.companyId, companyId), sql`${factoryMixBatches.createdAt} >= ${todayStart}`)),
 
-        db.select({
-          id: factoryBales.id,
-          baleCode: factoryBales.baleCode,
-          productName: factoryBales.productName,
-          category: factoryBales.category,
-          weightKg: factoryBales.weightKg,
-          pressedAt: factoryBales.pressedAt,
-          status: factoryBales.status,
-        })
+        db
+          .select({
+            id: factoryBales.id,
+            baleCode: factoryBales.baleCode,
+            productName: factoryBales.productName,
+            category: factoryBales.category,
+            weightKg: factoryBales.weightKg,
+            pressedAt: factoryBales.pressedAt,
+            status: factoryBales.status,
+          })
           .from(factoryBales)
-          .where(and(
-            eq(factoryBales.companyId, companyId),
-            sql`${factoryBales.pressedAt} >= ${todayStart}`,
-          )),
+          .where(and(eq(factoryBales.companyId, companyId), sql`${factoryBales.pressedAt} >= ${todayStart}`)),
       ]);
 
       const totalReceived = parseFloat(rawStockTotals[0]?.totalReceived || "0");
       const totalUsed = parseFloat(rawStockTotals[0]?.totalUsed || "0");
       const closingStockKg = totalReceived - totalUsed;
 
-      const kgsUsedToday = todayMixBatches.reduce(
-        (sum, mb) => sum + (parseFloat(mb.totalWeightKg as string) || 0), 0
-      );
+      const kgsUsedToday = todayMixBatches.reduce((sum, mb) => sum + (parseFloat(mb.totalWeightKg as string) || 0), 0);
       const openingStockKg = closingStockKg + kgsUsedToday;
 
       const balesPressedToday = todayBales.length;
-      const totalBaleWeightToday = todayBales.reduce(
-        (sum, b) => sum + (parseFloat(b.weightKg as string) || 0), 0
-      );
+      const totalBaleWeightToday = todayBales.reduce((sum, b) => sum + (parseFloat(b.weightKg as string) || 0), 0);
 
       const categoryMap: Record<string, { count: number; totalKg: number }> = {};
       for (const bale of todayBales) {
@@ -2357,7 +2580,9 @@ export function registerFactoryBalesRoutes(app: Express) {
             const [supplier] = await db
               .select()
               .from(factorySuppliers)
-              .where(and(eq(factorySuppliers.companyId, companyId), ilike(factorySuppliers.name, item.supplierName.trim())));
+              .where(
+                and(eq(factorySuppliers.companyId, companyId), ilike(factorySuppliers.name, item.supplierName.trim()))
+              );
             if (supplier) {
               supplierId = supplier.id;
             }
@@ -2366,18 +2591,26 @@ export function registerFactoryBalesRoutes(app: Express) {
           let [container] = await db
             .select()
             .from(factoryContainers)
-            .where(and(eq(factoryContainers.companyId, companyId), eq(factoryContainers.containerNumber, item.containerNumber.trim())));
+            .where(
+              and(
+                eq(factoryContainers.companyId, companyId),
+                eq(factoryContainers.containerNumber, item.containerNumber.trim())
+              )
+            );
 
           if (!container) {
-            [container] = await db.insert(factoryContainers).values({
-              companyId,
-              containerNumber: item.containerNumber.trim(),
-              supplierId,
-              totalKg: item.receivedKg,
-              ratePerKg: item.costPerKg,
-              arrivalDate: item.arrivalDate || null,
-              status: "RECEIVED",
-            }).returning();
+            [container] = await db
+              .insert(factoryContainers)
+              .values({
+                companyId,
+                containerNumber: item.containerNumber.trim(),
+                supplierId,
+                totalKg: item.receivedKg,
+                ratePerKg: item.costPerKg,
+                arrivalDate: item.arrivalDate || null,
+                status: "RECEIVED",
+              })
+              .returning();
           } else if (supplierId && !container.supplierId) {
             await db.update(factoryContainers).set({ supplierId }).where(eq(factoryContainers.id, container.id));
           }
@@ -2413,17 +2646,23 @@ export function registerFactoryBalesRoutes(app: Express) {
       }
 
       // Create import batch record upfront
-      const [batch] = await db.insert(factoryBaleImportBatches).values({
-        companyId,
-        fileName: fileName || "unknown.xlsx",
-        baleCount: 0,
-        errorCount: 0,
-        totalWeightKg: "0",
-        importedByUserId: String(req.session?.userId || ""),
-        importedByName: req.session?.userName || req.session?.username || null,
-      }).returning();
+      const [batch] = await db
+        .insert(factoryBaleImportBatches)
+        .values({
+          companyId,
+          fileName: fileName || "unknown.xlsx",
+          baleCount: 0,
+          errorCount: 0,
+          totalWeightKg: "0",
+          importedByUserId: String(req.session?.userId || ""),
+          importedByName: req.session?.userName || req.session?.username || null,
+        })
+        .returning();
 
-      const maxRef = await db.select({ maxRef: sql`MAX(CAST(SUBSTRING(reference_number FROM 4) AS INTEGER))` }).from(factoryBales).where(eq(factoryBales.companyId, companyId));
+      const maxRef = await db
+        .select({ maxRef: sql`MAX(CAST(SUBSTRING(reference_number FROM 4) AS INTEGER))` })
+        .from(factoryBales)
+        .where(eq(factoryBales.companyId, companyId));
       let nextRef = Math.max((maxRef[0]?.maxRef || 0) + 1, 200000);
 
       let imported = 0;
@@ -2476,7 +2715,8 @@ export function registerFactoryBalesRoutes(app: Express) {
       }
 
       // Update batch record with final counts
-      await db.update(factoryBaleImportBatches)
+      await db
+        .update(factoryBaleImportBatches)
         .set({ baleCount: imported, errorCount: errors.length, totalWeightKg: totalWeightKg.toFixed(3) })
         .where(eq(factoryBaleImportBatches.id, batch.id));
 
@@ -2513,7 +2753,8 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const batches = await db.select()
+      const batches = await db
+        .select()
         .from(factoryBaleImportBatches)
         .where(eq(factoryBaleImportBatches.companyId, companyId))
         .orderBy(desc(factoryBaleImportBatches.createdAt));
@@ -2536,7 +2777,8 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (batchId === null) return res.status(400).json({ message: "Invalid id" });
       if (isNaN(batchId)) return res.status(400).json({ message: "Invalid batch id" });
 
-      const bales = await db.select()
+      const bales = await db
+        .select()
         .from(factoryBales)
         .where(and(eq(factoryBales.companyId, companyId), eq(factoryBales.importBatchId, batchId)))
         .orderBy(asc(factoryBales.referenceNumber));
@@ -2555,7 +2797,9 @@ export function registerFactoryBalesRoutes(app: Express) {
   // Idempotent: resets usedKg to 0 on all OB records before recalculating.
   // Only OB raw stock (containers with status='OPENING_BALANCE') is touched.
   // Non-OB (container offload) raw stock is never modified.
-  async function recalcOpeningStockUsage(companyId: number): Promise<{ suppliersProcessed: number; totalAllocatedKg: number; unmatchedKg: number }> {
+  async function recalcOpeningStockUsage(
+    companyId: number
+  ): Promise<{ suppliersProcessed: number; totalAllocatedKg: number; unmatchedKg: number }> {
     const obRawStocks = await db
       .select({
         id: factoryRawStock.id,
@@ -2565,18 +2809,13 @@ export function registerFactoryBalesRoutes(app: Express) {
       })
       .from(factoryRawStock)
       .innerJoin(factoryContainers, eq(factoryRawStock.containerId, factoryContainers.id))
-      .where(and(
-        eq(factoryRawStock.companyId, companyId),
-        eq(factoryContainers.status, "OPENING_BALANCE")
-      ))
+      .where(and(eq(factoryRawStock.companyId, companyId), eq(factoryContainers.status, "OPENING_BALANCE")))
       .orderBy(factoryRawStock.offloadedAt, factoryRawStock.id);
 
     if (obRawStocks.length === 0) return { suppliersProcessed: 0, totalAllocatedKg: 0, unmatchedKg: 0 };
 
     const obIds = obRawStocks.map((r: any) => r.id);
-    await db.update(factoryRawStock)
-      .set({ usedKg: "0" })
-      .where(inArray(factoryRawStock.id, obIds));
+    await db.update(factoryRawStock).set({ usedKg: "0" }).where(inArray(factoryRawStock.id, obIds));
 
     const consumed = await db
       .select({
@@ -2585,10 +2824,7 @@ export function registerFactoryBalesRoutes(app: Express) {
       })
       .from(factoryMixBatchSources)
       .innerJoin(factoryMixBatches, eq(factoryMixBatchSources.mixBatchId, factoryMixBatches.id))
-      .where(and(
-        eq(factoryMixBatches.companyId, companyId),
-        sql`${factoryMixBatchSources.supplierId} IS NOT NULL`
-      ))
+      .where(and(eq(factoryMixBatches.companyId, companyId), sql`${factoryMixBatchSources.supplierId} IS NOT NULL`))
       .groupBy(factoryMixBatchSources.supplierId);
 
     const consumedBySupplier = new Map<number, number>();
@@ -2617,7 +2853,8 @@ export function registerFactoryBalesRoutes(app: Express) {
         if (remaining <= 0.001) break;
         const cap = parseFloat(rec.receivedKg as string) || 0;
         const deduct = Math.min(remaining, cap);
-        await db.update(factoryRawStock)
+        await db
+          .update(factoryRawStock)
           .set({ usedKg: String(deduct.toFixed(3)) })
           .where(eq(factoryRawStock.id, rec.id));
         remaining -= deduct;
@@ -2658,7 +2895,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const existingOBs = await db
         .select({ containerNumber: factoryContainers.containerNumber })
         .from(factoryContainers)
-        .where(and(eq(factoryContainers.companyId, companyId), sql`${factoryContainers.containerNumber} LIKE ${"OB-%"}`));
+        .where(
+          and(eq(factoryContainers.companyId, companyId), sql`${factoryContainers.containerNumber} LIKE ${"OB-%"}`)
+        );
 
       let nextNum = 1;
       for (const c of existingOBs) {
@@ -2677,42 +2916,66 @@ export function registerFactoryBalesRoutes(app: Express) {
           const fxRate = parseFloat(item.fxRateToUsd || "1");
           const openingDate = String(item.openingDate || "").trim();
 
-          if (!supplierStr) { errors.push(`Row ${i + 1}: supplier is required`); continue; }
-          if (isNaN(kgVal) || kgVal <= 0) { errors.push(`Row ${i + 1}: kg must be > 0`); continue; }
-          if (isNaN(rateVal) || rateVal < 0) { errors.push(`Row ${i + 1}: costPerKg must be >= 0`); continue; }
-          if (!currency) { errors.push(`Row ${i + 1}: currency is required`); continue; }
-          if (isNaN(fxRate) || fxRate <= 0) { errors.push(`Row ${i + 1}: fxRateToUsd must be > 0`); continue; }
-          if (!openingDate) { errors.push(`Row ${i + 1}: openingDate is required`); continue; }
+          if (!supplierStr) {
+            errors.push(`Row ${i + 1}: supplier is required`);
+            continue;
+          }
+          if (isNaN(kgVal) || kgVal <= 0) {
+            errors.push(`Row ${i + 1}: kg must be > 0`);
+            continue;
+          }
+          if (isNaN(rateVal) || rateVal < 0) {
+            errors.push(`Row ${i + 1}: costPerKg must be >= 0`);
+            continue;
+          }
+          if (!currency) {
+            errors.push(`Row ${i + 1}: currency is required`);
+            continue;
+          }
+          if (isNaN(fxRate) || fxRate <= 0) {
+            errors.push(`Row ${i + 1}: fxRateToUsd must be > 0`);
+            continue;
+          }
+          if (!openingDate) {
+            errors.push(`Row ${i + 1}: openingDate is required`);
+            continue;
+          }
 
           const [supplier] = await db
             .select()
             .from(factorySuppliers)
             .where(and(eq(factorySuppliers.companyId, companyId), ilike(factorySuppliers.name, supplierStr)));
 
-          if (!supplier) { errors.push(`Row ${i + 1}: supplier "${supplierStr}" not found`); continue; }
+          if (!supplier) {
+            errors.push(`Row ${i + 1}: supplier "${supplierStr}" not found`);
+            continue;
+          }
 
           const costPerKgUsd = currency === "USD" ? rateVal : rateVal * fxRate;
           const containerNumber = `OB-${String(nextNum).padStart(4, "0")}`;
           nextNum++;
 
-          const [container] = await db.insert(factoryContainers).values({
-            companyId,
-            containerNumber,
-            supplierId: supplier.id,
-            origin: "Opening Import",
-            totalKg: String(kgVal),
-            ratePerKg: String(rateVal),
-            declaredKg: String(kgVal),
-            actualReceivedKg: String(kgVal),
-            finalPayableAmount: String(kgVal * rateVal),
-            differenceKg: "0",
-            currencyCode: currency,
-            fxRateToUsd: String(fxRate),
-            ratePerKgUsd: String(costPerKgUsd),
-            finalPayableAmountUsd: String(kgVal * costPerKgUsd),
-            notes: String(item.notes || "Opening stock import"),
-            status: "OPENING_BALANCE",
-          }).returning();
+          const [container] = await db
+            .insert(factoryContainers)
+            .values({
+              companyId,
+              containerNumber,
+              supplierId: supplier.id,
+              origin: "Opening Import",
+              totalKg: String(kgVal),
+              ratePerKg: String(rateVal),
+              declaredKg: String(kgVal),
+              actualReceivedKg: String(kgVal),
+              finalPayableAmount: String(kgVal * rateVal),
+              differenceKg: "0",
+              currencyCode: currency,
+              fxRateToUsd: String(fxRate),
+              ratePerKgUsd: String(costPerKgUsd),
+              finalPayableAmountUsd: String(kgVal * costPerKgUsd),
+              notes: String(item.notes || "Opening stock import"),
+              status: "OPENING_BALANCE",
+            })
+            .returning();
 
           await db.insert(factoryRawStock).values({
             companyId,
@@ -2765,7 +3028,9 @@ export function registerFactoryBalesRoutes(app: Express) {
           filename = "factory_opening_raw_stock_template.csv";
           break;
         default:
-          return res.status(400).json({ message: "Invalid template type. Use: suppliers, raw-stock, bales, or opening-raw-stock" });
+          return res
+            .status(400)
+            .json({ message: "Invalid template type. Use: suppliers, raw-stock, bales, or opening-raw-stock" });
       }
 
       res.setHeader("Content-Type", "text/csv");
@@ -2787,12 +3052,13 @@ export function registerFactoryBalesRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const { currencyCode } = req.query;
       // Only return manually-set rates in the UI list (auto rows are internal cache only)
-      const conditions: any[] = [
-        eq(factoryFxRates.companyId, companyId),
-        eq(factoryFxRates.source, "manual"),
-      ];
+      const conditions: any[] = [eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.source, "manual")];
       if (currencyCode) conditions.push(eq(factoryFxRates.currencyCode, currencyCode as string));
-      const results = await db.select().from(factoryFxRates).where(and(...conditions)).orderBy(desc(factoryFxRates.effectiveDate));
+      const results = await db
+        .select()
+        .from(factoryFxRates)
+        .where(and(...conditions))
+        .orderBy(desc(factoryFxRates.effectiveDate));
       res.json(results);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2809,7 +3075,9 @@ export function registerFactoryBalesRoutes(app: Express) {
         const rate = await getOrFetchFxRateToUsd(companyId, currency, today);
         res.json({ rate, effectiveDate: today });
       } catch (err: any) {
-        const [fallback] = await db.select().from(factoryFxRates)
+        const [fallback] = await db
+          .select()
+          .from(factoryFxRates)
           .where(and(eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.currencyCode, currency)))
           .orderBy(desc(factoryFxRates.effectiveDate))
           .limit(1);
@@ -2864,10 +3132,9 @@ export function registerFactoryBalesRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const currency = req.params.currency.toUpperCase();
-      await db.delete(factoryFxRates).where(and(
-        eq(factoryFxRates.companyId, companyId),
-        eq(factoryFxRates.currencyCode, currency),
-      ));
+      await db
+        .delete(factoryFxRates)
+        .where(and(eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.currencyCode, currency)));
       res.json({ ok: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -2877,5 +3144,4 @@ export function registerFactoryBalesRoutes(app: Express) {
   // ───────────────────────────────────────────────
   // Factory Daybook
   // ───────────────────────────────────────────────
-
 }

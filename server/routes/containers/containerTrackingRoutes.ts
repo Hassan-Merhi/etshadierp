@@ -6,23 +6,68 @@ import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { upload, logAudit, getCurrentExchangeRate } from "../_helpers";
 import {
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, suppliers, customers,
-  locations, employees, userLocations, auditLog, interCompanyTransfers,
-  insertInterCompanyTransferSchema, FEATURE_KEYS,
-  ledgerAccounts, intercompanyPosConfigs,
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  suppliers,
+  customers,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  FEATURE_KEYS,
+  ledgerAccounts,
+  intercompanyPosConfigs,
   stockItemMergeLogs,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -40,16 +85,16 @@ export function registerContainerTrackingRoutes(app: Express) {
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
-      
+
       // Validate request body with Zod schema
       const parseResult = updateContainerTrackingSchema.safeParse(req.body);
       if (!parseResult.success) {
-        return res.status(400).json({ 
-          message: "Invalid tracking data", 
-          errors: parseResult.error.errors 
+        return res.status(400).json({
+          message: "Invalid tracking data",
+          errors: parseResult.error.errors,
         });
       }
-      
+
       const {
         shopName,
         eta,
@@ -70,7 +115,7 @@ export function registerContainerTrackingRoutes(app: Express) {
         status,
         blDocs,
       } = parseResult.data;
-      
+
       const updateData: any = {};
       if (shopName !== undefined) updateData.shopName = shopName;
       if (eta !== undefined) updateData.eta = eta || null;
@@ -95,28 +140,22 @@ export function registerContainerTrackingRoutes(app: Express) {
       if (trackingLink !== undefined) updateData.trackingLink = trackingLink || null;
       if (status !== undefined) updateData.status = status;
       if (blDocs !== undefined) updateData.blDocs = blDocs || null;
-      
+
       await db
         .update(containers)
         .set(updateData)
-        .where(and(
-          eq(containers.id, id),
-          eq(containers.companyId, req.session.currentCompanyId)
-        ));
-      
+        .where(and(eq(containers.id, id), eq(containers.companyId, req.session.currentCompanyId)));
+
       const [updated] = await db
         .select()
         .from(containers)
-        .where(and(
-          eq(containers.id, id),
-          eq(containers.companyId, req.session.currentCompanyId)
-        ))
+        .where(and(eq(containers.id, id), eq(containers.companyId, req.session.currentCompanyId)))
         .limit(1);
-      
+
       if (!updated) {
         return res.status(404).json({ message: "Container not found" });
       }
-      
+
       res.json(updated);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -130,47 +169,49 @@ export function registerContainerTrackingRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      
+
       const { rows } = req.body;
       if (!Array.isArray(rows) || rows.length === 0) {
         return res.status(400).json({ message: "No data provided" });
       }
-      
+
       let updated = 0;
       let notFound = 0;
       const errors: string[] = [];
-      
+
       for (const row of rows) {
         try {
           const parseResult = containerTrackingImportRowSchema.safeParse(row);
           if (!parseResult.success) {
-            errors.push(`Invalid row data for ${row.containerNumber || 'unknown'}`);
+            errors.push(`Invalid row data for ${row.containerNumber || "unknown"}`);
             continue;
           }
-          
+
           const data = parseResult.data;
           const containerNumber = data.containerNumber?.trim();
           if (!containerNumber) {
             errors.push("Missing container number in row");
             continue;
           }
-          
+
           // Find container by number
           const [container] = await db
             .select()
             .from(containers)
-            .where(and(
-              eq(containers.containerNumber, containerNumber),
-              eq(containers.companyId, req.session.currentCompanyId!)
-            ))
+            .where(
+              and(
+                eq(containers.containerNumber, containerNumber),
+                eq(containers.companyId, req.session.currentCompanyId!)
+              )
+            )
             .limit(1);
-          
+
           if (!container) {
             notFound++;
             errors.push(`Container not found: ${containerNumber}`);
             continue;
           }
-          
+
           // Normalise any date string to YYYY-MM-DD; return null for invalid values
           const normDate = (v: any): string | null => {
             if (!v) return null;
@@ -189,7 +230,7 @@ export function registerContainerTrackingRoutes(app: Express) {
             if (sl) {
               const [, mo, dy, yr] = sl;
               const fullYr = yr.length === 2 ? (parseInt(yr) >= 50 ? `19${yr}` : `20${yr}`) : yr;
-              return `${fullYr}-${mo.padStart(2,"0")}-${dy.padStart(2,"0")}`;
+              return `${fullYr}-${mo.padStart(2, "0")}-${dy.padStart(2, "0")}`;
             }
             const parsed = new Date(s);
             if (!isNaN(parsed.getTime())) {
@@ -215,11 +256,14 @@ export function registerContainerTrackingRoutes(app: Express) {
           if (data.shopName && String(data.shopName) !== "[object Object]") updateData.shopName = String(data.shopName);
           const etaDate = normDate(data.eta);
           if (etaDate) updateData.eta = etaDate;
-          if (data.transporter && String(data.transporter) !== "[object Object]") updateData.transporter = String(data.transporter);
+          if (data.transporter && String(data.transporter) !== "[object Object]")
+            updateData.transporter = String(data.transporter);
           const tFee = normNum(data.transportFee);
           if (tFee !== null) updateData.transportFee = tFee;
-          if (data.numberPlate && String(data.numberPlate) !== "[object Object]") updateData.numberPlate = String(data.numberPlate);
-          if (data.trackingLocation && String(data.trackingLocation) !== "[object Object]") updateData.trackingLocation = String(data.trackingLocation);
+          if (data.numberPlate && String(data.numberPlate) !== "[object Object]")
+            updateData.numberPlate = String(data.numberPlate);
+          if (data.trackingLocation && String(data.trackingLocation) !== "[object Object]")
+            updateData.trackingLocation = String(data.trackingLocation);
           const borderDateVal = normDate(data.borderDate);
           if (borderDateVal) updateData.borderDate = borderDateVal;
           const offloadDateVal = normDate(data.offloadDate);
@@ -228,22 +272,26 @@ export function registerContainerTrackingRoutes(app: Express) {
           const dFee = normNum(data.dutyFee);
           if (dFee !== null) updateData.dutyFee = dFee;
           if (data.docReceived !== undefined) {
-            updateData.docReceived = data.docReceived === true || data.docReceived === "Yes" || data.docReceived === "yes" || data.docReceived === "YES" || data.docReceived === "TRUE" || data.docReceived === "true";
+            updateData.docReceived =
+              data.docReceived === true ||
+              data.docReceived === "Yes" ||
+              data.docReceived === "yes" ||
+              data.docReceived === "YES" ||
+              data.docReceived === "TRUE" ||
+              data.docReceived === "true";
           }
-          if (data.trackingDescription && String(data.trackingDescription) !== "[object Object]") updateData.trackingDescription = String(data.trackingDescription);
-          
+          if (data.trackingDescription && String(data.trackingDescription) !== "[object Object]")
+            updateData.trackingDescription = String(data.trackingDescription);
+
           if (Object.keys(updateData).length > 0) {
-            await db
-              .update(containers)
-              .set(updateData)
-              .where(eq(containers.id, container.id));
+            await db.update(containers).set(updateData).where(eq(containers.id, container.id));
             updated++;
           }
         } catch (rowError: any) {
-          errors.push(`Error processing ${row.containerNumber || 'unknown'}: ${rowError.message}`);
+          errors.push(`Error processing ${row.containerNumber || "unknown"}: ${rowError.message}`);
         }
       }
-      
+
       res.json({
         success: true,
         updated,
@@ -267,29 +315,26 @@ export function registerContainerTrackingRoutes(app: Express) {
       if (isNaN(id)) {
         return res.status(400).json({ message: "Invalid container ID" });
       }
-      
+
       // Get the container
       const [container] = await db
         .select()
         .from(containers)
-        .where(and(
-          eq(containers.id, id),
-          eq(containers.companyId, req.session.currentCompanyId)
-        ))
+        .where(and(eq(containers.id, id), eq(containers.companyId, req.session.currentCompanyId)))
         .limit(1);
-      
+
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
       }
-      
+
       const apiKey = process.env.CONTAINER_TRACKING_API_KEY;
       if (!apiKey) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: "Container tracking API not configured. Add CONTAINER_TRACKING_API_KEY to enable auto ETA updates.",
-          needsSetup: true
+          needsSetup: true,
         });
       }
-      
+
       // Try to fetch from Terminal49 or similar API
       // For now, return a message that the feature requires setup
       // In production, this would call the actual API
@@ -300,19 +345,19 @@ export function registerContainerTrackingRoutes(app: Express) {
         // });
         // const data = await response.json();
         // const eta = data.pod_eta;
-        
+
         // For now, simulate the response
         return res.json({
           message: "Container tracking API integration requires Terminal49 or similar API key",
           containerNumber: container.containerNumber,
           currentEta: container.eta,
           etaSource: container.etaSource,
-          instructions: "Set CONTAINER_TRACKING_API_KEY secret with your Terminal49 API key to enable auto ETA updates"
+          instructions: "Set CONTAINER_TRACKING_API_KEY secret with your Terminal49 API key to enable auto ETA updates",
         });
       } catch (apiError: any) {
-        return res.status(502).json({ 
-          message: "Failed to fetch from tracking API", 
-          error: apiError.message 
+        return res.status(502).json({
+          message: "Failed to fetch from tracking API",
+          error: apiError.message,
         });
       }
     } catch (error: any) {

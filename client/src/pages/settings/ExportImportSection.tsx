@@ -2,7 +2,14 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -69,14 +76,22 @@ export function ExportImportSection({ companies }: { companies: any[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="space-y-4 border rounded-lg p-4">
-        <h3 className="font-semibold flex items-center gap-2"><Download className="h-4 w-4" /> Export Company Data</h3>
+        <h3 className="font-semibold flex items-center gap-2">
+          <Download className="h-4 w-4" /> Export Company Data
+        </h3>
         <p className="text-sm text-muted-foreground">Download all accounting data for a company as JSON.</p>
         <div className="space-y-2">
           <Label>Select Company</Label>
           <Select value={selectedExport} onValueChange={setSelectedExport}>
-            <SelectTrigger><SelectValue placeholder="Pick company..." /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Pick company..." />
+            </SelectTrigger>
             <SelectContent>
-              {companies.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+              {companies.map((c) => (
+                <SelectItem key={c.id} value={c.id.toString()}>
+                  {c.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -87,14 +102,22 @@ export function ExportImportSection({ companies }: { companies: any[] }) {
       </div>
 
       <div className="space-y-4 border rounded-lg p-4">
-        <h3 className="font-semibold flex items-center gap-2"><Upload className="h-4 w-4" /> Import Company Data</h3>
+        <h3 className="font-semibold flex items-center gap-2">
+          <Upload className="h-4 w-4" /> Import Company Data
+        </h3>
         <p className="text-sm text-muted-foreground">Upload accounting JSON to replace ALL data for this company.</p>
         <div className="space-y-2">
           <Label>Target Company</Label>
           <Select value={selectedImport} onValueChange={setSelectedImport}>
-            <SelectTrigger><SelectValue placeholder="Pick company..." /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue placeholder="Pick company..." />
+            </SelectTrigger>
             <SelectContent>
-              {companies.map(c => <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>)}
+              {companies.map((c) => (
+                <SelectItem key={c.id} value={c.id.toString()}>
+                  {c.name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -106,7 +129,11 @@ export function ExportImportSection({ companies }: { companies: any[] }) {
             disabled={!selectedImport || isImporting}
             className="cursor-pointer"
           />
-          {isImporting && <div className="absolute inset-0 bg-background/50 flex items-center justify-center"><Loader2 className="h-4 w-4 animate-spin" /></div>}
+          {isImporting && (
+            <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+          )}
         </div>
         {importResult && (
           <div className="mt-2 p-2 bg-muted rounded text-xs">

@@ -12,13 +12,7 @@ import { Label } from "@/components/ui/label";
 import { ArrowRightLeft, Globe, Info } from "lucide-react";
 import { UseMutationResult } from "@tanstack/react-query";
 import { SupplierWithBalance } from "./factorySupplierTypes";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SupplierPaymentFxDialogsProps {
   paymentDialogSupplier: SupplierWithBalance | null;
@@ -33,7 +27,7 @@ interface SupplierPaymentFxDialogsProps {
   isOverpayment: boolean;
   overpaymentUsd: number;
   formatNum: (val: string) => string;
-  
+
   fxConversionOpen: boolean;
   setFxConversionOpen: (val: boolean) => void;
   fxConversionForm: any;
@@ -45,15 +39,35 @@ interface SupplierPaymentFxDialogsProps {
 }
 
 export function SupplierPaymentFxDialogs({
-  paymentDialogSupplier, setPaymentDialogSupplier, paymentForm, setPaymentForm,
-  allSuppliers, ledgerAccounts, paymentMutation, paymentAmtUsd, paymentBalanceUsd,
-  isOverpayment, overpaymentUsd, formatNum,
-  fxConversionOpen, setFxConversionOpen, fxConversionForm, setFxConversionForm,
-  fxSourceType, setFxSourceType, fxConversionMutation, wrapAdminAction,
+  paymentDialogSupplier,
+  setPaymentDialogSupplier,
+  paymentForm,
+  setPaymentForm,
+  allSuppliers,
+  ledgerAccounts,
+  paymentMutation,
+  paymentAmtUsd,
+  paymentBalanceUsd,
+  isOverpayment,
+  overpaymentUsd,
+  formatNum,
+  fxConversionOpen,
+  setFxConversionOpen,
+  fxConversionForm,
+  setFxConversionForm,
+  fxSourceType,
+  setFxSourceType,
+  fxConversionMutation,
+  wrapAdminAction,
 }: SupplierPaymentFxDialogsProps) {
   return (
     <>
-      <Dialog open={!!paymentDialogSupplier} onOpenChange={(open) => { if (!open) setPaymentDialogSupplier(null); }}>
+      <Dialog
+        open={!!paymentDialogSupplier}
+        onOpenChange={(open) => {
+          if (!open) setPaymentDialogSupplier(null);
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
@@ -64,33 +78,34 @@ export function SupplierPaymentFxDialogs({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {paymentDialogSupplier && (() => {
-              const children = allSuppliers.filter(s => s.parentId === paymentDialogSupplier.id);
-              if (children.length === 0) return null;
-              return (
-                <div>
-                  <Label>Pay to (account)</Label>
-                  <Select
-                    value={String(paymentForm.supplierId)}
-                    onValueChange={(v) => setPaymentForm((prev: any) => ({ ...prev, supplierId: parseInt(v) }))}
-                  >
-                    <SelectTrigger data-testid="select-payment-target">
-                      <SelectValue placeholder="Select account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={String(paymentDialogSupplier.id)}>
-                        {paymentDialogSupplier.name} (broker)
-                      </SelectItem>
-                      {children.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.name} (linked supplier)
+            {paymentDialogSupplier &&
+              (() => {
+                const children = allSuppliers.filter((s) => s.parentId === paymentDialogSupplier.id);
+                if (children.length === 0) return null;
+                return (
+                  <div>
+                    <Label>Pay to (account)</Label>
+                    <Select
+                      value={String(paymentForm.supplierId)}
+                      onValueChange={(v) => setPaymentForm((prev: any) => ({ ...prev, supplierId: parseInt(v) }))}
+                    >
+                      <SelectTrigger data-testid="select-payment-target">
+                        <SelectValue placeholder="Select account" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={String(paymentDialogSupplier.id)}>
+                          {paymentDialogSupplier.name} (broker)
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              );
-            })()}
+                        {children.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.name} (linked supplier)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })()}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -103,7 +118,9 @@ export function SupplierPaymentFxDialogs({
                 />
               </div>
               <div>
-                <Label>Effective Date <span className="text-muted-foreground">(optional)</span></Label>
+                <Label>
+                  Effective Date <span className="text-muted-foreground">(optional)</span>
+                </Label>
                 <Input
                   type="date"
                   value={paymentForm.effectiveDate}
@@ -117,7 +134,13 @@ export function SupplierPaymentFxDialogs({
                 <Label>Currency</Label>
                 <Select
                   value={paymentForm.currencyCode}
-                  onValueChange={(v) => setPaymentForm((prev: any) => ({ ...prev, currencyCode: v, fxRateToUsd: v === "USD" ? "1" : prev.fxRateToUsd }))}
+                  onValueChange={(v) =>
+                    setPaymentForm((prev: any) => ({
+                      ...prev,
+                      currencyCode: v,
+                      fxRateToUsd: v === "USD" ? "1" : prev.fxRateToUsd,
+                    }))
+                  }
                 >
                   <SelectTrigger data-testid="select-payment-currency">
                     <SelectValue />
@@ -153,7 +176,12 @@ export function SupplierPaymentFxDialogs({
                 />
                 {paymentForm.amount && paymentForm.fxRateToUsd && parseFloat(paymentForm.fxRateToUsd) > 0 && (
                   <p className="text-sm font-medium mt-1.5 text-primary">
-                    = ${(parseFloat(paymentForm.amount) / parseFloat(paymentForm.fxRateToUsd)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD
+                    = $
+                    {(parseFloat(paymentForm.amount) / parseFloat(paymentForm.fxRateToUsd)).toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    USD
                   </p>
                 )}
               </div>
@@ -166,8 +194,10 @@ export function SupplierPaymentFxDialogs({
                   Overpayment Detected
                 </div>
                 <p className="text-xs text-amber-700 dark:text-amber-400">
-                  Total USD payout (${paymentAmtUsd.toFixed(2)}) exceeds the current USD balance (${paymentBalanceUsd.toFixed(2)}).
-                  Remaining <span className="font-bold">${overpaymentUsd.toFixed(2)}</span> will be recorded as a credit (CR) on the supplier's statement.
+                  Total USD payout (${paymentAmtUsd.toFixed(2)}) exceeds the current USD balance ($
+                  {paymentBalanceUsd.toFixed(2)}). Remaining{" "}
+                  <span className="font-bold">${overpaymentUsd.toFixed(2)}</span> will be recorded as a credit (CR) on
+                  the supplier's statement.
                 </p>
               </div>
             )}
@@ -182,8 +212,10 @@ export function SupplierPaymentFxDialogs({
                   <SelectValue placeholder="Select account" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ledgerAccounts?.map(acc => (
-                    <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
+                  {ledgerAccounts?.map((acc) => (
+                    <SelectItem key={acc.id} value={String(acc.id)}>
+                      {acc.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -199,7 +231,9 @@ export function SupplierPaymentFxDialogs({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPaymentDialogSupplier(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setPaymentDialogSupplier(null)}>
+              Cancel
+            </Button>
             <Button
               onClick={() => wrapAdminAction(() => paymentMutation.mutate(paymentForm), "Record Payment")}
               disabled={!paymentForm.amount || !paymentForm.paidFromAccountId || paymentMutation.isPending}
@@ -211,7 +245,12 @@ export function SupplierPaymentFxDialogs({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={fxConversionOpen} onOpenChange={(open) => { if (!open) setFxConversionOpen(false); }}>
+      <Dialog
+        open={fxConversionOpen}
+        onOpenChange={(open) => {
+          if (!open) setFxConversionOpen(false);
+        }}
+      >
         <DialogContent className="max-w-md">
           {(() => {
             const isSelf = fxConversionForm.toSupplierId === fxConversionForm.fromSupplierId;
@@ -220,23 +259,29 @@ export function SupplierPaymentFxDialogs({
                 <DialogTitle className="flex items-center gap-2">
                   <ArrowRightLeft className="h-4 w-4" />
                   {fxConversionForm.selectedCurrency === "USD"
-                    ? (parseFloat(fxConversionForm.commissionBalance || "0") > 0
-                        ? (isSelf ? "Settle Commission to EUR" : "Transfer Commission to Broker")
-                        : (isSelf ? "Settle Freight to EUR" : "Transfer Freight to Broker"))
-                    : (isSelf ? `FX Settlement to EUR` : "FX Settlement to Broker (EUR)")}
+                    ? parseFloat(fxConversionForm.commissionBalance || "0") > 0
+                      ? isSelf
+                        ? "Settle Commission to EUR"
+                        : "Transfer Commission to Broker"
+                      : isSelf
+                        ? "Settle Freight to EUR"
+                        : "Transfer Freight to Broker"
+                    : isSelf
+                      ? `FX Settlement to EUR`
+                      : "FX Settlement to Broker (EUR)"}
                 </DialogTitle>
                 <DialogDescription>
                   {fxConversionForm.selectedCurrency === "USD"
                     ? parseFloat(fxConversionForm.commissionBalance || "0") > 0
-                      ? (isSelf
-                          ? "Direct settlement: records this USD commission as settled. Not a voucher payment."
-                          : "Direct transfer: moves this USD commission from the linked supplier to the broker at 1:1 rate. Not a voucher payment.")
-                      : (isSelf
-                          ? "Direct settlement: records this USD freight obligation as settled. Not a voucher payment."
-                          : "Direct transfer: moves this USD freight obligation from the linked supplier to the broker at 1:1 rate. Not a voucher payment.")
-                    : (isSelf
-                        ? "Internal settlement: records the USD amount paid to settle this supplier's foreign currency balance. Not a voucher payment."
-                        : "Internal settlement: records the USD cost of settling this linked supplier's foreign currency balance into the broker's pool. Not a voucher payment.")}
+                      ? isSelf
+                        ? "Direct settlement: records this USD commission as settled. Not a voucher payment."
+                        : "Direct transfer: moves this USD commission from the linked supplier to the broker at 1:1 rate. Not a voucher payment."
+                      : isSelf
+                        ? "Direct settlement: records this USD freight obligation as settled. Not a voucher payment."
+                        : "Direct transfer: moves this USD freight obligation from the linked supplier to the broker at 1:1 rate. Not a voucher payment."
+                    : isSelf
+                      ? "Internal settlement: records the USD amount paid to settle this supplier's foreign currency balance. Not a voucher payment."
+                      : "Internal settlement: records the USD cost of settling this linked supplier's foreign currency balance into the broker's pool. Not a voucher payment."}
                 </DialogDescription>
               </DialogHeader>
             );
@@ -245,8 +290,12 @@ export function SupplierPaymentFxDialogs({
             <div>
               <Label className="text-xs text-muted-foreground mb-1 block">Settlement Source</Label>
               <div className="flex gap-2">
-                {(["supplier", "commission", "both"] as const).map(t => {
-                  const labels: Record<string, string> = { supplier: "Supplier Balance", commission: "Commission", both: "Both" };
+                {(["supplier", "commission", "both"] as const).map((t) => {
+                  const labels: Record<string, string> = {
+                    supplier: "Supplier Balance",
+                    commission: "Commission",
+                    both: "Both",
+                  };
                   const getAvail = (src: string) => {
                     const s = parseFloat(fxConversionForm.supplierBalance || "0");
                     const c = parseFloat(fxConversionForm.commissionBalance || "0");
@@ -293,7 +342,10 @@ export function SupplierPaymentFxDialogs({
 
             {fxConversionForm.selectedCurrency === "USD" ? (
               <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 text-sm text-muted-foreground">
-                <span>Rate: <span className="font-medium text-foreground">1 USD = 1 USD</span> (direct transfer, no FX conversion)</span>
+                <span>
+                  Rate: <span className="font-medium text-foreground">1 USD = 1 USD</span> (direct transfer, no FX
+                  conversion)
+                </span>
               </div>
             ) : (
               <div>
@@ -333,14 +385,18 @@ export function SupplierPaymentFxDialogs({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setFxConversionOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setFxConversionOpen(false)}>
+              Cancel
+            </Button>
             <Button
-              onClick={() => wrapAdminAction(() => {
-                fxConversionMutation.mutate({
-                  ...fxConversionForm,
-                  sourceType: fxSourceType,
-                } as any);
-              }, "Record FX Conversion")}
+              onClick={() =>
+                wrapAdminAction(() => {
+                  fxConversionMutation.mutate({
+                    ...fxConversionForm,
+                    sourceType: fxSourceType,
+                  } as any);
+                }, "Record FX Conversion")
+              }
               disabled={
                 !fxConversionForm.amount ||
                 !fxConversionForm.fxRateToUsd ||
@@ -350,7 +406,11 @@ export function SupplierPaymentFxDialogs({
               }
               data-testid="button-submit-fx-conversion"
             >
-              {fxConversionMutation.isPending ? "Recording..." : fxConversionForm.selectedCurrency === "USD" ? "Record Transfer" : "Record Settlement"}
+              {fxConversionMutation.isPending
+                ? "Recording..."
+                : fxConversionForm.selectedCurrency === "USD"
+                  ? "Record Transfer"
+                  : "Record Settlement"}
             </Button>
           </DialogFooter>
         </DialogContent>

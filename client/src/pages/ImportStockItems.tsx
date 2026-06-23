@@ -82,36 +82,70 @@ function NewItemsTab() {
       const columns = headerRow.map((h: any) => String(h || "").trim());
       const missingCols = ["code", "name"].filter((c) => !columns.includes(c));
       if (missingCols.length > 0) {
-        toast({ title: "Missing Required Columns", description: `Expected: code, name. Found: ${columns.slice(0, 5).join(", ")}. Download the template.`, variant: "destructive" });
+        toast({
+          title: "Missing Required Columns",
+          description: `Expected: code, name. Found: ${columns.slice(0, 5).join(", ")}. Download the template.`,
+          variant: "destructive",
+        });
         return;
       }
       const validationErrors: ValidationError[] = [];
       const rows: ImportRow[] = [];
       jsonData.forEach((row, index) => {
         const rowNumber = index + 2;
-        if (!row.code || String(row.code).trim() === "") validationErrors.push({ row: rowNumber, field: "code", message: "Code is required" });
-        if (!row.name || String(row.name).trim() === "") validationErrors.push({ row: rowNumber, field: "name", message: "Name is required" });
-        rows.push({ code: String(row.code || "").trim(), name: String(row.name || "").trim(), unit: row.unit ? String(row.unit).trim() : "Bale", stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined });
+        if (!row.code || String(row.code).trim() === "")
+          validationErrors.push({ row: rowNumber, field: "code", message: "Code is required" });
+        if (!row.name || String(row.name).trim() === "")
+          validationErrors.push({ row: rowNumber, field: "name", message: "Name is required" });
+        rows.push({
+          code: String(row.code || "").trim(),
+          name: String(row.name || "").trim(),
+          unit: row.unit ? String(row.unit).trim() : "Bale",
+          stockGroupCode: row.stockGroupCode ? String(row.stockGroupCode).trim() : undefined,
+        });
       });
       setPreviewData(rows);
       setErrors(validationErrors);
-      if (validationErrors.length === 0) toast({ title: "File Validated", description: `${rows.length} stock items ready to import` });
-      else toast({ title: "Validation Errors Found", description: `${validationErrors.length} errors found. Please fix them.`, variant: "destructive" });
+      if (validationErrors.length === 0)
+        toast({ title: "File Validated", description: `${rows.length} stock items ready to import` });
+      else
+        toast({
+          title: "Validation Errors Found",
+          description: `${validationErrors.length} errors found. Please fix them.`,
+          variant: "destructive",
+        });
     } catch {
-      toast({ title: "Error Reading File", description: "Please ensure the file is a valid Excel file (.xlsx)", variant: "destructive" });
+      toast({
+        title: "Error Reading File",
+        description: "Please ensure the file is a valid Excel file (.xlsx)",
+        variant: "destructive",
+      });
     }
   };
 
   const handleImport = async () => {
-    if (!selectedCompany) { toast({ title: "No Company Selected", variant: "destructive" }); return; }
-    if (errors.length > 0) { toast({ title: "Cannot Import", description: "Fix validation errors first", variant: "destructive" }); return; }
+    if (!selectedCompany) {
+      toast({ title: "No Company Selected", variant: "destructive" });
+      return;
+    }
+    if (errors.length > 0) {
+      toast({ title: "Cannot Import", description: "Fix validation errors first", variant: "destructive" });
+      return;
+    }
     setIsProcessing(true);
     try {
       const stockGroupsData: any[] = await fetch("/api/stock-groups", { credentials: "include" }).then((r) => r.json());
       const stockGroupMap = new Map(stockGroupsData.map((sg: any) => [sg.code, sg.id]));
       const itemsToImport = previewData.map((row) => {
-        const item: any = { companyId: selectedCompany.id, code: row.code, name: row.name, uom: row.unit || "Bale", active: true };
-        if (row.stockGroupCode && stockGroupMap.has(row.stockGroupCode)) item.stockGroupId = stockGroupMap.get(row.stockGroupCode);
+        const item: any = {
+          companyId: selectedCompany.id,
+          code: row.code,
+          name: row.name,
+          uom: row.unit || "Bale",
+          active: true,
+        };
+        if (row.stockGroupCode && stockGroupMap.has(row.stockGroupCode))
+          item.stockGroupId = stockGroupMap.get(row.stockGroupCode);
         return item;
       });
       await apiRequest("POST", "/api/stock-items/import", { items: itemsToImport });
@@ -119,7 +153,11 @@ function NewItemsTab() {
       setImportComplete(true);
       toast({ title: "Import Successful", description: `Successfully imported ${itemsToImport.length} stock items` });
     } catch (error: any) {
-      toast({ title: "Import Failed", description: error.message || "Failed to import stock items", variant: "destructive" });
+      toast({
+        title: "Import Failed",
+        description: error.message || "Failed to import stock items",
+        variant: "destructive",
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -139,16 +177,29 @@ function NewItemsTab() {
           </Button>
           <div className="space-y-2">
             <Label htmlFor="file-upload">Select Excel File</Label>
-            <Input id="file-upload" type="file" accept=".xlsx,.xls" onChange={handleFileChange} disabled={isProcessing || importComplete} data-testid="input-file-upload" />
+            <Input
+              id="file-upload"
+              type="file"
+              accept=".xlsx,.xls"
+              onChange={handleFileChange}
+              disabled={isProcessing || importComplete}
+              data-testid="input-file-upload"
+            />
             {file && <p className="text-sm text-muted-foreground">Selected: {file.name}</p>}
           </div>
           {errors.length > 0 && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                <div className="font-semibold mb-2">{errors.length} validation error{errors.length > 1 ? "s" : ""} found:</div>
+                <div className="font-semibold mb-2">
+                  {errors.length} validation error{errors.length > 1 ? "s" : ""} found:
+                </div>
                 <ul className="list-disc list-inside space-y-1">
-                  {errors.slice(0, 10).map((e, i) => <li key={i} className="text-sm">Row {e.row}, {e.field}: {e.message}</li>)}
+                  {errors.slice(0, 10).map((e, i) => (
+                    <li key={i} className="text-sm">
+                      Row {e.row}, {e.field}: {e.message}
+                    </li>
+                  ))}
                   {errors.length > 10 && <li className="text-sm">... and {errors.length - 10} more</li>}
                 </ul>
               </AlertDescription>
@@ -157,7 +208,9 @@ function NewItemsTab() {
           {importComplete && (
             <Alert>
               <CheckCircle2 className="h-4 w-4" />
-              <AlertDescription>Import completed successfully! {previewData.length} stock items created.</AlertDescription>
+              <AlertDescription>
+                Import completed successfully! {previewData.length} stock items created.
+              </AlertDescription>
             </Alert>
           )}
         </CardContent>
@@ -191,15 +244,32 @@ function NewItemsTab() {
                   ))}
                 </tbody>
               </table>
-              {previewData.length > 50 && <div className="p-2 text-center text-sm text-muted-foreground border-t">... and {previewData.length - 50} more items</div>}
+              {previewData.length > 50 && (
+                <div className="p-2 text-center text-sm text-muted-foreground border-t">
+                  ... and {previewData.length - 50} more items
+                </div>
+              )}
             </div>
             <div className="flex gap-4 mt-4">
-              <Button onClick={handleImport} disabled={isProcessing || errors.length > 0 || importComplete} data-testid="button-import">
+              <Button
+                onClick={handleImport}
+                disabled={isProcessing || errors.length > 0 || importComplete}
+                data-testid="button-import"
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 {isProcessing ? "Importing..." : "Import Stock Items"}
               </Button>
               {importComplete && (
-                <Button variant="outline" onClick={() => { setFile(null); setPreviewData([]); setErrors([]); setImportComplete(false); }} data-testid="button-import-another">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFile(null);
+                    setPreviewData([]);
+                    setErrors([]);
+                    setImportComplete(false);
+                  }}
+                  data-testid="button-import-another"
+                >
                   Import Another File
                 </Button>
               )}
@@ -221,14 +291,19 @@ function BarcodesTab() {
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<BarcodeRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<{ imported: number; skipped: number; notFound: number; notFoundCodes: string[] } | null>(null);
+  const [result, setResult] = useState<{
+    imported: number;
+    skipped: number;
+    notFound: number;
+    notFoundCodes: string[];
+  } | null>(null);
 
   const downloadTemplate = async () => {
     const wb = new (ExcelJS as any).Workbook();
     const ws = wb.addWorksheet("Barcodes");
     ws.columns = [
       { header: "Item Code", key: "itemCode", width: 20 },
-      { header: "Barcode",   key: "barcode",  width: 30 },
+      { header: "Barcode", key: "barcode", width: 30 },
     ];
     ws.getRow(1).font = { bold: true };
     ws.addRow({ itemCode: "ITEM001", barcode: "6291041500213" });
@@ -238,7 +313,9 @@ function BarcodesTab() {
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "barcode_import_template.xlsx"; a.click();
+    a.href = url;
+    a.download = "barcode_import_template.xlsx";
+    a.click();
     URL.revokeObjectURL(url);
     toast({ title: "Template Downloaded", description: "Fill in Item Code and Barcode columns, then upload" });
   };
@@ -263,17 +340,21 @@ function BarcodesTab() {
       const firstRow = jsonData[0];
       const keys = Object.keys(firstRow);
       const itemCodeKey = keys.find((k) => k.toLowerCase().replace(/[\s_]/g, "") === "itemcode") ?? keys[0];
-      const barcodeKey  = keys.find((k) => k.toLowerCase() === "barcode") ?? keys[1];
+      const barcodeKey = keys.find((k) => k.toLowerCase() === "barcode") ?? keys[1];
 
       if (!itemCodeKey || !barcodeKey) {
-        toast({ title: "Column Not Found", description: `Expected "Item Code" and "Barcode" columns. Download the template for the correct format.`, variant: "destructive" });
+        toast({
+          title: "Column Not Found",
+          description: `Expected "Item Code" and "Barcode" columns. Download the template for the correct format.`,
+          variant: "destructive",
+        });
         return;
       }
 
       const seen = new Set<string>();
       const parsed: BarcodeRow[] = jsonData.map((row) => {
         const itemCode = String(row[itemCodeKey] || "").trim();
-        const barcode  = String(row[barcodeKey]  || "").trim();
+        const barcode = String(row[barcodeKey] || "").trim();
         const key = `${itemCode.toLowerCase()}|${barcode.toLowerCase()}`;
         let status: BarcodeRow["status"] = "ok";
         if (!itemCode || !barcode) status = "empty";
@@ -284,23 +365,32 @@ function BarcodesTab() {
 
       setRows(parsed);
       const valid = parsed.filter((r) => r.status === "ok").length;
-      const dups  = parsed.filter((r) => r.status === "duplicate").length;
+      const dups = parsed.filter((r) => r.status === "duplicate").length;
       const empty = parsed.filter((r) => r.status === "empty").length;
       toast({
         title: "File Loaded",
         description: `${valid} valid rows${dups ? `, ${dups} duplicate${dups > 1 ? "s" : ""}` : ""}${empty ? `, ${empty} empty` : ""}`,
       });
     } catch {
-      toast({ title: "Error Reading File", description: "Please ensure the file is a valid Excel file (.xlsx)", variant: "destructive" });
+      toast({
+        title: "Error Reading File",
+        description: "Please ensure the file is a valid Excel file (.xlsx)",
+        variant: "destructive",
+      });
     }
   };
 
   const handleImport = async () => {
     const validRows = rows.filter((r) => r.status === "ok");
-    if (validRows.length === 0) { toast({ title: "Nothing to Import", description: "No valid rows found.", variant: "destructive" }); return; }
+    if (validRows.length === 0) {
+      toast({ title: "Nothing to Import", description: "No valid rows found.", variant: "destructive" });
+      return;
+    }
     setIsProcessing(true);
     try {
-      const res = await apiRequest("POST", "/api/stock-items/import-barcodes", { rows: validRows.map((r) => ({ itemCode: r.itemCode, barcode: r.barcode })) }) as any;
+      const res = (await apiRequest("POST", "/api/stock-items/import-barcodes", {
+        rows: validRows.map((r) => ({ itemCode: r.itemCode, barcode: r.barcode })),
+      })) as any;
       setResult(res);
       toast({
         title: "Import Complete",
@@ -322,15 +412,24 @@ function BarcodesTab() {
         <CardHeader>
           <CardTitle>Upload Barcode File</CardTitle>
           <CardDescription>
-            Match barcodes to existing items using their Item Code. Each row assigns one barcode to one item — you can have multiple rows for the same item.
+            Match barcodes to existing items using their Item Code. Each row assigns one barcode to one item — you can
+            have multiple rows for the same item.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted/40 p-4 text-sm space-y-1">
             <p className="font-medium">Required columns</p>
-            <p className="text-muted-foreground"><span className="font-mono bg-background px-1 rounded">Item Code</span> — must match the primary code of an existing item exactly</p>
-            <p className="text-muted-foreground"><span className="font-mono bg-background px-1 rounded">Barcode</span> — the barcode/alias to register (e.g. EAN-13, UPC)</p>
-            <p className="text-muted-foreground">One item can have many barcodes — just add multiple rows with the same Item Code.</p>
+            <p className="text-muted-foreground">
+              <span className="font-mono bg-background px-1 rounded">Item Code</span> — must match the primary code of
+              an existing item exactly
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-mono bg-background px-1 rounded">Barcode</span> — the barcode/alias to register
+              (e.g. EAN-13, UPC)
+            </p>
+            <p className="text-muted-foreground">
+              One item can have many barcodes — just add multiple rows with the same Item Code.
+            </p>
           </div>
 
           <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-barcode-template">
@@ -356,12 +455,19 @@ function BarcodesTab() {
             <Alert variant={result.notFound > 0 ? "destructive" : "default"}>
               <CheckCircle2 className="h-4 w-4" />
               <AlertDescription className="space-y-1">
-                <p><strong>{result.imported}</strong> barcodes imported successfully</p>
-                {result.skipped > 0 && <p className="text-muted-foreground">{result.skipped} skipped (already assigned)</p>}
+                <p>
+                  <strong>{result.imported}</strong> barcodes imported successfully
+                </p>
+                {result.skipped > 0 && (
+                  <p className="text-muted-foreground">{result.skipped} skipped (already assigned)</p>
+                )}
                 {result.notFound > 0 && (
                   <div>
                     <p>{result.notFound} item code(s) not found:</p>
-                    <p className="font-mono text-xs mt-1">{result.notFoundCodes.slice(0, 10).join(", ")}{result.notFoundCodes.length > 10 ? ` +${result.notFoundCodes.length - 10} more` : ""}</p>
+                    <p className="font-mono text-xs mt-1">
+                      {result.notFoundCodes.slice(0, 10).join(", ")}
+                      {result.notFoundCodes.length > 10 ? ` +${result.notFoundCodes.length - 10} more` : ""}
+                    </p>
                   </div>
                 )}
               </AlertDescription>
@@ -383,7 +489,9 @@ function BarcodesTab() {
                 <Badge variant="outline">{rows.filter((r) => r.status === "empty").length} empty</Badge>
               )}
             </CardTitle>
-            <CardDescription>Only "valid" rows will be imported. Duplicates and empty rows are skipped.</CardDescription>
+            <CardDescription>
+              Only "valid" rows will be imported. Duplicates and empty rows are skipped.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="border rounded-md overflow-auto max-h-96">
@@ -404,12 +512,16 @@ function BarcodesTab() {
                       data-testid={`row-barcode-preview-${i}`}
                     >
                       <td className="p-2 text-sm text-muted-foreground">{i + 2}</td>
-                      <td className="p-2 text-sm font-mono">{row.itemCode || <span className="text-muted-foreground italic">empty</span>}</td>
-                      <td className="p-2 text-sm font-mono">{row.barcode || <span className="text-muted-foreground italic">empty</span>}</td>
+                      <td className="p-2 text-sm font-mono">
+                        {row.itemCode || <span className="text-muted-foreground italic">empty</span>}
+                      </td>
+                      <td className="p-2 text-sm font-mono">
+                        {row.barcode || <span className="text-muted-foreground italic">empty</span>}
+                      </td>
                       <td className="p-2">
-                        {row.status === "ok"        && <Badge className="bg-green-600 text-white border-0">Valid</Badge>}
+                        {row.status === "ok" && <Badge className="bg-green-600 text-white border-0">Valid</Badge>}
                         {row.status === "duplicate" && <Badge variant="outline">Duplicate</Badge>}
-                        {row.status === "empty"     && <Badge variant="outline">Empty</Badge>}
+                        {row.status === "empty" && <Badge variant="outline">Empty</Badge>}
                       </td>
                     </tr>
                   ))}
@@ -434,7 +546,12 @@ function BarcodesTab() {
               {result && (
                 <Button
                   variant="outline"
-                  onClick={() => { setFile(null); setRows([]); setResult(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
+                  onClick={() => {
+                    setFile(null);
+                    setRows([]);
+                    setResult(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
                   data-testid="button-import-barcodes-reset"
                 >
                   Import Another File
@@ -463,14 +580,20 @@ function UpdateCategoriesTab() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<CategoryRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<{ updated: number; notFound: number; categoryNotFound: number; notFoundCodes: string[]; categoryNotFoundNames: string[] } | null>(null);
+  const [result, setResult] = useState<{
+    updated: number;
+    notFound: number;
+    categoryNotFound: number;
+    notFoundCodes: string[];
+    categoryNotFoundNames: string[];
+  } | null>(null);
 
   const downloadTemplate = async () => {
     const wb = new (ExcelJS as any).Workbook();
     const ws = wb.addWorksheet("Categories");
     ws.columns = [
-      { header: "Item Code",     key: "itemCode",      width: 20 },
-      { header: "Category Name", key: "categoryName",  width: 30 },
+      { header: "Item Code", key: "itemCode", width: 20 },
+      { header: "Category Name", key: "categoryName", width: 30 },
     ];
     ws.getRow(1).font = { bold: true };
     ws.addRow({ itemCode: "ITEM001", categoryName: "AJ" });
@@ -479,7 +602,10 @@ function UpdateCategoriesTab() {
     const buf = await wb.xlsx.writeBuffer();
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a"); a.href = url; a.download = "update_categories_template.xlsx"; a.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "update_categories_template.xlsx";
+    a.click();
     URL.revokeObjectURL(url);
     toast({ title: "Template Downloaded", description: "Fill in Item Code and Category Name, then upload" });
   };
@@ -493,7 +619,10 @@ function UpdateCategoriesTab() {
       const workbook = await read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
       const jsonData = utils.sheet_to_json<any>(worksheet);
-      if (jsonData.length === 0) { toast({ title: "Empty File", variant: "destructive" }); return; }
+      if (jsonData.length === 0) {
+        toast({ title: "Empty File", variant: "destructive" });
+        return;
+      }
 
       const keys = Object.keys(jsonData[0]);
       const itemCodeKey = keys.find((k) => k.toLowerCase().replace(/[\s_]/g, "") === "itemcode") ?? keys[0];
@@ -521,7 +650,10 @@ function UpdateCategoriesTab() {
 
   const handleImport = async () => {
     const valid = rows.filter((r) => r.status === "ok");
-    if (valid.length === 0) { toast({ title: "Nothing to import", variant: "destructive" }); return; }
+    if (valid.length === 0) {
+      toast({ title: "Nothing to import", variant: "destructive" });
+      return;
+    }
     setIsProcessing(true);
     try {
       const res = await apiRequest("POST", "/api/stock-items/update-categories", {
@@ -556,9 +688,17 @@ function UpdateCategoriesTab() {
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted/40 p-4 text-sm space-y-1">
             <p className="font-medium">Required columns</p>
-            <p className="text-muted-foreground"><span className="font-mono bg-background px-1 rounded">Item Code</span> — must match an existing item's code exactly</p>
-            <p className="text-muted-foreground"><span className="font-mono bg-background px-1 rounded">Category Name</span> — must match an existing stock group name exactly</p>
-            <p className="text-muted-foreground">Each row updates one item. Duplicate item codes are skipped (first row wins).</p>
+            <p className="text-muted-foreground">
+              <span className="font-mono bg-background px-1 rounded">Item Code</span> — must match an existing item's
+              code exactly
+            </p>
+            <p className="text-muted-foreground">
+              <span className="font-mono bg-background px-1 rounded">Category Name</span> — must match an existing stock
+              group name exactly
+            </p>
+            <p className="text-muted-foreground">
+              Each row updates one item. Duplicate item codes are skipped (first row wins).
+            </p>
           </div>
 
           <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-categories-template">
@@ -582,15 +722,31 @@ function UpdateCategoriesTab() {
             <Alert variant={result.notFound > 0 || result.categoryNotFound > 0 ? "destructive" : "default"}>
               <CheckCircle2 className="h-4 w-4" />
               <AlertDescription className="space-y-1">
-                <p><strong>{result.updated}</strong> items updated successfully</p>
+                <p>
+                  <strong>{result.updated}</strong> items updated successfully
+                </p>
                 {result.notFound > 0 && (
                   <div>
-                    <p className="text-muted-foreground">{result.notFound} item code(s) not found: <span className="font-mono text-xs">{result.notFoundCodes.slice(0, 8).join(", ")}{result.notFoundCodes.length > 8 ? ` +${result.notFoundCodes.length - 8} more` : ""}</span></p>
+                    <p className="text-muted-foreground">
+                      {result.notFound} item code(s) not found:{" "}
+                      <span className="font-mono text-xs">
+                        {result.notFoundCodes.slice(0, 8).join(", ")}
+                        {result.notFoundCodes.length > 8 ? ` +${result.notFoundCodes.length - 8} more` : ""}
+                      </span>
+                    </p>
                   </div>
                 )}
                 {result.categoryNotFound > 0 && (
                   <div>
-                    <p className="text-muted-foreground">{result.categoryNotFound} category name(s) not found: <span className="font-mono text-xs">{result.categoryNotFoundNames.slice(0, 8).join(", ")}{result.categoryNotFoundNames.length > 8 ? ` +${result.categoryNotFoundNames.length - 8} more` : ""}</span></p>
+                    <p className="text-muted-foreground">
+                      {result.categoryNotFound} category name(s) not found:{" "}
+                      <span className="font-mono text-xs">
+                        {result.categoryNotFoundNames.slice(0, 8).join(", ")}
+                        {result.categoryNotFoundNames.length > 8
+                          ? ` +${result.categoryNotFoundNames.length - 8} more`
+                          : ""}
+                      </span>
+                    </p>
                   </div>
                 )}
               </AlertDescription>
@@ -628,12 +784,16 @@ function UpdateCategoriesTab() {
                   {rows.slice(0, 200).map((row, i) => (
                     <tr key={i} className={`border-b last:border-b-0 ${row.status !== "ok" ? "opacity-50" : ""}`}>
                       <td className="p-2 text-sm text-muted-foreground">{i + 2}</td>
-                      <td className="p-2 text-sm font-mono">{row.itemCode || <span className="text-muted-foreground italic">empty</span>}</td>
-                      <td className="p-2 text-sm">{row.categoryName || <span className="text-muted-foreground italic">empty</span>}</td>
+                      <td className="p-2 text-sm font-mono">
+                        {row.itemCode || <span className="text-muted-foreground italic">empty</span>}
+                      </td>
+                      <td className="p-2 text-sm">
+                        {row.categoryName || <span className="text-muted-foreground italic">empty</span>}
+                      </td>
                       <td className="p-2">
-                        {row.status === "ok"        && <Badge className="bg-green-600 text-white border-0">Valid</Badge>}
+                        {row.status === "ok" && <Badge className="bg-green-600 text-white border-0">Valid</Badge>}
                         {row.status === "duplicate" && <Badge variant="outline">Duplicate</Badge>}
-                        {row.status === "empty"     && <Badge variant="outline">Empty</Badge>}
+                        {row.status === "empty" && <Badge variant="outline">Empty</Badge>}
                       </td>
                     </tr>
                   ))}
@@ -656,7 +816,14 @@ function UpdateCategoriesTab() {
                 {isProcessing ? "Updating..." : `Update ${validCount} Item${validCount !== 1 ? "s" : ""}`}
               </Button>
               {result && (
-                <Button variant="outline" onClick={() => { setRows([]); setResult(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setRows([]);
+                    setResult(null);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                >
                   Upload Another File
                 </Button>
               )}

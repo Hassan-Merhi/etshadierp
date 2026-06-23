@@ -39,5 +39,8 @@ export function saveDaybookState(state: DaybookUIState): void {
 
 export function focusDaybookEditById(id: string) {
   const el = document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-  if (el) { el.focus(); el.scrollIntoView({ block: "nearest" }); }
+  if (el) {
+    el.focus();
+    el.scrollIntoView({ block: "nearest" });
+  }
 }

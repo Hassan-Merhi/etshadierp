@@ -98,7 +98,7 @@ export default function FactoryInvoiceCreate() {
   })();
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
-  const [orderDate, setOrderDate] = useState(() => new Date().toLocaleDateString('en-CA'));
+  const [orderDate, setOrderDate] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [chargeLedgerAccountId, setChargeLedgerAccountId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
   const [orderId, setOrderId] = useState<number | null>(urlOrderId);
@@ -288,12 +288,15 @@ export default function FactoryInvoiceCreate() {
     },
   });
 
-  const handleDateChange = useCallback((newDate: string) => {
-    setOrderDate(newDate);
-    if (orderId && newDate) {
-      updateDateMutation.mutate(newDate);
-    }
-  }, [orderId, updateDateMutation]);
+  const handleDateChange = useCallback(
+    (newDate: string) => {
+      setOrderDate(newDate);
+      if (orderId && newDate) {
+        updateDateMutation.mutate(newDate);
+      }
+    },
+    [orderId, updateDateMutation]
+  );
 
   const repriceMutation = useMutation({
     mutationFn: async () => {
@@ -330,11 +333,14 @@ export default function FactoryInvoiceCreate() {
     }
   }, [customerId, activeProforma?.id]);
 
-  const handleScan = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
-    e.preventDefault();
-    addBaleMutation.mutate({ scanCode: scanCode.trim(), locationId: parseInt(selectedLocationId) });
-  }, [scanCode, orderId, selectedLocationId, addBaleMutation]);
+  const handleScan = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key !== "Enter" || !scanCode.trim() || !orderId || !selectedLocationId) return;
+      e.preventDefault();
+      addBaleMutation.mutate({ scanCode: scanCode.trim(), locationId: parseInt(selectedLocationId) });
+    },
+    [scanCode, orderId, selectedLocationId, addBaleMutation]
+  );
 
   const handleAddCharge = useCallback(() => {
     if (!chargeAmount || !orderId) return;
@@ -351,7 +357,19 @@ export default function FactoryInvoiceCreate() {
   const bales = orderDetail?.bales || [];
   const charges = orderDetail?.charges || [];
 
-  const groupedBales = bales.reduce<Record<string, { articleCode: string; productName: string; bales: OrderBale[]; totalWeight: number; totalPrice: number; pricePerBale: number }>>((acc, bale) => {
+  const groupedBales = bales.reduce<
+    Record<
+      string,
+      {
+        articleCode: string;
+        productName: string;
+        bales: OrderBale[];
+        totalWeight: number;
+        totalPrice: number;
+        pricePerBale: number;
+      }
+    >
+  >((acc, bale) => {
     const key = bale.articleCode;
     if (!acc[key]) {
       acc[key] = {
@@ -370,15 +388,20 @@ export default function FactoryInvoiceCreate() {
   }, {});
 
   const subtotal = bales.reduce((sum, b) => sum + parseFloat(b.totalPrice || "0"), 0);
-  const freightCharges = charges.filter((c) => c.chargeType === "FREIGHT").reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
-  const otherCharges = charges.filter((c) => c.chargeType !== "FREIGHT").reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
+  const freightCharges = charges
+    .filter((c) => c.chargeType === "FREIGHT")
+    .reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
+  const otherCharges = charges
+    .filter((c) => c.chargeType !== "FREIGHT")
+    .reduce((sum, c) => sum + parseFloat(c.amount || "0"), 0);
   const grandTotal = subtotal + freightCharges + otherCharges;
 
-  const scanInputClass = scanFlash === "success"
-    ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950 transition-all"
-    : scanFlash === "error"
-    ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
-    : "";
+  const scanInputClass =
+    scanFlash === "success"
+      ? "ring-2 ring-green-500 bg-green-50 dark:bg-green-950 transition-all"
+      : scanFlash === "error"
+        ? "ring-2 ring-red-500 bg-red-50 dark:bg-red-950 transition-all"
+        : "";
 
   return (
     <div className="flex flex-col h-full p-4 lg:p-6">
@@ -397,13 +420,20 @@ export default function FactoryInvoiceCreate() {
         <div className="lg:w-[60%] flex flex-col min-h-0">
           <Card className="flex-1 flex flex-col min-h-0 p-4">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <h2 className="font-semibold text-lg" data-testid="text-bales-header">Scanned Bales</h2>
-              <Badge variant="secondary" data-testid="badge-bale-count">{bales.length} bales</Badge>
+              <h2 className="font-semibold text-lg" data-testid="text-bales-header">
+                Scanned Bales
+              </h2>
+              <Badge variant="secondary" data-testid="badge-bale-count">
+                {bales.length} bales
+              </Badge>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {Object.keys(groupedBales).length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground" data-testid="text-no-bales">
+                <div
+                  className="flex flex-col items-center justify-center py-12 text-muted-foreground"
+                  data-testid="text-no-bales"
+                >
                   <ScanLine className="h-12 w-12 mb-3 opacity-40" />
                   <p>No bales scanned yet</p>
                   <p className="text-sm mt-1">Select a customer and location, then scan bales</p>
@@ -414,24 +444,48 @@ export default function FactoryInvoiceCreate() {
                     <div key={group.articleCode} data-testid={`group-article-${group.articleCode}`}>
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-2 px-1">
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" data-testid={`badge-article-${group.articleCode}`}>{group.articleCode}</Badge>
+                          <Badge variant="outline" data-testid={`badge-article-${group.articleCode}`}>
+                            {group.articleCode}
+                          </Badge>
                           <span className="text-sm font-medium">{group.productName}</span>
                         </div>
                         <div className="flex items-center gap-3 text-sm text-muted-foreground">
                           <span>Qty: {group.bales.length}</span>
-                          <span>Wt: {group.totalWeight.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          <span>
+                            Wt:{" "}
+                            {group.totalWeight.toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
                           {(() => {
-                            const pfl = activeProforma?.lines.find(l => l.articleCode === group.articleCode);
+                            const pfl = activeProforma?.lines.find((l) => l.articleCode === group.articleCode);
                             const isPerKg = pfl?.pricingMode === "per_kg";
                             return isPerKg ? (
                               <span className="font-mono text-xs text-muted-foreground">
-                                @{parseFloat(pfl?.pricePerKg || "0").toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })}/kg
+                                @
+                                {parseFloat(pfl?.pricePerKg || "0").toLocaleString(undefined, {
+                                  minimumFractionDigits: 3,
+                                  maximumFractionDigits: 3,
+                                })}
+                                /kg
                               </span>
                             ) : (
-                              <span className="font-mono">@{group.pricePerBale.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                              <span className="font-mono">
+                                @
+                                {group.pricePerBale.toLocaleString(undefined, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </span>
                             );
                           })()}
-                          <span className="font-mono font-semibold text-foreground">{group.totalPrice.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                          <span className="font-mono font-semibold text-foreground">
+                            {group.totalPrice.toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 2,
+                            })}
+                          </span>
                         </div>
                       </div>
                       <Table>
@@ -442,10 +496,20 @@ export default function FactoryInvoiceCreate() {
                                 {bale.referenceNumber}
                               </TableCell>
                               <TableCell className="text-right text-sm text-muted-foreground">
-                                {parseFloat(bale.weight || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} kg
+                                {parseFloat(bale.weight || "0").toLocaleString(undefined, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}{" "}
+                                kg
                               </TableCell>
-                              <TableCell className="text-right font-mono text-sm" data-testid={`text-bale-price-${bale.id}`}>
-                                {parseFloat(bale.totalPrice || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                              <TableCell
+                                className="text-right font-mono text-sm"
+                                data-testid={`text-bale-price-${bale.id}`}
+                              >
+                                {parseFloat(bale.totalPrice || "0").toLocaleString(undefined, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 2,
+                                })}
                               </TableCell>
                               <TableCell className="w-[40px]">
                                 <Button
@@ -471,7 +535,9 @@ export default function FactoryInvoiceCreate() {
             {bales.length > 0 && (
               <div className="border-t pt-3 mt-3 flex items-center justify-between gap-2">
                 <span className="font-medium">Subtotal</span>
-                <span className="font-mono font-semibold text-lg" data-testid="text-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                <span className="font-mono font-semibold text-lg" data-testid="text-subtotal">
+                  {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
               </div>
             )}
           </Card>
@@ -481,11 +547,7 @@ export default function FactoryInvoiceCreate() {
           <Card className="p-4 space-y-4">
             <div>
               <label className="text-sm font-medium mb-1 block">Customer</label>
-              <Select
-                value={selectedCustomerId}
-                onValueChange={handleCustomerChange}
-                disabled={!!orderId}
-              >
+              <Select value={selectedCustomerId} onValueChange={handleCustomerChange} disabled={!!orderId}>
                 <SelectTrigger data-testid="select-customer">
                   <SelectValue placeholder="Select customer..." />
                 </SelectTrigger>
@@ -511,7 +573,11 @@ export default function FactoryInvoiceCreate() {
 
             {activeProforma && (
               <div className="flex items-center gap-2">
-                <Badge variant="default" className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate" data-testid="badge-active-proforma">
+                <Badge
+                  variant="default"
+                  className="bg-green-600 text-white no-default-hover-elevate no-default-active-elevate"
+                  data-testid="badge-active-proforma"
+                >
                   {activeProforma.name}
                 </Badge>
                 <span className="text-sm text-muted-foreground">{activeProforma.lines.length} price lines</span>
@@ -519,7 +585,9 @@ export default function FactoryInvoiceCreate() {
             )}
 
             {customerId && !activeProforma && proformas.length === 0 && (
-              <p className="text-sm text-destructive" data-testid="text-no-proforma">No active proforma found for this customer</p>
+              <p className="text-sm text-destructive" data-testid="text-no-proforma">
+                No active proforma found for this customer
+              </p>
             )}
 
             <div>
@@ -567,7 +635,7 @@ export default function FactoryInvoiceCreate() {
           <Card className="p-4 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <h3 className="font-semibold text-sm">Charges</h3>
-              {orderDetail?.status === "FINALIZED" && charges.some(c => !c.voucherId) && (
+              {orderDetail?.status === "FINALIZED" && charges.some((c) => !c.voucherId) && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -583,10 +651,19 @@ export default function FactoryInvoiceCreate() {
             {charges.length > 0 && (
               <div className="space-y-1">
                 {charges.map((charge) => (
-                  <div key={charge.id} className="flex items-center justify-between gap-2" data-testid={`row-charge-${charge.id}`}>
+                  <div
+                    key={charge.id}
+                    className="flex items-center justify-between gap-2"
+                    data-testid={`row-charge-${charge.id}`}
+                  >
                     <span className="text-sm">{charge.name}</span>
                     <div className="flex items-center gap-1">
-                      <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{parseFloat(charge.amount).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                      <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>
+                        {parseFloat(charge.amount).toLocaleString(undefined, {
+                          minimumFractionDigits: 0,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -624,16 +701,24 @@ export default function FactoryInvoiceCreate() {
 
               <Select value={chargeLedgerAccountId} onValueChange={setChargeLedgerAccountId}>
                 <SelectTrigger data-testid="select-charge-ledger-account">
-                  <SelectValue placeholder={chargeType !== "FREIGHT" ? "Select account (required)..." : "Select account (optional)..."} />
+                  <SelectValue
+                    placeholder={
+                      chargeType !== "FREIGHT" ? "Select account (required)..." : "Select account (optional)..."
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {ledgerAccounts.map((acc) => (
-                    <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
+                    <SelectItem key={acc.id} value={String(acc.id)}>
+                      {acc.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {chargeType !== "FREIGHT" && !chargeLedgerAccountId && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">A ledger account is required so the charge posts to accounting.</p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  A ledger account is required so the charge posts to accounting.
+                </p>
               )}
 
               <div className="flex items-center gap-2">
@@ -649,7 +734,12 @@ export default function FactoryInvoiceCreate() {
                 <Button
                   variant="outline"
                   onClick={handleAddCharge}
-                  disabled={!orderId || !chargeAmount || (chargeType !== "FREIGHT" && !chargeLedgerAccountId) || addChargeMutation.isPending}
+                  disabled={
+                    !orderId ||
+                    !chargeAmount ||
+                    (chargeType !== "FREIGHT" && !chargeLedgerAccountId) ||
+                    addChargeMutation.isPending
+                  }
                   data-testid="button-add-charge"
                 >
                   <Plus className="h-4 w-4" />
@@ -661,19 +751,27 @@ export default function FactoryInvoiceCreate() {
           <Card className="p-4 space-y-2">
             <div className="flex items-center justify-between gap-2 text-sm">
               <span>Subtotal</span>
-              <span className="font-mono" data-testid="text-summary-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              <span className="font-mono" data-testid="text-summary-subtotal">
+                {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span>Freight</span>
-              <span className="font-mono" data-testid="text-summary-freight">{freightCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              <span className="font-mono" data-testid="text-summary-freight">
+                {freightCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm">
               <span>Other Charges</span>
-              <span className="font-mono" data-testid="text-summary-other">{otherCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              <span className="font-mono" data-testid="text-summary-other">
+                {otherCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="border-t pt-2 flex items-center justify-between gap-2">
               <span className="font-semibold">Grand Total</span>
-              <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+              <span className="font-mono font-bold text-lg" data-testid="text-grand-total">
+                {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+              </span>
             </div>
             <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
               <span>Total Bales</span>
@@ -713,7 +811,10 @@ export default function FactoryInvoiceCreate() {
             <DialogTitle>Finalize Invoice</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="mb-4">Are you sure you want to finalize this invoice for <span className="font-semibold">{customers.find(c => c.id === customerId)?.legalName}</span>?</p>
+            <p className="mb-4">
+              Are you sure you want to finalize this invoice for{" "}
+              <span className="font-semibold">{customers.find((c) => c.id === customerId)?.legalName}</span>?
+            </p>
             <div className="bg-muted p-4 rounded-lg space-y-2">
               <div className="flex justify-between">
                 <span>Total Bales:</span>
@@ -721,7 +822,9 @@ export default function FactoryInvoiceCreate() {
               </div>
               <div className="flex justify-between font-bold border-t pt-2">
                 <span>Grand Total:</span>
-                <span className="font-mono">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                <span className="font-mono">
+                  {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
               </div>
             </div>
             <p className="text-sm text-muted-foreground mt-4 italic">
@@ -729,8 +832,14 @@ export default function FactoryInvoiceCreate() {
             </p>
           </div>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setShowFinalizeDialog(false)} data-testid="button-cancel-finalize">Cancel</Button>
-            <Button onClick={() => finalizeMutation.mutate()} disabled={finalizeMutation.isPending} data-testid="button-confirm-finalize">
+            <Button variant="outline" onClick={() => setShowFinalizeDialog(false)} data-testid="button-cancel-finalize">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => finalizeMutation.mutate()}
+              disabled={finalizeMutation.isPending}
+              data-testid="button-confirm-finalize"
+            >
               Confirm & Finalize
             </Button>
           </div>

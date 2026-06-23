@@ -5,43 +5,109 @@ import { requireAuth } from "../../auth";
 import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "./_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
   customerLogos,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
@@ -62,7 +128,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const allCustomers = await db.select().from(customers)
+      const allCustomers = await db
+        .select()
+        .from(customers)
         .where(and(eq(customers.companyId, companyId), sql`${customers.deletedAt} IS NULL`))
         .orderBy(asc(customers.legalName));
 
@@ -78,59 +146,65 @@ export function registerFactoryCustomersRoutes(app: Express) {
       // We replicate that here in two bulk queries so both pages always agree.
 
       // 1. Net of ALL customerBalances rows (includes INVOICE type as stored)
-      const cbNetRows = await db.select({
-        customerId: customerBalances.customerId,
-        net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
-      })
+      const cbNetRows = await db
+        .select({
+          customerId: customerBalances.customerId,
+          net: sql<string>`COALESCE(SUM(CAST(${customerBalances.debitAmount} AS numeric) - CAST(${customerBalances.creditAmount} AS numeric)), 0)`,
+        })
         .from(customerBalances)
-        .where(and(
-          inArray(customerBalances.customerId, customerIds),
-          eq(customerBalances.companyId, companyId),
-        ))
+        .where(and(inArray(customerBalances.customerId, customerIds), eq(customerBalances.companyId, companyId)))
         .groupBy(customerBalances.customerId);
 
       // 2. Correction for INVOICE rows: replace stored debitAmount with the live
       //    grandTotal of FINALIZED orders (same correction the statement makes).
-      const invCorrRows = await db.select({
-        customerId: customerBalances.customerId,
-        correction: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric) - CAST(${customerBalances.debitAmount} AS numeric)), 0)`,
-      })
+      const invCorrRows = await db
+        .select({
+          customerId: customerBalances.customerId,
+          correction: sql<string>`COALESCE(SUM(CAST(${customerOrders.grandTotal} AS numeric) - CAST(${customerBalances.debitAmount} AS numeric)), 0)`,
+        })
         .from(customerBalances)
-        .innerJoin(customerOrders, and(
-          eq(customerOrders.id, customerBalances.referenceId as any),
-          eq(customerOrders.companyId, companyId),
-          eq(customerOrders.status, "FINALIZED"),
-        ))
-        .where(and(
-          inArray(customerBalances.customerId, customerIds),
-          eq(customerBalances.companyId, companyId),
-          sql`${customerBalances.referenceType} = 'INVOICE'`,
-        ))
+        .innerJoin(
+          customerOrders,
+          and(
+            eq(customerOrders.id, customerBalances.referenceId as any),
+            eq(customerOrders.companyId, companyId),
+            eq(customerOrders.status, "FINALIZED")
+          )
+        )
+        .where(
+          and(
+            inArray(customerBalances.customerId, customerIds),
+            eq(customerBalances.companyId, companyId),
+            sql`${customerBalances.referenceType} = 'INVOICE'`
+          )
+        )
         .groupBy(customerBalances.customerId);
 
       // Fetch net voucher entries — two passes to match what the statement page shows:
       // 1. Entries linked via the customer's ledgerAccountId
       // 2. Entries linked directly via customerId (e.g. receipt vouchers)
       // Exclude CHARGE-* vouchers: those amounts are already in salesTotal via grandTotal.
-      const ledgerAccountIds = allCustomers
-        .filter((c) => c.ledgerAccountId)
-        .map((c) => c.ledgerAccountId!);
+      const ledgerAccountIds = allCustomers.filter((c) => c.ledgerAccountId).map((c) => c.ledgerAccountId!);
 
       // net = debit - credit in Dr-positive convention (customer is an asset / receivable)
       const voucherNetByLedger = new Map<number, number>();
       if (ledgerAccountIds.length > 0) {
-        const voucherNetRows = await db.select({
-          ledgerAccountId: voucherEntries.ledgerAccountId,
-          net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
-        })
+        const voucherNetRows = await db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+          })
           .from(voucherEntries)
-          .innerJoin(vouchers, and(
-            eq(voucherEntries.voucherId, vouchers.id),
-            eq(vouchers.companyId, companyId),
-            sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
-            sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
-            sql`${vouchers.optional} IS NOT TRUE`,
-          ))
+          .innerJoin(
+            vouchers,
+            and(
+              eq(voucherEntries.voucherId, vouchers.id),
+              eq(vouchers.companyId, companyId),
+              sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+              sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
+              sql`${vouchers.optional} IS NOT TRUE`
+            )
+          )
           .where(inArray(voucherEntries.ledgerAccountId as any, ledgerAccountIds))
           .groupBy(voucherEntries.ledgerAccountId);
 
@@ -144,22 +218,25 @@ export function registerFactoryCustomersRoutes(app: Express) {
       // Net from entries linked directly via customerId (receipts posted without going through ledger)
       const voucherNetByCustomerId = new Map<number, number>();
       if (customerIds.length > 0) {
-        const directRows = await db.select({
-          customerId: voucherEntries.customerId,
-          net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
-        })
+        const directRows = await db
+          .select({
+            customerId: voucherEntries.customerId,
+            net: sql<string>`COALESCE(SUM(CAST(${voucherEntries.debitAmount} AS numeric) - CAST(${voucherEntries.creditAmount} AS numeric)), 0)`,
+          })
           .from(voucherEntries)
-          .innerJoin(vouchers, and(
-            eq(voucherEntries.voucherId, vouchers.id),
-            eq(vouchers.companyId, companyId),
-            sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
-            sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
-            sql`${vouchers.optional} IS NOT TRUE`,
-          ))
-          .where(and(
-            inArray(voucherEntries.customerId as any, customerIds),
-            sql`${voucherEntries.ledgerAccountId} IS NULL`,
-          ))
+          .innerJoin(
+            vouchers,
+            and(
+              eq(voucherEntries.voucherId, vouchers.id),
+              eq(vouchers.companyId, companyId),
+              sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+              sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
+              sql`${vouchers.optional} IS NOT TRUE`
+            )
+          )
+          .where(
+            and(inArray(voucherEntries.customerId as any, customerIds), sql`${voucherEntries.ledgerAccountId} IS NULL`)
+          )
           .groupBy(voucherEntries.customerId);
 
         for (const row of directRows) {
@@ -169,17 +246,18 @@ export function registerFactoryCustomersRoutes(app: Express) {
         }
       }
 
-      const cbNetMap   = new Map(cbNetRows.map((r) => [r.customerId, parseFloat(r.net || "0")]));
+      const cbNetMap = new Map(cbNetRows.map((r) => [r.customerId, parseFloat(r.net || "0")]));
       const invCorrMap = new Map(invCorrRows.map((r) => [r.customerId, parseFloat(r.correction || "0")]));
 
       const customersWithBalances = allCustomers.map((customer) => {
-        const cbNet      = cbNetMap.get(customer.id) ?? 0;
-        const invCorr    = invCorrMap.get(customer.id) ?? 0;
-        const voucherNet = (customer.ledgerAccountId ? (voucherNetByLedger.get(customer.ledgerAccountId) ?? 0) : 0)
-          + (voucherNetByCustomerId.get(customer.id) ?? 0);
+        const cbNet = cbNetMap.get(customer.id) ?? 0;
+        const invCorr = invCorrMap.get(customer.id) ?? 0;
+        const voucherNet =
+          (customer.ledgerAccountId ? (voucherNetByLedger.get(customer.ledgerAccountId) ?? 0) : 0) +
+          (voucherNetByCustomerId.get(customer.id) ?? 0);
         const openingBalance = parseFloat(customer.openingBalance || "0");
-        const openingSide    = customer.openingBalanceSide || "Dr";
-        const totalBalance   = (openingSide === "Dr" ? openingBalance : -openingBalance) + cbNet + invCorr + voucherNet;
+        const openingSide = customer.openingBalanceSide || "Dr";
+        const totalBalance = (openingSide === "Dr" ? openingBalance : -openingBalance) + cbNet + invCorr + voucherNet;
         return { ...customer, balance: Math.abs(totalBalance), balanceSide: totalBalance >= 0 ? "Dr" : "Cr" };
       });
 
@@ -199,8 +277,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const parsed = insertCustomerSchema.parse(dataWithCompany);
 
       let suffix = 1;
-      const allExisting = await db.select().from(customers)
-        .where(eq(customers.companyId, companyId));
+      const allExisting = await db.select().from(customers).where(eq(customers.companyId, companyId));
 
       const existingCodes = allExisting
         .map((c) => c.code)
@@ -215,7 +292,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       let codeExists = true;
       while (codeExists) {
-        const [dup] = await db.select().from(customers)
+        const [dup] = await db
+          .select()
+          .from(customers)
           .where(and(eq(customers.code, code), eq(customers.companyId, companyId)));
         if (dup) {
           suffix++;
@@ -225,7 +304,10 @@ export function registerFactoryCustomersRoutes(app: Express) {
         }
       }
 
-      const [customer] = await db.insert(customers).values({ ...parsed, code }).returning();
+      const [customer] = await db
+        .insert(customers)
+        .values({ ...parsed, code })
+        .returning();
 
       res.status(201).json(customer);
     } catch (error: any) {
@@ -247,14 +329,15 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (existing.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
 
       if (req.body.code && req.body.code !== existing.code) {
-        const [dup] = await db.select().from(customers)
+        const [dup] = await db
+          .select()
+          .from(customers)
           .where(and(eq(customers.code, req.body.code), eq(customers.companyId, companyId)));
         if (dup) return res.status(400).json({ message: "Customer code already exists" });
       }
 
       const parsed = insertCustomerSchema.partial().parse(req.body);
-      const [updated] = await db.update(customers).set(parsed)
-        .where(eq(customers.id, customerId)).returning();
+      const [updated] = await db.update(customers).set(parsed).where(eq(customers.id, customerId)).returning();
 
       res.json(updated);
     } catch (error: any) {
@@ -275,7 +358,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (!existing) return res.status(404).json({ message: "Customer not found" });
       if (existing.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
 
-      const [deleted] = await db.update(customers)
+      const [deleted] = await db
+        .update(customers)
         .set({ deletedAt: new Date() })
         .where(eq(customers.id, customerId))
         .returning();
@@ -299,7 +383,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (!existing) return res.status(404).json({ message: "Customer not found" });
       if (existing.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
 
-      const [restored] = await db.update(customers)
+      const [restored] = await db
+        .update(customers)
         .set({ deletedAt: null })
         .where(eq(customers.id, customerId))
         .returning();
@@ -317,7 +402,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const deletedCustomers = await db.select().from(customers)
+      const deletedCustomers = await db
+        .select()
+        .from(customers)
         .where(and(eq(customers.companyId, companyId), sql`${customers.deletedAt} IS NOT NULL`))
         .orderBy(desc(customers.deletedAt));
 
@@ -339,7 +426,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
 
-      const [customer] = await db.select().from(customers)
+      const [customer] = await db
+        .select()
+        .from(customers)
         .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
       if (!customer) return res.status(404).json({ message: "Customer not found" });
 
@@ -361,11 +450,13 @@ export function registerFactoryCustomersRoutes(app: Express) {
           createdAt: customerOrders.createdAt,
         })
         .from(customerOrders)
-        .where(and(
-          eq(customerOrders.companyId, companyId),
-          eq(customerOrders.customerId, customerId),
-          eq(customerOrders.status, "FINALIZED"),
-        ))
+        .where(
+          and(
+            eq(customerOrders.companyId, companyId),
+            eq(customerOrders.customerId, customerId),
+            eq(customerOrders.status, "FINALIZED")
+          )
+        )
         .orderBy(desc(customerOrders.createdAt));
 
       // Build orderId → various field maps for enriching statement rows
@@ -384,21 +475,17 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       // Build a map of orderId → current grandTotal so we can correct stale
       // INVOICE rows on the fly (read-only — no DB writes from a GET).
-      const invoiceGrandTotalMap = new Map<number, string>(
-        invoices.map((inv: any) => [inv.id, inv.grandTotal]),
-      );
+      const invoiceGrandTotalMap = new Map<number, string>(invoices.map((inv: any) => [inv.id, inv.grandTotal]));
 
       // Get all balance history entries ordered by date
-      const rawBalanceRows = await db.select().from(customerBalances)
+      const rawBalanceRows = await db
+        .select()
+        .from(customerBalances)
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
       const balanceRows = rawBalanceRows.map((row: any) => {
-        if (
-          row.referenceType === "INVOICE" &&
-          row.referenceId &&
-          invoiceGrandTotalMap.has(row.referenceId)
-        ) {
+        if (row.referenceType === "INVOICE" && row.referenceId && invoiceGrandTotalMap.has(row.referenceId)) {
           const actualAmt = invoiceGrandTotalMap.get(row.referenceId)!;
           return { ...row, debitAmount: actualAmt, balance: actualAmt };
         }
@@ -428,12 +515,15 @@ export function registerFactoryCustomersRoutes(app: Express) {
           optional: vouchers.optional,
         })
         .from(voucherEntries)
-        .innerJoin(vouchers, and(
-          eq(voucherEntries.voucherId, vouchers.id),
-          eq(vouchers.companyId, companyId),
-          sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
-          sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`,
-        ))
+        .innerJoin(
+          vouchers,
+          and(
+            eq(voucherEntries.voucherId, vouchers.id),
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`
+          )
+        )
         .where(voucherConditions)
         .orderBy(vouchers.voucherDate, voucherEntries.id);
 
@@ -458,17 +548,16 @@ export function registerFactoryCustomersRoutes(app: Express) {
       }
 
       // Merge customerBalances + voucher rows, sort by date then id
-      const allRows = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRows]
-        .sort((a, b) => {
-          const da = (a.transactionDate || "").toString();
-          const db2 = (b.transactionDate || "").toString();
-          if (da < db2) return -1;
-          if (da > db2) return 1;
-          // same date: customerBalances rows first (they have numeric ids)
-          const ia = a._fromVoucher ? 1 : 0;
-          const ib = b._fromVoucher ? 1 : 0;
-          return ia - ib;
-        });
+      const allRows = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRows].sort((a, b) => {
+        const da = (a.transactionDate || "").toString();
+        const db2 = (b.transactionDate || "").toString();
+        if (da < db2) return -1;
+        if (da > db2) return 1;
+        // same date: customerBalances rows first (they have numeric ids)
+        const ia = a._fromVoucher ? 1 : 0;
+        const ib = b._fromVoucher ? 1 : 0;
+        return ia - ib;
+      });
 
       // Build running balance
       const openingBalance = parseFloat(customer.openingBalance || "0");
@@ -480,9 +569,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
         const containerNumber =
-          row.referenceType === "INVOICE" && row.referenceId
-            ? (containerByOrderId.get(row.referenceId) ?? null)
-            : null;
+          row.referenceType === "INVOICE" && row.referenceId ? (containerByOrderId.get(row.referenceId) ?? null) : null;
         const destination =
           row.referenceType === "INVOICE" && row.referenceId
             ? (destinationByOrderId.get(row.referenceId) ?? null)
@@ -533,10 +620,15 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
       const { statementNote } = req.body;
       if (typeof statementNote !== "string") return res.status(400).json({ message: "statementNote must be a string" });
-      const [customer] = await db.select().from(customers)
+      const [customer] = await db
+        .select()
+        .from(customers)
         .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
       if (!customer) return res.status(404).json({ message: "Customer not found" });
-      await db.update(customers).set({ statementNote: statementNote || null }).where(eq(customers.id, customerId));
+      await db
+        .update(customers)
+        .set({ statementNote: statementNote || null })
+        .where(eq(customers.id, customerId));
       res.json({ ok: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -553,10 +645,21 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (isNaN(customerId) || isNaN(entryId)) return res.status(400).json({ message: "Invalid IDs" });
       const { rowNote } = req.body;
       if (typeof rowNote !== "string") return res.status(400).json({ message: "rowNote must be a string" });
-      const [entry] = await db.select().from(customerBalances)
-        .where(and(eq(customerBalances.id, entryId), eq(customerBalances.customerId, customerId), eq(customerBalances.companyId, companyId)));
+      const [entry] = await db
+        .select()
+        .from(customerBalances)
+        .where(
+          and(
+            eq(customerBalances.id, entryId),
+            eq(customerBalances.customerId, customerId),
+            eq(customerBalances.companyId, companyId)
+          )
+        );
       if (!entry) return res.status(404).json({ message: "Entry not found" });
-      await db.update(customerBalances).set({ rowNote: rowNote || null }).where(eq(customerBalances.id, entryId));
+      await db
+        .update(customerBalances)
+        .set({ rowNote: rowNote || null })
+        .where(eq(customerBalances.id, entryId));
       res.json({ ok: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -571,14 +674,18 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
 
-      const [customer] = await db.select().from(customers)
+      const [customer] = await db
+        .select()
+        .from(customers)
         .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
       if (!customer) return res.status(404).json({ message: "Customer not found" });
 
-      const [company]  = await db.select().from(companies).where(eq(companies.id, companyId));
+      const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
       const [settings] = await db.select().from(companySettings).where(eq(companySettings.companyId, companyId));
 
-      const balanceRows = await db.select().from(customerBalances)
+      const balanceRows = await db
+        .select()
+        .from(customerBalances)
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
@@ -588,50 +695,79 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const voucherCondPdf = ledgerAccountIdPdf
         ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountIdPdf} OR ${voucherEntries.customerId} = ${customerId})`
         : sql`${voucherEntries.customerId} = ${customerId}`;
-      const rawVePdf = await db.select({
-        id: voucherEntries.id, voucherId: voucherEntries.voucherId,
-        voucherNumber: vouchers.voucherNumber, voucherType: vouchers.voucherType,
-        voucherDate: vouchers.voucherDate, description: vouchers.description,
-        debitAmount: voucherEntries.debitAmount, creditAmount: voucherEntries.creditAmount,
-        narration: voucherEntries.narration, optional: vouchers.optional,
-      }).from(voucherEntries)
-        .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), eq(vouchers.companyId, companyId),
-          sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`, sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`))
-        .where(voucherCondPdf).orderBy(vouchers.voucherDate, voucherEntries.id);
+      const rawVePdf = await db
+        .select({
+          id: voucherEntries.id,
+          voucherId: voucherEntries.voucherId,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          description: vouchers.description,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
+          optional: vouchers.optional,
+        })
+        .from(voucherEntries)
+        .innerJoin(
+          vouchers,
+          and(
+            eq(voucherEntries.voucherId, vouchers.id),
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`
+          )
+        )
+        .where(voucherCondPdf)
+        .orderBy(vouchers.voucherDate, voucherEntries.id);
       for (const ve of rawVePdf) {
         if (ve.optional) continue; // optional vouchers don't affect the balance
         voucherRowsPdf.push({
-          transactionDate: ve.voucherDate, transactionType: ve.voucherType || "VOUCHER",
-          referenceType: "VOUCHER", referenceNumber: ve.voucherNumber,
+          transactionDate: ve.voucherDate,
+          transactionType: ve.voucherType || "VOUCHER",
+          referenceType: "VOUCHER",
+          referenceNumber: ve.voucherNumber,
           description: ve.narration || ve.description || ve.voucherType,
-          debitAmount: ve.debitAmount ?? "0", creditAmount: ve.creditAmount ?? "0", _fromVoucher: true,
+          debitAmount: ve.debitAmount ?? "0",
+          creditAmount: ve.creditAmount ?? "0",
+          _fromVoucher: true,
         });
       }
-      const allRowsPdf = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRowsPdf]
-        .sort((a, b) => {
-          const da = (a.transactionDate || "").toString(), db2 = (b.transactionDate || "").toString();
+      const allRowsPdf = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRowsPdf].sort(
+        (a, b) => {
+          const da = (a.transactionDate || "").toString(),
+            db2 = (b.transactionDate || "").toString();
           if (da !== db2) return da < db2 ? -1 : 1;
           return (a._fromVoucher ? 1 : 0) - (b._fromVoucher ? 1 : 0);
-        });
+        }
+      );
 
       const openingBalance = parseFloat(customer.openingBalance || "0");
       const openingSide = customer.openingBalanceSide || "Dr";
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
       // Read filter params (forwarded from the frontend export button)
-      const dateFromParam   = ((req.query.dateFrom    as string) || "").trim();
-      const dateToParam     = ((req.query.dateTo      as string) || "").trim();
+      const dateFromParam = ((req.query.dateFrom as string) || "").trim();
+      const dateToParam = ((req.query.dateTo as string) || "").trim();
       const destFilterParam = ((req.query.destination as string) || "").trim().toLowerCase();
 
       // Build container number + destination maps for INVOICE-type rows
-      const invoiceRefIds = [...new Set(
-        allRowsPdf.filter((r: any) => r.referenceType === "INVOICE" && r.referenceId).map((r: any) => r.referenceId as number)
-      )];
+      const invoiceRefIds = [
+        ...new Set(
+          allRowsPdf
+            .filter((r: any) => r.referenceType === "INVOICE" && r.referenceId)
+            .map((r: any) => r.referenceId as number)
+        ),
+      ];
       const containerNumMap = new Map<number, string>();
       const destinationMapPdf = new Map<number, string>();
       if (invoiceRefIds.length > 0) {
         const orderContainers = await db
-          .select({ id: customerOrders.id, containerNumber: customerOrders.containerNumber, destination: customerOrders.destination })
+          .select({
+            id: customerOrders.id,
+            containerNumber: customerOrders.containerNumber,
+            destination: customerOrders.destination,
+          })
           .from(customerOrders)
           .where(inArray(customerOrders.id, invoiceRefIds));
         for (const o of orderContainers) {
@@ -645,9 +781,10 @@ export function registerFactoryCustomersRoutes(app: Express) {
         const debit = parseFloat(row.debitAmount || "0");
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
-        let container = "", particulars = "";
+        let container = "",
+          particulars = "";
         if (row.referenceType === "INVOICE" && row.referenceId) {
-          container   = containerNumMap.get(row.referenceId) || "";
+          container = containerNumMap.get(row.referenceId) || "";
           particulars = destinationMapPdf.get(row.referenceId) || "";
         } else {
           particulars = row.description || "";
@@ -696,30 +833,38 @@ export function registerFactoryCustomersRoutes(app: Express) {
       };
       const fmtBalance = (n: number, side: string) => {
         const rounded = Math.round(n * 100) / 100;
-        const numStr = Math.abs(rounded - Math.round(rounded)) < 0.005
-          ? `$${Math.round(rounded).toLocaleString("en-US")}`
-          : `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        const numStr =
+          Math.abs(rounded - Math.round(rounded)) < 0.005
+            ? `$${Math.round(rounded).toLocaleString("en-US")}`
+            : `$${rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         return `${numStr} ${side}`;
       };
       const fmtDate = (d: string) => {
         if (!d) return "";
         const [y, m, day] = d.split("-");
-        const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         return `${parseInt(day, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
       };
       const txLabel = (type: string) => {
-        const map: Record<string, string> = { SALE: "Sale", PAYMENT: "Payment", RECEIPT: "Receipt", ADJUSTMENT: "Adjustment", JOURNAL: "Journal", OPENING_BALANCE: "Opening Bal." };
+        const map: Record<string, string> = {
+          SALE: "Sale",
+          PAYMENT: "Payment",
+          RECEIPT: "Receipt",
+          ADJUSTMENT: "Adjustment",
+          JOURNAL: "Journal",
+          OPENING_BALANCE: "Opening Bal.",
+        };
         return map[type] || type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       };
 
-      const PDFDocument  = (await import("pdfkit")).default;
-      const pathModCust  = await import("path");
+      const PDFDocument = (await import("pdfkit")).default;
+      const pathModCust = await import("path");
 
       // ── Arabic font ──
-      const custFontDir       = pathModCust.join(process.cwd(), "server", "fonts");
+      const custFontDir = pathModCust.join(process.cwd(), "server", "fonts");
       const custArabicFontPath = pathModCust.join(custFontDir, "Amiri-Regular.ttf");
       const custHasArabicFont = fs.existsSync(custArabicFontPath);
-      const custHmdLogoPath   = path.join(process.cwd(), "server", "hmd-logo.png");
+      const custHmdLogoPath = path.join(process.cwd(), "server", "hmd-logo.png");
 
       // ── Fetch company logo — prefer companySettings.logoUrl, fall back to disk ──
       let logoBuffer: Buffer | null = null;
@@ -728,60 +873,80 @@ export function registerFactoryCustomersRoutes(app: Express) {
         try {
           logoBuffer = await new Promise<Buffer>((resolve, reject) => {
             const proto = logoUrl.startsWith("https") ? require("https") : require("http");
-            proto.get(logoUrl, (r: any) => {
-              const parts: Buffer[] = [];
-              r.on("data", (d: Buffer) => parts.push(d));
-              r.on("end", () => resolve(Buffer.concat(parts)));
-              r.on("error", reject);
-            }).on("error", reject);
+            proto
+              .get(logoUrl, (r: any) => {
+                const parts: Buffer[] = [];
+                r.on("data", (d: Buffer) => parts.push(d));
+                r.on("end", () => resolve(Buffer.concat(parts)));
+                r.on("error", reject);
+              })
+              .on("error", reject);
           });
-        } catch { logoBuffer = null; }
+        } catch {
+          logoBuffer = null;
+        }
       }
       if (!logoBuffer && fs.existsSync(custHmdLogoPath)) {
-        try { logoBuffer = fs.readFileSync(custHmdLogoPath); } catch {}
+        try {
+          logoBuffer = fs.readFileSync(custHmdLogoPath);
+        } catch {}
       }
 
       // ── PDF document ──
       const doc = new PDFDocument({ margin: 40, size: "A4", autoFirstPage: true });
       if (custHasArabicFont) doc.registerFont("Arabic", custArabicFontPath);
       res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename=${(customer.legalName || customer.code || customerId).toString().replace(/[^\w\s.()\-]/g, "_").replace(/\s+/g, "_")}_Statement.pdf`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=${(customer.legalName || customer.code || customerId)
+          .toString()
+          .replace(/[^\w\s.()\-]/g, "_")
+          .replace(/\s+/g, "_")}_Statement.pdf`
+      );
       doc.pipe(res);
 
       // ── Arabic reshaper ──
       let custConvAr: ((t: string) => string) | null = null;
-      let custBidi: { getEmbeddingLevels: (t: string, d: string) => any; getReorderedString: (t: string, l: any) => string } | null = null;
+      let custBidi: {
+        getEmbeddingLevels: (t: string, d: string) => any;
+        getReorderedString: (t: string, l: any) => string;
+      } | null = null;
       try {
         custConvAr = (require("arabic-reshaper") as any).convertArabic;
-        custBidi   = (require("bidi-js") as any)();
+        custBidi = (require("bidi-js") as any)();
       } catch {}
       const custHasAr = (t: string) => /[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(t);
       const custShape = (t: string): string => {
         if (!t || !custConvAr) return t;
         try {
           const r = custConvAr(t);
-          if (custBidi) { const lv = custBidi.getEmbeddingLevels(r, "rtl"); return custBidi.getReorderedString(r, lv); }
+          if (custBidi) {
+            const lv = custBidi.getEmbeddingLevels(r, "rtl");
+            return custBidi.getReorderedString(r, lv);
+          }
           return r;
-        } catch { return t; }
+        } catch {
+          return t;
+        }
       };
 
       // ── Page geometry ──
-      const PAGE_W     = doc.page.width;   // 595
-      const MARGIN     = 40;
-      const CONTENT_W  = PAGE_W - MARGIN * 2; // 515
-      const SAFE_BOT   = doc.page.height - 55; // leave 55 px at bottom
+      const PAGE_W = doc.page.width; // 595
+      const MARGIN = 40;
+      const CONTENT_W = PAGE_W - MARGIN * 2; // 515
+      const SAFE_BOT = doc.page.height - 55; // leave 55 px at bottom
 
       // ── Column layout: Date | Type | Container | Particulars | Debit | Credit ──
-      const colX   = [40,  115, 185, 285, 380, 468] as const;
-      const colW   = [75,   70, 100,  95,  88,  87] as const;
+      const colX = [40, 115, 185, 285, 380, 468] as const;
+      const colW = [75, 70, 100, 95, 88, 87] as const;
       const colHdr = ["Date", "Type", "Container", "Particulars", "Debit (Dr)", "Credit (Cr)"];
       const colAlignArr: Array<"left" | "right"> = ["left", "left", "left", "left", "right", "right"];
 
-      const CP      = 3;   // cell horizontal padding each side
-      const ROW_PAD = 3;   // vertical padding top+bottom per row
-      const MIN_ROW = 14;  // minimum row height
-      const HDR_H   = 16;  // table column-header height
-      const FS      = 7.5; // body font size
+      const CP = 3; // cell horizontal padding each side
+      const ROW_PAD = 3; // vertical padding top+bottom per row
+      const MIN_ROW = 14; // minimum row height
+      const HDR_H = 16; // table column-header height
+      const FS = 7.5; // body font size
 
       let y = MARGIN;
 
@@ -789,7 +954,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const cellRender = (text: string, x: number, yPos: number, w: number, align: "left" | "right" = "left") => {
         if (!text) return;
         const ar = custHasArabicFont && custHasAr(text);
-        doc.font(ar ? "Arabic" : "Helvetica").fontSize(FS)
+        doc
+          .font(ar ? "Arabic" : "Helvetica")
+          .fontSize(FS)
           .text(ar ? custShape(text) : text, x, yPos, { width: w, align: ar ? "right" : align, lineBreak: true });
       };
 
@@ -827,23 +994,30 @@ export function registerFactoryCustomersRoutes(app: Express) {
         try {
           doc.image(logoBuffer, (PAGE_W - LOGO_MAX_W) / 2, 12, { fit: [LOGO_MAX_W, LOGO_MAX_H] });
           y = 12 + LOGO_MAX_H + 6;
-        } catch { y = 40; }
+        } catch {
+          y = 40;
+        }
       }
 
       // ── Company name below logo ──
-      doc.fillColor("#000000").font("Helvetica-Bold").fontSize(10)
+      doc
+        .fillColor("#000000")
+        .font("Helvetica-Bold")
+        .fontSize(10)
         .text(company?.name || "", MARGIN, y, { width: CONTENT_W, align: "center", lineBreak: false });
       y += 15;
 
       // ── "Account Statement" banner ──
       doc.rect(MARGIN, y, CONTENT_W, 30).fill("#1F3864");
-      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(13)
+      doc
+        .fillColor("#FFFFFF")
+        .font("Helvetica-Bold")
+        .fontSize(13)
         .text("Account Statement", MARGIN, y + 8, { width: CONTENT_W, align: "center", lineBreak: false });
       y += 34;
 
       // ── Customer info line ──
-      doc.fillColor("#000000").font("Helvetica").fontSize(9)
-        .text("Customer:  ", MARGIN, y, { continued: true });
+      doc.fillColor("#000000").font("Helvetica").fontSize(9).text("Customer:  ", MARGIN, y, { continued: true });
       const lnm = customer.legalName || "";
       if (custHasArabicFont && custHasAr(lnm)) {
         doc.font("Arabic").fontSize(9).text(custShape(lnm));
@@ -856,10 +1030,15 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (dateFromParam || dateToParam || destFilterParam) {
         const periodParts: string[] = [];
         if (dateFromParam || dateToParam) {
-          periodParts.push(`Period: ${dateFromParam ? fmtDate(dateFromParam) : "Start"} – ${dateToParam ? fmtDate(dateToParam) : "End"}`);
+          periodParts.push(
+            `Period: ${dateFromParam ? fmtDate(dateFromParam) : "Start"} – ${dateToParam ? fmtDate(dateToParam) : "End"}`
+          );
         }
         if (destFilterParam) periodParts.push(`Destination: ${destFilterParam.toUpperCase()}`);
-        doc.fillColor("#555555").font("Helvetica").fontSize(8)
+        doc
+          .fillColor("#555555")
+          .font("Helvetica")
+          .fontSize(8)
           .text(periodParts.join("   |   "), MARGIN, y, { width: CONTENT_W, align: "center", lineBreak: false });
         y += 12;
       }
@@ -870,7 +1049,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       // ── Balance B/F row (only when date-filtered and there's a prior balance) ──
       if (dateFromParam && Math.abs(bfRunning) > 0.005) {
-        const bfAbs  = Math.abs(bfRunning);
+        const bfAbs = Math.abs(bfRunning);
         const bfSide = bfRunning >= 0 ? "Dr" : "Cr";
         const bfRowH = MIN_ROW + ROW_PAD * 2;
         ensureSpace(bfRowH);
@@ -878,9 +1057,17 @@ export function registerFactoryCustomersRoutes(app: Express) {
         doc.fillColor("#000000").font("Helvetica-Bold").fontSize(FS);
         doc.text("Balance B/F", colX[3] + CP, y + ROW_PAD, { width: colW[3] - CP * 2, lineBreak: false });
         if (bfSide === "Dr") {
-          doc.text(fmtAmt(bfAbs), colX[4] + CP, y + ROW_PAD, { width: colW[4] - CP * 2, align: "right", lineBreak: false });
+          doc.text(fmtAmt(bfAbs), colX[4] + CP, y + ROW_PAD, {
+            width: colW[4] - CP * 2,
+            align: "right",
+            lineBreak: false,
+          });
         } else {
-          doc.text(fmtAmt(bfAbs), colX[5] + CP, y + ROW_PAD, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
+          doc.text(fmtAmt(bfAbs), colX[5] + CP, y + ROW_PAD, {
+            width: colW[5] - CP * 2,
+            align: "right",
+            lineBreak: false,
+          });
         }
         doc.fillColor("#000000").font("Helvetica").fontSize(FS);
         y += bfRowH;
@@ -888,7 +1075,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       // ── Data rows ──
       rows.forEach((row: any, idx: number) => {
-        const cTxt = row.container   || "";
+        const cTxt = row.container || "";
         const pTxt = row.particulars || "";
 
         // Calculate row height from the two wrapping columns
@@ -903,15 +1090,25 @@ export function registerFactoryCustomersRoutes(app: Express) {
         }
 
         // Bottom separator
-        doc.moveTo(MARGIN, y + rowH - 0.5).lineTo(MARGIN + CONTENT_W, y + rowH - 0.5)
-          .lineWidth(0.2).strokeColor("#DADADA").stroke();
+        doc
+          .moveTo(MARGIN, y + rowH - 0.5)
+          .lineTo(MARGIN + CONTENT_W, y + rowH - 0.5)
+          .lineWidth(0.2)
+          .strokeColor("#DADADA")
+          .stroke();
 
         doc.font("Helvetica").fontSize(FS).fillColor("#000000");
 
         // Date
-        doc.text(fmtDate(row.transactionDate), colX[0] + CP, y + ROW_PAD, { width: colW[0] - CP * 2, lineBreak: false });
+        doc.text(fmtDate(row.transactionDate), colX[0] + CP, y + ROW_PAD, {
+          width: colW[0] - CP * 2,
+          lineBreak: false,
+        });
         // Type
-        doc.text(txLabel(row.transactionType), colX[1] + CP, y + ROW_PAD, { width: colW[1] - CP * 2, lineBreak: false });
+        doc.text(txLabel(row.transactionType), colX[1] + CP, y + ROW_PAD, {
+          width: colW[1] - CP * 2,
+          lineBreak: false,
+        });
         // Container — only for INVOICE rows
         cellRender(cTxt, colX[2] + CP, y + ROW_PAD, colW[2] - CP * 2);
         // Particulars — destination (INVOICE) or narration (others)
@@ -920,15 +1117,28 @@ export function registerFactoryCustomersRoutes(app: Express) {
         doc.font("Helvetica").fontSize(FS).fillColor("#000000");
         // Debit
         if (row.debit > 0)
-          doc.text(fmtAmt(row.debit),  colX[4] + CP, y + ROW_PAD, { width: colW[4] - CP * 2, align: "right", lineBreak: false });
+          doc.text(fmtAmt(row.debit), colX[4] + CP, y + ROW_PAD, {
+            width: colW[4] - CP * 2,
+            align: "right",
+            lineBreak: false,
+          });
         // Credit
         if (row.credit > 0)
-          doc.text(fmtAmt(row.credit), colX[5] + CP, y + ROW_PAD, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
+          doc.text(fmtAmt(row.credit), colX[5] + CP, y + ROW_PAD, {
+            width: colW[5] - CP * 2,
+            align: "right",
+            lineBreak: false,
+          });
         // Row note (kept for backward compat)
         if (row.rowNote) {
-          doc.fillColor("#666666").font("Helvetica-Oblique").fontSize(6)
-            .text(`↳ ${row.rowNote}`, colX[2] + CP + 2, y + rowH - 9,
-              { width: colW[2] + colW[3] + colW[4] + colW[5] - CP * 2, lineBreak: false });
+          doc
+            .fillColor("#666666")
+            .font("Helvetica-Oblique")
+            .fontSize(6)
+            .text(`↳ ${row.rowNote}`, colX[2] + CP + 2, y + rowH - 9, {
+              width: colW[2] + colW[3] + colW[4] + colW[5] - CP * 2,
+              lineBreak: false,
+            });
           doc.fillColor("#000000");
         }
 
@@ -938,7 +1148,12 @@ export function registerFactoryCustomersRoutes(app: Express) {
       // ── Separator ──
       ensureSpace(55);
       y += 4;
-      doc.moveTo(MARGIN, y).lineTo(MARGIN + CONTENT_W, y).lineWidth(0.75).strokeColor("#888888").stroke();
+      doc
+        .moveTo(MARGIN, y)
+        .lineTo(MARGIN + CONTENT_W, y)
+        .lineWidth(0.75)
+        .strokeColor("#888888")
+        .stroke();
       y += 6;
 
       // ── TOTAL row ──
@@ -946,8 +1161,16 @@ export function registerFactoryCustomersRoutes(app: Express) {
       doc.rect(MARGIN, y, CONTENT_W, 16).fill("#1F3864");
       doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(FS);
       doc.text("TOTAL", colX[2] + CP, y + 4, { width: colW[2] - CP * 2, lineBreak: false });
-      doc.text(fmtAmt(totalDr) || "$0", colX[4] + CP, y + 4, { width: colW[4] - CP * 2, align: "right", lineBreak: false });
-      doc.text(fmtAmt(totalCr) || "$0", colX[5] + CP, y + 4, { width: colW[5] - CP * 2, align: "right", lineBreak: false });
+      doc.text(fmtAmt(totalDr) || "$0", colX[4] + CP, y + 4, {
+        width: colW[4] - CP * 2,
+        align: "right",
+        lineBreak: false,
+      });
+      doc.text(fmtAmt(totalCr) || "$0", colX[5] + CP, y + 4, {
+        width: colW[5] - CP * 2,
+        align: "right",
+        lineBreak: false,
+      });
       y += 18;
 
       // ── Closing Balance row ──
@@ -969,9 +1192,14 @@ export function registerFactoryCustomersRoutes(app: Express) {
         const noteH = Math.max(16, doc.heightOfString(customer.statementNote, { width: CONTENT_W - 50 }) + 8);
         ensureSpace(noteH);
         doc.rect(MARGIN, y, CONTENT_W, noteH).fill("#F4F6FB");
-        doc.fillColor("#333333").font("Helvetica-Bold").fontSize(FS)
+        doc
+          .fillColor("#333333")
+          .font("Helvetica-Bold")
+          .fontSize(FS)
           .text("Note:", MARGIN + 2, y + 4, { width: 38, lineBreak: false });
-        doc.font("Helvetica").fontSize(FS)
+        doc
+          .font("Helvetica")
+          .fontSize(FS)
           .text(customer.statementNote, MARGIN + 42, y + 4, { width: CONTENT_W - 50, lineBreak: true });
         doc.fillColor("#000000");
       }
@@ -991,13 +1219,17 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
 
-      const [customer] = await db.select().from(customers)
+      const [customer] = await db
+        .select()
+        .from(customers)
         .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
       if (!customer) return res.status(404).json({ message: "Customer not found" });
 
       const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
 
-      const balanceRows = await db.select().from(customerBalances)
+      const balanceRows = await db
+        .select()
+        .from(customerBalances)
         .where(and(eq(customerBalances.companyId, companyId), eq(customerBalances.customerId, customerId)))
         .orderBy(customerBalances.transactionDate, customerBalances.id);
 
@@ -1007,36 +1239,61 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const voucherCondXlsx = ledgerAccountIdXlsx
         ? sql`(${voucherEntries.ledgerAccountId} = ${ledgerAccountIdXlsx} OR ${voucherEntries.customerId} = ${customerId})`
         : sql`${voucherEntries.customerId} = ${customerId}`;
-      const rawVeXlsx = await db.select({
-        id: voucherEntries.id, voucherId: voucherEntries.voucherId,
-        voucherNumber: vouchers.voucherNumber, voucherType: vouchers.voucherType,
-        voucherDate: vouchers.voucherDate, description: vouchers.description,
-        debitAmount: voucherEntries.debitAmount, creditAmount: voucherEntries.creditAmount,
-        narration: voucherEntries.narration, optional: vouchers.optional,
-      }).from(voucherEntries)
-        .innerJoin(vouchers, and(eq(voucherEntries.voucherId, vouchers.id), eq(vouchers.companyId, companyId),
-          sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`, sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`))
-        .where(voucherCondXlsx).orderBy(vouchers.voucherDate, voucherEntries.id);
+      const rawVeXlsx = await db
+        .select({
+          id: voucherEntries.id,
+          voucherId: voucherEntries.voucherId,
+          voucherNumber: vouchers.voucherNumber,
+          voucherType: vouchers.voucherType,
+          voucherDate: vouchers.voucherDate,
+          description: vouchers.description,
+          debitAmount: voucherEntries.debitAmount,
+          creditAmount: voucherEntries.creditAmount,
+          narration: voucherEntries.narration,
+          optional: vouchers.optional,
+        })
+        .from(voucherEntries)
+        .innerJoin(
+          vouchers,
+          and(
+            eq(voucherEntries.voucherId, vouchers.id),
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'INV-%'`
+          )
+        )
+        .where(voucherCondXlsx)
+        .orderBy(vouchers.voucherDate, voucherEntries.id);
       for (const ve of rawVeXlsx) {
         if (ve.optional) continue; // optional vouchers don't affect the balance
         voucherRowsXlsx.push({
-          transactionDate: ve.voucherDate, transactionType: ve.voucherType || "VOUCHER",
-          referenceType: "VOUCHER", referenceNumber: ve.voucherNumber,
+          transactionDate: ve.voucherDate,
+          transactionType: ve.voucherType || "VOUCHER",
+          referenceType: "VOUCHER",
+          referenceNumber: ve.voucherNumber,
           description: ve.narration || ve.description || ve.voucherType,
-          debitAmount: ve.debitAmount ?? "0", creditAmount: ve.creditAmount ?? "0", _fromVoucher: true,
+          debitAmount: ve.debitAmount ?? "0",
+          creditAmount: ve.creditAmount ?? "0",
+          _fromVoucher: true,
         });
       }
-      const allRowsXlsx = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRowsXlsx]
-        .sort((a, b) => {
-          const da = (a.transactionDate || "").toString(), db2 = (b.transactionDate || "").toString();
+      const allRowsXlsx = [...balanceRows.map((r: any) => ({ ...r, _fromVoucher: false })), ...voucherRowsXlsx].sort(
+        (a, b) => {
+          const da = (a.transactionDate || "").toString(),
+            db2 = (b.transactionDate || "").toString();
           if (da !== db2) return da < db2 ? -1 : 1;
           return (a._fromVoucher ? 1 : 0) - (b._fromVoucher ? 1 : 0);
-        });
+        }
+      );
 
       // Build destination map for Excel
-      const xlsxInvoiceRefIds = [...new Set(
-        allRowsXlsx.filter((r: any) => r.referenceType === "INVOICE" && r.referenceId).map((r: any) => r.referenceId as number)
-      )];
+      const xlsxInvoiceRefIds = [
+        ...new Set(
+          allRowsXlsx
+            .filter((r: any) => r.referenceType === "INVOICE" && r.referenceId)
+            .map((r: any) => r.referenceId as number)
+        ),
+      ];
       const destinationMapXlsx = new Map<number, string>();
       if (xlsxInvoiceRefIds.length > 0) {
         const xlsxOrderRows = await db
@@ -1053,8 +1310,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
       let runningBalance = openingSide === "Dr" ? openingBalance : -openingBalance;
 
       // Read filter params (forwarded from frontend export button)
-      const dateFromXlsx   = ((req.query.dateFrom    as string) || "").trim();
-      const dateToXlsx     = ((req.query.dateTo      as string) || "").trim();
+      const dateFromXlsx = ((req.query.dateFrom as string) || "").trim();
+      const dateToXlsx = ((req.query.dateTo as string) || "").trim();
       const destFilterXlsx = ((req.query.destination as string) || "").trim().toLowerCase();
 
       // First pass: enrich ALL rows with running balance (needed before filtering)
@@ -1063,9 +1320,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
         const credit = parseFloat(row.creditAmount || "0");
         runningBalance += debit - credit;
         const destination =
-          row.referenceType === "INVOICE" && row.referenceId
-            ? (destinationMapXlsx.get(row.referenceId) || "")
-            : "";
+          row.referenceType === "INVOICE" && row.referenceId ? destinationMapXlsx.get(row.referenceId) || "" : "";
         return { ...row, debit, credit, destination };
       });
 
@@ -1100,7 +1355,14 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const closingBalanceSide = closingRawXlsx >= 0 ? "Dr" : "Cr";
 
       const txLabel = (type: string) => {
-        const map: Record<string, string> = { SALE: "Sale", PAYMENT: "Payment", RECEIPT: "Receipt", ADJUSTMENT: "Adjustment", JOURNAL: "Journal", OPENING_BALANCE: "Opening Bal." };
+        const map: Record<string, string> = {
+          SALE: "Sale",
+          PAYMENT: "Payment",
+          RECEIPT: "Receipt",
+          ADJUSTMENT: "Adjustment",
+          JOURNAL: "Journal",
+          OPENING_BALANCE: "Opening Bal.",
+        };
         return map[type] || type.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
       };
       const numFmt = "#,##0.00";
@@ -1108,8 +1370,10 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const lightBlueFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFEFF3FB" } };
       const greyFill = { type: "pattern" as const, pattern: "solid" as const, fgColor: { argb: "FFF5F5F5" } };
       const allBorders = {
-        top: { style: "thin" as const }, bottom: { style: "thin" as const },
-        left: { style: "thin" as const }, right: { style: "thin" as const },
+        top: { style: "thin" as const },
+        bottom: { style: "thin" as const },
+        left: { style: "thin" as const },
+        right: { style: "thin" as const },
       };
 
       const ExcelJS = (await import("exceljs")).default;
@@ -1117,13 +1381,13 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const sheet = workbook.addWorksheet("Statement");
 
       sheet.columns = [
-        { key: "date",        width: 14 },
-        { key: "type",        width: 16 },
-        { key: "desc",        width: 28 },
+        { key: "date", width: 14 },
+        { key: "type", width: 16 },
+        { key: "desc", width: 28 },
         { key: "destination", width: 22 },
-        { key: "dr",          width: 16 },
-        { key: "cr",          width: 16 },
-        { key: "note",        width: 30 },
+        { key: "dr", width: 16 },
+        { key: "cr", width: 16 },
+        { key: "note", width: 30 },
       ];
 
       // Rows 1–5+: Customer info block with HMD branding
@@ -1132,7 +1396,8 @@ export function registerFactoryCustomersRoutes(app: Express) {
         if (fs.existsSync(stmtLogo)) {
           const slBuf = fs.readFileSync(stmtLogo);
           const slId = workbook.addImage({ buffer: slBuf as Buffer, extension: "jpeg" });
-          const slRow = sheet.addRow([]); slRow.height = 90;
+          const slRow = sheet.addRow([]);
+          slRow.height = 90;
           sheet.addImage(slId, { tl: { col: 1.9, row: 0 }, ext: { width: 300, height: 90 } });
           sheet.mergeCells(`A1:G1`);
         }
@@ -1143,19 +1408,26 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const r2 = sheet.addRow(["Account Statement"]);
       r2.getCell(1).font = { bold: true, size: 11 };
       sheet.mergeCells(`A${r2.number}:G${r2.number}`);
-      const r3 = sheet.addRow([`Customer: ${customer.legalName}   |   Code: ${customer.code || "—"}   |   Phone: ${customer.phone || "—"}`]);
+      const r3 = sheet.addRow([
+        `Customer: ${customer.legalName}   |   Code: ${customer.code || "—"}   |   Phone: ${customer.phone || "—"}`,
+      ]);
       sheet.mergeCells(`A${r3.number}:G${r3.number}`);
-      const r4 = sheet.addRow([`Opening Balance: ${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`]);
+      const r4 = sheet.addRow([
+        `Opening Balance: ${openingBalance.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${openingSide}`,
+      ]);
       sheet.mergeCells(`A${r4.number}:G${r4.number}`);
       if (dateFromXlsx || dateToXlsx || destFilterXlsx) {
         const periodParts: string[] = [];
-        if (dateFromXlsx || dateToXlsx) periodParts.push(`Period: ${dateFromXlsx || "Start"} to ${dateToXlsx || "End"}`);
+        if (dateFromXlsx || dateToXlsx)
+          periodParts.push(`Period: ${dateFromXlsx || "Start"} to ${dateToXlsx || "End"}`);
         if (destFilterXlsx) periodParts.push(`Destination filter: ${destFilterXlsx.toUpperCase()}`);
         const r4b = sheet.addRow([periodParts.join("   |   ")]);
         sheet.mergeCells(`A${r4b.number}:G${r4b.number}`);
         r4b.getCell(1).font = { italic: true, color: { argb: "FF555555" } };
       }
-      const r5 = sheet.addRow([`Printed: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`]);
+      const r5 = sheet.addRow([
+        `Printed: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`,
+      ]);
       sheet.mergeCells(`A${r5.number}:G${r5.number}`);
       // spacer
       sheet.addRow([]);
@@ -1189,7 +1461,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
 
       // Balance B/F row (when date-filtered and there's a prior balance)
       if (dateFromXlsx && Math.abs(bfRunningXlsx) > 0.005) {
-        const bfAbsXlsx  = Math.abs(bfRunningXlsx);
+        const bfAbsXlsx = Math.abs(bfRunningXlsx);
         const bfSideXlsx = bfRunningXlsx >= 0 ? "Dr" : "Cr";
         const bfRow = sheet.addRow([
           new Date(dateFromXlsx + "T00:00:00"),
@@ -1215,13 +1487,23 @@ export function registerFactoryCustomersRoutes(app: Express) {
       rows.forEach((row: any, idx: number) => {
         const dr = row.debit > 0 ? row.debit : null;
         const cr = row.credit > 0 ? row.credit : null;
-        const dateVal = row.transactionDate
-          ? new Date(row.transactionDate + "T00:00:00")
-          : "";
-        const dr2 = sheet.addRow([dateVal, txLabel(row.transactionType), row.description || "—", row.destination || "", dr, cr, row.rowNote || ""]);
-        dr2.eachCell((cell) => { cell.border = allBorders; });
+        const dateVal = row.transactionDate ? new Date(row.transactionDate + "T00:00:00") : "";
+        const dr2 = sheet.addRow([
+          dateVal,
+          txLabel(row.transactionType),
+          row.description || "—",
+          row.destination || "",
+          dr,
+          cr,
+          row.rowNote || "",
+        ]);
+        dr2.eachCell((cell) => {
+          cell.border = allBorders;
+        });
         if (idx % 2 === 0) {
-          dr2.eachCell((cell) => { cell.fill = greyFill; });
+          dr2.eachCell((cell) => {
+            cell.fill = greyFill;
+          });
         }
         dr2.getCell(1).numFmt = "dd/mm/yyyy";
         dr2.getCell(5).numFmt = numFmt;
@@ -1270,7 +1552,10 @@ export function registerFactoryCustomersRoutes(app: Express) {
       }
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", `attachment; filename=${(customer.legalName || "customer").replace(/\s+/g, "_")}_Statement.xlsx`);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename=${(customer.legalName || "customer").replace(/\s+/g, "_")}_Statement.xlsx`
+      );
       await workbook.xlsx.write(res);
       res.end();
     } catch (error: any) {
@@ -1293,11 +1578,13 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const chargeVouchers = await db
         .select({ id: vouchers.id, description: vouchers.description, voucherNumber: vouchers.voucherNumber })
         .from(vouchers)
-        .where(and(
-          eq(vouchers.companyId, companyId),
-          sql`${vouchers.voucherNumber} LIKE 'CHARGE-INV-%'`,
-          sql`${vouchers.description} IS NOT NULL`,
-        ));
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.voucherNumber} LIKE 'CHARGE-INV-%'`,
+            sql`${vouchers.description} IS NOT NULL`
+          )
+        );
 
       for (const v of chargeVouchers) {
         // Extract invoice number: voucherNumber = CHARGE-INV-XXXXXX-chargeId-timestamp
@@ -1310,10 +1597,7 @@ export function registerFactoryCustomersRoutes(app: Express) {
         const [order] = await db
           .select({ id: customerOrders.id, containerNumber: customerOrders.containerNumber })
           .from(customerOrders)
-          .where(and(
-            eq(customerOrders.companyId, companyId),
-            eq(customerOrders.invoiceNumber, invoiceNumber),
-          ));
+          .where(and(eq(customerOrders.companyId, companyId), eq(customerOrders.invoiceNumber, invoiceNumber)));
 
         if (!order?.containerNumber) continue;
 
@@ -1332,15 +1616,17 @@ export function registerFactoryCustomersRoutes(app: Express) {
       const manualVouchers = await db
         .select({ id: vouchers.id, description: vouchers.description, voucherType: vouchers.voucherType })
         .from(vouchers)
-        .where(and(
-          eq(vouchers.companyId, companyId),
-          sql`${vouchers.description} IS NOT NULL AND ${vouchers.description} != ''`,
-          sql`${vouchers.voucherType} IN ('Payment', 'Receipt', 'Journal')`,
-          sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
-          sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-%'`,
-          sql`${vouchers.voucherNumber} NOT LIKE 'FPOS-%'`,
-          sql`${vouchers.sourceModule} = 'FACTORY' OR ${vouchers.sourceModule} IS NULL`,
-        ));
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            sql`${vouchers.description} IS NOT NULL AND ${vouchers.description} != ''`,
+            sql`${vouchers.voucherType} IN ('Payment', 'Receipt', 'Journal')`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'CHARGE-%'`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-%'`,
+            sql`${vouchers.voucherNumber} NOT LIKE 'FPOS-%'`,
+            sql`${vouchers.sourceModule} = 'FACTORY' OR ${vouchers.sourceModule} IS NULL`
+          )
+        );
 
       for (const v of manualVouchers) {
         const entries = await db
@@ -1401,8 +1687,16 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const customerId = parseInt(req.params.id);
       if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
-      const logos = await db.select().from(customerLogos)
-        .where(and(eq(customerLogos.companyId, companyId), eq(customerLogos.customerId, customerId), eq(customerLogos.active, true)))
+      const logos = await db
+        .select()
+        .from(customerLogos)
+        .where(
+          and(
+            eq(customerLogos.companyId, companyId),
+            eq(customerLogos.customerId, customerId),
+            eq(customerLogos.active, true)
+          )
+        )
         .orderBy(asc(customerLogos.createdAt));
       res.json(logos);
     } catch (e: any) {
@@ -1419,18 +1713,23 @@ export function registerFactoryCustomersRoutes(app: Express) {
         if (!req.file) return res.status(400).json({ message: "No image uploaded" });
         const customerId = parseInt(req.params.id);
         if (isNaN(customerId)) return res.status(400).json({ message: "Invalid customer ID" });
-        const [cust] = await db.select({ id: customers.id }).from(customers)
+        const [cust] = await db
+          .select({ id: customers.id })
+          .from(customers)
           .where(and(eq(customers.id, customerId), eq(customers.companyId, companyId)));
         if (!cust) return res.status(404).json({ message: "Customer not found" });
         const name = ((req.body.name || req.file.originalname.replace(/\.[^.]+$/, "")) as string).substring(0, 100);
-        const [logo] = await db.insert(customerLogos).values({
-          companyId,
-          customerId,
-          name,
-          filePath: req.file.filename,
-          mimeType: req.file.mimetype,
-          active: true,
-        }).returning();
+        const [logo] = await db
+          .insert(customerLogos)
+          .values({
+            companyId,
+            customerId,
+            name,
+            filePath: req.file.filename,
+            mimeType: req.file.mimetype,
+            active: true,
+          })
+          .returning();
         res.status(201).json(logo);
       } catch (e: any) {
         res.status(500).json({ message: e.message });
@@ -1444,14 +1743,18 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const logoId = parseInt(req.params.id);
       if (isNaN(logoId)) return res.status(400).json({ message: "Invalid logo ID" });
-      const [existing] = await db.select().from(customerLogos)
+      const [existing] = await db
+        .select()
+        .from(customerLogos)
         .where(and(eq(customerLogos.id, logoId), eq(customerLogos.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Logo not found" });
       const { name } = req.body;
       if (!name || !name.trim()) return res.status(400).json({ message: "Name is required" });
-      const [updated] = await db.update(customerLogos)
+      const [updated] = await db
+        .update(customerLogos)
         .set({ name: name.trim().substring(0, 100), updatedAt: new Date() })
-        .where(eq(customerLogos.id, logoId)).returning();
+        .where(eq(customerLogos.id, logoId))
+        .returning();
       res.json(updated);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -1464,12 +1767,16 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const logoId = parseInt(req.params.id);
       if (isNaN(logoId)) return res.status(400).json({ message: "Invalid logo ID" });
-      const [existing] = await db.select().from(customerLogos)
+      const [existing] = await db
+        .select()
+        .from(customerLogos)
         .where(and(eq(customerLogos.id, logoId), eq(customerLogos.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Logo not found" });
-      const [updated] = await db.update(customerLogos)
+      const [updated] = await db
+        .update(customerLogos)
         .set({ active: false, updatedAt: new Date() })
-        .where(eq(customerLogos.id, logoId)).returning();
+        .where(eq(customerLogos.id, logoId))
+        .returning();
       res.json(updated);
     } catch (e: any) {
       res.status(500).json({ message: e.message });
@@ -1482,7 +1789,9 @@ export function registerFactoryCustomersRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const logoId = parseInt(req.params.id);
       if (isNaN(logoId)) return res.status(400).json({ message: "Invalid logo ID" });
-      const [logo] = await db.select().from(customerLogos)
+      const [logo] = await db
+        .select()
+        .from(customerLogos)
         .where(and(eq(customerLogos.id, logoId), eq(customerLogos.companyId, companyId)));
       if (!logo) return res.status(404).json({ message: "Logo not found" });
       const filePath = path.join(process.cwd(), "uploads", "customer-logos", logo.filePath);

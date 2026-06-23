@@ -2,13 +2,7 @@ import { Label } from "@/components/ui/label";
 import { MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  Select, 
-  SelectTrigger, 
-  SelectValue, 
-  SelectContent, 
-  SelectItem 
-} from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 interface PosLocationManagerProps {
   locations: any[];
@@ -16,7 +10,11 @@ interface PosLocationManagerProps {
   setSelectedLocationIds: (v: number[] | ((prev: number[]) => number[])) => void;
   setAssignedLocationId: (v: number | undefined) => void;
   locationCashAccounts: Record<number, number | undefined>;
-  setLocationCashAccounts: (v: Record<number, number | undefined> | ((prev: Record<number, number | undefined>) => Record<number, number | undefined>)) => void;
+  setLocationCashAccounts: (
+    v:
+      | Record<number, number | undefined>
+      | ((prev: Record<number, number | undefined>) => Record<number, number | undefined>)
+  ) => void;
   posViewOnly: boolean;
   cashAccounts: any[];
 }
@@ -66,12 +64,18 @@ export function PosLocationManager({
           <MapPin className="h-3 w-3" />
           Assigned Locations
           {selectedLocationIds.length > 0 && (
-            <Badge variant="secondary" className="text-xs ml-1">{selectedLocationIds.length} selected</Badge>
+            <Badge variant="secondary" className="text-xs ml-1">
+              {selectedLocationIds.length} selected
+            </Badge>
           )}
         </Label>
         <div className="flex gap-1">
-          <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAllLocations}>All</Button>
-          <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={clearLocations}>Clear</Button>
+          <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={selectAllLocations}>
+            All
+          </Button>
+          <Button type="button" variant="ghost" size="sm" className="h-6 text-xs px-2" onClick={clearLocations}>
+            Clear
+          </Button>
         </div>
       </div>
       {locations.length === 0 ? (
@@ -99,9 +103,7 @@ export function PosLocationManager({
                   <div className="pl-6 pr-1 pb-1">
                     <Select
                       value={locationCashAccounts[loc.id]?.toString() || ""}
-                      onValueChange={(v) =>
-                        setLocationCashAccounts((prev) => ({ ...prev, [loc.id]: parseInt(v) }))
-                      }
+                      onValueChange={(v) => setLocationCashAccounts((prev) => ({ ...prev, [loc.id]: parseInt(v) }))}
                     >
                       <SelectTrigger className="h-7 text-xs" data-testid={`select-cash-account-loc-${loc.id}`}>
                         <SelectValue placeholder="Select cash account *" />

@@ -12,7 +12,26 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useLocation, useRoute } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import { FileDown, FileSpreadsheet, ArrowLeft, Trash2, ClipboardCheck, CheckCircle, RefreshCw, Container, Pencil, RotateCcw, Hammer, ChevronDown, GitCompare, DollarSign, ScanLine, ArrowLeftRight, Truck, ExternalLink } from "lucide-react";
+import {
+  FileDown,
+  FileSpreadsheet,
+  ArrowLeft,
+  Trash2,
+  ClipboardCheck,
+  CheckCircle,
+  RefreshCw,
+  Container,
+  Pencil,
+  RotateCcw,
+  Hammer,
+  ChevronDown,
+  GitCompare,
+  DollarSign,
+  ScanLine,
+  ArrowLeftRight,
+  Truck,
+  ExternalLink,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -139,7 +158,9 @@ export default function FactoryInvoiceDetail() {
 
   const updateChargeLedgerMutation = useMutation({
     mutationFn: async ({ chargeId, ledgerAccountId }: { chargeId: number; ledgerAccountId: number | null }) => {
-      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`, { ledgerAccountId });
+      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`, {
+        ledgerAccountId,
+      });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to update charge");
       return res.json();
     },
@@ -152,8 +173,23 @@ export default function FactoryInvoiceDetail() {
   });
 
   const addChargeMutation = useMutation({
-    mutationFn: async ({ name, amount, chargeType, ledgerAccountId }: { name: string; amount: number; chargeType: string; ledgerAccountId: number | null }) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, { name, amount, chargeType, ledgerAccountId });
+    mutationFn: async ({
+      name,
+      amount,
+      chargeType,
+      ledgerAccountId,
+    }: {
+      name: string;
+      amount: number;
+      chargeType: string;
+      ledgerAccountId: number | null;
+    }) => {
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/charges`, {
+        name,
+        amount,
+        chargeType,
+        ledgerAccountId,
+      });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to add charge");
       return res.json();
     },
@@ -188,7 +224,9 @@ export default function FactoryInvoiceDetail() {
 
   const updateChargeAmountMutation = useMutation({
     mutationFn: async ({ chargeId, amount }: { chargeId: number; amount: number }) => {
-      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`, { amount });
+      const res = await modeApiRequest("PATCH", `/api/factory/customer-orders/${orderId}/charges/${chargeId}`, {
+        amount,
+      });
       if (!res.ok) throw new Error((await res.json()).message || "Failed to update charge amount");
       return res.json();
     },
@@ -207,11 +245,15 @@ export default function FactoryInvoiceDetail() {
   const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = me?.role === "Developer";
 
-  const { data: proformas = [] } = useQuery<{ id: number; name: string; lines: { articleCode: string; pricePerBale: string }[] }[]>({
+  const { data: proformas = [] } = useQuery<
+    { id: number; name: string; lines: { articleCode: string; pricePerBale: string }[] }[]
+  >({
     queryKey: ["/api/factory/customer-proformas", order?.customerId],
     queryFn: async () => {
       if (!order?.customerId) return [];
-      const res = await fetch(`/api/factory/customer-proformas?customerId=${order.customerId}`, { credentials: "include" });
+      const res = await fetch(`/api/factory/customer-proformas?customerId=${order.customerId}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch proformas");
       return res.json();
     },
@@ -241,19 +283,59 @@ export default function FactoryInvoiceDetail() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "DRAFT":
-        return <Badge variant="secondary" data-testid="badge-status-draft">Draft</Badge>;
+        return (
+          <Badge variant="secondary" data-testid="badge-status-draft">
+            Draft
+          </Badge>
+        );
       case "LOADING":
-        return <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800" data-testid="badge-status-loading">Loading</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+            data-testid="badge-status-loading"
+          >
+            Loading
+          </Badge>
+        );
       case "PENDING_VERIFICATION":
-        return <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800" data-testid="badge-status-pending">Pending Verification</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800"
+            data-testid="badge-status-pending"
+          >
+            Pending Verification
+          </Badge>
+        );
       case "VERIFIED":
-        return <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800" data-testid="badge-status-verified">Verified</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+            data-testid="badge-status-verified"
+          >
+            Verified
+          </Badge>
+        );
       case "FINALIZED":
-        return <Badge variant="default" data-testid="badge-status-finalized">Finalized</Badge>;
+        return (
+          <Badge variant="default" data-testid="badge-status-finalized">
+            Finalized
+          </Badge>
+        );
       case "CANCELLED":
-        return <Badge variant="destructive" data-testid="badge-status-cancelled">Cancelled</Badge>;
+        return (
+          <Badge variant="destructive" data-testid="badge-status-cancelled">
+            Cancelled
+          </Badge>
+        );
       default:
-        return <Badge variant="secondary" data-testid="badge-status-unknown">{status}</Badge>;
+        return (
+          <Badge variant="secondary" data-testid="badge-status-unknown">
+            {status}
+          </Badge>
+        );
     }
   };
 
@@ -289,9 +371,15 @@ export default function FactoryInvoiceDetail() {
     },
     onSuccess: (data: any) => {
       if (data.repriced === 0) {
-        toast({ title: "Prices already current", description: "All bale prices already match the current catalogue — no changes needed." });
+        toast({
+          title: "Prices already current",
+          description: "All bale prices already match the current catalogue — no changes needed.",
+        });
       } else {
-        toast({ title: "Prices updated", description: `Updated ${data.repriced} bale(s) to current catalogue prices.` });
+        toast({
+          title: "Prices updated",
+          description: `Updated ${data.repriced} bale(s) to current catalogue prices.`,
+        });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
     },
@@ -314,7 +402,10 @@ export default function FactoryInvoiceDetail() {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Price updated", description: "All bales for this article have been repriced and totals recalculated." });
+      toast({
+        title: "Price updated",
+        description: "All bales for this article have been repriced and totals recalculated.",
+      });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
       setEditingArticleCode(null);
     },
@@ -356,9 +447,15 @@ export default function FactoryInvoiceDetail() {
     },
     onSuccess: (data: any) => {
       if (data.repriced === 0) {
-        toast({ title: "Already at production prices", description: "All bale prices already match the current production prices — no changes needed." });
+        toast({
+          title: "Already at production prices",
+          description: "All bale prices already match the current production prices — no changes needed.",
+        });
       } else {
-        toast({ title: "Production prices applied", description: `Updated ${data.repriced} bale(s) to production prices.` });
+        toast({
+          title: "Production prices applied",
+          description: `Updated ${data.repriced} bale(s) to production prices.`,
+        });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/factory/customer-orders", orderId] });
     },
@@ -370,7 +467,9 @@ export default function FactoryInvoiceDetail() {
 
   const applyProformaMutation = useMutation({
     mutationFn: async (proformaId: number) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/apply-proforma-prices`, { proformaId });
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/apply-proforma-prices`, {
+        proformaId,
+      });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || "Failed to apply proforma prices");
@@ -380,7 +479,10 @@ export default function FactoryInvoiceDetail() {
     onSuccess: (data: any) => {
       const repriced = data?.repriced ?? 0;
       if (repriced === 0) {
-        toast({ title: "No changes", description: "All bale prices already match the selected proforma — no updates needed." });
+        toast({
+          title: "No changes",
+          description: "All bale prices already match the selected proforma — no updates needed.",
+        });
       } else {
         toast({ title: "Proforma prices applied", description: `Updated ${repriced} bale(s).` });
       }
@@ -396,7 +498,10 @@ export default function FactoryInvoiceDetail() {
 
   const exchangeMutation = useMutation({
     mutationFn: async ({ orderBaleId, newBaleReference }: { orderBaleId: number; newBaleReference: string }) => {
-      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales/exchange`, { orderBaleId, newBaleReference });
+      const res = await modeApiRequest("POST", `/api/factory/customer-orders/${orderId}/bales/exchange`, {
+        orderBaleId,
+        newBaleReference,
+      });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || "Failed to exchange bale");
@@ -495,7 +600,9 @@ export default function FactoryInvoiceDetail() {
   if (!order) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-6">
-        <p className="text-muted-foreground" data-testid="text-not-found">Invoice not found</p>
+        <p className="text-muted-foreground" data-testid="text-not-found">
+          Invoice not found
+        </p>
         <Button
           variant="outline"
           className="mt-4"
@@ -509,9 +616,7 @@ export default function FactoryInvoiceDetail() {
     );
   }
 
-  const sortedLines = [...(order.lines || [])].sort((a, b) =>
-    (a.baleName || "").localeCompare(b.baleName || "")
-  );
+  const sortedLines = [...(order.lines || [])].sort((a, b) => (a.baleName || "").localeCompare(b.baleName || ""));
 
   const freightCharges = (order.charges || []).filter((c) => c.chargeType === "FREIGHT");
   const otherCharges = (order.charges || []).filter((c) => c.chargeType !== "FREIGHT");
@@ -602,11 +707,20 @@ export default function FactoryInvoiceDetail() {
               data-testid="button-go-to-verify"
             >
               {isPendingVerification ? (
-                <><ClipboardCheck className="mr-2 h-4 w-4" />View Verification</>
+                <>
+                  <ClipboardCheck className="mr-2 h-4 w-4" />
+                  View Verification
+                </>
               ) : isVerifiedStatus ? (
-                <><CheckCircle className="mr-2 h-4 w-4" />Charges &amp; Finalize</>
+                <>
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  Charges &amp; Finalize
+                </>
               ) : (
-                <><ClipboardCheck className="mr-2 h-4 w-4" />View Loading</>
+                <>
+                  <ClipboardCheck className="mr-2 h-4 w-4" />
+                  View Loading
+                </>
               )}
             </Button>
           )}
@@ -740,9 +854,9 @@ export default function FactoryInvoiceDetail() {
             <AlertDialogHeader>
               <AlertDialogTitle>Revert invoice to Draft?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will un-finalize {order.invoiceNumber || `Order #${order.id}`} and return it to Draft status.
-                The invoice number will be cleared and bales will be returned to "Reserved" state.
-                Any recorded payments must be reversed first.
+                This will un-finalize {order.invoiceNumber || `Order #${order.id}`} and return it to Draft status. The
+                invoice number will be cleared and bales will be returned to "Reserved" state. Any recorded payments
+                must be reversed first.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -763,16 +877,13 @@ export default function FactoryInvoiceDetail() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete order {order.invoiceNumber || `#${order.id}`} for {order.customerName}.
-                Any bales assigned to this order will be returned to stock. This cannot be undone.
+                This will permanently delete order {order.invoiceNumber || `#${order.id}`} for {order.customerName}. Any
+                bales assigned to this order will be returned to stock. This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => deleteMutation.mutate(order.id)}
-                data-testid="button-confirm-delete"
-              >
+              <AlertDialogAction onClick={() => deleteMutation.mutate(order.id)} data-testid="button-confirm-delete">
                 Delete
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -788,9 +899,7 @@ export default function FactoryInvoiceDetail() {
               <div className="flex items-center gap-2">
                 <Truck className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-semibold">Dispatch Batch</span>
-                {dispatchBatch?.batch && (
-                  <span className="font-mono font-bold">{dispatchBatch.batch.batchNumber}</span>
-                )}
+                {dispatchBatch?.batch && <span className="font-mono font-bold">{dispatchBatch.batch.batchNumber}</span>}
               </div>
               <Button
                 size="sm"
@@ -824,7 +933,9 @@ export default function FactoryInvoiceDetail() {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Rides</p>
-                      <p>{dispatchBatch.rides?.length || 0} truck{dispatchBatch.rides?.length !== 1 ? "s" : ""}</p>
+                      <p>
+                        {dispatchBatch.rides?.length || 0} truck{dispatchBatch.rides?.length !== 1 ? "s" : ""}
+                      </p>
                     </div>
                   </>
                 )}
@@ -846,17 +957,18 @@ export default function FactoryInvoiceDetail() {
               <TableHead className="text-right">Qty</TableHead>
               <TableHead className="text-right">Weight/Bale</TableHead>
               <TableHead className="text-right">Total Weight</TableHead>
-              {isAdmin && (() => {
-                const anyPerKg = sortedLines.some(l => l.pricingMode === 'per_kg');
-                return (
-                  <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>
-                    {anyPerKg ? "Price/KG" : "Price/Bale"}
-                    {(isVerifiedStatus || order.status === "FINALIZED") && (
-                      <Pencil className="inline ml-1 h-3 w-3 text-muted-foreground" />
-                    )}
-                  </TableHead>
-                );
-              })()}
+              {isAdmin &&
+                (() => {
+                  const anyPerKg = sortedLines.some((l) => l.pricingMode === "per_kg");
+                  return (
+                    <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>
+                      {anyPerKg ? "Price/KG" : "Price/Bale"}
+                      {(isVerifiedStatus || order.status === "FINALIZED") && (
+                        <Pencil className="inline ml-1 h-3 w-3 text-muted-foreground" />
+                      )}
+                    </TableHead>
+                  );
+                })()}
               {isAdmin && (
                 <TableHead className={`text-right${hideExportSelling ? " print:hidden" : ""}`}>Total Price</TableHead>
               )}
@@ -865,7 +977,11 @@ export default function FactoryInvoiceDetail() {
           <TableBody>
             {sortedLines.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isAdmin ? 8 : 6} className="text-center text-muted-foreground py-6" data-testid="text-no-lines">
+                <TableCell
+                  colSpan={isAdmin ? 8 : 6}
+                  className="text-center text-muted-foreground py-6"
+                  data-testid="text-no-lines"
+                >
                   No order lines
                 </TableCell>
               </TableRow>
@@ -890,59 +1006,83 @@ export default function FactoryInvoiceDetail() {
                     {line.qty}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-weight-per-bale-${idx}`}>
-                    {Number(line.weightPerBale || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {Number(line.weightPerBale || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
                   </TableCell>
                   <TableCell className="text-right font-mono" data-testid={`text-total-weight-${idx}`}>
-                    {Number(line.totalWeight || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    {Number(line.totalWeight || 0).toLocaleString(undefined, {
+                      minimumFractionDigits: 0,
+                      maximumFractionDigits: 2,
+                    })}
                   </TableCell>
-                  {isAdmin && (() => {
-                    const isPerKg = line.pricingMode === 'per_kg';
-                    const pkgRateInv = line.pricePerKg || 0;
-                    const displayRate = isPerKg
-                      ? (Number(line.totalPrice) > 0 && Number(line.totalWeight) > 0
+                  {isAdmin &&
+                    (() => {
+                      const isPerKg = line.pricingMode === "per_kg";
+                      const pkgRateInv = line.pricePerKg || 0;
+                      const displayRate = isPerKg
+                        ? Number(line.totalPrice) > 0 && Number(line.totalWeight) > 0
                           ? Number(line.totalPrice) / Number(line.totalWeight)
-                          : pkgRateInv)
-                      : Number(line.pricePerBale || 0);
-                    return (
-                      <TableCell className={`text-right font-mono${hideExportSelling ? " print:hidden" : ""}`} data-testid={`text-price-per-bale-${idx}`}>
-                        {(isVerifiedStatus || order.status === "FINALIZED") && !isPerKg ? (
-                          editingArticleCode === line.articleCode ? (
-                            <Input
-                              ref={inputRef}
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={editValue}
-                              onChange={(e) => setEditValue(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") commitEdit(line.articleCode);
-                                if (e.key === "Escape") cancelEdit();
-                              }}
-                              onBlur={() => commitEdit(line.articleCode)}
-                              className="h-7 w-28 text-right font-mono p-1 ml-auto"
-                              disabled={repriceArticleMutation.isPending}
-                              data-testid={`input-price-${idx}`}
-                            />
+                          : pkgRateInv
+                        : Number(line.pricePerBale || 0);
+                      return (
+                        <TableCell
+                          className={`text-right font-mono${hideExportSelling ? " print:hidden" : ""}`}
+                          data-testid={`text-price-per-bale-${idx}`}
+                        >
+                          {(isVerifiedStatus || order.status === "FINALIZED") && !isPerKg ? (
+                            editingArticleCode === line.articleCode ? (
+                              <Input
+                                ref={inputRef}
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") commitEdit(line.articleCode);
+                                  if (e.key === "Escape") cancelEdit();
+                                }}
+                                onBlur={() => commitEdit(line.articleCode)}
+                                className="h-7 w-28 text-right font-mono p-1 ml-auto"
+                                disabled={repriceArticleMutation.isPending}
+                                data-testid={`input-price-${idx}`}
+                              />
+                            ) : (
+                              <button
+                                onClick={() => startEdit(line.articleCode, line.pricePerBale)}
+                                className="group flex items-center justify-end gap-1 w-full hover-elevate rounded-md px-1 py-0.5"
+                                data-testid={`button-edit-price-${idx}`}
+                                title="Click to edit price"
+                              >
+                                <span>
+                                  {displayRate.toLocaleString(undefined, {
+                                    minimumFractionDigits: 0,
+                                    maximumFractionDigits: 4,
+                                  })}
+                                </span>
+                                <Pencil className="h-3 w-3 text-muted-foreground invisible group-hover:visible" />
+                              </button>
+                            )
                           ) : (
-                            <button
-                              onClick={() => startEdit(line.articleCode, line.pricePerBale)}
-                              className="group flex items-center justify-end gap-1 w-full hover-elevate rounded-md px-1 py-0.5"
-                              data-testid={`button-edit-price-${idx}`}
-                              title="Click to edit price"
-                            >
-                              <span>{displayRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })}</span>
-                              <Pencil className="h-3 w-3 text-muted-foreground invisible group-hover:visible" />
-                            </button>
-                          )
-                        ) : (
-                          displayRate.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })
-                        )}
-                      </TableCell>
-                    );
-                  })()}
+                            displayRate.toLocaleString(undefined, {
+                              minimumFractionDigits: 0,
+                              maximumFractionDigits: 4,
+                            })
+                          )}
+                        </TableCell>
+                      );
+                    })()}
                   {isAdmin && (
-                    <TableCell className={`text-right font-mono font-semibold${hideExportSelling ? " print:hidden" : ""}`} data-testid={`text-total-price-${idx}`}>
-                      {Number(line.totalPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    <TableCell
+                      className={`text-right font-mono font-semibold${hideExportSelling ? " print:hidden" : ""}`}
+                      data-testid={`text-total-price-${idx}`}
+                    >
+                      {Number(line.totalPrice || 0).toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })}
                     </TableCell>
                   )}
                 </TableRow>
@@ -955,8 +1095,10 @@ export default function FactoryInvoiceDetail() {
       {isAdmin && (freightCharges.length > 0 || otherCharges.length > 0 || isFinalized) && (
         <Card className={`p-4 mb-6${hideExportSelling ? " print:hidden" : ""}`}>
           <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
-            <h3 className="font-semibold" data-testid="text-charges-header">Freight &amp; Charges</h3>
-            {isFinalized && [...freightCharges, ...otherCharges].some(c => !c.voucherId) && (
+            <h3 className="font-semibold" data-testid="text-charges-header">
+              Freight &amp; Charges
+            </h3>
+            {isFinalized && [...freightCharges, ...otherCharges].some((c) => !c.voucherId) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -970,7 +1112,7 @@ export default function FactoryInvoiceDetail() {
           </div>
           <div className="space-y-3">
             {[...freightCharges, ...otherCharges].map((charge, idx) => {
-              const linkedAccount = ledgerAccounts.find(a => a.id === charge.ledgerAccountId);
+              const linkedAccount = ledgerAccounts.find((a) => a.id === charge.ledgerAccountId);
               const isEditingLedger = editingChargeLedger === charge.id;
               const isEditingAmount = editingChargeAmount === charge.id;
               const canEditAmount = isFinalized && !!charge.voucherId;
@@ -984,13 +1126,17 @@ export default function FactoryInvoiceDetail() {
                           type="number"
                           className="h-7 w-28 text-xs text-right font-mono"
                           value={chargeAmountInput}
-                          onChange={e => setChargeAmountInput(e.target.value)}
-                          onKeyDown={e => {
+                          onChange={(e) => setChargeAmountInput(e.target.value)}
+                          onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               const val = parseFloat(chargeAmountInput);
-                              if (!isNaN(val) && val >= 0) updateChargeAmountMutation.mutate({ chargeId: charge.id, amount: val });
+                              if (!isNaN(val) && val >= 0)
+                                updateChargeAmountMutation.mutate({ chargeId: charge.id, amount: val });
                             }
-                            if (e.key === "Escape") { setEditingChargeAmount(null); setChargeAmountInput(""); }
+                            if (e.key === "Escape") {
+                              setEditingChargeAmount(null);
+                              setChargeAmountInput("");
+                            }
                           }}
                           autoFocus
                           data-testid={`input-charge-amount-${charge.id}`}
@@ -1002,29 +1148,43 @@ export default function FactoryInvoiceDetail() {
                           disabled={updateChargeAmountMutation.isPending}
                           onClick={() => {
                             const val = parseFloat(chargeAmountInput);
-                            if (!isNaN(val) && val >= 0) updateChargeAmountMutation.mutate({ chargeId: charge.id, amount: val });
+                            if (!isNaN(val) && val >= 0)
+                              updateChargeAmountMutation.mutate({ chargeId: charge.id, amount: val });
                           }}
                           data-testid={`button-save-charge-amount-${charge.id}`}
-                        >Save</Button>
+                        >
+                          Save
+                        </Button>
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-7 text-xs px-2"
-                          onClick={() => { setEditingChargeAmount(null); setChargeAmountInput(""); }}
+                          onClick={() => {
+                            setEditingChargeAmount(null);
+                            setChargeAmountInput("");
+                          }}
                           data-testid={`button-cancel-charge-amount-${charge.id}`}
-                        >Cancel</Button>
+                        >
+                          Cancel
+                        </Button>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1">
                         <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>
-                          {Number(charge.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                          {Number(charge.amount || 0).toLocaleString(undefined, {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })}
                         </span>
                         {canEditAmount && (
                           <Button
                             size="icon"
                             variant="ghost"
                             className="h-6 w-6 print:hidden"
-                            onClick={() => { setEditingChargeAmount(charge.id); setChargeAmountInput(charge.amount); }}
+                            onClick={() => {
+                              setEditingChargeAmount(charge.id);
+                              setChargeAmountInput(charge.amount);
+                            }}
                             data-testid={`button-edit-charge-amount-${charge.id}`}
                           >
                             <Pencil className="h-3 w-3" />
@@ -1037,28 +1197,53 @@ export default function FactoryInvoiceDetail() {
                     <div className="flex items-center gap-2 print:hidden">
                       <Select
                         value={String(charge.ledgerAccountId ?? "")}
-                        onValueChange={(val) => updateChargeLedgerMutation.mutate({ chargeId: charge.id, ledgerAccountId: val ? parseInt(val) : null })}
+                        onValueChange={(val) =>
+                          updateChargeLedgerMutation.mutate({
+                            chargeId: charge.id,
+                            ledgerAccountId: val ? parseInt(val) : null,
+                          })
+                        }
                       >
                         <SelectTrigger className="h-8 text-xs flex-1" data-testid={`select-charge-ledger-${charge.id}`}>
                           <SelectValue placeholder="Select ledger account..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {ledgerAccounts.map(acc => (
-                            <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
+                          {ledgerAccounts.map((acc) => (
+                            <SelectItem key={acc.id} value={String(acc.id)}>
+                              {acc.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button size="sm" variant="ghost" onClick={() => setEditingChargeLedger(null)} data-testid={`button-cancel-charge-ledger-${charge.id}`}>Cancel</Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setEditingChargeLedger(null)}
+                        data-testid={`button-cancel-charge-ledger-${charge.id}`}
+                      >
+                        Cancel
+                      </Button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 print:hidden">
                       {linkedAccount ? (
-                        <Badge variant="secondary" className="text-xs">{linkedAccount.name}</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {linkedAccount.name}
+                        </Badge>
                       ) : (
-                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">No ledger account — not posted</span>
+                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                          No ledger account — not posted
+                        </span>
                       )}
-                      <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setEditingChargeLedger(charge.id)} data-testid={`button-edit-charge-ledger-${charge.id}`}>
-                        <Pencil className="h-3 w-3 mr-1" />Link
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 text-xs px-2"
+                        onClick={() => setEditingChargeLedger(charge.id)}
+                        data-testid={`button-edit-charge-ledger-${charge.id}`}
+                      >
+                        <Pencil className="h-3 w-3 mr-1" />
+                        Link
                       </Button>
                     </div>
                   )}
@@ -1075,7 +1260,7 @@ export default function FactoryInvoiceDetail() {
                     <Input
                       placeholder="Charge name"
                       value={newChargeName}
-                      onChange={e => setNewChargeName(e.target.value)}
+                      onChange={(e) => setNewChargeName(e.target.value)}
                       className="text-sm"
                       data-testid="input-new-charge-name"
                     />
@@ -1083,7 +1268,7 @@ export default function FactoryInvoiceDetail() {
                       type="number"
                       placeholder="Amount"
                       value={newChargeAmount}
-                      onChange={e => setNewChargeAmount(e.target.value)}
+                      onChange={(e) => setNewChargeAmount(e.target.value)}
                       className="text-sm font-mono"
                       data-testid="input-new-charge-amount"
                     />
@@ -1104,8 +1289,10 @@ export default function FactoryInvoiceDetail() {
                         <SelectValue placeholder="Ledger account..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {ledgerAccounts.map(acc => (
-                          <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
+                        {ledgerAccounts.map((acc) => (
+                          <SelectItem key={acc.id} value={String(acc.id)}>
+                            {acc.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -1115,7 +1302,9 @@ export default function FactoryInvoiceDetail() {
                     <Button
                       size="sm"
                       variant="default"
-                      disabled={addChargeMutation.isPending || !newChargeName.trim() || !newChargeAmount || !newChargeLedgerId}
+                      disabled={
+                        addChargeMutation.isPending || !newChargeName.trim() || !newChargeAmount || !newChargeLedgerId
+                      }
                       onClick={() => {
                         const amt = parseFloat(newChargeAmount);
                         if (isNaN(amt) || amt <= 0) return;
@@ -1133,9 +1322,17 @@ export default function FactoryInvoiceDetail() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => { setShowAddCharge(false); setNewChargeName(""); setNewChargeAmount(""); setNewChargeType("FREIGHT"); setNewChargeLedgerId(""); }}
+                      onClick={() => {
+                        setShowAddCharge(false);
+                        setNewChargeName("");
+                        setNewChargeAmount("");
+                        setNewChargeType("FREIGHT");
+                        setNewChargeLedgerId("");
+                      }}
                       data-testid="button-cancel-new-charge"
-                    >Cancel</Button>
+                    >
+                      Cancel
+                    </Button>
                   </div>
                 </div>
               ) : (
@@ -1146,7 +1343,8 @@ export default function FactoryInvoiceDetail() {
                   onClick={() => setShowAddCharge(true)}
                   data-testid="button-add-charge"
                 >
-                  <Pencil className="h-3 w-3 mr-1" />Add Charge
+                  <Pencil className="h-3 w-3 mr-1" />
+                  Add Charge
                 </Button>
               )}
             </div>
@@ -1160,15 +1358,21 @@ export default function FactoryInvoiceDetail() {
             <>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Subtotal (Bales)</span>
-                <span className="font-mono" data-testid="text-subtotal">{subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                <span className="font-mono" data-testid="text-subtotal">
+                  {subtotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
               </div>
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span>Total Charges</span>
-                <span className="font-mono" data-testid="text-total-charges">{totalCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                <span className="font-mono" data-testid="text-total-charges">
+                  {totalCharges.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
               </div>
               <div className="border-t pt-2 flex items-center justify-between gap-2">
                 <span className="font-semibold">Grand Total</span>
-                <span className="font-mono font-bold text-lg" data-testid="text-grand-total">{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</span>
+                <span className="font-mono font-bold text-lg" data-testid="text-grand-total">
+                  {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
               </div>
             </>
           )}
@@ -1210,27 +1414,34 @@ export default function FactoryInvoiceDetail() {
                 </SelectContent>
               </Select>
             )}
-            {selectedProformaId && (() => {
-              const pf = proformas.find(p => String(p.id) === selectedProformaId);
-              if (!pf || pf.lines.length === 0) return null;
-              return (
-                <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
-                  <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
-                  {pf.lines.map((l, i) => (
-                    <div key={i} className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">{l.articleCode}</span>
-                      <span className="font-medium">${parseFloat(l.pricePerBale).toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
+            {selectedProformaId &&
+              (() => {
+                const pf = proformas.find((p) => String(p.id) === selectedProformaId);
+                if (!pf || pf.lines.length === 0) return null;
+                return (
+                  <div className="rounded-md border p-3 space-y-1 max-h-48 overflow-y-auto">
+                    <p className="text-xs font-medium text-muted-foreground mb-2">Price lines in this proforma:</p>
+                    {pf.lines.map((l, i) => (
+                      <div key={i} className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">{l.articleCode}</span>
+                        <span className="font-medium">${parseFloat(l.pricePerBale).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowProformaDialog(false)} data-testid="button-cancel-proforma">
+              <Button
+                variant="outline"
+                onClick={() => setShowProformaDialog(false)}
+                data-testid="button-cancel-proforma"
+              >
                 Cancel
               </Button>
               <Button
-                onClick={() => { if (selectedProformaId) applyProformaMutation.mutate(parseInt(selectedProformaId)); }}
+                onClick={() => {
+                  if (selectedProformaId) applyProformaMutation.mutate(parseInt(selectedProformaId));
+                }}
                 disabled={!selectedProformaId || applyProformaMutation.isPending}
                 data-testid="button-confirm-proforma"
               >
@@ -1243,7 +1454,12 @@ export default function FactoryInvoiceDetail() {
       </Dialog>
 
       {/* Bale References Dialog */}
-      <Dialog open={baleRefArticle !== null} onOpenChange={(open) => { if (!open) setBaleRefArticle(null); }}>
+      <Dialog
+        open={baleRefArticle !== null}
+        onOpenChange={(open) => {
+          if (!open) setBaleRefArticle(null);
+        }}
+      >
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-base">
@@ -1251,63 +1467,80 @@ export default function FactoryInvoiceDetail() {
               <span className="ml-2 font-mono text-sm text-muted-foreground">({baleRefArticle?.code})</span>
             </DialogTitle>
           </DialogHeader>
-          {baleRefArticle && (() => {
-            const balesForArticle = (order?.bales ?? [])
-              .filter((b) => b.articleCode === baleRefArticle.code)
-              .sort((a, b) => a.baleReference.localeCompare(b.baleReference));
-            const canExchange = isAdmin && isFinalized;
-            return balesForArticle.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No bale references found for this item.</p>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-muted-foreground">
-                  {balesForArticle.length} bale{balesForArticle.length !== 1 ? "s" : ""} loaded
-                  {canExchange && <span className="ml-1">— hover a chip to remove <Trash2 className="inline h-3 w-3" /> or exchange <ArrowLeftRight className="inline h-3 w-3" /></span>}
+          {baleRefArticle &&
+            (() => {
+              const balesForArticle = (order?.bales ?? [])
+                .filter((b) => b.articleCode === baleRefArticle.code)
+                .sort((a, b) => a.baleReference.localeCompare(b.baleReference));
+              const canExchange = isAdmin && isFinalized;
+              return balesForArticle.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No bale references found for this item.
                 </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {balesForArticle.map((b) => (
-                    <div
-                      key={b.id}
-                      className="group relative rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center"
-                      data-testid={`bale-ref-${b.baleReference}`}
-                    >
-                      {b.baleReference}
-                      {canExchange && (
-                        <>
-                          <button
-                            className="absolute -top-1.5 -left-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
-                            onClick={() => setRemoveBaleState({ orderBaleId: b.id, reference: b.baleReference })}
-                            data-testid={`button-remove-bale-${b.id}`}
-                            title="Remove this bale and return to stock"
-                          >
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </button>
-                          <button
-                            className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
-                            onClick={() => { setExchangeBale({ orderBaleId: b.id, reference: b.baleReference }); setNewRefInput(""); }}
-                            data-testid={`button-exchange-bale-${b.id}`}
-                            title="Exchange this bale for another"
-                          >
-                            <ArrowLeftRight className="h-3 w-3" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ))}
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-muted-foreground">
+                    {balesForArticle.length} bale{balesForArticle.length !== 1 ? "s" : ""} loaded
+                    {canExchange && (
+                      <span className="ml-1">
+                        — hover a chip to remove <Trash2 className="inline h-3 w-3" /> or exchange{" "}
+                        <ArrowLeftRight className="inline h-3 w-3" />
+                      </span>
+                    )}
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {balesForArticle.map((b) => (
+                      <div
+                        key={b.id}
+                        className="group relative rounded-md border bg-muted/30 px-2.5 py-1.5 font-mono text-sm text-center"
+                        data-testid={`bale-ref-${b.baleReference}`}
+                      >
+                        {b.baleReference}
+                        {canExchange && (
+                          <>
+                            <button
+                              className="absolute -top-1.5 -left-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
+                              onClick={() => setRemoveBaleState({ orderBaleId: b.id, reference: b.baleReference })}
+                              data-testid={`button-remove-bale-${b.id}`}
+                              title="Remove this bale and return to stock"
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </button>
+                            <button
+                              className="absolute -top-1.5 -right-1.5 opacity-0 group-hover:opacity-100 bg-background border rounded-full p-0.5 hover-elevate transition-opacity"
+                              onClick={() => {
+                                setExchangeBale({ orderBaleId: b.id, reference: b.baleReference });
+                                setNewRefInput("");
+                              }}
+                              data-testid={`button-exchange-bale-${b.id}`}
+                              title="Exchange this bale for another"
+                            >
+                              <ArrowLeftRight className="h-3 w-3" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
         </DialogContent>
       </Dialog>
 
       {/* Remove Bale Confirm Dialog */}
-      <AlertDialog open={removeBaleState !== null} onOpenChange={(open) => { if (!open) setRemoveBaleState(null); }}>
+      <AlertDialog
+        open={removeBaleState !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoveBaleState(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove bale from invoice?</AlertDialogTitle>
             <AlertDialogDescription>
-              Bale <span className="font-mono font-medium">{removeBaleState?.reference}</span> will be removed from this invoice and returned to stock. The invoice totals will update automatically.
+              Bale <span className="font-mono font-medium">{removeBaleState?.reference}</span> will be removed from this
+              invoice and returned to stock. The invoice totals will update automatically.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1325,7 +1558,15 @@ export default function FactoryInvoiceDetail() {
       </AlertDialog>
 
       {/* Exchange Bale Dialog */}
-      <Dialog open={exchangeBale !== null} onOpenChange={(open) => { if (!open) { setExchangeBale(null); setNewRefInput(""); } }}>
+      <Dialog
+        open={exchangeBale !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setExchangeBale(null);
+            setNewRefInput("");
+          }
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="text-base flex items-center gap-2">
@@ -1346,20 +1587,38 @@ export default function FactoryInvoiceDetail() {
                 onChange={(e) => setNewRefInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && newRefInput.trim() && exchangeBale) {
-                    exchangeMutation.mutate({ orderBaleId: exchangeBale.orderBaleId, newBaleReference: newRefInput.trim() });
+                    exchangeMutation.mutate({
+                      orderBaleId: exchangeBale.orderBaleId,
+                      newBaleReference: newRefInput.trim(),
+                    });
                   }
                 }}
                 data-testid="input-exchange-bale-ref"
                 autoFocus
               />
-              <p className="text-xs text-muted-foreground">The replacement bale must be in stock. Price is preserved.</p>
+              <p className="text-xs text-muted-foreground">
+                The replacement bale must be in stock. Price is preserved.
+              </p>
             </div>
             <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => { setExchangeBale(null); setNewRefInput(""); }} data-testid="button-cancel-exchange">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setExchangeBale(null);
+                  setNewRefInput("");
+                }}
+                data-testid="button-cancel-exchange"
+              >
                 Cancel
               </Button>
               <Button
-                onClick={() => { if (exchangeBale && newRefInput.trim()) exchangeMutation.mutate({ orderBaleId: exchangeBale.orderBaleId, newBaleReference: newRefInput.trim() }); }}
+                onClick={() => {
+                  if (exchangeBale && newRefInput.trim())
+                    exchangeMutation.mutate({
+                      orderBaleId: exchangeBale.orderBaleId,
+                      newBaleReference: newRefInput.trim(),
+                    });
+                }}
                 disabled={!newRefInput.trim() || exchangeMutation.isPending}
                 data-testid="button-confirm-exchange"
               >

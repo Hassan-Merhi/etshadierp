@@ -44,13 +44,13 @@ interface AccountSidebarProps {
 }
 
 const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
-  bank:            { label: "Bank",     cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300" },
-  ledger:          { label: "Ledger",   cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
-  supplier:        { label: "Supplier", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" },
-  employee:        { label: "Staff",    cls: "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300" },
-  fixedAsset:      { label: "Asset",    cls: "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300" },
-  customer:        { label: "Customer", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" },
-  factorySupplier: { label: "F.Supp",  cls: "bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300" },
+  bank: { label: "Bank", cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300" },
+  ledger: { label: "Ledger", cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
+  supplier: { label: "Supplier", cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300" },
+  employee: { label: "Staff", cls: "bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300" },
+  fixedAsset: { label: "Asset", cls: "bg-orange-100 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300" },
+  customer: { label: "Customer", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300" },
+  factorySupplier: { label: "F.Supp", cls: "bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300" },
 };
 
 export default function AccountSidebar({
@@ -101,9 +101,7 @@ export default function AccountSidebar({
       e.preventDefault();
       if (filteredAccounts.length > 0) {
         // Accounts exist — select highlighted (or first) just like ERP
-        const idx = highlightedIndex >= 0 && highlightedIndex < filteredAccounts.length
-          ? highlightedIndex
-          : 0;
+        const idx = highlightedIndex >= 0 && highlightedIndex < filteredAccounts.length ? highlightedIndex : 0;
         onSelectAccount(filteredAccounts[idx]);
       } else if (isFactoryCompany && onAutoCreateAccount && searchValue.trim()) {
         // No accounts found and factory mode — auto-create
@@ -117,8 +115,7 @@ export default function AccountSidebar({
     const currentBalance = account.balance ?? 0;
     let adjustment = 0;
 
-    const isPaymentAccount =
-      account.id === paymentAccountId && account.type === paymentAccountType;
+    const isPaymentAccount = account.id === paymentAccountId && account.type === paymentAccountType;
 
     // Check if this is the payment/receipt account
     if (isPaymentAccount && voucherTotal > 0) {
@@ -135,7 +132,7 @@ export default function AccountSidebar({
             entry.accountId === account.id &&
             entry.accountType === account.type &&
             entry.amount &&
-            !isNaN(Number(entry.amount)),
+            !isNaN(Number(entry.amount))
         )
         .reduce((sum, entry) => sum + Number(entry.amount), 0);
 
@@ -152,9 +149,7 @@ export default function AccountSidebar({
 
   // Scroll highlighted item into view
   useEffect(() => {
-    const highlightedElement = listRef.current?.querySelector(
-      `[data-index="${highlightedIndex}"]`,
-    );
+    const highlightedElement = listRef.current?.querySelector(`[data-index="${highlightedIndex}"]`);
     if (highlightedElement) {
       highlightedElement.scrollIntoView({
         block: "nearest",
@@ -170,10 +165,7 @@ export default function AccountSidebar({
     return balance < 0 ? `(${formatted})` : formatted;
   };
 
-  const getBalanceColorClass = (
-    balance: number | undefined,
-    _accountType?: string,
-  ) => {
+  const getBalanceColorClass = (balance: number | undefined, _accountType?: string) => {
     if (balance === undefined) return "text-muted-foreground";
     // All account types use the same sign convention in the sidebar:
     // negative = credit balance (red), positive = debit balance (green).
@@ -244,12 +236,16 @@ export default function AccountSidebar({
                     data-testid="button-create-account-inline"
                     className="gap-1.5"
                   >
-                    {isAutoCreating
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <Plus className="h-3.5 w-3.5" />}
+                    {isAutoCreating ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5" />
+                    )}
                     Create "{searchValue.trim()}"
                   </Button>
-                  <p className="text-xs">or press <kbd className="px-1.5 py-0.5 bg-muted rounded">Enter</kbd></p>
+                  <p className="text-xs">
+                    or press <kbd className="px-1.5 py-0.5 bg-muted rounded">Enter</kbd>
+                  </p>
                 </div>
               ) : (
                 "No accounts found"
@@ -257,9 +253,7 @@ export default function AccountSidebar({
             </div>
           ) : (
             filteredAccounts.map((account, idx) => {
-              const isSelected =
-                account.id === selectedAccountId &&
-                account.type === selectedAccountType;
+              const isSelected = account.id === selectedAccountId && account.type === selectedAccountType;
               const isHighlighted = idx === highlightedIndex;
               const projectedBalance = getProjectedBalance(account);
               const hasProjection = projectedBalance !== (account.balance ?? 0);
@@ -277,12 +271,12 @@ export default function AccountSidebar({
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">
-                        {account.name ||
-                          account.code ||
-                          `${account.type}-${account.id}`}
+                        {account.name || account.code || `${account.type}-${account.id}`}
                       </div>
                       {TYPE_BADGE[account.type] && (
-                        <span className={`inline-block text-[9px] font-medium px-1.5 py-0 rounded mt-0.5 ${TYPE_BADGE[account.type].cls}`}>
+                        <span
+                          className={`inline-block text-[9px] font-medium px-1.5 py-0 rounded mt-0.5 ${TYPE_BADGE[account.type].cls}`}
+                        >
                           {TYPE_BADGE[account.type].label}
                         </span>
                       )}

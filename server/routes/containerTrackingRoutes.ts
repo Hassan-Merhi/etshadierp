@@ -9,10 +9,7 @@
 import type { Express, Request, Response } from "express";
 import { db } from "../db";
 import { requireAuth, requireRole } from "../auth";
-import {
-  containers,
-  containerTrackingEvents,
-} from "../../shared/schema";
+import { containers, containerTrackingEvents } from "../../shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { z } from "zod";
 import {
@@ -27,9 +24,15 @@ import {
 } from "../services/containerTrackingService";
 import { testConnection } from "../lib/parcelsAppClient";
 import { isConfigured as isMaerskConfigured } from "../lib/trackingProviders/maerskProvider";
-import { isEnabled as isMaerskPublicEnabled, track as maerskPublicTrack } from "../lib/trackingProviders/maerskPublicProvider";
+import {
+  isEnabled as isMaerskPublicEnabled,
+  track as maerskPublicTrack,
+} from "../lib/trackingProviders/maerskPublicProvider";
 import { isEnabled as isCmaPublicEnabled } from "../lib/trackingProviders/cmaPublicProvider";
-import { isConfigured as is17trackConfigured, getMonthlyLimit as get17trackLimit } from "../lib/trackingProviders/seventeenTrackProvider";
+import {
+  isConfigured as is17trackConfigured,
+  getMonthlyLimit as get17trackLimit,
+} from "../lib/trackingProviders/seventeenTrackProvider";
 import { isScraperAvailable } from "../lib/parcelsAppScraper";
 import { isHttpScraperAvailable } from "../lib/httpTrackingScraper";
 import { scrapeMaerskDirect, isMaerskDirectScraperAvailable, deepScanForEta } from "../lib/maerskDirectScraper";
@@ -58,7 +61,7 @@ function anyProviderAvailable(): boolean {
     !!process.env.PARCELSAPP_API_KEY ||
     is17trackConfigured() ||
     isScraperAvailable() ||
-    isHttpScraperAvailable()   // always true — built-in HTTP endpoints need no config
+    isHttpScraperAvailable() // always true — built-in HTTP endpoints need no config
   );
 }
 
@@ -70,12 +73,14 @@ const updateTrackingSettingsSchema = z.object({
 });
 
 export function registerContainerTrackingRoutes(app: Express) {
-
   // GET /api/container-tracking/:id/progress — live progress for in-flight Track Now
   app.get("/api/container-tracking/:id/progress", requireAuth, (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
     const id = parseInt(req.params.id, 10);
-    if (isNaN(id)) { res.status(400).json([]); return; }
+    if (isNaN(id)) {
+      res.status(400).json([]);
+      return;
+    }
     res.json(getTrackingProgress(id));
   });
 
@@ -83,16 +88,16 @@ export function registerContainerTrackingRoutes(app: Express) {
   app.get("/api/container-tracking/status", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
 
-    const maerskConfigured    = isMaerskConfigured();
+    const maerskConfigured = isMaerskConfigured();
     const maerskPublicEnabled = isMaerskPublicEnabled();
-    const cmaPublicEnabled    = isCmaPublicEnabled();
+    const cmaPublicEnabled = isCmaPublicEnabled();
     const parcelsAppConfigured = !!process.env.PARCELSAPP_API_KEY;
     const publicProvidersEnabled = maerskPublicEnabled || cmaPublicEnabled;
 
     const directProviders: string[] = [];
-    if (maerskConfigured)    directProviders.push("maersk");
+    if (maerskConfigured) directProviders.push("maersk");
     if (maerskPublicEnabled) directProviders.push("maersk_public");
-    if (cmaPublicEnabled)    directProviders.push("cma_public");
+    if (cmaPublicEnabled) directProviders.push("cma_public");
 
     // Quota from DB — accurate even after server restarts
     const [
@@ -100,7 +105,7 @@ export function registerContainerTrackingRoutes(app: Express) {
       { used: seventeenTrackUsage, limit: seventeenTrackLimit },
     ] = await Promise.all([getParcelsAppUsageStats(), get17trackUsageStats()]);
 
-    const scraperAvailable    = isScraperAvailable();
+    const scraperAvailable = isScraperAvailable();
     const httpScraperAvailable = isHttpScraperAvailable();
     const seventeenConfigured = is17trackConfigured();
 
@@ -109,15 +114,19 @@ export function registerContainerTrackingRoutes(app: Express) {
     const parcelsAppRemaining = Math.max(0, parcelsAppMonthlyLimit - parcelsAppUsageThisMonth);
 
     // Smart scheduler budget
-    const remainingDays = Math.max(
-      1,
-      Math.ceil((nextReset.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
-    );
+    const remainingDays = Math.max(1, Math.ceil((nextReset.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)));
     const dailyBudget = Math.floor(parcelsAppRemaining / remainingDays);
     const perRunBudget = Math.max(1, Math.floor(dailyBudget / 4));
 
     res.json({
-      configured: maerskConfigured || maerskPublicEnabled || cmaPublicEnabled || parcelsAppConfigured || scraperAvailable || seventeenConfigured || httpScraperAvailable,
+      configured:
+        maerskConfigured ||
+        maerskPublicEnabled ||
+        cmaPublicEnabled ||
+        parcelsAppConfigured ||
+        scraperAvailable ||
+        seventeenConfigured ||
+        httpScraperAvailable,
       maerskConfigured,
       parcelsAppConfigured,
       publicProvidersEnabled,
@@ -220,7 +229,7 @@ export function registerContainerTrackingRoutes(app: Express) {
         .then((r) => {
           console.log(
             `[TrackNow] ${row.containerNumber}: done — success=${r.success} ` +
-              `provider=${r.provider ?? "none"} oldEta=${r.oldEta ?? "null"} newEta=${r.newEta ?? "null"}`,
+              `provider=${r.provider ?? "none"} oldEta=${r.oldEta ?? "null"} newEta=${r.newEta ?? "null"}`
           );
         })
         .catch((err) => {
@@ -286,7 +295,8 @@ export function registerContainerTrackingRoutes(app: Express) {
 
     if (!anyProviderAvailable()) {
       res.status(400).json({
-        message: "No tracking provider configured. Add PARCELSAPP_API_KEY or ensure Chrome is available for Maersk direct tracking.",
+        message:
+          "No tracking provider configured. Add PARCELSAPP_API_KEY or ensure Chrome is available for Maersk direct tracking.",
       });
       return;
     }
@@ -301,9 +311,10 @@ export function registerContainerTrackingRoutes(app: Express) {
       const queued = await trackAllEnabledNow();
       res.json({
         queued,
-        message: queued === 0
-          ? "No containers eligible for tracking (all may be offloaded or have invalid numbers)."
-          : `Tracking started for ${queued} container${queued !== 1 ? "s" : ""}. Results will appear shortly.`,
+        message:
+          queued === 0
+            ? "No containers eligible for tracking (all may be offloaded or have invalid numbers)."
+            : `Tracking started for ${queued} container${queued !== 1 ? "s" : ""}. Results will appear shortly.`,
       });
     } catch (err: any) {
       res.status(500).json({ message: err?.message ?? "Bulk track failed" });
@@ -317,7 +328,10 @@ export function registerContainerTrackingRoutes(app: Express) {
   app.post("/api/container-tracking/:id/debug-eta", requireAuth, async (req: Request, res: Response) => {
     if (!requireAllowedRole(req, res)) return;
     const containerId = parseInt(req.params.id, 10);
-    if (isNaN(containerId)) { res.status(400).json({ message: "Invalid container ID" }); return; }
+    if (isNaN(containerId)) {
+      res.status(400).json({ message: "Invalid container ID" });
+      return;
+    }
 
     const [row] = await db
       .select({ containerNumber: containers.containerNumber, eta: containers.eta })
@@ -325,7 +339,10 @@ export function registerContainerTrackingRoutes(app: Express) {
       .where(eq(containers.id, containerId))
       .limit(1);
 
-    if (!row) { res.status(404).json({ message: "Container not found" }); return; }
+    if (!row) {
+      res.status(404).json({ message: "Container not found" });
+      return;
+    }
 
     const { containerNumber, eta: currentEta } = row;
     const providersAttempted: Array<Record<string, unknown>> = [];
@@ -340,7 +357,10 @@ export function registerContainerTrackingRoutes(app: Express) {
         const r = await scrapeMaerskDirect(containerNumber);
         const deepEta = !r.eta ? deepScanForEta(r.raw ?? {}) : null;
         const etaFound = r.eta ?? deepEta?.value ?? null;
-        if (etaFound && !finalEta) { finalEta = etaFound; finalReason = `maersk_direct returned ETA=${etaFound}`; }
+        if (etaFound && !finalEta) {
+          finalEta = etaFound;
+          finalReason = `maersk_direct returned ETA=${etaFound}`;
+        }
         providersAttempted.push({
           provider: "maersk_direct",
           success: r.success,
@@ -354,7 +374,12 @@ export function registerContainerTrackingRoutes(app: Express) {
         providersAttempted.push({ provider: "maersk_direct", success: false, etaFound: null, error: e?.message });
       }
     } else {
-      providersAttempted.push({ provider: "maersk_direct", success: false, etaFound: null, error: "puppeteer_not_available" });
+      providersAttempted.push({
+        provider: "maersk_direct",
+        success: false,
+        etaFound: null,
+        error: "puppeteer_not_available",
+      });
     }
 
     // ── maersk_public ─────────────────────────────────────────────────────────
@@ -363,7 +388,10 @@ export function registerContainerTrackingRoutes(app: Express) {
       const r = await maerskPublicTrack(containerNumber);
       const deepEta = !r.eta ? deepScanForEta(r.raw ?? {}) : null;
       const etaFound = r.eta ?? deepEta?.value ?? null;
-      if (etaFound && !finalEta) { finalEta = etaFound; finalReason = `maersk_public returned ETA=${etaFound}`; }
+      if (etaFound && !finalEta) {
+        finalEta = etaFound;
+        finalReason = `maersk_public returned ETA=${etaFound}`;
+      }
       providersAttempted.push({
         provider: "maersk_public",
         success: r.success,
@@ -415,17 +443,13 @@ export function registerContainerTrackingRoutes(app: Express) {
     }
 
     try {
-      const [updated] = await db
-        .update(containers)
-        .set(updates)
-        .where(eq(containers.id, containerId))
-        .returning({
-          id: containers.id,
-          trackingEnabled: containers.trackingEnabled,
-          trackingAutoUpdate: containers.trackingAutoUpdate,
-          trackingCarrierHint: containers.trackingCarrierHint,
-          trackingProvider: containers.trackingProvider,
-        });
+      const [updated] = await db.update(containers).set(updates).where(eq(containers.id, containerId)).returning({
+        id: containers.id,
+        trackingEnabled: containers.trackingEnabled,
+        trackingAutoUpdate: containers.trackingAutoUpdate,
+        trackingCarrierHint: containers.trackingCarrierHint,
+        trackingProvider: containers.trackingProvider,
+      });
 
       if (!updated) {
         res.status(404).json({ message: "Container not found" });

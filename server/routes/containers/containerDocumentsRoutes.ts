@@ -6,23 +6,68 @@ import { storage } from "../../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../../auth";
 import { upload, logAudit, getCurrentExchangeRate } from "../_helpers";
 import {
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, suppliers, customers,
-  locations, employees, userLocations, auditLog, interCompanyTransfers,
-  insertInterCompanyTransferSchema, FEATURE_KEYS,
-  ledgerAccounts, intercompanyPosConfigs,
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  suppliers,
+  customers,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  FEATURE_KEYS,
+  ledgerAccounts,
+  intercompanyPosConfigs,
   stockItemMergeLogs,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -40,7 +85,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
 
       if (containerId === null) return res.status(400).json({ message: "Invalid id" });
       const container = await storage.getContainerById(containerId);
-      
+
       if (!container) {
         return res.status(404).json({ message: "Container not found" });
       }
@@ -49,24 +94,41 @@ export function registerContainerDocumentsRoutes(app: Express) {
       const purchaseOrders = await storage.getPurchaseOrdersByContainer(containerId);
 
       // Batch-fetch all PO line items and offload items in parallel
-      const poIds = purchaseOrders.map(po => po.id);
+      const poIds = purchaseOrders.map((po) => po.id);
       const [[offloadRecord], allPoLineItems] = await Promise.all([
         db.select().from(containerOffloads).where(eq(containerOffloads.containerId, containerId)).limit(1).execute(),
         poIds.length > 0 ? db.select().from(poLineItems).where(inArray(poLineItems.poId, poIds)).execute() : [],
       ]);
 
-      const poStockIds = [...new Set(allPoLineItems.map(li => li.stockItemId).filter(Boolean) as number[])];
+      const poStockIds = [...new Set(allPoLineItems.map((li) => li.stockItemId).filter(Boolean) as number[])];
       const [offloadItems, poStockRows] = await Promise.all([
-        offloadRecord ? db.select().from(containerOffloadItems).where(eq(containerOffloadItems.offloadId, offloadRecord.id)).execute() : [],
-        poStockIds.length > 0 ? db.select({ id: stockItems.id, code: stockItems.code, name: stockItems.name }).from(stockItems).where(inArray(stockItems.id, poStockIds)).execute() : [],
+        offloadRecord
+          ? db
+              .select()
+              .from(containerOffloadItems)
+              .where(eq(containerOffloadItems.offloadId, offloadRecord.id))
+              .execute()
+          : [],
+        poStockIds.length > 0
+          ? db
+              .select({ id: stockItems.id, code: stockItems.code, name: stockItems.name })
+              .from(stockItems)
+              .where(inArray(stockItems.id, poStockIds))
+              .execute()
+          : [],
       ]);
 
-      const offloadStockIds = [...new Set(offloadItems.map(i => i.stockItemId).filter(Boolean) as number[])];
-      const offloadStockRows = offloadStockIds.length > 0
-        ? await db.select({ id: stockItems.id, code: stockItems.code, name: stockItems.name }).from(stockItems).where(inArray(stockItems.id, offloadStockIds)).execute()
-        : [];
+      const offloadStockIds = [...new Set(offloadItems.map((i) => i.stockItemId).filter(Boolean) as number[])];
+      const offloadStockRows =
+        offloadStockIds.length > 0
+          ? await db
+              .select({ id: stockItems.id, code: stockItems.code, name: stockItems.name })
+              .from(stockItems)
+              .where(inArray(stockItems.id, offloadStockIds))
+              .execute()
+          : [];
 
-      const stockMap = new Map([...poStockRows, ...offloadStockRows].map(s => [s.id, s]));
+      const stockMap = new Map([...poStockRows, ...offloadStockRows].map((s) => [s.id, s]));
       const lineItemsByPO = new Map<number, typeof allPoLineItems>();
       for (const li of allPoLineItems) {
         const arr = lineItemsByPO.get(li.poId!) || [];
@@ -74,7 +136,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
         lineItemsByPO.set(li.poId!, arr);
       }
 
-      const posWithItems = purchaseOrders.map(po => {
+      const posWithItems = purchaseOrders.map((po) => {
         const lineItemsForPO = lineItemsByPO.get(po.id) || [];
         return {
           poNumber: po.poNumber,
@@ -87,9 +149,15 @@ export function registerContainerDocumentsRoutes(app: Express) {
           discount: po.discount,
           otherCharges: po.otherCharges,
           status: po.status,
-          lineItems: lineItemsForPO.map(item => {
+          lineItems: lineItemsForPO.map((item) => {
             const stockItem = item.stockItemId ? stockMap.get(item.stockItemId) : null;
-            return { stockItemCode: stockItem?.code || "", stockItemName: stockItem?.name || item.itemName, quantity: item.quantity, rate: item.rate, lineTotal: item.lineTotal };
+            return {
+              stockItemCode: stockItem?.code || "",
+              stockItemName: stockItem?.name || item.itemName,
+              quantity: item.quantity,
+              rate: item.rate,
+              lineTotal: item.lineTotal,
+            };
           }),
         };
       });
@@ -107,9 +175,15 @@ export function registerContainerDocumentsRoutes(app: Express) {
           totalBales: offloadRecord.totalBales,
           additionalCostPerBale: offloadRecord.additionalCostPerBale,
           offloadedAt: offloadRecord.offloadedAt,
-          offloadItems: offloadItems.map(item => {
+          offloadItems: offloadItems.map((item) => {
             const stockItem = item.stockItemId ? stockMap.get(item.stockItemId) : null;
-            return { stockItemCode: stockItem?.code || "", stockItemName: stockItem?.name || "", quantity: item.quantity, rate: item.rate, totalValue: item.totalValue };
+            return {
+              stockItemCode: stockItem?.code || "",
+              stockItemName: stockItem?.name || "",
+              quantity: item.quantity,
+              rate: item.rate,
+              totalValue: item.totalValue,
+            };
           }),
         };
       }
@@ -157,9 +231,9 @@ export function registerContainerDocumentsRoutes(app: Express) {
       for (const container of allContainers) {
         const supplier = await storage.getSupplierById(container.supplierId);
         const purchaseOrders = await storage.getPurchaseOrdersByContainer(container.id);
-        
+
         const sheetData: any[][] = [];
-        
+
         sheetData.push(["CONTAINER DETAILS"]);
         sheetData.push(["Container Number", container.containerNumber]);
         sheetData.push(["Supplier", supplier?.legalName || ""]);
@@ -227,31 +301,23 @@ export function registerContainerDocumentsRoutes(app: Express) {
             .select()
             .from(containerOffloadItems)
             .where(eq(containerOffloadItems.offloadId, offloadRecord.id));
-          
+
           if (offloadItems.length > 0) {
             sheetData.push(["OFFLOAD ITEMS"]);
             sheetData.push(["Stock Code", "Item Name", "Quantity", "Rate", "Total Value"]);
             for (const item of offloadItems) {
               const stockItem = await storage.getStockItemById(item.stockItemId);
-              sheetData.push([
-                stockItem?.code || "",
-                stockItem?.name || "",
-                item.quantity,
-                item.rate,
-                item.totalValue,
-              ]);
+              sheetData.push([stockItem?.code || "", stockItem?.name || "", item.quantity, item.rate, item.totalValue]);
             }
           }
         }
 
-        const sheetName = container.containerNumber
-          .replace(/[\\/*?:\[\]]/g, "_")
-          .substring(0, 31);
+        const sheetName = container.containerNumber.replace(/[\\/*?:\[\]]/g, "_").substring(0, 31);
         aoaToSheet(workbook, sheetData, sheetName);
       }
 
       const buffer = await writeWorkbook(workbook);
-      
+
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="containers_export_${getClientDate(req)}.xlsx"`);
       res.send(buffer);
@@ -271,9 +337,10 @@ export function registerContainerDocumentsRoutes(app: Express) {
 
       const { locationCashAccountMap } = req.body;
 
-      if (!locationCashAccountMap || typeof locationCashAccountMap !== 'object') {
-        return res.status(400).json({ 
-          message: "Location-to-cash-account mapping is required. Please specify which cash account to use for each location's sales." 
+      if (!locationCashAccountMap || typeof locationCashAccountMap !== "object") {
+        return res.status(400).json({
+          message:
+            "Location-to-cash-account mapping is required. Please specify which cash account to use for each location's sales.",
         });
       }
 
@@ -305,12 +372,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
       const allVouchers = await db
         .select()
         .from(vouchers)
-        .where(
-          and(
-            eq(vouchers.companyId, req.session.currentCompanyId!),
-            eq(vouchers.voucherType, "Sales")
-          )
-        )
+        .where(and(eq(vouchers.companyId, req.session.currentCompanyId!), eq(vouchers.voucherType, "Sales")))
         .execute();
 
       if (allVouchers.length === 0) {
@@ -321,7 +383,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
       }
 
       // Get all existing voucher entries for these vouchers
-      const voucherIds = allVouchers.map(v => v.id);
+      const voucherIds = allVouchers.map((v) => v.id);
       const existingEntries = await db
         .select()
         .from(voucherEntries)
@@ -340,10 +402,10 @@ export function registerContainerDocumentsRoutes(app: Express) {
       }
 
       // Filter to vouchers that need backfill (missing entries or have wrong structure)
-      const vouchersNeedingBackfill = allVouchers.filter(v => {
+      const vouchersNeedingBackfill = allVouchers.filter((v) => {
         const ledgerIds = voucherLedgerMap.get(v.id) || new Set();
         const entryCount = ledgerIds.size;
-        
+
         // Need backfill if:
         // 1. No entries at all
         // 2. Missing sales revenue
@@ -366,11 +428,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
         // Use a transaction to ensure atomic updates
         await db.transaction(async (tx) => {
           // Get all sales items for this voucher
-          const items = await tx
-            .select()
-            .from(salesItems)
-            .where(eq(salesItems.voucherId, voucher.id))
-            .execute();
+          const items = await tx.select().from(salesItems).where(eq(salesItems.voucherId, voucher.id)).execute();
 
           if (items.length === 0) {
             console.warn(`No sales items found for voucher ${voucher.id}, skipping`);
@@ -389,11 +447,7 @@ export function registerContainerDocumentsRoutes(app: Express) {
 
           // Determine location for this voucher by checking first sales item
           const firstItem = items[0];
-          const stockItem = await tx
-            .select()
-            .from(stockItems)
-            .where(eq(stockItems.id, firstItem.stockItemId))
-            .limit(1);
+          const stockItem = await tx.select().from(stockItems).where(eq(stockItems.id, firstItem.stockItemId)).limit(1);
 
           if (stockItem.length === 0) {
             console.warn(`Could not find stock item ${firstItem.stockItemId} for voucher ${voucher.id}, skipping`);
@@ -424,12 +478,10 @@ export function registerContainerDocumentsRoutes(app: Express) {
           }
 
           // Delete all existing voucher entries (in case of old format)
-          await tx
-            .delete(voucherEntries)
-            .where(eq(voucherEntries.voucherId, voucher.id));
+          await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
 
           // Create new balanced entries (periodic inventory system)
-          
+
           // Entry 1: Debit Cash Account (location-specific)
           await tx.insert(voucherEntries).values({
             voucherId: voucher.id,

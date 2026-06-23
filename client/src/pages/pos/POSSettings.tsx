@@ -43,15 +43,27 @@ export default function POSSettings() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPassword !== confirmPassword) {
-      toast({ title: "Passwords don't match", description: "New password and confirmation must be identical.", variant: "destructive" });
+      toast({
+        title: "Passwords don't match",
+        description: "New password and confirmation must be identical.",
+        variant: "destructive",
+      });
       return;
     }
     if (newPassword.length < 4) {
-      toast({ title: "Password too short", description: "Password must be at least 4 characters.", variant: "destructive" });
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 4 characters.",
+        variant: "destructive",
+      });
       return;
     }
     if (!navigator.onLine) {
-      toast({ title: "Not available offline", description: "Password changes require a connection", variant: "destructive" });
+      toast({
+        title: "Not available offline",
+        description: "Password changes require a connection",
+        variant: "destructive",
+      });
       return;
     }
     changePasswordMutation.mutate();

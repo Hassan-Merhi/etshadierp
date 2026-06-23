@@ -1,9 +1,7 @@
 import type { Express } from "express";
 import { db } from "../db";
 import { requireAuth, requireNonPOS } from "../auth";
-import {
-  ledgerAccounts, vouchers, voucherEntries, containers,
-} from "@shared/schema";
+import { ledgerAccounts, vouchers, voucherEntries, containers } from "@shared/schema";
 import { eq, and, asc, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { parseId } from "../lib/parseId";
@@ -27,7 +25,6 @@ function extractContainerNumber(text: string | null | undefined): string | null 
 // ── route registration ────────────────────────────────────────────────────────
 
 export function registerTransporterStatementRoutes(app: Express) {
-
   // GET /api/transporter-statement/transporters
   // Returns only Loans accounts whose name matches a transporter currently
   // used in an active OTW container for this company (case-insensitive).
@@ -91,9 +88,11 @@ export function registerTransporterStatementRoutes(app: Express) {
       const accountId = parseId(req.params.accountId);
       if (accountId === null) return res.status(400).json({ message: "Invalid account ID" });
 
-      const { paymentTermsDays } = z.object({
-        paymentTermsDays: z.number().int().min(0).max(365),
-      }).parse(req.body);
+      const { paymentTermsDays } = z
+        .object({
+          paymentTermsDays: z.number().int().min(0).max(365),
+        })
+        .parse(req.body);
 
       await db.execute(
         sql`INSERT INTO transporter_payment_settings (company_id, ledger_account_id, payment_terms_days)
@@ -116,9 +115,11 @@ export function registerTransporterStatementRoutes(app: Express) {
       const entryId = parseId(req.params.entryId);
       if (entryId === null) return res.status(400).json({ message: "Invalid entry ID" });
 
-      const { dueDate } = z.object({
-        dueDate: z.string().nullable(),
-      }).parse(req.body);
+      const { dueDate } = z
+        .object({
+          dueDate: z.string().nullable(),
+        })
+        .parse(req.body);
 
       if (dueDate) {
         await db.execute(
@@ -128,9 +129,7 @@ export function registerTransporterStatementRoutes(app: Express) {
               DO UPDATE SET due_date = EXCLUDED.due_date, updated_at = now()`
         );
       } else {
-        await db.execute(
-          sql`DELETE FROM transporter_entry_due_dates WHERE voucher_entry_id = ${entryId}`
-        );
+        await db.execute(sql`DELETE FROM transporter_entry_due_dates WHERE voucher_entry_id = ${entryId}`);
       }
 
       res.json({ ok: true, dueDate });
@@ -148,11 +147,13 @@ export function registerTransporterStatementRoutes(app: Express) {
       const accountId = parseId(req.params.accountId);
       if (accountId === null) return res.status(400).json({ message: "Invalid account ID" });
 
-      const { dateFrom, dateTo, imageBase64 } = z.object({
-        dateFrom:    z.string().optional(),
-        dateTo:      z.string().optional(),
-        imageBase64: z.string().optional(),
-      }).parse(req.body);
+      const { dateFrom, dateTo, imageBase64 } = z
+        .object({
+          dateFrom: z.string().optional(),
+          dateTo: z.string().optional(),
+          imageBase64: z.string().optional(),
+        })
+        .parse(req.body);
 
       // Verify account
       const [account] = await db
@@ -182,7 +183,7 @@ export function registerTransporterStatementRoutes(app: Express) {
         GROUP BY credit_entry_id
       `);
       const paidMap = new Map<number, number>();
-      for (const a of (allocRows.rows as any[])) {
+      for (const a of allocRows.rows as any[]) {
         paidMap.set(Number(a.credit_entry_id), parseFloat(a.paid_amount || "0"));
       }
 
@@ -194,15 +195,13 @@ export function registerTransporterStatementRoutes(app: Express) {
       const now = new Date().toISOString().slice(0, 10);
 
       for (const row of allRows) {
-        const debit  = parseFloat(row.debit_amount  || "0");
+        const debit = parseFloat(row.debit_amount || "0");
         const credit = parseFloat(row.credit_amount || "0");
         runningBalance += credit - debit;
-        const inRange =
-          (!dateFrom || row.voucher_date >= dateFrom) &&
-          (!dateTo   || row.voucher_date <= dateTo);
+        const inRange = (!dateFrom || row.voucher_date >= dateFrom) && (!dateTo || row.voucher_date <= dateTo);
         if (inRange) {
           totalCharged += credit;
-          totalPaid    += debit;
+          totalPaid += debit;
         }
         if (credit > 0) {
           const paid = paidMap.get(row.id) ?? 0;
@@ -210,12 +209,16 @@ export function registerTransporterStatementRoutes(app: Express) {
         }
       }
 
-      const fmt = (n: number) =>
-        n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-      const periodLine = dateFrom && dateTo
-        ? `Period: ${dateFrom} → ${dateTo}`
-        : dateFrom ? `From: ${dateFrom}` : dateTo ? `To: ${dateTo}` : "All time";
+      const periodLine =
+        dateFrom && dateTo
+          ? `Period: ${dateFrom} → ${dateTo}`
+          : dateFrom
+            ? `From: ${dateFrom}`
+            : dateTo
+              ? `To: ${dateTo}`
+              : "All time";
 
       const message = [
         `*Transporter Statement*`,
@@ -246,13 +249,23 @@ export function registerTransporterStatementRoutes(app: Express) {
         const fileName = `TransporterStatement_${account.name}_${new Date().toISOString().substring(0, 10)}.png`;
         for (const r of recipients) {
           const result = await sendWhatsAppFileToChatId(r.chatId, buffer, fileName, message, "image/png");
-          if (result.success) { sent++; } else { failed++; if (result.error) errors.push(result.error); }
+          if (result.success) {
+            sent++;
+          } else {
+            failed++;
+            if (result.error) errors.push(result.error);
+          }
         }
       } else {
         // Fallback: send as text
         for (const r of recipients) {
           const result = await sendWhatsAppTextToChatId(r.chatId, message);
-          if (result.success) { sent++; } else { failed++; if (result.error) errors.push(result.error); }
+          if (result.success) {
+            sent++;
+          } else {
+            failed++;
+            if (result.error) errors.push(result.error);
+          }
         }
       }
 
@@ -469,13 +482,11 @@ export function registerTransporterStatementRoutes(app: Express) {
 
       // Build rows with running balance
       const statementRows = allRows.map((row: any) => {
-        const debit  = parseFloat(row.debit_amount  || "0");
+        const debit = parseFloat(row.debit_amount || "0");
         const credit = parseFloat(row.credit_amount || "0");
         runningBalance = runningBalance + credit - debit;
 
-        const containerNum =
-          extractContainerNumber(row.voucher_description) ||
-          extractContainerNumber(row.narration);
+        const containerNum = extractContainerNumber(row.voucher_description) || extractContainerNumber(row.narration);
 
         let numberPlate: string | null = null;
         let offloadDate: string | null = null;
@@ -539,15 +550,16 @@ export function registerTransporterStatementRoutes(app: Express) {
       });
 
       // Opening balance for the filtered window
-      const filteredOpeningBalance = filteredRows.length > 0
-        ? (() => {
-            const firstIdx = allRows.findIndex((r: any) => r.id === filteredRows[0].id);
-            if (firstIdx === 0) {
-              return (obSide === "Dr" ? -ob : ob).toFixed(2);
-            }
-            return statementRows[firstIdx - 1].runningBalance;
-          })()
-        : runningBalance.toFixed(2);
+      const filteredOpeningBalance =
+        filteredRows.length > 0
+          ? (() => {
+              const firstIdx = allRows.findIndex((r: any) => r.id === filteredRows[0].id);
+              if (firstIdx === 0) {
+                return (obSide === "Dr" ? -ob : ob).toFixed(2);
+              }
+              return statementRows[firstIdx - 1].runningBalance;
+            })()
+          : runningBalance.toFixed(2);
 
       res.json({
         account: {
@@ -559,9 +571,8 @@ export function registerTransporterStatementRoutes(app: Express) {
         },
         paymentTermsDays,
         openingBalance: filteredOpeningBalance,
-        closingBalance: filteredRows.length > 0
-          ? filteredRows[filteredRows.length - 1].runningBalance
-          : runningBalance.toFixed(2),
+        closingBalance:
+          filteredRows.length > 0 ? filteredRows[filteredRows.length - 1].runningBalance : runningBalance.toFixed(2),
         rows: filteredRows,
       });
     } catch (err: any) {

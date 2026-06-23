@@ -9,9 +9,27 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { cn } from "@/lib/utils";
-import { format, startOfDay, endOfDay, startOfMonth, endOfMonth, subMonths, startOfYear, endOfYear, subDays } from "date-fns";
+import {
+  format,
+  startOfDay,
+  endOfDay,
+  startOfMonth,
+  endOfMonth,
+  subMonths,
+  startOfYear,
+  endOfYear,
+  subDays,
+} from "date-fns";
 
-export type PeriodPreset = "all_time" | "today" | "yesterday" | "this_month" | "last_1_month" | "last_6_months" | "this_year" | "custom";
+export type PeriodPreset =
+  | "all_time"
+  | "today"
+  | "yesterday"
+  | "this_month"
+  | "last_1_month"
+  | "last_6_months"
+  | "this_year"
+  | "custom";
 
 export interface PeriodFilterValue {
   fromDate: string;
@@ -129,47 +147,27 @@ export function PeriodFilter({
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1"
-            data-testid={testId || "period-filter-dropdown"}
-          >
+          <Button variant="outline" size="sm" className="gap-1" data-testid={testId || "period-filter-dropdown"}>
             <CalendarIcon className="h-4 w-4 shrink-0" />
             <span className="max-w-[200px] truncate">{displayLabel}</span>
             <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
-          <DropdownMenuItem
-            onClick={() => handlePresetChange("all_time")}
-            data-testid="period-preset-all-time"
-          >
+          <DropdownMenuItem onClick={() => handlePresetChange("all_time")} data-testid="period-preset-all-time">
             All Time
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => handlePresetChange("today")}
-            data-testid="period-preset-today"
-          >
+          <DropdownMenuItem onClick={() => handlePresetChange("today")} data-testid="period-preset-today">
             Today
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handlePresetChange("yesterday")}
-            data-testid="period-preset-yesterday"
-          >
+          <DropdownMenuItem onClick={() => handlePresetChange("yesterday")} data-testid="period-preset-yesterday">
             Yesterday
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handlePresetChange("this_month")}
-            data-testid="period-preset-this-month"
-          >
+          <DropdownMenuItem onClick={() => handlePresetChange("this_month")} data-testid="period-preset-this-month">
             This Month
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handlePresetChange("last_1_month")}
-            data-testid="period-preset-last-1-month"
-          >
+          <DropdownMenuItem onClick={() => handlePresetChange("last_1_month")} data-testid="period-preset-last-1-month">
             Last 1 Month
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -178,17 +176,11 @@ export function PeriodFilter({
           >
             Last 6 Months
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => handlePresetChange("this_year")}
-            data-testid="period-preset-this-year"
-          >
+          <DropdownMenuItem onClick={() => handlePresetChange("this_year")} data-testid="period-preset-this-year">
             This Year
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => handlePresetChange("custom")}
-            data-testid="period-preset-custom"
-          >
+          <DropdownMenuItem onClick={() => handlePresetChange("custom")} data-testid="period-preset-custom">
             Custom Range...
           </DropdownMenuItem>
         </DropdownMenuContent>

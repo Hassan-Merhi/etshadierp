@@ -1,5 +1,21 @@
 import { useState, lazy, Suspense } from "react";
-import { Factory, Package, Boxes, Layers, Tags, Search, Container, History, BarChart3, ArrowRightLeft, ScanLine, CheckCircle, Users, Upload, type LucideIcon } from "lucide-react";
+import {
+  Factory,
+  Package,
+  Boxes,
+  Layers,
+  Tags,
+  Search,
+  Container,
+  History,
+  BarChart3,
+  ArrowRightLeft,
+  ScanLine,
+  CheckCircle,
+  Users,
+  Upload,
+  type LucideIcon,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -25,7 +41,19 @@ function LoadingFallback() {
   );
 }
 
-type SectionKey = "raw-stock" | "mix-batches" | "pressing-bales" | "production-bales" | "bales-history" | "bale-products" | "barcode-lookup" | "production-summary" | "bale-transfers" | "factory-suppliers" | "factory-containers" | "factory-import";
+type SectionKey =
+  | "raw-stock"
+  | "mix-batches"
+  | "pressing-bales"
+  | "production-bales"
+  | "bales-history"
+  | "bale-products"
+  | "barcode-lookup"
+  | "production-summary"
+  | "bale-transfers"
+  | "factory-suppliers"
+  | "factory-containers"
+  | "factory-import";
 
 interface SidebarItem {
   key: SectionKey;
@@ -67,27 +95,19 @@ export default function FactoryProduction() {
     },
     {
       label: "Logistics",
-      items: [
-        { key: "bale-transfers", label: "Bale Transfers", icon: ArrowRightLeft },
-      ],
+      items: [{ key: "bale-transfers", label: "Bale Transfers", icon: ArrowRightLeft }],
     },
     {
       label: "Analytics",
-      items: [
-        { key: "production-summary", label: "Production Summary", icon: BarChart3 },
-      ],
+      items: [{ key: "production-summary", label: "Production Summary", icon: BarChart3 }],
     },
     {
       label: "Traceability",
-      items: [
-        { key: "barcode-lookup", label: "Barcode Lookup", icon: Search },
-      ],
+      items: [{ key: "barcode-lookup", label: "Barcode Lookup", icon: Search }],
     },
     {
       label: "Data",
-      items: [
-        { key: "factory-import", label: "Import Data", icon: Upload },
-      ],
+      items: [{ key: "factory-import", label: "Import Data", icon: Upload }],
     },
   ];
 

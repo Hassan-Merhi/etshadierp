@@ -6,20 +6,21 @@ import type { Employee, InsertEmployee } from "@shared/schema";
 // Employees
 
 export async function getAllEmployees(companyId: number): Promise<Employee[]> {
-  const employees = await db.select().from(schema.employees).where(
-    and(
-      eq(schema.employees.companyId, companyId),
-      isNull(schema.employees.deletedAt)
-    )
-  ).orderBy(asc(schema.employees.firstName), asc(schema.employees.lastName));
-  return employees.map(emp => ({
+  const employees = await db
+    .select()
+    .from(schema.employees)
+    .where(and(eq(schema.employees.companyId, companyId), isNull(schema.employees.deletedAt)))
+    .orderBy(asc(schema.employees.firstName), asc(schema.employees.lastName));
+  return employees.map((emp) => ({
     ...emp,
     firstName: (emp as any).firstName || (emp as any).first_name,
     lastName: (emp as any).lastName || (emp as any).last_name,
   })) as Employee[];
 }
 
-export async function getEmployeesWithBalances(companyId: number): Promise<Array<Employee & { calculatedBalance: string }>> {
+export async function getEmployeesWithBalances(
+  companyId: number
+): Promise<Array<Employee & { calculatedBalance: string }>> {
   const employees = await getAllEmployees(companyId);
   return employees.map((employee) => {
     const calculatedBalance = parseFloat(employee.currentBalance || "0");
@@ -41,11 +42,18 @@ export async function getEmployeeById(id: number): Promise<Employee | undefined>
 }
 
 export async function createEmployee(employee: InsertEmployee): Promise<Employee> {
-  const [created] = await db.insert(schema.employees).values([employee as any]).returning();
+  const [created] = await db
+    .insert(schema.employees)
+    .values([employee as any])
+    .returning();
   return created;
 }
 
-export async function updateEmployee(id: number, companyId: number, updates: Partial<InsertEmployee>): Promise<Employee | undefined> {
+export async function updateEmployee(
+  id: number,
+  companyId: number,
+  updates: Partial<InsertEmployee>
+): Promise<Employee | undefined> {
   const [updated] = await db
     .update(schema.employees)
     .set(updates as any)
@@ -54,12 +62,12 @@ export async function updateEmployee(id: number, companyId: number, updates: Par
   return updated;
 }
 
-export async function deleteEmployee(id: number, forceDelete: boolean = false): Promise<{success: boolean, message?: string, employeeBalance?: number, ledgerBalance?: number}> {
+export async function deleteEmployee(
+  id: number,
+  forceDelete: boolean = false
+): Promise<{ success: boolean; message?: string; employeeBalance?: number; ledgerBalance?: number }> {
   return await db.transaction(async (tx) => {
-    const [employee] = await tx
-      .select()
-      .from(schema.employees)
-      .where(eq(schema.employees.id, id));
+    const [employee] = await tx.select().from(schema.employees).where(eq(schema.employees.id, id));
 
     if (!employee) {
       return { success: false, message: "Employee not found" };
@@ -74,7 +82,7 @@ export async function deleteEmployee(id: number, forceDelete: boolean = false): 
     if (salaryAdvances.length > 0) {
       return {
         success: false,
-        message: "Cannot delete employee with salary advances. Please remove all salary advances first."
+        message: "Cannot delete employee with salary advances. Please remove all salary advances first.",
       };
     }
 
@@ -84,10 +92,7 @@ export async function deleteEmployee(id: number, forceDelete: boolean = false): 
       .select()
       .from(schema.ledgerAccounts)
       .where(
-        and(
-          eq(schema.ledgerAccounts.code, employee.code),
-          eq(schema.ledgerAccounts.companyId, employee.companyId)
-        )
+        and(eq(schema.ledgerAccounts.code, employee.code), eq(schema.ledgerAccounts.companyId, employee.companyId))
       );
 
     let ledgerBalance = 0;
@@ -102,7 +107,7 @@ export async function deleteEmployee(id: number, forceDelete: boolean = false): 
       if (voucherEntries.length > 0) {
         return {
           success: false,
-          message: "Cannot delete employee. The linked ledger account has transaction history."
+          message: "Cannot delete employee. The linked ledger account has transaction history.",
         };
       }
 
@@ -116,7 +121,7 @@ export async function deleteEmployee(id: number, forceDelete: boolean = false): 
         success: false,
         message: "Employee or linked account has a non-zero balance. Admin confirmation required.",
         employeeBalance: employeeBalance,
-        ledgerBalance: ledgerBalance
+        ledgerBalance: ledgerBalance,
       };
     }
 
@@ -129,14 +134,9 @@ export async function deleteEmployee(id: number, forceDelete: boolean = false): 
         .where(eq(schema.ledgerAccounts.id, linkedAccount.id));
     }
 
-    await tx
-      .delete(schema.employeeGroupMembers)
-      .where(eq(schema.employeeGroupMembers.employeeId, id));
+    await tx.delete(schema.employeeGroupMembers).where(eq(schema.employeeGroupMembers.employeeId, id));
 
-    await tx
-      .update(schema.employees)
-      .set({ deletedAt: now, active: false })
-      .where(eq(schema.employees.id, id));
+    await tx.update(schema.employees).set({ deletedAt: now, active: false }).where(eq(schema.employees.id, id));
 
     return { success: true };
   });
@@ -150,9 +150,9 @@ export async function getAllEmployeeGroups(companyId: number): Promise<any[]> {
     .from(schema.employeeGroups)
     .where(eq(schema.employeeGroups.companyId, companyId))
     .orderBy(asc(schema.employeeGroups.name));
-  return results.map(g => ({
+  return results.map((g) => ({
     ...g,
-    groupType: (g as any).groupType || "Employee"
+    groupType: (g as any).groupType || "Employee",
   }));
 }
 
@@ -166,7 +166,10 @@ export async function createEmployeeGroup(group: schema.InsertEmployeeGroup): Pr
   return created;
 }
 
-export async function updateEmployeeGroup(id: number, updates: Partial<schema.InsertEmployeeGroup>): Promise<schema.EmployeeGroup> {
+export async function updateEmployeeGroup(
+  id: number,
+  updates: Partial<schema.InsertEmployeeGroup>
+): Promise<schema.EmployeeGroup> {
   const [updated] = await db
     .update(schema.employeeGroups)
     .set(updates)
@@ -230,29 +233,31 @@ export async function removeEmployeeFromGroup(groupId: number, employeeId: numbe
 // Salary Advances
 
 export async function getAllSalaryAdvances(companyId: number): Promise<schema.SalaryAdvance[]> {
-  return await db.select().from(schema.salaryAdvances)
+  return await db
+    .select()
+    .from(schema.salaryAdvances)
     .where(eq(schema.salaryAdvances.companyId, companyId))
     .orderBy(sql`${schema.salaryAdvances.advanceDate} DESC`);
 }
 
 export async function getSalaryAdvanceById(id: number): Promise<schema.SalaryAdvance | undefined> {
-  const [advance] = await db.select().from(schema.salaryAdvances)
-    .where(eq(schema.salaryAdvances.id, id));
+  const [advance] = await db.select().from(schema.salaryAdvances).where(eq(schema.salaryAdvances.id, id));
   return advance;
 }
 
 export async function getSalaryAdvancesByEmployee(employeeId: number): Promise<schema.SalaryAdvance[]> {
-  return await db.select().from(schema.salaryAdvances)
+  return await db
+    .select()
+    .from(schema.salaryAdvances)
     .where(eq(schema.salaryAdvances.employeeId, employeeId))
     .orderBy(sql`${schema.salaryAdvances.advanceDate} DESC`);
 }
 
 export async function getUnpaidSalaryAdvancesByEmployee(employeeId: number): Promise<schema.SalaryAdvance[]> {
-  return await db.select().from(schema.salaryAdvances)
-    .where(and(
-      eq(schema.salaryAdvances.employeeId, employeeId),
-      eq(schema.salaryAdvances.fullyPaid, false)
-    ))
+  return await db
+    .select()
+    .from(schema.salaryAdvances)
+    .where(and(eq(schema.salaryAdvances.employeeId, employeeId), eq(schema.salaryAdvances.fullyPaid, false)))
     .orderBy(sql`${schema.salaryAdvances.advanceDate}`);
 }
 
@@ -261,9 +266,15 @@ export async function createSalaryAdvance(advance: schema.InsertSalaryAdvance): 
   return newAdvance;
 }
 
-export async function updateSalaryAdvance(id: number, updates: Partial<schema.InsertSalaryAdvance>): Promise<schema.SalaryAdvance> {
-  const [advance] = await db.update(schema.salaryAdvances).set(updates)
-    .where(eq(schema.salaryAdvances.id, id)).returning();
+export async function updateSalaryAdvance(
+  id: number,
+  updates: Partial<schema.InsertSalaryAdvance>
+): Promise<schema.SalaryAdvance> {
+  const [advance] = await db
+    .update(schema.salaryAdvances)
+    .set(updates)
+    .where(eq(schema.salaryAdvances.id, id))
+    .returning();
   return advance;
 }
 
@@ -275,12 +286,16 @@ export async function deleteSalaryAdvance(id: number): Promise<void> {
 // Salary Advance Deductions
 
 export async function getSalaryAdvanceDeductions(salaryAdvanceId: number): Promise<schema.SalaryAdvanceDeduction[]> {
-  return await db.select().from(schema.salaryAdvanceDeductions)
+  return await db
+    .select()
+    .from(schema.salaryAdvanceDeductions)
     .where(eq(schema.salaryAdvanceDeductions.salaryAdvanceId, salaryAdvanceId))
     .orderBy(schema.salaryAdvanceDeductions.payrollMonth);
 }
 
-export async function createSalaryAdvanceDeduction(deduction: schema.InsertSalaryAdvanceDeduction): Promise<schema.SalaryAdvanceDeduction> {
+export async function createSalaryAdvanceDeduction(
+  deduction: schema.InsertSalaryAdvanceDeduction
+): Promise<schema.SalaryAdvanceDeduction> {
   const [newDeduction] = await db.insert(schema.salaryAdvanceDeductions).values(deduction).returning();
   return newDeduction;
 }
@@ -288,41 +303,64 @@ export async function createSalaryAdvanceDeduction(deduction: schema.InsertSalar
 // Employee Bale Rates
 
 export async function getEmployeeBaleRates(employeeId: number, companyId: number): Promise<schema.EmployeeBaleRate[]> {
-  return await db.select().from(schema.employeeBaleRates)
-    .where(and(
-      eq(schema.employeeBaleRates.employeeId, employeeId),
-      eq(schema.employeeBaleRates.companyId, companyId)
-    ));
+  return await db
+    .select()
+    .from(schema.employeeBaleRates)
+    .where(and(eq(schema.employeeBaleRates.employeeId, employeeId), eq(schema.employeeBaleRates.companyId, companyId)));
 }
 
-export async function setEmployeeBaleRates(employeeId: number, companyId: number, rates: { locationId: number; rate: string; sourceCompanyId?: number | null }[]): Promise<void> {
-  await db.delete(schema.employeeBaleRates).where(and(
-    eq(schema.employeeBaleRates.employeeId, employeeId),
-    eq(schema.employeeBaleRates.companyId, companyId)
-  ));
+export async function setEmployeeBaleRates(
+  employeeId: number,
+  companyId: number,
+  rates: { locationId: number; rate: string; sourceCompanyId?: number | null }[]
+): Promise<void> {
+  await db
+    .delete(schema.employeeBaleRates)
+    .where(and(eq(schema.employeeBaleRates.employeeId, employeeId), eq(schema.employeeBaleRates.companyId, companyId)));
   if (rates.length > 0) {
     await db.insert(schema.employeeBaleRates).values(
-      rates.map(r => ({ companyId, employeeId, locationId: r.locationId, rate: r.rate, sourceCompanyId: r.sourceCompanyId ?? null }))
+      rates.map((r) => ({
+        companyId,
+        employeeId,
+        locationId: r.locationId,
+        rate: r.rate,
+        sourceCompanyId: r.sourceCompanyId ?? null,
+      }))
     );
   }
 }
 
-export async function getEmployeeBalePctRates(employeeId: number, companyId: number): Promise<schema.EmployeeBalePctRate[]> {
-  return await db.select().from(schema.employeeBalePctRates)
-    .where(and(
-      eq(schema.employeeBalePctRates.employeeId, employeeId),
-      eq(schema.employeeBalePctRates.companyId, companyId)
-    ));
+export async function getEmployeeBalePctRates(
+  employeeId: number,
+  companyId: number
+): Promise<schema.EmployeeBalePctRate[]> {
+  return await db
+    .select()
+    .from(schema.employeeBalePctRates)
+    .where(
+      and(eq(schema.employeeBalePctRates.employeeId, employeeId), eq(schema.employeeBalePctRates.companyId, companyId))
+    );
 }
 
-export async function setEmployeeBalePctRates(employeeId: number, companyId: number, rates: { locationId: number; pct: string; sourceCompanyId?: number | null }[]): Promise<void> {
-  await db.delete(schema.employeeBalePctRates).where(and(
-    eq(schema.employeeBalePctRates.employeeId, employeeId),
-    eq(schema.employeeBalePctRates.companyId, companyId)
-  ));
+export async function setEmployeeBalePctRates(
+  employeeId: number,
+  companyId: number,
+  rates: { locationId: number; pct: string; sourceCompanyId?: number | null }[]
+): Promise<void> {
+  await db
+    .delete(schema.employeeBalePctRates)
+    .where(
+      and(eq(schema.employeeBalePctRates.employeeId, employeeId), eq(schema.employeeBalePctRates.companyId, companyId))
+    );
   if (rates.length > 0) {
     await db.insert(schema.employeeBalePctRates).values(
-      rates.map(r => ({ companyId, employeeId, locationId: r.locationId, pct: r.pct, sourceCompanyId: r.sourceCompanyId ?? null }))
+      rates.map((r) => ({
+        companyId,
+        employeeId,
+        locationId: r.locationId,
+        pct: r.pct,
+        sourceCompanyId: r.sourceCompanyId ?? null,
+      }))
     );
   }
 }

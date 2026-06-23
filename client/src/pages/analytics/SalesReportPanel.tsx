@@ -65,7 +65,7 @@ export function SalesReportPanel({
   setDetailsPeriod,
   transactionsLoading,
   transactions,
-  formatDisplayDate
+  formatDisplayDate,
 }: SalesReportPanelProps) {
   if (appMode === "factory") {
     return (
@@ -76,7 +76,14 @@ export function SalesReportPanel({
           <span className="text-muted-foreground text-sm">—</span>
           <DatePickerInput value={factorySalesEndDate} onChange={setFactorySalesEndDate} placeholder="End date" />
           {(factorySalesStartDate || factorySalesEndDate) && (
-            <Button variant="ghost" size="sm" onClick={() => { setFactorySalesStartDate(""); setFactorySalesEndDate(""); }}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFactorySalesStartDate("");
+                setFactorySalesEndDate("");
+              }}
+            >
               Clear
             </Button>
           )}
@@ -85,10 +92,16 @@ export function SalesReportPanel({
         <Card className="p-6">
           <div className="mb-4">
             <h3 className="text-lg font-medium">Factory OS — By Customer</h3>
-            <p className="text-sm text-muted-foreground mt-1">Container sales from the factory system, grouped by customer</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Container sales from the factory system, grouped by customer
+            </p>
           </div>
           {loadingFactorySales ? (
-            <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
           ) : factorySalesByCustomer.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No factory OS sales data available</p>
           ) : (
@@ -108,8 +121,12 @@ export function SalesReportPanel({
                     <TableRow key={row.customerId ?? "null"}>
                       <TableCell className="font-medium">{row.customerName || `Customer #${row.customerId}`}</TableCell>
                       <TableCell className="text-right hidden sm:table-cell">{row.containers}</TableCell>
-                      <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
-                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400 hidden sm:table-cell">{formatAmount(parseFloat(row.paidAmount))}</TableCell>
+                      <TableCell className="text-right font-mono hidden sm:table-cell">
+                        {formatAmount(parseFloat(row.totalAmount))}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400 hidden sm:table-cell">
+                        {formatAmount(parseFloat(row.paidAmount))}
+                      </TableCell>
                       <TableCell className="text-right font-mono text-amber-600 dark:text-amber-400">
                         {formatAmount(parseFloat(row.totalAmount) - parseFloat(row.paidAmount))}
                       </TableCell>
@@ -119,10 +136,27 @@ export function SalesReportPanel({
                 <TableBody className="font-semibold border-t-2">
                   <TableRow>
                     <TableCell>Total</TableCell>
-                    <TableCell className="text-right hidden sm:table-cell">{factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}</TableCell>
-                    <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount), 0))}</TableCell>
-                    <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.paidAmount), 0))}</TableCell>
-                    <TableCell className="text-right font-mono">{formatAmount(factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount) - parseFloat(r.paidAmount), 0))}</TableCell>
+                    <TableCell className="text-right hidden sm:table-cell">
+                      {factorySalesByCustomer.reduce((s: number, r: any) => s + Number(r.containers), 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono hidden sm:table-cell">
+                      {formatAmount(
+                        factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.totalAmount), 0)
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono hidden sm:table-cell">
+                      {formatAmount(
+                        factorySalesByCustomer.reduce((s: number, r: any) => s + parseFloat(r.paidAmount), 0)
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {formatAmount(
+                        factorySalesByCustomer.reduce(
+                          (s: number, r: any) => s + parseFloat(r.totalAmount) - parseFloat(r.paidAmount),
+                          0
+                        )
+                      )}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -136,7 +170,11 @@ export function SalesReportPanel({
             <p className="text-sm text-muted-foreground mt-1">Point-of-sale transactions, by customer</p>
           </div>
           {loadingFactoryPos ? (
-            <div className="space-y-3">{[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}</div>
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
+            </div>
           ) : !factoryPosSummary || (factoryPosSummary.byCustomer ?? []).length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">No factory POS sales data available</p>
           ) : (
@@ -157,10 +195,18 @@ export function SalesReportPanel({
                     <TableRow key={row.customerId ?? idx}>
                       <TableCell className="font-medium">{row.customerName}</TableCell>
                       <TableCell className="text-right hidden sm:table-cell">{row.sales}</TableCell>
-                      <TableCell className="text-right font-mono">{formatAmount(parseFloat(row.totalAmount))}</TableCell>
-                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400 hidden sm:table-cell">{formatAmount(parseFloat(row.cashSales))}</TableCell>
-                      <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400 hidden sm:table-cell">{formatAmount(parseFloat(row.creditSales))}</TableCell>
-                      <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(parseFloat(row.depositAmount))}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatAmount(parseFloat(row.totalAmount))}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400 hidden sm:table-cell">
+                        {formatAmount(parseFloat(row.cashSales))}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400 hidden sm:table-cell">
+                        {formatAmount(parseFloat(row.creditSales))}
+                      </TableCell>
+                      <TableCell className="text-right font-mono hidden sm:table-cell">
+                        {formatAmount(parseFloat(row.depositAmount))}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -169,10 +215,18 @@ export function SalesReportPanel({
                     <TableRow>
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right hidden sm:table-cell">{factoryPosSummary.grand.sales}</TableCell>
-                      <TableCell className="text-right font-mono">{formatAmount(parseFloat(factoryPosSummary.grand.totalAmount))}</TableCell>
-                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400 hidden sm:table-cell">{formatAmount(parseFloat(factoryPosSummary.grand.cashSales))}</TableCell>
-                      <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400 hidden sm:table-cell">{formatAmount(parseFloat(factoryPosSummary.grand.creditSales))}</TableCell>
-                      <TableCell className="text-right font-mono hidden sm:table-cell">{formatAmount(parseFloat(factoryPosSummary.grand.depositAmount))}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatAmount(parseFloat(factoryPosSummary.grand.totalAmount))}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-green-600 dark:text-green-400 hidden sm:table-cell">
+                        {formatAmount(parseFloat(factoryPosSummary.grand.cashSales))}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400 hidden sm:table-cell">
+                        {formatAmount(parseFloat(factoryPosSummary.grand.creditSales))}
+                      </TableCell>
+                      <TableCell className="text-right font-mono hidden sm:table-cell">
+                        {formatAmount(parseFloat(factoryPosSummary.grand.depositAmount))}
+                      </TableCell>
                     </TableRow>
                   </TableBody>
                 )}
@@ -231,9 +285,7 @@ export function SalesReportPanel({
             ))}
           </div>
         ) : salesData.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            No sales data available
-          </p>
+          <p className="text-sm text-muted-foreground text-center py-8">No sales data available</p>
         ) : (
           <>
             <div className="hidden md:block">
@@ -248,29 +300,27 @@ export function SalesReportPanel({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {[...salesData].sort((a, b) => (a.locationName ?? "").localeCompare(b.locationName ?? "")).map((location) => (
-                    <TableRow key={location.locationId}>
-                      <TableCell className="font-medium">{location.locationName}</TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatNumber(location.totalQuantity ?? 0)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {formatAmount(location.totalSales)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {location.totalTransactions}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setSelectedLocationForDetails(location.locationId)}
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {[...salesData]
+                    .sort((a, b) => (a.locationName ?? "").localeCompare(b.locationName ?? ""))
+                    .map((location) => (
+                      <TableRow key={location.locationId}>
+                        <TableCell className="font-medium">{location.locationName}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {formatNumber(location.totalQuantity ?? 0)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">{formatAmount(location.totalSales)}</TableCell>
+                        <TableCell className="text-right">{location.totalTransactions}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSelectedLocationForDetails(location.locationId)}
+                          >
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                 </TableBody>
                 <TableBody className="font-semibold border-t-2 bg-muted/40">
                   <TableRow>
@@ -290,28 +340,56 @@ export function SalesReportPanel({
               </Table>
             </div>
             <div className="md:hidden space-y-3">
-              {[...salesData].sort((a, b) => (a.locationName ?? "").localeCompare(b.locationName ?? "")).map((location) => (
-                <Card key={location.locationId} className="hover-elevate cursor-pointer" onClick={() => setSelectedLocationForDetails(location.locationId)}>
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{location.locationName}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div className="grid grid-cols-3 mt-2 text-sm gap-2">
-                      <span className="text-muted-foreground">Bales: <span className="font-mono text-foreground">{formatNumber(location.totalQuantity ?? 0)}</span></span>
-                      <span className="text-muted-foreground">Sales: <span className="font-mono text-foreground">{formatAmount(location.totalSales)}</span></span>
-                      <span className="text-muted-foreground text-right">Txns: <span className="text-foreground">{location.totalTransactions}</span></span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {[...salesData]
+                .sort((a, b) => (a.locationName ?? "").localeCompare(b.locationName ?? ""))
+                .map((location) => (
+                  <Card
+                    key={location.locationId}
+                    className="hover-elevate cursor-pointer"
+                    onClick={() => setSelectedLocationForDetails(location.locationId)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium">{location.locationName}</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      <div className="grid grid-cols-3 mt-2 text-sm gap-2">
+                        <span className="text-muted-foreground">
+                          Bales:{" "}
+                          <span className="font-mono text-foreground">{formatNumber(location.totalQuantity ?? 0)}</span>
+                        </span>
+                        <span className="text-muted-foreground">
+                          Sales: <span className="font-mono text-foreground">{formatAmount(location.totalSales)}</span>
+                        </span>
+                        <span className="text-muted-foreground text-right">
+                          Txns: <span className="text-foreground">{location.totalTransactions}</span>
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               <Card className="bg-muted/40">
                 <CardContent className="p-4">
                   <div className="font-semibold mb-2">Total</div>
                   <div className="grid grid-cols-3 text-sm gap-2">
-                    <span className="text-muted-foreground">Bales: <span className="font-mono text-foreground font-semibold">{formatNumber(salesData.reduce((s, l) => s + (l.totalQuantity ?? 0), 0))}</span></span>
-                    <span className="text-muted-foreground">Sales: <span className="font-mono text-foreground font-semibold">{formatAmount(salesData.reduce((s, l) => s + l.totalSales, 0))}</span></span>
-                    <span className="text-muted-foreground text-right">Txns: <span className="text-foreground font-semibold">{salesData.reduce((s, l) => s + l.totalTransactions, 0)}</span></span>
+                    <span className="text-muted-foreground">
+                      Bales:{" "}
+                      <span className="font-mono text-foreground font-semibold">
+                        {formatNumber(salesData.reduce((s, l) => s + (l.totalQuantity ?? 0), 0))}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground">
+                      Sales:{" "}
+                      <span className="font-mono text-foreground font-semibold">
+                        {formatAmount(salesData.reduce((s, l) => s + l.totalSales, 0))}
+                      </span>
+                    </span>
+                    <span className="text-muted-foreground text-right">
+                      Txns:{" "}
+                      <span className="text-foreground font-semibold">
+                        {salesData.reduce((s, l) => s + l.totalTransactions, 0)}
+                      </span>
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -320,14 +398,14 @@ export function SalesReportPanel({
         )}
       </Card>
 
-      <Dialog 
-        open={selectedLocationForDetails !== null} 
+      <Dialog
+        open={selectedLocationForDetails !== null}
         onOpenChange={(open) => !open && setSelectedLocationForDetails(null)}
       >
         <DialogContent className="w-[95vw] max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>
-              Sales Details - {salesData.find(l => l.locationId === selectedLocationForDetails)?.locationName}
+              Sales Details - {salesData.find((l) => l.locationId === selectedLocationForDetails)?.locationName}
             </DialogTitle>
           </DialogHeader>
 
@@ -351,9 +429,7 @@ export function SalesReportPanel({
                 ))}
               </div>
             ) : transactions.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No transactions found
-              </p>
+              <p className="text-sm text-muted-foreground text-center py-8">No transactions found</p>
             ) : (
               <>
                 <div className="overflow-y-auto flex-1 min-h-0">
@@ -392,19 +468,13 @@ export function SalesReportPanel({
                               </button>
                             </TableCell>
                             {selectedLocationForDetails === -1 && (
-                              <TableCell className="text-muted-foreground">
-                                {transaction.customerName || "—"}
-                              </TableCell>
+                              <TableCell className="text-muted-foreground">{transaction.customerName || "—"}</TableCell>
                             )}
                             <TableCell className="text-muted-foreground text-sm">
                               {transaction.cashAccountName || "—"}
                             </TableCell>
-                            <TableCell className="text-right">
-                              {transaction.itemCount}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {transaction.totalQuantity}
-                            </TableCell>
+                            <TableCell className="text-right">{transaction.itemCount}</TableCell>
+                            <TableCell className="text-right">{transaction.totalQuantity}</TableCell>
                             <TableCell className="text-right font-mono">
                               {formatAmount(transaction.totalAmount)}
                             </TableCell>
@@ -433,7 +503,9 @@ export function SalesReportPanel({
                       >
                         <CardContent className="p-3 space-y-1">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium text-primary">{formatDisplayDate(transaction.voucherDate)}</span>
+                            <span className="text-sm font-medium text-primary">
+                              {formatDisplayDate(transaction.voucherDate)}
+                            </span>
                             <span className="font-mono font-medium">{formatAmount(transaction.totalAmount)}</span>
                           </div>
                           {selectedLocationForDetails === -1 && transaction.customerName && (

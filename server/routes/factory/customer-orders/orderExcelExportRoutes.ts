@@ -10,44 +10,112 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, recalculateOrderTotals,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  recalculateOrderTotals,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  customerOrderBaleRemovals, customerOrderExpectedLines,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
+  customerOrderBaleRemovals,
+  customerOrderExpectedLines,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -71,7 +139,9 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       const { hideSelling: hideSellingXls1 } = await getExportPriceVisibility(req);
 
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
@@ -80,24 +150,35 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       const baleLinks = await db.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
       const baleIds = baleLinks.map((b: any) => b.baleId).filter(Boolean);
-      const baleRows: any[] = baleIds.length > 0
-        ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds))
-        : [];
-      const orderCharges = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+      const baleRows: any[] =
+        baleIds.length > 0 ? await db.select().from(factoryBales).where(inArray(factoryBales.id, baleIds)) : [];
+      const orderCharges = await db
+        .select()
+        .from(customerOrderCharges)
+        .where(eq(customerOrderCharges.orderId, orderId));
 
       const productIds = [...new Set(baleRows.map((b: any) => b.productId).filter((id: any) => id != null))];
-      const productRecords: any[] = productIds.length > 0
-        ? await db.select().from(factoryBaleProducts).where(inArray(factoryBaleProducts.id, productIds as number[]))
-        : [];
+      const productRecords: any[] =
+        productIds.length > 0
+          ? await db
+              .select()
+              .from(factoryBaleProducts)
+              .where(inArray(factoryBaleProducts.id, productIds as number[]))
+          : [];
       const productMap = new Map<number, any>(productRecords.map((p: any) => [p.id, p]));
-      const balePriceMap = new Map<number, number>(baleLinks.map((l: any) => [l.baleId, parseFloat(l.priceUsed || "0")]));
+      const balePriceMap = new Map<number, number>(
+        baleLinks.map((l: any) => [l.baleId, parseFloat(l.priceUsed || "0")])
+      );
 
       // Also read order lines for pricing mode metadata
-      const orderLinesForXls = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
+      const orderLinesForXls = await db
+        .select()
+        .from(customerOrderLines)
+        .where(eq(customerOrderLines.orderId, orderId));
       const orderLinePricingMap = new Map<string, { pricingMode: string; pricePerKg: number }>();
       for (const ol of orderLinesForXls) {
         orderLinePricingMap.set((ol.articleCode || "").toLowerCase(), {
-          pricingMode: (ol as any).pricingMode || 'per_bale',
+          pricingMode: (ol as any).pricingMode || "per_bale",
           pricePerKg: parseFloat((ol as any).pricePerKg || "0"),
         });
       }
@@ -121,9 +202,22 @@ export function registerOrderExcelExportRoutes(app: Express) {
         const productName = product?.name || bale.productName || articleCode;
         const wtPerBale = parseFloat(product?.weightPerBaleKg || bale.weightKg || "0");
         const price = balePriceMap.get(bale.id) || 0;
-        const pricingInfo = orderLinePricingMap.get(articleCode.toLowerCase()) || { pricingMode: 'per_bale', pricePerKg: 0 };
+        const pricingInfo = orderLinePricingMap.get(articleCode.toLowerCase()) || {
+          pricingMode: "per_bale",
+          pricePerKg: 0,
+        };
         if (!grouped.has(articleCode)) {
-          grouped.set(articleCode, { articleCode, productName, qty: 0, wtPerBale, totalWt: 0, pricePerBale: price, total: 0, pricingMode: pricingInfo.pricingMode, pricePerKg: pricingInfo.pricePerKg });
+          grouped.set(articleCode, {
+            articleCode,
+            productName,
+            qty: 0,
+            wtPerBale,
+            totalWt: 0,
+            pricePerBale: price,
+            total: 0,
+            pricingMode: pricingInfo.pricingMode,
+            pricePerKg: pricingInfo.pricePerKg,
+          });
         }
         const g = grouped.get(articleCode)!;
         g.qty += 1;
@@ -132,14 +226,21 @@ export function registerOrderExcelExportRoutes(app: Express) {
       }
 
       const lines = Array.from(grouped.values()).sort((a, b) => a.articleCode.localeCompare(b.articleCode));
-      const anyPerKgXls1 = lines.some(l => l.pricingMode === 'per_kg');
+      const anyPerKgXls1 = lines.some((l) => l.pricingMode === "per_kg");
 
       // Currency
       const baseCurrency = (company as any)?.baseCurrency || "USD";
-      const currencySymbolMap: Record<string, string> = { USD: "$", GBP: "£", EUR: "€", CFA: "CFA", XOF: "CFA", XAF: "CFA" };
+      const currencySymbolMap: Record<string, string> = {
+        USD: "$",
+        GBP: "£",
+        EUR: "€",
+        CFA: "CFA",
+        XOF: "CFA",
+        XAF: "CFA",
+      };
       const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? baseCurrency;
       const fmtMoney = (n: number) => `${currSym}${n % 1 === 0 ? n.toLocaleString() : n.toFixed(2)}`;
-      const fmtNum = (n: number) => n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
+      const fmtNum = (n: number) => (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
 
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
@@ -163,7 +264,9 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const GOLD = "FFD4AF37";
 
       const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
-      const setFill = (cell: any, argb: string) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } }; };
+      const setFill = (cell: any, argb: string) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
+      };
       const setBorder = (row: any) => {
         row.eachCell((cell: any) => {
           cell.border = {
@@ -227,29 +330,48 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       // ── Table header ──
       const unitPriceLabelXls1 = anyPerKgXls1 ? "Price/KG" : "Price/Bale";
-      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSellingXls1 ? [] : [unitPriceLabelXls1, "Total"])]);
+      const hdrRow = sheet.addRow([
+        "#",
+        "Article Code",
+        "Product",
+        "Qty",
+        "Wt/Bale",
+        "Total Wt",
+        ...(hideSellingXls1 ? [] : [unitPriceLabelXls1, "Total"]),
+      ]);
       hdrRow.height = 24;
       hdrRow.eachCell((cell: any) => {
         cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
+        cell.border = {
+          top: { style: "thin", color: { argb: WHITE } },
+          bottom: { style: "thin", color: { argb: WHITE } },
+          left: { style: "thin", color: { argb: WHITE } },
+          right: { style: "thin", color: { argb: WHITE } },
+        };
       });
 
       // ── Data rows ──
-      let totalQty = 0, totalWtAll = 0, totalAll = 0;
+      let totalQty = 0,
+        totalWtAll = 0,
+        totalAll = 0;
       lines.forEach((g, idx) => {
         totalQty += g.qty;
         totalWtAll += g.totalWt;
         totalAll += g.total;
-        const unitPriceXls1 = g.pricingMode === 'per_kg'
-          ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg)
-          : g.pricePerBale;
+        const unitPriceXls1 =
+          g.pricingMode === "per_kg" ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg) : g.pricePerBale;
         const rowCells: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
-        if (!hideSellingXls1) { rowCells.push(fmtMoney(unitPriceXls1)); rowCells.push(fmtMoney(g.total)); }
+        if (!hideSellingXls1) {
+          rowCells.push(fmtMoney(unitPriceXls1));
+          rowCells.push(fmtMoney(g.total));
+        }
         const dr = sheet.addRow(rowCells);
         dr.height = 20;
-        dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
+        dr.eachCell((cell: any) => {
+          cell.font = { size: 11 };
+        });
         if (idx % 2 === 1) {
           dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
         }
@@ -266,7 +388,10 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       // ── Totals row ──
       const totRowCells: any[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
-      if (!hideSellingXls1) { totRowCells.push(""); totRowCells.push(fmtMoney(totalAll)); }
+      if (!hideSellingXls1) {
+        totRowCells.push("");
+        totRowCells.push(fmtMoney(totalAll));
+      }
       const totRow = sheet.addRow(totRowCells);
       totRow.height = 22;
       totRow.eachCell((cell: any) => {
@@ -289,11 +414,12 @@ export function registerOrderExcelExportRoutes(app: Express) {
         const grandTotal = parseFloat(order.grandTotal || "0");
 
         const otherChargeLines = orderCharges.filter((ch: any) => ch.chargeType !== "FREIGHT");
-        const chargeRows: [string, number][] = otherChargeLines.length > 0
-          ? otherChargeLines.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
-          : otherChargesTotal > 0
-            ? [["Other Charges", otherChargesTotal]]
-            : [];
+        const chargeRows: [string, number][] =
+          otherChargeLines.length > 0
+            ? otherChargeLines.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+            : otherChargesTotal > 0
+              ? [["Other Charges", otherChargesTotal]]
+              : [];
 
         const summaryData: [string, number][] = [
           ["Subtotal (Bales)", subtotal],
@@ -315,7 +441,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           const sr = sheet.addRow(["", "", "", "", "", "", label as string, fmtMoney(amount as number)]);
           sr.height = 20;
           const isGrandTotal = idx === summaryData.length - 1;
-          const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
+          const bg = isGrandTotal ? DARK_BLUE : idx % 2 === 0 ? WHITE : LIGHT_GRAY;
           const fg = isGrandTotal ? WHITE : "FF000000";
           setFill(sr.getCell(7), bg);
           setFill(sr.getCell(8), bg);
@@ -323,8 +449,18 @@ export function registerOrderExcelExportRoutes(app: Express) {
           sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
           sr.getCell(7).alignment = { horizontal: "left" };
           sr.getCell(8).alignment = { horizontal: "right" };
-          sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
-          sr.getCell(8).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+          sr.getCell(7).border = {
+            top: { style: "thin", color: { argb: "FFDDDDDD" } },
+            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+            left: { style: "thin", color: { argb: "FFDDDDDD" } },
+            right: { style: "thin", color: { argb: "FFDDDDDD" } },
+          };
+          sr.getCell(8).border = {
+            top: { style: "thin", color: { argb: "FFDDDDDD" } },
+            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+            left: { style: "thin", color: { argb: "FFDDDDDD" } },
+            right: { style: "thin", color: { argb: "FFDDDDDD" } },
+          };
         });
       }
 
@@ -338,7 +474,6 @@ export function registerOrderExcelExportRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 
   app.get("/api/factory/customer-orders/:id/export-excel", requireAuth, async (req: any, res: any) => {
     try {
@@ -373,7 +508,10 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       if (!order) return res.status(404).json({ message: "Order not found" });
 
-      const orderCharges2 = await db.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
+      const orderCharges2 = await db
+        .select()
+        .from(customerOrderCharges)
+        .where(eq(customerOrderCharges.orderId, orderId));
       const rawLines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
 
       // Canonical product names from factoryBaleProducts
@@ -382,9 +520,15 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const wtPerBaleMap = new Map<string, number>();
       if (articleCodes.length > 0) {
         const products = await db
-          .select({ articleCode: factoryBaleProducts.articleCode, name: factoryBaleProducts.name, weightPerBaleKg: factoryBaleProducts.weightPerBaleKg })
+          .select({
+            articleCode: factoryBaleProducts.articleCode,
+            name: factoryBaleProducts.name,
+            weightPerBaleKg: factoryBaleProducts.weightPerBaleKg,
+          })
           .from(factoryBaleProducts)
-          .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes)));
+          .where(
+            and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes))
+          );
         for (const p of products) {
           if (p.articleCode) {
             productNameMap.set(p.articleCode, p.name);
@@ -406,14 +550,21 @@ export function registerOrderExcelExportRoutes(app: Express) {
           pricePerKg: parseFloat(l.pricePerKg || "0"),
         }))
         .sort((a: any, b: any) => a.articleCode.localeCompare(b.articleCode));
-      const anyPerKgXls2 = lines.some((l: any) => l.pricingMode === 'per_kg');
+      const anyPerKgXls2 = lines.some((l: any) => l.pricingMode === "per_kg");
 
       // Currency
       const baseCurrency = (company as any)?.baseCurrency || "USD";
-      const currencySymbolMap: Record<string, string> = { USD: "$", GBP: "£", EUR: "€", CFA: "CFA", XOF: "CFA", XAF: "CFA" };
+      const currencySymbolMap: Record<string, string> = {
+        USD: "$",
+        GBP: "£",
+        EUR: "€",
+        CFA: "CFA",
+        XOF: "CFA",
+        XAF: "CFA",
+      };
       const currSym = currencySymbolMap[baseCurrency.toUpperCase()] ?? baseCurrency;
       const fmtMoney = (n: number) => `${currSym}${n % 1 === 0 ? n.toLocaleString() : n.toFixed(2)}`;
-      const fmtNum = (n: number) => n % 1 === 0 ? n.toLocaleString() : n.toFixed(2);
+      const fmtNum = (n: number) => (n % 1 === 0 ? n.toLocaleString() : n.toFixed(2));
 
       const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
@@ -436,7 +587,9 @@ export function registerOrderExcelExportRoutes(app: Express) {
       const WHITE = "FFFFFFFF";
 
       const merge = (r: number, c1: number, c2: number) => sheet.mergeCells(r, c1, r, c2);
-      const setFill = (cell: any, argb: string) => { cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } }; };
+      const setFill = (cell: any, argb: string) => {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
+      };
       const setBorder = (row: any) => {
         row.eachCell((cell: any) => {
           cell.border = {
@@ -500,29 +653,48 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       // ── Table header ──
       const unitPriceLabelXls2 = anyPerKgXls2 ? "Price/KG" : "Price/Bale";
-      const hdrRow = sheet.addRow(["#", "Article Code", "Product", "Qty", "Wt/Bale", "Total Wt", ...(hideSellingXls2 ? [] : [unitPriceLabelXls2, "Total"])]);
+      const hdrRow = sheet.addRow([
+        "#",
+        "Article Code",
+        "Product",
+        "Qty",
+        "Wt/Bale",
+        "Total Wt",
+        ...(hideSellingXls2 ? [] : [unitPriceLabelXls2, "Total"]),
+      ]);
       hdrRow.height = 24;
       hdrRow.eachCell((cell: any) => {
         cell.font = { bold: true, color: { argb: WHITE }, size: 11 };
         setFill(cell, DARK_BLUE);
         cell.alignment = { horizontal: "center", vertical: "middle" };
-        cell.border = { top: { style: "thin", color: { argb: WHITE } }, bottom: { style: "thin", color: { argb: WHITE } }, left: { style: "thin", color: { argb: WHITE } }, right: { style: "thin", color: { argb: WHITE } } };
+        cell.border = {
+          top: { style: "thin", color: { argb: WHITE } },
+          bottom: { style: "thin", color: { argb: WHITE } },
+          left: { style: "thin", color: { argb: WHITE } },
+          right: { style: "thin", color: { argb: WHITE } },
+        };
       });
 
       // ── Data rows ──
-      let totalQty = 0, totalWtAll = 0, totalAll = 0;
+      let totalQty = 0,
+        totalWtAll = 0,
+        totalAll = 0;
       lines.forEach((g: any, idx: number) => {
         totalQty += g.qty;
         totalWtAll += g.totalWt;
         totalAll += g.total;
-        const unitPriceXls2 = g.pricingMode === 'per_kg'
-          ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg)
-          : g.pricePerBale;
+        const unitPriceXls2 =
+          g.pricingMode === "per_kg" ? (g.totalWt > 0 ? g.total / g.totalWt : g.pricePerKg) : g.pricePerBale;
         const rowCells2: any[] = [idx + 1, g.articleCode, g.productName, g.qty, fmtNum(g.wtPerBale), fmtNum(g.totalWt)];
-        if (!hideSellingXls2) { rowCells2.push(fmtMoney(unitPriceXls2)); rowCells2.push(fmtMoney(g.total)); }
+        if (!hideSellingXls2) {
+          rowCells2.push(fmtMoney(unitPriceXls2));
+          rowCells2.push(fmtMoney(g.total));
+        }
         const dr = sheet.addRow(rowCells2);
         dr.height = 20;
-        dr.eachCell((cell: any) => { cell.font = { size: 11 }; });
+        dr.eachCell((cell: any) => {
+          cell.font = { size: 11 };
+        });
         if (idx % 2 === 1) {
           dr.eachCell((cell: any) => setFill(cell, LIGHT_GRAY));
         }
@@ -539,7 +711,10 @@ export function registerOrderExcelExportRoutes(app: Express) {
 
       // ── Totals row ──
       const totRowCells2: any[] = ["", "", "Totals", totalQty, "", fmtNum(totalWtAll)];
-      if (!hideSellingXls2) { totRowCells2.push(""); totRowCells2.push(fmtMoney(totalAll)); }
+      if (!hideSellingXls2) {
+        totRowCells2.push("");
+        totRowCells2.push(fmtMoney(totalAll));
+      }
       const totRow = sheet.addRow(totRowCells2);
       totRow.height = 22;
       totRow.eachCell((cell: any) => {
@@ -559,18 +734,19 @@ export function registerOrderExcelExportRoutes(app: Express) {
         const grandTotal = parseFloat(order.grandTotal || "0");
 
         const otherChargeLines2 = orderCharges2.filter((ch: any) => ch.chargeType !== "FREIGHT");
-        const chargeRows2: [string, number][] = otherChargeLines2.length > 0
-          ? otherChargeLines2.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
-          : otherChargesTotal2 > 0
-            ? [["Other Charges", otherChargesTotal2]]
-            : [];
+        const chargeRows2: [string, number][] =
+          otherChargeLines2.length > 0
+            ? otherChargeLines2.map((ch: any) => [ch.name, parseFloat(ch.amount || "0")] as [string, number])
+            : otherChargesTotal2 > 0
+              ? [["Other Charges", otherChargesTotal2]]
+              : [];
 
-      const summaryData: [string, number][] = [
-        ["Subtotal (Bales)", subtotal],
-        ...(freight > 0 ? [["Freight", freight] as [string, number]] : []),
-        ...chargeRows2,
-        ["Grand Total", grandTotal],
-      ];
+        const summaryData: [string, number][] = [
+          ["Subtotal (Bales)", subtotal],
+          ...(freight > 0 ? [["Freight", freight] as [string, number]] : []),
+          ...chargeRows2,
+          ["Grand Total", grandTotal],
+        ];
 
         const sumHdr = sheet.addRow(["", "", "", "", "", "", "Name", "Amount"]);
         sumHdr.height = 22;
@@ -585,7 +761,7 @@ export function registerOrderExcelExportRoutes(app: Express) {
           const sr = sheet.addRow(["", "", "", "", "", "", label, fmtMoney(amount)]);
           sr.height = 20;
           const isGrandTotal = idx === summaryData.length - 1;
-          const bg = isGrandTotal ? DARK_BLUE : (idx % 2 === 0 ? WHITE : LIGHT_GRAY);
+          const bg = isGrandTotal ? DARK_BLUE : idx % 2 === 0 ? WHITE : LIGHT_GRAY;
           const fg = isGrandTotal ? WHITE : "FF000000";
           setFill(sr.getCell(7), bg);
           setFill(sr.getCell(8), bg);
@@ -593,8 +769,18 @@ export function registerOrderExcelExportRoutes(app: Express) {
           sr.getCell(8).font = { bold: isGrandTotal, size: 11, color: { argb: fg } };
           sr.getCell(7).alignment = { horizontal: "left" };
           sr.getCell(8).alignment = { horizontal: "right" };
-          sr.getCell(7).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
-          sr.getCell(8).border = { top: { style: "thin", color: { argb: "FFDDDDDD" } }, bottom: { style: "thin", color: { argb: "FFDDDDDD" } }, left: { style: "thin", color: { argb: "FFDDDDDD" } }, right: { style: "thin", color: { argb: "FFDDDDDD" } } };
+          sr.getCell(7).border = {
+            top: { style: "thin", color: { argb: "FFDDDDDD" } },
+            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+            left: { style: "thin", color: { argb: "FFDDDDDD" } },
+            right: { style: "thin", color: { argb: "FFDDDDDD" } },
+          };
+          sr.getCell(8).border = {
+            top: { style: "thin", color: { argb: "FFDDDDDD" } },
+            bottom: { style: "thin", color: { argb: "FFDDDDDD" } },
+            left: { style: "thin", color: { argb: "FFDDDDDD" } },
+            right: { style: "thin", color: { argb: "FFDDDDDD" } },
+          };
         });
       } // end if (!hideSellingXls2)
 

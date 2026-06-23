@@ -27,7 +27,7 @@ const getDateFnsFormat = (format: DateFormatType, style: "full" | "short" = "ful
 
 const parseDateString = (dateStr: string): Date => {
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-    const [year, month, day] = dateStr.split('-').map(Number);
+    const [year, month, day] = dateStr.split("-").map(Number);
     return new Date(year, month - 1, day);
   }
   if (/^\d{4}-\d{2}-\d{2}T/.test(dateStr)) {

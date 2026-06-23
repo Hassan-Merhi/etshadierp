@@ -5,22 +5,8 @@ import { z } from "zod";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -31,9 +17,12 @@ import { format } from "date-fns";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
 const exchangeRateFormSchema = z.object({
-  rate: z.string().min(1, "Rate is required").refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
-    message: "Rate must be a positive number",
-  }),
+  rate: z
+    .string()
+    .min(1, "Rate is required")
+    .refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, {
+      message: "Rate must be a positive number",
+    }),
   effectiveDate: z.string().min(1, "Date is required"),
 });
 
@@ -115,9 +104,7 @@ export function ExchangeRateSettings() {
             <TrendingUp className="h-5 w-5" />
             Exchange Rates
           </CardTitle>
-          <CardDescription>
-            Multi-currency is not enabled for this company.
-          </CardDescription>
+          <CardDescription>Multi-currency is not enabled for this company.</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-sm">
@@ -145,11 +132,7 @@ export function ExchangeRateSettings() {
               {company?.baseCurrency} to {company?.displayCurrency} conversion rates
             </CardDescription>
           </div>
-          <Button 
-            onClick={() => setShowForm(!showForm)} 
-            size="sm"
-            data-testid="button-add-exchange-rate"
-          >
+          <Button onClick={() => setShowForm(!showForm)} size="sm" data-testid="button-add-exchange-rate">
             <Plus className="h-4 w-4 mr-1" />
             Set Today's Rate
           </Button>
@@ -165,9 +148,7 @@ export function ExchangeRateSettings() {
                   $1 {company?.baseCurrency} = {parseFloat(latestRate.rate).toLocaleString()} {company?.displayCurrency}
                 </p>
               </div>
-              <Badge variant="secondary">
-                Effective: {formatDisplayDate(latestRate.effectiveDate)}
-              </Badge>
+              <Badge variant="secondary">Effective: {formatDisplayDate(latestRate.effectiveDate)}</Badge>
             </div>
           </div>
         )}
@@ -183,7 +164,9 @@ export function ExchangeRateSettings() {
                       name="rate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>$1 {company?.baseCurrency} = X {company?.displayCurrency}</FormLabel>
+                          <FormLabel>
+                            $1 {company?.baseCurrency} = X {company?.displayCurrency}
+                          </FormLabel>
                           <FormControl>
                             <Input
                               {...field}
@@ -204,11 +187,7 @@ export function ExchangeRateSettings() {
                         <FormItem>
                           <FormLabel>Effective Date</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
-                              type="date"
-                              data-testid="input-effective-date"
-                            />
+                            <Input {...field} type="date" data-testid="input-effective-date" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -216,17 +195,17 @@ export function ExchangeRateSettings() {
                     />
                   </div>
                   <div className="flex gap-2">
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       disabled={createRateMutation.isPending}
                       data-testid="button-save-exchange-rate"
                     >
                       {createRateMutation.isPending && <RefreshCw className="h-4 w-4 mr-2 animate-spin" />}
                       Save Rate
                     </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={() => setShowForm(false)}
                       data-testid="button-cancel-exchange-rate"
                     >

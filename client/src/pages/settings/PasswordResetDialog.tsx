@@ -1,4 +1,11 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +19,14 @@ interface PasswordResetDialogProps {
   isPending: boolean;
 }
 
-export function PasswordResetDialog({ user, onClose, onReset, newPassword, onPasswordChange, isPending }: PasswordResetDialogProps) {
+export function PasswordResetDialog({
+  user,
+  onClose,
+  onReset,
+  newPassword,
+  onPasswordChange,
+  isPending,
+}: PasswordResetDialogProps) {
   if (!user) return null;
 
   return (
@@ -37,7 +51,9 @@ export function PasswordResetDialog({ user, onClose, onReset, newPassword, onPas
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
             onClick={() => onReset(user.id, newPassword)}
             disabled={!newPassword || newPassword.length < 6 || isPending}

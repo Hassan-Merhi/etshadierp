@@ -2,12 +2,7 @@ import { useState, useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -90,9 +85,7 @@ function CategoryGroup({
             {accounts.length}
           </Badge>
         </div>
-        <span className={`font-mono font-bold ${accentColor}`}>
-          {formatAmount(total)}
-        </span>
+        <span className={`font-mono font-bold ${accentColor}`}>{formatAmount(total)}</span>
       </button>
       {open && (
         <div className="divide-y divide-border">
@@ -114,9 +107,7 @@ function CategoryGroup({
               ) : (
                 <span className="font-medium text-foreground">{acc.name}</span>
               )}
-              <span className={`font-mono tabular-nums ${amountColor}`}>
-                {formatAmount(Math.abs(acc.value))}
-              </span>
+              <span className={`font-mono tabular-nums ${amountColor}`}>{formatAmount(Math.abs(acc.value))}</span>
             </div>
           ))}
         </div>
@@ -160,33 +151,22 @@ function CollapsibleSection({
   }, {});
 
   const sortedCategories = Object.entries(grouped).sort(
-    ([, a], [, b]) =>
-      b.reduce((s, x) => s + Math.abs(x.value), 0) -
-      a.reduce((s, x) => s + Math.abs(x.value), 0)
+    ([, a], [, b]) => b.reduce((s, x) => s + Math.abs(x.value), 0) - a.reduce((s, x) => s + Math.abs(x.value), 0)
   );
 
   return (
     <Card data-testid={`card-${id}`} className="flex flex-col">
-      <CardHeader
-        className="cursor-pointer select-none pb-3"
-        onClick={() => setOpen((v) => !v)}
-      >
+      <CardHeader className="cursor-pointer select-none pb-3" onClick={() => setOpen((v) => !v)}>
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <span className={accentColor}>{icon}</span>
             <div>
-              <CardTitle className={`flex items-center gap-2 text-lg ${accentColor}`}>
-                {title}
-              </CardTitle>
-              {subtitle && (
-                <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
-              )}
+              <CardTitle className={`flex items-center gap-2 text-lg ${accentColor}`}>{title}</CardTitle>
+              {subtitle && <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>}
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className={`text-2xl font-bold font-mono ${totalColor}`}>
-              {formatAmount(total)}
-            </span>
+            <span className={`text-2xl font-bold font-mono ${totalColor}`}>{formatAmount(total)}</span>
             {open ? (
               <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
             ) : (
@@ -246,7 +226,15 @@ interface PayrollEmployee {
   balance: number;
 }
 
-function CustomNetPositionView({ data, formatAmount, asOf }: { data: FactoryNetPositionData; formatAmount: (n: number) => string; asOf: string }) {
+function CustomNetPositionView({
+  data,
+  formatAmount,
+  asOf,
+}: {
+  data: FactoryNetPositionData;
+  formatAmount: (n: number) => string;
+  asOf: string;
+}) {
   const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -274,14 +262,18 @@ function CustomNetPositionView({ data, formatAmount, asOf }: { data: FactoryNetP
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify([...next])); } catch {}
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+      } catch {}
       return next;
     });
   }, []);
 
   const showAll = useCallback(() => {
     setHiddenKeys(new Set());
-    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
   }, []);
 
   const forUsAccounts = useMemo(
@@ -291,9 +283,10 @@ function CustomNetPositionView({ data, formatAmount, asOf }: { data: FactoryNetP
 
   // Exclude the aggregated "Payroll Payable" row — rendered as individual employee rows instead
   const onUsAccounts = useMemo(
-    () => (data.onUs.accounts || [])
-      .filter((a) => a.name !== "Payroll Payable")
-      .map((a) => ({ ...a, side: "onUs" as const })),
+    () =>
+      (data.onUs.accounts || [])
+        .filter((a) => a.name !== "Payroll Payable")
+        .map((a) => ({ ...a, side: "onUs" as const })),
     [data]
   );
 
@@ -327,17 +320,14 @@ function CustomNetPositionView({ data, formatAmount, asOf }: { data: FactoryNetP
           </div>
           <div className="flex items-center gap-2">
             {hiddenKeys.size > 0 && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={showAll}
-                data-testid="button-show-all-accounts"
-              >
+              <Button size="sm" variant="outline" onClick={showAll} data-testid="button-show-all-accounts">
                 <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
                 Show all ({hiddenKeys.size} hidden)
               </Button>
             )}
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold font-mono ${isPositive ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300" : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"}`}>
+            <div
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-bold font-mono ${isPositive ? "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300" : "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"}`}
+            >
               <Equal className="h-3.5 w-3.5" />
               {formatAmount(customNet)}
             </div>
@@ -364,13 +354,18 @@ function CustomNetPositionView({ data, formatAmount, asOf }: { data: FactoryNetP
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm hover-elevate transition-opacity ${hidden ? "opacity-40" : ""}`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    {hidden
-                      ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      : <Eye className="h-3.5 w-3.5 text-green-500 shrink-0" />}
+                    {hidden ? (
+                      <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    ) : (
+                      <Eye className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                    )}
                     <span className={hidden ? "text-muted-foreground line-through" : "text-foreground"}>{a.name}</span>
                     {a.id && (
                       <span
-                        onClick={(e) => { e.stopPropagation(); window.open(`/factory/ledger-monthly/${a.id}`, "_blank"); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/factory/ledger-monthly/${a.id}`, "_blank");
+                        }}
                         className="text-muted-foreground hover:text-foreground shrink-0"
                         data-testid={`link-ledger-forus-${a.id}`}
                       >
@@ -410,13 +405,18 @@ function CustomNetPositionView({ data, formatAmount, asOf }: { data: FactoryNetP
                   className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm hover-elevate transition-opacity ${hidden ? "opacity-40" : ""}`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    {hidden
-                      ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      : <Eye className="h-3.5 w-3.5 text-red-500 shrink-0" />}
+                    {hidden ? (
+                      <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    ) : (
+                      <Eye className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                    )}
                     <span className={hidden ? "text-muted-foreground line-through" : "text-foreground"}>{a.name}</span>
                     {a.id && (
                       <span
-                        onClick={(e) => { e.stopPropagation(); window.open(`/factory/ledger-monthly/${a.id}`, "_blank"); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/factory/ledger-monthly/${a.id}`, "_blank");
+                        }}
                         className="text-muted-foreground hover:text-foreground shrink-0"
                         data-testid={`link-ledger-onus-${a.id}`}
                       >
@@ -449,10 +449,14 @@ function CustomNetPositionView({ data, formatAmount, asOf }: { data: FactoryNetP
                       className={`w-full flex items-center justify-between pl-6 pr-3 py-2 rounded-md text-sm hover-elevate transition-opacity ${hidden ? "opacity-40" : ""}`}
                     >
                       <div className="flex items-center gap-2">
-                        {hidden
-                          ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          : <Eye className="h-3.5 w-3.5 text-red-500 shrink-0" />}
-                        <span className={hidden ? "text-muted-foreground line-through" : "text-foreground"}>{emp.name}</span>
+                        {hidden ? (
+                          <EyeOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                        )}
+                        <span className={hidden ? "text-muted-foreground line-through" : "text-foreground"}>
+                          {emp.name}
+                        </span>
                       </div>
                       <span className={`font-mono tabular-nums ${hidden ? "text-muted-foreground" : "text-red-600"}`}>
                         {formatAmount(emp.balance)}
@@ -524,7 +528,11 @@ export default function FactoryNetPositionDetails() {
         <div>
           <PageHeader
             title="Factory Net Position"
-            subtitle={isToday ? "Current factory financial standing — what we have vs what we owe" : `Historical snapshot — as of ${formatDateLabel(asOf)}`}
+            subtitle={
+              isToday
+                ? "Current factory financial standing — what we have vs what we owe"
+                : `Historical snapshot — as of ${formatDateLabel(asOf)}`
+            }
           />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -562,12 +570,7 @@ export default function FactoryNetPositionDetails() {
             </Button>
           </div>
           {!isToday && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAsOf(todayStr())}
-              data-testid="button-date-today"
-            >
+            <Button variant="outline" size="sm" onClick={() => setAsOf(todayStr())} data-testid="button-date-today">
               Today
             </Button>
           )}
@@ -599,8 +602,12 @@ export default function FactoryNetPositionDetails() {
               <span className="font-bold font-mono text-red-600">{formatAmount(data?.onUsTotal || 0)}</span>
             </div>
             <Equal className="h-4 w-4 text-muted-foreground shrink-0" />
-            <div className={`flex items-center gap-2 px-4 py-2.5 rounded-md ${isPositive ? "bg-green-100 dark:bg-green-900/40" : "bg-red-100 dark:bg-red-900/40"}`}>
-              <span className={`text-sm font-medium ${isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}>
+            <div
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-md ${isPositive ? "bg-green-100 dark:bg-green-900/40" : "bg-red-100 dark:bg-red-900/40"}`}
+            >
+              <span
+                className={`text-sm font-medium ${isPositive ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`}
+              >
                 Net Position
               </span>
               <span className={`font-bold font-mono ${isPositive ? "text-green-600" : "text-red-600"}`}>
@@ -643,9 +650,7 @@ export default function FactoryNetPositionDetails() {
         />
       </div>
 
-      {data && (
-        <CustomNetPositionView data={data} formatAmount={formatAmount} asOf={asOf} />
-      )}
+      {data && <CustomNetPositionView data={data} formatAmount={formatAmount} asOf={asOf} />}
     </div>
   );
 }

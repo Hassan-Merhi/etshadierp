@@ -7,44 +7,111 @@ import { classifyNetPositionAccounts } from "../../netPositionHelper";
 import { adjustInventory } from "../../inventoryHelper";
 import { sqlArray } from "../../lib/sqlArray";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, checkFactoryAdmin,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  checkFactoryAdmin,
 } from "./_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
   factoryBaleProductImages,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -159,12 +226,12 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       const grade = req.query.grade as string;
       const gradeToPrefix: Record<string, string> = {
-        "CREAM": "HMD10",
+        CREAM: "HMD10",
         "#1": "HMD11",
         "#2": "HMD12",
         "#3": "HMD13",
         "#4": "HMD14",
-        "Garbage": "HMD16",
+        Garbage: "HMD16",
       };
 
       if (!grade || !gradeToPrefix[grade]) {
@@ -174,19 +241,26 @@ export function registerFactoryProductsRoutes(app: Express) {
       const prefix = gradeToPrefix[grade];
       const prefixLen = prefix.length;
       const [maxResult] = await db
-        .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)` })
+        .select({
+          maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)`,
+        })
         .from(factoryBaleProducts)
-        .where(and(
-          eq(factoryBaleProducts.companyId, companyId),
-          sql`${factoryBaleProducts.articleCode} LIKE ${prefix + '%'}`,
-          sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
-        ));
+        .where(
+          and(
+            eq(factoryBaleProducts.companyId, companyId),
+            sql`${factoryBaleProducts.articleCode} LIKE ${prefix + "%"}`,
+            sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
+          )
+        );
 
       let nextNum = (maxResult?.maxNum || 0) + 1;
       let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
       let attempts = 0;
       while (attempts < 100) {
-        const candidateCodeClean = candidateCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+        const candidateCodeClean = candidateCode
+          .replace(/[^a-zA-Z0-9]/g, "")
+          .toUpperCase()
+          .substring(0, 50);
         const [dupArticle] = await db
           .select({ id: factoryBaleProducts.id })
           .from(factoryBaleProducts)
@@ -267,30 +341,36 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (productId === null) return res.status(400).json({ message: "Invalid id" });
       if (!productId) return res.status(400).json({ message: "Invalid product ID" });
 
-      const [product] = await db.select().from(factoryBaleProducts)
+      const [product] = await db
+        .select()
+        .from(factoryBaleProducts)
         .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
       if (!product) return res.status(404).json({ message: "Product not found" });
 
       const articleCode = product.articleCode;
 
       // 1. Pressed/Printed: bales grouped by entry date
-      const allBales = await db.select({
-        createdAt: factoryBales.createdAt,
-        pressedAt: factoryBales.pressedAt,
-        weightKg: factoryBales.weightKg,
-        totalCost: factoryBales.totalCost,
-        status: factoryBales.status,
-      }).from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.productId, productId),
-          inArray(factoryBales.status, ['IN_STOCK', 'SOLD', 'REMOVED', 'DELETED', 'DISPATCHED'])
-        ))
+      const allBales = await db
+        .select({
+          createdAt: factoryBales.createdAt,
+          pressedAt: factoryBales.pressedAt,
+          weightKg: factoryBales.weightKg,
+          totalCost: factoryBales.totalCost,
+          status: factoryBales.status,
+        })
+        .from(factoryBales)
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.productId, productId),
+            inArray(factoryBales.status, ["IN_STOCK", "SOLD", "REMOVED", "DELETED", "DISPATCHED"])
+          )
+        )
         .orderBy(factoryBales.createdAt);
 
       const pressedMap = new Map<string, { date: string; qty: number; totalWeight: number; totalCost: number }>();
       for (const bale of allBales) {
-        const dateKey = ((bale.pressedAt || bale.createdAt) as Date).toISOString().split('T')[0];
+        const dateKey = ((bale.pressedAt || bale.createdAt) as Date).toISOString().split("T")[0];
         const existing = pressedMap.get(dateKey) || { date: dateKey, qty: 0, totalWeight: 0, totalCost: 0 };
         existing.qty += 1;
         existing.totalWeight += parseFloat(bale.weightKg as any) || 0;
@@ -305,36 +385,39 @@ export function registerFactoryProductsRoutes(app: Express) {
       const loaded: any[] = [];
 
       if (articleCode) {
-        const orderBalesForProduct = await db.select({
-          orderId: customerOrderBales.orderId,
-          weight: customerOrderBales.weight,
-          priceUsed: customerOrderBales.priceUsed,
-        }).from(customerOrderBales)
+        const orderBalesForProduct = await db
+          .select({
+            orderId: customerOrderBales.orderId,
+            weight: customerOrderBales.weight,
+            priceUsed: customerOrderBales.priceUsed,
+          })
+          .from(customerOrderBales)
           .where(eq(customerOrderBales.articleCode, articleCode));
 
         if (orderBalesForProduct.length > 0) {
           const orderIds = [...new Set(orderBalesForProduct.map((b: any) => b.orderId))];
 
-          const allRelevantOrders = await db.select({
-            id: customerOrders.id,
-            invoiceNumber: customerOrders.invoiceNumber,
-            orderDate: customerOrders.orderDate,
-            customerId: customerOrders.customerId,
-            status: customerOrders.status,
-            containerNumber: customerOrders.containerNumber,
-          }).from(customerOrders)
-            .where(and(
-              eq(customerOrders.companyId, companyId),
-              inArray(customerOrders.id, orderIds)
-            ));
+          const allRelevantOrders = await db
+            .select({
+              id: customerOrders.id,
+              invoiceNumber: customerOrders.invoiceNumber,
+              orderDate: customerOrders.orderDate,
+              customerId: customerOrders.customerId,
+              status: customerOrders.status,
+              containerNumber: customerOrders.containerNumber,
+            })
+            .from(customerOrders)
+            .where(and(eq(customerOrders.companyId, companyId), inArray(customerOrders.id, orderIds)));
 
           for (const order of allRelevantOrders) {
             const balesInOrder = orderBalesForProduct.filter((b: any) => b.orderId === order.id);
             const qty = balesInOrder.length;
-            const total = balesInOrder.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || '0'), 0);
+            const total = balesInOrder.reduce((s: number, b: any) => s + parseFloat(b.priceUsed || "0"), 0);
             const pricePerBale = qty > 0 ? total / qty : 0;
 
-            const [customer] = await db.select({ legalName: customers.legalName }).from(customers)
+            const [customer] = await db
+              .select({ legalName: customers.legalName })
+              .from(customers)
               .where(eq(customers.id, order.customerId));
 
             const entry = {
@@ -342,16 +425,16 @@ export function registerFactoryProductsRoutes(app: Express) {
               invoiceNumber: order.invoiceNumber || `Order #${order.id}`,
               orderDate: order.orderDate,
               containerNumber: order.containerNumber,
-              customerName: customer?.legalName || 'Unknown',
+              customerName: customer?.legalName || "Unknown",
               qty,
               pricePerBale: pricePerBale.toFixed(2),
               total: total.toFixed(2),
               status: order.status,
             };
 
-            if (order.status === 'FINALIZED') {
+            if (order.status === "FINALIZED") {
               sales.push(entry);
-            } else if (['LOADING', 'PENDING_VERIFICATION', 'VERIFIED'].includes(order.status)) {
+            } else if (["LOADING", "PENDING_VERIFICATION", "VERIFIED"].includes(order.status)) {
               loaded.push(entry);
             }
           }
@@ -362,28 +445,41 @@ export function registerFactoryProductsRoutes(app: Express) {
       }
 
       // Current stock: IN_STOCK + FINALIZED bales grouped by location
-      const inStockBales = await db.select({
-        id: factoryBales.id,
-        weightKg: factoryBales.weightKg,
-        erpLocationId: factoryBales.erpLocationId,
-      }).from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.productId, productId),
-          eq(factoryBales.status, 'IN_STOCK')
-        ));
+      const inStockBales = await db
+        .select({
+          id: factoryBales.id,
+          weightKg: factoryBales.weightKg,
+          erpLocationId: factoryBales.erpLocationId,
+        })
+        .from(factoryBales)
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.productId, productId),
+            eq(factoryBales.status, "IN_STOCK")
+          )
+        );
 
-      const locStockMap = new Map<number, { locationId: number; locationName: string; qty: number; totalWeight: number }>();
+      const locStockMap = new Map<
+        number,
+        { locationId: number; locationName: string; qty: number; totalWeight: number }
+      >();
       for (const bale of inStockBales) {
         const locId = bale.erpLocationId ?? 0;
-        const existing = locStockMap.get(locId) ?? { locationId: locId, locationName: 'Unknown', qty: 0, totalWeight: 0 };
+        const existing = locStockMap.get(locId) ?? {
+          locationId: locId,
+          locationName: "Unknown",
+          qty: 0,
+          totalWeight: 0,
+        };
         existing.qty += 1;
         existing.totalWeight += parseFloat(bale.weightKg as any) || 0;
         locStockMap.set(locId, existing);
       }
-      const locIds = [...locStockMap.keys()].filter(id => id > 0);
+      const locIds = [...locStockMap.keys()].filter((id) => id > 0);
       if (locIds.length > 0) {
-        const locRecords = await db.select({ id: locations.id, name: locations.name })
+        const locRecords = await db
+          .select({ id: locations.id, name: locations.name })
           .from(locations)
           .where(inArray(locations.id, locIds));
         for (const loc of locRecords) {
@@ -424,7 +520,9 @@ export function registerFactoryProductsRoutes(app: Express) {
         if (!passwordValid) {
           return res.status(403).json({ message: "Invalid admin credentials" });
         }
-        const [adminRole] = await db.select().from(userCompanyRoles)
+        const [adminRole] = await db
+          .select()
+          .from(userCompanyRoles)
           .where(and(eq(userCompanyRoles.userId, adminUser.id), eq(userCompanyRoles.companyId, companyId)));
         if (!adminRole || !["Admin", "Owner", "Developer"].includes(adminRole.role)) {
           return res.status(403).json({ message: "The provided user does not have admin access to this company" });
@@ -436,34 +534,43 @@ export function registerFactoryProductsRoutes(app: Express) {
       const grade = req.body.grade;
 
       const gradeToPrefix: Record<string, string> = {
-        "CREAM": "HMD10",
+        CREAM: "HMD10",
         "#1": "HMD11",
         "#2": "HMD12",
         "#3": "HMD13",
         "#4": "HMD14",
-        "Garbage": "HMD16",
+        Garbage: "HMD16",
       };
 
       if (!articleCode && grade && gradeToPrefix[grade]) {
         const prefix = gradeToPrefix[grade];
         const prefixLen = prefix.length;
         const [maxResult] = await db
-          .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)` })
+          .select({
+            maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)`,
+          })
           .from(factoryBaleProducts)
-          .where(and(
-            eq(factoryBaleProducts.companyId, companyId),
-            sql`${factoryBaleProducts.articleCode} LIKE ${prefix + '%'}`,
-            sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
-          ));
+          .where(
+            and(
+              eq(factoryBaleProducts.companyId, companyId),
+              sql`${factoryBaleProducts.articleCode} LIKE ${prefix + "%"}`,
+              sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
+            )
+          );
         let nextNum = (maxResult?.maxNum || 0) + 1;
         let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
         let attempts = 0;
         while (attempts < 100) {
-          const candidateCodeClean = candidateCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+          const candidateCodeClean = candidateCode
+            .replace(/[^a-zA-Z0-9]/g, "")
+            .toUpperCase()
+            .substring(0, 50);
           const [dupArticle] = await db
             .select({ id: factoryBaleProducts.id })
             .from(factoryBaleProducts)
-            .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode)));
+            .where(
+              and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode))
+            );
           const [dupCode] = await db
             .select({ id: factoryBaleProducts.id })
             .from(factoryBaleProducts)
@@ -478,18 +585,24 @@ export function registerFactoryProductsRoutes(app: Express) {
         const noGradePrefix = "HMD00";
         const noGradePrefixLen = noGradePrefix.length;
         const [noGradeMax] = await db
-          .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${noGradePrefixLen + 1}) AS INTEGER)), 0)` })
+          .select({
+            maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${noGradePrefixLen + 1}) AS INTEGER)), 0)`,
+          })
           .from(factoryBaleProducts)
-          .where(and(
-            eq(factoryBaleProducts.companyId, companyId),
-            sql`${factoryBaleProducts.articleCode} LIKE ${noGradePrefix + '%'}`,
-            sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${noGradePrefixLen + 1}) ~ '^[0-9]+$'`
-          ));
+          .where(
+            and(
+              eq(factoryBaleProducts.companyId, companyId),
+              sql`${factoryBaleProducts.articleCode} LIKE ${noGradePrefix + "%"}`,
+              sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${noGradePrefixLen + 1}) ~ '^[0-9]+$'`
+            )
+          );
         let noGradeNext = (noGradeMax?.maxNum || 0) + 1;
         articleCode = `${noGradePrefix}${String(noGradeNext).padStart(3, "0")}`;
         let noGradeAttempts = 0;
         while (noGradeAttempts < 100) {
-          const [dupCheck] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
+          const [dupCheck] = await db
+            .select({ id: factoryBaleProducts.id })
+            .from(factoryBaleProducts)
             .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, articleCode)));
           if (!dupCheck) break;
           noGradeNext++;
@@ -500,43 +613,70 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       if (articleCode) {
         // Helper: check both articleCode AND code uniqueness within the company
-        const codeClean = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
-        const [existingArticle] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
+        const codeClean = articleCode
+          .replace(/[^a-zA-Z0-9]/g, "")
+          .toUpperCase()
+          .substring(0, 50);
+        const [existingArticle] = await db
+          .select({ id: factoryBaleProducts.id })
+          .from(factoryBaleProducts)
           .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, articleCode)));
-        const [existingCode] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
+        const [existingCode] = await db
+          .select({ id: factoryBaleProducts.id })
+          .from(factoryBaleProducts)
           .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, codeClean)));
 
         if (existingArticle || existingCode) {
           // Either articleCode or code is already taken — try to regenerate from the grade prefix
           const knownPrefixes = ["HMD10", "HMD11", "HMD12", "HMD13", "HMD14", "HMD16"];
-          const matchedPrefix = knownPrefixes.find(p => articleCode.startsWith(p) && /^\d+$/.test(articleCode.slice(p.length)));
+          const matchedPrefix = knownPrefixes.find(
+            (p) => articleCode.startsWith(p) && /^\d+$/.test(articleCode.slice(p.length))
+          );
           if (matchedPrefix) {
             const prefix = matchedPrefix;
             const prefixLen = prefix.length;
             const [maxResult] = await db
-              .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)` })
+              .select({
+                maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) AS INTEGER)), 0)`,
+              })
               .from(factoryBaleProducts)
-              .where(and(
-                eq(factoryBaleProducts.companyId, companyId),
-                sql`${factoryBaleProducts.articleCode} LIKE ${prefix + '%'}`,
-                sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
-              ));
+              .where(
+                and(
+                  eq(factoryBaleProducts.companyId, companyId),
+                  sql`${factoryBaleProducts.articleCode} LIKE ${prefix + "%"}`,
+                  sql`SUBSTRING(${factoryBaleProducts.articleCode} FROM ${prefixLen + 1}) ~ '^[0-9]+$'`
+                )
+              );
             let nextNum = (maxResult?.maxNum || 0) + 1;
             let candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
             let attempts = 0;
             while (attempts < 200) {
-              const candidateCodeClean = candidateCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
-              const [dupA] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
-                .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode)));
-              const [dupC] = await db.select({ id: factoryBaleProducts.id }).from(factoryBaleProducts)
-                .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean)));
+              const candidateCodeClean = candidateCode
+                .replace(/[^a-zA-Z0-9]/g, "")
+                .toUpperCase()
+                .substring(0, 50);
+              const [dupA] = await db
+                .select({ id: factoryBaleProducts.id })
+                .from(factoryBaleProducts)
+                .where(
+                  and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, candidateCode))
+                );
+              const [dupC] = await db
+                .select({ id: factoryBaleProducts.id })
+                .from(factoryBaleProducts)
+                .where(
+                  and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, candidateCodeClean))
+                );
               if (!dupA && !dupC) break;
               nextNum++;
               candidateCode = `${prefix}${String(nextNum).padStart(3, "0")}`;
               attempts++;
             }
             articleCode = candidateCode;
-            code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+            code = articleCode
+              .replace(/[^a-zA-Z0-9]/g, "")
+              .toUpperCase()
+              .substring(0, 50);
           } else {
             return res.status(400).json({ message: "A product with this article code already exists" });
           }
@@ -552,10 +692,12 @@ export function registerFactoryProductsRoutes(app: Express) {
         const [nameDup] = await db
           .select({ id: factoryBaleProducts.id })
           .from(factoryBaleProducts)
-          .where(and(
-            eq(factoryBaleProducts.companyId, companyId),
-            sql`LOWER(${factoryBaleProducts.name}) = LOWER(${nameToCheck})`
-          ));
+          .where(
+            and(
+              eq(factoryBaleProducts.companyId, companyId),
+              sql`LOWER(${factoryBaleProducts.name}) = LOWER(${nameToCheck})`
+            )
+          );
         if (nameDup) {
           return res.status(400).json({ message: `A product named "${nameToCheck}" already exists` });
         }
@@ -571,11 +713,15 @@ export function registerFactoryProductsRoutes(app: Express) {
           active: req.body.active !== undefined ? Boolean(req.body.active) : true,
         };
         if (req.body.description != null && req.body.description !== "") v.description = String(req.body.description);
-        if (req.body.weightPerBaleKg != null && req.body.weightPerBaleKg !== "") v.weightPerBaleKg = String(req.body.weightPerBaleKg);
+        if (req.body.weightPerBaleKg != null && req.body.weightPerBaleKg !== "")
+          v.weightPerBaleKg = String(req.body.weightPerBaleKg);
         if (req.body.categoryId != null) v.categoryId = parseInt(String(req.body.categoryId));
-        if (req.body.sellingPrice != null && req.body.sellingPrice !== "") v.sellingPrice = String(req.body.sellingPrice);
-        if (req.body.productionPrice != null && req.body.productionPrice !== "") v.productionPrice = String(req.body.productionPrice);
-        if (req.body.labelDesignColor != null && req.body.labelDesignColor !== "") v.labelDesignColor = String(req.body.labelDesignColor);
+        if (req.body.sellingPrice != null && req.body.sellingPrice !== "")
+          v.sellingPrice = String(req.body.sellingPrice);
+        if (req.body.productionPrice != null && req.body.productionPrice !== "")
+          v.productionPrice = String(req.body.productionPrice);
+        if (req.body.labelDesignColor != null && req.body.labelDesignColor !== "")
+          v.labelDesignColor = String(req.body.labelDesignColor);
         return v;
       };
 
@@ -583,7 +729,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       // keep incrementing the numeric suffix until we find a free slot.
       let product: any;
       const knownPrefixesRetry = ["HMD10", "HMD11", "HMD12", "HMD13", "HMD14", "HMD16", "HMD00"];
-      const retryPrefix = knownPrefixesRetry.find(p => articleCode.startsWith(p) && /^\d+$/.test(articleCode.slice(p.length)));
+      const retryPrefix = knownPrefixesRetry.find(
+        (p) => articleCode.startsWith(p) && /^\d+$/.test(articleCode.slice(p.length))
+      );
       let retryAttempts = 0;
       while (true) {
         try {
@@ -603,7 +751,10 @@ export function registerFactoryProductsRoutes(app: Express) {
           const currentNum = parseInt(articleCode.slice(retryPrefix.length)) || 0;
           const nextCandidate = `${retryPrefix}${String(currentNum + 1).padStart(3, "0")}`;
           articleCode = nextCandidate;
-          code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+          code = articleCode
+            .replace(/[^a-zA-Z0-9]/g, "")
+            .toUpperCase()
+            .substring(0, 50);
         }
       }
       res.json(product);
@@ -644,7 +795,16 @@ export function registerFactoryProductsRoutes(app: Express) {
       const id = parseId(req.params.id);
 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const { name, weightPerBaleKg, articleCode, description, categoryId, productionPrice, sellingPrice, labelDesignColor } = req.body;
+      const {
+        name,
+        weightPerBaleKg,
+        articleCode,
+        description,
+        categoryId,
+        productionPrice,
+        sellingPrice,
+        labelDesignColor,
+      } = req.body;
 
       const [existing] = await db
         .select()
@@ -658,11 +818,13 @@ export function registerFactoryProductsRoutes(app: Express) {
         const [nameConflict] = await db
           .select({ id: factoryBaleProducts.id })
           .from(factoryBaleProducts)
-          .where(and(
-            eq(factoryBaleProducts.companyId, companyId),
-            sql`LOWER(${factoryBaleProducts.name}) = LOWER(${name.trim()})`,
-            sql`${factoryBaleProducts.id} != ${id}`
-          ));
+          .where(
+            and(
+              eq(factoryBaleProducts.companyId, companyId),
+              sql`LOWER(${factoryBaleProducts.name}) = LOWER(${name.trim()})`,
+              sql`${factoryBaleProducts.id} != ${id}`
+            )
+          );
         if (nameConflict) {
           return res.status(400).json({ message: `A product named "${name.trim()}" already exists` });
         }
@@ -673,11 +835,13 @@ export function registerFactoryProductsRoutes(app: Express) {
         const [conflict] = await db
           .select({ id: factoryBaleProducts.id })
           .from(factoryBaleProducts)
-          .where(and(
-            eq(factoryBaleProducts.companyId, companyId),
-            eq(factoryBaleProducts.articleCode, articleCode),
-            sql`${factoryBaleProducts.id} != ${id}`
-          ));
+          .where(
+            and(
+              eq(factoryBaleProducts.companyId, companyId),
+              eq(factoryBaleProducts.articleCode, articleCode),
+              sql`${factoryBaleProducts.id} != ${id}`
+            )
+          );
         if (conflict) {
           return res.status(400).json({ message: `Article code "${articleCode}" is already used by another product` });
         }
@@ -697,8 +861,10 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (articleCode !== undefined) productUpdate.articleCode = articleCode;
       if (description !== undefined) productUpdate.description = description;
       if (categoryId !== undefined) productUpdate.categoryId = categoryId;
-      if (productionPrice !== undefined && productionPrice !== "") productUpdate.productionPrice = String(parseFloat(productionPrice) || 0);
-      if (sellingPrice !== undefined && sellingPrice !== "") productUpdate.sellingPrice = String(parseFloat(sellingPrice) || 0);
+      if (productionPrice !== undefined && productionPrice !== "")
+        productUpdate.productionPrice = String(parseFloat(productionPrice) || 0);
+      if (sellingPrice !== undefined && sellingPrice !== "")
+        productUpdate.sellingPrice = String(parseFloat(sellingPrice) || 0);
       if (labelDesignColor !== undefined) productUpdate.labelDesignColor = labelDesignColor || null;
 
       const [updatedProduct] = await db
@@ -709,7 +875,8 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       const baleUpdate: any = {};
       if (name !== undefined && name !== existing.name) baleUpdate.productName = name;
-      if (weightPerBaleKg !== undefined && weightPerBaleKg !== existing.weightPerBaleKg) baleUpdate.weightKg = weightPerBaleKg;
+      if (weightPerBaleKg !== undefined && weightPerBaleKg !== existing.weightPerBaleKg)
+        baleUpdate.weightKg = weightPerBaleKg;
       if (articleCode !== undefined && articleCode !== existing.articleCode) baleUpdate.articleCode = articleCode;
 
       let balesUpdated = 0;
@@ -761,7 +928,20 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       if (!location) return res.status(404).json({ message: "Location not found" });
 
-      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
 
       const startDate = new Date(year, 0, 1);
       const endDate = new Date(year + 1, 0, 1);
@@ -771,34 +951,44 @@ export function registerFactoryProductsRoutes(app: Express) {
         .select({
           month: sql<number>`EXTRACT(MONTH FROM ${factoryBales.createdAt})`.as("month"),
           balesIn: sql<number>`COUNT(*)::int`.as("bales_in"),
-          balesOut: sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN 1 ELSE 0 END)::int`.as("bales_out"),
+          balesOut:
+            sql<number>`SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN 1 ELSE 0 END)::int`.as(
+              "bales_out"
+            ),
           // balesInStock = all IN_STOCK bales from this month
-          balesInStock: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' THEN 1 ELSE 0 END)::int`.as("bales_in_stock"),
+          balesInStock: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' THEN 1 ELSE 0 END)::int`.as(
+            "bales_in_stock"
+          ),
           // balesLoading = IN_STOCK bales that are assigned to a LOADING order
           balesLoading: sql<number>`SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' AND EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw("factory_bales.id")} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN 1 ELSE 0 END)::int`.as("bales_loading"),
           totalWeightIn: sql<number>`COALESCE(SUM(${factoryBales.weightKg}::numeric), 0)`.as("total_weight_in"),
-          totalWeightOut: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_out"),
+          totalWeightOut:
+            sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} IN ('SOLD','REMOVED','DELETED','DISPATCHED') THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as(
+              "total_weight_out"
+            ),
           // Weight of bales from this month that are currently IN_STOCK and not in a loading order
           totalWeightInStock: sql<number>`COALESCE(SUM(CASE WHEN ${factoryBales.status} = 'IN_STOCK' AND NOT EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw("factory_bales.id")} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_in_stock"),
           totalCost: sql<number>`COALESCE(SUM(${factoryBales.totalCost}::numeric), 0)`.as("total_cost"),
         })
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.productId, productId),
-          eq(factoryBales.erpLocationId, locationId),
-          sql`${factoryBales.createdAt} >= ${startDate}`,
-          sql`${factoryBales.createdAt} < ${endDate}`,
-          not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
-        ))
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.productId, productId),
+            eq(factoryBales.erpLocationId, locationId),
+            sql`${factoryBales.createdAt} >= ${startDate}`,
+            sql`${factoryBales.createdAt} < ${endDate}`,
+            not(inArray(factoryBales.status, ["DELETED", "REMOVED"]))
+          )
+        )
         .groupBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`)
         .orderBy(sql`EXTRACT(MONTH FROM ${factoryBales.createdAt})`);
 
@@ -809,26 +999,28 @@ export function registerFactoryProductsRoutes(app: Express) {
           balesNet: sql<number>`SUM(CASE WHEN NOT EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw("factory_bales.id")} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN 1 ELSE 0 END)::int`.as("bales_net"),
           balesLoading: sql<number>`SUM(CASE WHEN EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw("factory_bales.id")} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN 1 ELSE 0 END)::int`.as("bales_loading"),
           totalWeightNet: sql<number>`COALESCE(SUM(CASE WHEN NOT EXISTS (
             SELECT 1 FROM customer_order_bales cob
             JOIN customer_orders co ON co.id = cob.order_id
-            WHERE cob.bale_id = ${sql.raw('factory_bales.id')} AND co.status = 'LOADING' AND co.company_id = ${companyId}
+            WHERE cob.bale_id = ${sql.raw("factory_bales.id")} AND co.status = 'LOADING' AND co.company_id = ${companyId}
           ) THEN ${factoryBales.weightKg}::numeric ELSE 0 END), 0)`.as("total_weight_net"),
         })
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.productId, productId),
-          eq(factoryBales.erpLocationId, locationId),
-          eq(factoryBales.status, "IN_STOCK"),
-        ));
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            eq(factoryBales.productId, productId),
+            eq(factoryBales.erpLocationId, locationId),
+            eq(factoryBales.status, "IN_STOCK")
+          )
+        );
 
       const realInStockCount = Number(inStockSnapshot?.balesNet ?? 0);
       const realLoadingCount = Number(inStockSnapshot?.balesLoading ?? 0);
@@ -889,131 +1081,136 @@ export function registerFactoryProductsRoutes(app: Express) {
     }
   });
 
-  app.get("/api/factory/bale-product-history/:productId/:locationId/:year/:month", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.get(
+    "/api/factory/bale-product-history/:productId/:locationId/:year/:month",
+    requireAuth,
+    async (req: any, res: any) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const productId = parseId(req.params.productId);
+        const productId = parseId(req.params.productId);
 
-      if (productId === null) return res.status(400).json({ message: "Invalid id" });
-      const locationId = parseId(req.params.locationId);
-      if (locationId === null) return res.status(400).json({ message: "Invalid id" });
-      const year = parseId(req.params.year);
-      if (year === null) return res.status(400).json({ message: "Invalid id" });
-      const month = parseId(req.params.month);
-      if (month === null) return res.status(400).json({ message: "Invalid id" });
+        if (productId === null) return res.status(400).json({ message: "Invalid id" });
+        const locationId = parseId(req.params.locationId);
+        if (locationId === null) return res.status(400).json({ message: "Invalid id" });
+        const year = parseId(req.params.year);
+        if (year === null) return res.status(400).json({ message: "Invalid id" });
+        const month = parseId(req.params.month);
+        if (month === null) return res.status(400).json({ message: "Invalid id" });
 
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 1);
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 1);
 
-      const bales = await db
-        .select({
-          id: factoryBales.id,
-          baleCode: factoryBales.baleCode,
-          referenceNumber: factoryBales.referenceNumber,
-          weightKg: factoryBales.weightKg,
-          costPerKg: factoryBales.costPerKg,
-          totalCost: factoryBales.totalCost,
-          status: factoryBales.status,
-          createdAt: factoryBales.createdAt,
-        })
-        .from(factoryBales)
-        .where(and(
+        const bales = await db
+          .select({
+            id: factoryBales.id,
+            baleCode: factoryBales.baleCode,
+            referenceNumber: factoryBales.referenceNumber,
+            weightKg: factoryBales.weightKg,
+            costPerKg: factoryBales.costPerKg,
+            totalCost: factoryBales.totalCost,
+            status: factoryBales.status,
+            createdAt: factoryBales.createdAt,
+          })
+          .from(factoryBales)
+          .where(
+            and(
+              eq(factoryBales.companyId, companyId),
+              eq(factoryBales.productId, productId),
+              eq(factoryBales.erpLocationId, locationId),
+              sql`${factoryBales.createdAt} >= ${startDate}`,
+              sql`${factoryBales.createdAt} < ${endDate}`,
+              not(inArray(factoryBales.status, ["DELETED", "REMOVED"]))
+            )
+          )
+          .orderBy(desc(factoryBales.createdAt));
+
+        const [product] = await db
+          .select({ sellingPrice: factoryBaleProducts.sellingPrice })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
+
+        res.json({ bales, sellingPrice: product?.sellingPrice || "0" });
+      } catch (error: any) {
+        console.error("Error fetching monthly bale details:", error);
+        res.status(500).json({ message: error.message });
+      }
+    }
+  );
+
+  app.get(
+    "/api/factory/bale-product-history/:productId/:locationId/all-bales",
+    requireAuth,
+    async (req: any, res: any) => {
+      try {
+        const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+        const productId = parseId(req.params.productId);
+
+        if (productId === null) return res.status(400).json({ message: "Invalid id" });
+        const locationId = parseId(req.params.locationId);
+        if (locationId === null) return res.status(400).json({ message: "Invalid id" });
+        const year = req.query.year ? parseOptionalId(req.query.year) : null;
+
+        const conditions = [
           eq(factoryBales.companyId, companyId),
           eq(factoryBales.productId, productId),
           eq(factoryBales.erpLocationId, locationId),
-          sql`${factoryBales.createdAt} >= ${startDate}`,
-          sql`${factoryBales.createdAt} < ${endDate}`,
           not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
-        ))
-        .orderBy(desc(factoryBales.createdAt));
+        ];
 
-      const [product] = await db
-        .select({ sellingPrice: factoryBaleProducts.sellingPrice })
-        .from(factoryBaleProducts)
-        .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
+        if (year) {
+          const startDate = new Date(year, 0, 1);
+          const endDate = new Date(year + 1, 0, 1);
+          conditions.push(sql`${factoryBales.createdAt} >= ${startDate}`);
+          conditions.push(sql`${factoryBales.createdAt} < ${endDate}`);
+        }
 
-      res.json({ bales, sellingPrice: product?.sellingPrice || "0" });
-    } catch (error: any) {
-      console.error("Error fetching monthly bale details:", error);
-      res.status(500).json({ message: error.message });
-    }
-  });
+        const bales = await db
+          .select({
+            id: factoryBales.id,
+            baleCode: factoryBales.baleCode,
+            referenceNumber: factoryBales.referenceNumber,
+            weightKg: factoryBales.weightKg,
+            costPerKg: factoryBales.costPerKg,
+            totalCost: factoryBales.totalCost,
+            status: factoryBales.status,
+            createdAt: factoryBales.createdAt,
+          })
+          .from(factoryBales)
+          .where(and(...conditions))
+          .orderBy(desc(factoryBales.createdAt));
 
-  app.get("/api/factory/bale-product-history/:productId/:locationId/all-bales", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+        // Find which IN_STOCK bales are currently scanned into a LOADING order
+        // (V5 bales stay IN_STOCK during loading — need cross-reference to detect)
+        const inStockIds = bales.filter((b) => b.status === "IN_STOCK").map((b) => b.id);
+        const loadingBaleIds = new Set<number>();
+        if (inStockIds.length > 0) {
+          const loadingRows = await db
+            .select({ baleId: customerOrderBales.baleId })
+            .from(customerOrderBales)
+            .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
+            .where(and(eq(customerOrders.status, "LOADING"), inArray(customerOrderBales.baleId, inStockIds)));
+          for (const r of loadingRows) loadingBaleIds.add(r.baleId);
+        }
 
-      const productId = parseId(req.params.productId);
+        const [product] = await db
+          .select({ sellingPrice: factoryBaleProducts.sellingPrice })
+          .from(factoryBaleProducts)
+          .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
 
-      if (productId === null) return res.status(400).json({ message: "Invalid id" });
-      const locationId = parseId(req.params.locationId);
-      if (locationId === null) return res.status(400).json({ message: "Invalid id" });
-      const year = req.query.year ? parseOptionalId(req.query.year) : null;
-
-      const conditions = [
-        eq(factoryBales.companyId, companyId),
-        eq(factoryBales.productId, productId),
-        eq(factoryBales.erpLocationId, locationId),
-        not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
-      ];
-
-      if (year) {
-        const startDate = new Date(year, 0, 1);
-        const endDate = new Date(year + 1, 0, 1);
-        conditions.push(sql`${factoryBales.createdAt} >= ${startDate}`);
-        conditions.push(sql`${factoryBales.createdAt} < ${endDate}`);
+        res.json({
+          bales: bales.map((b) => ({ ...b, isInLoadingOrder: loadingBaleIds.has(b.id) })),
+          sellingPrice: product?.sellingPrice || "0",
+        });
+      } catch (error: any) {
+        console.error("Error fetching all bale details:", error);
+        res.status(500).json({ message: error.message });
       }
-
-      const bales = await db
-        .select({
-          id: factoryBales.id,
-          baleCode: factoryBales.baleCode,
-          referenceNumber: factoryBales.referenceNumber,
-          weightKg: factoryBales.weightKg,
-          costPerKg: factoryBales.costPerKg,
-          totalCost: factoryBales.totalCost,
-          status: factoryBales.status,
-          createdAt: factoryBales.createdAt,
-        })
-        .from(factoryBales)
-        .where(and(...conditions))
-        .orderBy(desc(factoryBales.createdAt));
-
-      // Find which IN_STOCK bales are currently scanned into a LOADING order
-      // (V5 bales stay IN_STOCK during loading — need cross-reference to detect)
-      const inStockIds = bales.filter((b) => b.status === "IN_STOCK").map((b) => b.id);
-      const loadingBaleIds = new Set<number>();
-      if (inStockIds.length > 0) {
-        const loadingRows = await db
-          .select({ baleId: customerOrderBales.baleId })
-          .from(customerOrderBales)
-          .innerJoin(customerOrders, eq(customerOrderBales.orderId, customerOrders.id))
-          .where(
-            and(
-              eq(customerOrders.status, "LOADING"),
-              inArray(customerOrderBales.baleId, inStockIds),
-            )
-          );
-        for (const r of loadingRows) loadingBaleIds.add(r.baleId);
-      }
-
-      const [product] = await db
-        .select({ sellingPrice: factoryBaleProducts.sellingPrice })
-        .from(factoryBaleProducts)
-        .where(and(eq(factoryBaleProducts.id, productId), eq(factoryBaleProducts.companyId, companyId)));
-
-      res.json({
-        bales: bales.map((b) => ({ ...b, isInLoadingOrder: loadingBaleIds.has(b.id) })),
-        sellingPrice: product?.sellingPrice || "0",
-      });
-    } catch (error: any) {
-      console.error("Error fetching all bale details:", error);
-      res.status(500).json({ message: error.message });
     }
-  });
+  );
 
   app.delete("/api/factory/bale-products/:id", requireAuth, async (req: any, res: any) => {
     try {
@@ -1047,7 +1244,8 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: "ids array required" });
       if (typeof active !== "boolean") return res.status(400).json({ message: "active boolean required" });
 
-      await db.update(factoryBaleProducts)
+      await db
+        .update(factoryBaleProducts)
         .set({ active, updatedAt: new Date() })
         .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.id, ids)));
 
@@ -1070,13 +1268,15 @@ export function registerFactoryProductsRoutes(app: Express) {
       const products = await db
         .select()
         .from(factoryBaleProducts)
-        .where(and(
-          eq(factoryBaleProducts.companyId, companyId),
-          or(
-            ilike(factoryBaleProducts.code, `${codePrefix}%`),
-            ilike(factoryBaleProducts.articleCode, `${codePrefix}%`)
+        .where(
+          and(
+            eq(factoryBaleProducts.companyId, companyId),
+            or(
+              ilike(factoryBaleProducts.code, `${codePrefix}%`),
+              ilike(factoryBaleProducts.articleCode, `${codePrefix}%`)
+            )
           )
-        ))
+        )
         .orderBy(factoryBaleProducts.id);
 
       const matches = products
@@ -1214,7 +1414,10 @@ export function registerFactoryProductsRoutes(app: Express) {
 
       for (const row of prices) {
         const id = parseInt(String(row.id));
-        if (isNaN(id) || id <= 0) { skipped++; continue; }
+        if (isNaN(id) || id <= 0) {
+          skipped++;
+          continue;
+        }
 
         const updates: Record<string, any> = { updatedAt: new Date() };
 
@@ -1222,12 +1425,19 @@ export function registerFactoryProductsRoutes(app: Express) {
           const sp = parseFloat(String(row.sellingPrice));
           if (!isNaN(sp) && sp >= 0) updates.sellingPrice = sp.toFixed(2);
         }
-        if (row.productionPrice !== undefined && row.productionPrice !== null && String(row.productionPrice).trim() !== "") {
+        if (
+          row.productionPrice !== undefined &&
+          row.productionPrice !== null &&
+          String(row.productionPrice).trim() !== ""
+        ) {
           const pp = parseFloat(String(row.productionPrice));
           if (!isNaN(pp) && pp >= 0) updates.productionPrice = pp.toFixed(2);
         }
 
-        if (Object.keys(updates).length <= 1) { skipped++; continue; }
+        if (Object.keys(updates).length <= 1) {
+          skipped++;
+          continue;
+        }
 
         await db
           .update(factoryBaleProducts)
@@ -1257,7 +1467,10 @@ export function registerFactoryProductsRoutes(app: Express) {
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-          const { read: readExcel, utils: { sheet_to_json: sheetToJson } } = await import("xlsx");
+          const {
+            read: readExcel,
+            utils: { sheet_to_json: sheetToJson },
+          } = await import("xlsx");
           const workbook = readExcel(req.file.buffer, { type: "buffer" });
           const sheetName = workbook.SheetNames[0];
           const rows: any[] = sheetToJson(workbook.Sheets[sheetName]);
@@ -1270,9 +1483,25 @@ export function registerFactoryProductsRoutes(app: Express) {
 
           // Detect column names from the first row for feedback
           const firstRow = rows[0] || {};
-          const detectedArticleCodeCol = Object.keys(firstRow).find(k => ["articlecode", "article_code", "article code", "barcode"].includes(k.toLowerCase())) || null;
-          const detectedProductionPriceCol = Object.keys(firstRow).find(k => ["production price", "productionprice", "production_price", "cost price", "costprice", "cost_price"].includes(k.toLowerCase())) || null;
-          const detectedSellingPriceCol = Object.keys(firstRow).find(k => ["selling price", "sellingprice", "selling_price"].includes(k.toLowerCase())) || null;
+          const detectedArticleCodeCol =
+            Object.keys(firstRow).find((k) =>
+              ["articlecode", "article_code", "article code", "barcode"].includes(k.toLowerCase())
+            ) || null;
+          const detectedProductionPriceCol =
+            Object.keys(firstRow).find((k) =>
+              [
+                "production price",
+                "productionprice",
+                "production_price",
+                "cost price",
+                "costprice",
+                "cost_price",
+              ].includes(k.toLowerCase())
+            ) || null;
+          const detectedSellingPriceCol =
+            Object.keys(firstRow).find((k) =>
+              ["selling price", "sellingprice", "selling_price"].includes(k.toLowerCase())
+            ) || null;
 
           const categoryCache = new Map<string, number>();
           const existingCategories = await db
@@ -1284,19 +1513,52 @@ export function registerFactoryProductsRoutes(app: Express) {
           }
 
           for (const row of rows) {
-            const articleCode = String(row.articleCode || row.article_code || row.ArticleCode || row["Article Code"] || "").trim();
-            if (!articleCode) { skippedNoArticleCode++; continue; }
+            const articleCode = String(
+              row.articleCode || row.article_code || row.ArticleCode || row["Article Code"] || ""
+            ).trim();
+            if (!articleCode) {
+              skippedNoArticleCode++;
+              continue;
+            }
 
             const name = String(row.name || row.Name || row.productName || row["Product Name"] || articleCode).trim();
             const description = String(row.description || row.Description || "").trim() || null;
-            const weightPerBaleKg = row.weightPerBaleKg || row.weight_per_bale_kg || row.WeightPerBaleKg || row["Weight Per Bale"] || row.weight || null;
+            const weightPerBaleKg =
+              row.weightPerBaleKg ||
+              row.weight_per_bale_kg ||
+              row.WeightPerBaleKg ||
+              row["Weight Per Bale"] ||
+              row.weight ||
+              null;
             const categoryName = String(row.category || row.Category || row.categoryName || "").trim();
 
-            const rawSellingPrice = row["selling price"] ?? row["sellingPrice"] ?? row["selling_price"] ?? row["Selling Price"] ?? row["SELLING PRICE"] ?? null;
-            const sellingPrice = rawSellingPrice !== null && rawSellingPrice !== "" ? String(parseFloat(String(rawSellingPrice)) || 0) : null;
+            const rawSellingPrice =
+              row["selling price"] ??
+              row["sellingPrice"] ??
+              row["selling_price"] ??
+              row["Selling Price"] ??
+              row["SELLING PRICE"] ??
+              null;
+            const sellingPrice =
+              rawSellingPrice !== null && rawSellingPrice !== ""
+                ? String(parseFloat(String(rawSellingPrice)) || 0)
+                : null;
 
-            const rawProductionPrice = row["production price"] ?? row["productionPrice"] ?? row["production_price"] ?? row["Production Price"] ?? row["PRODUCTION PRICE"] ?? row["cost price"] ?? row["costPrice"] ?? row["cost_price"] ?? row["Cost Price"] ?? null;
-            const productionPrice = rawProductionPrice !== null && rawProductionPrice !== "" ? String(parseFloat(String(rawProductionPrice)) || 0) : null;
+            const rawProductionPrice =
+              row["production price"] ??
+              row["productionPrice"] ??
+              row["production_price"] ??
+              row["Production Price"] ??
+              row["PRODUCTION PRICE"] ??
+              row["cost price"] ??
+              row["costPrice"] ??
+              row["cost_price"] ??
+              row["Cost Price"] ??
+              null;
+            const productionPrice =
+              rawProductionPrice !== null && rawProductionPrice !== ""
+                ? String(parseFloat(String(rawProductionPrice)) || 0)
+                : null;
 
             let categoryId: number | null = null;
             if (categoryName) {
@@ -1314,12 +1576,17 @@ export function registerFactoryProductsRoutes(app: Express) {
               }
             }
 
-            const code = articleCode.replace(/[^a-zA-Z0-9]/g, "").toUpperCase().substring(0, 50);
+            const code = articleCode
+              .replace(/[^a-zA-Z0-9]/g, "")
+              .toUpperCase()
+              .substring(0, 50);
 
             let [existing] = await db
               .select()
               .from(factoryBaleProducts)
-              .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, articleCode)));
+              .where(
+                and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.articleCode, articleCode))
+              );
 
             if (!existing) {
               [existing] = await db
@@ -1328,7 +1595,9 @@ export function registerFactoryProductsRoutes(app: Express) {
                 .where(and(eq(factoryBaleProducts.companyId, companyId), eq(factoryBaleProducts.code, code)));
             }
 
-            const hasPriceData = (productionPrice !== null && parseFloat(productionPrice) > 0) || (sellingPrice !== null && parseFloat(sellingPrice) > 0);
+            const hasPriceData =
+              (productionPrice !== null && parseFloat(productionPrice) > 0) ||
+              (sellingPrice !== null && parseFloat(sellingPrice) > 0);
 
             if (existing) {
               await db
@@ -1411,8 +1680,9 @@ export function registerFactoryProductsRoutes(app: Express) {
           const getVal = (row: any, ...keys: string[]): any => {
             const rowKeys = Object.keys(row);
             for (const k of keys) {
-              const found = rowKeys.find(rk => rk.trim().toLowerCase() === k.toLowerCase());
-              if (found && row[found] !== undefined && row[found] !== null && String(row[found]).trim() !== "") return row[found];
+              const found = rowKeys.find((rk) => rk.trim().toLowerCase() === k.toLowerCase());
+              if (found && row[found] !== undefined && row[found] !== null && String(row[found]).trim() !== "")
+                return row[found];
             }
             return undefined;
           };
@@ -1426,14 +1696,38 @@ export function registerFactoryProductsRoutes(app: Express) {
             if (p.articleCode) productByArticle.set(p.articleCode.trim().toUpperCase(), p);
           }
 
-          const validRows: { rowIndex: number; articleCode: string; productName: string; productId: number; quantity: number; weight: number; productionDate: string }[] = [];
+          const validRows: {
+            rowIndex: number;
+            articleCode: string;
+            productName: string;
+            productId: number;
+            quantity: number;
+            weight: number;
+            productionDate: string;
+          }[] = [];
           const skippedRows: { rowIndex: number; articleCode: string; reason: string }[] = [];
 
           for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
-            const rawCode = getVal(row, "ITEM BARCODE", "Item Barcode", "itemBarcode", "articleCode", "article_code", "ArticleCode", "Article Code", "barcode", "Barcode", "ITEM NAME", "Item Name");
+            const rawCode = getVal(
+              row,
+              "ITEM BARCODE",
+              "Item Barcode",
+              "itemBarcode",
+              "articleCode",
+              "article_code",
+              "ArticleCode",
+              "Article Code",
+              "barcode",
+              "Barcode",
+              "ITEM NAME",
+              "Item Name"
+            );
             const articleCode = rawCode ? String(rawCode).trim().toUpperCase() : "";
-            if (!articleCode) { skippedRows.push({ rowIndex: i + 2, articleCode: "", reason: "Empty article code" }); continue; }
+            if (!articleCode) {
+              skippedRows.push({ rowIndex: i + 2, articleCode: "", reason: "Empty article code" });
+              continue;
+            }
 
             const product = productByArticle.get(articleCode);
             if (!product) {
@@ -1449,7 +1743,15 @@ export function registerFactoryProductsRoutes(app: Express) {
             const weight = parseFloat(String(product.weightPerBaleKg || "25"));
 
             let prodDate: Date | null = null;
-            const rawDate = getVal(row, "PRODUCTION DATE", "Production Date", "productionDate", "production_date", "date", "Date");
+            const rawDate = getVal(
+              row,
+              "PRODUCTION DATE",
+              "Production Date",
+              "productionDate",
+              "production_date",
+              "date",
+              "Date"
+            );
             if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
               prodDate = rawDate;
             } else if (rawDate) {
@@ -1511,7 +1813,7 @@ export function registerFactoryProductsRoutes(app: Express) {
 
           if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-          const locationId = req.body.locationId ? parseId(req.body.locationId) ?? -1 : null;
+          const locationId = req.body.locationId ? (parseId(req.body.locationId) ?? -1) : null;
 
           const XLSX = await import("xlsx");
           const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
@@ -1521,8 +1823,9 @@ export function registerFactoryProductsRoutes(app: Express) {
           const getVal = (row: any, ...keys: string[]): any => {
             const rowKeys = Object.keys(row);
             for (const k of keys) {
-              const found = rowKeys.find(rk => rk.trim().toLowerCase() === k.toLowerCase());
-              if (found && row[found] !== undefined && row[found] !== null && String(row[found]).trim() !== "") return row[found];
+              const found = rowKeys.find((rk) => rk.trim().toLowerCase() === k.toLowerCase());
+              if (found && row[found] !== undefined && row[found] !== null && String(row[found]).trim() !== "")
+                return row[found];
             }
             return undefined;
           };
@@ -1543,12 +1846,32 @@ export function registerFactoryProductsRoutes(app: Express) {
           const rowGroups: { product: any; qty: number; weight: number; prodDate: Date }[] = [];
           let totalBalesNeeded = 0;
 
-          console.log("Bale import: processing", rows.length, "rows. First row keys:", rows.length > 0 ? Object.keys(rows[0]) : "none");
+          console.log(
+            "Bale import: processing",
+            rows.length,
+            "rows. First row keys:",
+            rows.length > 0 ? Object.keys(rows[0]) : "none"
+          );
 
           for (const row of rows) {
-            const rawCode = getVal(row, "ITEM BARCODE", "Item Barcode", "itemBarcode", "articleCode", "article_code", "ArticleCode", "Article Code", "barcode", "Barcode");
+            const rawCode = getVal(
+              row,
+              "ITEM BARCODE",
+              "Item Barcode",
+              "itemBarcode",
+              "articleCode",
+              "article_code",
+              "ArticleCode",
+              "Article Code",
+              "barcode",
+              "Barcode"
+            );
             const articleCode = rawCode ? String(rawCode).trim().toUpperCase() : "";
-            if (!articleCode) { skippedRows++; skippedDetails.push("Row with empty article code"); continue; }
+            if (!articleCode) {
+              skippedRows++;
+              skippedDetails.push("Row with empty article code");
+              continue;
+            }
 
             const product = productByArticle.get(articleCode);
             if (!product) {
@@ -1567,7 +1890,15 @@ export function registerFactoryProductsRoutes(app: Express) {
             const weight = parseFloat(String(product.weightPerBaleKg || "25"));
 
             let prodDate: Date | null = null;
-            const rawDate = getVal(row, "PRODUCTION DATE", "Production Date", "productionDate", "production_date", "date", "Date");
+            const rawDate = getVal(
+              row,
+              "PRODUCTION DATE",
+              "Production Date",
+              "productionDate",
+              "production_date",
+              "date",
+              "Date"
+            );
             if (rawDate instanceof Date && !isNaN(rawDate.getTime())) {
               prodDate = rawDate;
             } else if (rawDate) {
@@ -1616,25 +1947,23 @@ export function registerFactoryProductsRoutes(app: Express) {
             let baleIndex = 0;
             for (const group of rowGroups) {
               for (let i = 0; i < group.qty; i++) {
-                const refNum = `REF${String(nextNumber + baleIndex).padStart(6, '0')}`;
-                await tx
-                  .insert(factoryBales)
-                  .values({
-                    companyId,
-                    mixBatchId: null,
-                    productId: group.product.id,
-                    erpLocationId: locationId,
-                    baleCode: group.product.code,
-                    referenceNumber: refNum,
-                    articleCode: group.product.articleCode,
-                    productName: group.product.name,
-                    weightKg: String(group.weight),
-                    costPerKg: "0",
-                    totalCost: "0",
-                    status: "IN_STOCK",
-                    finalizedAt: group.prodDate,
-                    createdAt: group.prodDate,
-                  });
+                const refNum = `REF${String(nextNumber + baleIndex).padStart(6, "0")}`;
+                await tx.insert(factoryBales).values({
+                  companyId,
+                  mixBatchId: null,
+                  productId: group.product.id,
+                  erpLocationId: locationId,
+                  baleCode: group.product.code,
+                  referenceNumber: refNum,
+                  articleCode: group.product.articleCode,
+                  productName: group.product.name,
+                  weightKg: String(group.weight),
+                  costPerKg: "0",
+                  totalCost: "0",
+                  status: "IN_STOCK",
+                  finalizedAt: group.prodDate,
+                  createdAt: group.prodDate,
+                });
                 baleIndex++;
               }
               totalBalesCreated += group.qty;
@@ -1694,7 +2023,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       const { articleCode } = req.query;
       const conditions = [eq(factoryBaleProductImages.companyId, companyId)];
       if (articleCode) conditions.push(eq(factoryBaleProductImages.articleCode, String(articleCode)));
-      const images = await db.select().from(factoryBaleProductImages)
+      const images = await db
+        .select()
+        .from(factoryBaleProductImages)
         .where(and(...conditions))
         .orderBy(asc(factoryBaleProductImages.sortOrder), asc(factoryBaleProductImages.uploadedAt));
       res.json(images);
@@ -1713,14 +2044,17 @@ export function registerFactoryProductsRoutes(app: Express) {
         const { articleCode, productId } = req.body;
         if (!articleCode) return res.status(400).json({ message: "articleCode is required" });
         const url = `/api/factory/uploads/product-images/${req.file.filename}`;
-        const [created] = await db.insert(factoryBaleProductImages).values({
-          companyId,
-          articleCode,
-          productId: productId ? parseInt(productId) : null,
-          url,
-          fileName: req.file.originalname,
-          sortOrder: 0,
-        }).returning();
+        const [created] = await db
+          .insert(factoryBaleProductImages)
+          .values({
+            companyId,
+            articleCode,
+            productId: productId ? parseInt(productId) : null,
+            url,
+            fileName: req.file.originalname,
+            sortOrder: 0,
+          })
+          .returning();
         res.json(created);
       } catch (e: any) {
         res.status(500).json({ message: e.message });
@@ -1734,7 +2068,9 @@ export function registerFactoryProductsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseId(req.params.id);
       if (id === null) return res.status(400).json({ message: "Invalid id" });
-      const [img] = await db.select().from(factoryBaleProductImages)
+      const [img] = await db
+        .select()
+        .from(factoryBaleProductImages)
         .where(and(eq(factoryBaleProductImages.id, id), eq(factoryBaleProductImages.companyId, companyId)));
       if (!img) return res.status(404).json({ message: "Image not found" });
       // Delete physical file
@@ -1743,12 +2079,12 @@ export function registerFactoryProductsRoutes(app: Express) {
         const filePath = path.join(process.cwd(), "uploads", "product-images", filename);
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
-      await db.delete(factoryBaleProductImages)
+      await db
+        .delete(factoryBaleProductImages)
         .where(and(eq(factoryBaleProductImages.id, id), eq(factoryBaleProductImages.companyId, companyId)));
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
   });
-
 }

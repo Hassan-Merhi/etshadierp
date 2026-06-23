@@ -23,8 +23,9 @@ export async function saveDraft(
   try {
     const now = Date.now();
     const existing = await db.localDrafts
-      .where("entityType").equals(entityType)
-      .filter(r => r.mode === mode && r.companyId === companyId && r.locationId === locationId)
+      .where("entityType")
+      .equals(entityType)
+      .filter((r) => r.mode === mode && r.companyId === companyId && r.locationId === locationId)
       .first()
       .catch(() => null);
 
@@ -60,8 +61,9 @@ export async function loadDraft(
 ): Promise<DraftRecord | null> {
   try {
     const record = await db.localDrafts
-      .where("entityType").equals(entityType)
-      .filter(r => r.mode === mode && r.companyId === companyId && r.locationId === locationId)
+      .where("entityType")
+      .equals(entityType)
+      .filter((r) => r.mode === mode && r.companyId === companyId && r.locationId === locationId)
       .first()
       .catch(() => null);
 

@@ -5,30 +5,76 @@ import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } 
 import { requireActionAccess } from "../../lib/permissionMiddleware";
 import { upload, logAudit, getCurrentExchangeRate } from "../_helpers";
 import {
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
   stockItemMergeLogs,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, suppliers, customers,
-  locations, employees, userLocations, auditLog, interCompanyTransfers,
-  insertInterCompanyTransferSchema, FEATURE_KEYS,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  suppliers,
+  customers,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  FEATURE_KEYS,
   locationPriceGroups,
-  stockGrades, stockCategories, insertStockGradeSchema, insertStockCategorySchema,
+  stockGrades,
+  stockCategories,
+  insertStockGradeSchema,
+  insertStockCategorySchema,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
 import { readExcel, sheetToJson, createWorkbook, jsonToSheet, aoaToSheet, writeWorkbook } from "../../excelHelper";
 import { adjustInventory } from "../../inventoryHelper";
-
 
 export function registerStockGroupsItemsRoutes(app: Express) {
   app.get("/api/stock-groups", requireAuth, async (req, res) => {
@@ -36,53 +82,41 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const groups = await storage.getAllStockGroups(
-        req.session.currentCompanyId,
-      );
+      const groups = await storage.getAllStockGroups(req.session.currentCompanyId);
       res.json(groups);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.post(
-    "/api/stock-groups",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-
-        // Inject companyId before schema validation
-        const dataWithCompany = {
-          ...req.body,
-          companyId: req.session.currentCompanyId,
-        };
-
-        const parsed = insertStockGroupSchema.parse(dataWithCompany);
-
-        // Check for duplicate code within the same company
-        const existing = await storage.getStockGroupByCode(
-          parsed.code,
-          req.session.currentCompanyId,
-        );
-        if (existing) {
-          return res
-            .status(400)
-            .json({
-              message: "Stock group code already exists in this company",
-            });
-        }
-
-        const group = await storage.createStockGroup(parsed);
-        res.status(201).json(group);
-      } catch (error: any) {
-        res.status(400).json({ message: error.message });
+  app.post("/api/stock-groups", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
-    },
-  );
+
+      // Inject companyId before schema validation
+      const dataWithCompany = {
+        ...req.body,
+        companyId: req.session.currentCompanyId,
+      };
+
+      const parsed = insertStockGroupSchema.parse(dataWithCompany);
+
+      // Check for duplicate code within the same company
+      const existing = await storage.getStockGroupByCode(parsed.code, req.session.currentCompanyId);
+      if (existing) {
+        return res.status(400).json({
+          message: "Stock group code already exists in this company",
+        });
+      }
+
+      const group = await storage.createStockGroup(parsed);
+      res.status(201).json(group);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 
   // ── Stock Grades ────────────────────────────────────────────────────────────
 
@@ -93,9 +127,15 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       const includeInactive = req.query.includeInactive === "true";
       const conds = [eq(stockGrades.companyId, companyId)];
       if (!includeInactive) conds.push(eq(stockGrades.active, true));
-      const rows = await db.select().from(stockGrades).where(and(...conds)).orderBy(asc(stockGrades.name));
+      const rows = await db
+        .select()
+        .from(stockGrades)
+        .where(and(...conds))
+        .orderBy(asc(stockGrades.name));
       res.json(rows);
-    } catch (error: any) { res.status(500).json({ message: error.message }); }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   app.post("/api/stock-grades", requireAuth, requireNonPOS, async (req, res) => {
@@ -105,10 +145,23 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       const parsed = insertStockGradeSchema.parse({ ...req.body, companyId });
       const [created] = await db.insert(stockGrades).values(parsed).returning();
       try {
-        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "stock_grades", recordId: created.id, recordIdentifier: created.name, changes: { name: { old: null, new: created.name } } });
-      } catch { /* non-fatal */ }
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "create",
+          tableName: "stock_grades",
+          recordId: created.id,
+          recordIdentifier: created.name,
+          changes: { name: { old: null, new: created.name } },
+        });
+      } catch {
+        /* non-fatal */
+      }
       res.status(201).json(created);
-    } catch (error: any) { res.status(400).json({ message: error.message }); }
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
 
   app.patch("/api/stock-grades/:id", requireAuth, requireNonPOS, async (req, res) => {
@@ -117,7 +170,10 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
-      const [existing] = await db.select().from(stockGrades).where(and(eq(stockGrades.id, id), eq(stockGrades.companyId, companyId)));
+      const [existing] = await db
+        .select()
+        .from(stockGrades)
+        .where(and(eq(stockGrades.id, id), eq(stockGrades.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Stock grade not found" });
       const updates: any = {};
       if (req.body.name !== undefined) {
@@ -128,10 +184,25 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       if (req.body.active !== undefined) updates.active = req.body.active;
       const [updated] = await db.update(stockGrades).set(updates).where(eq(stockGrades.id, id)).returning();
       try {
-        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "stock_grades", recordId: id, recordIdentifier: updated.name, changes: Object.fromEntries(Object.entries(updates).map(([k, v]) => [k, { old: (existing as any)[k], new: v }])) });
-      } catch { /* non-fatal */ }
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "update",
+          tableName: "stock_grades",
+          recordId: id,
+          recordIdentifier: updated.name,
+          changes: Object.fromEntries(
+            Object.entries(updates).map(([k, v]) => [k, { old: (existing as any)[k], new: v }])
+          ),
+        });
+      } catch {
+        /* non-fatal */
+      }
       res.json(updated);
-    } catch (error: any) { res.status(500).json({ message: error.message }); }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   app.delete("/api/stock-grades/:id", requireAuth, requireNonPOS, async (req, res) => {
@@ -140,14 +211,30 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
-      const [existing] = await db.select().from(stockGrades).where(and(eq(stockGrades.id, id), eq(stockGrades.companyId, companyId)));
+      const [existing] = await db
+        .select()
+        .from(stockGrades)
+        .where(and(eq(stockGrades.id, id), eq(stockGrades.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Stock grade not found" });
       await db.update(stockGrades).set({ active: false }).where(eq(stockGrades.id, id));
       try {
-        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "stock_grades", recordId: id, recordIdentifier: existing.name, changes: { active: { old: true, new: false } } });
-      } catch { /* non-fatal */ }
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "update",
+          tableName: "stock_grades",
+          recordId: id,
+          recordIdentifier: existing.name,
+          changes: { active: { old: true, new: false } },
+        });
+      } catch {
+        /* non-fatal */
+      }
       res.json({ message: "Stock grade deactivated" });
-    } catch (error: any) { res.status(500).json({ message: error.message }); }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // ── Stock Categories ─────────────────────────────────────────────────────────
@@ -159,9 +246,15 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       const includeInactive = req.query.includeInactive === "true";
       const conds = [eq(stockCategories.companyId, companyId)];
       if (!includeInactive) conds.push(eq(stockCategories.active, true));
-      const rows = await db.select().from(stockCategories).where(and(...conds)).orderBy(asc(stockCategories.name));
+      const rows = await db
+        .select()
+        .from(stockCategories)
+        .where(and(...conds))
+        .orderBy(asc(stockCategories.name));
       res.json(rows);
-    } catch (error: any) { res.status(500).json({ message: error.message }); }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   app.post("/api/stock-categories", requireAuth, requireNonPOS, async (req, res) => {
@@ -171,10 +264,23 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       const parsed = insertStockCategorySchema.parse({ ...req.body, companyId });
       const [created] = await db.insert(stockCategories).values(parsed).returning();
       try {
-        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "create", tableName: "stock_categories", recordId: created.id, recordIdentifier: created.name, changes: { name: { old: null, new: created.name } } });
-      } catch { /* non-fatal */ }
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "create",
+          tableName: "stock_categories",
+          recordId: created.id,
+          recordIdentifier: created.name,
+          changes: { name: { old: null, new: created.name } },
+        });
+      } catch {
+        /* non-fatal */
+      }
       res.status(201).json(created);
-    } catch (error: any) { res.status(400).json({ message: error.message }); }
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
   });
 
   app.patch("/api/stock-categories/:id", requireAuth, requireNonPOS, async (req, res) => {
@@ -183,7 +289,10 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
-      const [existing] = await db.select().from(stockCategories).where(and(eq(stockCategories.id, id), eq(stockCategories.companyId, companyId)));
+      const [existing] = await db
+        .select()
+        .from(stockCategories)
+        .where(and(eq(stockCategories.id, id), eq(stockCategories.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Stock category not found" });
       const updates: any = {};
       if (req.body.name !== undefined) {
@@ -194,10 +303,25 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       if (req.body.active !== undefined) updates.active = req.body.active;
       const [updated] = await db.update(stockCategories).set(updates).where(eq(stockCategories.id, id)).returning();
       try {
-        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "stock_categories", recordId: id, recordIdentifier: updated.name, changes: Object.fromEntries(Object.entries(updates).map(([k, v]) => [k, { old: (existing as any)[k], new: v }])) });
-      } catch { /* non-fatal */ }
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "update",
+          tableName: "stock_categories",
+          recordId: id,
+          recordIdentifier: updated.name,
+          changes: Object.fromEntries(
+            Object.entries(updates).map(([k, v]) => [k, { old: (existing as any)[k], new: v }])
+          ),
+        });
+      } catch {
+        /* non-fatal */
+      }
       res.json(updated);
-    } catch (error: any) { res.status(500).json({ message: error.message }); }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   app.delete("/api/stock-categories/:id", requireAuth, requireNonPOS, async (req, res) => {
@@ -206,14 +330,30 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid ID" });
-      const [existing] = await db.select().from(stockCategories).where(and(eq(stockCategories.id, id), eq(stockCategories.companyId, companyId)));
+      const [existing] = await db
+        .select()
+        .from(stockCategories)
+        .where(and(eq(stockCategories.id, id), eq(stockCategories.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Stock category not found" });
       await db.update(stockCategories).set({ active: false }).where(eq(stockCategories.id, id));
       try {
-        await logAudit({ userId: req.session.userId!, username: (req.session as any).username || "unknown", companyId, action: "update", tableName: "stock_categories", recordId: id, recordIdentifier: existing.name, changes: { active: { old: true, new: false } } });
-      } catch { /* non-fatal */ }
+        await logAudit({
+          userId: req.session.userId!,
+          username: (req.session as any).username || "unknown",
+          companyId,
+          action: "update",
+          tableName: "stock_categories",
+          recordId: id,
+          recordIdentifier: existing.name,
+          changes: { active: { old: true, new: false } },
+        });
+      } catch {
+        /* non-fatal */
+      }
       res.json({ message: "Stock category deactivated" });
-    } catch (error: any) { res.status(500).json({ message: error.message }); }
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
   });
 
   // Stock Items
@@ -237,10 +377,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       const pageSizeNum = Math.min(500, Math.max(1, parseInt(pageSize as string) || 50));
       const offset = (pageNum - 1) * pageSizeNum;
 
-      const conditions: any[] = [
-        eq(stockItems.companyId, companyId),
-        isNull(stockItems.deletedAt),
-      ];
+      const conditions: any[] = [eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt)];
       if (search && typeof search === "string" && search.trim()) {
         const q = `%${search.trim()}%`;
         conditions.push(or(ilike(stockItems.name, q), ilike(stockItems.code, q)));
@@ -279,7 +416,13 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         .limit(pageSizeNum)
         .offset(offset);
 
-      return res.json({ data, page: pageNum, pageSize: pageSizeNum, total, totalPages: Math.ceil(total / pageSizeNum) });
+      return res.json({
+        data,
+        page: pageNum,
+        pageSize: pageSizeNum,
+        total,
+        totalPages: Math.ceil(total / pageSizeNum),
+      });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -305,14 +448,9 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       }
 
       // Check for duplicate code within the same company
-      const existing = await storage.getStockItemByCode(
-        parsed.code,
-        req.session.currentCompanyId,
-      );
+      const existing = await storage.getStockItemByCode(parsed.code, req.session.currentCompanyId);
       if (existing) {
-        return res
-          .status(400)
-          .json({ message: "Stock item code already exists in this company" });
+        return res.status(400).json({ message: "Stock item code already exists in this company" });
       }
 
       // Calculate opening value if qty and rate provided
@@ -341,7 +479,9 @@ export function registerStockGroupsItemsRoutes(app: Express) {
             openingRate: { new: item.openingRate || "0" },
           },
         });
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
       res.status(201).json(item);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -367,21 +507,22 @@ export function registerStockGroupsItemsRoutes(app: Express) {
 
       // Get all items that exist and belong to the current company
       const validItems = await storage.bulkGetStockItemsByIds(ids, req.session.currentCompanyId);
-      const validIds = validItems.map(item => item.id);
-      
+      const validIds = validItems.map((item) => item.id);
+
       if (validIds.length === 0) {
         return res.status(404).json({ message: "No valid stock items found to delete" });
       }
 
       // Block deletion if any item has inventory records (regardless of quantity)
       const inventoryCheck = await db.execute(
-        sql`SELECT stock_item_id FROM inventory WHERE stock_item_id = ANY(ARRAY[${sql.join(validIds.map(id => sql`${id}`), sql`, `)}]) GROUP BY stock_item_id`
+        sql`SELECT stock_item_id FROM inventory WHERE stock_item_id = ANY(ARRAY[${sql.join(
+          validIds.map((id) => sql`${id}`),
+          sql`, `
+        )}]) GROUP BY stock_item_id`
       );
       if ((inventoryCheck.rows as any[]).length > 0) {
         const blockedIds = new Set((inventoryCheck.rows as any[]).map((r: any) => parseInt(r.stock_item_id)));
-        const blockedCodes = validItems
-          .filter(item => blockedIds.has(item.id))
-          .map(item => item.code);
+        const blockedCodes = validItems.filter((item) => blockedIds.has(item.id)).map((item) => item.code);
         return res.status(400).json({
           message: `Cannot delete ${blockedCodes.length} item(s) — they have existing inventory records: ${blockedCodes.join(", ")}. Please clear all inventory first.`,
         });
@@ -405,17 +546,20 @@ export function registerStockGroupsItemsRoutes(app: Express) {
             },
           });
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
 
       const skippedCount = ids.length - validIds.length;
-      const message = skippedCount > 0
-        ? `Successfully deleted ${validIds.length} stock item(s). ${skippedCount} item(s) were skipped (not found or belong to another company).`
-        : `Successfully deleted ${validIds.length} stock item(s)`;
+      const message =
+        skippedCount > 0
+          ? `Successfully deleted ${validIds.length} stock item(s). ${skippedCount} item(s) were skipped (not found or belong to another company).`
+          : `Successfully deleted ${validIds.length} stock item(s)`;
 
-      res.json({ 
+      res.json({
         message,
         deleted: validIds.length,
-        skipped: skippedCount
+        skipped: skippedCount,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -442,7 +586,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
 
       // Verify items belong to this company
       const validItems = await storage.bulkGetStockItemsByIds(ids, companyId);
-      const validIds = validItems.map(item => item.id);
+      const validIds = validItems.map((item) => item.id);
       if (validIds.length === 0) {
         return res.status(404).json({ message: "No valid stock items found" });
       }
@@ -450,10 +594,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       await db
         .update(stockItems)
         .set({ categoryId: isNaN(categoryId as number) ? null : categoryId })
-        .where(and(
-          inArray(stockItems.id, validIds),
-          eq(stockItems.companyId, companyId)
-        ));
+        .where(and(inArray(stockItems.id, validIds), eq(stockItems.companyId, companyId)));
 
       res.json({ message: `Category updated for ${validIds.length} item(s)`, updated: validIds.length });
     } catch (error: any) {
@@ -478,8 +619,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       // Pre-fetch all items + aliases once to avoid N+1
       const allItems = await storage.getAllStockItems(companyId);
       const allAliases = await storage.getAllCompanyCodeAliases(companyId);
-      const itemsById = new Map(allItems.map(i => [i.id, i]));
-      const itemsByCode = new Map<string, typeof allItems[0]>();
+      const itemsById = new Map(allItems.map((i) => [i.id, i]));
+      const itemsByCode = new Map<string, (typeof allItems)[0]>();
       for (const item of allItems) {
         if (item.code) itemsByCode.set(item.code.toLowerCase(), item);
       }
@@ -519,14 +660,17 @@ export function registerStockGroupsItemsRoutes(app: Express) {
             await tx.update(stockItems).set({ sellingPrice: u.sellingPrice }).where(eq(stockItems.id, u.id));
           }
           for (const u of locationUpdates) {
-            await tx.insert(stockItemLocationPrices).values({
-              stockItemId: u.stockItemId,
-              locationId: u.locationId,
-              sellingPrice: u.sellingPrice,
-            }).onConflictDoUpdate({
-              target: [stockItemLocationPrices.stockItemId, stockItemLocationPrices.locationId],
-              set: { sellingPrice: u.sellingPrice, updatedAt: new Date() },
-            });
+            await tx
+              .insert(stockItemLocationPrices)
+              .values({
+                stockItemId: u.stockItemId,
+                locationId: u.locationId,
+                sellingPrice: u.sellingPrice,
+              })
+              .onConflictDoUpdate({
+                target: [stockItemLocationPrices.stockItemId, stockItemLocationPrices.locationId],
+                set: { sellingPrice: u.sellingPrice, updatedAt: new Date() },
+              });
           }
         });
       }
@@ -548,7 +692,9 @@ export function registerStockGroupsItemsRoutes(app: Express) {
             },
           });
         }
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
       res.json({ message, updated, notFound });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -575,19 +721,19 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       // Pre-fetch all stock items once for efficient lookup
       const allItems = await storage.getAllStockItems(req.session.currentCompanyId);
       // Map by primary code field (skip empty/null codes)
-      const itemsByCode = new Map<string, typeof allItems[0]>();
-      const itemsById = new Map(allItems.map(i => [i.id, i]));
+      const itemsByCode = new Map<string, (typeof allItems)[0]>();
+      const itemsById = new Map(allItems.map((i) => [i.id, i]));
       for (const item of allItems) {
-        if (item.code && typeof item.code === 'string') {
+        if (item.code && typeof item.code === "string") {
           itemsByCode.set((item.code || "").toLowerCase(), item);
         }
       }
-      
+
       // Pre-fetch all code aliases and build alias lookup map (skip empty/null aliases)
       const allAliases = await storage.getAllCompanyCodeAliases(req.session.currentCompanyId);
-      const itemsByAlias = new Map<string, typeof allItems[0]>();
+      const itemsByAlias = new Map<string, (typeof allItems)[0]>();
       for (const alias of allAliases) {
-        if (alias.aliasCode && typeof alias.aliasCode === 'string') {
+        if (alias.aliasCode && typeof alias.aliasCode === "string") {
           const item = itemsById.get(alias.stockItemId);
           if (item) {
             itemsByAlias.set((alias.aliasCode || "").toLowerCase(), item);
@@ -597,7 +743,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
 
       for (const entry of openingBalances) {
         const { barcode, openingQty, openingRate, openingValue } = entry;
-        if (!barcode || typeof barcode !== 'string') continue;
+        if (!barcode || typeof barcode !== "string") continue;
 
         // Find item by primary code first, then by alias (case-insensitive)
         const barcodeLC = (barcode || "").toLowerCase();
@@ -608,7 +754,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
           const qty = parseFloat(openingQty) || 0;
           const rate = parseFloat(openingRate) || 0;
           let totalValue = parseFloat(openingValue) || 0;
-          
+
           // If total value not provided, calculate from qty * rate
           if (totalValue === 0 && qty > 0 && rate > 0) {
             totalValue = qty * rate;
@@ -644,11 +790,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       const baleItems = await db.query.stockItems.findMany({
         where: and(
           eq(stockItems.companyId, req.session.currentCompanyId),
-          or(
-            eq(stockItems.uom, "bale"),
-            eq(stockItems.uom, "Bale"),
-            eq(stockItems.uom, "BALE")
-          )
+          or(eq(stockItems.uom, "bale"), eq(stockItems.uom, "Bale"), eq(stockItems.uom, "BALE"))
         ),
       });
 
@@ -757,7 +899,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
-      const q = (req.query.q as string || "").trim();
+      const q = ((req.query.q as string) || "").trim();
       if (!q) return res.json([]);
 
       const result = await db.execute(sql`
@@ -779,7 +921,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         LEFT JOIN suppliers s ON po.supplier_id = s.id
         WHERE po.company_id = ${companyId}
           AND c.offload_date IS NOT NULL
-          AND pli.item_name ILIKE ${'%' + q + '%'}
+          AND pli.item_name ILIKE ${"%" + q + "%"}
         ORDER BY c.offload_date DESC, pli.item_name
       `);
       res.json(result.rows);
@@ -862,8 +1004,8 @@ export function registerStockGroupsItemsRoutes(app: Express) {
         "Item Code": r.code,
         "Item Name": r.name,
         "Stock Group": r.stockGroupName,
-        "UOM": r.uom,
-        "Active": r.active ? "Yes" : "No",
+        UOM: r.uom,
+        Active: r.active ? "Yes" : "No",
         "Selling Price": r.sellingPrice ?? "0",
         "Current Grade": r.gradeName ?? "",
         "Current Category": r.categoryName ?? "",
@@ -884,7 +1026,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
 
       const buffer = await writeWorkbook(wb);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-      res.setHeader("Content-Disposition", "attachment; filename=\"grade-category-template.xlsx\"");
+      res.setHeader("Content-Disposition", 'attachment; filename="grade-category-template.xlsx"');
       res.send(buffer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -909,11 +1051,9 @@ export function registerStockGroupsItemsRoutes(app: Express) {
       }
 
       if (stockItem.companyId !== req.session.currentCompanyId) {
-        return res
-          .status(403)
-          .json({
-            message: "Access denied: Stock item belongs to a different company",
-          });
+        return res.status(403).json({
+          message: "Access denied: Stock item belongs to a different company",
+        });
       }
 
       res.json(stockItem);
@@ -974,10 +1114,7 @@ export function registerStockGroupsItemsRoutes(app: Express) {
           .select({ followerLocationId: locationPriceGroups.followerLocationId })
           .from(locationPriceGroups)
           .where(
-            and(
-              eq(locationPriceGroups.companyId, companyId),
-              eq(locationPriceGroups.masterLocationId, locationId)
-            )
+            and(eq(locationPriceGroups.companyId, companyId), eq(locationPriceGroups.masterLocationId, locationId))
           );
         for (const f of followers) {
           await storage.upsertLocationPrice(stockItemId, f.followerLocationId, sellingPrice);

@@ -7,24 +7,22 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Archive, ChevronDown, ChevronRight, Users, Info, Loader2, Send,
-} from "lucide-react";
+import { Archive, ChevronDown, ChevronRight, Users, Info, Loader2, Send } from "lucide-react";
 
 interface WaSettings {
-  instanceId:       string;
-  enabled:          boolean;
-  dailyAutoSend:    boolean;
+  instanceId: string;
+  enabled: boolean;
+  dailyAutoSend: boolean;
   dailyRecipientId: number | null;
-  hasCredentials:   boolean;
+  hasCredentials: boolean;
 }
 
 interface Recipient {
-  id:      number;
-  chatId:  string;
-  name:    string;
+  id: number;
+  chatId: string;
+  name: string;
   isGroup: boolean;
-  active:  boolean;
+  active: boolean;
 }
 
 export function DailyAutoSendSection() {
@@ -71,9 +69,7 @@ export function DailyAutoSendSection() {
           <Archive className="h-5 w-5 text-blue-500" />
           <div>
             <p className="font-semibold">Daily Auto-Send</p>
-            <p className="text-sm text-muted-foreground">
-              Send the daily ZIP export to a WhatsApp group every day
-            </p>
+            <p className="text-sm text-muted-foreground">Send the daily ZIP export to a WhatsApp group every day</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -88,14 +84,12 @@ export function DailyAutoSendSection() {
 
       {expanded && (
         <div className="border-t p-4 space-y-6">
-
           {/* Info box */}
           <div className="flex gap-2 rounded-md bg-muted/50 border p-3 text-sm text-muted-foreground">
             <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-500" />
             <p>
-              Every day at the configured schedule time a ZIP file is generated containing all company
-              exports plus the all-companies net position Excel (full current year) and sent to the
-              selected WhatsApp group.
+              Every day at the configured schedule time a ZIP file is generated containing all company exports plus the
+              all-companies net position Excel (full current year) and sent to the selected WhatsApp group.
             </p>
           </div>
 
@@ -139,9 +133,7 @@ export function DailyAutoSendSection() {
             ) : (
               <Select
                 value={String(settings?.dailyRecipientId ?? "")}
-                onValueChange={(v) =>
-                  patchSettings.mutate({ dailyRecipientId: v ? parseInt(v) : null })
-                }
+                onValueChange={(v) => patchSettings.mutate({ dailyRecipientId: v ? parseInt(v) : null })}
                 disabled={!settings?.enabled || patchSettings.isPending}
               >
                 <SelectTrigger data-testid="select-daily-autosend-group" className="w-full sm:w-80">
@@ -174,9 +166,17 @@ export function DailyAutoSendSection() {
               disabled={sendNow.isPending || !isActive}
               data-testid="button-daily-autosend-send-now"
             >
-              {sendNow.isPending
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Sending…</>
-                : <><Send className="h-4 w-4 mr-2" />Send Now</>}
+              {sendNow.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending…
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Now
+                </>
+              )}
             </Button>
             {!isActive && (
               <p className="text-xs text-muted-foreground">

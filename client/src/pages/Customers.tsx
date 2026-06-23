@@ -6,29 +6,27 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber, drCrClass } from "@/lib/formatNumber";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
-import { Plus, Search, Building2, Pencil, Users, Wallet, TrendingUp, TrendingDown, EyeOff, Eye, Printer } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Building2,
+  Pencil,
+  Users,
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  EyeOff,
+  Eye,
+  Printer,
+} from "lucide-react";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { insertCustomerSchema, type Customer } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,13 +58,13 @@ export default function Customers() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [hideZero, setHideZero] = useState(true);
-  const [statementCustomer, setStatementCustomer] = useState<(Customer & { balance: number; balanceSide: string }) | null>(null);
+  const [statementCustomer, setStatementCustomer] = useState<
+    (Customer & { balance: number; balanceSide: string }) | null
+  >(null);
 
   const { data: ledgerTxns = [], isLoading: txnsLoading } = useQuery<any[]>({
     queryKey: ["/api/customers", statementCustomer?.id, "transactions"],
-    queryFn: () =>
-      fetch(`/api/customers/${statementCustomer!.id}/transactions`)
-        .then((r) => r.json()),
+    queryFn: () => fetch(`/api/customers/${statementCustomer!.id}/transactions`).then((r) => r.json()),
     enabled: !!statementCustomer?.id,
   });
 
@@ -109,7 +107,13 @@ export default function Customers() {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts/all", selectedCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsCreateOpen(false);
-      form.reset({ companyId: selectedCompany?.id || 0, legalName: "", phone: "", openingBalance: "0", openingBalanceSide: "Dr" });
+      form.reset({
+        companyId: selectedCompany?.id || 0,
+        legalName: "",
+        phone: "",
+        openingBalance: "0",
+        openingBalanceSide: "Dr",
+      });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -129,7 +133,13 @@ export default function Customers() {
       queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany?.id] });
       setIsEditOpen(false);
       setEditingCustomer(null);
-      form.reset({ companyId: selectedCompany?.id || 0, legalName: "", phone: "", openingBalance: "0", openingBalanceSide: "Dr" });
+      form.reset({
+        companyId: selectedCompany?.id || 0,
+        legalName: "",
+        phone: "",
+        openingBalance: "0",
+        openingBalanceSide: "Dr",
+      });
     },
     onError: (error: Error) => {
       if ((error as any)?._handledGlobally) return;
@@ -152,7 +162,10 @@ export default function Customers() {
       legalName: customer.legalName,
       phone: customer.phone || "",
       openingBalance: customer.openingBalance || "0",
-      openingBalanceSide: (customer.openingBalanceSide === "Dr" || customer.openingBalanceSide === "Cr") ? customer.openingBalanceSide : "Dr",
+      openingBalanceSide:
+        customer.openingBalanceSide === "Dr" || customer.openingBalanceSide === "Cr"
+          ? customer.openingBalanceSide
+          : "Dr",
     });
     setIsEditOpen(true);
   };
@@ -185,7 +198,11 @@ export default function Customers() {
             <FormItem>
               <FormLabel>Legal Name *</FormLabel>
               <FormControl>
-                <Input {...field} placeholder="ABC Company Ltd." data-testid={isEdit ? "input-edit-legal-name" : "input-legal-name"} />
+                <Input
+                  {...field}
+                  placeholder="ABC Company Ltd."
+                  data-testid={isEdit ? "input-edit-legal-name" : "input-legal-name"}
+                />
               </FormControl>
               {!isEdit && <FormDescription>Customer code will be auto-generated</FormDescription>}
               <FormMessage />
@@ -199,7 +216,12 @@ export default function Customers() {
             <FormItem>
               <FormLabel>Phone Number</FormLabel>
               <FormControl>
-                <Input {...field} value={field.value || ""} placeholder="+1234567890" data-testid={isEdit ? "input-edit-phone" : "input-phone"} />
+                <Input
+                  {...field}
+                  value={field.value || ""}
+                  placeholder="+1234567890"
+                  data-testid={isEdit ? "input-edit-phone" : "input-phone"}
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -213,7 +235,14 @@ export default function Customers() {
               <FormItem>
                 <FormLabel>Opening Balance</FormLabel>
                 <FormControl>
-                  <Input {...field} value={field.value || "0"} type="number" step="0.01" placeholder="0.00" data-testid={isEdit ? "input-edit-opening-balance" : "input-opening-balance"} />
+                  <Input
+                    {...field}
+                    value={field.value || "0"}
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    data-testid={isEdit ? "input-edit-opening-balance" : "input-opening-balance"}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -245,7 +274,7 @@ export default function Customers() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => isEdit ? setIsEditOpen(false) : setIsCreateOpen(false)}
+            onClick={() => (isEdit ? setIsEditOpen(false) : setIsCreateOpen(false))}
             data-testid={isEdit ? "button-edit-cancel" : "button-cancel"}
           >
             Cancel
@@ -256,8 +285,12 @@ export default function Customers() {
             data-testid={isEdit ? "button-submit-edit-customer" : "button-submit-customer"}
           >
             {isEdit
-              ? (updateMutation.isPending ? "Updating..." : "Update Customer")
-              : (createMutation.isPending ? "Creating..." : "Create Customer")}
+              ? updateMutation.isPending
+                ? "Updating..."
+                : "Update Customer"
+              : createMutation.isPending
+                ? "Creating..."
+                : "Create Customer"}
           </Button>
         </div>
       </form>
@@ -332,11 +365,7 @@ export default function Customers() {
             data-testid="input-search-customers"
           />
         </div>
-        <Button
-          variant="outline"
-          onClick={() => setHideZero(!hideZero)}
-          data-testid="button-toggle-hide-zero"
-        >
+        <Button variant="outline" onClick={() => setHideZero(!hideZero)} data-testid="button-toggle-hide-zero">
           {hideZero ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
           {hideZero ? "Show Zero" : "Hide Zero"}
         </Button>
@@ -356,9 +385,15 @@ export default function Customers() {
             {isLoading ? (
               [...Array(6)].map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-28 ml-auto" /></TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-40" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-28" />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton className="h-4 w-28 ml-auto" />
+                  </TableCell>
                   <TableCell></TableCell>
                 </TableRow>
               ))
@@ -407,7 +442,10 @@ export default function Customers() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={(e) => { e.stopPropagation(); handleEditClick(customer); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditClick(customer);
+                        }}
                         data-testid={`button-edit-customer-${customer.id}`}
                       >
                         <Pencil className="h-4 w-4" />
@@ -422,13 +460,22 @@ export default function Customers() {
       </div>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={(open) => {
-        setIsEditOpen(open);
-        if (!open) {
-          setEditingCustomer(null);
-          form.reset({ companyId: selectedCompany?.id || 0, legalName: "", phone: "", openingBalance: "0", openingBalanceSide: "Dr" });
-        }
-      }}>
+      <Dialog
+        open={isEditOpen}
+        onOpenChange={(open) => {
+          setIsEditOpen(open);
+          if (!open) {
+            setEditingCustomer(null);
+            form.reset({
+              companyId: selectedCompany?.id || 0,
+              legalName: "",
+              phone: "",
+              openingBalance: "0",
+              openingBalanceSide: "Dr",
+            });
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Customer</DialogTitle>
@@ -467,122 +514,133 @@ export default function Customers() {
           <div className="flex-1 overflow-y-auto min-h-0">
             {txnsLoading ? (
               <div className="space-y-2">
-                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+                {[...Array(5)].map((_, i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
               </div>
-            ) : (() => {
-              const sorted = [...ledgerTxns].sort((a, b) =>
-                new Date(a.voucherDate).getTime() - new Date(b.voucherDate).getTime()
-              );
-              const totalDr = sorted.reduce((s, t) => s + parseFloat(t.debitAmount || "0"), 0);
-              const totalCr = sorted.reduce((s, t) => s + parseFloat(t.creditAmount || "0"), 0);
-              const closingBalance = statementCustomer?.balance || 0;
-              const openingBalance = closingBalance - totalDr + totalCr;
-              let running = openingBalance;
+            ) : (
+              (() => {
+                const sorted = [...ledgerTxns].sort(
+                  (a, b) => new Date(a.voucherDate).getTime() - new Date(b.voucherDate).getTime()
+                );
+                const totalDr = sorted.reduce((s, t) => s + parseFloat(t.debitAmount || "0"), 0);
+                const totalCr = sorted.reduce((s, t) => s + parseFloat(t.creditAmount || "0"), 0);
+                const closingBalance = statementCustomer?.balance || 0;
+                const openingBalance = closingBalance - totalDr + totalCr;
+                let running = openingBalance;
 
-              return sorted.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-10 text-center">
-                  <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                    <Building2 className="h-5 w-5 text-muted-foreground" />
+                return sorted.length === 0 ? (
+                  <div className="flex flex-col items-center gap-2 py-10 text-center">
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <Building2 className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">No transactions</p>
+                    <p className="text-xs text-muted-foreground">No ledger entries found for this customer</p>
                   </div>
-                  <p className="text-sm font-medium">No transactions</p>
-                  <p className="text-xs text-muted-foreground">No ledger entries found for this customer</p>
-                </div>
-              ) : (
-                <div className="border rounded-xl overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/40 hover:bg-muted/40">
-                        <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
-                        <TableHead className="text-xs h-9 font-semibold">Type</TableHead>
-                        <TableHead className="text-xs h-9 font-semibold">Description</TableHead>
-                        <TableHead className="text-xs h-9 font-semibold text-right">Debit</TableHead>
-                        <TableHead className="text-xs h-9 font-semibold text-right">Credit</TableHead>
-                        <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
-                        <TableHead className="text-xs h-9 w-8"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {openingBalance !== 0 && (
-                        <TableRow className="text-muted-foreground text-xs italic">
-                          <TableCell className="py-2">—</TableCell>
-                          <TableCell className="py-2"></TableCell>
-                          <TableCell className="py-2">Opening Balance</TableCell>
-                          <TableCell className="py-2"></TableCell>
-                          <TableCell className="py-2"></TableCell>
-                          <TableCell className="py-2 text-right font-mono font-medium">
-                            {formatAmount(Math.abs(openingBalance))}
-                          </TableCell>
-                          <TableCell className="py-2"></TableCell>
+                ) : (
+                  <div className="border rounded-xl overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/40 hover:bg-muted/40">
+                          <TableHead className="text-xs h-9 font-semibold">Date</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold">Type</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold">Description</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold text-right">Debit</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold text-right">Credit</TableHead>
+                          <TableHead className="text-xs h-9 font-semibold text-right">Balance</TableHead>
+                          <TableHead className="text-xs h-9 w-8"></TableHead>
                         </TableRow>
-                      )}
-                      {sorted.map((t, i) => {
-                        const dr = parseFloat(t.debitAmount || "0");
-                        const cr = parseFloat(t.creditAmount || "0");
-                        running = running + dr - cr;
-                        const isSale = t.voucherType === "Sales" && t.voucherId;
-                        return (
-                          <TableRow key={t.entryId ?? i} className="text-xs hover:bg-muted/40">
-                            <TableCell className="py-2 font-mono whitespace-nowrap">
-                              {t.voucherDate ? format(new Date(t.voucherDate), "yyyy-MM-dd") : "—"}
-                            </TableCell>
-                            <TableCell className="py-2">
-                              {t.voucherType ? (
-                                <Badge variant="secondary" className={`text-xs ${typeBadgeClass[t.voucherType] || ""}`}>
-                                  {t.voucherType}
-                                </Badge>
-                              ) : <span className="text-muted-foreground">—</span>}
-                            </TableCell>
-                            <TableCell className="py-2 text-muted-foreground max-w-[160px] truncate">
-                              {t.narration || t.voucherDescription || "—"}
-                            </TableCell>
-                            <TableCell className="py-2 text-right font-mono">
-                              {dr > 0 ? formatAmount(dr) : ""}
-                            </TableCell>
-                            <TableCell className="py-2 text-right font-mono">
-                              {cr > 0 ? formatAmount(cr) : ""}
-                            </TableCell>
+                      </TableHeader>
+                      <TableBody>
+                        {openingBalance !== 0 && (
+                          <TableRow className="text-muted-foreground text-xs italic">
+                            <TableCell className="py-2">—</TableCell>
+                            <TableCell className="py-2"></TableCell>
+                            <TableCell className="py-2">Opening Balance</TableCell>
+                            <TableCell className="py-2"></TableCell>
+                            <TableCell className="py-2"></TableCell>
                             <TableCell className="py-2 text-right font-mono font-medium">
-                              {formatAmount(Math.abs(running))}
-                              <span className={`text-xs font-semibold ml-1 ${drCrClass(running >= 0 ? "Dr" : "Cr")}`}>
-                                {running >= 0 ? "Dr" : "Cr"}
-                              </span>
+                              {formatAmount(Math.abs(openingBalance))}
                             </TableCell>
-                            <TableCell className="py-2">
-                              {isSale ? (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-6 w-6"
-                                  title="Print Invoice"
-                                  data-testid={`btn-print-invoice-${t.voucherId}`}
-                                  onClick={() => window.open(`/api/pos/invoice/${t.voucherId}/pdf`, "_blank")}
-                                >
-                                  <Printer className="h-3 w-3" />
-                                </Button>
-                              ) : null}
-                            </TableCell>
+                            <TableCell className="py-2"></TableCell>
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                    <TableFooter className="bg-muted/40">
-                      <TableRow className="font-semibold text-xs">
-                        <TableCell colSpan={3}>Total</TableCell>
-                        <TableCell className="text-right font-mono">{formatAmount(totalDr)}</TableCell>
-                        <TableCell className="text-right font-mono">{formatAmount(totalCr)}</TableCell>
-                        <TableCell className="text-right font-mono">
-                          {formatAmount(Math.abs(closingBalance))}
-                          <span className={`text-xs font-semibold ml-1 ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}>
-                            {statementCustomer?.balanceSide || "Dr"}
-                          </span>
-                        </TableCell>
-                        <TableCell></TableCell>
-                      </TableRow>
-                    </TableFooter>
-                  </Table>
-                </div>
-              );
-            })()}
+                        )}
+                        {sorted.map((t, i) => {
+                          const dr = parseFloat(t.debitAmount || "0");
+                          const cr = parseFloat(t.creditAmount || "0");
+                          running = running + dr - cr;
+                          const isSale = t.voucherType === "Sales" && t.voucherId;
+                          return (
+                            <TableRow key={t.entryId ?? i} className="text-xs hover:bg-muted/40">
+                              <TableCell className="py-2 font-mono whitespace-nowrap">
+                                {t.voucherDate ? format(new Date(t.voucherDate), "yyyy-MM-dd") : "—"}
+                              </TableCell>
+                              <TableCell className="py-2">
+                                {t.voucherType ? (
+                                  <Badge
+                                    variant="secondary"
+                                    className={`text-xs ${typeBadgeClass[t.voucherType] || ""}`}
+                                  >
+                                    {t.voucherType}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-2 text-muted-foreground max-w-[160px] truncate">
+                                {t.narration || t.voucherDescription || "—"}
+                              </TableCell>
+                              <TableCell className="py-2 text-right font-mono">
+                                {dr > 0 ? formatAmount(dr) : ""}
+                              </TableCell>
+                              <TableCell className="py-2 text-right font-mono">
+                                {cr > 0 ? formatAmount(cr) : ""}
+                              </TableCell>
+                              <TableCell className="py-2 text-right font-mono font-medium">
+                                {formatAmount(Math.abs(running))}
+                                <span className={`text-xs font-semibold ml-1 ${drCrClass(running >= 0 ? "Dr" : "Cr")}`}>
+                                  {running >= 0 ? "Dr" : "Cr"}
+                                </span>
+                              </TableCell>
+                              <TableCell className="py-2">
+                                {isSale ? (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-6 w-6"
+                                    title="Print Invoice"
+                                    data-testid={`btn-print-invoice-${t.voucherId}`}
+                                    onClick={() => window.open(`/api/pos/invoice/${t.voucherId}/pdf`, "_blank")}
+                                  >
+                                    <Printer className="h-3 w-3" />
+                                  </Button>
+                                ) : null}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                      <TableFooter className="bg-muted/40">
+                        <TableRow className="font-semibold text-xs">
+                          <TableCell colSpan={3}>Total</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(totalDr)}</TableCell>
+                          <TableCell className="text-right font-mono">{formatAmount(totalCr)}</TableCell>
+                          <TableCell className="text-right font-mono">
+                            {formatAmount(Math.abs(closingBalance))}
+                            <span
+                              className={`text-xs font-semibold ml-1 ${drCrClass(statementCustomer?.balanceSide || "Dr")}`}
+                            >
+                              {statementCustomer?.balanceSide || "Dr"}
+                            </span>
+                          </TableCell>
+                          <TableCell></TableCell>
+                        </TableRow>
+                      </TableFooter>
+                    </Table>
+                  </div>
+                );
+              })()
+            )}
           </div>
         </DialogContent>
       </Dialog>

@@ -30,7 +30,13 @@ export default function PendingLoadings() {
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
-    return new Date(dateStr).toLocaleString(undefined, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    return new Date(dateStr).toLocaleString(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
@@ -46,11 +52,18 @@ export default function PendingLoadings() {
           ))}
         </div>
       ) : loads.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground" data-testid="text-no-loads">
+        <div
+          className="flex flex-col items-center justify-center py-20 text-muted-foreground"
+          data-testid="text-no-loads"
+        >
           <Clock className="h-16 w-16 mb-4 opacity-30" />
           <p className="text-lg font-medium">No pending loads</p>
           <p className="text-sm mt-1">All container loadings are either complete or not yet started.</p>
-          <Button className="mt-6" onClick={() => navigate("/factory/sales/loading/new")} data-testid="button-start-new">
+          <Button
+            className="mt-6"
+            onClick={() => navigate("/factory/sales/loading/new")}
+            data-testid="button-start-new"
+          >
             <Play className="h-4 w-4 mr-2" />
             Start New Loading
           </Button>
@@ -85,7 +98,10 @@ export default function PendingLoadings() {
                     </span>
                   </div>
                   {load.containerNotes && (
-                    <div className="flex items-start gap-1.5 text-sm text-muted-foreground mt-0.5" data-testid={`text-note-${load.id}`}>
+                    <div
+                      className="flex items-start gap-1.5 text-sm text-muted-foreground mt-0.5"
+                      data-testid={`text-note-${load.id}`}
+                    >
                       <StickyNote className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                       <span className="italic">{load.containerNotes}</span>
                     </div>

@@ -1,21 +1,22 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Tag, Search, Printer, CheckSquare, Square, MapPin, Package, X, ChevronDown, Filter
-} from "lucide-react";
+import { Tag, Search, Printer, CheckSquare, Square, MapPin, Package, X, ChevronDown, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAppMode } from "@/contexts/AppModeContext";
@@ -83,10 +84,9 @@ export default function FactoryReprintLabels() {
     queryKey: ["/api/factory/bales", selectedLocationId],
     queryFn: async () => {
       if (!selectedLocationId) return [];
-      const res = await fetch(
-        `/api/factory/bales?locationId=${selectedLocationId}&status=IN_STOCK`,
-        { credentials: "include" }
-      );
+      const res = await fetch(`/api/factory/bales?locationId=${selectedLocationId}&status=IN_STOCK`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch bales");
       return res.json();
     },
@@ -111,7 +111,12 @@ export default function FactoryReprintLabels() {
       const refNum = (row.bale.referenceNumber || "").toLowerCase();
       const baleCode = (row.bale.baleCode || "").toLowerCase();
       const prodName = (row.bale.productName || row.product?.name || "").toLowerCase();
-      return refNum.includes(term) || baleCode.includes(term) || prodName.includes(term) || artCode.toLowerCase().includes(term);
+      return (
+        refNum.includes(term) ||
+        baleCode.includes(term) ||
+        prodName.includes(term) ||
+        artCode.toLowerCase().includes(term)
+      );
     });
   }, [balesData, search, articleCodeFilters]);
 
@@ -141,9 +146,7 @@ export default function FactoryReprintLabels() {
       setDesignPickerOpen(true);
       return;
     }
-    const paperHtml = fmt === "A5"
-      ? generateA5LabelsHtml(labels)
-      : generateCombinedLabelsHtml(labels, designColor);
+    const paperHtml = fmt === "A5" ? generateA5LabelsHtml(labels) : generateCombinedLabelsHtml(labels, designColor);
     const stickerHtml = generateStickerLabelsHtml(labels);
 
     const w1 = window.open("", "_blank", "width=800,height=900");
@@ -161,9 +164,18 @@ export default function FactoryReprintLabels() {
       const imgs = w2.document.images;
       let loaded = 0;
       const total = imgs.length;
-      const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => w2.print(), 300); };
-      if (total === 0) { setTimeout(() => w2.print(), 300); }
-      else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+      const tryPrint = () => {
+        loaded++;
+        if (loaded >= total) setTimeout(() => w2.print(), 300);
+      };
+      if (total === 0) {
+        setTimeout(() => w2.print(), 300);
+      } else {
+        for (let i = 0; i < total; i++) {
+          if (imgs[i].complete) tryPrint();
+          else imgs[i].onload = imgs[i].onerror = tryPrint;
+        }
+      }
     }
     if (!w1 && !w2) {
       toast({ title: "Warning", description: "Please allow pop-ups to print labels", variant: "destructive" });
@@ -197,7 +209,11 @@ export default function FactoryReprintLabels() {
         await printRawZpl(zpl);
         toast({ title: `${labels.length} label(s) sent to Zebra printer` });
       } catch (err: any) {
-        toast({ title: "Zebra print failed — falling back to browser", description: err.message, variant: "destructive" });
+        toast({
+          title: "Zebra print failed — falling back to browser",
+          description: err.message,
+          variant: "destructive",
+        });
         openBrowserPrint(labels);
       }
     } else {
@@ -205,8 +221,7 @@ export default function FactoryReprintLabels() {
     }
   };
 
-  const allFilteredSelected =
-    filteredBales.length > 0 && filteredBales.every((r) => selectedIds.has(r.bale.id));
+  const allFilteredSelected = filteredBales.length > 0 && filteredBales.every((r) => selectedIds.has(r.bale.id));
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
@@ -241,11 +256,14 @@ export default function FactoryReprintLabels() {
             </SelectTrigger>
             <SelectContent>
               {locationsLoading ? (
-                <SelectItem value="__loading__" disabled>Loading…</SelectItem>
+                <SelectItem value="__loading__" disabled>
+                  Loading…
+                </SelectItem>
               ) : (
                 locations.map((loc) => (
                   <SelectItem key={loc.id} value={String(loc.id)} data-testid={`option-location-${loc.id}`}>
-                    {loc.name}{loc.city ? ` — ${loc.city}` : ""}
+                    {loc.name}
+                    {loc.city ? ` — ${loc.city}` : ""}
                   </SelectItem>
                 ))
               )}
@@ -286,16 +304,9 @@ export default function FactoryReprintLabels() {
 
             <Popover open={articlePickerOpen} onOpenChange={setArticlePickerOpen}>
               <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="default"
-                  className="gap-2"
-                  data-testid="button-article-code-filter"
-                >
+                <Button variant="outline" size="default" className="gap-2" data-testid="button-article-code-filter">
                   <Filter className="h-4 w-4" />
-                  {articleCodeFilters.size === 0
-                    ? "Article code"
-                    : `${articleCodeFilters.size} selected`}
+                  {articleCodeFilters.size === 0 ? "Article code" : `${articleCodeFilters.size} selected`}
                   <ChevronDown className="h-3 w-3 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
@@ -331,7 +342,9 @@ export default function FactoryReprintLabels() {
 
                 <div className="max-h-52 overflow-y-auto space-y-0.5">
                   {uniqueArticleCodes
-                    .filter((c) => !articleCodeSearch.trim() || c.toLowerCase().includes(articleCodeSearch.toLowerCase()))
+                    .filter(
+                      (c) => !articleCodeSearch.trim() || c.toLowerCase().includes(articleCodeSearch.toLowerCase())
+                    )
                     .map((code) => (
                       <label
                         key={code}
@@ -353,7 +366,9 @@ export default function FactoryReprintLabels() {
                         <span>{code}</span>
                       </label>
                     ))}
-                  {uniqueArticleCodes.filter((c) => !articleCodeSearch.trim() || c.toLowerCase().includes(articleCodeSearch.toLowerCase())).length === 0 && (
+                  {uniqueArticleCodes.filter(
+                    (c) => !articleCodeSearch.trim() || c.toLowerCase().includes(articleCodeSearch.toLowerCase())
+                  ).length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-2">No article codes found</p>
                   )}
                 </div>
@@ -368,9 +383,13 @@ export default function FactoryReprintLabels() {
               data-testid="button-select-all"
             >
               {allFilteredSelected ? (
-                <><Square className="h-4 w-4 mr-1.5" /> Deselect All</>
+                <>
+                  <Square className="h-4 w-4 mr-1.5" /> Deselect All
+                </>
               ) : (
-                <><CheckSquare className="h-4 w-4 mr-1.5" /> Select All</>
+                <>
+                  <CheckSquare className="h-4 w-4 mr-1.5" /> Select All
+                </>
               )}
             </Button>
 
@@ -427,9 +446,7 @@ export default function FactoryReprintLabels() {
           ) : filteredBales.length === 0 ? (
             <Card className="p-8 text-center text-muted-foreground">
               <Package className="h-8 w-8 mx-auto mb-2 opacity-40" />
-              {balesData.length === 0
-                ? "No bales in stock at this location."
-                : `No bales match "${search}".`}
+              {balesData.length === 0 ? "No bales in stock at this location." : `No bales match "${search}".`}
             </Card>
           ) : (
             <>
@@ -479,7 +496,10 @@ export default function FactoryReprintLabels() {
                           <td className="px-3 font-medium">{prodName}</td>
                           <td className="px-3 font-mono text-xs text-muted-foreground">{articleCode}</td>
                           <td className="px-3 text-right font-mono">
-                            {parseFloat(row.bale.weightKg).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                            {parseFloat(row.bale.weightKg).toLocaleString(undefined, {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 1,
+                            })}
                           </td>
                           <td className="px-3 text-right font-mono">{row.bale.quantity}</td>
                         </tr>
@@ -517,7 +537,13 @@ export default function FactoryReprintLabels() {
                           </div>
                           <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                             <span>{articleCode}</span>
-                            <span>{parseFloat(row.bale.weightKg).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} KG</span>
+                            <span>
+                              {parseFloat(row.bale.weightKg).toLocaleString(undefined, {
+                                minimumFractionDigits: 1,
+                                maximumFractionDigits: 1,
+                              })}{" "}
+                              KG
+                            </span>
                             <span>{row.bale.quantity} pc(s)</span>
                           </div>
                         </div>
@@ -549,7 +575,10 @@ export default function FactoryReprintLabels() {
                 }}
                 data-testid={`button-design-${opt.value}`}
               >
-                <span className="inline-block h-2.5 w-2.5 rounded-full mr-2 flex-shrink-0 border border-border/50" style={{ background: opt.color }} />
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full mr-2 flex-shrink-0 border border-border/50"
+                  style={{ background: opt.color }}
+                />
                 {opt.label}
               </Button>
             ))}

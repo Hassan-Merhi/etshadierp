@@ -6,7 +6,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ImagePlus } from "lucide-react";
 
 export function BaleLogoPickerPopover({
-  productId, overrideLogoId, allCustomers, onSelect, open, onOpenChange,
+  productId,
+  overrideLogoId,
+  allCustomers,
+  onSelect,
+  open,
+  onOpenChange,
 }: {
   productId: number;
   overrideLogoId: number | null;
@@ -18,7 +23,8 @@ export function BaleLogoPickerPopover({
   const [pickerCustomerId, setPickerCustomerId] = useState("none");
   const { data: logos = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/customers", pickerCustomerId, "logos"],
-    queryFn: () => fetch(`/api/factory/customers/${pickerCustomerId}/logos`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () =>
+      fetch(`/api/factory/customers/${pickerCustomerId}/logos`, { credentials: "include" }).then((r) => r.json()),
     enabled: pickerCustomerId !== "none",
   });
   const activeCustomers = allCustomers.filter((c: any) => c.active);
@@ -32,7 +38,11 @@ export function BaleLogoPickerPopover({
           title={overrideLogoId ? "Custom logo assigned — click to change" : "Assign customer logo for this bale"}
         >
           {overrideLogoId ? (
-            <img src={`/api/factory/customer-logos/${overrideLogoId}/image`} alt="Logo" className="h-5 w-8 object-contain rounded" />
+            <img
+              src={`/api/factory/customer-logos/${overrideLogoId}/image`}
+              alt="Logo"
+              className="h-5 w-8 object-contain rounded"
+            />
           ) : (
             <ImagePlus className="h-4 w-4 text-muted-foreground" />
           )}
@@ -48,12 +58,14 @@ export function BaleLogoPickerPopover({
             <SelectContent>
               <SelectItem value="none">— Choose customer —</SelectItem>
               {activeCustomers.map((c: any) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.legalName}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          {pickerCustomerId !== "none" && (
-            logos.length === 0 ? (
+          {pickerCustomerId !== "none" &&
+            (logos.length === 0 ? (
               <p className="text-xs text-muted-foreground py-1">No logos uploaded for this customer.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5 pt-1">
@@ -61,21 +73,30 @@ export function BaleLogoPickerPopover({
                   <button
                     key={logo.id}
                     type="button"
-                    onClick={() => { onSelect(logo.id); onOpenChange(false); }}
+                    onClick={() => {
+                      onSelect(logo.id);
+                      onOpenChange(false);
+                    }}
                     className={`flex flex-col items-center gap-0.5 p-1.5 rounded-md border text-xs ${overrideLogoId === logo.id ? "border-primary bg-primary/10" : "border-border hover-elevate"}`}
                     data-testid={`bale-logo-option-${productId}-${logo.id}`}
                   >
-                    <img src={`/api/factory/customer-logos/${logo.id}/image`} alt={logo.name} className="h-6 w-10 object-contain" />
+                    <img
+                      src={`/api/factory/customer-logos/${logo.id}/image`}
+                      alt={logo.name}
+                      className="h-6 w-10 object-contain"
+                    />
                     <span className="truncate max-w-[56px]">{logo.name}</span>
                   </button>
                 ))}
               </div>
-            )
-          )}
+            ))}
           {overrideLogoId && (
             <button
               className="text-xs text-muted-foreground underline hover:text-foreground mt-1"
-              onClick={() => { onSelect(null); onOpenChange(false); }}
+              onClick={() => {
+                onSelect(null);
+                onOpenChange(false);
+              }}
               data-testid={`bale-logo-clear-${productId}`}
             >
               Clear logo

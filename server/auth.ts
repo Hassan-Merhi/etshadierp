@@ -138,7 +138,15 @@ export function canDelete(req: Request, res: Response, next: NextFunction) {
   }
 
   // Normal User, unknown/future roles — default deny
-  logDenied({ userId, username, role, companyId, method, path, reason: `Role '${role}' is not permitted to delete records` });
+  logDenied({
+    userId,
+    username,
+    role,
+    companyId,
+    method,
+    path,
+    reason: `Role '${role}' is not permitted to delete records`,
+  });
   return res.status(403).json({ message: "You do not have permission to delete records" });
 }
 
@@ -220,7 +228,7 @@ export async function checkPOSLocation(req: Request, res: Response, next: NextFu
   }
 
   const locationId = parseInt(req.params.locationId || req.body.locationId || req.query.locationId);
-  
+
   if (!locationId) {
     return next();
   }
@@ -233,18 +241,13 @@ export async function checkPOSLocation(req: Request, res: Response, next: NextFu
   const assignedLocations = await db
     .select({ locationId: userLocations.locationId })
     .from(userLocations)
-    .where(
-      and(
-        eq(userLocations.userId, req.user.id),
-        eq(userLocations.companyId, companyId)
-      )
-    );
+    .where(and(eq(userLocations.userId, req.user.id), eq(userLocations.companyId, companyId)));
 
-  const allowedIds = assignedLocations.map(l => l.locationId);
+  const allowedIds = assignedLocations.map((l) => l.locationId);
 
   if (!allowedIds.includes(locationId)) {
-    return res.status(403).json({ 
-      message: "You can only access data for your assigned locations" 
+    return res.status(403).json({
+      message: "You can only access data for your assigned locations",
     });
   }
 
@@ -319,8 +322,8 @@ export function requireNonPOS(req: Request, res: Response, next: NextFunction) {
       path: req.path,
       reason: "POS role attempted access to non-POS route",
     });
-    return res.status(403).json({ 
-      message: "Access denied: This resource is not available for POS users" 
+    return res.status(403).json({
+      message: "Access denied: This resource is not available for POS users",
     });
   }
 

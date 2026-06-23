@@ -2,12 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { StickyNote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  OTW_NOTES_KEY,
-  otwFmtCcy,
-  otwCcySymbol,
-  getContainerStatusLabel,
-} from "./otwHelpers";
+import { OTW_NOTES_KEY, otwFmtCcy, otwCcySymbol, getContainerStatusLabel } from "./otwHelpers";
 
 export function OtwCurrencyInline({ amounts }: { amounts: Record<string, number> }) {
   const entries = Object.entries(amounts).filter(([, v]) => v > 0);
@@ -35,7 +30,12 @@ export function OtwNotes() {
     }, 600);
   }
 
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    },
+    []
+  );
 
   return (
     <div className="rounded-xl border overflow-hidden">
@@ -59,16 +59,30 @@ export function OtwNotes() {
 export function ContainerStatusBadge({ status }: { status: string }) {
   const label = getContainerStatusLabel(status);
   if (status === "OFFLOADED") {
-    return <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{label}</Badge>;
+    return (
+      <Badge className="text-xs bg-green-500/10 text-green-700 dark:text-green-300 border-green-500/20">{label}</Badge>
+    );
   }
   if (status === "PARTIALLY_RECEIVED") {
-    return <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{label}</Badge>;
+    return (
+      <Badge className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20">{label}</Badge>
+    );
   }
   if (status === "IN_TRANSIT") {
-    return <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{label}</Badge>;
+    return (
+      <Badge className="text-xs bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20">{label}</Badge>
+    );
   }
   if (status === "ARRIVED") {
-    return <Badge className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">{label}</Badge>;
+    return (
+      <Badge className="text-xs bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20">
+        {label}
+      </Badge>
+    );
   }
-  return <Badge variant="secondary" className="text-xs">{label}</Badge>;
+  return (
+    <Badge variant="secondary" className="text-xs">
+      {label}
+    </Badge>
+  );
 }

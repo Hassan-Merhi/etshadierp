@@ -3,10 +3,22 @@ import { db } from "../db";
 import { requireAuth } from "../auth";
 import { sql, eq, and, gt, isNull, desc, asc } from "drizzle-orm";
 import {
-  ledgerAccounts, vouchers, voucherEntries, locations, bankAccounts,
-  spContainers, spContainerLines, spPrepaidCharges, spOffloads,
-  spOffloadCharges, spStockMovements, spSales, spSaleLines, spProfitSplits,
-  stockItemCodeAliases, stockItems,
+  ledgerAccounts,
+  vouchers,
+  voucherEntries,
+  locations,
+  bankAccounts,
+  spContainers,
+  spContainerLines,
+  spPrepaidCharges,
+  spOffloads,
+  spOffloadCharges,
+  spStockMovements,
+  spSales,
+  spSaleLines,
+  spProfitSplits,
+  stockItemCodeAliases,
+  stockItems,
 } from "@shared/schema";
 import { adjustInventory } from "../inventoryHelper";
 import { getClientDate } from "../lib/dateUtils";
@@ -55,29 +67,64 @@ function parseNum(v: any): number {
 // ── SP Chart of Accounts setup ───────────────────────────────────────────────
 
 const SP_ACCOUNTS = [
-  { code: "SP-OTW",     name: "Goods On The Way",              accountType: "Asset",          subType: "sp_goods_otw",          isHidden: false },
-  { code: "SP-OTWCLR",  name: "Goods OTW Clearing",            accountType: "Liability",       subType: "sp_otw_clearing",       isHidden: true  },
-  { code: "SP-PREPAID", name: "Prepaid Charges",               accountType: "Asset",          subType: "sp_prepaid",            isHidden: false },
+  { code: "SP-OTW", name: "Goods On The Way", accountType: "Asset", subType: "sp_goods_otw", isHidden: false },
+  {
+    code: "SP-OTWCLR",
+    name: "Goods OTW Clearing",
+    accountType: "Liability",
+    subType: "sp_otw_clearing",
+    isHidden: true,
+  },
+  { code: "SP-PREPAID", name: "Prepaid Charges", accountType: "Asset", subType: "sp_prepaid", isHidden: false },
   // SP-STOCK is isHidden=true: it is an internal double-entry counterpart to the ERP
   // inventory table and must NOT appear as a normal postable account in the Accounts UI.
-  { code: "SP-STOCK",   name: "Stock on Floor",                accountType: "Asset",          subType: "sp_stock",              isHidden: true  },
-  { code: "SP-COSTCLR", name: "Stock Cost Payable Clearing",   accountType: "Liability",       subType: "sp_cost_clearing",      isHidden: true  },
+  { code: "SP-STOCK", name: "Stock on Floor", accountType: "Asset", subType: "sp_stock", isHidden: true },
+  {
+    code: "SP-COSTCLR",
+    name: "Stock Cost Payable Clearing",
+    accountType: "Liability",
+    subType: "sp_cost_clearing",
+    isHidden: true,
+  },
   // Internal clearing account to keep vouchers balanced when a per-qty deduction
   // silently reduces Supplier Cash Payable. Not income/expense — excluded from all reports.
-  { code: "SP-PAYDDC", name: "Supplier Payable Deduction Clearing", accountType: "Liability", subType: "sp_pay_deduction_clearing", isHidden: true },
-  { code: "SP-PAY",     name: "Supplier Cash Payable",         accountType: "Liability",       subType: "sp_payable",            isHidden: false },
-  { code: "SP-SALES",   name: "Sales",                         accountType: "Income",         subType: "sp_sales",              isHidden: false },
-  { code: "SP-COGS",    name: "Cost of Goods Sold",            accountType: "Direct Expense", subType: "sp_cogs",               isHidden: false },
-  { code: "SP-SHARED",  name: "Shared Charges",                accountType: "Direct Expense", subType: "sp_shared_charges",     isHidden: false },
-  { code: "SP-OPNBAL",  name: "Opening Balance Clearing",      accountType: "Equity",         subType: "sp_opnbal",             isHidden: true  },
-  { code: "SP-PREEXP",  name: "Prepaid Expenses",              accountType: "Asset",          subType: "sp_prepaid_expenses",   isHidden: false },
-  { code: "SP-HADI-IC", name: "HADI L'SHI — Intercompany",    accountType: "Intercompany",   subType: "sp_hadi_intercompany",  isHidden: false },
+  {
+    code: "SP-PAYDDC",
+    name: "Supplier Payable Deduction Clearing",
+    accountType: "Liability",
+    subType: "sp_pay_deduction_clearing",
+    isHidden: true,
+  },
+  { code: "SP-PAY", name: "Supplier Cash Payable", accountType: "Liability", subType: "sp_payable", isHidden: false },
+  { code: "SP-SALES", name: "Sales", accountType: "Income", subType: "sp_sales", isHidden: false },
+  { code: "SP-COGS", name: "Cost of Goods Sold", accountType: "Direct Expense", subType: "sp_cogs", isHidden: false },
+  {
+    code: "SP-SHARED",
+    name: "Shared Charges",
+    accountType: "Direct Expense",
+    subType: "sp_shared_charges",
+    isHidden: false,
+  },
+  { code: "SP-OPNBAL", name: "Opening Balance Clearing", accountType: "Equity", subType: "sp_opnbal", isHidden: true },
+  {
+    code: "SP-PREEXP",
+    name: "Prepaid Expenses",
+    accountType: "Asset",
+    subType: "sp_prepaid_expenses",
+    isHidden: false,
+  },
+  {
+    code: "SP-HADI-IC",
+    name: "HADI L'SHI — Intercompany",
+    accountType: "Intercompany",
+    subType: "sp_hadi_intercompany",
+    isHidden: false,
+  },
 ];
 
 // ── Route Registration ────────────────────────────────────────────────────────
 
 export function registerSpRoutes(app: Express) {
-
   // ── Setup ─────────────────────────────────────────────────────────────────
 
   app.post("/api/sp/setup", requireAuth, async (req: any, res: any) => {
@@ -135,21 +182,18 @@ export function registerSpRoutes(app: Express) {
       const accounts = await db
         .select()
         .from(ledgerAccounts)
-        .where(
-          and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
-        )
+        .where(and(eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt)))
         .orderBy(asc(ledgerAccounts.code));
 
-      const spAccounts = accounts.filter(a => a.subType?.startsWith("sp_"));
-      const isConfigured = SP_ACCOUNTS.every(sa => spAccounts.some(a => a.subType === sa.subType));
+      const spAccounts = accounts.filter((a) => a.subType?.startsWith("sp_"));
+      const isConfigured = SP_ACCOUNTS.every((sa) => spAccounts.some((a) => a.subType === sa.subType));
 
-      const locs = await db.select().from(locations).where(
-        and(eq(locations.companyId, companyId), isNull(locations.deletedAt))
-      );
+      const locs = await db
+        .select()
+        .from(locations)
+        .where(and(eq(locations.companyId, companyId), isNull(locations.deletedAt)));
 
-      const banks = await db.select().from(bankAccounts).where(
-        eq(bankAccounts.companyId, companyId)
-      );
+      const banks = await db.select().from(bankAccounts).where(eq(bankAccounts.companyId, companyId));
 
       res.json({ isConfigured, spAccounts, locations: locs, bankAccounts: banks });
     } catch (error: any) {
@@ -170,15 +214,12 @@ export function registerSpRoutes(app: Express) {
         .where(eq(spContainers.companyId, companyId))
         .orderBy(desc(spContainers.createdAt));
 
-      const lines = await db
-        .select()
-        .from(spContainerLines)
-        .where(eq(spContainerLines.companyId, companyId));
+      const lines = await db.select().from(spContainerLines).where(eq(spContainerLines.companyId, companyId));
 
-      const result = containers.map(c => ({
+      const result = containers.map((c) => ({
         ...c,
-        lines: lines.filter(l => l.containerId === c.id),
-        totalQty: lines.filter(l => l.containerId === c.id).reduce((s, l) => s + parseNum(l.qty), 0),
+        lines: lines.filter((l) => l.containerId === c.id),
+        totalQty: lines.filter((l) => l.containerId === c.id).reduce((s, l) => s + parseNum(l.qty), 0),
       }));
 
       res.json(result);
@@ -192,7 +233,20 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { supplierId, supplierName, containerNumber, invoiceNumber, invoiceDate, invoiceTotalUsd, discountPct, freightEstimateUsd, notes, lines, otwAccountId, otwClearingAccountId } = req.body;
+      const {
+        supplierId,
+        supplierName,
+        containerNumber,
+        invoiceNumber,
+        invoiceDate,
+        invoiceTotalUsd,
+        discountPct,
+        freightEstimateUsd,
+        notes,
+        lines,
+        otwAccountId,
+        otwClearingAccountId,
+      } = req.body;
 
       if (!supplierName || !invoiceNumber || !invoiceDate) {
         return res.status(400).json({ message: "supplierName, invoiceNumber, invoiceDate are required" });
@@ -206,16 +260,30 @@ export function registerSpRoutes(app: Express) {
 
       // Allow optional override accounts — validate they belong to this company
       if (otwAccountId) {
-        const [customOtw] = await db.select().from(ledgerAccounts).where(
-          and(eq(ledgerAccounts.id, parseInt(otwAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
-        );
+        const [customOtw] = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.id, parseInt(otwAccountId)),
+              eq(ledgerAccounts.companyId, companyId),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
         if (!customOtw) return res.status(400).json({ message: "Goods OTW account not found for this company" });
         otwAcct = customOtw;
       }
       if (otwClearingAccountId) {
-        const [customOtwClr] = await db.select().from(ledgerAccounts).where(
-          and(eq(ledgerAccounts.id, parseInt(otwClearingAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
-        );
+        const [customOtwClr] = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.id, parseInt(otwClearingAccountId)),
+              eq(ledgerAccounts.companyId, companyId),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
         if (!customOtwClr) return res.status(400).json({ message: "OTW Clearing account not found for this company" });
         otwClrAcct = customOtwClr;
       }
@@ -224,19 +292,22 @@ export function registerSpRoutes(app: Express) {
       const supplierIdNum = supplierId ? parseInt(String(supplierId)) : null;
 
       const result = await db.transaction(async (tx) => {
-        const [container] = await tx.insert(spContainers).values({
-          companyId,
-          supplierId: supplierIdNum,
-          supplierName,
-          containerNumber: containerNumber || null,
-          invoiceNumber,
-          invoiceDate,
-          invoiceTotalUsd: String(totalUsd),
-          discountPct: String(parseNum(discountPct)),
-          freightEstimateUsd: String(parseNum(freightEstimateUsd)),
-          notes: notes || null,
-          status: "open",
-        }).returning();
+        const [container] = await tx
+          .insert(spContainers)
+          .values({
+            companyId,
+            supplierId: supplierIdNum,
+            supplierName,
+            containerNumber: containerNumber || null,
+            invoiceNumber,
+            invoiceDate,
+            invoiceTotalUsd: String(totalUsd),
+            discountPct: String(parseNum(discountPct)),
+            freightEstimateUsd: String(parseNum(freightEstimateUsd)),
+            notes: notes || null,
+            status: "open",
+          })
+          .returning();
 
         // Insert lines
         if (lines && lines.length > 0) {
@@ -256,18 +327,21 @@ export function registerSpRoutes(app: Express) {
         // Voucher: Dr Goods OTW / Cr Goods OTW Clearing
         if (totalUsd > 0) {
           const voucherNum = `SP-OTW-${container.id}-${Date.now()}`;
-          const [voucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherType: "Journal",
-            voucherNumber: voucherNum,
-            voucherDate: invoiceDate,
-            description: `Goods OTW: ${supplierName} — Invoice ${invoiceNumber}`,
-            totalAmount: String(totalUsd),
-            currency: "USD",
-            exchangeRate: "1",
-            sourceModule: "SP",
-            supplierId: supplierIdNum,
-          }).returning();
+          const [voucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: voucherNum,
+              voucherDate: invoiceDate,
+              description: `Goods OTW: ${supplierName} — Invoice ${invoiceNumber}`,
+              totalAmount: String(totalUsd),
+              currency: "USD",
+              exchangeRate: "1",
+              sourceModule: "SP",
+              supplierId: supplierIdNum,
+            })
+            .returning();
 
           await tx.insert(voucherEntries).values({
             voucherId: voucher.id,
@@ -285,9 +359,7 @@ export function registerSpRoutes(app: Express) {
             narration: `OTW Clearing — ${supplierName} inv ${invoiceNumber}`,
           });
 
-          await tx.update(spContainers)
-            .set({ goodsOtwVoucherId: voucher.id })
-            .where(eq(spContainers.id, container.id));
+          await tx.update(spContainers).set({ goodsOtwVoucherId: voucher.id }).where(eq(spContainers.id, container.id));
         }
 
         return container;
@@ -308,15 +380,26 @@ export function registerSpRoutes(app: Express) {
       const containerId = parseInt(req.params.id);
       if (isNaN(containerId)) return res.status(400).json({ message: "Invalid container ID" });
 
-      const [existing] = await db.select().from(spContainers).where(
-        and(eq(spContainers.id, containerId), eq(spContainers.companyId, companyId))
-      );
+      const [existing] = await db
+        .select()
+        .from(spContainers)
+        .where(and(eq(spContainers.id, containerId), eq(spContainers.companyId, companyId)));
       if (!existing) return res.status(404).json({ message: "Container not found" });
       if (existing.status === "offloaded") {
         return res.status(400).json({ message: "Cannot edit an offloaded container" });
       }
 
-      const { supplierId, supplierName, containerNumber, invoiceNumber, invoiceDate, invoiceTotalUsd, discountPct, freightEstimateUsd, notes } = req.body;
+      const {
+        supplierId,
+        supplierName,
+        containerNumber,
+        invoiceNumber,
+        invoiceDate,
+        invoiceTotalUsd,
+        discountPct,
+        freightEstimateUsd,
+        notes,
+      } = req.body;
 
       const totalUsd = parseNum(invoiceTotalUsd ?? existing.invoiceTotalUsd);
       const supplierIdNum = supplierId ? parseInt(String(supplierId)) : (existing.supplierId ?? null);
@@ -332,27 +415,34 @@ export function registerSpRoutes(app: Express) {
 
       const updated = await db.transaction(async (tx) => {
         // Update container fields
-        const [updatedContainer] = await tx.update(spContainers).set({
-          supplierId: supplierIdNum,
-          supplierName: newSupplierName,
-          containerNumber: containerNumber !== undefined ? (containerNumber || null) : existing.containerNumber,
-          invoiceNumber: newInvoiceNumber,
-          invoiceDate: newInvoiceDate,
-          invoiceTotalUsd: String(totalUsd),
-          discountPct: String(parseNum(discountPct ?? existing.discountPct)),
-          freightEstimateUsd: String(parseNum(freightEstimateUsd ?? existing.freightEstimateUsd)),
-          notes: notes !== undefined ? (notes || null) : existing.notes,
-        }).where(and(eq(spContainers.id, containerId), eq(spContainers.companyId, companyId))).returning();
+        const [updatedContainer] = await tx
+          .update(spContainers)
+          .set({
+            supplierId: supplierIdNum,
+            supplierName: newSupplierName,
+            containerNumber: containerNumber !== undefined ? containerNumber || null : existing.containerNumber,
+            invoiceNumber: newInvoiceNumber,
+            invoiceDate: newInvoiceDate,
+            invoiceTotalUsd: String(totalUsd),
+            discountPct: String(parseNum(discountPct ?? existing.discountPct)),
+            freightEstimateUsd: String(parseNum(freightEstimateUsd ?? existing.freightEstimateUsd)),
+            notes: notes !== undefined ? notes || null : existing.notes,
+          })
+          .where(and(eq(spContainers.id, containerId), eq(spContainers.companyId, companyId)))
+          .returning();
 
         // Regenerate OTW voucher if amount or supplier changed
         if (existing.goodsOtwVoucherId && totalUsd > 0) {
           // Update voucher header
-          await tx.update(vouchers).set({
-            voucherDate: newInvoiceDate,
-            description: `Goods OTW: ${newSupplierName} — Invoice ${newInvoiceNumber}`,
-            totalAmount: String(totalUsd),
-            supplierId: supplierIdNum,
-          }).where(eq(vouchers.id, existing.goodsOtwVoucherId));
+          await tx
+            .update(vouchers)
+            .set({
+              voucherDate: newInvoiceDate,
+              description: `Goods OTW: ${newSupplierName} — Invoice ${newInvoiceNumber}`,
+              totalAmount: String(totalUsd),
+              supplierId: supplierIdNum,
+            })
+            .where(eq(vouchers.id, existing.goodsOtwVoucherId));
 
           // Delete old entries and recreate with updated amounts
           await tx.delete(voucherEntries).where(eq(voucherEntries.voucherId, existing.goodsOtwVoucherId));
@@ -375,18 +465,21 @@ export function registerSpRoutes(app: Express) {
         } else if (!existing.goodsOtwVoucherId && totalUsd > 0) {
           // Create new voucher if none existed
           const voucherNum = `SP-OTW-${containerId}-${Date.now()}`;
-          const [voucher] = await tx.insert(vouchers).values({
-            companyId,
-            voucherType: "Journal",
-            voucherNumber: voucherNum,
-            voucherDate: newInvoiceDate,
-            description: `Goods OTW: ${newSupplierName} — Invoice ${newInvoiceNumber}`,
-            totalAmount: String(totalUsd),
-            currency: "USD",
-            exchangeRate: "1",
-            sourceModule: "SP",
-            supplierId: supplierIdNum,
-          }).returning();
+          const [voucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Journal",
+              voucherNumber: voucherNum,
+              voucherDate: newInvoiceDate,
+              description: `Goods OTW: ${newSupplierName} — Invoice ${newInvoiceNumber}`,
+              totalAmount: String(totalUsd),
+              currency: "USD",
+              exchangeRate: "1",
+              sourceModule: "SP",
+              supplierId: supplierIdNum,
+            })
+            .returning();
 
           await tx.insert(voucherEntries).values({
             voucherId: voucher.id,
@@ -404,9 +497,7 @@ export function registerSpRoutes(app: Express) {
             narration: `OTW Clearing — ${newSupplierName} inv ${newInvoiceNumber}`,
           });
 
-          await tx.update(spContainers)
-            .set({ goodsOtwVoucherId: voucher.id })
-            .where(eq(spContainers.id, containerId));
+          await tx.update(spContainers).set({ goodsOtwVoucherId: voucher.id }).where(eq(spContainers.id, containerId));
         }
 
         return updatedContainer;
@@ -452,10 +543,7 @@ export function registerSpRoutes(app: Express) {
 
       let offloadCharges: any[] = [];
       if (offload) {
-        offloadCharges = await db
-          .select()
-          .from(spOffloadCharges)
-          .where(eq(spOffloadCharges.offloadId, offload.id));
+        offloadCharges = await db.select().from(spOffloadCharges).where(eq(spOffloadCharges.offloadId, offload.id));
       }
 
       const movements = await db
@@ -499,16 +587,20 @@ export function registerSpRoutes(app: Express) {
       `);
       const aliasMap = new Map<string, { stockItemId: number; itemCode: string; itemName: string }>();
       for (const row of aliasResult.rows as any[]) {
-        aliasMap.set(row.alias_code, { stockItemId: row.stock_item_id, itemCode: row.item_code, itemName: row.item_name });
+        aliasMap.set(row.alias_code, {
+          stockItemId: row.stock_item_id,
+          itemCode: row.item_code,
+          itemName: row.item_name,
+        });
       }
 
-      const discountFactor = 1 - parseFloat(container.discountPct as any || "0") / 100;
-      const totalQty = lines.reduce((s, l) => s + parseFloat(l.qty as any || "0"), 0);
+      const discountFactor = 1 - parseFloat((container.discountPct as any) || "0") / 100;
+      const totalQty = lines.reduce((s, l) => s + parseFloat((l.qty as any) || "0"), 0);
 
-      const enriched = lines.map(l => {
+      const enriched = lines.map((l) => {
         const alias = aliasMap.get(l.articleCode);
-        const qty = parseFloat(l.qty as any || "0");
-        const unitRate = parseFloat(l.unitRateUsd as any || "0");
+        const qty = parseFloat((l.qty as any) || "0");
+        const unitRate = parseFloat((l.unitRateUsd as any) || "0");
         const discountedBaseRate = unitRate * discountFactor;
         return {
           id: l.id,
@@ -531,7 +623,7 @@ export function registerSpRoutes(app: Express) {
         totalQty,
         discountFactor,
         discountPct: container.discountPct,
-        unmappedCount: enriched.filter(l => !l.aliasResolved).length,
+        unmappedCount: enriched.filter((l) => !l.aliasResolved).length,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -567,7 +659,8 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { containerId, prepaidDate, chargeType, agentName, amountPaidUsd, bankAccountId, debitAccountId, notes } = req.body;
+      const { containerId, prepaidDate, chargeType, agentName, amountPaidUsd, bankAccountId, debitAccountId, notes } =
+        req.body;
 
       if (!chargeType || !amountPaidUsd) {
         return res.status(400).json({ message: "chargeType, amountPaidUsd required" });
@@ -578,18 +671,26 @@ export function registerSpRoutes(app: Express) {
 
       // Allow optional debit account override — validate it belongs to this company
       if (debitAccountId) {
-        const [customDebit] = await db.select().from(ledgerAccounts).where(
-          and(eq(ledgerAccounts.id, parseInt(debitAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
-        );
+        const [customDebit] = await db
+          .select()
+          .from(ledgerAccounts)
+          .where(
+            and(
+              eq(ledgerAccounts.id, parseInt(debitAccountId)),
+              eq(ledgerAccounts.companyId, companyId),
+              isNull(ledgerAccounts.deletedAt)
+            )
+          );
         if (!customDebit) return res.status(400).json({ message: "Debit account not found for this company" });
         prepaidAcct = customDebit;
       }
 
       // Validate bank account belongs to this company
       if (bankAccountId) {
-        const [bank] = await db.select().from(bankAccounts).where(
-          and(eq(bankAccounts.id, parseInt(bankAccountId)), eq(bankAccounts.companyId, companyId))
-        );
+        const [bank] = await db
+          .select()
+          .from(bankAccounts)
+          .where(and(eq(bankAccounts.id, parseInt(bankAccountId)), eq(bankAccounts.companyId, companyId)));
         if (!bank) return res.status(400).json({ message: "Bank account not found for this company" });
       }
 
@@ -597,31 +698,37 @@ export function registerSpRoutes(app: Express) {
       const date = prepaidDate || getClientDate(req);
 
       const result = await db.transaction(async (tx) => {
-        const [charge] = await tx.insert(spPrepaidCharges).values({
-          companyId,
-          containerId: containerId ? parseInt(containerId) : null,
-          prepaidDate: date,
-          chargeType,
-          agentName: agentName || null,
-          amountPaidUsd: String(amount),
-          amountUsedUsd: "0",
-          notes: notes || null,
-        }).returning();
+        const [charge] = await tx
+          .insert(spPrepaidCharges)
+          .values({
+            companyId,
+            containerId: containerId ? parseInt(containerId) : null,
+            prepaidDate: date,
+            chargeType,
+            agentName: agentName || null,
+            amountPaidUsd: String(amount),
+            amountUsedUsd: "0",
+            notes: notes || null,
+          })
+          .returning();
 
         const voucherNum = `SP-PRE-${charge.id}-${Date.now()}`;
         const desc = `Prepaid ${chargeType}${agentName ? ` — ${agentName}` : ""} for container #${containerId}`;
 
-        const [voucher] = await tx.insert(vouchers).values({
-          companyId,
-          voucherType: "Journal",
-          voucherNumber: voucherNum,
-          voucherDate: date,
-          description: desc,
-          totalAmount: String(amount),
-          currency: "USD",
-          exchangeRate: "1",
-          sourceModule: "SP",
-        }).returning();
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: voucherNum,
+            voucherDate: date,
+            description: desc,
+            totalAmount: String(amount),
+            currency: "USD",
+            exchangeRate: "1",
+            sourceModule: "SP",
+          })
+          .returning();
 
         // Dr Prepaid Charges
         await tx.insert(voucherEntries).values({
@@ -643,9 +750,7 @@ export function registerSpRoutes(app: Express) {
           });
         }
 
-        await tx.update(spPrepaidCharges)
-          .set({ voucherId: voucher.id })
-          .where(eq(spPrepaidCharges.id, charge.id));
+        await tx.update(spPrepaidCharges).set({ voucherId: voucher.id }).where(eq(spPrepaidCharges.id, charge.id));
 
         return { ...charge, voucherId: voucher.id };
       });
@@ -663,9 +768,7 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const parentRows = await db.execute(
-        sql`SELECT parent_company_id FROM companies WHERE id = ${companyId} LIMIT 1`
-      );
+      const parentRows = await db.execute(sql`SELECT parent_company_id FROM companies WHERE id = ${companyId} LIMIT 1`);
       const parentRow = (parentRows as any).rows?.[0] ?? (parentRows as any)[0];
       const parentId = parentRow?.parent_company_id ?? 1;
 
@@ -701,8 +804,12 @@ export function registerSpRoutes(app: Express) {
       if (!locationId) {
         return res.status(400).json({ message: "locationId is required" });
       }
-      const [offloadLocation] = await db.select().from(locations)
-        .where(and(eq(locations.id, parseInt(locationId)), eq(locations.companyId, companyId), isNull(locations.deletedAt)));
+      const [offloadLocation] = await db
+        .select()
+        .from(locations)
+        .where(
+          and(eq(locations.id, parseInt(locationId)), eq(locations.companyId, companyId), isNull(locations.deletedAt))
+        );
       if (!offloadLocation) {
         return res.status(400).json({ message: "Invalid location for this company" });
       }
@@ -725,16 +832,15 @@ export function registerSpRoutes(app: Express) {
       }
 
       // Fetch SP accounts
-      const otwAcct    = await getSpAccount(companyId, "sp_goods_otw");
+      const otwAcct = await getSpAccount(companyId, "sp_goods_otw");
       const otwClrAcct = await getSpAccount(companyId, "sp_otw_clearing");
       const prepaidAcct = await getSpAccount(companyId, "sp_prepaid");
-      const stockAcct  = await getSpAccount(companyId, "sp_stock");
+      const stockAcct = await getSpAccount(companyId, "sp_stock");
       const costClrAcct = await getSpAccount(companyId, "sp_cost_clearing");
 
       if (!otwAcct || !otwClrAcct || !stockAcct || !costClrAcct) {
         return res.status(400).json({ message: "SP accounts not configured. Run setup first." });
       }
-
 
       // Discount rate
       const discountPct = parseNum(container.discountPct);
@@ -756,17 +862,20 @@ export function registerSpRoutes(app: Express) {
 
       const result = await db.transaction(async (tx) => {
         // ── Voucher A: Reverse Goods OTW ──────────────────────────────────────
-        const [voucherA] = await tx.insert(vouchers).values({
-          companyId,
-          voucherType: "Journal",
-          voucherNumber: `SP-OTW-REV-${container.id}-${Date.now()}`,
-          voucherDate: offloadDate,
-          description: `Goods OTW Reversal — ${container.supplierName} inv ${container.invoiceNumber}`,
-          totalAmount: String(invoiceTotal),
-          currency: "USD",
-          exchangeRate: "1",
-          sourceModule: "SP",
-        }).returning();
+        const [voucherA] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: `SP-OTW-REV-${container.id}-${Date.now()}`,
+            voucherDate: offloadDate,
+            description: `Goods OTW Reversal — ${container.supplierName} inv ${container.invoiceNumber}`,
+            totalAmount: String(invoiceTotal),
+            currency: "USD",
+            exchangeRate: "1",
+            sourceModule: "SP",
+          })
+          .returning();
 
         // Dr Goods OTW Clearing (Liability side reduces)
         await tx.insert(voucherEntries).values({
@@ -786,17 +895,20 @@ export function registerSpRoutes(app: Express) {
         });
 
         // ── Voucher B: Create Stock ───────────────────────────────────────────
-        const [voucherB] = await tx.insert(vouchers).values({
-          companyId,
-          voucherType: "Journal",
-          voucherNumber: `SP-STOCK-${container.id}-${Date.now()}`,
-          voucherDate: offloadDate,
-          description: `Stock offload — ${container.supplierName} inv ${container.invoiceNumber}`,
-          totalAmount: String(totalFinalCost),
-          currency: "USD",
-          exchangeRate: "1",
-          sourceModule: "SP",
-        }).returning();
+        const [voucherB] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: `SP-STOCK-${container.id}-${Date.now()}`,
+            voucherDate: offloadDate,
+            description: `Stock offload — ${container.supplierName} inv ${container.invoiceNumber}`,
+            totalAmount: String(totalFinalCost),
+            currency: "USD",
+            exchangeRate: "1",
+            sourceModule: "SP",
+          })
+          .returning();
 
         // Dr Stock on Floor (full final cost)
         await tx.insert(voucherEntries).values({
@@ -829,8 +941,8 @@ export function registerSpRoutes(app: Express) {
             const prepaidRow = (prepaidRows as any).rows?.[0] ?? (prepaidRows as any)[0];
             if (!prepaidRow) throw new Error(`Prepaid charge #${charge.prepaidChargeId} not found`);
             const alreadyUsed = parseNum(prepaidRow.amount_used_usd);
-            const totalPaid   = parseNum(prepaidRow.amount_paid_usd);
-            const remaining   = totalPaid - alreadyUsed;
+            const totalPaid = parseNum(prepaidRow.amount_paid_usd);
+            const remaining = totalPaid - alreadyUsed;
             if (chargeAmt > remaining + 0.0001) {
               throw new Error(
                 `Prepaid charge #${charge.prepaidChargeId} has only ${remaining.toFixed(4)} remaining (paid ${totalPaid}, used ${alreadyUsed}), cannot use ${chargeAmt}`
@@ -851,12 +963,14 @@ export function registerSpRoutes(app: Express) {
             await tx.execute(
               sql`UPDATE sp_prepaid_charges SET amount_used_usd = amount_used_usd + ${chargeAmt} WHERE id = ${parseInt(charge.prepaidChargeId)}`
             );
-
           } else if (charge.chargeType === "paid_now" && charge.creditBankAccountId) {
             // Validate bank account belongs to company
-            const [bankRow] = await db.select().from(bankAccounts).where(
-              and(eq(bankAccounts.id, parseInt(charge.creditBankAccountId)), eq(bankAccounts.companyId, companyId))
-            );
+            const [bankRow] = await db
+              .select()
+              .from(bankAccounts)
+              .where(
+                and(eq(bankAccounts.id, parseInt(charge.creditBankAccountId)), eq(bankAccounts.companyId, companyId))
+              );
             if (!bankRow) throw new Error(`Bank account #${charge.creditBankAccountId} not found for this company`);
 
             await tx.insert(voucherEntries).values({
@@ -866,13 +980,20 @@ export function registerSpRoutes(app: Express) {
               creditAmount: String(chargeAmt),
               narration: `Cash paid at offload — ${charge.description || "charge"}`,
             });
-
           } else if (charge.chargeType === "unpaid_payable" && charge.creditLedgerAccountId) {
             // Validate ledger account belongs to company
-            const [ledgerRow] = await db.select().from(ledgerAccounts).where(
-              and(eq(ledgerAccounts.id, parseInt(charge.creditLedgerAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
-            );
-            if (!ledgerRow) throw new Error(`Ledger account #${charge.creditLedgerAccountId} not found for this company`);
+            const [ledgerRow] = await db
+              .select()
+              .from(ledgerAccounts)
+              .where(
+                and(
+                  eq(ledgerAccounts.id, parseInt(charge.creditLedgerAccountId)),
+                  eq(ledgerAccounts.companyId, companyId),
+                  isNull(ledgerAccounts.deletedAt)
+                )
+              );
+            if (!ledgerRow)
+              throw new Error(`Ledger account #${charge.creditLedgerAccountId} not found for this company`);
 
             await tx.insert(voucherEntries).values({
               voucherId: voucherB.id,
@@ -881,13 +1002,20 @@ export function registerSpRoutes(app: Express) {
               creditAmount: String(chargeAmt),
               narration: `Payable — ${charge.description || "charge"}`,
             });
-
           } else if (charge.chargeType === "other" && charge.creditLedgerAccountId) {
             // Validate ledger account belongs to company
-            const [otherRow] = await db.select().from(ledgerAccounts).where(
-              and(eq(ledgerAccounts.id, parseInt(charge.creditLedgerAccountId)), eq(ledgerAccounts.companyId, companyId), isNull(ledgerAccounts.deletedAt))
-            );
-            if (!otherRow) throw new Error(`Ledger account #${charge.creditLedgerAccountId} not found for this company`);
+            const [otherRow] = await db
+              .select()
+              .from(ledgerAccounts)
+              .where(
+                and(
+                  eq(ledgerAccounts.id, parseInt(charge.creditLedgerAccountId)),
+                  eq(ledgerAccounts.companyId, companyId),
+                  isNull(ledgerAccounts.deletedAt)
+                )
+              );
+            if (!otherRow)
+              throw new Error(`Ledger account #${charge.creditLedgerAccountId} not found for this company`);
 
             await tx.insert(voucherEntries).values({
               voucherId: voucherB.id,
@@ -896,12 +1024,12 @@ export function registerSpRoutes(app: Express) {
               creditAmount: String(chargeAmt),
               narration: `Other charge — ${charge.description || "charge"}`,
             });
-
           } else if (charge.chargeType === "parent_agent") {
             // Agent charge via parent company (HADI L'SHI) — Cr Prepaid Expenses in SP Test Co.
             // The HADI L'SHI side (Dr Agent / Cr SP Intercompany) is posted after Voucher B.
             const prepaidExpAcct = await getSpAccount(companyId, "sp_prepaid_expenses");
-            if (!prepaidExpAcct) throw new Error("Prepaid Expenses account (SP-PREEXP) not found. Run SP setup or contact admin.");
+            if (!prepaidExpAcct)
+              throw new Error("Prepaid Expenses account (SP-PREEXP) not found. Run SP setup or contact admin.");
 
             await tx.insert(voucherEntries).values({
               voucherId: voucherB.id,
@@ -910,7 +1038,6 @@ export function registerSpRoutes(app: Express) {
               creditAmount: String(chargeAmt),
               narration: `Agent charge via HADI L'SHI — ${charge.description || ""}`,
             });
-
           } else {
             // invoice_freight or fallback → Cr Stock Cost Payable Clearing
             await tx.insert(voucherEntries).values({
@@ -924,40 +1051,48 @@ export function registerSpRoutes(app: Express) {
         }
 
         // ── Insert sp_offload record ──────────────────────────────────────────
-        const [offload] = await tx.insert(spOffloads).values({
-          companyId,
-          containerId: container.id,
-          offloadDate,
-          totalQty: String(totalQty),
-          totalBaseCostUsd: String(totalBaseCost),
-          totalLandedCostUsd: String(totalLandedCost),
-          totalFinalCostUsd: String(totalFinalCost),
-          voucherIdReversal: voucherA.id,
-          voucherIdStock: voucherB.id,
-        }).returning();
+        const [offload] = await tx
+          .insert(spOffloads)
+          .values({
+            companyId,
+            containerId: container.id,
+            offloadDate,
+            totalQty: String(totalQty),
+            totalBaseCostUsd: String(totalBaseCost),
+            totalLandedCostUsd: String(totalLandedCost),
+            totalFinalCostUsd: String(totalFinalCost),
+            voucherIdReversal: voucherA.id,
+            voucherIdStock: voucherB.id,
+          })
+          .returning();
 
         // ── Insert offload charges ────────────────────────────────────────────
         if (charges.length > 0) {
           await tx.insert(spOffloadCharges).values(
-            charges.filter(c => parseNum(c.amountUsd) > 0).map((c: any) => ({
-              offloadId: offload.id,
-              companyId,
-              chargeType: c.chargeType,
-              description: c.description || null,
-              amountUsd: String(parseNum(c.amountUsd)),
-              prepaidChargeId: c.prepaidChargeId ? parseInt(c.prepaidChargeId) : null,
-              // For parent_agent: store the agent ledger id here for reference/traceability
-              creditLedgerAccountId: c.chargeType === "parent_agent" && c.parentAgentAccountId
-                ? parseInt(c.parentAgentAccountId)
-                : (c.creditLedgerAccountId ? parseInt(c.creditLedgerAccountId) : null),
-              creditBankAccountId: c.creditBankAccountId ? parseInt(c.creditBankAccountId) : null,
-            }))
+            charges
+              .filter((c) => parseNum(c.amountUsd) > 0)
+              .map((c: any) => ({
+                offloadId: offload.id,
+                companyId,
+                chargeType: c.chargeType,
+                description: c.description || null,
+                amountUsd: String(parseNum(c.amountUsd)),
+                prepaidChargeId: c.prepaidChargeId ? parseInt(c.prepaidChargeId) : null,
+                // For parent_agent: store the agent ledger id here for reference/traceability
+                creditLedgerAccountId:
+                  c.chargeType === "parent_agent" && c.parentAgentAccountId
+                    ? parseInt(c.parentAgentAccountId)
+                    : c.creditLedgerAccountId
+                      ? parseInt(c.creditLedgerAccountId)
+                      : null,
+                creditBankAccountId: c.creditBankAccountId ? parseInt(c.creditBankAccountId) : null,
+              }))
           );
         }
 
         // ── Voucher C: HADI L'SHI agent journals (if any parent_agent charges) ──
         const agentCharges = charges.filter(
-          c => c.chargeType === "parent_agent" && parseNum(c.amountUsd) > 0 && c.parentAgentAccountId
+          (c) => c.chargeType === "parent_agent" && parseNum(c.amountUsd) > 0 && c.parentAgentAccountId
         );
         if (agentCharges.length > 0) {
           // Lookup HADI L'SHI intercompany account (lives in HADI L'SHI, company_id=1)
@@ -972,23 +1107,28 @@ export function registerSpRoutes(app: Express) {
               )
             );
           if (!hadiSpInterco) {
-            throw new Error("HADI L'SHI intercompany account not found (SP-IC). Run startup migrations or contact admin.");
+            throw new Error(
+              "HADI L'SHI intercompany account not found (SP-IC). Run startup migrations or contact admin."
+            );
           }
 
           const totalAgentAmt = agentCharges.reduce((s: number, c: any) => s + parseNum(c.amountUsd), 0);
 
           // Create Voucher C in HADI L'SHI (company_id=1)
-          const [voucherC] = await tx.insert(vouchers).values({
-            companyId: 1,
-            voucherType: "Journal",
-            voucherNumber: `SP-AGENT-${container.id}-${Date.now()}`,
-            voucherDate: offloadDate,
-            description: `Agent charges for SP offload — ${container.supplierName} inv ${container.invoiceNumber}`,
-            totalAmount: String(totalAgentAmt),
-            currency: "USD",
-            exchangeRate: "1",
-            sourceModule: "SP",
-          }).returning();
+          const [voucherC] = await tx
+            .insert(vouchers)
+            .values({
+              companyId: 1,
+              voucherType: "Journal",
+              voucherNumber: `SP-AGENT-${container.id}-${Date.now()}`,
+              voucherDate: offloadDate,
+              description: `Agent charges for SP offload — ${container.supplierName} inv ${container.invoiceNumber}`,
+              totalAmount: String(totalAgentAmt),
+              currency: "USD",
+              exchangeRate: "1",
+              sourceModule: "SP",
+            })
+            .returning();
 
           // Dr each agent account in HADI L'SHI
           for (const ac of agentCharges) {
@@ -1037,7 +1177,16 @@ export function registerSpRoutes(app: Express) {
           // Call adjustInventory if stock item + location are configured
           if (line.stockItemId) {
             try {
-              await adjustInventory(tx, offloadLocation.id, line.stockItemId, qty, companyId, finalUnitCost, "SP_OFFLOAD", offload.id);
+              await adjustInventory(
+                tx,
+                offloadLocation.id,
+                line.stockItemId,
+                qty,
+                companyId,
+                finalUnitCost,
+                "SP_OFFLOAD",
+                offload.id
+              );
             } catch {
               // Non-blocking for Phase 1 — sp_stock_movements is the primary lot tracker
             }
@@ -1045,9 +1194,7 @@ export function registerSpRoutes(app: Express) {
         }
 
         // ── Update container status ───────────────────────────────────────────
-        await tx.update(spContainers)
-          .set({ status: "offloaded" })
-          .where(eq(spContainers.id, container.id));
+        await tx.update(spContainers).set({ status: "offloaded" }).where(eq(spContainers.id, container.id));
 
         return offload;
       });
@@ -1071,14 +1218,11 @@ export function registerSpRoutes(app: Express) {
         .where(eq(spSales.companyId, companyId))
         .orderBy(desc(spSales.createdAt));
 
-      const lines = await db
-        .select()
-        .from(spSaleLines)
-        .where(eq(spSaleLines.companyId, companyId));
+      const lines = await db.select().from(spSaleLines).where(eq(spSaleLines.companyId, companyId));
 
-      const result = sales.map(s => ({
+      const result = sales.map((s) => ({
         ...s,
-        lines: lines.filter(l => l.saleId === s.id),
+        lines: lines.filter((l) => l.saleId === s.id),
       }));
 
       res.json(result);
@@ -1100,7 +1244,8 @@ export function registerSpRoutes(app: Express) {
 
       // Validate bank account belongs to this company (if provided)
       if (bankAccountId) {
-        const [ba] = await db.select({ id: bankAccounts.id, companyId: bankAccounts.companyId })
+        const [ba] = await db
+          .select({ id: bankAccounts.id, companyId: bankAccounts.companyId })
           .from(bankAccounts)
           .where(and(eq(bankAccounts.id, parseInt(bankAccountId)), eq(bankAccounts.companyId, companyId)))
           .limit(1);
@@ -1109,9 +1254,9 @@ export function registerSpRoutes(app: Express) {
         }
       }
 
-      const salesAcct   = await getSpAccount(companyId, "sp_sales");
-      const cogsAcct    = await getSpAccount(companyId, "sp_cogs");
-      const stockAcct   = await getSpAccount(companyId, "sp_stock");
+      const salesAcct = await getSpAccount(companyId, "sp_sales");
+      const cogsAcct = await getSpAccount(companyId, "sp_cogs");
+      const stockAcct = await getSpAccount(companyId, "sp_stock");
       const costClrAcct = await getSpAccount(companyId, "sp_cost_clearing");
       const payableAcct = await getSpAccount(companyId, "sp_payable");
 
@@ -1121,17 +1266,17 @@ export function registerSpRoutes(app: Express) {
 
       const result = await db.transaction(async (tx) => {
         let totalSalePrice = 0;
-        let totalBaseCost  = 0;
+        let totalBaseCost = 0;
         let totalFinalCost = 0;
         const postedLines: any[] = [];
 
         for (const sl of saleLines) {
-          const qtySold   = parseNum(sl.qtySold);
+          const qtySold = parseNum(sl.qtySold);
           const salePrice = parseNum(sl.salePricePerUnit);
           if (qtySold <= 0) continue;
 
           const articleCode = sl.articleCode ? String(sl.articleCode).trim() : null;
-          let stockItemId   = sl.stockItemId ? parseInt(sl.stockItemId) : null;
+          let stockItemId = sl.stockItemId ? parseInt(sl.stockItemId) : null;
 
           if (!articleCode && !stockItemId) throw new Error("Each sale line needs articleCode or stockItemId");
 
@@ -1140,7 +1285,9 @@ export function registerSpRoutes(app: Express) {
             const aliasRows = await db
               .select()
               .from(stockItemCodeAliases)
-              .where(and(eq(stockItemCodeAliases.companyId, companyId), eq(stockItemCodeAliases.aliasCode, articleCode)));
+              .where(
+                and(eq(stockItemCodeAliases.companyId, companyId), eq(stockItemCodeAliases.aliasCode, articleCode))
+              );
             if (aliasRows.length > 0) stockItemId = aliasRows[0].stockItemId;
           }
 
@@ -1171,17 +1318,17 @@ export function registerSpRoutes(app: Express) {
           let qtyLeft = qtySold;
           for (const lot of lots) {
             if (qtyLeft <= 0.0001) break;
-            const qtyFromLot    = Math.min(qtyLeft, parseNum(lot.qty_remaining));
-            qtyLeft            -= qtyFromLot;
-            const baseUC        = parseNum(lot.base_unit_cost_usd);
-            const landedUC      = parseNum(lot.landed_unit_cost_usd);
-            const finalUC       = parseNum(lot.final_unit_cost_usd);
-            const saleTotal     = qtyFromLot * salePrice;
-            const baseTotal     = qtyFromLot * baseUC;
-            const finalTotal    = qtyFromLot * finalUC;
+            const qtyFromLot = Math.min(qtyLeft, parseNum(lot.qty_remaining));
+            qtyLeft -= qtyFromLot;
+            const baseUC = parseNum(lot.base_unit_cost_usd);
+            const landedUC = parseNum(lot.landed_unit_cost_usd);
+            const finalUC = parseNum(lot.final_unit_cost_usd);
+            const saleTotal = qtyFromLot * salePrice;
+            const baseTotal = qtyFromLot * baseUC;
+            const finalTotal = qtyFromLot * finalUC;
 
             totalSalePrice += saleTotal;
-            totalBaseCost  += baseTotal;
+            totalBaseCost += baseTotal;
             totalFinalCost += finalTotal;
 
             await tx.execute(
@@ -1190,18 +1337,26 @@ export function registerSpRoutes(app: Express) {
 
             if (lot.stock_item_id && lot.location_id) {
               try {
-                await adjustInventory(tx, parseInt(lot.location_id), parseInt(lot.stock_item_id), -qtyFromLot, companyId);
-              } catch { /* non-blocking */ }
+                await adjustInventory(
+                  tx,
+                  parseInt(lot.location_id),
+                  parseInt(lot.stock_item_id),
+                  -qtyFromLot,
+                  companyId
+                );
+              } catch {
+                /* non-blocking */
+              }
             }
 
             postedLines.push({
-              movementId:       lot.id,
-              articleCode:      lot.article_code,
-              description:      lot.description || null,
-              stockItemId:      lot.stock_item_id || null,
-              qtySold:          qtyFromLot,
+              movementId: lot.id,
+              articleCode: lot.article_code,
+              description: lot.description || null,
+              stockItemId: lot.stock_item_id || null,
+              qtySold: qtyFromLot,
               salePricePerUnit: salePrice,
-              baseUnitCostUsd:  baseUC,
+              baseUnitCostUsd: baseUC,
               landedUnitCostUsd: landedUC,
               finalUnitCostUsd: finalUC,
               saleTotal,
@@ -1215,78 +1370,94 @@ export function registerSpRoutes(app: Express) {
 
         const grossProfit = totalSalePrice - totalFinalCost;
 
-        const [sale] = await tx.insert(spSales).values({
-          companyId,
-          saleDate,
-          customerName,
-          totalSalePriceUsd: String(totalSalePrice),
-          totalBaseCostUsd:  String(totalBaseCost),
-          totalFinalCostUsd: String(totalFinalCost),
-          grossProfitUsd:    String(grossProfit),
-          status: "posted",
-          notes: notes || null,
-        }).returning();
+        const [sale] = await tx
+          .insert(spSales)
+          .values({
+            companyId,
+            saleDate,
+            customerName,
+            totalSalePriceUsd: String(totalSalePrice),
+            totalBaseCostUsd: String(totalBaseCost),
+            totalFinalCostUsd: String(totalFinalCost),
+            grossProfitUsd: String(grossProfit),
+            status: "posted",
+            notes: notes || null,
+          })
+          .returning();
 
         const voucherNum = `SP-SALE-${sale.id}-${Date.now()}`;
-        const [voucher] = await tx.insert(vouchers).values({
-          companyId,
-          voucherType:  "Journal",
-          voucherNumber: voucherNum,
-          voucherDate:  saleDate,
-          description:  `Sale — ${customerName}`,
-          totalAmount:  String(totalSalePrice),
-          currency:     "USD",
-          exchangeRate: "1",
-          sourceModule: "SP",
-        }).returning();
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: voucherNum,
+            voucherDate: saleDate,
+            description: `Sale — ${customerName}`,
+            totalAmount: String(totalSalePrice),
+            currency: "USD",
+            exchangeRate: "1",
+            sourceModule: "SP",
+          })
+          .returning();
 
         if (bankAccountId) {
           await tx.insert(voucherEntries).values({
             voucherId: voucher.id,
             bankAccountId: parseInt(bankAccountId),
-            debitAmount:  String(totalSalePrice),
+            debitAmount: String(totalSalePrice),
             creditAmount: "0",
             narration: `Sale receipts — ${customerName}`,
           });
         }
 
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id, ledgerAccountId: salesAcct.id,
-          debitAmount: "0", creditAmount: String(totalSalePrice),
+          voucherId: voucher.id,
+          ledgerAccountId: salesAcct.id,
+          debitAmount: "0",
+          creditAmount: String(totalSalePrice),
           narration: `Sales — ${customerName}`,
         });
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id, ledgerAccountId: cogsAcct.id,
-          debitAmount: String(totalFinalCost), creditAmount: "0",
+          voucherId: voucher.id,
+          ledgerAccountId: cogsAcct.id,
+          debitAmount: String(totalFinalCost),
+          creditAmount: "0",
           narration: `COGS — ${customerName}`,
         });
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id, ledgerAccountId: stockAcct.id,
-          debitAmount: "0", creditAmount: String(totalFinalCost),
+          voucherId: voucher.id,
+          ledgerAccountId: stockAcct.id,
+          debitAmount: "0",
+          creditAmount: String(totalFinalCost),
           narration: `Stock reduction — ${customerName}`,
         });
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id, ledgerAccountId: costClrAcct.id,
-          debitAmount: String(totalBaseCost), creditAmount: "0",
+          voucherId: voucher.id,
+          ledgerAccountId: costClrAcct.id,
+          debitAmount: String(totalBaseCost),
+          creditAmount: "0",
           narration: `Cost clearing — base cost to payable — ${customerName}`,
         });
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id, ledgerAccountId: payableAcct.id,
-          debitAmount: "0", creditAmount: String(totalBaseCost),
+          voucherId: voucher.id,
+          ledgerAccountId: payableAcct.id,
+          debitAmount: "0",
+          creditAmount: String(totalBaseCost),
           narration: `Supplier Cash Payable — ${customerName}`,
         });
 
         await tx.insert(spSaleLines).values(
           postedLines.map((pl: any) => ({
-            saleId:           sale.id,
+            saleId: sale.id,
             companyId,
-            movementId:       pl.movementId,
-            articleCode:      pl.articleCode,
-            description:      pl.description || null,
-            stockItemId:      pl.stockItemId || null,
-            qtySold:          String(pl.qtySold),
+            movementId: pl.movementId,
+            articleCode: pl.articleCode,
+            description: pl.description || null,
+            stockItemId: pl.stockItemId || null,
+            qtySold: String(pl.qtySold),
             salePricePerUnit: String(pl.salePricePerUnit),
-            baseUnitCostUsd:  String(pl.baseUnitCostUsd),
+            baseUnitCostUsd: String(pl.baseUnitCostUsd),
             landedUnitCostUsd: String(pl.landedUnitCostUsd),
             finalUnitCostUsd: String(pl.finalUnitCostUsd),
           }))
@@ -1358,88 +1529,109 @@ export function registerSpRoutes(app: Express) {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
 
-      const { articleCode, stockItemId, qty, baseUnitCostUsd, landedUnitCostUsd, finalUnitCostUsd, locationId, notes } = req.body;
+      const { articleCode, stockItemId, qty, baseUnitCostUsd, landedUnitCostUsd, finalUnitCostUsd, locationId, notes } =
+        req.body;
 
       if (!articleCode) return res.status(400).json({ message: "articleCode required" });
-      const qtyNum  = parseNum(qty);
+      const qtyNum = parseNum(qty);
       if (qtyNum <= 0) return res.status(400).json({ message: "qty must be > 0" });
-      const baseUC  = parseNum(baseUnitCostUsd);
-      const landUC  = parseNum(landedUnitCostUsd);
+      const baseUC = parseNum(baseUnitCostUsd);
+      const landUC = parseNum(landedUnitCostUsd);
       const finalUC = parseNum(finalUnitCostUsd);
       if (finalUC <= 0) return res.status(400).json({ message: "finalUnitCostUsd must be > 0" });
 
-      const stockAcct   = await getSpAccount(companyId, "sp_stock");
+      const stockAcct = await getSpAccount(companyId, "sp_stock");
       const costClrAcct = await getSpAccount(companyId, "sp_cost_clearing");
-      const opnBalAcct  = await getSpAccount(companyId, "sp_opnbal");
+      const opnBalAcct = await getSpAccount(companyId, "sp_opnbal");
       if (!stockAcct || !costClrAcct || !opnBalAcct) {
         return res.status(400).json({ message: "SP accounts not configured. Run Setup first." });
       }
 
       let locId: number | null = locationId ? parseInt(locationId) : null;
       if (!locId) {
-        const locs = await db.select().from(locations).where(and(eq(locations.companyId, companyId), isNull(locations.deletedAt)));
+        const locs = await db
+          .select()
+          .from(locations)
+          .where(and(eq(locations.companyId, companyId), isNull(locations.deletedAt)));
         if (locs.length > 0) locId = locs[0].id;
       }
 
       const finalTotal = qtyNum * finalUC;
-      const baseTotal  = qtyNum * baseUC;
-      const landTotal  = qtyNum * landUC;
+      const baseTotal = qtyNum * baseUC;
+      const landTotal = qtyNum * landUC;
 
       const result = await db.transaction(async (tx) => {
-        const [movement] = await tx.insert(spStockMovements).values({
-          companyId,
-          sourceType:       "opening",
-          articleCode,
-          description:      notes || null,
-          stockItemId:      stockItemId ? parseInt(stockItemId) : null,
-          locationId:       locId,
-          qtyIn:            String(qtyNum),
-          qtyRemaining:     String(qtyNum),
-          baseUnitCostUsd:  String(baseUC),
-          landedUnitCostUsd: String(landUC),
-          finalUnitCostUsd: String(finalUC),
-        }).returning();
+        const [movement] = await tx
+          .insert(spStockMovements)
+          .values({
+            companyId,
+            sourceType: "opening",
+            articleCode,
+            description: notes || null,
+            stockItemId: stockItemId ? parseInt(stockItemId) : null,
+            locationId: locId,
+            qtyIn: String(qtyNum),
+            qtyRemaining: String(qtyNum),
+            baseUnitCostUsd: String(baseUC),
+            landedUnitCostUsd: String(landUC),
+            finalUnitCostUsd: String(finalUC),
+          })
+          .returning();
 
         if (stockItemId && locId) {
-          try { await adjustInventory(tx, locId, parseInt(stockItemId), qtyNum, companyId); } catch { /* non-blocking */ }
+          try {
+            await adjustInventory(tx, locId, parseInt(stockItemId), qtyNum, companyId);
+          } catch {
+            /* non-blocking */
+          }
         }
 
-        const [voucher] = await tx.insert(vouchers).values({
-          companyId,
-          voucherType:  "Journal",
-          voucherNumber: `SP-OPNSTK-${movement.id}-${Date.now()}`,
-          voucherDate:  new Date().toISOString().slice(0, 10),
-          description:  `Opening stock — ${articleCode} (${qtyNum} units)`,
-          totalAmount:  String(finalTotal),
-          currency:     "USD",
-          exchangeRate: "1",
-          sourceModule: "SP",
-        }).returning();
+        const [voucher] = await tx
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherType: "Journal",
+            voucherNumber: `SP-OPNSTK-${movement.id}-${Date.now()}`,
+            voucherDate: new Date().toISOString().slice(0, 10),
+            description: `Opening stock — ${articleCode} (${qtyNum} units)`,
+            totalAmount: String(finalTotal),
+            currency: "USD",
+            exchangeRate: "1",
+            sourceModule: "SP",
+          })
+          .returning();
 
         // Dr SP-STOCK = finalTotal
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id, ledgerAccountId: stockAcct.id,
-          debitAmount: String(finalTotal), creditAmount: "0",
+          voucherId: voucher.id,
+          ledgerAccountId: stockAcct.id,
+          debitAmount: String(finalTotal),
+          creditAmount: "0",
           narration: `Opening stock — ${articleCode} — ${qtyNum} units @ $${finalUC} (final)`,
         });
         // Cr SP-COSTCLR = baseTotal (cleared to supplier payable when sold)
         await tx.insert(voucherEntries).values({
-          voucherId: voucher.id, ledgerAccountId: costClrAcct.id,
-          debitAmount: "0", creditAmount: String(baseTotal),
+          voucherId: voucher.id,
+          ledgerAccountId: costClrAcct.id,
+          debitAmount: "0",
+          creditAmount: String(baseTotal),
           narration: `Opening stock base cost clearing — ${articleCode}`,
         });
         // Cr SP-OPNBAL = landTotal (opening equity source for landed portion)
         if (landTotal > 0.00001) {
           await tx.insert(voucherEntries).values({
-            voucherId: voucher.id, ledgerAccountId: opnBalAcct.id,
-            debitAmount: "0", creditAmount: String(landTotal),
+            voucherId: voucher.id,
+            ledgerAccountId: opnBalAcct.id,
+            debitAmount: "0",
+            creditAmount: String(landTotal),
             narration: `Opening stock landed clearing — ${articleCode}`,
           });
         } else if (Math.abs(finalTotal - baseTotal) > 0.00001) {
           // finalUC was set manually different from base+landed=0, route difference to opnbal
           const diff = finalTotal - baseTotal;
           await tx.insert(voucherEntries).values({
-            voucherId: voucher.id, ledgerAccountId: opnBalAcct.id,
+            voucherId: voucher.id,
+            ledgerAccountId: opnBalAcct.id,
             debitAmount: diff < 0 ? String(Math.abs(diff)) : "0",
             creditAmount: diff >= 0 ? String(diff) : "0",
             narration: `Opening stock cost adjustment — ${articleCode}`,
@@ -1481,15 +1673,19 @@ export function registerSpRoutes(app: Express) {
       if (!companyId) return;
       const { aliasCode, stockItemId, description } = req.body;
       if (!aliasCode || !stockItemId) return res.status(400).json({ message: "aliasCode and stockItemId required" });
-      const [row] = await db.insert(stockItemCodeAliases).values({
-        companyId,
-        stockItemId: parseInt(stockItemId),
-        aliasCode: String(aliasCode).trim(),
-        description: description || null,
-      }).returning();
+      const [row] = await db
+        .insert(stockItemCodeAliases)
+        .values({
+          companyId,
+          stockItemId: parseInt(stockItemId),
+          aliasCode: String(aliasCode).trim(),
+          description: description || null,
+        })
+        .returning();
       res.json(row);
     } catch (error: any) {
-      if (error.code === "23505") return res.status(400).json({ message: "Alias code already exists for this company" });
+      if (error.code === "23505")
+        return res.status(400).json({ message: "Alias code already exists for this company" });
       res.status(500).json({ message: error.message });
     }
   });
@@ -1498,7 +1694,9 @@ export function registerSpRoutes(app: Express) {
     try {
       const companyId = await requireSpCompany(req, res);
       if (!companyId) return;
-      await db.execute(sql`DELETE FROM stock_item_code_aliases WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`);
+      await db.execute(
+        sql`DELETE FROM stock_item_code_aliases WHERE id = ${parseInt(req.params.id)} AND company_id = ${companyId}`
+      );
       res.json({ ok: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1529,7 +1727,7 @@ export function registerSpRoutes(app: Express) {
       let runningBalance = 0;
       const movements = entries.map((e: any) => {
         const credit = parseNum(e.credit_amount);
-        const debit  = parseNum(e.debit_amount);
+        const debit = parseNum(e.debit_amount);
         runningBalance += credit - debit;
         return {
           date: e.voucher_date,
@@ -1567,12 +1765,12 @@ export function registerSpRoutes(app: Express) {
         LIMIT 1
       `);
       const settingsRow = ((settingsRows as any).rows ?? settingsRows)[0];
-      const spPosProfitAccountId  = settingsRow?.sp_pos_profit_account_id  ?? null;
+      const spPosProfitAccountId = settingsRow?.sp_pos_profit_account_id ?? null;
       const spPosPayableAccountId = settingsRow?.sp_pos_payable_account_id ?? null;
 
       let totalRevenue = 0;
-      let totalCogs    = 0;
-      let saleCount    = 0;
+      let totalCogs = 0;
+      let saleCount = 0;
 
       // Use salesItems as source of truth: totalSales/totalCost/profit are stored
       // at sale time regardless of how the ledger accounts are configured.
@@ -1588,12 +1786,12 @@ export function registerSpRoutes(app: Express) {
           AND v.voucher_type = 'Sales'
           AND v.deleted_at   IS NULL
           ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
-          ${endDate   ? sql`AND v.voucher_date <= ${endDate}`   : sql``}
+          ${endDate ? sql`AND v.voucher_date <= ${endDate}` : sql``}
       `);
       const siRow = ((siRows as any).rows ?? siRows)[0];
       totalRevenue = parseNum(siRow?.total_revenue);
-      totalCogs    = parseNum(siRow?.total_cogs);
-      saleCount    = parseInt(String(siRow?.cnt ?? "0"), 10);
+      totalCogs = parseNum(siRow?.total_cogs);
+      saleCount = parseInt(String(siRow?.cnt ?? "0"), 10);
 
       const grossProfit = totalRevenue - totalCogs;
 
@@ -1609,15 +1807,15 @@ export function registerSpRoutes(app: Express) {
             AND v.company_id         = ${companyId}
             AND v.deleted_at IS NULL
             ${startDate ? sql`AND v.voucher_date >= ${startDate}` : sql``}
-            ${endDate   ? sql`AND v.voucher_date <= ${endDate}`   : sql``}
+            ${endDate ? sql`AND v.voucher_date <= ${endDate}` : sql``}
         `);
         const sr = ((sharedRows as any).rows ?? sharedRows)[0];
         totalSharedCharges = parseNum(sr?.total);
       }
 
-      const netProfit     = grossProfit - totalSharedCharges;
-      const splitPct      = 50;
-      const ourShare      = netProfit * (splitPct / 100);
+      const netProfit = grossProfit - totalSharedCharges;
+      const splitPct = 50;
+      const ourShare = netProfit * (splitPct / 100);
       const supplierShare = netProfit - ourShare;
 
       res.json({
@@ -1666,14 +1864,14 @@ export function registerSpRoutes(app: Express) {
         const qtyIn = parseNum(m.qtyIn);
         const qtyRem = parseNum(m.qtyRemaining);
         const finalCost = parseNum(m.finalUnitCostUsd);
-        g.totalQtyIn        += qtyIn;
+        g.totalQtyIn += qtyIn;
         g.totalQtyRemaining += qtyRem;
-        g.totalValueIn      += qtyIn  * finalCost;
+        g.totalValueIn += qtyIn * finalCost;
         g.totalValueRemaining += qtyRem * finalCost;
         g.movements.push(m);
       }
 
-      const result = [...groups.values()].map(g => ({
+      const result = [...groups.values()].map((g) => ({
         ...g,
         avgFinalCost: g.totalQtyRemaining > 0 ? g.totalValueRemaining / g.totalQtyRemaining : 0,
       }));
@@ -1736,33 +1934,33 @@ export function registerSpRoutes(app: Express) {
           WHERE ve.ledger_account_id = ${payableAcct.id} AND v.company_id = ${companyId}
         `);
         const pr = ((payRows as any).rows ?? payRows)[0];
-        paymentsTotal  = parseNum(pr?.total_payments);
+        paymentsTotal = parseNum(pr?.total_payments);
         payableBalance = parseNum(pr?.total_credits) - paymentsTotal;
       }
 
-      const salesArr  = (salesRows  as any).rows ?? (salesRows  as any);
-      const stockArr  = (stockRows  as any).rows ?? (stockRows  as any);
-      const stockMap  = new Map<string, any>();
+      const salesArr = (salesRows as any).rows ?? (salesRows as any);
+      const stockArr = (stockRows as any).rows ?? (stockRows as any);
+      const stockMap = new Map<string, any>();
       for (const s of stockArr) stockMap.set(s.article_code, s);
 
       const rows = salesArr.map((r: any) => {
         const stk = stockMap.get(r.article_code) || {};
-        const soldQty    = parseNum(r.sold_qty);
+        const soldQty = parseNum(r.sold_qty);
         const salesTotal = parseNum(r.sales_total);
-        const finalCost  = parseNum(r.total_final_cost);
-        const basePay    = parseNum(r.base_payable);
+        const finalCost = parseNum(r.total_final_cost);
+        const basePay = parseNum(r.base_payable);
         return {
-          articleCode:      r.article_code,
-          description:      r.description,
-          totalQtyIn:       parseNum(stk.total_qty_in),
+          articleCode: r.article_code,
+          description: r.description,
+          totalQtyIn: parseNum(stk.total_qty_in),
           currentQtyRemaining: parseNum(stk.qty_remaining),
           soldQty,
           salesTotal,
-          avgSalePrice:     parseNum(r.avg_sale_price),
-          totalFinalCost:   finalCost,
-          avgFinalCost:     parseNum(r.avg_final_cost),
-          grossProfit:      salesTotal - finalCost,
-          basePayable:      basePay,
+          avgSalePrice: parseNum(r.avg_sale_price),
+          totalFinalCost: finalCost,
+          avgFinalCost: parseNum(r.avg_final_cost),
+          grossProfit: salesTotal - finalCost,
+          basePayable: basePay,
         };
       });
 
@@ -1800,27 +1998,30 @@ export function registerSpRoutes(app: Express) {
 
       if (!periodMonth) return res.status(400).json({ message: "periodMonth required (YYYY-MM)" });
 
-      const rev    = parseNum(totalRevenue);
-      const cogs   = parseNum(totalCogs);
+      const rev = parseNum(totalRevenue);
+      const cogs = parseNum(totalCogs);
       const shared = parseNum(totalSharedCharges);
-      const gross  = rev - cogs;
-      const net    = gross - shared;
-      const pct    = parseNum(splitPct) || 50;
-      const our    = net * (pct / 100);
-      const sup    = net - our;
+      const gross = rev - cogs;
+      const net = gross - shared;
+      const pct = parseNum(splitPct) || 50;
+      const our = net * (pct / 100);
+      const sup = net - our;
 
-      const [split] = await db.insert(spProfitSplits).values({
-        companyId,
-        periodMonth,
-        totalRevenue: String(rev),
-        totalCogs: String(cogs),
-        totalSharedCharges: String(shared),
-        grossProfit: String(gross),
-        splitPct: String(pct),
-        ourShare: String(our),
-        supplierShare: String(sup),
-        finalizedAt: new Date(),
-      }).returning();
+      const [split] = await db
+        .insert(spProfitSplits)
+        .values({
+          companyId,
+          periodMonth,
+          totalRevenue: String(rev),
+          totalCogs: String(cogs),
+          totalSharedCharges: String(shared),
+          grossProfit: String(gross),
+          splitPct: String(pct),
+          ourShare: String(our),
+          supplierShare: String(sup),
+          finalizedAt: new Date(),
+        })
+        .returning();
 
       res.json(split);
     } catch (error: any) {
@@ -1850,17 +2051,13 @@ export function registerSpRoutes(app: Express) {
       let locationName = "";
       let companyName = "";
       try {
-        const locRows = await db.execute(
-          sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`
-        );
-        const locRow = ((locRows as any).rows ?? locRows as any[])[0];
+        const locRows = await db.execute(sql`SELECT name FROM locations WHERE id = ${locId} LIMIT 1`);
+        const locRow = ((locRows as any).rows ?? (locRows as any[]))[0];
         locationName = locRow?.name ?? "";
       } catch {}
       try {
-        const coRows = await db.execute(
-          sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`
-        );
-        const coRow = ((coRows as any).rows ?? coRows as any[])[0];
+        const coRows = await db.execute(sql`SELECT name FROM companies WHERE id = ${companyId} LIMIT 1`);
+        const coRow = ((coRows as any).rows ?? (coRows as any[]))[0];
         companyName = coRow?.name ?? "";
       } catch {}
 
@@ -1874,11 +2071,10 @@ export function registerSpRoutes(app: Express) {
       });
 
       const from = (fromDate as string).slice(5).replace("-", "");
-      const to   = (toDate as string).slice(5).replace("-", "");
+      const to = (toDate as string).slice(5).replace("-", "");
       const safeLoc = locationName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
-      const safeCo  = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
-      const filename = `${safeLoc} ${safeCo} sales form ${from}-${to}.xlsx`
-        .replace(/\s+/g, " ").trim();
+      const safeCo = companyName.replace(/[^a-zA-Z0-9 ]/g, "").trim();
+      const filename = `${safeLoc} ${safeCo} sales form ${from}-${to}.xlsx`.replace(/\s+/g, " ").trim();
 
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);

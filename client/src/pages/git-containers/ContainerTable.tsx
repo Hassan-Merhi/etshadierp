@@ -1,19 +1,6 @@
 import React from "react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  EnrichedContainerRow,
-  OtwColId,
-  STATUS_META,
-  FREIGHT_META,
-  fmtDate,
-} from "./gitContainerTypes";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EnrichedContainerRow, OtwColId, STATUS_META, FREIGHT_META, fmtDate } from "./gitContainerTypes";
 import {
   EtaCell,
   InlineTextCell,
@@ -32,13 +19,7 @@ interface ContainerTableProps {
   printRef: React.RefObject<HTMLDivElement>;
 }
 
-export function ContainerTable({
-  containers,
-  colVis,
-  sessionCompanyId,
-  onOpenDrawer,
-  printRef,
-}: ContainerTableProps) {
+export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDrawer, printRef }: ContainerTableProps) {
   return (
     <div className="rounded-md border bg-card overflow-hidden h-full flex flex-col shadow-sm">
       <div className="flex-1 overflow-auto custom-scrollbar relative">
@@ -85,11 +66,13 @@ export function ContainerTable({
 
                   const transUpper = (c.transporter ?? "").toUpperCase();
                   const transDays = transUpper.includes("FARHAT") || transUpper.includes("CONTINENTAL") ? 11 : 14;
-                  const maxOffDate = c.borderDate ? (() => {
-                    const d = new Date(c.borderDate);
-                    d.setDate(d.getDate() + transDays);
-                    return d.toISOString().slice(0, 10);
-                  })() : null;
+                  const maxOffDate = c.borderDate
+                    ? (() => {
+                        const d = new Date(c.borderDate);
+                        d.setDate(d.getDate() + transDays);
+                        return d.toISOString().slice(0, 10);
+                      })()
+                    : null;
 
                   return (
                     <TableRow
@@ -127,7 +110,12 @@ export function ContainerTable({
                         </TableCell>
                       )}
                       <TableCell className="h-10">
-                        <div className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit", meta.color)}>
+                        <div
+                          className={cn(
+                            "px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit",
+                            meta.color
+                          )}
+                        >
                           {meta.icon}
                           <span className="whitespace-nowrap uppercase">{c.status}</span>
                         </div>
@@ -154,7 +142,13 @@ export function ContainerTable({
                       {colVis.truckNo && (
                         <TableCell className="font-mono text-primary font-medium h-10">
                           {canEditRow ? (
-                            <InlineTextCell id={c.id} field="numberPlate" value={c.numberPlate} width="90px" uppercase />
+                            <InlineTextCell
+                              id={c.id}
+                              field="numberPlate"
+                              value={c.numberPlate}
+                              width="90px"
+                              uppercase
+                            />
                           ) : (
                             c.numberPlate || "—"
                           )}
@@ -164,7 +158,12 @@ export function ContainerTable({
                         <TableCell className="h-10">
                           <span className="truncate block max-w-[100px]" title={c.trackingLocation ?? ""}>
                             {canEditRow ? (
-                              <InlineTextCell id={c.id} field="trackingLocation" value={c.trackingLocation} width="100px" />
+                              <InlineTextCell
+                                id={c.id}
+                                field="trackingLocation"
+                                value={c.trackingLocation}
+                                width="100px"
+                              />
                             ) : (
                               c.trackingLocation || "—"
                             )}
@@ -183,10 +182,10 @@ export function ContainerTable({
                       {colVis.maxOffload && (
                         <TableCell className="h-10 font-medium">
                           {maxOffDate ? (
-                            <span className={cn(c.isOverdue && "text-red-600")}>
-                              {fmtDate(maxOffDate)}
-                            </span>
-                          ) : "—"}
+                            <span className={cn(c.isOverdue && "text-red-600")}>{fmtDate(maxOffDate)}</span>
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                       )}
                       {colVis.delayed && (
@@ -195,7 +194,9 @@ export function ContainerTable({
                             <span className="px-1.5 py-0.5 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 rounded-md font-bold">
                               {c.daysDelayed}d
                             </span>
-                          ) : "—"}
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                       )}
                       {colVis.docs && (
@@ -203,8 +204,10 @@ export function ContainerTable({
                           <div className="flex justify-center">
                             {canEditRow ? (
                               <InlineBoolCell id={c.id} field="docReceived" value={c.docReceived} />
+                            ) : c.docReceived ? (
+                              "✅"
                             ) : (
-                              c.docReceived ? "✅" : "❌"
+                              "❌"
                             )}
                           </div>
                         </TableCell>
@@ -231,8 +234,10 @@ export function ContainerTable({
                         <TableCell className="text-right h-10">
                           {canEditRow ? (
                             <InlineNumberCell id={c.id} field="transportFee" value={c.transportFee} width="70px" />
+                          ) : c.transportFee ? (
+                            Number(c.transportFee).toLocaleString()
                           ) : (
-                            c.transportFee ? Number(c.transportFee).toLocaleString() : "—"
+                            "—"
                           )}
                         </TableCell>
                       )}
@@ -249,8 +254,10 @@ export function ContainerTable({
                         <TableCell className="text-right h-10">
                           {canEditRow ? (
                             <InlineNumberCell id={c.id} field="dutyFee" value={c.dutyFee} width="70px" />
+                          ) : c.dutyFee ? (
+                            Number(c.dutyFee).toLocaleString()
                           ) : (
-                            c.dutyFee ? Number(c.dutyFee).toLocaleString() : "—"
+                            "—"
                           )}
                         </TableCell>
                       )}
@@ -258,7 +265,12 @@ export function ContainerTable({
                         <TableCell className="h-10">
                           <span className="truncate block max-w-[110px]" title={c.trackingDescription ?? ""}>
                             {canEditRow ? (
-                              <InlineTextCell id={c.id} field="trackingDescription" value={c.trackingDescription} width="110px" />
+                              <InlineTextCell
+                                id={c.id}
+                                field="trackingDescription"
+                                value={c.trackingDescription}
+                                width="110px"
+                              />
                             ) : (
                               c.trackingDescription || "—"
                             )}

@@ -7,13 +7,11 @@ import {
   Layers,
   BarChart3,
   FolderPlus,
-
   Wallet,
   Users,
   Receipt,
   Book,
   UserCheck,
-
   PieChart,
   Ship,
   TrendingUp,
@@ -67,12 +65,12 @@ import {
 } from "@/components/sidebar/sidebarPrimitives";
 
 const defaultPinnedItems: NavItem[] = [
-  { title: "Tracking",    url: "/tracking",             icon: Ship            },
-  { title: "Dashboard",   url: "/financial-overview",  icon: LayoutDashboard },
-  { title: "Agent Ledger", url: "/agents",              icon: UserRound       },
-  { title: "Daybook",     url: "/daybook",             icon: Book            },
-  { title: "All Daybook", url: "/transaction-journal", icon: ScrollText      },
-  { title: "Vouchers",    url: "/vouchers",            icon: Receipt         },
+  { title: "Tracking", url: "/tracking", icon: Ship },
+  { title: "Dashboard", url: "/financial-overview", icon: LayoutDashboard },
+  { title: "Agent Ledger", url: "/agents", icon: UserRound },
+  { title: "Daybook", url: "/daybook", icon: Book },
+  { title: "All Daybook", url: "/transaction-journal", icon: ScrollText },
+  { title: "Vouchers", url: "/vouchers", icon: Receipt },
 ];
 
 export const ERP_NAV_SECTIONS: NavSection[] = [
@@ -80,27 +78,27 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     label: "Inventory",
     color: NAV_COLOR.inventory,
     items: [
-      { title: "Inventory",         url: "/inventory",              icon: Layers      },
-      { title: "Stock",             url: "/stock",                  icon: Package     },
-      { title: "Optional Vouchers", url: "/optional-vouchers",      icon: FileText    },
-      { title: "Profit Check",      url: "/supplier-profit-check",  icon: Calculator  },
+      { title: "Inventory", url: "/inventory", icon: Layers },
+      { title: "Stock", url: "/stock", icon: Package },
+      { title: "Optional Vouchers", url: "/optional-vouchers", icon: FileText },
+      { title: "Profit Check", url: "/supplier-profit-check", icon: Calculator },
     ],
   },
   {
     label: "Sales & POS",
     color: NAV_COLOR.sales,
     items: [
-      { title: "POS",          url: "/pos",          icon: ShoppingCart },
-      { title: "Sales Tools",  url: "/sales-tools",  icon: LayoutGrid   },
+      { title: "POS", url: "/pos", icon: ShoppingCart },
+      { title: "Sales Tools", url: "/sales-tools", icon: LayoutGrid },
     ],
   },
   {
     label: "Accounting",
     color: NAV_COLOR.accounting,
     items: [
-      { title: "Accounts",         url: "/accounts",         icon: Wallet         },
-      { title: "Parties",          url: "/parties",          icon: Handshake      },
-      { title: "Payroll",          url: "/payroll",          icon: UserCheck      },
+      { title: "Accounts", url: "/accounts", icon: Wallet },
+      { title: "Parties", url: "/parties", icon: Handshake },
+      { title: "Payroll", url: "/payroll", icon: UserCheck },
       { title: "Company Transfer", url: "/company-transfer", icon: ArrowLeftRight },
     ],
   },
@@ -108,33 +106,31 @@ export const ERP_NAV_SECTIONS: NavSection[] = [
     label: "Analytics",
     color: NAV_COLOR.analytics,
     items: [
-      { title: "Sales Report",      url: "/sales-report",      icon: PieChart   },
-      { title: "Analytics",         url: "/analytics",         icon: BarChart3  },
+      { title: "Sales Report", url: "/sales-report", icon: PieChart },
+      { title: "Analytics", url: "/analytics", icon: BarChart3 },
       { title: "Net Profit Report", url: "/net-profit-report", icon: TrendingUp },
     ],
   },
   {
     label: "Rentals",
     color: NAV_COLOR.rentals,
-    items: [
-      { title: "Shops",         url: "/erp/rental/shops",      icon: Store          },
-    ],
+    items: [{ title: "Shops", url: "/erp/rental/shops", icon: Store }],
   },
   {
     label: "AI Tools",
     color: NAV_COLOR.analytics,
     devOnly: true,
     items: [
-      { title: "AI Command Center", url: "/ai-command-center", icon: Bot         },
-      { title: "AI Validation",     url: "/ai-validation",     icon: ShieldCheck },
+      { title: "AI Command Center", url: "/ai-command-center", icon: Bot },
+      { title: "AI Validation", url: "/ai-validation", icon: ShieldCheck },
     ],
   },
 ];
 
 const utilityItems: NavItem[] = [
-  { title: "Create",      url: "/create",      icon: FolderPlus      },
+  { title: "Create", url: "/create", icon: FolderPlus },
   { title: "Spreadsheet", url: "/spreadsheet", icon: TableProperties },
-  { title: "Live Sheets", url: "/live-sheets", icon: ExternalLink    },
+  { title: "Live Sheets", url: "/live-sheets", icon: ExternalLink },
 ];
 
 export const ERP_PINNED_ITEMS = defaultPinnedItems;
@@ -166,20 +162,25 @@ export function useErpVisibleSections(user?: any): {
 
   const isItemVisible = (item: NavItem): boolean => {
     const effectiveRole = user?.currentRole ?? user?.role ?? "";
-    const isPOSUser   = effectiveRole === "POS";
-    const isAdmin     = effectiveRole === "Admin" || effectiveRole === "Developer";
+    const isPOSUser = effectiveRole === "POS";
+    const isAdmin = effectiveRole === "Admin" || effectiveRole === "Developer";
     const isDeveloper = effectiveRole === "Developer";
-    const isOwner     = effectiveRole === "Owner";
-    const featureKey  = ROUTE_TO_FEATURE[item.url];
+    const isOwner = effectiveRole === "Owner";
+    const featureKey = ROUTE_TO_FEATURE[item.url];
 
     if (item.url === "/tracking") return ["Admin", "Developer", "Owner"].includes(effectiveRole);
 
-    if (item.url === "/factory/raw-stock" && selectedCompany?.companyType !== "factory" && selectedCompany?.companyType !== "factory_v2") return false;
-    if (item.url === "/net-profit-report")       return isDeveloper;
-    if (item.url === "/company-transfer")        return isDeveloper;
-    if (item.url === "/spreadsheet")             return isDeveloper;
-    if (item.url === "/live-sheets")             return isDeveloper;
-    if (item.url === "/chat")        return !isPOSUser;
+    if (
+      item.url === "/factory/raw-stock" &&
+      selectedCompany?.companyType !== "factory" &&
+      selectedCompany?.companyType !== "factory_v2"
+    )
+      return false;
+    if (item.url === "/net-profit-report") return isDeveloper;
+    if (item.url === "/company-transfer") return isDeveloper;
+    if (item.url === "/spreadsheet") return isDeveloper;
+    if (item.url === "/live-sheets") return isDeveloper;
+    if (item.url === "/chat") return !isPOSUser;
     if (item.url === "/settings" && isOwner) return false;
 
     if (isDeveloper || isAdmin || myErpPages?.fullAccess) return true;
@@ -191,18 +192,18 @@ export function useErpVisibleSections(user?: any): {
     }
 
     if (featureKey && allowedPages.size > 0) return allowedPages.has(featureKey);
-    if (allowedPages.size === 0 && myErpPages)  return false;
-    if (item.url === "/settings")    return false;
+    if (allowedPages.size === 0 && myErpPages) return false;
+    if (item.url === "/settings") return false;
 
     return true;
   };
 
   const isDeveloper = (user?.currentRole ?? user?.role) === "Developer";
 
-  const sections = ERP_NAV_SECTIONS.map(s => ({
+  const sections = ERP_NAV_SECTIONS.map((s) => ({
     ...s,
     items: s.items.filter(isItemVisible),
-  })).filter(s => s.items.length > 0 && (!s.devOnly || isDeveloper));
+  })).filter((s) => s.items.length > 0 && (!s.devOnly || isDeveloper));
 
   return {
     sections,
@@ -218,10 +219,7 @@ export function AppSidebar({ user }: { user?: any }) {
   const { selectedCompany } = useCompany();
   const prevUnreadRef = useRef<number>(-1);
 
-  const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder(
-    "erp-pinned-order",
-    defaultPinnedItems,
-  );
+  const { items: pinnedItems, reorder: reorderPinned } = usePinnedOrder("erp-pinned-order", defaultPinnedItems);
 
   const { data: chatUnread } = useQuery<{ count: number }>({
     queryKey: ["/api/chat/unread-count"],
@@ -231,7 +229,10 @@ export function AppSidebar({ user }: { user?: any }) {
 
   useEffect(() => {
     const count = chatUnread?.count || 0;
-    if (prevUnreadRef.current === -1) { prevUnreadRef.current = count; return; }
+    if (prevUnreadRef.current === -1) {
+      prevUnreadRef.current = count;
+      return;
+    }
     if (count > prevUnreadRef.current)
       toast({ title: "New message", description: `You have ${count} unread message${count > 1 ? "s" : ""}.` });
     prevUnreadRef.current = count;
@@ -242,12 +243,8 @@ export function AppSidebar({ user }: { user?: any }) {
   const { openSections, toggleSection } = useOpenSections(visibleSections);
 
   const allNavItems = useMemo(
-    () => [
-      ...defaultPinnedItems,
-      ...ERP_NAV_SECTIONS.flatMap((s) => s.items),
-      ...utilityItems,
-    ],
-    [],
+    () => [...defaultPinnedItems, ...ERP_NAV_SECTIONS.flatMap((s) => s.items), ...utilityItems],
+    []
   );
   const recentItems = useRecentNav(allNavItems, selectedCompany?.id);
 
@@ -264,12 +261,7 @@ export function AppSidebar({ user }: { user?: any }) {
 
   return (
     <Sidebar>
-      <ModuleHeader
-        icon={Package}
-        label="Business OS"
-        tagline="ERP / Warehouse"
-        accent={MODULE_ACCENT.erp}
-      />
+      <ModuleHeader icon={Package} label="Business OS" tagline="ERP / Warehouse" accent={MODULE_ACCENT.erp} />
 
       <SidebarContent className="px-3 py-2 overflow-y-auto">
         <PinnedNavList
@@ -299,10 +291,10 @@ export function AppSidebar({ user }: { user?: any }) {
                 label: "Supplier Partner",
                 color: NAV_COLOR.operations,
                 items: [
-                  { title: "SP Reports",    url: "/sp/reports",        icon: BarChart3      },
-                  { title: "Setup",         url: "/sp/setup",          icon: Wrench         },
-                  { title: "Migration",     url: "/sp/migration",      icon: ArrowLeftRight },
-                  { title: "GC Migration",  url: "/sp/gc-migration",   icon: Building2      },
+                  { title: "SP Reports", url: "/sp/reports", icon: BarChart3 },
+                  { title: "Setup", url: "/sp/setup", icon: Wrench },
+                  { title: "Migration", url: "/sp/migration", icon: ArrowLeftRight },
+                  { title: "GC Migration", url: "/sp/gc-migration", icon: Building2 },
                 ],
               }}
               isOpen={openSections.has("Supplier Partner")}
@@ -372,7 +364,11 @@ export function AppSidebar({ user }: { user?: any }) {
             >
               <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-orange-500" />
               <span className="flex-1 leading-tight">Conflicts</span>
-              <Badge variant="outline" className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400" data-testid="badge-conflict-count">
+              <Badge
+                variant="outline"
+                className="text-xs min-w-5 justify-center border-orange-500/40 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400"
+                data-testid="badge-conflict-count"
+              >
                 {conflictCount}
               </Badge>
             </a>
@@ -380,7 +376,12 @@ export function AppSidebar({ user }: { user?: any }) {
           {!["Admin", "Owner", "Developer"].includes(user?.currentRole ?? user?.role ?? "") && (
             <SidebarFlatLink href="/my-settings" icon={KeyRound} label="My Settings" testId="link-my-settings" />
           )}
-          <SidebarFlatLink href="/intercompany-requests" icon={ArrowRight} label="IC Requests" testId="link-ic-requests" />
+          <SidebarFlatLink
+            href="/intercompany-requests"
+            icon={ArrowRight}
+            label="IC Requests"
+            testId="link-ic-requests"
+          />
           {isItemVisible({ title: "Settings", url: "/settings", icon: Settings }) && (
             <SidebarFlatLink href="/settings" icon={Settings} label="Settings" testId="link-settings" />
           )}

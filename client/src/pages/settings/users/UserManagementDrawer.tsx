@@ -3,13 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,10 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Shield,
-  Save,
-} from "lucide-react";
+import { Shield, Save } from "lucide-react";
 import { UserManagementForm } from "./UserManagementForm";
 
 interface UserManagementDrawerProps {
@@ -36,13 +27,7 @@ interface UserManagementDrawerProps {
   onUserDeleted: () => void;
 }
 
-export function UserManagementDrawer({
-  user,
-  open,
-  onClose,
-  companies,
-  onUserDeleted,
-}: UserManagementDrawerProps) {
+export function UserManagementDrawer({ user, open, onClose, companies, onUserDeleted }: UserManagementDrawerProps) {
   const { toast } = useToast();
   const isPrivileged = ["admin", "owner", "developer"].includes(user?.role?.toLowerCase() ?? "");
   const isViewOnly = user?.role?.toLowerCase() === "view only";
@@ -171,15 +156,11 @@ export function UserManagementDrawer({
   };
 
   const toggleCostField = (key: string) => {
-    setHiddenCostFields((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
+    setHiddenCostFields((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
   const toggleErpCostField = (key: string) => {
-    setHiddenErpCostFields((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
+    setHiddenErpCostFields((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
   const saveErpRestrictionsMutation = useMutation({
@@ -216,8 +197,7 @@ export function UserManagementDrawer({
     if (!user) return false;
     const origPageAccess = new Set(user.pageAccess ?? []);
     const pageSetChanged =
-      pageAccess.size !== origPageAccess.size ||
-      Array.from(pageAccess).some((k) => !origPageAccess.has(k));
+      pageAccess.size !== origPageAccess.size || Array.from(pageAccess).some((k) => !origPageAccess.has(k));
     const sortedCost = JSON.stringify([...hiddenCostFields].sort());
     const origSortedCost = JSON.stringify([...(user.hiddenCostFields ?? [])].sort());
     const sortedErp = JSON.stringify([...hiddenErpCostFields].sort());
@@ -232,7 +212,19 @@ export function UserManagementDrawer({
       (!isPrivileged && sortedCost !== origSortedCost) ||
       (!isPrivileged && sortedErp !== origSortedErp)
     );
-  }, [user, username, displayName, newPassword, hasErpAccess, hasFactoryAccess, pageAccess, hiddenCostFields, hiddenErpCostFields, erpHiddenCostData, isPrivileged]);
+  }, [
+    user,
+    username,
+    displayName,
+    newPassword,
+    hasErpAccess,
+    hasFactoryAccess,
+    pageAccess,
+    hiddenCostFields,
+    hiddenErpCostFields,
+    erpHiddenCostData,
+    isPrivileged,
+  ]);
 
   const handleSaveAll = () => {
     const payload: any = {
@@ -272,10 +264,10 @@ export function UserManagementDrawer({
     (isPrivileged || hasErpAccess) && (isPrivileged || hasFactoryAccess)
       ? "ERP + Factory"
       : isPrivileged || hasErpAccess
-      ? "ERP only"
-      : isPrivileged || hasFactoryAccess
-      ? "Factory only"
-      : "No access";
+        ? "ERP only"
+        : isPrivileged || hasFactoryAccess
+          ? "Factory only"
+          : "No access";
 
   const restrictionCount =
     (isPrivileged ? 0 : pageAccess.size) +
@@ -284,24 +276,22 @@ export function UserManagementDrawer({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
-        <SheetContent
-          side="right"
-          className="w-full sm:max-w-[520px] p-0 flex flex-col"
-        >
+      <Sheet
+        open={open}
+        onOpenChange={(v) => {
+          if (!v) onClose();
+        }}
+      >
+        <SheetContent side="right" className="w-full sm:max-w-[520px] p-0 flex flex-col">
           <SheetHeader className="px-6 py-4 border-b shrink-0">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted font-bold text-base uppercase text-muted-foreground">
                 {(user.displayName || user.username).charAt(0)}
               </div>
               <div className="flex-1 min-w-0">
-                <SheetTitle className="text-lg leading-tight">
-                  {user.displayName || user.username}
-                </SheetTitle>
+                <SheetTitle className="text-lg leading-tight">{user.displayName || user.username}</SheetTitle>
                 {user.displayName && (
-                  <SheetDescription className="font-mono text-xs mt-0">
-                    {user.username}
-                  </SheetDescription>
+                  <SheetDescription className="font-mono text-xs mt-0">{user.username}</SheetDescription>
                 )}
               </div>
               {isPrivileged && (
@@ -311,7 +301,10 @@ export function UserManagementDrawer({
                 </Badge>
               )}
               {isViewOnly && (
-                <Badge variant="outline" className="gap-1 shrink-0 border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                <Badge
+                  variant="outline"
+                  className="gap-1 shrink-0 border-sky-300 bg-sky-100 text-sky-700 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-300"
+                >
                   View Only
                 </Badge>
               )}

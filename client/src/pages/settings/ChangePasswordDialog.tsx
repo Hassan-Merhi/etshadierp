@@ -20,7 +20,11 @@ export function ChangePasswordDialog({ open, onOpenChange, onSubmit, isPending }
     if (!val) setData({ currentPassword: "", newPassword: "", confirmPassword: "" });
   };
 
-  const isValid = data.currentPassword && data.newPassword && data.newPassword.length >= 6 && data.newPassword === data.confirmPassword;
+  const isValid =
+    data.currentPassword &&
+    data.newPassword &&
+    data.newPassword.length >= 6 &&
+    data.newPassword === data.confirmPassword;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -37,7 +41,7 @@ export function ChangePasswordDialog({ open, onOpenChange, onSubmit, isPending }
             <Input
               type="password"
               value={data.currentPassword}
-              onChange={e => setData(prev => ({ ...prev, currentPassword: e.target.value }))}
+              onChange={(e) => setData((prev) => ({ ...prev, currentPassword: e.target.value }))}
             />
           </div>
           <div className="space-y-1">
@@ -45,7 +49,7 @@ export function ChangePasswordDialog({ open, onOpenChange, onSubmit, isPending }
             <Input
               type="password"
               value={data.newPassword}
-              onChange={e => setData(prev => ({ ...prev, newPassword: e.target.value }))}
+              onChange={(e) => setData((prev) => ({ ...prev, newPassword: e.target.value }))}
             />
           </div>
           <div className="space-y-1">
@@ -53,16 +57,15 @@ export function ChangePasswordDialog({ open, onOpenChange, onSubmit, isPending }
             <Input
               type="password"
               value={data.confirmPassword}
-              onChange={e => setData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+              onChange={(e) => setData((prev) => ({ ...prev, confirmPassword: e.target.value }))}
             />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
-          <Button
-            onClick={() => onSubmit(data.currentPassword, data.newPassword)}
-            disabled={!isValid || isPending}
-          >
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={() => onSubmit(data.currentPassword, data.newPassword)} disabled={!isValid || isPending}>
             {isPending ? "Updating..." : "Update Password"}
           </Button>
         </DialogFooter>

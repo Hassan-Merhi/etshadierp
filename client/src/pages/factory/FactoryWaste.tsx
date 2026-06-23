@@ -10,7 +10,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Loader2, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 
@@ -30,8 +38,8 @@ function getDefaultDateRange() {
   const from = new Date();
   from.setDate(from.getDate() - 30);
   return {
-    from: from.toLocaleDateString('en-CA'),
-    to: to.toLocaleDateString('en-CA'),
+    from: from.toLocaleDateString("en-CA"),
+    to: to.toLocaleDateString("en-CA"),
   };
 }
 
@@ -43,7 +51,7 @@ export default function FactoryWaste() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
 
-  const [formDate, setFormDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [formDate, setFormDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [formKg, setFormKg] = useState("");
   const [formWasteType, setFormWasteType] = useState("");
   const [formReason, setFormReason] = useState("");
@@ -111,7 +119,7 @@ export default function FactoryWaste() {
   });
 
   function resetForm() {
-    setFormDate(new Date().toLocaleDateString('en-CA'));
+    setFormDate(new Date().toLocaleDateString("en-CA"));
     setFormKg("");
     setFormWasteType("");
     setFormReason("");
@@ -134,9 +142,7 @@ export default function FactoryWaste() {
     createMutation.mutate(payload);
   }
 
-  const totalWasteKg = wasteQuery.data
-    ? wasteQuery.data.reduce((sum, entry) => sum + (entry.kgWaste || 0), 0)
-    : 0;
+  const totalWasteKg = wasteQuery.data ? wasteQuery.data.reduce((sum, entry) => sum + (entry.kgWaste || 0), 0) : 0;
 
   return (
     <div className="space-y-6">
@@ -290,7 +296,9 @@ export default function FactoryWaste() {
             </div>
           ) : !Array.isArray(wasteQuery.data) || wasteQuery.data.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground" data-testid="text-no-data">No waste entries for selected range</p>
+              <p className="text-muted-foreground" data-testid="text-no-data">
+                No waste entries for selected range
+              </p>
             </div>
           ) : (
             <div className="table-responsive">
@@ -310,7 +318,9 @@ export default function FactoryWaste() {
                 <TableBody>
                   {wasteQuery.data.map((entry, idx) => (
                     <TableRow key={entry.id ?? idx} data-testid={`row-waste-${entry.id}`}>
-                      <TableCell className="font-mono text-sm">{entry.date ? formatDisplayDate(entry.date) : "—"}</TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {entry.date ? formatDisplayDate(entry.date) : "—"}
+                      </TableCell>
                       <TableCell className="text-sm">{entry.wasteType || "—"}</TableCell>
                       <TableCell className="font-mono">{entry.kgWaste}</TableCell>
                       <TableCell>{entry.reason || "—"}</TableCell>
@@ -338,16 +348,19 @@ export default function FactoryWaste() {
       </Card>
 
       {/* Delete Waste Entry Confirmation */}
-      <Dialog open={pendingDeleteId !== null} onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}>
+      <Dialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null);
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-4 w-4" />
               Delete Waste Entry?
             </DialogTitle>
-            <DialogDescription>
-              This will permanently remove the waste record. This cannot be undone.
-            </DialogDescription>
+            <DialogDescription>This will permanently remove the waste record. This cannot be undone.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setPendingDeleteId(null)} disabled={deleteMutation.isPending}>
@@ -356,7 +369,9 @@ export default function FactoryWaste() {
             <Button
               variant="destructive"
               disabled={deleteMutation.isPending}
-              onClick={() => { if (pendingDeleteId !== null) deleteMutation.mutate(pendingDeleteId); }}
+              onClick={() => {
+                if (pendingDeleteId !== null) deleteMutation.mutate(pendingDeleteId);
+              }}
               data-testid="button-confirm-delete-waste"
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete Entry"}

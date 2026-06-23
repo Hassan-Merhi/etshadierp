@@ -1,10 +1,6 @@
-import {
-  Badge,
-} from "@/components/ui/badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Switch,
-} from "@/components/ui/switch";
+import { Switch } from "@/components/ui/switch";
 import {
   ArrowLeft,
   Building2,
@@ -49,18 +45,19 @@ export function BrokerOverviewPanel({
   formatNum,
   formatDate,
 }: BrokerOverviewPanelProps) {
-  const parentSup = allSuppliers.find(s => s.id === parentViewSupplierId);
+  const parentSup = allSuppliers.find((s) => s.id === parentViewSupplierId);
   const children = subAccountsByParent[parentViewSupplierId] || [];
 
   // Pool balances from broker activity ledger (all currencies, net balance per currency section)
-  const brokerOwnBalances: { currencyCode: string; balance: number; isBrokerPool: boolean }[] =
-    (brokerOverviewStatement?.currencyLedgers || [])
-      .map((section: any) => ({
-        currencyCode: section.currencyCode,
-        balance: parseFloat(section.netBalance || "0"),
-        isBrokerPool: !!section.isBrokerPool
-      }))
-      .filter((b: any) => Math.abs(b.balance) > 0.001);
+  const brokerOwnBalances: { currencyCode: string; balance: number; isBrokerPool: boolean }[] = (
+    brokerOverviewStatement?.currencyLedgers || []
+  )
+    .map((section: any) => ({
+      currencyCode: section.currencyCode,
+      balance: parseFloat(section.netBalance || "0"),
+      isBrokerPool: !!section.isBrokerPool,
+    }))
+    .filter((b: any) => Math.abs(b.balance) > 0.001);
 
   return (
     <div className="space-y-6">
@@ -87,7 +84,10 @@ export function BrokerOverviewPanel({
             {children.length} linked supplier{children.length !== 1 ? "s" : ""}
           </p>
         </div>
-        <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="label-broker-overview-include-otw">
+        <label
+          className="flex items-center gap-2 cursor-pointer select-none"
+          data-testid="label-broker-overview-include-otw"
+        >
           <Switch
             checked={brokerIncludeOtw}
             onCheckedChange={setBrokerIncludeOtw}
@@ -112,42 +112,44 @@ export function BrokerOverviewPanel({
       {parentSup && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           <div className="rounded-xl border p-4">
-              <div className="text-xs text-muted-foreground">Total Containers</div>
-              <div className="text-2xl font-bold mt-1" data-testid="text-parent-total-containers">
-                {parentSup.totalContainers}
-              </div>
+            <div className="text-xs text-muted-foreground">Total Containers</div>
+            <div className="text-2xl font-bold mt-1" data-testid="text-parent-total-containers">
+              {parentSup.totalContainers}
+            </div>
           </div>
           <div className="rounded-xl border p-4">
-              <div className="text-xs text-muted-foreground">Linked Suppliers</div>
-              <div className="text-2xl font-bold mt-1">
-                {children.length}
-              </div>
+            <div className="text-xs text-muted-foreground">Linked Suppliers</div>
+            <div className="text-2xl font-bold mt-1">{children.length}</div>
           </div>
           {/* OTW card — only shown when there are pending containers */}
-          {parentSup.pendingContainers > 0 && (() => {
-            const byCC = parentSup.otwByCurrency || {};
-            const eurCount = byCC["EUR"] || 0;
-            const usdCount = byCC["USD"] || 0;
-            const otherCount = Object.entries(byCC)
-              .filter(([cc]) => cc !== "EUR" && cc !== "USD")
-              .reduce((s, [, n]) => s + n, 0);
-            const pills = [
-              { label: "EUR", count: eurCount },
-              { label: "USD", count: usdCount },
-              { label: "Other", count: otherCount },
-            ].filter(p => p.count > 0);
-            return (
-              <div key="otw" className="rounded-xl border p-4" data-testid="card-otw-containers">
+          {parentSup.pendingContainers > 0 &&
+            (() => {
+              const byCC = parentSup.otwByCurrency || {};
+              const eurCount = byCC["EUR"] || 0;
+              const usdCount = byCC["USD"] || 0;
+              const otherCount = Object.entries(byCC)
+                .filter(([cc]) => cc !== "EUR" && cc !== "USD")
+                .reduce((s, [, n]) => s + n, 0);
+              const pills = [
+                { label: "EUR", count: eurCount },
+                { label: "USD", count: usdCount },
+                { label: "Other", count: otherCount },
+              ].filter((p) => p.count > 0);
+              return (
+                <div key="otw" className="rounded-xl border p-4" data-testid="card-otw-containers">
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     OTW Containers
                   </div>
-                  <div className="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400 tabular-nums" data-testid="text-otw-total">
+                  <div
+                    className="text-2xl font-bold mt-1 text-amber-600 dark:text-amber-400 tabular-nums"
+                    data-testid="text-otw-total"
+                  >
                     {parentSup.pendingContainers}
                   </div>
                   {pills.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
-                      {pills.map(p => (
+                      {pills.map((p) => (
                         <span
                           key={p.label}
                           className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
@@ -159,15 +161,16 @@ export function BrokerOverviewPanel({
                     </div>
                   )}
                 </div>
-            );
-          })()}
+              );
+            })()}
           {brokerOverviewLoading ? (
             <div className="rounded-xl border p-4">
-                <div className="text-xs text-muted-foreground">Pool Balance</div>
-                <div className="text-2xl font-bold mt-1 text-muted-foreground animate-pulse">—</div>
+              <div className="text-xs text-muted-foreground">Pool Balance</div>
+              <div className="text-2xl font-bold mt-1 text-muted-foreground animate-pulse">—</div>
             </div>
-          ) : brokerOwnBalances.map((b) => (
-            <div key={b.currencyCode} className="rounded-xl border p-4">
+          ) : (
+            brokerOwnBalances.map((b) => (
+              <div key={b.currencyCode} className="rounded-xl border p-4">
                 <div className="text-xs text-muted-foreground">
                   {b.isBrokerPool ? "Pool Balance" : "Net Balance"} ({b.currencyCode})
                 </div>
@@ -175,15 +178,25 @@ export function BrokerOverviewPanel({
                   className={`text-2xl font-bold mt-1 tabular-nums ${b.balance > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                   data-testid={`text-pool-balance-${b.currencyCode}`}
                 >
-                  {b.currencyCode === "USD" ? "$" : `${b.currencyCode} `}{formatNum(Math.abs(b.balance).toFixed(2))}
+                  {b.currencyCode === "USD" ? "$" : `${b.currencyCode} `}
+                  {formatNum(Math.abs(b.balance).toFixed(2))}
                 </div>
                 <div className="text-xs text-muted-foreground mt-0.5">
                   {b.isBrokerPool
-                    ? (b.balance > 0 ? "Received" : b.balance < 0 ? "Owed" : "Settled")
-                    : (b.balance > 0 ? "Payable to suppliers" : b.balance < 0 ? "Overpaid" : "Settled")}
+                    ? b.balance > 0
+                      ? "Received"
+                      : b.balance < 0
+                        ? "Owed"
+                        : "Settled"
+                    : b.balance > 0
+                      ? "Payable to suppliers"
+                      : b.balance < 0
+                        ? "Overpaid"
+                        : "Settled"}
                 </div>
-            </div>
-          ))}
+              </div>
+            ))
+          )}
         </div>
       )}
 
@@ -201,7 +214,7 @@ export function BrokerOverviewPanel({
             </div>
           ) : (
             <div className="divide-y">
-              {children.map(child => (
+              {children.map((child) => (
                 <div
                   key={child.id}
                   className="flex items-center justify-between gap-3 p-4"
@@ -218,7 +231,9 @@ export function BrokerOverviewPanel({
                         {child.name}
                       </button>
                       {!child.isActive && (
-                        <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          Inactive
+                        </Badge>
                       )}
                     </div>
                     <div className="flex items-center gap-4 mt-1.5 text-sm text-muted-foreground flex-wrap">

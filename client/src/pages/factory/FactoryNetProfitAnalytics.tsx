@@ -25,7 +25,15 @@ import {
 } from "lucide-react";
 import { useLocation } from "wouter";
 
-type Period = "today" | "yesterday" | "this_week" | "this_month" | "this_year" | "all_time" | "specific_month" | "custom_range";
+type Period =
+  | "today"
+  | "yesterday"
+  | "this_week"
+  | "this_month"
+  | "this_year"
+  | "all_time"
+  | "specific_month"
+  | "custom_range";
 
 const PERIODS: { value: Period; label: string }[] = [
   { value: "today", label: "Today" },
@@ -39,8 +47,18 @@ const PERIODS: { value: Period; label: string }[] = [
 ];
 
 const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 function getDateRange(
@@ -99,10 +117,13 @@ function getDateRange(
 }
 
 function fmt(n: number): string {
-  return "$" + new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Math.abs(n));
+  return (
+    "$" +
+    new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(Math.abs(n))
+  );
 }
 
 function AccountBreakdown({
@@ -127,11 +148,19 @@ function AccountBreakdown({
       <CollapsibleTrigger className="w-full" data-testid={`toggle-${title.toLowerCase().replace(/\s+/g, "-")}`}>
         <div className="flex items-center justify-between px-3 py-2.5 rounded-md hover-elevate cursor-pointer">
           <div className="flex items-center gap-2">
-            {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+            {open ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            )}
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeClass}`}>{title}</span>
-            <span className="text-xs text-muted-foreground">{active.length} account{active.length !== 1 ? "s" : ""}</span>
+            <span className="text-xs text-muted-foreground">
+              {active.length} account{active.length !== 1 ? "s" : ""}
+            </span>
           </div>
-          <span className={`font-mono text-sm font-semibold ${type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+          <span
+            className={`font-mono text-sm font-semibold ${type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+          >
             {fmt(total)}
           </span>
         </div>
@@ -152,11 +181,17 @@ function AccountBreakdown({
               </thead>
               <tbody>
                 {active.map((acc: any, i: number) => (
-                  <tr key={i} className="border-t hover-elevate cursor-pointer" onClick={() => acc.id && window.open(`/factory/ledger-monthly/${acc.id}`, "_blank")}>
+                  <tr
+                    key={i}
+                    className="border-t hover-elevate cursor-pointer"
+                    onClick={() => acc.id && window.open(`/factory/ledger-monthly/${acc.id}`, "_blank")}
+                  >
                     <td className="px-3 py-2 text-foreground hover:underline">{acc.name}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground font-mono">{fmt(acc.debit)}</td>
                     <td className="px-3 py-2 text-right text-muted-foreground font-mono">{fmt(acc.credit)}</td>
-                    <td className={`px-3 py-2 text-right font-mono font-medium ${type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                    <td
+                      className={`px-3 py-2 text-right font-mono font-medium ${type === "income" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                    >
                       {fmt(Math.abs(acc.balance))}
                     </td>
                   </tr>
@@ -247,9 +282,7 @@ export default function FactoryNetProfitAnalytics() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <PageHeader title="Net Profit Analytics" icon={<BarChart3 className="h-5 w-5" />} />
-          <p className="text-muted-foreground text-sm mt-1">
-            Income, expenses and profitability — {periodLabel}
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">Income, expenses and profitability — {periodLabel}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={period} onValueChange={(v) => setPeriod(v as Period)}>
@@ -295,7 +328,9 @@ export default function FactoryNetProfitAnalytics() {
           {period === "custom_range" && (
             <>
               <div className="flex items-center gap-1.5">
-                <Label htmlFor="factory-np-from" className="text-sm whitespace-nowrap text-muted-foreground">From:</Label>
+                <Label htmlFor="factory-np-from" className="text-sm whitespace-nowrap text-muted-foreground">
+                  From:
+                </Label>
                 <Input
                   id="factory-np-from"
                   type="date"
@@ -306,7 +341,9 @@ export default function FactoryNetProfitAnalytics() {
                 />
               </div>
               <div className="flex items-center gap-1.5">
-                <Label htmlFor="factory-np-to" className="text-sm whitespace-nowrap text-muted-foreground">To:</Label>
+                <Label htmlFor="factory-np-to" className="text-sm whitespace-nowrap text-muted-foreground">
+                  To:
+                </Label>
                 <Input
                   id="factory-np-to"
                   type="date"
@@ -320,7 +357,10 @@ export default function FactoryNetProfitAnalytics() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => { setCustomFromDate(""); setCustomToDate(""); }}
+                  onClick={() => {
+                    setCustomFromDate("");
+                    setCustomToDate("");
+                  }}
                   data-testid="button-clear-custom-dates"
                 >
                   Clear
@@ -338,7 +378,9 @@ export default function FactoryNetProfitAnalytics() {
       {/* Net Position Breakdown — 4 panel layout */}
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-36 w-full" />)}
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-36 w-full" />
+          ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-testid="section-breakdown">
@@ -350,7 +392,10 @@ export default function FactoryNetProfitAnalytics() {
                 <span className="text-sm font-semibold text-green-600 dark:text-green-400">What We Made</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">Total Revenue:</p>
-              <p className="text-xl font-bold text-green-600 dark:text-green-400 font-mono" data-testid="text-total-income">
+              <p
+                className="text-xl font-bold text-green-600 dark:text-green-400 font-mono"
+                data-testid="text-total-income"
+              >
                 {fmt(totalIncome)}
               </p>
               <div className="mt-3 space-y-1">
@@ -390,7 +435,10 @@ export default function FactoryNetProfitAnalytics() {
                 <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">What We Bought</span>
               </div>
               <p className="text-xs text-muted-foreground mb-1">Total Purchases:</p>
-              <p className="text-xl font-bold text-orange-600 dark:text-orange-400 font-mono" data-testid="text-purchases">
+              <p
+                className="text-xl font-bold text-orange-600 dark:text-orange-400 font-mono"
+                data-testid="text-purchases"
+              >
                 {fmt(purchasesTotal + openingStock)}
               </p>
               <div className="mt-3 space-y-1">
@@ -445,14 +493,13 @@ export default function FactoryNetProfitAnalytics() {
                 <Equal className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm font-semibold">Net Profit</span>
               </div>
-              <p className="text-xs text-muted-foreground mb-1">
-                {isPositive ? "Revenue − Expenses:" : "Deficit:"}
-              </p>
+              <p className="text-xs text-muted-foreground mb-1">{isPositive ? "Revenue − Expenses:" : "Deficit:"}</p>
               <p
                 className={`text-xl font-bold font-mono ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
                 data-testid="text-net-profit"
               >
-                {netProfit < 0 ? "-" : ""}{fmt(Math.abs(netProfit))}
+                {netProfit < 0 ? "-" : ""}
+                {fmt(Math.abs(netProfit))}
               </p>
               <div className="mt-3 space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
@@ -466,8 +513,11 @@ export default function FactoryNetProfitAnalytics() {
                 <Separator className="my-1" />
                 <div className="flex justify-between text-xs font-semibold">
                   <span>= Net</span>
-                  <span className={`font-mono ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    {netProfit < 0 ? "-" : ""}{fmt(Math.abs(netProfit))}
+                  <span
+                    className={`font-mono ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+                  >
+                    {netProfit < 0 ? "-" : ""}
+                    {fmt(Math.abs(netProfit))}
                   </span>
                 </div>
               </div>
@@ -541,18 +591,25 @@ export default function FactoryNetProfitAnalytics() {
 
             <Separator className="my-4" />
 
-            <div className={`flex justify-between items-center font-bold text-base rounded-md px-4 py-3 ${
-              isPositive ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"
-            }`} data-testid="row-net-profit-bottom">
+            <div
+              className={`flex justify-between items-center font-bold text-base rounded-md px-4 py-3 ${
+                isPositive ? "bg-green-50 dark:bg-green-950/30" : "bg-red-50 dark:bg-red-950/30"
+              }`}
+              data-testid="row-net-profit-bottom"
+            >
               <span className="flex items-center gap-2">
-                {isPositive
-                  ? <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  : <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
-                }
+                {isPositive ? (
+                  <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
+                ) : (
+                  <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
+                )}
                 {isPositive ? "Net Profit" : "Net Loss"}
               </span>
-              <span className={`font-mono ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                {netProfit < 0 ? "-" : ""}{fmt(Math.abs(netProfit))}
+              <span
+                className={`font-mono ${isPositive ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
+              >
+                {netProfit < 0 ? "-" : ""}
+                {fmt(Math.abs(netProfit))}
               </span>
             </div>
           </CardContent>

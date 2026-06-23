@@ -1,8 +1,4 @@
-import { 
-  EnrichedContainerRow, 
-  parseNum, 
-  fmt 
-} from "./gitContainerTypes";
+import { EnrichedContainerRow, parseNum, fmt } from "./gitContainerTypes";
 
 interface ContainerSummaryStatsProps {
   filteredContainers: EnrichedContainerRow[];
@@ -16,7 +12,7 @@ export function useContainerSummaryStats({ filteredContainers }: ContainerSummar
   const arrived = filteredContainers.filter((c) => c.status === "Arrived").length;
   const delayed = filteredContainers.filter((c) => c.daysDelayed !== null && c.daysDelayed > 0).length;
   const offloadOverdue = filteredContainers.filter((c) => c.isOverdue).length;
-  
+
   const totalCost = filteredContainers.reduce((s, c) => s + parseNum(c.grandTotal), 0);
   const totalTransport = filteredContainers.reduce((s, c) => s + parseNum(c.transportFee), 0);
   const totalDuty = filteredContainers.reduce((s, c) => s + parseNum(c.dutyFee), 0);
@@ -30,6 +26,6 @@ export function useContainerSummaryStats({ filteredContainers }: ContainerSummar
     delayed,
     offloadOverdue,
     totalCost: `$${fmt(totalCost)}`,
-    totalTransportDuty: `$${fmt(totalTransport + totalDuty)}`
+    totalTransportDuty: `$${fmt(totalTransport + totalDuty)}`,
   };
 }

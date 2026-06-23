@@ -2,7 +2,15 @@ import { useEffect, useRef } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { parseDateLocal } from "@/components/vouchers/PrintTemplate";
 import type { VoucherFormData } from "./voucherTypes";
-import type { BankAccount, LedgerAccount, Supplier, Customer, Employee, FixedAsset, FactorySupplierBasic } from "./voucherTypes";
+import type {
+  BankAccount,
+  LedgerAccount,
+  Supplier,
+  Customer,
+  Employee,
+  FixedAsset,
+  FactorySupplierBasic,
+} from "./voucherTypes";
 
 interface UseVoucherHydrationProps {
   voucherToEdit: any;
@@ -81,32 +89,32 @@ export function useVoucherHydration({
       if (paymentEntry.bankAccountId) {
         paymentType = "bank";
         paymentId = paymentEntry.bankAccountId;
-        const account = bankAccounts.find(b => b.id === paymentId);
+        const account = bankAccounts.find((b) => b.id === paymentId);
         paymentName = account?.bankName || "";
       } else if (paymentEntry.ledgerAccountId) {
         paymentType = "ledger";
         paymentId = paymentEntry.ledgerAccountId;
-        const account = ledgerAccounts.find(l => l.id === paymentId);
+        const account = ledgerAccounts.find((l) => l.id === paymentId);
         paymentName = account?.name || "";
       } else if (paymentEntry.supplierId) {
         paymentType = "supplier";
         paymentId = paymentEntry.supplierId;
-        const supplier = suppliers.find(s => s.id === paymentId);
+        const supplier = suppliers.find((s) => s.id === paymentId);
         paymentName = supplier?.legalName || "";
       } else if (paymentEntry.factorySupplierId) {
         paymentType = "factorySupplier";
         paymentId = paymentEntry.factorySupplierId;
-        const fs = factorySuppliersList.find(s => s.id === paymentId);
+        const fs = factorySuppliersList.find((s) => s.id === paymentId);
         paymentName = fs?.name || "";
       } else if (paymentEntry.employeeId) {
         paymentType = "employee";
         paymentId = paymentEntry.employeeId;
-        const employee = employees.find(e => e.id === paymentId);
+        const employee = employees.find((e) => e.id === paymentId);
         paymentName = employee ? `${employee.firstName} ${employee.lastName}` : "";
       } else if (paymentEntry.fixedAssetId) {
         paymentType = "fixedAsset";
         paymentId = paymentEntry.fixedAssetId;
-        const asset = fixedAssets.find(f => f.id === paymentId);
+        const asset = fixedAssets.find((f) => f.id === paymentId);
         paymentName = asset?.name || "";
       }
 
@@ -129,7 +137,8 @@ export function useVoucherHydration({
           return true;
         })
         .map((entry: any) => {
-          let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier" = "ledger";
+          let accountType: "ledger" | "bank" | "supplier" | "employee" | "fixedAsset" | "customer" | "factorySupplier" =
+            "ledger";
           let accountId = 0;
           let accountName = "";
           let amount = "0";
@@ -137,45 +146,49 @@ export function useVoucherHydration({
           if (entry.ledgerAccountId) {
             accountType = "ledger";
             accountId = entry.ledgerAccountId;
-            const account = ledgerAccounts.find(l => l.id === accountId);
+            const account = ledgerAccounts.find((l) => l.id === accountId);
             accountName = account?.name || "";
           } else if (entry.bankAccountId) {
             accountType = "bank";
             accountId = entry.bankAccountId;
-            const account = bankAccounts.find(b => b.id === accountId);
+            const account = bankAccounts.find((b) => b.id === accountId);
             accountName = account?.bankName || "";
           } else if (entry.supplierId) {
             accountType = "supplier";
             accountId = entry.supplierId;
-            const supplier = suppliers.find(s => s.id === accountId);
+            const supplier = suppliers.find((s) => s.id === accountId);
             accountName = supplier?.legalName || "";
           } else if (entry.factorySupplierId) {
             accountType = "factorySupplier";
             accountId = entry.factorySupplierId;
-            const fs = factorySuppliersList.find(s => s.id === accountId);
+            const fs = factorySuppliersList.find((s) => s.id === accountId);
             accountName = fs?.name || "";
           } else if (entry.employeeId) {
             accountType = "employee";
             accountId = entry.employeeId;
-            const employee = employees.find(e => e.id === accountId);
+            const employee = employees.find((e) => e.id === accountId);
             accountName = employee ? `${employee.firstName} ${employee.lastName}` : "";
           } else if (entry.fixedAssetId) {
             accountType = "fixedAsset";
             accountId = entry.fixedAssetId;
-            const asset = fixedAssets.find(f => f.id === accountId);
+            const asset = fixedAssets.find((f) => f.id === accountId);
             accountName = asset?.name || "";
           } else if (entry.customerId) {
             accountType = "customer";
             accountId = entry.customerId;
-            const customer = customers.find(c => c.id === accountId);
+            const customer = customers.find((c) => c.id === accountId);
             accountName = customer?.legalName || "";
           }
 
-          const isLiabilityPayment = paymentEntry.supplierId || paymentEntry.employeeId || paymentEntry.customerId || paymentEntry.factorySupplierId;
+          const isLiabilityPayment =
+            paymentEntry.supplierId ||
+            paymentEntry.employeeId ||
+            paymentEntry.customerId ||
+            paymentEntry.factorySupplierId;
           if (voucherToEdit.voucherType === "Payment") {
-            amount = isLiabilityPayment ? (entry.creditAmount || "0") : (entry.debitAmount || "0");
+            amount = isLiabilityPayment ? entry.creditAmount || "0" : entry.debitAmount || "0";
           } else if (voucherToEdit.voucherType === "Receipt") {
-            amount = isLiabilityPayment ? (entry.debitAmount || "0") : (entry.creditAmount || "0");
+            amount = isLiabilityPayment ? entry.debitAmount || "0" : entry.creditAmount || "0";
           }
 
           return { accountType, accountId, accountName, amount };
@@ -187,12 +200,17 @@ export function useVoucherHydration({
         paymentAccountId: paymentId,
         paymentAccountName: paymentName,
         voucherDate: parseDateLocal(voucherToEdit.voucherDate),
-        entries: formEntries.length > 0 ? formEntries : [{
-          accountType: "ledger",
-          accountId: 0,
-          accountName: "",
-          amount: "",
-        }],
+        entries:
+          formEntries.length > 0
+            ? formEntries
+            : [
+                {
+                  accountType: "ledger",
+                  accountId: 0,
+                  accountName: "",
+                  amount: "",
+                },
+              ],
         notes: voucherToEdit.description || "",
         optional: voucherToEdit.optional || false,
       });
@@ -204,7 +222,18 @@ export function useVoucherHydration({
       }
       setVoucherEffectiveDate(voucherToEdit.effectiveDate || "");
     }
-  }, [voucherToEdit, allAccounts, bankAccounts, ledgerAccounts, suppliers, employees, fixedAssets, customers, factorySuppliersList, form]);
+  }, [
+    voucherToEdit,
+    allAccounts,
+    bankAccounts,
+    ledgerAccounts,
+    suppliers,
+    employees,
+    fixedAssets,
+    customers,
+    factorySuppliersList,
+    form,
+  ]);
 
   return { hydratedVoucherIdRef };
 }

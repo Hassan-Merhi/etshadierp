@@ -47,12 +47,22 @@ export default function FactoryCustomers() {
     paymentTermsDays: "" as string,
   });
 
-  const { data: customers = [], isLoading, isError, error } = useQuery<Customer[]>({
+  const {
+    data: customers = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<Customer[]>({
     queryKey: ["/api/factory/customers"],
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { legalName: string; phone?: string; openingBalance?: string; openingBalanceSide?: string }) => {
+    mutationFn: async (data: {
+      legalName: string;
+      phone?: string;
+      openingBalance?: string;
+      openingBalanceSide?: string;
+    }) => {
       return await factoryApiRequest("POST", "/api/factory/customers", data);
     },
     onSuccess: () => {
@@ -170,7 +180,9 @@ export default function FactoryCustomers() {
   const filtered = customers.filter((c) => {
     if (!search) return true;
     const q = search.toLowerCase();
-    return c.legalName.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || (c.phone && c.phone.includes(q));
+    return (
+      c.legalName.toLowerCase().includes(q) || c.code.toLowerCase().includes(q) || (c.phone && c.phone.includes(q))
+    );
   });
 
   if (isLoading) {
@@ -198,15 +210,13 @@ export default function FactoryCustomers() {
     <div className="flex flex-col h-full p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Customers</h1>
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">
+            Customers
+          </h1>
           <p className="text-sm text-muted-foreground">{customers.length} total customers</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={() => setShowDeleted(!showDeleted)}
-            data-testid="button-toggle-deleted"
-          >
+          <Button variant="outline" onClick={() => setShowDeleted(!showDeleted)} data-testid="button-toggle-deleted">
             <History className="h-4 w-4 mr-2" />
             {showDeleted ? "Hide Deleted" : "Deleted Customers"}
           </Button>
@@ -230,91 +240,100 @@ export default function FactoryCustomers() {
 
       <div className="rounded-xl border overflow-hidden">
         <div className="table-responsive">
-            <Table>
-              <TableHeader className="sticky top-0 z-30">
-                <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Name</TableHead>
-                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Balance</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Status</TableHead>
-                  <TableHead className="w-[90px] py-2"></TableHead>
+          <Table>
+            <TableHeader className="sticky top-0 z-30">
+              <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  Name
+                </TableHead>
+                <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  Balance
+                </TableHead>
+                <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                  Status
+                </TableHead>
+                <TableHead className="w-[90px] py-2"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    {search ? "No customers match your search" : "No customers yet"}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      {search ? "No customers match your search" : "No customers yet"}
+              ) : (
+                filtered.map((customer) => (
+                  <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
+                    <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
+                      <button
+                        className="text-left hover:underline text-foreground"
+                        onClick={() => navigate(`/factory/customers/${customer.id}`)}
+                        data-testid={`button-open-statement-${customer.id}`}
+                      >
+                        {customer.legalName}
+                      </button>
+                      {customer.phone && <p className="text-xs text-muted-foreground mt-0.5">{customer.phone}</p>}
+                    </TableCell>
+                    <TableCell className="text-right font-mono">
+                      {customer.balance !== undefined ? (
+                        <span data-testid={`text-customer-balance-${customer.id}`}>
+                          {formatCashAmount(customer.balance)}{" "}
+                          <span className={`text-xs font-semibold ${drCrClass(customer.balanceSide)}`}>
+                            {customer.balanceSide}
+                          </span>
+                        </span>
+                      ) : (
+                        "-"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={customer.active ? "default" : "secondary"}
+                        data-testid={`badge-customer-status-${customer.id}`}
+                      >
+                        {customer.active ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => navigate(`/factory/invoicing?tab=proformas&customerId=${customer.id}`)}
+                          title="View Proformas"
+                          data-testid={`button-proformas-customer-${customer.id}`}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEdit(customer)}
+                          title="Edit Customer"
+                          data-testid={`button-edit-customer-${customer.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <div className="w-px h-5 bg-border mx-0.5" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setDeletingCustomer(customer)}
+                          title="Delete Customer"
+                          className="text-destructive"
+                          data-testid={`button-delete-customer-${customer.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ) : (
-                  filtered.map((customer) => (
-                    <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
-                      <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
-                        <button
-                          className="text-left hover:underline text-foreground"
-                          onClick={() => navigate(`/factory/customers/${customer.id}`)}
-                          data-testid={`button-open-statement-${customer.id}`}
-                        >
-                          {customer.legalName}
-                        </button>
-                        {customer.phone && (
-                          <p className="text-xs text-muted-foreground mt-0.5">{customer.phone}</p>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {customer.balance !== undefined ? (
-                          <span data-testid={`text-customer-balance-${customer.id}`}>
-                            {formatCashAmount(customer.balance)}{" "}
-                            <span className={`text-xs font-semibold ${drCrClass(customer.balanceSide)}`}>{customer.balanceSide}</span>
-                          </span>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={customer.active ? "default" : "secondary"} data-testid={`badge-customer-status-${customer.id}`}>
-                          {customer.active ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => navigate(`/factory/invoicing?tab=proformas&customerId=${customer.id}`)}
-                            title="View Proformas"
-                            data-testid={`button-proformas-customer-${customer.id}`}
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(customer)}
-                            title="Edit Customer"
-                            data-testid={`button-edit-customer-${customer.id}`}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <div className="w-px h-5 bg-border mx-0.5" />
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeletingCustomer(customer)}
-                            title="Delete Customer"
-                            className="text-destructive"
-                            data-testid={`button-delete-customer-${customer.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </div>
 
       {showDeleted && (
@@ -323,55 +342,65 @@ export default function FactoryCustomers() {
             <History className="h-4 w-4 text-muted-foreground" />
             <span className="text-sm font-semibold">Deleted Customers</span>
             {deletedCustomers.length > 0 && (
-              <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">{deletedCustomers.length}</Badge>
+              <Badge variant="secondary" className="no-default-hover-elevate no-default-active-elevate text-xs">
+                {deletedCustomers.length}
+              </Badge>
             )}
           </div>
-            {deletedCustomers.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8 px-4">No deleted customers found</p>
-            ) : (
-              <div className="table-responsive">
-                <Table>
-                  <TableHeader className="sticky top-0 z-30">
-                    <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
-                      <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">Name</TableHead>
-                      <TableHead className="w-[80px] py-2"></TableHead>
+          {deletedCustomers.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8 px-4">No deleted customers found</p>
+          ) : (
+            <div className="table-responsive">
+              <Table>
+                <TableHeader className="sticky top-0 z-30">
+                  <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
+                    <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground py-2">
+                      Name
+                    </TableHead>
+                    <TableHead className="w-[80px] py-2"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {deletedCustomers.map((customer) => (
+                    <TableRow key={customer.id} data-testid={`row-deleted-customer-${customer.id}`}>
+                      <TableCell className="font-medium text-muted-foreground">{customer.legalName}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => restoreMutation.mutate(customer.id)}
+                          disabled={restoreMutation.isPending}
+                          data-testid={`button-restore-customer-${customer.id}`}
+                        >
+                          <RotateCcw className="h-3 w-3 mr-1" />
+                          Restore
+                        </Button>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {deletedCustomers.map((customer) => (
-                      <TableRow key={customer.id} data-testid={`row-deleted-customer-${customer.id}`}>
-                        <TableCell className="font-medium text-muted-foreground">{customer.legalName}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => restoreMutation.mutate(customer.id)}
-                            disabled={restoreMutation.isPending}
-                            data-testid={`button-restore-customer-${customer.id}`}
-                          >
-                            <RotateCcw className="h-3 w-3 mr-1" />
-                            Restore
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </div>
       )}
 
-      <Dialog open={isCreateOpen} onOpenChange={(open) => { if (!open) { setIsCreateOpen(false); resetForm(); } }}>
+      <Dialog
+        open={isCreateOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsCreateOpen(false);
+            resetForm();
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
               Add Customer
             </DialogTitle>
-            <DialogDescription>
-              A unique customer code will be generated automatically.
-            </DialogDescription>
+            <DialogDescription>A unique customer code will be generated automatically.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -427,7 +456,9 @@ export default function FactoryCustomers() {
               </label>
               <Select
                 value={formData.paymentTermsDays || "none"}
-                onValueChange={(v) => setFormData({ ...formData, paymentTermsDays: v === "none" ? "" : v === "custom" ? "" : v })}
+                onValueChange={(v) =>
+                  setFormData({ ...formData, paymentTermsDays: v === "none" ? "" : v === "custom" ? "" : v })
+                }
               >
                 <SelectTrigger data-testid="select-payment-terms">
                   <SelectValue placeholder="No payment terms" />
@@ -440,7 +471,7 @@ export default function FactoryCustomers() {
                   <SelectItem value="90">Net 90 days</SelectItem>
                 </SelectContent>
               </Select>
-              {formData.paymentTermsDays && !["30","45","60","90"].includes(formData.paymentTermsDays) && (
+              {formData.paymentTermsDays && !["30", "45", "60", "90"].includes(formData.paymentTermsDays) && (
                 <Input
                   type="number"
                   min={1}
@@ -451,10 +482,19 @@ export default function FactoryCustomers() {
                   data-testid="input-custom-payment-terms"
                 />
               )}
-              <p className="text-xs text-muted-foreground mt-1">A WhatsApp reminder will be sent when this customer has an outstanding balance past their due date.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                A WhatsApp reminder will be sent when this customer has an outstanding balance past their due date.
+              </p>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => { setIsCreateOpen(false); resetForm(); }} data-testid="button-cancel-create">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  resetForm();
+                }}
+                data-testid="button-cancel-create"
+              >
                 Cancel
               </Button>
               <Button
@@ -469,16 +509,22 @@ export default function FactoryCustomers() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editingCustomer} onOpenChange={(open) => { if (!open) { setEditingCustomer(null); resetForm(); } }}>
+      <Dialog
+        open={!!editingCustomer}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingCustomer(null);
+            resetForm();
+          }
+        }}
+      >
         <DialogContent className="max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Pencil className="h-5 w-5" />
               Edit Customer
             </DialogTitle>
-            <DialogDescription>
-              {editingCustomer ? `Editing ${editingCustomer.legalName}` : ""}
-            </DialogDescription>
+            <DialogDescription>{editingCustomer ? `Editing ${editingCustomer.legalName}` : ""}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -505,7 +551,13 @@ export default function FactoryCustomers() {
                 Payment Terms
               </label>
               <Select
-                value={formData.paymentTermsDays && ["30","45","60","90"].includes(formData.paymentTermsDays) ? formData.paymentTermsDays : formData.paymentTermsDays ? "custom" : "none"}
+                value={
+                  formData.paymentTermsDays && ["30", "45", "60", "90"].includes(formData.paymentTermsDays)
+                    ? formData.paymentTermsDays
+                    : formData.paymentTermsDays
+                      ? "custom"
+                      : "none"
+                }
                 onValueChange={(v) => {
                   if (v === "none") setFormData({ ...formData, paymentTermsDays: "" });
                   else if (v === "custom") setFormData({ ...formData, paymentTermsDays: "" });
@@ -524,7 +576,7 @@ export default function FactoryCustomers() {
                   <SelectItem value="custom">Custom...</SelectItem>
                 </SelectContent>
               </Select>
-              {formData.paymentTermsDays && !["30","45","60","90"].includes(formData.paymentTermsDays) && (
+              {formData.paymentTermsDays && !["30", "45", "60", "90"].includes(formData.paymentTermsDays) && (
                 <Input
                   type="number"
                   min={1}
@@ -535,10 +587,19 @@ export default function FactoryCustomers() {
                   data-testid="input-edit-custom-payment-terms"
                 />
               )}
-              <p className="text-xs text-muted-foreground mt-1">A WhatsApp reminder is sent at 9 AM when this customer has an outstanding balance past their due date.</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                A WhatsApp reminder is sent at 9 AM when this customer has an outstanding balance past their due date.
+              </p>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => { setEditingCustomer(null); resetForm(); }} data-testid="button-cancel-edit">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditingCustomer(null);
+                  resetForm();
+                }}
+                data-testid="button-cancel-edit"
+              >
                 Cancel
               </Button>
               <Button
@@ -555,15 +616,20 @@ export default function FactoryCustomers() {
 
       <ConfirmDialog
         open={!!deletingCustomer}
-        onOpenChange={(open) => { if (!open) setDeletingCustomer(null); }}
+        onOpenChange={(open) => {
+          if (!open) setDeletingCustomer(null);
+        }}
         title="Delete Customer"
         tone="destructive"
         confirmText={deleteMutation.isPending ? "Deleting..." : "Delete"}
         loading={deleteMutation.isPending}
-        onConfirm={() => { if (deletingCustomer) deleteMutation.mutate(deletingCustomer.id); }}
+        onConfirm={() => {
+          if (deletingCustomer) deleteMutation.mutate(deletingCustomer.id);
+        }}
         description={
           <span>
-            Are you sure you want to delete <strong>{deletingCustomer?.legalName}</strong>? They will be hidden from the customers list. You can restore them later from the "Deleted Customers" section.
+            Are you sure you want to delete <strong>{deletingCustomer?.legalName}</strong>? They will be hidden from the
+            customers list. You can restore them later from the "Deleted Customers" section.
           </span>
         }
       />

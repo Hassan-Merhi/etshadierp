@@ -1,18 +1,18 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import * as DialogPrimitive from "@radix-ui/react-dialog"
-import { X } from "lucide-react"
+import * as React from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-const Dialog = DialogPrimitive.Root
+const Dialog = DialogPrimitive.Root;
 
-const DialogTrigger = DialogPrimitive.Trigger
+const DialogTrigger = DialogPrimitive.Trigger;
 
-const DialogPortal = DialogPrimitive.Portal
+const DialogPortal = DialogPrimitive.Portal;
 
-const DialogClose = DialogPrimitive.Close
+const DialogClose = DialogPrimitive.Close;
 
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
@@ -26,33 +26,33 @@ const DialogOverlay = React.forwardRef<
     )}
     {...props}
   />
-))
-DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
+));
+DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
-const ARROW_SCROLL_PX = 80
+const ARROW_SCROLL_PX = 80;
 
 function findScrollTarget(el: HTMLElement): HTMLElement | null {
-  const ov = getComputedStyle(el).overflowY
+  const ov = getComputedStyle(el).overflowY;
   if ((ov === "auto" || ov === "scroll") && el.scrollHeight > el.clientHeight) {
-    return el
+    return el;
   }
   for (const child of Array.from(el.children)) {
-    const found = findScrollTarget(child as HTMLElement)
-    if (found) return found
+    const found = findScrollTarget(child as HTMLElement);
+    if (found) return found;
   }
-  return null
+  return null;
 }
 
-const SKIP_ROLES = new Set(["option", "listbox", "combobox", "slider", "spinbutton", "textbox"])
+const SKIP_ROLES = new Set(["option", "listbox", "combobox", "slider", "spinbutton", "textbox"]);
 
 function shouldSkipArrow(active: Element | null): boolean {
-  if (!active) return false
-  const tag = (active as HTMLElement).tagName.toLowerCase()
-  if (["input", "textarea", "select"].includes(tag)) return true
-  if ((active as HTMLElement).getAttribute("contenteditable")) return true
-  const role = active.getAttribute("role") || ""
-  if (SKIP_ROLES.has(role)) return true
-  return false
+  if (!active) return false;
+  const tag = (active as HTMLElement).tagName.toLowerCase();
+  if (["input", "textarea", "select"].includes(tag)) return true;
+  if ((active as HTMLElement).getAttribute("contenteditable")) return true;
+  const role = active.getAttribute("role") || "";
+  if (SKIP_ROLES.has(role)) return true;
+  return false;
 }
 
 const DialogContent = React.forwardRef<
@@ -62,25 +62,25 @@ const DialogContent = React.forwardRef<
   const handleKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       if (!shouldSkipArrow(document.activeElement)) {
-        const scrollEl = findScrollTarget(e.currentTarget)
+        const scrollEl = findScrollTarget(e.currentTarget);
         if (scrollEl) {
-          e.preventDefault()
-          e.stopPropagation()
-          scrollEl.scrollBy({ top: e.key === "ArrowDown" ? ARROW_SCROLL_PX : -ARROW_SCROLL_PX, behavior: "smooth" })
+          e.preventDefault();
+          e.stopPropagation();
+          scrollEl.scrollBy({ top: e.key === "ArrowDown" ? ARROW_SCROLL_PX : -ARROW_SCROLL_PX, behavior: "smooth" });
         }
       }
     }
-    onKeyDown?.(e)
-  }
+    onKeyDown?.(e);
+  };
 
   // Prevent Radix from trying to return focus to the trigger element when the
   // dialog closes. Without this, if the trigger element has been removed or
   // re-rendered, Radix's focus-return can leave the page in a frozen state
   // (pointer-events blocked, scroll locked) until a page refresh.
   const handleCloseAutoFocus = (e: Event) => {
-    e.preventDefault()
-    onCloseAutoFocus?.(e)
-  }
+    e.preventDefault();
+    onCloseAutoFocus?.(e);
+  };
 
   return (
     <DialogPortal>
@@ -102,37 +102,19 @@ const DialogContent = React.forwardRef<
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPortal>
-  )
-})
-DialogContent.displayName = DialogPrimitive.Content.displayName
+  );
+});
+DialogContent.displayName = DialogPrimitive.Content.displayName;
 
-const DialogHeader = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "flex flex-col space-y-1.5 text-center sm:text-left",
-      className
-    )}
-    {...props}
-  />
-)
-DialogHeader.displayName = "DialogHeader"
+const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props} />
+);
+DialogHeader.displayName = "DialogHeader";
 
-const DialogFooter = ({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) => (
-  <div
-    className={cn(
-      "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2",
-      className
-    )}
-    {...props}
-  />
-)
-DialogFooter.displayName = "DialogFooter"
+const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={cn("flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2", className)} {...props} />
+);
+DialogFooter.displayName = "DialogFooter";
 
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
@@ -140,26 +122,19 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
-      className
-    )}
+    className={cn("text-lg font-semibold leading-none tracking-tight", className)}
     {...props}
   />
-))
-DialogTitle.displayName = DialogPrimitive.Title.displayName
+));
+DialogTitle.displayName = DialogPrimitive.Title.displayName;
 
 const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
-  <DialogPrimitive.Description
-    ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
-    {...props}
-  />
-))
-DialogDescription.displayName = DialogPrimitive.Description.displayName
+  <DialogPrimitive.Description ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+));
+DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
 export {
   Dialog,
@@ -172,4 +147,4 @@ export {
   DialogFooter,
   DialogTitle,
   DialogDescription,
-}
+};

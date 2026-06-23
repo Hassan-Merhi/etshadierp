@@ -5,7 +5,7 @@ import type { Sheet as FortuneSheet } from "@fortune-sheet/core";
 
 export type ExcelSpreadsheetData = {
   mode: "excel";
-  rawXlsx: string;       // base64-encoded original .xlsx binary
+  rawXlsx: string; // base64-encoded original .xlsx binary
   sheets: FortuneSheet[];
 };
 
@@ -84,10 +84,7 @@ function hexToArgb(hex?: string): string {
 }
 
 /** Iterates Fortune Sheet cells regardless of sparse (celldata) or dense (data) format */
-function iterateFortuneCells(
-  sheet: FortuneSheet,
-  cb: (r: number, c: number, v: any) => void
-): void {
+function iterateFortuneCells(sheet: FortuneSheet, cb: (r: number, c: number, v: any) => void): void {
   const s = sheet as any;
   if (Array.isArray(s.celldata)) {
     for (const { r, c, v } of s.celldata) {
@@ -196,10 +193,7 @@ function applyFortuneStyleToCell(excelCell: ExcelJS.Cell, v: any): void {
  * named ranges) are preserved automatically because ExcelJS reads and
  * re-writes them without modification.
  */
-export async function syncFortuneToXlsx(
-  rawXlsx: string,
-  sheets: FortuneSheet[]
-): Promise<ArrayBuffer> {
+export async function syncFortuneToXlsx(rawXlsx: string, sheets: FortuneSheet[]): Promise<ArrayBuffer> {
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(base64ToArrayBuffer(rawXlsx));
 
@@ -292,7 +286,7 @@ export async function syncFortuneToXlsx(
     if (cfg.columnlen) {
       for (const [ci, wpx] of Object.entries(cfg.columnlen)) {
         const col = ws.getColumn(Number(ci) + 1);
-        col.width = Math.round(Number(wpx) / 7 * 100) / 100;
+        col.width = Math.round((Number(wpx) / 7) * 100) / 100;
       }
     }
     if (cfg.colhidden) {

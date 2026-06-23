@@ -26,11 +26,7 @@
  */
 
 import { db } from "../db";
-import {
-  containers,
-  containerTrackingEvents,
-  containerTrackingChecks,
-} from "../../shared/schema";
+import { containers, containerTrackingEvents, containerTrackingChecks } from "../../shared/schema";
 import { and, eq, inArray, gte, sql, desc, isNotNull, isNull } from "drizzle-orm";
 import {
   trackContainer,
@@ -50,15 +46,8 @@ import * as cmaPublicProvider from "../lib/trackingProviders/cmaPublicProvider";
 import * as cmaCgmApiProvider from "../lib/trackingProviders/cmaCgmApiProvider";
 import { resolveProvider } from "../lib/trackingProviders/providerResolver";
 import type { CarrierTrackResult } from "../lib/trackingProviders/types";
-import {
-  getTrackingPriority,
-  calcPerRunBudget,
-} from "../lib/trackingPriority";
-import {
-  calcMaxOffloadDate,
-  calcIsOverdue,
-  calcDocsReadyNotSent,
-} from "../lib/gitHelpers";
+import { getTrackingPriority, calcPerRunBudget } from "../lib/trackingPriority";
+import { calcMaxOffloadDate, calcIsOverdue, calcDocsReadyNotSent } from "../lib/gitHelpers";
 
 // ── Inactive status — case-insensitive throughout ─────────────────────────────
 
@@ -102,17 +91,16 @@ export function initTrackingProgress(containerId: number): void {
 
 /** Emit or update a progress step.  If a "running" step with the same label
  *  already exists it is replaced in-place so there are no duplicates. */
-function ep(
-  containerId: number,
-  label: string,
-  status: ProgressStep["status"],
-  detail?: string | null,
-): void {
+function ep(containerId: number, label: string, status: ProgressStep["status"], detail?: string | null): void {
   let steps = _progressStore.get(containerId);
-  if (!steps) { steps = []; _progressStore.set(containerId, steps); }
+  if (!steps) {
+    steps = [];
+    _progressStore.set(containerId, steps);
+  }
   const step: ProgressStep = { label, status, detail: detail ?? null, ts: Date.now() };
   const idx = steps.findIndex((s) => s.label === label && s.status === "running");
-  if (idx >= 0) steps[idx] = step; else steps.push(step);
+  if (idx >= 0) steps[idx] = step;
+  else steps.push(step);
 }
 
 // ── ParcelsApp quota — sourced from DB, not memory ───────────────────────────
@@ -136,8 +124,8 @@ export async function getParcelsAppUsageStats(): Promise<{ used: number; limit: 
         and(
           eq(containerTrackingChecks.provider, "parcelsapp"),
           inArray(containerTrackingChecks.status, ["success", "error", "timeout"]),
-          gte(containerTrackingChecks.checkedAt, startOfMonth),
-        ),
+          gte(containerTrackingChecks.checkedAt, startOfMonth)
+        )
       );
 
     const used = result[0]?.count ?? 0;
@@ -181,8 +169,8 @@ export async function get17trackUsageStats(): Promise<{ used: number; limit: num
         and(
           eq(containerTrackingChecks.provider, "17track"),
           inArray(containerTrackingChecks.status, ["success", "error"]),
-          gte(containerTrackingChecks.checkedAt, startOfMonth),
-        ),
+          gte(containerTrackingChecks.checkedAt, startOfMonth)
+        )
       );
     return { used: result[0]?.count ?? 0, limit };
   } catch {
@@ -200,8 +188,8 @@ async function check17trackQuota(): Promise<boolean> {
 function deriveFallbackReason(result: CarrierTrackResult): string {
   const p = result.provider;
   if (result.notConfigured) return `${p}_not_configured`;
-  if (result.blocked)       return `${p}_blocked`;
-  if (result.noData)        return `${p}_no_data`;
+  if (result.blocked) return `${p}_blocked`;
+  if (result.noData) return `${p}_no_data`;
   return `${p}_error`;
 }
 
@@ -214,12 +202,15 @@ function deriveFallbackReason(result: CarrierTrackResult): string {
 async function setSchedulerMeta(
   containerId: number,
   skipReason: string | null,
-  nextCheckAt: Date | null | undefined,
+  nextCheckAt: Date | null | undefined
 ): Promise<void> {
   try {
     const patch: Record<string, unknown> = { trackingLastSkipReason: skipReason };
     if (nextCheckAt !== undefined) patch.trackingNextCheckAt = nextCheckAt;
-    await db.update(containers).set(patch as any).where(eq(containers.id, containerId));
+    await db
+      .update(containers)
+      .set(patch as any)
+      .where(eq(containers.id, containerId));
   } catch (err: any) {
     console.warn("[ContainerTracking] setSchedulerMeta warn:", err?.message);
   }
@@ -258,7 +249,7 @@ export async function trackDueContainers(): Promise<void> {
 
   console.log(
     `[ContainerTracking] Quota: ${used}/${limit} used (${remaining} remaining). ` +
-    `Budget: ${perRunBudget}/run (${dailyBudget}/day, ${remainingDays} days left in month).`,
+      `Budget: ${perRunBudget}/run (${dailyBudget}/day, ${remainingDays} days left in month).`
   );
 
   // ── Fetch all active tracking-enabled containers ───────────────────────────
@@ -328,7 +319,7 @@ export async function trackDueContainers(): Promise<void> {
         "skipped",
         "invalid_container_number",
         `Invalid container number: "${row.containerNumber}" (must be 4 letters + 7 digits)`,
-        null,
+        null
       );
       await setSchedulerMeta(row.id, "invalid_container_number", null);
       continue;
@@ -356,7 +347,7 @@ export async function trackDueContainers(): Promise<void> {
         trackingLastCheckedAt: row.trackingLastCheckedAt,
         trackingChangedAt: row.trackingChangedAt,
       },
-      now,
+      now
     );
 
     // 4. Cooldown: skip if checked too recently for this priority tier
@@ -381,7 +372,7 @@ export async function trackDueContainers(): Promise<void> {
   if (eligible.length === 0) {
     console.log(
       `[ContainerTracking] No containers eligible this run ` +
-      `(invalid=${countInvalid}, auto_update_off=${countDisabled}, checked_recently=${countRecent}).`,
+        `(invalid=${countInvalid}, auto_update_off=${countDisabled}, checked_recently=${countRecent}).`
     );
     return;
   }
@@ -416,11 +407,11 @@ export async function trackDueContainers(): Promise<void> {
   // eventually call the ParcelsApp API and therefore count against the quota.
   const SCHED_MAERSK_PREFIXES = /^(MAEU|MSKU|MRKU|MRSU|HASU|HJSC|HJCU|SUDU|SAFM|MCIU|TRHU|TEMU|SEAU|PONU|SEGU|MWMU)/i;
   const maerskEligible = eligible.filter(({ row }) => SCHED_MAERSK_PREFIXES.test(row.containerNumber));
-  const quotaEligible  = eligible.filter(({ row }) => !SCHED_MAERSK_PREFIXES.test(row.containerNumber));
+  const quotaEligible = eligible.filter(({ row }) => !SCHED_MAERSK_PREFIXES.test(row.containerNumber));
 
-  const toTrackQuota   = quotaEligible.slice(0, perRunBudget);
-  const budgetSkipped  = quotaEligible.slice(perRunBudget);
-  const toTrack        = [...maerskEligible, ...toTrackQuota];
+  const toTrackQuota = quotaEligible.slice(0, perRunBudget);
+  const budgetSkipped = quotaEligible.slice(perRunBudget);
+  const toTrack = [...maerskEligible, ...toTrackQuota];
 
   // Save skip records for containers that didn't make the budget cut
   for (const { row } of budgetSkipped) {
@@ -429,27 +420,24 @@ export async function trackDueContainers(): Promise<void> {
       "skipped",
       "skipped_priority_budget",
       "Skipped because lower priority this run",
-      null,
+      null
     );
     await setSchedulerMeta(row.id, "skipped_priority_budget", undefined);
   }
 
   console.log(
     `[ContainerTracking] Eligible: ${eligible.length} (maersk=${maerskEligible.length} unlimited + quota=${quotaEligible.length} capped at ${perRunBudget}/run), ` +
-    `tracking: ${toTrack.length}, ` +
-    `budget-skipped: ${budgetSkipped.length}, ` +
-    `recent: ${countRecent}, invalid: ${countInvalid}, disabled: ${countDisabled}.`,
+      `tracking: ${toTrack.length}, ` +
+      `budget-skipped: ${budgetSkipped.length}, ` +
+      `recent: ${countRecent}, invalid: ${countInvalid}, disabled: ${countDisabled}.`
   );
 
   if (toTrack.length > 0) {
     console.log(
       `[ContainerTracking] Tracking: ` +
-      toTrack
-        .map(
-          ({ row, priority }) =>
-            `${row.containerNumber}(${priority.priorityLabel}/${priority.priorityScore})`,
-        )
-        .join(", "),
+        toTrack
+          .map(({ row, priority }) => `${row.containerNumber}(${priority.priorityLabel}/${priority.priorityScore})`)
+          .join(", ")
     );
   }
 
@@ -510,7 +498,9 @@ export function getBulkProgress(): BulkTrackingProgress {
 }
 
 /** True while a bulk "Track All Now" run is in progress. */
-export function isBulkTrackingRunning(): boolean { return _bulkRunning; }
+export function isBulkTrackingRunning(): boolean {
+  return _bulkRunning;
+}
 
 /**
  * Immediately trigger tracking for every non-inactive container.
@@ -550,8 +540,11 @@ export async function trackAllEnabledNow(): Promise<number> {
   (async () => {
     console.log(
       `[BulkTracking] Starting manual run for ${eligible.length} container(s): ` +
-        eligible.map((r) => r.containerNumber).slice(0, 5).join(", ") +
-        (eligible.length > 5 ? "…" : ""),
+        eligible
+          .map((r) => r.containerNumber)
+          .slice(0, 5)
+          .join(", ") +
+        (eligible.length > 5 ? "…" : "")
     );
     for (let i = 0; i < eligible.length; i++) {
       const row = eligible[i];
@@ -663,10 +656,7 @@ export async function trackOneContainerById(containerId: number): Promise<TrackN
     })
     .from(containerTrackingChecks)
     .where(
-      and(
-        eq(containerTrackingChecks.containerId, containerId),
-        gte(containerTrackingChecks.checkedAt, trackStartedAt),
-      ),
+      and(eq(containerTrackingChecks.containerId, containerId), gte(containerTrackingChecks.checkedAt, trackStartedAt))
     )
     .orderBy(containerTrackingChecks.checkedAt);
 
@@ -699,7 +689,7 @@ export async function trackOneContainerById(containerId: number): Promise<TrackN
 function resolveEtaFromProvider(
   providerEta: string | null,
   _events: TrackingEvent[] | undefined,
-  currentEta: string | null,
+  currentEta: string | null
 ): { eta: string | null; source: "api" | "manual" | null } {
   if (providerEta) return { eta: providerEta, source: "api" };
   if (currentEta) return { eta: currentEta, source: "manual" };
@@ -714,14 +704,14 @@ function logEtaResolution(
   currentEta: string | null,
   providerEta: string | null,
   finalEta: string | null,
-  source: string | null,
+  source: string | null
 ): void {
   const changed = finalEta !== null && finalEta !== currentEta;
   console.log(
     `[ETA] ${containerNumber} provider=${provider}` +
-    ` old=${currentEta ?? "—"} providerEta=${providerEta ?? "—"}` +
-    ` final=${finalEta ?? "—"} src=${source ?? "—"}` +
-    (changed ? " [UPDATED]" : ""),
+      ` old=${currentEta ?? "—"} providerEta=${providerEta ?? "—"}` +
+      ` final=${finalEta ?? "—"} src=${source ?? "—"}` +
+      (changed ? " [UPDATED]" : "")
   );
 }
 
@@ -732,7 +722,7 @@ function logEtaResolution(
  */
 function resolveEtaFromShipment(
   shipment: ParcelsAppShipment,
-  currentEta: string | null,
+  currentEta: string | null
 ): { eta: string | null; source: "api" | "manual" | null } {
   const derived = deriveEstimatedDeliveryDate(shipment);
   if (derived) return { eta: derived, source: "api" };
@@ -751,27 +741,25 @@ async function logAndConfirmEta(
   newEta: string | null,
   source: string | null,
   provider: string,
-  noUpdateReason?: string,
+  noUpdateReason?: string
 ): Promise<void> {
   if (noUpdateReason) {
     console.log(
       `[ContainerTracking ETA] container=${containerNumber} NO UPDATE — ${noUpdateReason} ` +
-        `(existing=${oldEta ?? "null"}) provider=${provider}`,
+        `(existing=${oldEta ?? "null"}) provider=${provider}`
     );
     return;
   }
   console.log(
     `[ContainerTracking ETA] container=${containerNumber} oldEta=${oldEta ?? "null"} ` +
-      `→ newEta=${newEta ?? "null"} source=${source ?? "none"} provider=${provider}`,
+      `→ newEta=${newEta ?? "null"} source=${source ?? "none"} provider=${provider}`
   );
   const [saved] = await db
     .select({ eta: containers.eta })
     .from(containers)
     .where(eq(containers.id, containerId))
     .limit(1);
-  console.log(
-    `[ContainerTracking ETA] DB-confirmed: container=${containerNumber} eta=${saved?.eta ?? "null"}`,
-  );
+  console.log(`[ContainerTracking ETA] DB-confirmed: container=${containerNumber} eta=${saved?.eta ?? "null"}`);
 }
 
 // ─── Internal tracking implementation ─────────────────────────────────────────
@@ -779,7 +767,7 @@ async function logAndConfirmEta(
 async function trackOneContainer(
   containerId: number,
   containerNumber: string,
-  destinationCountry?: string,
+  destinationCountry?: string
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -833,11 +821,7 @@ async function trackOneContainer(
       await saveDirectEvents(containerId, result);
       await saveTrackingCheck(containerId, result.provider, "success", null, result.raw);
 
-      const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
-        result.eta ?? null,
-        result.events,
-        currentEta,
-      );
+      const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(result.eta ?? null, result.events, currentEta);
       logEtaResolution(containerNumber, result.provider, currentEta, result.eta ?? null, finalEta, etaSrc);
 
       const updateSet: Record<string, unknown> = {
@@ -852,12 +836,23 @@ async function trackOneContainer(
         trackingFallbackUsed: false,
         trackingFallbackReason: null,
       };
-      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+      if (finalEta) {
+        updateSet.eta = finalEta;
+        updateSet.etaSource = etaSrc;
+      }
 
-      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+      await db
+        .update(containers)
+        .set(updateSet as any)
+        .where(eq(containers.id, containerId));
       await logAndConfirmEta(
-        containerId, containerNumber, currentEta, finalEta, etaSrc, result.provider,
-        !finalEta ? "provider returned no ETA and no events with dates" : undefined,
+        containerId,
+        containerNumber,
+        currentEta,
+        finalEta,
+        etaSrc,
+        result.provider,
+        !finalEta ? "provider returned no ETA and no events with dates" : undefined
       );
       console.log(`[ContainerTracking] ${containerNumber} → ${result.provider}: status=${result.latestStatus ?? "?"}`);
 
@@ -874,17 +869,9 @@ async function trackOneContainer(
     const reason = deriveFallbackReason(result);
     const checkStatus = result.blocked ? "blocked" : result.noData ? "no_data" : "error";
 
-    await saveTrackingCheck(
-      containerId,
-      result.provider,
-      checkStatus,
-      result.error ?? reason,
-      null,
-    );
+    await saveTrackingCheck(containerId, result.provider, checkStatus, result.error ?? reason, null);
 
-    console.log(
-      `[ContainerTracking] ${containerNumber}: ${result.provider} failed (${reason}) — trying next provider`,
-    );
+    console.log(`[ContainerTracking] ${containerNumber}: ${result.provider} failed (${reason}) — trying next provider`);
 
     lastDirectFallbackReason = reason;
   }
@@ -897,7 +884,7 @@ async function trackOneContainer(
     lastDirectFallbackReason,
     now,
     currentEta,
-    destinationCountry,
+    destinationCountry
   );
 }
 
@@ -910,7 +897,7 @@ async function trackViaParcelsApp(
   fallbackReason: string | null,
   now: Date,
   currentEta: string | null,
-  destinationCountry?: string,
+  destinationCountry?: string
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -919,7 +906,6 @@ async function trackViaParcelsApp(
   lastCheckedAt: Date;
   error: string | null;
 }> {
-
   // Reset progress for this tracking run
   initTrackingProgress(containerId);
 
@@ -934,14 +920,14 @@ async function trackViaParcelsApp(
       "http_scraper",
       httpResult.success ? "success" : "error",
       httpResult.error ?? null,
-      httpResult.rawResponse ?? null,
+      httpResult.rawResponse ?? null
     );
 
     if (httpResult.success && httpResult.shipment) {
       const shipment = httpResult.shipment;
-      const lastStatus      = deriveLastStatus(shipment);
-      const lastLocation    = deriveLastLocation(shipment);
-      const lastEventDate   = deriveLastEventDate(shipment);
+      const lastStatus = deriveLastStatus(shipment);
+      const lastLocation = deriveLastLocation(shipment);
+      const lastEventDate = deriveLastEventDate(shipment);
       const lastDescription = shipment.states?.[0]?.description ?? null;
       const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
       logEtaResolution(containerNumber, "http_scraper", currentEta, finalEta, finalEta, etaSrc);
@@ -960,11 +946,22 @@ async function trackViaParcelsApp(
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
       };
-      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+      if (finalEta) {
+        updateSet.eta = finalEta;
+        updateSet.etaSource = etaSrc;
+      }
+      await db
+        .update(containers)
+        .set(updateSet as any)
+        .where(eq(containers.id, containerId));
       await logAndConfirmEta(
-        containerId, containerNumber, currentEta, finalEta, etaSrc, "http_scraper",
-        !finalEta ? "no explicit ETA field found — existing ETA preserved" : undefined,
+        containerId,
+        containerNumber,
+        currentEta,
+        finalEta,
+        etaSrc,
+        "http_scraper",
+        !finalEta ? "no explicit ETA field found — existing ETA preserved" : undefined
       );
 
       ep(containerId, "HTTP scraper", "success", lastStatus ?? "got data");
@@ -974,10 +971,14 @@ async function trackViaParcelsApp(
         return { success: true, lastStatus, lastLocation, lastDescription, lastCheckedAt: now, error: null };
       }
       // Status/events saved but no ETA anywhere — fall through to next provider to try to get one
-      console.log(`[ContainerTracking] ${containerNumber}: http_scraper got status/events but no ETA — continuing to fallback provider for ETA`);
+      console.log(
+        `[ContainerTracking] ${containerNumber}: http_scraper got status/events but no ETA — continuing to fallback provider for ETA`
+      );
     } else {
       ep(containerId, "HTTP scraper", "skip", httpResult.error ?? "no data");
-      console.log(`[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying next provider...`);
+      console.log(
+        `[ContainerTracking] ${containerNumber}: HTTP scraper got no data (${httpResult.error}) — trying next provider...`
+      );
     }
   }
 
@@ -998,8 +999,17 @@ async function trackViaParcelsApp(
     lastCheckedAt &&
     now.getTime() - lastCheckedAt.getTime() < SIX_HOURS_MS
   ) {
-    console.log(`[ContainerTracking] ${containerNumber}: Maersk ETA cached (${currentEta}) checked ${Math.round((now.getTime() - lastCheckedAt.getTime()) / 60000)}min ago — skipping providers`);
-    return { success: true, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: lastCheckedAt, error: null };
+    console.log(
+      `[ContainerTracking] ${containerNumber}: Maersk ETA cached (${currentEta}) checked ${Math.round((now.getTime() - lastCheckedAt.getTime()) / 60000)}min ago — skipping providers`
+    );
+    return {
+      success: true,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: lastCheckedAt,
+      error: null,
+    };
   }
 
   if (isMaerskDirectScraperAvailable() && MAERSK_PREFIXES.test(containerNumber)) {
@@ -1012,7 +1022,7 @@ async function trackViaParcelsApp(
       "maersk_scraper",
       mdResult.success ? "success" : mdResult.blocked ? "blocked" : "error",
       mdResult.error ?? null,
-      mdResult.raw ?? null,
+      mdResult.raw ?? null
     );
 
     if (mdResult.success && (mdResult.latestStatus || mdResult.eta)) {
@@ -1035,18 +1045,25 @@ async function trackViaParcelsApp(
 
       // Save events
       if (mdResult.events?.length) {
-        ({ eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
-          mdResult.eta ?? null,
-          mdResult.events,
-          currentEta,
-        ));
+        ({ eta: finalEta, source: etaSrc } = resolveEtaFromProvider(mdResult.eta ?? null, mdResult.events, currentEta));
         logEtaResolution(containerNumber, "maersk_scraper", currentEta, mdResult.eta ?? null, finalEta, etaSrc);
-        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+        if (finalEta) {
+          updateSet.eta = finalEta;
+          updateSet.etaSource = etaSrc;
+        }
 
-        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        await db
+          .update(containers)
+          .set(updateSet as any)
+          .where(eq(containers.id, containerId));
         await logAndConfirmEta(
-          containerId, containerNumber, currentEta, finalEta ?? null, etaSrc ?? null, "maersk_scraper",
-          !finalEta ? "no ETA from maersk_scraper" : undefined,
+          containerId,
+          containerNumber,
+          currentEta,
+          finalEta ?? null,
+          etaSrc ?? null,
+          "maersk_scraper",
+          !finalEta ? "no ETA from maersk_scraper" : undefined
         );
 
         // Persist tracking events
@@ -1067,8 +1084,15 @@ async function trackViaParcelsApp(
         };
         await saveParcelsAppEvents(containerId, fakeShipment);
       } else {
-        if (mdResult.eta && !currentEta) { finalEta = mdResult.eta; updateSet.eta = mdResult.eta; updateSet.etaSource = "api"; }
-        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        if (mdResult.eta && !currentEta) {
+          finalEta = mdResult.eta;
+          updateSet.eta = mdResult.eta;
+          updateSet.etaSource = "api";
+        }
+        await db
+          .update(containers)
+          .set(updateSet as any)
+          .where(eq(containers.id, containerId));
       }
 
       ep(containerId, "Maersk Puppeteer", "success", mdResult.latestStatus ?? "got data");
@@ -1085,10 +1109,14 @@ async function trackViaParcelsApp(
         };
       }
       // Status/events saved but no ETA anywhere — continue to Maersk public / ParcelsApp for ETA
-      console.log(`[ContainerTracking] ${containerNumber}: maersk_scraper got status/events but no ETA — continuing to Maersk public for ETA`);
+      console.log(
+        `[ContainerTracking] ${containerNumber}: maersk_scraper got status/events but no ETA — continuing to Maersk public for ETA`
+      );
     } else {
       ep(containerId, "Maersk Puppeteer", "fail", mdResult.error ?? "no data");
-      console.log(`[ContainerTracking] ${containerNumber}: maersk_scraper got no data (${mdResult.error}) — trying Maersk public HTTP...`);
+      console.log(
+        `[ContainerTracking] ${containerNumber}: maersk_scraper got no data (${mdResult.error}) — trying Maersk public HTTP...`
+      );
     }
   } else if (MAERSK_PREFIXES.test(containerNumber) && !isMaerskDirectScraperAvailable()) {
     ep(containerId, "Maersk Puppeteer", "skip", "Chrome not available in this environment");
@@ -1111,20 +1139,14 @@ async function trackViaParcelsApp(
           ? "skipped"
           : "error";
 
-    await saveTrackingCheck(
-      containerId,
-      "maersk_public",
-      mpStatus,
-      mpResult.error ?? null,
-      mpResult.raw ?? null,
-    );
+    await saveTrackingCheck(containerId, "maersk_public", mpStatus, mpResult.error ?? null, mpResult.raw ?? null);
 
     if (mpResult.success && (mpResult.latestStatus || mpResult.events.length > 0)) {
       await saveDirectEvents(containerId, mpResult);
       const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
         mpResult.eta ?? null,
         mpResult.events,
-        currentEta,
+        currentEta
       );
       logEtaResolution(containerNumber, "maersk_public", currentEta, mpResult.eta ?? null, finalEta, etaSrc);
 
@@ -1140,12 +1162,23 @@ async function trackViaParcelsApp(
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
       };
-      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
+      if (finalEta) {
+        updateSet.eta = finalEta;
+        updateSet.etaSource = etaSrc;
+      }
 
-      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+      await db
+        .update(containers)
+        .set(updateSet as any)
+        .where(eq(containers.id, containerId));
       await logAndConfirmEta(
-        containerId, containerNumber, currentEta, finalEta ?? null, etaSrc ?? null, "maersk_public",
-        !finalEta ? "no ETA from maersk_public" : undefined,
+        containerId,
+        containerNumber,
+        currentEta,
+        finalEta ?? null,
+        etaSrc ?? null,
+        "maersk_public",
+        !finalEta ? "no ETA from maersk_public" : undefined
       );
 
       ep(containerId, "Maersk public HTTP", "success", mpResult.latestStatus ?? "got data");
@@ -1162,7 +1195,9 @@ async function trackViaParcelsApp(
         };
       }
       // Status/events saved but no ETA anywhere — continue to ParcelsApp to try to get one
-      console.log(`[ContainerTracking] ${containerNumber}: maersk_public got status/events but no ETA — continuing to ParcelsApp for ETA`);
+      console.log(
+        `[ContainerTracking] ${containerNumber}: maersk_public got status/events but no ETA — continuing to ParcelsApp for ETA`
+      );
     } else if (mpResult.error === "rate_limited") {
       ep(containerId, "Maersk public HTTP", "skip", "rate-limited — 6 h cooldown");
     } else {
@@ -1175,11 +1210,21 @@ async function trackViaParcelsApp(
   // ParcelsApp has stale/unreliable data for Maersk and risks clobbering correct ETAs.
   // Both dedicated Maersk providers have been tried above — stop here and preserve state.
   if (MAERSK_PREFIXES.test(containerNumber)) {
-    console.log(`[ContainerTracking] ${containerNumber}: Maersk chain exhausted — preserving ETA=${currentEta ?? "none"}`);
-    await db.update(containers)
+    console.log(
+      `[ContainerTracking] ${containerNumber}: Maersk chain exhausted — preserving ETA=${currentEta ?? "none"}`
+    );
+    await db
+      .update(containers)
       .set({ trackingLastCheckedAt: now } as any)
       .where(eq(containers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: "maersk_providers_unavailable" };
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: "maersk_providers_unavailable",
+    };
   }
 
   // ── CMA CGM API — leasing / unknown-carrier containers ───────────────────────
@@ -1194,14 +1239,18 @@ async function trackViaParcelsApp(
     console.log(`[ContainerTracking] ${containerNumber}: trying CMA CGM API (leasing/unknown carrier)...`);
     const cmaFallResult = await cmaCgmApiProvider.track(containerNumber);
     await saveTrackingCheck(
-      containerId, "cma_cgm_api",
+      containerId,
+      "cma_cgm_api",
       cmaFallResult.success ? "success" : cmaFallResult.noData ? "no_data" : "error",
-      cmaFallResult.error ?? null, cmaFallResult.raw ?? null,
+      cmaFallResult.error ?? null,
+      cmaFallResult.raw ?? null
     );
     if (cmaFallResult.success && (cmaFallResult.latestStatus || cmaFallResult.events.length > 0)) {
       await saveDirectEvents(containerId, cmaFallResult);
       const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
-        cmaFallResult.eta ?? null, cmaFallResult.events, currentEta,
+        cmaFallResult.eta ?? null,
+        cmaFallResult.events,
+        currentEta
       );
       logEtaResolution(containerNumber, "cma_cgm_api", currentEta, cmaFallResult.eta ?? null, finalEta, etaSrc);
       const updateSet: Record<string, unknown> = {
@@ -1216,16 +1265,40 @@ async function trackViaParcelsApp(
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
       };
-      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
-      await logAndConfirmEta(containerId, containerNumber, currentEta, finalEta, etaSrc, "cma_cgm_api",
-        !finalEta ? "CMA API: no ETA returned" : undefined);
+      if (finalEta) {
+        updateSet.eta = finalEta;
+        updateSet.etaSource = etaSrc;
+      }
+      await db
+        .update(containers)
+        .set(updateSet as any)
+        .where(eq(containers.id, containerId));
+      await logAndConfirmEta(
+        containerId,
+        containerNumber,
+        currentEta,
+        finalEta,
+        etaSrc,
+        "cma_cgm_api",
+        !finalEta ? "CMA API: no ETA returned" : undefined
+      );
       ep(containerId, "CMA CGM API", "success", cmaFallResult.latestStatus ?? "got data");
-      console.log(`[ContainerTracking] ${containerNumber} → cma_cgm_api (leasing): status=${cmaFallResult.latestStatus ?? "?"}`);
-      return { success: true, lastStatus: cmaFallResult.latestStatus, lastLocation: cmaFallResult.latestLocation, lastDescription: cmaFallResult.latestDescription, lastCheckedAt: now, error: null };
+      console.log(
+        `[ContainerTracking] ${containerNumber} → cma_cgm_api (leasing): status=${cmaFallResult.latestStatus ?? "?"}`
+      );
+      return {
+        success: true,
+        lastStatus: cmaFallResult.latestStatus,
+        lastLocation: cmaFallResult.latestLocation,
+        lastDescription: cmaFallResult.latestDescription,
+        lastCheckedAt: now,
+        error: null,
+      };
     }
     ep(containerId, "CMA CGM API", cmaFallResult.noData ? "skip" : "fail", cmaFallResult.error ?? "not on CMA ship");
-    console.log(`[ContainerTracking] ${containerNumber}: CMA API — not on CMA ship (${cmaFallResult.error ?? "no data"}) — proceeding`);
+    console.log(
+      `[ContainerTracking] ${containerNumber}: CMA API — not on CMA ship (${cmaFallResult.error ?? "no data"}) — proceeding`
+    );
   }
 
   // ── CMA provider chain ────────────────────────────────────────────────────────
@@ -1246,7 +1319,7 @@ async function trackViaParcelsApp(
         "cma_cgm_api",
         apiResult.success ? "success" : apiResult.noData ? "no_data" : "error",
         apiResult.error ?? null,
-        apiResult.raw ?? null,
+        apiResult.raw ?? null
       );
 
       if (apiResult.success && (apiResult.latestStatus || apiResult.events.length > 0)) {
@@ -1254,7 +1327,7 @@ async function trackViaParcelsApp(
         const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
           apiResult.eta ?? null,
           apiResult.events,
-          currentEta,
+          currentEta
         );
         logEtaResolution(containerNumber, "cma_cgm_api", currentEta, apiResult.eta ?? null, finalEta, etaSrc);
         const updateSet: Record<string, unknown> = {
@@ -1269,17 +1342,39 @@ async function trackViaParcelsApp(
           trackingFallbackUsed: !!fallbackReason,
           trackingFallbackReason: fallbackReason,
         };
-        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        if (finalEta) {
+          updateSet.eta = finalEta;
+          updateSet.etaSource = etaSrc;
+        }
+        await db
+          .update(containers)
+          .set(updateSet as any)
+          .where(eq(containers.id, containerId));
         await logAndConfirmEta(
-          containerId, containerNumber, currentEta, finalEta, etaSrc, "cma_cgm_api",
-          !finalEta ? "no ETA from CMA CGM official API" : undefined,
+          containerId,
+          containerNumber,
+          currentEta,
+          finalEta,
+          etaSrc,
+          "cma_cgm_api",
+          !finalEta ? "no ETA from CMA CGM official API" : undefined
         );
-        console.log(`[ContainerTracking] ${containerNumber} → cma_cgm_api: status=${apiResult.latestStatus ?? "?"} eta=${finalEta ?? "none"}`);
-        return { success: true, lastStatus: apiResult.latestStatus, lastLocation: apiResult.latestLocation, lastDescription: apiResult.latestDescription, lastCheckedAt: now, error: null };
+        console.log(
+          `[ContainerTracking] ${containerNumber} → cma_cgm_api: status=${apiResult.latestStatus ?? "?"} eta=${finalEta ?? "none"}`
+        );
+        return {
+          success: true,
+          lastStatus: apiResult.latestStatus,
+          lastLocation: apiResult.latestLocation,
+          lastDescription: apiResult.latestDescription,
+          lastCheckedAt: now,
+          error: null,
+        };
       }
 
-      console.log(`[ContainerTracking] ${containerNumber}: CMA official API returned no data (${apiResult.error}) — trying public endpoint...`);
+      console.log(
+        `[ContainerTracking] ${containerNumber}: CMA official API returned no data (${apiResult.error}) — trying public endpoint...`
+      );
     }
 
     if (cmaPublicProvider.isEnabled()) {
@@ -1289,7 +1384,7 @@ async function trackViaParcelsApp(
         "cma_public",
         cmaResult.success ? "success" : cmaResult.blocked ? "blocked" : "error",
         cmaResult.error ?? null,
-        cmaResult.raw ?? null,
+        cmaResult.raw ?? null
       );
 
       if (cmaResult.success && (cmaResult.latestStatus || cmaResult.events.length > 0)) {
@@ -1297,7 +1392,7 @@ async function trackViaParcelsApp(
         const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
           cmaResult.eta ?? null,
           cmaResult.events,
-          currentEta,
+          currentEta
         );
         logEtaResolution(containerNumber, "cma_public", currentEta, cmaResult.eta ?? null, finalEta, etaSrc);
         const updateSet: Record<string, unknown> = {
@@ -1312,17 +1407,37 @@ async function trackViaParcelsApp(
           trackingFallbackUsed: !!fallbackReason,
           trackingFallbackReason: fallbackReason,
         };
-        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        if (finalEta) {
+          updateSet.eta = finalEta;
+          updateSet.etaSource = etaSrc;
+        }
+        await db
+          .update(containers)
+          .set(updateSet as any)
+          .where(eq(containers.id, containerId));
         await logAndConfirmEta(
-          containerId, containerNumber, currentEta, finalEta, etaSrc, "cma_public",
-          !finalEta ? "no ETA from CMA public endpoint" : undefined,
+          containerId,
+          containerNumber,
+          currentEta,
+          finalEta,
+          etaSrc,
+          "cma_public",
+          !finalEta ? "no ETA from CMA public endpoint" : undefined
         );
         console.log(`[ContainerTracking] ${containerNumber} → cma_public: status=${cmaResult.latestStatus ?? "?"}`);
-        return { success: true, lastStatus: cmaResult.latestStatus, lastLocation: cmaResult.latestLocation, lastDescription: cmaResult.latestDescription, lastCheckedAt: now, error: null };
+        return {
+          success: true,
+          lastStatus: cmaResult.latestStatus,
+          lastLocation: cmaResult.latestLocation,
+          lastDescription: cmaResult.latestDescription,
+          lastCheckedAt: now,
+          error: null,
+        };
       }
 
-      console.log(`[ContainerTracking] ${containerNumber}: CMA public endpoint failed (${cmaResult.error}) — trying 17track...`);
+      console.log(
+        `[ContainerTracking] ${containerNumber}: CMA public endpoint failed (${cmaResult.error}) — trying 17track...`
+      );
     }
 
     // 17track handles CMA well — try it before burning ParcelsApp quota
@@ -1336,14 +1451,14 @@ async function trackViaParcelsApp(
           "17track",
           result17.success ? "success" : result17.noData ? "no_data" : "error",
           result17.error ?? null,
-          result17.raw,
+          result17.raw
         );
         if (result17.success) {
           await saveDirectEvents(containerId, result17);
           const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
             result17.eta ?? null,
             result17.events,
-            currentEta,
+            currentEta
           );
           logEtaResolution(containerNumber, "17track", currentEta, result17.eta ?? null, finalEta, etaSrc);
           const updateSet: Record<string, unknown> = {
@@ -1358,22 +1473,50 @@ async function trackViaParcelsApp(
             trackingFallbackUsed: !!fallbackReason,
             trackingFallbackReason: fallbackReason,
           };
-          if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-          await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+          if (finalEta) {
+            updateSet.eta = finalEta;
+            updateSet.etaSource = etaSrc;
+          }
+          await db
+            .update(containers)
+            .set(updateSet as any)
+            .where(eq(containers.id, containerId));
           await logAndConfirmEta(
-            containerId, containerNumber, currentEta, finalEta, etaSrc, "17track",
-            !finalEta ? "17track returned no ETA" : undefined,
+            containerId,
+            containerNumber,
+            currentEta,
+            finalEta,
+            etaSrc,
+            "17track",
+            !finalEta ? "17track returned no ETA" : undefined
           );
           console.log(`[ContainerTracking] ${containerNumber} → 17track (CMA): status=${result17.latestStatus ?? "?"}`);
-          return { success: true, lastStatus: result17.latestStatus, lastLocation: result17.latestLocation, lastDescription: result17.latestDescription, lastCheckedAt: now, error: null };
+          return {
+            success: true,
+            lastStatus: result17.latestStatus,
+            lastLocation: result17.latestLocation,
+            lastDescription: result17.latestDescription,
+            lastCheckedAt: now,
+            error: null,
+          };
         }
-        console.log(`[ContainerTracking] ${containerNumber}: 17track failed for CMA (${result17.error}) — trying ParcelsApp scraper...`);
+        console.log(
+          `[ContainerTracking] ${containerNumber}: 17track failed for CMA (${result17.error}) — trying ParcelsApp scraper...`
+        );
       }
     }
 
     // ParcelsApp website (scraped via Puppeteer) has no CMA CGM data — skip it.
     // Go straight to the ParcelsApp v3 API which may have broader carrier coverage.
-    return await trackViaParcelsAppApi(containerId, containerNumber, null, fallbackReason, now, currentEta, destinationCountry);
+    return await trackViaParcelsAppApi(
+      containerId,
+      containerNumber,
+      null,
+      fallbackReason,
+      now,
+      currentEta,
+      destinationCountry
+    );
   }
 
   // ── Attempt 2: Puppeteer stealth scraper (ParcelsApp, no API key, no quota cost) ──
@@ -1387,14 +1530,14 @@ async function trackViaParcelsApp(
       "parcelsapp_scraper",
       scraped.success ? "success" : scraped.blocked ? "blocked" : "error",
       scraped.error ?? null,
-      scraped.rawResponse ?? null,
+      scraped.rawResponse ?? null
     );
 
     if (scraped.success && scraped.shipment) {
       const shipment = scraped.shipment;
-      const lastStatus      = deriveLastStatus(shipment);
-      const lastLocation    = deriveLastLocation(shipment);
-      const lastEventDate   = deriveLastEventDate(shipment);
+      const lastStatus = deriveLastStatus(shipment);
+      const lastLocation = deriveLastLocation(shipment);
+      const lastEventDate = deriveLastEventDate(shipment);
       const lastDescription = shipment.states?.[0]?.description ?? null;
       const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
 
@@ -1412,11 +1555,22 @@ async function trackViaParcelsApp(
         trackingFallbackUsed: !!fallbackReason,
         trackingFallbackReason: fallbackReason,
       };
-      if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-      await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+      if (finalEta) {
+        updateSet.eta = finalEta;
+        updateSet.etaSource = etaSrc;
+      }
+      await db
+        .update(containers)
+        .set(updateSet as any)
+        .where(eq(containers.id, containerId));
       await logAndConfirmEta(
-        containerId, containerNumber, currentEta, finalEta, etaSrc, "parcelsapp_scraper",
-        !finalEta ? "no ETA derived from shipment states" : undefined,
+        containerId,
+        containerNumber,
+        currentEta,
+        finalEta,
+        etaSrc,
+        "parcelsapp_scraper",
+        !finalEta ? "no ETA derived from shipment states" : undefined
       );
 
       ep(containerId, "Puppeteer scraper", "success", lastStatus ?? "got data");
@@ -1448,7 +1602,7 @@ async function trackViaParcelsApp(
         "17track",
         result17.success ? "success" : result17.noData ? "no_data" : "error",
         result17.error ?? null,
-        result17.raw,
+        result17.raw
       );
 
       if (result17.success) {
@@ -1457,7 +1611,7 @@ async function trackViaParcelsApp(
         const { eta: finalEta, source: etaSrc } = resolveEtaFromProvider(
           result17.eta ?? null,
           result17.events,
-          currentEta,
+          currentEta
         );
         logEtaResolution(containerNumber, "17track", currentEta, result17.eta ?? null, finalEta, etaSrc);
 
@@ -1473,11 +1627,22 @@ async function trackViaParcelsApp(
           trackingFallbackUsed: !!fallbackReason,
           trackingFallbackReason: fallbackReason,
         };
-        if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-        await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+        if (finalEta) {
+          updateSet.eta = finalEta;
+          updateSet.etaSource = etaSrc;
+        }
+        await db
+          .update(containers)
+          .set(updateSet as any)
+          .where(eq(containers.id, containerId));
         await logAndConfirmEta(
-          containerId, containerNumber, currentEta, finalEta, etaSrc, "17track",
-          !finalEta ? "17track returned no ETA and no events with dates" : undefined,
+          containerId,
+          containerNumber,
+          currentEta,
+          finalEta,
+          etaSrc,
+          "17track",
+          !finalEta ? "17track returned no ETA and no events with dates" : undefined
         );
 
         ep(containerId, "17track API", "success", result17.latestStatus ?? "got data");
@@ -1493,12 +1658,22 @@ async function trackViaParcelsApp(
       }
 
       ep(containerId, "17track API", "fail", result17.error ?? "no data");
-      console.warn(`[ContainerTracking] ${containerNumber}: 17track failed (${result17.error}) — trying ParcelsApp API...`);
+      console.warn(
+        `[ContainerTracking] ${containerNumber}: 17track failed (${result17.error}) — trying ParcelsApp API...`
+      );
     }
   }
 
   // ── Final: ParcelsApp API ─────────────────────────────────────────────────────
-  return await trackViaParcelsAppApi(containerId, containerNumber, detectedCarrier, fallbackReason, now, currentEta, destinationCountry);
+  return await trackViaParcelsAppApi(
+    containerId,
+    containerNumber,
+    detectedCarrier,
+    fallbackReason,
+    now,
+    currentEta,
+    destinationCountry
+  );
 }
 
 // ─── ParcelsApp API — shared final step for all carriers ──────────────────────
@@ -1510,7 +1685,7 @@ async function trackViaParcelsAppApi(
   fallbackReason: string | null,
   now: Date,
   currentEta: string | null,
-  destinationCountry?: string | null,
+  destinationCountry?: string | null
 ): Promise<{
   success: boolean;
   lastStatus: string | null;
@@ -1521,8 +1696,11 @@ async function trackViaParcelsAppApi(
 }> {
   if (!process.env.PARCELSAPP_API_KEY) {
     ep(containerId, "ParcelsApp API", "skip", "API key not configured");
-    console.log(`[ContainerTracking] ${containerNumber}: ParcelsApp API skipped — PARCELSAPP_API_KEY is not configured`);
-    const noProviderError = "No tracking provider configured (scraper unavailable, 17track not set, ParcelsApp key missing)";
+    console.log(
+      `[ContainerTracking] ${containerNumber}: ParcelsApp API skipped — PARCELSAPP_API_KEY is not configured`
+    );
+    const noProviderError =
+      "No tracking provider configured (scraper unavailable, 17track not set, ParcelsApp key missing)";
     await db
       .update(containers)
       .set({
@@ -1533,7 +1711,14 @@ async function trackViaParcelsAppApi(
         trackingFallbackReason: fallbackReason,
       } as any)
       .where(eq(containers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: noProviderError };
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: noProviderError,
+    };
   }
 
   const quotaOk = await checkParcelsAppQuota();
@@ -1553,13 +1738,22 @@ async function trackViaParcelsAppApi(
         trackingFallbackReason: fallbackReason ?? "parcelsapp_quota_exhausted",
       } as any)
       .where(eq(containers.id, containerId));
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: quotaError };
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: quotaError,
+    };
   }
 
   const hintCarrier = detectedCarrier && detectedCarrier !== "OTHER" ? detectedCarrier : undefined;
   const effectiveDestination = destinationCountry || "United States";
   ep(containerId, "ParcelsApp API", "running");
-  console.log(`[ContainerTracking] ${containerNumber}: ParcelsApp API attempt carrier=${hintCarrier ?? "auto"} destination="${effectiveDestination}"`);
+  console.log(
+    `[ContainerTracking] ${containerNumber}: ParcelsApp API attempt carrier=${hintCarrier ?? "auto"} destination="${effectiveDestination}"`
+  );
 
   const result = await trackContainer(containerNumber, effectiveDestination, hintCarrier);
 
@@ -1568,7 +1762,7 @@ async function trackViaParcelsAppApi(
     "parcelsapp",
     result.success ? "success" : result.timedOut ? "timeout" : "error",
     result.error ?? null,
-    result.rawResponse,
+    result.rawResponse
   );
 
   if (!result.success || !result.shipment) {
@@ -1585,13 +1779,20 @@ async function trackViaParcelsAppApi(
       } as any)
       .where(eq(containers.id, containerId));
     // backfillEtaFromEvents removed — event dates must not be used as ETA
-    return { success: false, lastStatus: null, lastLocation: null, lastDescription: null, lastCheckedAt: now, error: result.error ?? "Tracking failed" };
+    return {
+      success: false,
+      lastStatus: null,
+      lastLocation: null,
+      lastDescription: null,
+      lastCheckedAt: now,
+      error: result.error ?? "Tracking failed",
+    };
   }
 
   const shipment = result.shipment;
-  const lastStatus      = deriveLastStatus(shipment);
-  const lastLocation    = deriveLastLocation(shipment);
-  const lastEventDate   = deriveLastEventDate(shipment);
+  const lastStatus = deriveLastStatus(shipment);
+  const lastLocation = deriveLastLocation(shipment);
+  const lastEventDate = deriveLastEventDate(shipment);
   const lastDescription = shipment.states?.[0]?.description ?? null;
   const { eta: finalEta, source: etaSrc } = resolveEtaFromShipment(shipment, currentEta);
   logEtaResolution(containerNumber, "parcelsapp", currentEta, finalEta, finalEta, etaSrc);
@@ -1611,11 +1812,22 @@ async function trackViaParcelsAppApi(
     trackingFallbackUsed: !!fallbackReason,
     trackingFallbackReason: fallbackReason,
   };
-  if (finalEta) { updateSet.eta = finalEta; updateSet.etaSource = etaSrc; }
-  await db.update(containers).set(updateSet as any).where(eq(containers.id, containerId));
+  if (finalEta) {
+    updateSet.eta = finalEta;
+    updateSet.etaSource = etaSrc;
+  }
+  await db
+    .update(containers)
+    .set(updateSet as any)
+    .where(eq(containers.id, containerId));
   await logAndConfirmEta(
-    containerId, containerNumber, currentEta, finalEta, etaSrc, "parcelsapp",
-    !finalEta ? "no explicit ETA field found — existing ETA preserved" : undefined,
+    containerId,
+    containerNumber,
+    currentEta,
+    finalEta,
+    etaSrc,
+    "parcelsapp",
+    !finalEta ? "no explicit ETA field found — existing ETA preserved" : undefined
   );
 
   ep(containerId, "ParcelsApp API", "success", lastStatus ?? "got data");
@@ -1642,12 +1854,7 @@ async function backfillEtaFromEvents(containerId: number): Promise<void> {
   const [latest] = await db
     .select({ eventTime: containerTrackingEvents.eventTime })
     .from(containerTrackingEvents)
-    .where(
-      and(
-        eq(containerTrackingEvents.containerId, containerId),
-        isNotNull(containerTrackingEvents.eventTime),
-      ),
-    )
+    .where(and(eq(containerTrackingEvents.containerId, containerId), isNotNull(containerTrackingEvents.eventTime)))
     .orderBy(desc(containerTrackingEvents.eventTime))
     .limit(1);
 
@@ -1663,10 +1870,7 @@ async function backfillEtaFromEvents(containerId: number): Promise<void> {
 
 // ─── Event persistence ─────────────────────────────────────────────────────────
 
-async function saveDirectEvents(
-  containerId: number,
-  result: CarrierTrackResult,
-): Promise<void> {
+async function saveDirectEvents(containerId: number, result: CarrierTrackResult): Promise<void> {
   if (result.events.length === 0) return;
 
   for (const ev of result.events) {
@@ -1689,10 +1893,7 @@ async function saveDirectEvents(
   }
 }
 
-async function saveParcelsAppEvents(
-  containerId: number,
-  shipment: ParcelsAppShipment,
-): Promise<void> {
+async function saveParcelsAppEvents(containerId: number, shipment: ParcelsAppShipment): Promise<void> {
   const events = normaliseEvents(shipment);
   if (events.length === 0) return;
 
@@ -1726,7 +1927,7 @@ async function saveTrackingCheck(
   provider: string,
   status: string,
   errorMessage: string | null,
-  rawResponse: unknown,
+  rawResponse: unknown
 ): Promise<void> {
   try {
     await db.insert(containerTrackingChecks).values({

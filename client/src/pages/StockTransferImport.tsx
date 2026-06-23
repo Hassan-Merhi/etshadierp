@@ -28,7 +28,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
   const [_location, navigate] = useLocation();
   const { toast } = useToast();
   const isPOS = !!posUser;
-  
+
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<any>(null);
   const [validationResult, setValidationResult] = useState<any>(null);
@@ -36,7 +36,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
     isPOS && posUser?.assignedLocationId ? posUser.assignedLocationId.toString() : ""
   );
   const [selectedDestLocation, setSelectedDestLocation] = useState<string>("");
-  const [transferDate, setTransferDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [transferDate, setTransferDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [notes, setNotes] = useState<string>("");
 
   const { data: locations = [] } = useQuery<Location[]>({
@@ -148,7 +148,11 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       return;
     }
     if (!navigator.onLine) {
-      toast({ title: "Not available offline", description: "File imports require a connection", variant: "destructive" });
+      toast({
+        title: "Not available offline",
+        description: "File imports require a connection",
+        variant: "destructive",
+      });
       return;
     }
     const formData = new FormData();
@@ -262,30 +266,31 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       items: itemsToImport,
     });
   };
-  
+
   const handleConfirmedImport = () => {
     // Filter valid items and proceed with import
     const itemsToImport = validationResult?.validatedItems?.filter((item: any) => !item.error) || [];
-    
+
     // Close confirmation dialog first
     setConfirmDialogOpen(false);
-    
+
     if (itemsToImport.length === 0) {
       // Reset all state for a fresh start
       setFile(null);
       setPreview(null);
       setValidationResult(null);
       setSelectedDestLocation("");
-      setTransferDate(new Date().toLocaleDateString('en-CA'));
+      setTransferDate(new Date().toLocaleDateString("en-CA"));
       setNotes("");
       // Show informational message
       toast({
         title: "No items imported",
-        description: "All items had validation errors. No transfer was created. You can try again with a different file.",
+        description:
+          "All items had validation errors. No transfer was created. You can try again with a different file.",
       });
       return;
     }
-    
+
     importMutation.mutate({
       sourceLocationId: parseInt(selectedSourceLocation),
       destinationLocationId: parseInt(selectedDestLocation),
@@ -301,25 +306,23 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
 
   const isValidated = validationResult !== null;
   const hasValidationErrors = validationResult?.errors && validationResult.errors.length > 0;
-  
+
   // Calculate valid items (items without errors)
   const validItems = validationResult?.validatedItems?.filter((item: any) => !item.error) || [];
   const validItemsCount = validItems.length;
   const totalItemsCount = validationResult?.validatedItems?.length || 0;
-  
+
   // Confirmation dialog state
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
-  const sourceLocationName = locations.find(l => l.id === parseInt(selectedSourceLocation))?.name;
+  const sourceLocationName = locations.find((l) => l.id === parseInt(selectedSourceLocation))?.name;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <PageHeader title="Stock Transfer Import" icon={<ArrowRightLeft className="h-5 w-5" />} />
-          <p className="text-muted-foreground mt-1">
-            Import stock transfers from Excel (Barcode, Quantity)
-          </p>
+          <p className="text-muted-foreground mt-1">Import stock transfers from Excel (Barcode, Quantity)</p>
         </div>
         <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
           <Download className="h-4 w-4 mr-2" />
@@ -330,26 +333,14 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
       <Card>
         <CardHeader>
           <CardTitle>Upload Transfer Data</CardTitle>
-          <CardDescription>
-            Upload an Excel file with columns: Barcode, Quantity
-          </CardDescription>
+          <CardDescription>Upload an Excel file with columns: Barcode, Quantity</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="file">Excel File</Label>
-              <Input
-                id="file"
-                type="file"
-                accept=".xlsx,.xls"
-                onChange={handleFileChange}
-                data-testid="input-file"
-              />
-              {file && (
-                <p className="text-sm text-muted-foreground">
-                  Selected: {file.name}
-                </p>
-              )}
+              <Input id="file" type="file" accept=".xlsx,.xls" onChange={handleFileChange} data-testid="input-file" />
+              {file && <p className="text-sm text-muted-foreground">Selected: {file.name}</p>}
             </div>
 
             <div className="space-y-2">
@@ -418,11 +409,7 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
           </div>
 
           <div className="flex gap-2 flex-wrap">
-            <Button
-              onClick={handleParse}
-              disabled={!file || parseMutation.isPending}
-              data-testid="button-parse"
-            >
+            <Button onClick={handleParse} disabled={!file || parseMutation.isPending} data-testid="button-parse">
               <FileSpreadsheet className="h-4 w-4 mr-2" />
               {parseMutation.isPending ? "Parsing..." : "Parse File"}
             </Button>
@@ -449,7 +436,11 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
               data-testid="button-import"
             >
               <Upload className="h-4 w-4 mr-2" />
-              {importMutation.isPending ? "Importing..." : hasValidationErrors ? `Import Transfer (${validItemsCount} valid)` : "Import Transfer"}
+              {importMutation.isPending
+                ? "Importing..."
+                : hasValidationErrors
+                  ? `Import Transfer (${validItemsCount} valid)`
+                  : "Import Transfer"}
             </Button>
           </div>
         </CardContent>
@@ -495,12 +486,14 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
                     const hasError = validation?.error;
 
                     return (
-                      <TableRow key={index} className={hasError ? "bg-destructive/10" : ""} data-testid={`preview-row-${index}`}>
+                      <TableRow
+                        key={index}
+                        className={hasError ? "bg-destructive/10" : ""}
+                        data-testid={`preview-row-${index}`}
+                      >
                         <TableCell className="font-mono">{item.barcode}</TableCell>
                         <TableCell>
-                          {validation?.stockItemName || (
-                            <span className="text-muted-foreground italic">Unknown</span>
-                          )}
+                          {validation?.stockItemName || <span className="text-muted-foreground italic">Unknown</span>}
                         </TableCell>
                         <TableCell className="text-right">{item.quantity}</TableCell>
                         <TableCell className="text-right">
@@ -542,15 +535,16 @@ export default function StockTransferImport({ posUser }: StockTransferImportProp
         confirmText={validItemsCount === 0 ? "OK" : `Import ${validItemsCount} Item(s)`}
         onConfirm={handleConfirmedImport}
         description={
-          validItemsCount === 0
-            ? `All ${totalItemsCount} items have validation errors. Nothing will be imported.`
-            : (
-              <>
-                {totalItemsCount - validItemsCount} of {totalItemsCount} items have validation errors and will be skipped.
-                <br /><br />
-                <strong>{validItemsCount} valid item(s)</strong> will be transferred.
-              </>
-            )
+          validItemsCount === 0 ? (
+            `All ${totalItemsCount} items have validation errors. Nothing will be imported.`
+          ) : (
+            <>
+              {totalItemsCount - validItemsCount} of {totalItemsCount} items have validation errors and will be skipped.
+              <br />
+              <br />
+              <strong>{validItemsCount} valid item(s)</strong> will be transferred.
+            </>
+          )
         }
       />
     </div>

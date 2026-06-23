@@ -64,9 +64,7 @@ const ERP_GROUPS: PageGroup[] = [
   },
   {
     label: "System",
-    pages: [
-      { label: "Settings", featureKey: "settings" },
-    ],
+    pages: [{ label: "Settings", featureKey: "settings" }],
   },
 ];
 
@@ -158,11 +156,12 @@ function PageRow({
             ) : (
               <span className="w-5 shrink-0" />
             )}
-            <span className={`text-sm ${depth > 0 ? "text-muted-foreground" : "font-medium"}`}>
-              {page.label}
-            </span>
+            <span className={`text-sm ${depth > 0 ? "text-muted-foreground" : "font-medium"}`}>{page.label}</span>
             {isMissing && (
-              <Badge variant="outline" className="ml-1 text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+              <Badge
+                variant="outline"
+                className="ml-1 text-xs text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30"
+              >
                 Needs mapping
               </Badge>
             )}
@@ -187,7 +186,8 @@ function PageRow({
           </td>
         ))}
       </tr>
-      {hasChildren && expanded &&
+      {hasChildren &&
+        expanded &&
         page.children!.map((child, i) => (
           <PageRow
             key={i}
@@ -262,7 +262,8 @@ export function PageVisibilityTree({ appMode }: { appMode?: string }) {
       <div className="flex items-start gap-3 p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
         <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
         <div className="text-sm text-amber-700 dark:text-amber-300">
-          <span className="font-medium">Needs mapping</span> items are not yet connected to the permission system. Only Owner and Manager role visibility is configurable here.
+          <span className="font-medium">Needs mapping</span> items are not yet connected to the permission system. Only
+          Owner and Manager role visibility is configurable here.
         </div>
       </div>
 

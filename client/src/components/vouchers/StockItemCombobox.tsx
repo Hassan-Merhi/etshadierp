@@ -24,7 +24,7 @@ export function StockItemCombobox({
 }) {
   const [open, setOpen] = useState(false);
 
-  const sortedStockItems = [...stockItems].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const sortedStockItems = [...stockItems].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -58,12 +58,7 @@ export function StockItemCombobox({
                   }}
                   data-testid={`option-stock-item-${item.id}`}
                 >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value?.id === item.id ? "opacity-100" : "opacity-0"
-                    )}
-                  />
+                  <Check className={cn("mr-2 h-4 w-4", value?.id === item.id ? "opacity-100" : "opacity-0")} />
                   {item.name}
                 </CommandItem>
               ))}

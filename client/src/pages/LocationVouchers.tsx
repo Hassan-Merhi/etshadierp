@@ -38,29 +38,41 @@ interface Transaction {
 }
 
 interface LocationVouchersData {
-  stockItem: { id: number; code: string; name: string; uom: string; };
-  location: { id: number; code: string; name: string; };
+  stockItem: { id: number; code: string; name: string; uom: string };
+  location: { id: number; code: string; name: string };
   year: number;
   month: number;
   monthName: string;
   transactions: Transaction[];
   totals: {
-    inwardQty: number; inwardRate: number; inwardValue: number;
-    outwardQty: number; outwardRate: number; outwardValue: number;
-    closingQty: number; closingRate: number; closingValue: number;
+    inwardQty: number;
+    inwardRate: number;
+    inwardValue: number;
+    outwardQty: number;
+    outwardRate: number;
+    outwardValue: number;
+    closingQty: number;
+    closingRate: number;
+    closingValue: number;
   };
 }
 
 interface RangeVouchersData {
-  stockItem: { id: number; code: string; name: string; uom: string; };
-  location: { id: number; code: string; name: string; };
+  stockItem: { id: number; code: string; name: string; uom: string };
+  location: { id: number; code: string; name: string };
   startDate: string;
   endDate: string;
   transactions: Transaction[];
   totals: {
-    inwardQty: number; inwardRate: number; inwardValue: number;
-    outwardQty: number; outwardRate: number; outwardValue: number;
-    closingQty: number; closingRate: number; closingValue: number;
+    inwardQty: number;
+    inwardRate: number;
+    inwardValue: number;
+    outwardQty: number;
+    outwardRate: number;
+    outwardValue: number;
+    closingQty: number;
+    closingRate: number;
+    closingValue: number;
   };
 }
 
@@ -83,7 +95,11 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
 
   // Single-month query
   const { data: monthData, isLoading: monthLoading } = useQuery<LocationVouchersData>({
-    queryKey: [`/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`, periodFilter.fromDate, periodFilter.toDate],
+    queryKey: [
+      `/api/locations/${locationId}/stock-items/${stockItemId}/vouchers/${year}/${month}`,
+      periodFilter.fromDate,
+      periodFilter.toDate,
+    ],
     queryFn: async () => {
       const p = new URLSearchParams();
       if (periodFilter.fromDate) p.set("startDate", periodFilter.fromDate);
@@ -120,7 +136,11 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   };
 
   const formatDate = (dateStr: string) => {
-    try { return formatDisplayDate(new Date(dateStr)); } catch { return dateStr; }
+    try {
+      return formatDisplayDate(new Date(dateStr));
+    } catch {
+      return dateStr;
+    }
   };
 
   const isStockTransfer = (vchType: string) => {
@@ -141,8 +161,20 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   // When showing all months, build rows with month separator rows injected
   const displayRows = useMemo(() => {
     if (!showAllMonths) return filteredTransactions;
-    const monthNames = ['January','February','March','April','May','June',
-                        'July','August','September','October','November','December'];
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
     const rows: (Transaction & { _isSeparator?: boolean; _separatorLabel?: string })[] = [];
     let lastMonth = -1;
     for (const txn of filteredTransactions) {
@@ -151,7 +183,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
         const m = d.getMonth(); // 0-indexed
         if (m !== lastMonth) {
           lastMonth = m;
-          rows.push({ ...txn, _isSeparator: true, _separatorLabel: monthNames[m] + ' ' + year });
+          rows.push({ ...txn, _isSeparator: true, _separatorLabel: monthNames[m] + " " + year });
         }
       }
       rows.push(txn);
@@ -160,15 +192,19 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   }, [filteredTransactions, showAllMonths, year]);
 
   const calculatedTotals = useMemo(() => {
-    const nonOpening = filteredTransactions.filter(t => !t.isOpeningBalance);
+    const nonOpening = filteredTransactions.filter((t) => !t.isOpeningBalance);
     const inwardQty = nonOpening.reduce((s, t) => s + (t.inwardQty || 0), 0);
     const inwardValue = nonOpening.reduce((s, t) => s + (t.inwardValue || 0), 0);
     const outwardQty = nonOpening.reduce((s, t) => s + (t.outwardQty || 0), 0);
     const outwardValue = nonOpening.reduce((s, t) => s + (t.outwardValue || 0), 0);
     const originalLastTxn = allTransactions[allTransactions.length - 1];
     return {
-      inwardQty, inwardRate: inwardQty > 0 ? inwardValue / inwardQty : 0, inwardValue,
-      outwardQty, outwardRate: outwardQty > 0 ? outwardValue / outwardQty : 0, outwardValue,
+      inwardQty,
+      inwardRate: inwardQty > 0 ? inwardValue / inwardQty : 0,
+      inwardValue,
+      outwardQty,
+      outwardRate: outwardQty > 0 ? outwardValue / outwardQty : 0,
+      outwardValue,
       closingQty: originalLastTxn?.closingQty || 0,
       closingRate: originalLastTxn?.closingRate || 0,
       closingValue: originalLastTxn?.closingValue || 0,
@@ -178,10 +214,11 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   const getTransactionEditUrl = (txn: Transaction): string | null => {
     if (txn.isOpeningBalance) return null;
     const vchType = (txn.vchType || "").toLowerCase();
-    if (vchType === 'production' || vchType === 'consumption') return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
-    if (vchType === 'pos') return txn.voucherId ? `/pos/edit/${txn.voucherId}` : null;
-    if (vchType === 'stock transfer') return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
-    if (vchType === 'po offload') return txn.poId ? `/purchase-orders/${txn.poId}` : null;
+    if (vchType === "production" || vchType === "consumption")
+      return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+    if (vchType === "pos") return txn.voucherId ? `/pos/edit/${txn.voucherId}` : null;
+    if (vchType === "stock transfer") return txn.voucherId ? `/vouchers/${txn.voucherId}/edit` : null;
+    if (vchType === "po offload") return txn.poId ? `/purchase-orders/${txn.poId}` : null;
     return null;
   };
 
@@ -190,7 +227,7 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
     if (url) navigate(url);
   };
 
-  const navigableRows = useMemo(() => filteredTransactions.filter(t => !t.isOpeningBalance), [filteredTransactions]);
+  const navigableRows = useMemo(() => filteredTransactions.filter((t) => !t.isOpeningBalance), [filteredTransactions]);
 
   const handleTableKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -203,11 +240,11 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
     if (navigableRows.length === 0) return;
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedRowIndex(prev => Math.max(-1, prev - 1));
+      setSelectedRowIndex((prev) => Math.max(-1, prev - 1));
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
       if (selectedRowIndex === -1) setSelectedRowIndex(0);
-      else if (selectedRowIndex < navigableRows.length - 1) setSelectedRowIndex(prev => prev + 1);
+      else if (selectedRowIndex < navigableRows.length - 1) setSelectedRowIndex((prev) => prev + 1);
     } else if (e.key === "Enter") {
       e.preventDefault();
       if (selectedRowIndex >= 0 && selectedRowIndex < navigableRows.length) {
@@ -225,37 +262,35 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
   useEffect(() => {
     if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
     const rowElement = tableScrollContainer.current.querySelector(`[data-row-index="${selectedRowIndex}"]`);
-    if (rowElement) rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (rowElement) rowElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [selectedRowIndex]);
 
   useEffect(() => {
     registerCursorNav({
       canNavigateUp: selectedRowIndex > -1,
-      canNavigateDown: navigableRows.length > 0 && (selectedRowIndex === -1 || selectedRowIndex < navigableRows.length - 1),
-      onUp: () => setSelectedRowIndex(prev => Math.max(-1, prev - 1)),
-      onDown: () => setSelectedRowIndex(prev => {
-        if (prev === -1) return 0;
-        if (prev < navigableRows.length - 1) return prev + 1;
-        return prev;
-      }),
+      canNavigateDown:
+        navigableRows.length > 0 && (selectedRowIndex === -1 || selectedRowIndex < navigableRows.length - 1),
+      onUp: () => setSelectedRowIndex((prev) => Math.max(-1, prev - 1)),
+      onDown: () =>
+        setSelectedRowIndex((prev) => {
+          if (prev === -1) return 0;
+          if (prev < navigableRows.length - 1) return prev + 1;
+          return prev;
+        }),
     });
     return () => clearCursorNav();
   }, [selectedRowIndex, navigableRows]);
 
   const getVchTypeBadge = (vchType: string) => {
     const t = (vchType || "").toLowerCase();
-    if (t === "pos")
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
+    if (t === "pos") return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300";
     if (t === "po offload" || t === "purchase import")
       return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300";
     if (t === "stock transfer" || t === "stocktransfer" || t === "st")
       return "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300";
-    if (t === "production")
-      return "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300";
-    if (t === "consumption")
-      return "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300";
-    if (t === "sales")
-      return "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300";
+    if (t === "production") return "bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-300";
+    if (t === "consumption") return "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300";
+    if (t === "sales") return "bg-rose-100 text-rose-800 dark:bg-rose-900/40 dark:text-rose-300";
     return "bg-muted text-muted-foreground";
   };
 
@@ -275,7 +310,8 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
           <Button
-            variant="ghost" size="icon"
+            variant="ghost"
+            size="icon"
             onClick={() => navigate(`/locations/${locationId}/stock-items/${stockItemId}/history`)}
             data-testid="button-back"
           >
@@ -285,12 +321,18 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
             <PageHeader title="Location Vouchers" />
             {data?.stockItem && data?.location && (
               <div className="flex items-center gap-2 text-muted-foreground" data-testid="text-item-location">
-                <span>{data.stockItem.name} ({data.stockItem.code})</span>
+                <span>
+                  {data.stockItem.name} ({data.stockItem.code})
+                </span>
                 <span>•</span>
                 <MapPin className="h-4 w-4" />
                 <span>{data.location.name}</span>
                 <span>•</span>
-                <span>{showAllMonths ? String(year) : `${'monthName' in (data as any) ? (data as any).monthName : ''} ${year}`}</span>
+                <span>
+                  {showAllMonths
+                    ? String(year)
+                    : `${"monthName" in (data as any) ? (data as any).monthName : ""} ${year}`}
+                </span>
               </div>
             )}
           </div>
@@ -299,7 +341,10 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
           <Button
             variant={showAllMonths ? "default" : "outline"}
             size="sm"
-            onClick={() => { setShowAllMonths(v => !v); setSelectedRowIndex(-1); }}
+            onClick={() => {
+              setShowAllMonths((v) => !v);
+              setSelectedRowIndex(-1);
+            }}
             data-testid="button-show-all-months"
           >
             <Eye className="h-4 w-4 mr-1.5" />
@@ -312,7 +357,9 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
               onCheckedChange={(checked) => setShowStockTransfers(checked === true)}
               data-testid="checkbox-show-stock-transfers"
             />
-            <Label htmlFor="show-stock-transfers" className="text-sm cursor-pointer">Show Stock Transfers</Label>
+            <Label htmlFor="show-stock-transfers" className="text-sm cursor-pointer">
+              Show Stock Transfers
+            </Label>
           </div>
           {!showAllMonths && (
             <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
@@ -329,10 +376,14 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
               Total In
             </div>
             <div className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400">
-              {calculatedTotals.inwardQty > 0 ? calculatedTotals.inwardQty.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}
+              {calculatedTotals.inwardQty > 0
+                ? calculatedTotals.inwardQty.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                : "—"}
             </div>
             {!posUser && calculatedTotals.inwardValue > 0 && (
-              <div className="text-xs font-mono text-muted-foreground">{formatAmount(calculatedTotals.inwardValue)}</div>
+              <div className="text-xs font-mono text-muted-foreground">
+                {formatAmount(calculatedTotals.inwardValue)}
+              </div>
             )}
           </div>
           <div className="flex-1 min-w-[130px] rounded-xl border bg-card p-3 flex flex-col gap-0.5">
@@ -341,10 +392,14 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
               Total Out
             </div>
             <div className="text-lg font-bold font-mono text-rose-600 dark:text-rose-400">
-              {calculatedTotals.outwardQty > 0 ? calculatedTotals.outwardQty.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—"}
+              {calculatedTotals.outwardQty > 0
+                ? calculatedTotals.outwardQty.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                : "—"}
             </div>
             {!posUser && calculatedTotals.outwardValue > 0 && (
-              <div className="text-xs font-mono text-muted-foreground">{formatAmount(calculatedTotals.outwardValue)}</div>
+              <div className="text-xs font-mono text-muted-foreground">
+                {formatAmount(calculatedTotals.outwardValue)}
+              </div>
             )}
           </div>
           <div className="flex-1 min-w-[130px] rounded-xl border bg-primary/5 p-3 flex flex-col gap-0.5">
@@ -352,51 +407,103 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
               <Layers className="h-3.5 w-3.5 text-primary" />
               Closing
             </div>
-            <div className={`text-lg font-bold font-mono ${calculatedTotals.closingQty < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}>
+            <div
+              className={`text-lg font-bold font-mono ${calculatedTotals.closingQty < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}
+            >
               {calculatedTotals.closingQty.toLocaleString(undefined, { maximumFractionDigits: 0 })}
             </div>
             {!posUser && (
-              <div className="text-xs font-mono text-muted-foreground">{formatAmount(calculatedTotals.closingValue)}</div>
+              <div className="text-xs font-mono text-muted-foreground">
+                {formatAmount(calculatedTotals.closingValue)}
+              </div>
             )}
           </div>
         </div>
       )}
 
-      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 270px)' }}>
+      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 270px)" }}>
         <CardHeader className="pb-2 flex-shrink-0">
           <CardTitle className="text-base">
             {showAllMonths
               ? `All Transactions — ${year}`
-              : `Transactions — ${'monthName' in ((data as any) ?? {}) ? (data as any).monthName : ''} ${year}`}
+              : `Transactions — ${"monthName" in ((data as any) ?? {}) ? (data as any).monthName : ""} ${year}`}
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
           <table className="w-full text-sm border-collapse">
             <thead className="sticky top-0 z-30">
               <tr className="bg-muted border-b">
-                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium w-[100px]">Date</th>
-                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium">Particulars</th>
-                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium w-[110px]">Vch Type</th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-3 py-1.5 border-r font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border-t-2 border-t-emerald-500">
-                  <span className="flex items-center justify-center gap-1"><ArrowDownToLine className="h-3.5 w-3.5" />Inwards</span>
+                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium w-[100px]">
+                  Date
                 </th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-3 py-1.5 border-r font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 border-t-2 border-t-rose-500">
-                  <span className="flex items-center justify-center gap-1"><ArrowUpFromLine className="h-3.5 w-3.5" />Outwards</span>
+                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium">
+                  Particulars
                 </th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-3 py-1.5 font-semibold text-primary bg-primary/5 border-t-2 border-t-primary">
-                  <span className="flex items-center justify-center gap-1"><Layers className="h-3.5 w-3.5" />Closing</span>
+                <th rowSpan={2} className="text-left align-bottom px-4 py-2 border-r bg-muted font-medium w-[110px]">
+                  Vch Type
+                </th>
+                <th
+                  colSpan={posUser ? 1 : 3}
+                  className="text-center px-3 py-1.5 border-r font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 border-t-2 border-t-emerald-500"
+                >
+                  <span className="flex items-center justify-center gap-1">
+                    <ArrowDownToLine className="h-3.5 w-3.5" />
+                    Inwards
+                  </span>
+                </th>
+                <th
+                  colSpan={posUser ? 1 : 3}
+                  className="text-center px-3 py-1.5 border-r font-semibold text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 border-t-2 border-t-rose-500"
+                >
+                  <span className="flex items-center justify-center gap-1">
+                    <ArrowUpFromLine className="h-3.5 w-3.5" />
+                    Outwards
+                  </span>
+                </th>
+                <th
+                  colSpan={posUser ? 1 : 3}
+                  className="text-center px-3 py-1.5 font-semibold text-primary bg-primary/5 border-t-2 border-t-primary"
+                >
+                  <span className="flex items-center justify-center gap-1">
+                    <Layers className="h-3.5 w-3.5" />
+                    Closing
+                  </span>
                 </th>
               </tr>
               <tr className="border-b text-xs">
-                <th className="text-right px-2 py-1.5 font-medium border-r bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-[55px]">Qty</th>
-                {!posUser && <th className="text-right px-2 py-1.5 font-medium bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-[60px]">Rate</th>}
-                {!posUser && <th className="text-right px-2 py-1.5 border-r font-medium bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-[75px]">Value</th>}
-                <th className="text-right px-2 py-1.5 font-medium border-r bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-[55px]">Qty</th>
-                {!posUser && <th className="text-right px-2 py-1.5 font-medium bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-[60px]">Rate</th>}
-                {!posUser && <th className="text-right px-2 py-1.5 border-r font-medium bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-[75px]">Value</th>}
+                <th className="text-right px-2 py-1.5 font-medium border-r bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-[55px]">
+                  Qty
+                </th>
+                {!posUser && (
+                  <th className="text-right px-2 py-1.5 font-medium bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-[60px]">
+                    Rate
+                  </th>
+                )}
+                {!posUser && (
+                  <th className="text-right px-2 py-1.5 border-r font-medium bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 w-[75px]">
+                    Value
+                  </th>
+                )}
+                <th className="text-right px-2 py-1.5 font-medium border-r bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-[55px]">
+                  Qty
+                </th>
+                {!posUser && (
+                  <th className="text-right px-2 py-1.5 font-medium bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-[60px]">
+                    Rate
+                  </th>
+                )}
+                {!posUser && (
+                  <th className="text-right px-2 py-1.5 border-r font-medium bg-rose-50 dark:bg-rose-950/20 text-rose-700 dark:text-rose-400 w-[75px]">
+                    Value
+                  </th>
+                )}
                 <th className="text-right px-2 py-1.5 font-medium bg-primary/5 text-primary w-[55px]">Qty</th>
-                {!posUser && <th className="text-right px-2 py-1.5 font-medium bg-primary/5 text-primary w-[60px]">Rate</th>}
-                {!posUser && <th className="text-right px-2 py-1.5 font-medium bg-primary/5 text-primary w-[75px]">Value</th>}
+                {!posUser && (
+                  <th className="text-right px-2 py-1.5 font-medium bg-primary/5 text-primary w-[60px]">Rate</th>
+                )}
+                {!posUser && (
+                  <th className="text-right px-2 py-1.5 font-medium bg-primary/5 text-primary w-[75px]">Value</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -436,18 +543,30 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
                         >
                           {txn.particulars}
                         </button>
-                      ) : txn.particulars}
+                      ) : (
+                        txn.particulars
+                      )}
                     </td>
                     <td className="px-4 py-2.5 border-r">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getVchTypeBadge(txn.vchType)}`}>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${getVchTypeBadge(txn.vchType)}`}
+                      >
                         {txn.vchType}
                       </span>
                     </td>
                     <td className="text-right px-2 py-2.5 tabular-nums border-r font-medium text-emerald-700 dark:text-emerald-400">
                       {formatNumber(txn.inwardQty, 0)}
                     </td>
-                    {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(txn.inwardRate)}</td>}
-                    {!posUser && <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">{formatAmount(txn.inwardValue)}</td>}
+                    {!posUser && (
+                      <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">
+                        {formatAmount(txn.inwardRate)}
+                      </td>
+                    )}
+                    {!posUser && (
+                      <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">
+                        {formatAmount(txn.inwardValue)}
+                      </td>
+                    )}
                     <td className="text-right px-2 py-2.5 tabular-nums border-r font-medium text-rose-700 dark:text-rose-400">
                       {formatNumber(txn.outwardQty, 0)}
                     </td>
@@ -461,9 +580,19 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
                         {formatAmount(txn.isPOS && txn.posSellingValue ? txn.posSellingValue : txn.outwardValue)}
                       </td>
                     )}
-                    <td className="text-right px-2 py-2.5 tabular-nums font-semibold text-foreground">{formatNumber(txn.closingQty, 0)}</td>
-                    {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(txn.closingRate)}</td>}
-                    {!posUser && <td className="text-right px-2 py-2.5 tabular-nums font-medium">{formatAmount(txn.closingValue)}</td>}
+                    <td className="text-right px-2 py-2.5 tabular-nums font-semibold text-foreground">
+                      {formatNumber(txn.closingQty, 0)}
+                    </td>
+                    {!posUser && (
+                      <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">
+                        {formatAmount(txn.closingRate)}
+                      </td>
+                    )}
+                    {!posUser && (
+                      <td className="text-right px-2 py-2.5 tabular-nums font-medium">
+                        {formatAmount(txn.closingValue)}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -478,16 +607,48 @@ export default function LocationVouchers({ posUser }: { posUser?: any } = {}) {
 
               {filteredTransactions.length > 0 && (
                 <tr className="bg-muted font-bold border-t-2">
-                  <td colSpan={3} className="px-4 py-2.5 border-r text-sm">Totals</td>
-                  <td className="text-right px-2 py-2.5 tabular-nums border-r text-emerald-700 dark:text-emerald-400">{formatNumber(calculatedTotals.inwardQty, 0)}</td>
-                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(calculatedTotals.inwardRate)}</td>}
-                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">{formatAmount(calculatedTotals.inwardValue)}</td>}
-                  <td className="text-right px-2 py-2.5 tabular-nums border-r text-rose-700 dark:text-rose-400">{formatNumber(calculatedTotals.outwardQty, 0)}</td>
-                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(calculatedTotals.outwardRate)}</td>}
-                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">{formatAmount(calculatedTotals.outwardValue)}</td>}
-                  <td className="text-right px-2 py-2.5 tabular-nums text-foreground">{formatNumber(calculatedTotals.closingQty, 0)}</td>
-                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">{formatAmount(calculatedTotals.closingRate)}</td>}
-                  {!posUser && <td className="text-right px-2 py-2.5 tabular-nums text-primary">{formatAmount(calculatedTotals.closingValue)}</td>}
+                  <td colSpan={3} className="px-4 py-2.5 border-r text-sm">
+                    Totals
+                  </td>
+                  <td className="text-right px-2 py-2.5 tabular-nums border-r text-emerald-700 dark:text-emerald-400">
+                    {formatNumber(calculatedTotals.inwardQty, 0)}
+                  </td>
+                  {!posUser && (
+                    <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">
+                      {formatAmount(calculatedTotals.inwardRate)}
+                    </td>
+                  )}
+                  {!posUser && (
+                    <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">
+                      {formatAmount(calculatedTotals.inwardValue)}
+                    </td>
+                  )}
+                  <td className="text-right px-2 py-2.5 tabular-nums border-r text-rose-700 dark:text-rose-400">
+                    {formatNumber(calculatedTotals.outwardQty, 0)}
+                  </td>
+                  {!posUser && (
+                    <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">
+                      {formatAmount(calculatedTotals.outwardRate)}
+                    </td>
+                  )}
+                  {!posUser && (
+                    <td className="text-right px-2 py-2.5 tabular-nums border-r text-muted-foreground">
+                      {formatAmount(calculatedTotals.outwardValue)}
+                    </td>
+                  )}
+                  <td className="text-right px-2 py-2.5 tabular-nums text-foreground">
+                    {formatNumber(calculatedTotals.closingQty, 0)}
+                  </td>
+                  {!posUser && (
+                    <td className="text-right px-2 py-2.5 tabular-nums text-muted-foreground">
+                      {formatAmount(calculatedTotals.closingRate)}
+                    </td>
+                  )}
+                  {!posUser && (
+                    <td className="text-right px-2 py-2.5 tabular-nums text-primary">
+                      {formatAmount(calculatedTotals.closingValue)}
+                    </td>
+                  )}
                 </tr>
               )}
             </tbody>

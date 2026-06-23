@@ -9,44 +9,55 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  TrendingUp, TrendingDown, Minus, AlertTriangle, Search, Download,
-  FileText, CheckCircle, Package, Loader2, BarChart2, Save,
-  Hash, ShoppingCart, Columns, RotateCcw, Truck, Filter, ChevronDown,
-  CircleDollarSign, MapPin, Container, Plus,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  AlertTriangle,
+  Search,
+  Download,
+  FileText,
+  CheckCircle,
+  Package,
+  Loader2,
+  BarChart2,
+  Save,
+  Hash,
+  ShoppingCart,
+  Columns,
+  RotateCcw,
+  Truck,
+  Filter,
+  ChevronDown,
+  CircleDollarSign,
+  MapPin,
+  Container,
+  Plus,
 } from "lucide-react";
 
 // ─── Column definitions ───────────────────────────────────────────────────────
 const ALL_COLUMNS = [
-  { key: "code",             label: "Code",               default: true  },
-  { key: "name",             label: "Name",               default: true  },
-  { key: "salesQty",         label: "Sales Qty",          default: true  },
-  { key: "avgSell",          label: "Avg Sell",           default: true  },
-  { key: "dubaiPrice",       label: "Dubai Price",        default: true  },
-  { key: "extraPerBale",     label: "Extra / Bale",       default: true  },
-  { key: "landingCost",      label: "Landing Cost",       default: true  },
-  { key: "costProfit",       label: "Cost Profit",        default: true  },
-  { key: "status",           label: "Status",             default: true  },
-  { key: "qtyToOrder",       label: "Qty to Order",       default: true  },
+  { key: "code", label: "Code", default: true },
+  { key: "name", label: "Name", default: true },
+  { key: "salesQty", label: "Sales Qty", default: true },
+  { key: "avgSell", label: "Avg Sell", default: true },
+  { key: "dubaiPrice", label: "Dubai Price", default: true },
+  { key: "extraPerBale", label: "Extra / Bale", default: true },
+  { key: "landingCost", label: "Landing Cost", default: true },
+  { key: "costProfit", label: "Cost Profit", default: true },
+  { key: "status", label: "Status", default: true },
+  { key: "qtyToOrder", label: "Qty to Order", default: true },
   { key: "inventoryAvgCost", label: "Inventory Avg Cost", default: false },
-  { key: "hassanPrice",      label: "Hassan Price",       default: false },
-  { key: "hassanProfit",     label: "Hassan Profit",      default: false },
-  { key: "currentStock",     label: "Current Stock",      default: false },
+  { key: "hassanPrice", label: "Hassan Price", default: false },
+  { key: "hassanProfit", label: "Hassan Profit", default: false },
+  { key: "currentStock", label: "Current Stock", default: false },
 ] as const;
 
-type ColKey = typeof ALL_COLUMNS[number]["key"];
+type ColKey = (typeof ALL_COLUMNS)[number]["key"];
 type ColVisibility = Record<ColKey, boolean>;
 
 const DEFAULT_COL_VISIBILITY: ColVisibility = Object.fromEntries(
@@ -64,11 +75,11 @@ function loadColVisibility(): ColVisibility {
 
 // ─── Status options ───────────────────────────────────────────────────────────
 const STATUS_OPTIONS = [
-  { value: "gaining",       label: "Gaining",          dot: "bg-emerald-500" },
-  { value: "losing",        label: "Losing",           dot: "bg-red-500"     },
-  { value: "break_even",    label: "Break Even",       dot: "bg-blue-500"    },
-  { value: "no_sales_data", label: "No Data",          dot: "bg-amber-500"   },
-  { value: "missing_po",    label: "Missing PO Price", dot: "bg-orange-500"  },
+  { value: "gaining", label: "Gaining", dot: "bg-emerald-500" },
+  { value: "losing", label: "Losing", dot: "bg-red-500" },
+  { value: "break_even", label: "Break Even", dot: "bg-blue-500" },
+  { value: "no_sales_data", label: "No Data", dot: "bg-amber-500" },
+  { value: "missing_po", label: "Missing PO Price", dot: "bg-orange-500" },
 ];
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -127,8 +138,12 @@ function ProfitCell({ value, pct }: { value: number | null; pct: number | null }
   if (value == null) return <span className="text-muted-foreground text-xs">—</span>;
   const positive = value >= 0;
   return (
-    <div className={`text-right font-semibold tabular-nums ${positive ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>
-      <div className="text-sm">{value < 0 ? "-" : ""}${fmt(Math.abs(value))}</div>
+    <div
+      className={`text-right font-semibold tabular-nums ${positive ? "text-emerald-500 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}
+    >
+      <div className="text-sm">
+        {value < 0 ? "-" : ""}${fmt(Math.abs(value))}
+      </div>
       {pct != null && <div className="text-[11px] font-normal opacity-70">{fmt(Math.abs(pct), 1)}%</div>}
     </div>
   );
@@ -136,19 +151,49 @@ function ProfitCell({ value, pct }: { value: number | null; pct: number | null }
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "gaining")
-    return <Badge className="bg-emerald-500 text-white gap-1 font-medium"><TrendingUp className="w-3 h-3" />Gaining</Badge>;
+    return (
+      <Badge className="bg-emerald-500 text-white gap-1 font-medium">
+        <TrendingUp className="w-3 h-3" />
+        Gaining
+      </Badge>
+    );
   if (status === "losing")
-    return <Badge className="bg-red-500 text-white gap-1 font-medium"><TrendingDown className="w-3 h-3" />Losing</Badge>;
+    return (
+      <Badge className="bg-red-500 text-white gap-1 font-medium">
+        <TrendingDown className="w-3 h-3" />
+        Losing
+      </Badge>
+    );
   if (status === "break_even")
-    return <Badge className="bg-blue-500 text-white gap-1 font-medium"><Minus className="w-3 h-3" />Break Even</Badge>;
-  return <Badge className="bg-amber-500 text-white gap-1 font-medium"><AlertTriangle className="w-3 h-3" />No Data</Badge>;
+    return (
+      <Badge className="bg-blue-500 text-white gap-1 font-medium">
+        <Minus className="w-3 h-3" />
+        Break Even
+      </Badge>
+    );
+  return (
+    <Badge className="bg-amber-500 text-white gap-1 font-medium">
+      <AlertTriangle className="w-3 h-3" />
+      No Data
+    </Badge>
+  );
 }
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 function StatCard({
-  icon: Icon, iconBg, label, value, sub, valueColor,
+  icon: Icon,
+  iconBg,
+  label,
+  value,
+  sub,
+  valueColor,
 }: {
-  icon: any; iconBg: string; label: string; value: string; sub?: string; valueColor?: string;
+  icon: any;
+  iconBg: string;
+  label: string;
+  value: string;
+  sub?: string;
+  valueColor?: string;
 }) {
   return (
     <div className="rounded-xl border bg-card px-4 py-3 flex items-center gap-3">
@@ -270,18 +315,30 @@ export default function SupplierProfitCheck() {
     queryKey: ["/api/supplier-profit-check/otw-containers", supplierId],
     enabled: !!supplierId && sourceType === "otw_containers",
     queryFn: async () => {
-      const res = await fetch(`/api/supplier-profit-check/otw-containers?supplierId=${supplierId}`, { credentials: "include" });
+      const res = await fetch(`/api/supplier-profit-check/otw-containers?supplierId=${supplierId}`, {
+        credentials: "include",
+      });
       return res.ok ? res.json() : [];
     },
   });
 
-  const queryEnabled = !!supplierId && (
-    sourceType === "all" ||
-    (sourceType === "proforma" && !!proformaId) ||
-    (sourceType === "otw_containers" && otwContainerIds.length > 0)
-  );
+  const queryEnabled =
+    !!supplierId &&
+    (sourceType === "all" ||
+      (sourceType === "proforma" && !!proformaId) ||
+      (sourceType === "otw_containers" && otwContainerIds.length > 0));
   const { data: rows = [], isLoading } = useQuery<AnalysisRow[]>({
-    queryKey: ["/api/supplier-profit-check/analyze", supplierId, periodFilter.fromDate, periodFilter.toDate, sourceType, proformaId, otwContainerIds, sellPriceSource, selectedLocationId],
+    queryKey: [
+      "/api/supplier-profit-check/analyze",
+      supplierId,
+      periodFilter.fromDate,
+      periodFilter.toDate,
+      sourceType,
+      proformaId,
+      otwContainerIds,
+      sellPriceSource,
+      selectedLocationId,
+    ],
     enabled: queryEnabled,
     queryFn: async () => {
       const res = await apiRequest("POST", "/api/supplier-profit-check/analyze", {
@@ -311,7 +368,7 @@ export default function SupplierProfitCheck() {
   useEffect(() => {
     const initPo: Record<number, string> = {};
     const initAvg: Record<number, string> = {};
-    for (const o of (overridesData ?? [])) {
+    for (const o of overridesData ?? []) {
       if (o.poPrice != null) initPo[o.stockItemId] = String(parseFloat(parseFloat(String(o.poPrice)).toFixed(2)));
       if (o.avgPrice != null) initAvg[o.stockItemId] = String(parseFloat(parseFloat(String(o.avgPrice)).toFixed(2)));
     }
@@ -335,8 +392,12 @@ export default function SupplierProfitCheck() {
 
   const addItemMutation = useMutation({
     mutationFn: async (payload: {
-      code: string; name: string; supplierId: number;
-      stockGroupId?: number; dubaiPrice?: number; avgSellPrice?: number;
+      code: string;
+      name: string;
+      supplierId: number;
+      stockGroupId?: number;
+      dubaiPrice?: number;
+      avgSellPrice?: number;
     }) => {
       const res = await apiRequest("POST", "/api/supplier-profit-check/add-stock-item", payload);
       const data = await res.json();
@@ -347,23 +408,29 @@ export default function SupplierProfitCheck() {
       queryClient.invalidateQueries({ queryKey: ["/api/supplier-profit-check/analyze"] });
       queryClient.invalidateQueries({ queryKey: ["/api/supplier-profit-check/po-overrides", supplierId] });
       setShowAddItemDialog(false);
-      setNewItemCode(""); setNewItemName(""); setNewItemGroupId("");
-      setNewItemDubaiPrice(""); setNewItemAvgSell("");
+      setNewItemCode("");
+      setNewItemName("");
+      setNewItemGroupId("");
+      setNewItemDubaiPrice("");
+      setNewItemAvgSell("");
       toast({ title: "Item added", description: "The item is now included in the analysis." });
     },
     onError: (err: any) => toast({ title: "Failed to add item", description: err.message, variant: "destructive" }),
   });
 
-  const handleManualPoChange = useCallback((stockItemId: number, value: string) => {
-    setManualPoPrices(prev => ({ ...prev, [stockItemId]: value }));
-    clearTimeout(debounceTimers.current[stockItemId]);
-    const num = parseFloat(value);
-    if (!isNaN(num) && num > 0 && supplierId) {
-      debounceTimers.current[stockItemId] = setTimeout(() => {
-        saveOverrideMutation.mutate({ supplierId: Number(supplierId), stockItemId, poPrice: num });
-      }, 800);
-    }
-  }, [supplierId, saveOverrideMutation]);
+  const handleManualPoChange = useCallback(
+    (stockItemId: number, value: string) => {
+      setManualPoPrices((prev) => ({ ...prev, [stockItemId]: value }));
+      clearTimeout(debounceTimers.current[stockItemId]);
+      const num = parseFloat(value);
+      if (!isNaN(num) && num > 0 && supplierId) {
+        debounceTimers.current[stockItemId] = setTimeout(() => {
+          saveOverrideMutation.mutate({ supplierId: Number(supplierId), stockItemId, poPrice: num });
+        }, 800);
+      }
+    },
+    [supplierId, saveOverrideMutation]
+  );
 
   const handleArrowNav = useCallback((e: React.KeyboardEvent<HTMLInputElement>, dataAttr: string) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
@@ -371,19 +438,25 @@ export default function SupplierProfitCheck() {
     const inputs = Array.from(document.querySelectorAll<HTMLInputElement>(`[${dataAttr}]`));
     const idx = inputs.indexOf(e.currentTarget);
     const target = e.key === "ArrowDown" ? inputs[idx + 1] : inputs[idx - 1];
-    if (target) { target.focus(); target.select(); }
+    if (target) {
+      target.focus();
+      target.select();
+    }
   }, []);
 
-  const handleManualAvgChange = useCallback((stockItemId: number, value: string) => {
-    setManualAvgPrices(prev => ({ ...prev, [stockItemId]: value }));
-    clearTimeout(debounceAvgTimers.current[stockItemId]);
-    const num = parseFloat(value);
-    if (!isNaN(num) && num > 0 && supplierId) {
-      debounceAvgTimers.current[stockItemId] = setTimeout(() => {
-        saveOverrideMutation.mutate({ supplierId: Number(supplierId), stockItemId, avgPrice: num });
-      }, 800);
-    }
-  }, [supplierId, saveOverrideMutation]);
+  const handleManualAvgChange = useCallback(
+    (stockItemId: number, value: string) => {
+      setManualAvgPrices((prev) => ({ ...prev, [stockItemId]: value }));
+      clearTimeout(debounceAvgTimers.current[stockItemId]);
+      const num = parseFloat(value);
+      if (!isNaN(num) && num > 0 && supplierId) {
+        debounceAvgTimers.current[stockItemId] = setTimeout(() => {
+          saveOverrideMutation.mutate({ supplierId: Number(supplierId), stockItemId, avgPrice: num });
+        }, 800);
+      }
+    },
+    [supplierId, saveOverrideMutation]
+  );
 
   useEffect(() => {
     const initialQty: Record<number, string> = {};
@@ -399,9 +472,7 @@ export default function SupplierProfitCheck() {
   // ─── Autosave effect ─────────────────────────────────────────────────────
   useEffect(() => {
     if (qtyVersion === 0) return; // skip initial render / initialization
-    const targetId = sourceType === "proforma" && proformaId
-      ? Number(proformaId)
-      : savedProforma?.id ?? null;
+    const targetId = sourceType === "proforma" && proformaId ? Number(proformaId) : (savedProforma?.id ?? null);
     if (!targetId) return; // no proforma to save to yet
 
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
@@ -412,9 +483,13 @@ export default function SupplierProfitCheck() {
         const items = computedRows
           .filter((r) => Number(qtyMap[r.stockItemId]) > 0)
           .map((r) => ({
-            barcode: r.code, code: r.code, name: r.name, itemName: r.name,
+            barcode: r.code,
+            code: r.code,
+            name: r.name,
+            itemName: r.name,
             qty: Number(qtyMap[r.stockItemId]) || 0,
-            supplierPrice: r.poPrice ?? r.nCost, weight: 0,
+            supplierPrice: r.poPrice ?? r.nCost,
+            weight: 0,
           }));
         const res = await apiRequest("PUT", `/api/supplier-profit-check/proforma/${targetId}/update-items`, { items });
         if (!res.ok) throw new Error("Save failed");
@@ -436,21 +511,22 @@ export default function SupplierProfitCheck() {
     return Object.values(qtyMap).reduce((s, v) => s + (Number(v) || 0), 0);
   }, [rows, qtyMap]);
 
-  const totalExtraCharges = (Number(freight) || 0) + (Number(duties) || 0) + (Number(otherCharges) || 0) + (Number(surcharge) || 0);
+  const totalExtraCharges =
+    (Number(freight) || 0) + (Number(duties) || 0) + (Number(otherCharges) || 0) + (Number(surcharge) || 0);
   const extraCostPerBale = totalBales > 0 ? totalExtraCharges / totalBales : 0;
 
   // ─── Computed rows ────────────────────────────────────────────────────────
   const computedRows = useMemo((): ComputedRow[] => {
     return rows.map((row) => {
       const manualPoNum = parseFloat(manualPoPrices[row.stockItemId] ?? "");
-      const poP = (!isNaN(manualPoNum) && manualPoNum > 0) ? manualPoNum : row.poPrice;
+      const poP = !isNaN(manualPoNum) && manualPoNum > 0 ? manualPoNum : row.poPrice;
       const manualAvgNum = parseFloat(manualAvgPrices[row.stockItemId] ?? "");
       // Use group price when source is location_group; otherwise use avg/manual
       let sell: number | null;
       if (sellPriceSource === "location_group") {
         sell = row.groupSellingPrice ?? null;
       } else {
-        sell = (!isNaN(manualAvgNum) && manualAvgNum > 0) ? manualAvgNum : row.avgSellingPrice;
+        sell = !isNaN(manualAvgNum) && manualAvgNum > 0 ? manualAvgNum : row.avgSellingPrice;
       }
       const landingCost = poP != null ? poP + extraCostPerBale : null;
       const costProfit = sell != null && landingCost != null ? sell - landingCost : null;
@@ -467,14 +543,13 @@ export default function SupplierProfitCheck() {
 
   // ─── Multi-status filter ──────────────────────────────────────────────────
   const toggleStatus = useCallback((val: string) => {
-    setActiveStatuses((prev) =>
-      prev.includes(val) ? prev.filter((s) => s !== val) : [...prev, val]
-    );
+    setActiveStatuses((prev) => (prev.includes(val) ? prev.filter((s) => s !== val) : [...prev, val]));
   }, []);
 
   const statusFilterLabel = useMemo(() => {
     if (activeStatuses.length === 0) return "All Statuses";
-    if (activeStatuses.length === 1) return STATUS_OPTIONS.find((s) => s.value === activeStatuses[0])?.label ?? activeStatuses[0];
+    if (activeStatuses.length === 1)
+      return STATUS_OPTIONS.find((s) => s.value === activeStatuses[0])?.label ?? activeStatuses[0];
     return `${activeStatuses.length} statuses`;
   }, [activeStatuses]);
 
@@ -498,8 +573,10 @@ export default function SupplierProfitCheck() {
   const summary = useMemo(() => {
     const withQty = computedRows.filter((r) => Number(qtyMap[r.stockItemId]) > 0);
     const totalQty = withQty.reduce((s, r) => s + (Number(qtyMap[r.stockItemId]) || 0), 0);
-    const totalLandingCost = withQty.reduce((s, r) =>
-      r.landingCost != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.landingCost : s, 0);
+    const totalLandingCost = withQty.reduce(
+      (s, r) => (r.landingCost != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.landingCost : s),
+      0
+    );
     // Use the active sell price source for totals
     const effectiveSellPrice = (r: ComputedRow) =>
       sellPriceSource === "location_group" ? r.groupSellingPrice : r.avgSellingPrice;
@@ -507,19 +584,28 @@ export default function SupplierProfitCheck() {
       const sp = effectiveSellPrice(r);
       return sp != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * sp : s;
     }, 0);
-    const totalCostProfit = withQty.reduce((s, r) =>
-      r.costProfit != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.costProfit : s, 0);
+    const totalCostProfit = withQty.reduce(
+      (s, r) => (r.costProfit != null ? s + (Number(qtyMap[r.stockItemId]) || 0) * r.costProfit : s),
+      0
+    );
     const costProfitPct = totalEstSales > 0 ? (totalCostProfit / totalEstSales) * 100 : null;
     const losingCount = computedRows.filter((r) => r.computedStatus === "losing").length;
     const noDataCount = computedRows.filter((r) => r.computedStatus === "no_sales_data").length;
     const missingPoCount = computedRows.filter((r) => r.poPriceSource === "missing").length;
-    const noGroupPriceCount = sellPriceSource === "location_group"
-      ? computedRows.filter((r) => r.groupSellingPrice == null).length
-      : 0;
+    const noGroupPriceCount =
+      sellPriceSource === "location_group" ? computedRows.filter((r) => r.groupSellingPrice == null).length : 0;
     return {
-      totalItems: computedRows.length, selectedCount: withQty.length, totalQty,
-      totalLandingCost, totalEstSales, totalCostProfit, costProfitPct,
-      losingCount, noDataCount, missingPoCount, noGroupPriceCount,
+      totalItems: computedRows.length,
+      selectedCount: withQty.length,
+      totalQty,
+      totalLandingCost,
+      totalEstSales,
+      totalCostProfit,
+      costProfitPct,
+      losingCount,
+      noDataCount,
+      missingPoCount,
+      noGroupPriceCount,
     };
   }, [computedRows, qtyMap, sellPriceSource]);
 
@@ -549,9 +635,13 @@ export default function SupplierProfitCheck() {
     setIsSaving(true);
     try {
       const items = itemsWithQty.map((r) => ({
-        barcode: r.code, code: r.code, name: r.name, itemName: r.name,
+        barcode: r.code,
+        code: r.code,
+        name: r.name,
+        itemName: r.name,
         qty: Number(qtyMap[r.stockItemId]) || 0,
-        supplierPrice: r.poPrice ?? r.nCost, weight: 0,
+        supplierPrice: r.poPrice ?? r.nCost,
+        weight: 0,
       }));
       const res = await apiRequest("POST", "/api/supplier-profit-check/save-proforma", {
         supplierId: Number(supplierId),
@@ -565,47 +655,62 @@ export default function SupplierProfitCheck() {
       toast({ title: "Proforma saved", description: `Reference: ${data.reference}` });
     } catch (err: any) {
       toast({ title: "Save failed", description: err.message, variant: "destructive" });
-    } finally { setIsSaving(false); }
+    } finally {
+      setIsSaving(false);
+    }
   }, [itemsWithQty, qtyMap, supplierId, proformaRef, proformaNotes, toast]);
 
   const handleExportSupplier = useCallback(async () => {
     if (!savedProforma) return;
     try {
-      const res = await fetch(`/api/supplier-profit-check/proforma/${savedProforma.id}/export-supplier`, { credentials: "include" });
+      const res = await fetch(`/api/supplier-profit-check/proforma/${savedProforma.id}/export-supplier`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = `proforma-${savedProforma.reference}.xlsx`; a.click();
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `proforma-${savedProforma.reference}.xlsx`;
+      a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) { toast({ title: "Export failed", description: err.message, variant: "destructive" }); }
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    }
   }, [savedProforma, toast]);
 
   const handleExportInternal = useCallback(async () => {
     try {
       const exportRows = itemsWithQty.map((r) => ({ ...r, qty: Number(qtyMap[r.stockItemId]) || 0 }));
       const res = await fetch("/api/supplier-profit-check/export-internal", {
-        method: "POST", credentials: "include",
+        method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           rows: exportRows,
           supplierName: selectedSupplier?.legalName || selectedSupplier?.legal_name || "",
-          fromDate: periodFilter.fromDate, toDate: periodFilter.toDate,
+          fromDate: periodFilter.fromDate,
+          toDate: periodFilter.toDate,
           proformaRef: savedProforma?.reference || "",
         }),
       });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement("a"); a.href = url; a.download = `profit-analysis-${savedProforma?.reference || "export"}.xlsx`; a.click();
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `profit-analysis-${savedProforma?.reference || "export"}.xlsx`;
+      a.click();
       URL.revokeObjectURL(url);
-    } catch (err: any) { toast({ title: "Export failed", description: err.message, variant: "destructive" }); }
+    } catch (err: any) {
+      toast({ title: "Export failed", description: err.message, variant: "destructive" });
+    }
   }, [itemsWithQty, qtyMap, selectedSupplier, periodFilter, savedProforma, toast]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="h-full overflow-y-auto bg-background">
       <div className="max-w-full p-4 space-y-3">
-
         {/* ── Header + Setup (unified card) ── */}
         <div className="rounded-xl border bg-card overflow-hidden">
           {/* Top strip: title + action */}
@@ -621,13 +726,17 @@ export default function SupplierProfitCheck() {
             </div>
             {/* Autosave indicator */}
             {autosaveStatus !== "idle" && (
-              <span className={`flex items-center gap-1.5 text-xs shrink-0 ${
-                autosaveStatus === "saving" ? "text-muted-foreground" :
-                autosaveStatus === "saved"  ? "text-emerald-500" :
-                "text-destructive"
-              }`}>
+              <span
+                className={`flex items-center gap-1.5 text-xs shrink-0 ${
+                  autosaveStatus === "saving"
+                    ? "text-muted-foreground"
+                    : autosaveStatus === "saved"
+                      ? "text-emerald-500"
+                      : "text-destructive"
+                }`}
+              >
                 {autosaveStatus === "saving" && <Loader2 className="w-3 h-3 animate-spin" />}
-                {autosaveStatus === "saved"  && <CheckCircle className="w-3 h-3" />}
+                {autosaveStatus === "saved" && <CheckCircle className="w-3 h-3" />}
                 {autosaveStatus === "saving" ? "Saving…" : autosaveStatus === "saved" ? "Saved" : "Save failed"}
               </span>
             )}
@@ -647,7 +756,10 @@ export default function SupplierProfitCheck() {
             {loaded && !savedProforma && !(sourceType === "proforma" && proformaId) && (
               <Button
                 onClick={() => {
-                  if (itemsWithQty.length === 0) { toast({ title: "Enter qty for at least one item", variant: "destructive" }); return; }
+                  if (itemsWithQty.length === 0) {
+                    toast({ title: "Enter qty for at least one item", variant: "destructive" });
+                    return;
+                  }
                   setShowConfirmModal(true);
                 }}
                 disabled={itemsWithQty.length === 0}
@@ -660,10 +772,20 @@ export default function SupplierProfitCheck() {
             )}
             {loaded && savedProforma && (
               <div className="flex gap-2 shrink-0">
-                <Button variant="outline" size="sm" onClick={handleExportSupplier} data-testid="button-export-supplier-bar">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportSupplier}
+                  data-testid="button-export-supplier-bar"
+                >
                   <Download className="w-4 h-4 mr-1.5" /> Supplier Excel
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleExportInternal} data-testid="button-export-internal-bar">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportInternal}
+                  data-testid="button-export-internal-bar"
+                >
                   <FileText className="w-4 h-4 mr-1.5" /> Analysis Excel
                 </Button>
               </div>
@@ -675,8 +797,16 @@ export default function SupplierProfitCheck() {
             {/* Row 1: Supplier, Date, Item Source, Sell Price Source */}
             <div className="flex flex-wrap gap-4 items-end">
               <div className="space-y-1.5 min-w-[180px] flex-1">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Supplier</label>
-                <Select value={supplierId} onValueChange={(v) => { setSupplierId(v); setOtwContainerIds([]); }}>
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Supplier
+                </label>
+                <Select
+                  value={supplierId}
+                  onValueChange={(v) => {
+                    setSupplierId(v);
+                    setOtwContainerIds([]);
+                  }}
+                >
                   <SelectTrigger data-testid="select-supplier">
                     <SelectValue placeholder="Select supplier…" />
                   </SelectTrigger>
@@ -691,14 +821,32 @@ export default function SupplierProfitCheck() {
               </div>
 
               <div className="space-y-1.5 shrink-0">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Sales Date Range</label>
-                <PeriodFilter value={periodFilter} onChange={setPeriodFilter} hideCustomInputs data-testid="period-filter-sales" />
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Sales Date Range
+                </label>
+                <PeriodFilter
+                  value={periodFilter}
+                  onChange={setPeriodFilter}
+                  hideCustomInputs
+                  data-testid="period-filter-sales"
+                />
               </div>
 
               <div className="space-y-1.5 min-w-[160px] shrink-0">
-                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Item Source</label>
-                <Select value={sourceType} onValueChange={(v) => { setSourceType(v as "all" | "proforma" | "otw_containers"); setProformaId(""); setOtwContainerIds([]); }}>
-                  <SelectTrigger data-testid="select-source-type"><SelectValue /></SelectTrigger>
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Item Source
+                </label>
+                <Select
+                  value={sourceType}
+                  onValueChange={(v) => {
+                    setSourceType(v as "all" | "proforma" | "otw_containers");
+                    setProformaId("");
+                    setOtwContainerIds([]);
+                  }}
+                >
+                  <SelectTrigger data-testid="select-source-type">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Supplier Items</SelectItem>
                     <SelectItem value="proforma">Existing Proforma</SelectItem>
@@ -709,12 +857,18 @@ export default function SupplierProfitCheck() {
 
               {sourceType === "proforma" && (
                 <div className="space-y-1.5 min-w-[160px] shrink-0">
-                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Select Proforma</label>
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Select Proforma
+                  </label>
                   <Select value={proformaId} onValueChange={setProformaId}>
-                    <SelectTrigger data-testid="select-proforma"><SelectValue placeholder="Select proforma…" /></SelectTrigger>
+                    <SelectTrigger data-testid="select-proforma">
+                      <SelectValue placeholder="Select proforma…" />
+                    </SelectTrigger>
                     <SelectContent>
                       {proformas.map((p: any) => (
-                        <SelectItem key={p.id} value={String(p.id)}>{p.reference}</SelectItem>
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.reference}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -726,15 +880,20 @@ export default function SupplierProfitCheck() {
                 <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
                   <MapPin className="w-3 h-3" /> Sell Price Source
                 </label>
-                <Select value={sellPriceSource} onValueChange={(v) => {
-                  setSellPriceSource(v as "avg" | "location_group");
-                  if (v === "location_group" && locationGroups.length > 0) {
-                    setSelectedLocationId(String(locationGroups[0].id));
-                  } else {
-                    setSelectedLocationId("");
-                  }
-                }}>
-                  <SelectTrigger data-testid="select-sell-price-source"><SelectValue /></SelectTrigger>
+                <Select
+                  value={sellPriceSource}
+                  onValueChange={(v) => {
+                    setSellPriceSource(v as "avg" | "location_group");
+                    if (v === "location_group" && locationGroups.length > 0) {
+                      setSelectedLocationId(String(locationGroups[0].id));
+                    } else {
+                      setSelectedLocationId("");
+                    }
+                  }}
+                >
+                  <SelectTrigger data-testid="select-sell-price-source">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="avg">Average Sell Price</SelectItem>
                     <SelectItem value="location_group">Location Group Price</SelectItem>
@@ -744,17 +903,23 @@ export default function SupplierProfitCheck() {
 
               {sellPriceSource === "location_group" && (
                 <div className="space-y-1.5 min-w-[180px] shrink-0">
-                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Location Group</label>
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Location Group
+                  </label>
                   {locationGroups.length === 0 ? (
                     <div className="h-9 flex items-center px-3 rounded-md border text-xs text-muted-foreground">
                       No groups configured
                     </div>
                   ) : (
                     <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                      <SelectTrigger data-testid="select-location-group"><SelectValue placeholder="Select group…" /></SelectTrigger>
+                      <SelectTrigger data-testid="select-location-group">
+                        <SelectValue placeholder="Select group…" />
+                      </SelectTrigger>
                       <SelectContent>
                         {locationGroups.map((lg) => (
-                          <SelectItem key={lg.id} value={String(lg.id)}>{lg.name}</SelectItem>
+                          <SelectItem key={lg.id} value={String(lg.id)}>
+                            {lg.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -768,12 +933,21 @@ export default function SupplierProfitCheck() {
               <div className="rounded-lg border bg-muted/30 p-3 space-y-2">
                 <div className="flex items-center gap-2">
                   <Container className="w-3.5 h-3.5 text-blue-500" />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">OTW Containers</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    OTW Containers
+                  </span>
                   {otwContainerIds.length > 0 && (
-                    <Badge className="bg-blue-500 text-white text-[10px] px-1.5 py-0 h-4">{otwContainerIds.length} selected</Badge>
+                    <Badge className="bg-blue-500 text-white text-[10px] px-1.5 py-0 h-4">
+                      {otwContainerIds.length} selected
+                    </Badge>
                   )}
                   {otwContainerIds.length > 0 && (
-                    <Button variant="ghost" size="sm" className="h-6 text-xs px-2 ml-auto" onClick={() => setOtwContainerIds([])}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs px-2 ml-auto"
+                      onClick={() => setOtwContainerIds([])}
+                    >
                       Clear
                     </Button>
                   )}
@@ -801,9 +975,7 @@ export default function SupplierProfitCheck() {
                           <Checkbox
                             checked={selected}
                             onCheckedChange={(chk) => {
-                              setOtwContainerIds((prev) =>
-                                chk ? [...prev, c.id] : prev.filter((id) => id !== c.id)
-                              );
+                              setOtwContainerIds((prev) => (chk ? [...prev, c.id] : prev.filter((id) => id !== c.id)));
                             }}
                           />
                           <div>
@@ -838,24 +1010,31 @@ export default function SupplierProfitCheck() {
                 <div className="p-1.5 rounded-lg bg-amber-500/15">
                   <Truck className="w-3.5 h-3.5 text-amber-500" />
                 </div>
-                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Landing Charges</span>
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  Landing Charges
+                </span>
               </div>
 
               {/* Inputs */}
               <div className="flex flex-wrap gap-3 flex-1">
                 {[
-                  { label: "Freight",        value: freight,       set: setFreight,       id: "input-freight"        },
-                  { label: "Duties",         value: duties,        set: setDuties,        id: "input-duties"         },
-                  { label: "Transportation", value: otherCharges,  set: setOtherCharges,  id: "input-other-charges"  },
-                  { label: "Surcharge",      value: surcharge,     set: setSurcharge,     id: "input-surcharge"      },
+                  { label: "Freight", value: freight, set: setFreight, id: "input-freight" },
+                  { label: "Duties", value: duties, set: setDuties, id: "input-duties" },
+                  { label: "Transportation", value: otherCharges, set: setOtherCharges, id: "input-other-charges" },
+                  { label: "Surcharge", value: surcharge, set: setSurcharge, id: "input-surcharge" },
                 ].map(({ label, value, set, id }) => (
                   <div key={id} className="space-y-1 w-32">
                     <label className="text-[11px] text-muted-foreground font-medium">{label}</label>
                     <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">$</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-medium">
+                        $
+                      </span>
                       <Input
-                        type="number" min="0" placeholder="0"
-                        value={value} onChange={(e) => set(e.target.value)}
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        value={value}
+                        onChange={(e) => set(e.target.value)}
                         className="h-8 pl-6 text-right font-mono"
                         data-testid={id}
                       />
@@ -867,11 +1046,14 @@ export default function SupplierProfitCheck() {
               {/* Derived metric chips */}
               <div className="flex flex-wrap items-center gap-2">
                 {[
-                  { label: "Total Extra",  value: `$${fmt(totalExtraCharges)}`, highlight: false },
-                  { label: "Total Bales",  value: totalBales.toLocaleString(),   highlight: false },
-                  { label: "Extra / Bale", value: `$${fmt(extraCostPerBale)}`,   highlight: true  },
+                  { label: "Total Extra", value: `$${fmt(totalExtraCharges)}`, highlight: false },
+                  { label: "Total Bales", value: totalBales.toLocaleString(), highlight: false },
+                  { label: "Extra / Bale", value: `$${fmt(extraCostPerBale)}`, highlight: true },
                 ].map(({ label, value, highlight }) => (
-                  <div key={label} className={`rounded-lg px-3 py-1.5 text-center ${highlight ? "bg-amber-500/15 border border-amber-500/30" : "bg-background border"}`}>
+                  <div
+                    key={label}
+                    className={`rounded-lg px-3 py-1.5 text-center ${highlight ? "bg-amber-500/15 border border-amber-500/30" : "bg-background border"}`}
+                  >
                     <div className="text-[10px] text-muted-foreground font-medium uppercase tracking-wide">{label}</div>
                     <div className={`text-sm font-bold tabular-nums ${highlight ? "text-amber-500" : ""}`}>{value}</div>
                   </div>
@@ -890,21 +1072,29 @@ export default function SupplierProfitCheck() {
         {loaded && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             <StatCard
-              icon={Hash} iconBg="bg-blue-500/10 text-blue-500"
-              label="Items" value={String(summary.selectedCount)}
+              icon={Hash}
+              iconBg="bg-blue-500/10 text-blue-500"
+              label="Items"
+              value={String(summary.selectedCount)}
               sub={`of ${summary.totalItems}`}
             />
             <StatCard
-              icon={ShoppingCart} iconBg="bg-indigo-500/10 text-indigo-500"
-              label="Total Qty" value={summary.totalQty.toLocaleString()}
+              icon={ShoppingCart}
+              iconBg="bg-indigo-500/10 text-indigo-500"
+              label="Total Qty"
+              value={summary.totalQty.toLocaleString()}
             />
             <StatCard
-              icon={CircleDollarSign} iconBg="bg-amber-500/10 text-amber-500"
-              label="Total Landing Cost" value={`$${fmt(summary.totalLandingCost)}`}
+              icon={CircleDollarSign}
+              iconBg="bg-amber-500/10 text-amber-500"
+              label="Total Landing Cost"
+              value={`$${fmt(summary.totalLandingCost)}`}
             />
             <StatCard
               icon={TrendingUp}
-              iconBg={summary.totalCostProfit >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}
+              iconBg={
+                summary.totalCostProfit >= 0 ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+              }
               label="Cost Profit"
               value={`${summary.totalCostProfit < 0 ? "-" : ""}$${fmt(Math.abs(summary.totalCostProfit))}`}
               sub={summary.costProfitPct != null ? `${fmt(Math.abs(summary.costProfitPct), 1)}%` : undefined}
@@ -917,33 +1107,48 @@ export default function SupplierProfitCheck() {
                 {summary.losingCount > 0 && (
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
-                    <span className="text-xs"><span className="font-bold text-red-500">{summary.losingCount}</span> <span className="text-muted-foreground">cost losing</span></span>
+                    <span className="text-xs">
+                      <span className="font-bold text-red-500">{summary.losingCount}</span>{" "}
+                      <span className="text-muted-foreground">cost losing</span>
+                    </span>
                   </div>
                 )}
                 {summary.noDataCount > 0 && (
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                    <span className="text-xs"><span className="font-bold text-amber-500">{summary.noDataCount}</span> <span className="text-muted-foreground">no data</span></span>
+                    <span className="text-xs">
+                      <span className="font-bold text-amber-500">{summary.noDataCount}</span>{" "}
+                      <span className="text-muted-foreground">no data</span>
+                    </span>
                   </div>
                 )}
                 {summary.missingPoCount > 0 && (
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-orange-500 shrink-0" />
-                    <span className="text-xs"><span className="font-bold text-orange-500">{summary.missingPoCount}</span> <span className="text-muted-foreground">no PO price</span></span>
+                    <span className="text-xs">
+                      <span className="font-bold text-orange-500">{summary.missingPoCount}</span>{" "}
+                      <span className="text-muted-foreground">no PO price</span>
+                    </span>
                   </div>
                 )}
                 {summary.noGroupPriceCount > 0 && (
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                    <span className="text-xs"><span className="font-bold text-amber-500">{summary.noGroupPriceCount}</span> <span className="text-muted-foreground">no group price</span></span>
+                    <span className="text-xs">
+                      <span className="font-bold text-amber-500">{summary.noGroupPriceCount}</span>{" "}
+                      <span className="text-muted-foreground">no group price</span>
+                    </span>
                   </div>
                 )}
-                {summary.losingCount === 0 && summary.noDataCount === 0 && summary.missingPoCount === 0 && summary.noGroupPriceCount === 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
-                    <span className="text-xs text-emerald-500 font-medium">All good</span>
-                  </div>
-                )}
+                {summary.losingCount === 0 &&
+                  summary.noDataCount === 0 &&
+                  summary.missingPoCount === 0 &&
+                  summary.noGroupPriceCount === 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                      <span className="text-xs text-emerald-500 font-medium">All good</span>
+                    </div>
+                  )}
               </div>
             </div>
           </div>
@@ -955,7 +1160,9 @@ export default function SupplierProfitCheck() {
             <div className="flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
               <span className="text-sm font-medium">Proforma saved:</span>
-              <span className="font-mono text-sm text-emerald-600 dark:text-emerald-400">{savedProforma.reference}</span>
+              <span className="font-mono text-sm text-emerald-600 dark:text-emerald-400">
+                {savedProforma.reference}
+              </span>
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={handleExportSupplier} data-testid="button-export-supplier">
@@ -976,7 +1183,8 @@ export default function SupplierProfitCheck() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
               <Input
                 placeholder="Search code / name"
-                value={search} onChange={(e) => setSearch(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="pl-8 w-48 rounded-lg"
                 data-testid="input-search"
               />
@@ -1002,16 +1210,28 @@ export default function SupplierProfitCheck() {
               </PopoverTrigger>
               <PopoverContent className="w-52 p-2" align="start">
                 <div className="flex items-center justify-between mb-2 pb-1.5 border-b">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Filter by Status</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Filter by Status
+                  </span>
                   {activeStatuses.length > 0 && (
-                    <Button variant="ghost" size="sm" className="h-5 text-xs px-1.5" onClick={() => setActiveStatuses([])} data-testid="button-clear-status">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 text-xs px-1.5"
+                      onClick={() => setActiveStatuses([])}
+                      data-testid="button-clear-status"
+                    >
                       Clear
                     </Button>
                   )}
                 </div>
                 <div className="space-y-0.5">
                   {STATUS_OPTIONS.map((opt) => (
-                    <label key={opt.value} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover-elevate cursor-pointer" data-testid={`status-filter-${opt.value}`}>
+                    <label
+                      key={opt.value}
+                      className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover-elevate cursor-pointer"
+                      data-testid={`status-filter-${opt.value}`}
+                    >
                       <Checkbox
                         checked={activeStatuses.includes(opt.value)}
                         onCheckedChange={() => toggleStatus(opt.value)}
@@ -1037,13 +1257,23 @@ export default function SupplierProfitCheck() {
               <PopoverContent className="w-56 p-2" align="start">
                 <div className="flex items-center justify-between mb-2 pb-1.5 border-b">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Columns</span>
-                  <Button variant="ghost" size="sm" className="h-5 text-xs px-1.5" onClick={resetCols} data-testid="button-reset-columns">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-5 text-xs px-1.5"
+                    onClick={resetCols}
+                    data-testid="button-reset-columns"
+                  >
                     <RotateCcw className="w-3 h-3 mr-1" /> Reset
                   </Button>
                 </div>
                 <div className="space-y-0.5">
                   {ALL_COLUMNS.map((col) => (
-                    <label key={col.key} className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover-elevate cursor-pointer" data-testid={`col-toggle-${col.key}`}>
+                    <label
+                      key={col.key}
+                      className="flex items-center gap-2.5 px-1.5 py-1.5 rounded-md hover-elevate cursor-pointer"
+                      data-testid={`col-toggle-${col.key}`}
+                    >
                       <Checkbox checked={colVisibility[col.key]} onCheckedChange={() => toggleCol(col.key)} />
                       <span className="text-sm">{col.label}</span>
                     </label>
@@ -1067,40 +1297,80 @@ export default function SupplierProfitCheck() {
             <Table wrapperClassName="max-h-[calc(100vh-340px)]">
               <TableHeader className="sticky top-0 z-30">
                 <TableRow className="bg-muted/60 border-b-2 hover:bg-muted/60">
-                  {colVisibility.code           && <TableHead className="min-w-[90px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Code</TableHead>}
-                  {colVisibility.name           && <TableHead className="min-w-[200px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Name</TableHead>}
-                  {colVisibility.salesQty       && <TableHead className="text-right min-w-[80px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Sales Qty</TableHead>}
-                  {colVisibility.avgSell        && <TableHead className="text-right min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{sellPriceSource === "location_group" ? "Group Sell" : "Avg Sell"}</TableHead>}
-                  {colVisibility.dubaiPrice     && (
+                  {colVisibility.code && (
+                    <TableHead className="min-w-[90px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Code
+                    </TableHead>
+                  )}
+                  {colVisibility.name && (
+                    <TableHead className="min-w-[200px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Name
+                    </TableHead>
+                  )}
+                  {colVisibility.salesQty && (
+                    <TableHead className="text-right min-w-[80px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Sales Qty
+                    </TableHead>
+                  )}
+                  {colVisibility.avgSell && (
+                    <TableHead className="text-right min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      {sellPriceSource === "location_group" ? "Group Sell" : "Avg Sell"}
+                    </TableHead>
+                  )}
+                  {colVisibility.dubaiPrice && (
                     <TableHead className="text-right min-w-[110px] text-[11px] font-bold uppercase tracking-wide">
                       <span className="text-amber-500">Dubai Price</span>
                       <div className="font-normal text-muted-foreground normal-case text-[10px]">PO rate</div>
                     </TableHead>
                   )}
-                  {colVisibility.extraPerBale   && (
+                  {colVisibility.extraPerBale && (
                     <TableHead className="text-right min-w-[90px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                       Extra / Bale
                       <div className="font-normal normal-case text-[10px]">freight+duties</div>
                     </TableHead>
                   )}
-                  {colVisibility.landingCost    && (
+                  {colVisibility.landingCost && (
                     <TableHead className="text-right min-w-[110px] text-[11px] font-bold uppercase tracking-wide">
                       <span className="text-blue-500">Landing Cost</span>
                       <div className="font-normal text-muted-foreground normal-case text-[10px]">Dubai + Extra</div>
                     </TableHead>
                   )}
-                  {colVisibility.costProfit     && (
+                  {colVisibility.costProfit && (
                     <TableHead className="text-right min-w-[130px] text-[11px] font-bold uppercase tracking-wide">
                       <span className="text-emerald-500">Cost Profit</span>
                       <div className="font-normal text-muted-foreground normal-case text-[10px]">Sell − Landing</div>
                     </TableHead>
                   )}
-                  {colVisibility.status         && <TableHead className="min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Status</TableHead>}
-                  {colVisibility.qtyToOrder     && <TableHead className="text-right min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Qty to Order</TableHead>}
-                  {colVisibility.inventoryAvgCost && <TableHead className="text-right min-w-[130px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Inv. Avg Cost</TableHead>}
-                  {colVisibility.hassanPrice    && <TableHead className="text-right min-w-[110px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Hassan Price</TableHead>}
-                  {colVisibility.hassanProfit   && <TableHead className="text-right min-w-[120px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Hassan Profit</TableHead>}
-                  {colVisibility.currentStock   && <TableHead className="text-right min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Stock</TableHead>}
+                  {colVisibility.status && (
+                    <TableHead className="min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Status
+                    </TableHead>
+                  )}
+                  {colVisibility.qtyToOrder && (
+                    <TableHead className="text-right min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Qty to Order
+                    </TableHead>
+                  )}
+                  {colVisibility.inventoryAvgCost && (
+                    <TableHead className="text-right min-w-[130px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Inv. Avg Cost
+                    </TableHead>
+                  )}
+                  {colVisibility.hassanPrice && (
+                    <TableHead className="text-right min-w-[110px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Hassan Price
+                    </TableHead>
+                  )}
+                  {colVisibility.hassanProfit && (
+                    <TableHead className="text-right min-w-[120px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Hassan Profit
+                    </TableHead>
+                  )}
+                  {colVisibility.currentStock && (
+                    <TableHead className="text-right min-w-[100px] text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                      Stock
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1117,11 +1387,15 @@ export default function SupplierProfitCheck() {
                     const isNoData = row.computedStatus === "no_sales_data";
                     const isNoGroupPrice = sellPriceSource === "location_group" && row.groupSellingPrice == null;
                     const rowClass = [
-                      isLosing  ? "border-l-2 border-l-red-500 bg-red-500/5"
-                      : isNoGroupPrice ? "border-l-2 border-l-amber-400 bg-amber-500/5"
-                      : isNoData ? "bg-amber-500/3"
-                      : idx % 2 === 1 ? "bg-muted/20"
-                      : "",
+                      isLosing
+                        ? "border-l-2 border-l-red-500 bg-red-500/5"
+                        : isNoGroupPrice
+                          ? "border-l-2 border-l-amber-400 bg-amber-500/5"
+                          : isNoData
+                            ? "bg-amber-500/3"
+                            : idx % 2 === 1
+                              ? "bg-muted/20"
+                              : "",
                       "hover:bg-muted/40 transition-colors",
                     ].join(" ");
 
@@ -1130,12 +1404,14 @@ export default function SupplierProfitCheck() {
                         {colVisibility.code && (
                           <TableCell className="font-mono text-xs text-muted-foreground py-2.5">{row.code}</TableCell>
                         )}
-                        {colVisibility.name && (
-                          <TableCell className="font-medium text-sm py-2.5">{row.name}</TableCell>
-                        )}
+                        {colVisibility.name && <TableCell className="font-medium text-sm py-2.5">{row.name}</TableCell>}
                         {colVisibility.salesQty && (
                           <TableCell className="text-right font-mono text-sm py-2.5">
-                            {row.salesQty > 0 ? row.salesQty.toLocaleString("en-US") : <span className="text-muted-foreground text-xs">—</span>}
+                            {row.salesQty > 0 ? (
+                              row.salesQty.toLocaleString("en-US")
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
                           </TableCell>
                         )}
                         {colVisibility.avgSell && (
@@ -1145,7 +1421,9 @@ export default function SupplierProfitCheck() {
                                 {row.groupSellingPrice != null ? (
                                   <span className="font-mono text-sm">${fmt(row.groupSellingPrice)}</span>
                                 ) : (
-                                  <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">No Price</span>
+                                  <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                                    No Price
+                                  </span>
                                 )}
                               </div>
                             ) : (
@@ -1163,7 +1441,9 @@ export default function SupplierProfitCheck() {
                                   data-avg-input="true"
                                 />
                                 {manualAvgPrices[row.stockItemId] && row.avgSellingPrice != null && (
-                                  <span className="text-[10px] text-muted-foreground leading-tight">auto ${fmt(row.avgSellingPrice)}</span>
+                                  <span className="text-[10px] text-muted-foreground leading-tight">
+                                    auto ${fmt(row.avgSellingPrice)}
+                                  </span>
                                 )}
                               </div>
                             )}
@@ -1188,7 +1468,9 @@ export default function SupplierProfitCheck() {
                                 />
                               </div>
                               {manualPoPrices[row.stockItemId] && row.poPrice != null && (
-                                <span className="text-[10px] text-muted-foreground leading-tight">auto ${fmt(row.poPrice)}</span>
+                                <span className="text-[10px] text-muted-foreground leading-tight">
+                                  auto ${fmt(row.poPrice)}
+                                </span>
                               )}
                               {!manualPoPrices[row.stockItemId] && row.poPriceSource === "any_po_fallback" && (
                                 <span className="text-[10px] text-amber-500/80 leading-tight">any supplier</span>
@@ -1198,16 +1480,22 @@ export default function SupplierProfitCheck() {
                         )}
                         {colVisibility.extraPerBale && (
                           <TableCell className="text-right text-sm py-2.5">
-                            {extraCostPerBale > 0
-                              ? <span className="font-mono text-amber-500">${fmt(extraCostPerBale)}</span>
-                              : <span className="text-muted-foreground text-xs">—</span>}
+                            {extraCostPerBale > 0 ? (
+                              <span className="font-mono text-amber-500">${fmt(extraCostPerBale)}</span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
                           </TableCell>
                         )}
                         {colVisibility.landingCost && (
                           <TableCell className="text-right text-sm font-medium py-2.5 bg-blue-500/5">
-                            {row.landingCost != null
-                              ? <span className="text-blue-600 dark:text-blue-400 tabular-nums">${fmt(row.landingCost)}</span>
-                              : <span className="text-muted-foreground text-xs">—</span>}
+                            {row.landingCost != null ? (
+                              <span className="text-blue-600 dark:text-blue-400 tabular-nums">
+                                ${fmt(row.landingCost)}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
                           </TableCell>
                         )}
                         {colVisibility.costProfit && (
@@ -1223,7 +1511,10 @@ export default function SupplierProfitCheck() {
                         {colVisibility.qtyToOrder && (
                           <TableCell className="py-2.5">
                             <Input
-                              type="number" min="0" step="1" placeholder="0"
+                              type="number"
+                              min="0"
+                              step="1"
+                              placeholder="0"
                               value={qtyMap[row.stockItemId] ?? ""}
                               onChange={(e) => {
                                 setQtyMap((prev) => ({ ...prev, [row.stockItemId]: e.target.value }));
@@ -1232,10 +1523,15 @@ export default function SupplierProfitCheck() {
                               onKeyDown={(e) => {
                                 if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                                   e.preventDefault();
-                                  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>("[data-qty-input]"));
+                                  const inputs = Array.from(
+                                    document.querySelectorAll<HTMLInputElement>("[data-qty-input]")
+                                  );
                                   const idx2 = inputs.indexOf(e.currentTarget as HTMLInputElement);
                                   const target = e.key === "ArrowDown" ? inputs[idx2 + 1] : inputs[idx2 - 1];
-                                  if (target) { target.focus(); target.select(); }
+                                  if (target) {
+                                    target.focus();
+                                    target.select();
+                                  }
                                 }
                               }}
                               className="w-24 h-7 text-right ml-auto font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -1251,17 +1547,28 @@ export default function SupplierProfitCheck() {
                         )}
                         {colVisibility.hassanPrice && (
                           <TableCell className="text-right text-sm font-mono py-2.5">
-                            {row.configPrice > 0 ? `$${fmt(row.configPrice)}` : <span className="text-muted-foreground text-xs">—</span>}
+                            {row.configPrice > 0 ? (
+                              `$${fmt(row.configPrice)}`
+                            ) : (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            )}
                           </TableCell>
                         )}
                         {colVisibility.hassanProfit && (
                           <TableCell className="py-2.5">
-                            <ProfitCell value={row.hassanProfit} pct={row.configPrice > 0 ? (row.hassanProfit / row.configPrice) * 100 : null} />
+                            <ProfitCell
+                              value={row.hassanProfit}
+                              pct={row.configPrice > 0 ? (row.hassanProfit / row.configPrice) * 100 : null}
+                            />
                           </TableCell>
                         )}
                         {colVisibility.currentStock && (
                           <TableCell className="text-right text-sm font-mono text-muted-foreground py-2.5">
-                            {row.currentStock > 0 ? row.currentStock.toLocaleString() : <span className="text-xs">—</span>}
+                            {row.currentStock > 0 ? (
+                              row.currentStock.toLocaleString()
+                            ) : (
+                              <span className="text-xs">—</span>
+                            )}
                           </TableCell>
                         )}
                       </TableRow>
@@ -1281,7 +1588,9 @@ export default function SupplierProfitCheck() {
             </div>
             <div>
               <p className="font-semibold text-base">Select a supplier to begin</p>
-              <p className="text-sm text-muted-foreground mt-1">Choose a supplier from the panel above to load its items</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Choose a supplier from the panel above to load its items
+              </p>
             </div>
           </div>
         )}
@@ -1294,13 +1603,19 @@ export default function SupplierProfitCheck() {
       </div>
 
       {/* ── Add Item Dialog ── */}
-      <Dialog open={showAddItemDialog} onOpenChange={(open) => {
-        setShowAddItemDialog(open);
-        if (!open) {
-          setNewItemCode(""); setNewItemName(""); setNewItemGroupId("");
-          setNewItemDubaiPrice(""); setNewItemAvgSell("");
-        }
-      }}>
+      <Dialog
+        open={showAddItemDialog}
+        onOpenChange={(open) => {
+          setShowAddItemDialog(open);
+          if (!open) {
+            setNewItemCode("");
+            setNewItemName("");
+            setNewItemGroupId("");
+            setNewItemDubaiPrice("");
+            setNewItemAvgSell("");
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1349,7 +1664,9 @@ export default function SupplierProfitCheck() {
                 <SelectContent>
                   <SelectItem value="none">No group</SelectItem>
                   {(stockGroups as any[]).map((g: any) => (
-                    <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                    <SelectItem key={g.id} value={String(g.id)}>
+                      {g.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1365,7 +1682,10 @@ export default function SupplierProfitCheck() {
                 <div className="relative">
                   <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                   <Input
-                    type="number" min="0" step="0.01" placeholder="0.00"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
                     value={newItemDubaiPrice}
                     onChange={(e) => setNewItemDubaiPrice(e.target.value)}
                     className="pl-6 font-mono"
@@ -1381,7 +1701,10 @@ export default function SupplierProfitCheck() {
                 <div className="relative">
                   <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                   <Input
-                    type="number" min="0" step="0.01" placeholder="0.00"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
                     value={newItemAvgSell}
                     onChange={(e) => setNewItemAvgSell(e.target.value)}
                     className="pl-6 font-mono"
@@ -1413,10 +1736,17 @@ export default function SupplierProfitCheck() {
               disabled={addItemMutation.isPending || !newItemCode.trim() || !newItemName.trim()}
               data-testid="button-confirm-add-item"
             >
-              {addItemMutation.isPending
-                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Adding…</>
-                : <><Plus className="w-4 h-4 mr-2" />Add Item</>
-              }
+              {addItemMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Adding…
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Item
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1433,16 +1763,22 @@ export default function SupplierProfitCheck() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: "Items Selected",    value: summary.selectedCount },
-                { label: "Total Quantity",     value: summary.totalQty.toLocaleString() },
+                { label: "Items Selected", value: summary.selectedCount },
+                { label: "Total Quantity", value: summary.totalQty.toLocaleString() },
                 { label: "Total Landing Cost", value: `$${fmt(summary.totalLandingCost)}` },
-                { label: "Cost Profit",        value: `${summary.totalCostProfit < 0 ? "-" : ""}$${fmt(Math.abs(summary.totalCostProfit))}`, negative: summary.totalCostProfit < 0 },
-                { label: "Losing Items",       value: summary.losingCount, warn: summary.losingCount > 0 },
-                { label: "No PO Price",        value: summary.missingPoCount, warn: summary.missingPoCount > 0 },
+                {
+                  label: "Cost Profit",
+                  value: `${summary.totalCostProfit < 0 ? "-" : ""}$${fmt(Math.abs(summary.totalCostProfit))}`,
+                  negative: summary.totalCostProfit < 0,
+                },
+                { label: "Losing Items", value: summary.losingCount, warn: summary.losingCount > 0 },
+                { label: "No PO Price", value: summary.missingPoCount, warn: summary.missingPoCount > 0 },
               ].map((item) => (
                 <div key={item.label} className="rounded-lg border p-2.5 bg-muted/30">
                   <div className="text-xs text-muted-foreground">{item.label}</div>
-                  <div className={`text-sm font-semibold ${"warn" in item && item.warn ? "text-red-500" : "negative" in item && item.negative ? "text-red-500" : ""}`}>
+                  <div
+                    className={`text-sm font-semibold ${"warn" in item && item.warn ? "text-red-500" : "negative" in item && item.negative ? "text-red-500" : ""}`}
+                  >
                     {item.value}
                   </div>
                 </div>
@@ -1457,16 +1793,28 @@ export default function SupplierProfitCheck() {
             <div className="space-y-2">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Proforma Reference</label>
-                <Input placeholder="Auto-generated if blank" value={proformaRef} onChange={(e) => setProformaRef(e.target.value)} data-testid="input-proforma-ref" />
+                <Input
+                  placeholder="Auto-generated if blank"
+                  value={proformaRef}
+                  onChange={(e) => setProformaRef(e.target.value)}
+                  data-testid="input-proforma-ref"
+                />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Notes (optional)</label>
-                <Input placeholder="Any notes..." value={proformaNotes} onChange={(e) => setProformaNotes(e.target.value)} data-testid="input-proforma-notes" />
+                <Input
+                  placeholder="Any notes..."
+                  value={proformaNotes}
+                  onChange={(e) => setProformaNotes(e.target.value)}
+                  data-testid="input-proforma-notes"
+                />
               </div>
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowConfirmModal(false)} disabled={isSaving}>Cancel</Button>
+            <Button variant="outline" onClick={() => setShowConfirmModal(false)} disabled={isSaving}>
+              Cancel
+            </Button>
             <Button onClick={handleSaveProforma} disabled={isSaving} data-testid="button-confirm-save">
               {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
               {isSaving ? "Saving..." : "Save Proforma"}

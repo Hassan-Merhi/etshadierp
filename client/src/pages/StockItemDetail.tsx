@@ -22,7 +22,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useEscapeBack } from "@/hooks/use-escape-back";
 import { PageHeader } from "@/components/PageHeader";
 
-type DatePreset = "all" | "today" | "yesterday" | "this-month" | "last-1-month" | "last-6-months" | "this-year" | "custom";
+type DatePreset =
+  | "all"
+  | "today"
+  | "yesterday"
+  | "this-month"
+  | "last-1-month"
+  | "last-6-months"
+  | "this-year"
+  | "custom";
 
 function getPresetDates(preset: DatePreset): { from: string; to: string } {
   const now = new Date();
@@ -30,10 +38,13 @@ function getPresetDates(preset: DatePreset): { from: string; to: string } {
   const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const today = fmt(now);
   switch (preset) {
-    case "all": return { from: "", to: "" };
-    case "today": return { from: today, to: today };
+    case "all":
+      return { from: "", to: "" };
+    case "today":
+      return { from: today, to: today };
     case "yesterday": {
-      const y = new Date(now); y.setDate(y.getDate() - 1);
+      const y = new Date(now);
+      y.setDate(y.getDate() - 1);
       return { from: fmt(y), to: fmt(y) };
     }
     case "this-month": {
@@ -42,30 +53,33 @@ function getPresetDates(preset: DatePreset): { from: string; to: string } {
       return { from: fmt(first), to: fmt(last) };
     }
     case "last-1-month": {
-      const from = new Date(now); from.setMonth(from.getMonth() - 1);
+      const from = new Date(now);
+      from.setMonth(from.getMonth() - 1);
       return { from: fmt(from), to: today };
     }
     case "last-6-months": {
-      const from = new Date(now); from.setMonth(from.getMonth() - 6);
+      const from = new Date(now);
+      from.setMonth(from.getMonth() - 6);
       return { from: fmt(from), to: today };
     }
     case "this-year": {
       const first = new Date(now.getFullYear(), 0, 1);
       return { from: fmt(first), to: today };
     }
-    default: return { from: "", to: "" };
+    default:
+      return { from: "", to: "" };
   }
 }
 
 const PRESET_LABELS: Record<DatePreset, string> = {
-  "all": "All Time",
-  "today": "Today",
-  "yesterday": "Yesterday",
+  all: "All Time",
+  today: "Today",
+  yesterday: "Yesterday",
   "this-month": "This Month",
   "last-1-month": "Last 1 Month",
   "last-6-months": "Last 6 Months",
   "this-year": "This Year",
-  "custom": "Custom Range",
+  custom: "Custom Range",
 };
 
 interface StockItem {
@@ -112,8 +126,8 @@ interface StockItemDetails {
 }
 
 const formatSmartNumber = (value: string | number) => {
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  if (isNaN(num)) return '0';
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "0";
   return num % 1 === 0 ? num.toString() : value.toString();
 };
 
@@ -144,9 +158,14 @@ export default function StockItemDetail() {
     queryKey: ["/api/stock-items"],
   });
 
-  const selectedItem = stockItems.find(item => item.id === itemId);
+  const selectedItem = stockItems.find((item) => item.id === itemId);
 
-  const { data: itemDetails, isLoading: detailsLoading, error: detailsError, refetch: refetchDetails } = useQuery<StockItemDetails>({
+  const {
+    data: itemDetails,
+    isLoading: detailsLoading,
+    error: detailsError,
+    refetch: refetchDetails,
+  } = useQuery<StockItemDetails>({
     queryKey: ["/api/stock-items", itemId, "details", fromDate, toDate],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -177,7 +196,7 @@ export default function StockItemDetail() {
   const handleSaleClick = (sale: Sale) => {
     if (!sale.voucherId) return;
     if (sale.posStation != null) {
-      const normalizedDate = sale.saleDate.split(' ')[0];
+      const normalizedDate = sale.saleDate.split(" ")[0];
       navigate(`/pos-daybook?date=${normalizedDate}&voucherId=${sale.voucherId}`);
     } else {
       navigate(`/daybook?voucherId=${sale.voucherId}`);
@@ -187,19 +206,12 @@ export default function StockItemDetail() {
   if (!itemId || (stockItems.length > 0 && !selectedItem)) {
     return (
       <div className="p-3 sm:p-6 space-y-6">
-        <Button
-          variant="ghost"
-          onClick={handleBack}
-          data-testid="button-back-to-stock-query"
-          className="gap-2"
-        >
+        <Button variant="ghost" onClick={handleBack} data-testid="button-back-to-stock-query" className="gap-2">
           <ArrowLeft className="h-4 w-4" />
           Back to Stock Query
         </Button>
         <Card>
-          <CardContent className="p-6 text-center text-muted-foreground">
-            Stock item not found
-          </CardContent>
+          <CardContent className="p-6 text-center text-muted-foreground">Stock item not found</CardContent>
         </Card>
       </div>
     );
@@ -208,12 +220,7 @@ export default function StockItemDetail() {
   return (
     <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          onClick={handleBack}
-          data-testid="button-back-to-stock-query"
-          className="gap-2"
-        >
+        <Button variant="ghost" onClick={handleBack} data-testid="button-back-to-stock-query" className="gap-2">
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Back to Stock Query</span>
           <span className="sm:hidden">Back</span>
@@ -221,7 +228,10 @@ export default function StockItemDetail() {
       </div>
 
       <div>
-        <PageHeader title={selectedItem?.name || "Loading..."} subtitle="Purchase history, sales history, and current inventory locations" />
+        <PageHeader
+          title={selectedItem?.name || "Loading..."}
+          subtitle="Purchase history, sales history, and current inventory locations"
+        />
       </div>
 
       {/* Date filter */}
@@ -236,7 +246,17 @@ export default function StockItemDetail() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              {(["all","today","yesterday","this-month","last-1-month","last-6-months","this-year"] as DatePreset[]).map((p) => (
+              {(
+                [
+                  "all",
+                  "today",
+                  "yesterday",
+                  "this-month",
+                  "last-1-month",
+                  "last-6-months",
+                  "this-year",
+                ] as DatePreset[]
+              ).map((p) => (
                 <DropdownMenuItem
                   key={p}
                   onClick={() => applyPreset(p)}
@@ -260,7 +280,9 @@ export default function StockItemDetail() {
           {preset === "custom" && (
             <>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="filter-from" className="text-xs text-muted-foreground">From</Label>
+                <Label htmlFor="filter-from" className="text-xs text-muted-foreground">
+                  From
+                </Label>
                 <Input
                   id="filter-from"
                   type="date"
@@ -271,7 +293,9 @@ export default function StockItemDetail() {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="filter-to" className="text-xs text-muted-foreground">To</Label>
+                <Label htmlFor="filter-to" className="text-xs text-muted-foreground">
+                  To
+                </Label>
                 <Input
                   id="filter-to"
                   type="date"
@@ -301,9 +325,7 @@ export default function StockItemDetail() {
           )}
 
           {preset !== "all" && (
-            <span className="text-xs text-muted-foreground">
-              Filtering purchases &amp; sales by date
-            </span>
+            <span className="text-xs text-muted-foreground">Filtering purchases &amp; sales by date</span>
           )}
         </div>
       </Card>
@@ -357,17 +379,29 @@ export default function StockItemDetail() {
                         <TableBody>
                           {itemDetails.purchases.map((purchase, idx) => (
                             <TableRow key={idx}>
-                              <TableCell className="text-sm font-mono">{purchase.containerNumber || purchase.supplierName || "-"}</TableCell>
-                              <TableCell className="text-right font-mono text-sm">{formatSmartNumber(purchase.quantity)}</TableCell>
-                              <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(purchase.rate))}</TableCell>
+                              <TableCell className="text-sm font-mono">
+                                {purchase.containerNumber || purchase.supplierName || "-"}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {formatSmartNumber(purchase.quantity)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {formatAmount(parseFloat(purchase.rate))}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                         <TableFooter className="sticky bottom-0 bg-background border-t">
                           <TableRow className="font-semibold text-sm">
                             <TableCell>Total</TableCell>
-                            <TableCell className="text-right font-mono" data-testid="total-purchase-qty">{formatSmartNumber(itemDetails.purchases.reduce((s, p) => s + parseFloat(p.quantity || '0'), 0))}</TableCell>
-                            <TableCell className="text-right font-mono" data-testid="total-purchase-value">{formatAmount(itemDetails.purchases.reduce((s, p) => s + parseFloat(p.amount || '0'), 0))}</TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-purchase-qty">
+                              {formatSmartNumber(
+                                itemDetails.purchases.reduce((s, p) => s + parseFloat(p.quantity || "0"), 0)
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-purchase-value">
+                              {formatAmount(itemDetails.purchases.reduce((s, p) => s + parseFloat(p.amount || "0"), 0))}
+                            </TableCell>
                           </TableRow>
                         </TableFooter>
                       </Table>
@@ -375,7 +409,9 @@ export default function StockItemDetail() {
                     <div className="md:hidden space-y-2">
                       {itemDetails.purchases.map((purchase, idx) => (
                         <div key={idx} className="p-2 rounded-md border text-sm">
-                          <div className="font-mono font-medium">{purchase.containerNumber || purchase.supplierName || "-"}</div>
+                          <div className="font-mono font-medium">
+                            {purchase.containerNumber || purchase.supplierName || "-"}
+                          </div>
                           <div className="flex justify-between mt-1 text-muted-foreground">
                             <span>Qty: {formatSmartNumber(purchase.quantity)}</span>
                             <span>Rate: {formatAmount(parseFloat(purchase.rate))}</span>
@@ -386,9 +422,7 @@ export default function StockItemDetail() {
                   </div>
                 </>
               ) : (
-                <div className="h-64 flex items-center justify-center text-muted-foreground">
-                  No purchase history
-                </div>
+                <div className="h-64 flex items-center justify-center text-muted-foreground">No purchase history</div>
               )}
             </CardContent>
           </Card>
@@ -417,7 +451,7 @@ export default function StockItemDetail() {
                         </TableHeader>
                         <TableBody>
                           {itemDetails.sales.map((sale, idx) => (
-                            <TableRow 
+                            <TableRow
                               key={idx}
                               onClick={() => handleSaleClick(sale)}
                               className={sale.voucherId ? "cursor-pointer hover-elevate" : ""}
@@ -425,8 +459,12 @@ export default function StockItemDetail() {
                             >
                               <TableCell className="text-sm">{formatDisplayDate(new Date(sale.saleDate))}</TableCell>
                               <TableCell className="text-sm">{sale.locationName || "-"}</TableCell>
-                              <TableCell className="text-right font-mono text-sm">{formatSmartNumber(sale.quantity)}</TableCell>
-                              <TableCell className="text-right font-mono text-sm">{formatAmount(parseFloat(sale.sellingPrice))}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {formatSmartNumber(sale.quantity)}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {formatAmount(parseFloat(sale.sellingPrice))}
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -434,8 +472,16 @@ export default function StockItemDetail() {
                           <TableRow className="font-semibold text-sm">
                             <TableCell>Total</TableCell>
                             <TableCell></TableCell>
-                            <TableCell className="text-right font-mono" data-testid="total-sales-qty">{formatSmartNumber(itemDetails.sales.reduce((s, sa) => s + parseFloat(sa.quantity || '0'), 0))}</TableCell>
-                            <TableCell className="text-right font-mono" data-testid="total-sales-value">{formatAmount(itemDetails.sales.reduce((s, sa) => s + parseFloat(sa.totalSales || '0'), 0))}</TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-sales-qty">
+                              {formatSmartNumber(
+                                itemDetails.sales.reduce((s, sa) => s + parseFloat(sa.quantity || "0"), 0)
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-sales-value">
+                              {formatAmount(
+                                itemDetails.sales.reduce((s, sa) => s + parseFloat(sa.totalSales || "0"), 0)
+                              )}
+                            </TableCell>
                           </TableRow>
                         </TableFooter>
                       </Table>
@@ -462,9 +508,7 @@ export default function StockItemDetail() {
                   </div>
                 </>
               ) : (
-                <div className="h-64 flex items-center justify-center text-muted-foreground">
-                  No sales history
-                </div>
+                <div className="h-64 flex items-center justify-center text-muted-foreground">No sales history</div>
               )}
             </CardContent>
           </Card>
@@ -510,9 +554,17 @@ export default function StockItemDetail() {
                         <TableFooter className="sticky bottom-0 bg-background border-t">
                           <TableRow className="font-semibold text-sm">
                             <TableCell>Total</TableCell>
-                            <TableCell className="text-right font-mono" data-testid="total-inventory-qty">{formatSmartNumber(itemDetails.inventoryLocations.reduce((s, l) => s + parseFloat(l.quantity || '0'), 0))}</TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-inventory-qty">
+                              {formatSmartNumber(
+                                itemDetails.inventoryLocations.reduce((s, l) => s + parseFloat(l.quantity || "0"), 0)
+                              )}
+                            </TableCell>
                             <TableCell></TableCell>
-                            <TableCell className="text-right font-mono" data-testid="total-inventory-value">{formatAmount(itemDetails.inventoryLocations.reduce((s, l) => s + parseFloat(l.totalValue || '0'), 0))}</TableCell>
+                            <TableCell className="text-right font-mono" data-testid="total-inventory-value">
+                              {formatAmount(
+                                itemDetails.inventoryLocations.reduce((s, l) => s + parseFloat(l.totalValue || "0"), 0)
+                              )}
+                            </TableCell>
                           </TableRow>
                         </TableFooter>
                       </Table>

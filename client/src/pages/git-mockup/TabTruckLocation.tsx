@@ -12,13 +12,14 @@ import { STATUS_BADGE as STATUS_BADGE_MAP } from "./types";
 
 export function TabTruckLocation() {
   const [companyMode, setCompanyMode] = useState<CompanyViewMode>("session");
-  const [waSending, setWaSending]     = useState(false);
-  const printRef                      = useRef<HTMLDivElement>(null);
-  const { toast }                     = useToast();
+  const [waSending, setWaSending] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-  const queryUrl = companyMode === "all"
-    ? "/api/git/containers?allCompanies=true&includeOffloaded=true"
-    : "/api/git/containers?includeOffloaded=true";
+  const queryUrl =
+    companyMode === "all"
+      ? "/api/git/containers?allCompanies=true&includeOffloaded=true"
+      : "/api/git/containers?includeOffloaded=true";
 
   const { data, isLoading, isError, error } = useQuery<GitContainersResponse>({
     queryKey: [queryUrl],
@@ -27,13 +28,13 @@ export function TabTruckLocation() {
   });
 
   const allContainers: EnrichedContainerApi[] = data?.containers ?? [];
-  const withTruck = allContainers.filter(r => !!(r.numberPlate ?? "").trim());
-  const noTruck   = allContainers.filter(r => !(r.numberPlate ?? "").trim());
-  const shops = [...new Set(withTruck.map(r => r.shopName ?? r.companyName ?? "Unknown"))].sort();
+  const withTruck = allContainers.filter((r) => !!(r.numberPlate ?? "").trim());
+  const noTruck = allContainers.filter((r) => !(r.numberPlate ?? "").trim());
+  const shops = [...new Set(withTruck.map((r) => r.shopName ?? r.companyName ?? "Unknown"))].sort();
 
   const companyGroups: { id: number; name: string; rows: EnrichedContainerApi[] }[] = [];
   for (const r of withTruck) {
-    const existing = companyGroups.find(g => g.id === r.companyId);
+    const existing = companyGroups.find((g) => g.id === r.companyId);
     if (existing) existing.rows.push(r);
     else companyGroups.push({ id: r.companyId, name: r.companyName, rows: [r] });
   }
@@ -73,34 +74,63 @@ export function TabTruckLocation() {
   const modeSelector = (
     <div className="flex items-center gap-2 flex-wrap">
       <span className="text-xs text-muted-foreground">Viewing:</span>
-      <Button size="sm" variant={companyMode === "session" ? "default" : "outline"} onClick={() => setCompanyMode("session")} data-testid="btn-truck-mode-session">My Company</Button>
-      <Button size="sm" variant={companyMode === "all" ? "default" : "outline"} onClick={() => setCompanyMode("all")} data-testid="btn-truck-mode-all">All Accessible Companies</Button>
+      <Button
+        size="sm"
+        variant={companyMode === "session" ? "default" : "outline"}
+        onClick={() => setCompanyMode("session")}
+        data-testid="btn-truck-mode-session"
+      >
+        My Company
+      </Button>
+      <Button
+        size="sm"
+        variant={companyMode === "all" ? "default" : "outline"}
+        onClick={() => setCompanyMode("all")}
+        data-testid="btn-truck-mode-all"
+      >
+        All Accessible Companies
+      </Button>
     </div>
   );
 
-  if (isLoading) return (
-    <div className="space-y-3">{modeSelector}<Skeleton className="h-48 w-full rounded-md" /></div>
-  );
+  if (isLoading)
+    return (
+      <div className="space-y-3">
+        {modeSelector}
+        <Skeleton className="h-48 w-full rounded-md" />
+      </div>
+    );
 
-  if (isError) return (
-    <div className="space-y-3">
-      {modeSelector}
-      <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm">
-        <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-        <div>
-          <div className="font-semibold">Failed to load container data</div>
-          <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+  if (isError)
+    return (
+      <div className="space-y-3">
+        {modeSelector}
+        <div className="flex items-start gap-2 px-3 py-2.5 rounded-md border border-destructive/40 bg-destructive/10 text-destructive text-sm">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <div className="font-semibold">Failed to load container data</div>
+            <div className="text-xs mt-0.5">{(error as Error)?.message ?? "Network or server error."}</div>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
 
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2 flex-wrap justify-between">
         {modeSelector}
-        <Button variant="outline" size="sm" onClick={sendToWhatsApp} disabled={waSending || withTruck.length === 0} data-testid="button-send-wa-truck-location">
-          {waSending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <MessageCircle className="h-4 w-4 mr-1.5" />}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={sendToWhatsApp}
+          disabled={waSending || withTruck.length === 0}
+          data-testid="button-send-wa-truck-location"
+        >
+          {waSending ? (
+            <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+          ) : (
+            <MessageCircle className="h-4 w-4 mr-1.5" />
+          )}
           {waSending ? "Sending…" : "Send to WhatsApp"}
         </Button>
       </div>
@@ -125,9 +155,9 @@ export function TabTruckLocation() {
         <div className="py-10 text-center text-muted-foreground text-sm">No active containers found.</div>
       )}
 
-      {(companyMode === "all" ? companyGroups : [{ id: 0, name: "", rows: withTruck }]).map(cg => {
-        const cgShops = [...new Set(cg.rows.map(r => r.shopName ?? r.companyName ?? "Unknown"))].sort(
-          (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+      {(companyMode === "all" ? companyGroups : [{ id: 0, name: "", rows: withTruck }]).map((cg) => {
+        const cgShops = [...new Set(cg.rows.map((r) => r.shopName ?? r.companyName ?? "Unknown"))].sort((a, b) =>
+          a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
         );
         return (
           <div key={cg.id} className="space-y-1">
@@ -150,11 +180,14 @@ export function TabTruckLocation() {
                   </tr>
                 </thead>
                 <tbody>
-                  {cgShops.flatMap(shop => {
-                    const shopRows = cg.rows.filter(r => (r.shopName ?? r.companyName ?? "Unknown") === shop);
+                  {cgShops.flatMap((shop) => {
+                    const shopRows = cg.rows.filter((r) => (r.shopName ?? r.companyName ?? "Unknown") === shop);
                     const hdrRow = (
                       <tr key={`hdr-${cg.id}-${shop}`} className="bg-yellow-300 border-t border-yellow-500">
-                        <td colSpan={7} className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase">
+                        <td
+                          colSpan={7}
+                          className="py-1 px-3 font-bold text-yellow-900 text-center tracking-wide uppercase"
+                        >
                           {shop} — {shopRows.length} container{shopRows.length !== 1 ? "s" : ""} on the road
                         </td>
                       </tr>
@@ -164,21 +197,41 @@ export function TabTruckLocation() {
                     const dataRows = supplierGroups.flatMap(({ name: supName, rows: supRows }) => {
                       const supHdr = hasMultiSupplier ? (
                         <tr key={`sup-${cg.id}-${shop}-${supName}`} className="bg-muted/40 border-t border-border">
-                          <td colSpan={7} className="py-0.5 px-3 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                          <td
+                            colSpan={7}
+                            className="py-0.5 px-3 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+                          >
                             {supName} — {supRows.length}
                           </td>
                         </tr>
                       ) : null;
-                      const rows = supRows.map(r => (
+                      const rows = supRows.map((r) => (
                         <tr key={r.id} className="border-b last:border-b-0 hover:bg-muted/40">
-                          <td className="py-0.5 px-3 text-center font-mono font-semibold tracking-tight">{r.containerNumber}</td>
-                          <td className="py-0.5 px-3 text-center">{r.supplierCode ?? <span className="text-muted-foreground">—</span>}</td>
-                          <td className="py-0.5 px-3 text-center font-mono">{r.numberPlate ?? <span className="text-muted-foreground">—</span>}</td>
-                          <td className="py-0.5 px-3 text-center">{r.trackingLocation ?? <span className="text-muted-foreground">—</span>}</td>
-                          <td className="py-0.5 px-3 text-center">{r.agent ?? <span className="text-muted-foreground">—</span>}</td>
-                          <td className="py-0.5 px-3 text-center">{r.transporter ?? <span className="text-muted-foreground">—</span>}</td>
+                          <td className="py-0.5 px-3 text-center font-mono font-semibold tracking-tight">
+                            {r.containerNumber}
+                          </td>
                           <td className="py-0.5 px-3 text-center">
-                            <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-medium", (STATUS_BADGE_MAP as Record<string, string>)[r.status] ?? "bg-muted text-foreground")}>
+                            {r.supplierCode ?? <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="py-0.5 px-3 text-center font-mono">
+                            {r.numberPlate ?? <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="py-0.5 px-3 text-center">
+                            {r.trackingLocation ?? <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="py-0.5 px-3 text-center">
+                            {r.agent ?? <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="py-0.5 px-3 text-center">
+                            {r.transporter ?? <span className="text-muted-foreground">—</span>}
+                          </td>
+                          <td className="py-0.5 px-3 text-center">
+                            <span
+                              className={cn(
+                                "px-1.5 py-0.5 rounded text-[10px] font-medium",
+                                (STATUS_BADGE_MAP as Record<string, string>)[r.status] ?? "bg-muted text-foreground"
+                              )}
+                            >
                               {r.status}
                             </span>
                           </td>
@@ -199,79 +252,210 @@ export function TabTruckLocation() {
       <div
         ref={printRef}
         style={{
-          position: "absolute", left: "-9999px", top: 0,
-          backgroundColor: "#f8fafc", color: "#1e293b",
+          position: "absolute",
+          left: "-9999px",
+          top: 0,
+          backgroundColor: "#f8fafc",
+          color: "#1e293b",
           fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
-          fontSize: "22px", width: "1600px", padding: "44px 48px 36px",
+          fontSize: "22px",
+          width: "1600px",
+          padding: "44px 48px 36px",
           boxSizing: "border-box",
         }}
         aria-hidden="true"
       >
-        <div style={{ textAlign: "center", marginBottom: "32px", paddingBottom: "24px", borderBottom: "5px solid #f59e0b" }}>
-          <div style={{ fontSize: "52px", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.5px", lineHeight: 1.15 }}>HMD International Group</div>
-          <div style={{ fontSize: "26px", fontWeight: 700, color: "#b45309", marginTop: "10px", letterSpacing: "1.2px", textTransform: "uppercase" }}>Truck / Location Status — Live Tracking Report</div>
+        <div
+          style={{
+            textAlign: "center",
+            marginBottom: "32px",
+            paddingBottom: "24px",
+            borderBottom: "5px solid #f59e0b",
+          }}
+        >
+          <div
+            style={{ fontSize: "52px", fontWeight: 900, color: "#0f172a", letterSpacing: "-0.5px", lineHeight: 1.15 }}
+          >
+            HMD International Group
+          </div>
+          <div
+            style={{
+              fontSize: "26px",
+              fontWeight: 700,
+              color: "#b45309",
+              marginTop: "10px",
+              letterSpacing: "1.2px",
+              textTransform: "uppercase",
+            }}
+          >
+            Truck / Location Status — Live Tracking Report
+          </div>
           <div style={{ fontSize: "22px", color: "#475569", marginTop: "12px", fontWeight: 500 }}>
-            {new Date().toLocaleDateString("en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+            {new Date().toLocaleDateString("en-GB", {
+              weekday: "long",
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+            })}
             {" · "}
             {new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false })}
           </div>
-          <div style={{ display: "inline-block", marginTop: "16px", padding: "10px 28px", backgroundColor: "#fef3c7", border: "2px solid #f59e0b", borderRadius: "28px", fontSize: "22px", fontWeight: 800, color: "#78350f" }}>
+          <div
+            style={{
+              display: "inline-block",
+              marginTop: "16px",
+              padding: "10px 28px",
+              backgroundColor: "#fef3c7",
+              border: "2px solid #f59e0b",
+              borderRadius: "28px",
+              fontSize: "22px",
+              fontWeight: 800,
+              color: "#78350f",
+            }}
+          >
             {withTruck.length} Container{withTruck.length !== 1 ? "s" : ""} on the road
           </div>
         </div>
 
         {(() => {
-          const allShops = [...new Set(withTruck.map(r => r.shopName ?? r.companyName ?? "Unknown"))].sort(
-            (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
+          const allShops = [...new Set(withTruck.map((r) => r.shopName ?? r.companyName ?? "Unknown"))].sort((a, b) =>
+            a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })
           );
-          const cell: React.CSSProperties = { padding: "16px 14px", fontSize: "22px", overflow: "hidden", whiteSpace: "nowrap", borderBottom: "1px solid #cbd5e1", color: "#1e293b" };
+          const cell: React.CSSProperties = {
+            padding: "16px 14px",
+            fontSize: "22px",
+            overflow: "hidden",
+            whiteSpace: "nowrap",
+            borderBottom: "1px solid #cbd5e1",
+            color: "#1e293b",
+          };
           const hdrCols = [
-            { label: "#", align: "center" as const }, { label: "Container #", align: "center" as const },
-            { label: "Supplier", align: "center" as const }, { label: "Truck #", align: "center" as const },
-            { label: "Location", align: "center" as const }, { label: "Agent", align: "center" as const },
-            { label: "Transporter", align: "center" as const }, { label: "Status", align: "center" as const },
+            { label: "#", align: "center" as const },
+            { label: "Container #", align: "center" as const },
+            { label: "Supplier", align: "center" as const },
+            { label: "Truck #", align: "center" as const },
+            { label: "Location", align: "center" as const },
+            { label: "Agent", align: "center" as const },
+            { label: "Transporter", align: "center" as const },
+            { label: "Status", align: "center" as const },
           ];
           return (
             <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
               <colgroup>
-                <col style={{ width: "52px" }} /><col style={{ width: "270px" }} /><col style={{ width: "230px" }} />
-                <col style={{ width: "210px" }} /><col style={{ width: "240px" }} /><col style={{ width: "180px" }} />
-                <col style={{ width: "230px" }} /><col style={{ width: "92px" }} />
+                <col style={{ width: "52px" }} />
+                <col style={{ width: "270px" }} />
+                <col style={{ width: "230px" }} />
+                <col style={{ width: "210px" }} />
+                <col style={{ width: "240px" }} />
+                <col style={{ width: "180px" }} />
+                <col style={{ width: "230px" }} />
+                <col style={{ width: "92px" }} />
               </colgroup>
               <thead>
                 <tr style={{ backgroundColor: "#1e3a5f" }}>
-                  {hdrCols.map(h => (
-                    <th key={h.label} style={{ padding: "18px 14px", textAlign: h.align, color: "#ffffff", fontWeight: 700, fontSize: "20px", textTransform: "uppercase", letterSpacing: "0.8px" }}>
+                  {hdrCols.map((h) => (
+                    <th
+                      key={h.label}
+                      style={{
+                        padding: "18px 14px",
+                        textAlign: h.align,
+                        color: "#ffffff",
+                        fontWeight: 700,
+                        fontSize: "20px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.8px",
+                      }}
+                    >
                       {h.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {allShops.flatMap(shop => {
-                  const shopRows = withTruck.filter(r => (r.shopName ?? r.companyName ?? "Unknown") === shop);
+                {allShops.flatMap((shop) => {
+                  const shopRows = withTruck.filter((r) => (r.shopName ?? r.companyName ?? "Unknown") === shop);
                   let idx = 0;
                   return [
                     <tr key={`hd-shop-${shop}`}>
-                      <td colSpan={8} style={{ padding: "14px 16px", backgroundColor: "#fef3c7", fontWeight: 800, color: "#78350f", fontSize: "22px", letterSpacing: "0.5px", textAlign: "center", textTransform: "uppercase", borderTop: "3px solid #f59e0b", borderBottom: "3px solid #f59e0b" }}>
+                      <td
+                        colSpan={8}
+                        style={{
+                          padding: "14px 16px",
+                          backgroundColor: "#fef3c7",
+                          fontWeight: 800,
+                          color: "#78350f",
+                          fontSize: "22px",
+                          letterSpacing: "0.5px",
+                          textAlign: "center",
+                          textTransform: "uppercase",
+                          borderTop: "3px solid #f59e0b",
+                          borderBottom: "3px solid #f59e0b",
+                        }}
+                      >
                         {shop}
-                        <span style={{ fontWeight: 500, color: "#92400e", marginLeft: "14px", fontSize: "19px", textTransform: "none" }}>({shopRows.length} container{shopRows.length !== 1 ? "s" : ""})</span>
+                        <span
+                          style={{
+                            fontWeight: 500,
+                            color: "#92400e",
+                            marginLeft: "14px",
+                            fontSize: "19px",
+                            textTransform: "none",
+                          }}
+                        >
+                          ({shopRows.length} container{shopRows.length !== 1 ? "s" : ""})
+                        </span>
                       </td>
                     </tr>,
-                    ...shopRows.map(r => {
+                    ...shopRows.map((r) => {
                       idx++;
                       const rowBg = idx % 2 === 0 ? "#f1f5f9" : "#f8fafc";
                       return (
                         <tr key={`hd-row-${r.id}`} style={{ backgroundColor: rowBg }}>
                           <td style={{ ...cell, textAlign: "center", color: "#94a3b8", fontSize: "18px" }}>{idx}</td>
-                          <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#1d4ed8" }}>{r.containerNumber}</td>
+                          <td
+                            style={{
+                              ...cell,
+                              textAlign: "center",
+                              fontFamily: "monospace",
+                              fontWeight: 700,
+                              color: "#1d4ed8",
+                            }}
+                          >
+                            {r.containerNumber}
+                          </td>
                           <td style={{ ...cell, textAlign: "center", fontWeight: 500 }}>{r.supplierCode ?? "—"}</td>
-                          <td style={{ ...cell, textAlign: "center", fontFamily: "monospace", fontWeight: 700, color: "#6d28d9" }}>{r.numberPlate ?? "—"}</td>
-                          <td style={{ ...cell, textAlign: "center", fontWeight: 700, color: "#065f46" }}>{r.trackingLocation ?? "—"}</td>
+                          <td
+                            style={{
+                              ...cell,
+                              textAlign: "center",
+                              fontFamily: "monospace",
+                              fontWeight: 700,
+                              color: "#6d28d9",
+                            }}
+                          >
+                            {r.numberPlate ?? "—"}
+                          </td>
+                          <td style={{ ...cell, textAlign: "center", fontWeight: 700, color: "#065f46" }}>
+                            {r.trackingLocation ?? "—"}
+                          </td>
                           <td style={{ ...cell, textAlign: "center", fontWeight: 500 }}>{r.agent ?? "—"}</td>
-                          <td style={{ ...cell, textAlign: "center", color: "#92400e", fontWeight: 700 }}>{r.transporter ?? "—"}</td>
+                          <td style={{ ...cell, textAlign: "center", color: "#92400e", fontWeight: 700 }}>
+                            {r.transporter ?? "—"}
+                          </td>
                           <td style={{ ...cell, textAlign: "center" }}>
-                            <span style={{ display: "inline-block", padding: "6px 10px", borderRadius: "5px", fontSize: "17px", fontWeight: 800, backgroundColor: "#dbeafe", color: "#1e40af", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                padding: "6px 10px",
+                                borderRadius: "5px",
+                                fontSize: "17px",
+                                fontWeight: 800,
+                                backgroundColor: "#dbeafe",
+                                color: "#1e40af",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.6px",
+                              }}
+                            >
                               {r.status}
                             </span>
                           </td>
@@ -285,9 +469,22 @@ export function TabTruckLocation() {
           );
         })()}
 
-        <div style={{ marginTop: "28px", paddingTop: "18px", borderTop: "1px solid #cbd5e1", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: "16px", color: "#64748b" }}>HMD International Group — ERP System — Auto-generated report</div>
-          <div style={{ fontSize: "16px", color: "#64748b" }}>{new Date().toISOString().replace("T", " ").substring(0, 16)} UTC</div>
+        <div
+          style={{
+            marginTop: "28px",
+            paddingTop: "18px",
+            borderTop: "1px solid #cbd5e1",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ fontSize: "16px", color: "#64748b" }}>
+            HMD International Group — ERP System — Auto-generated report
+          </div>
+          <div style={{ fontSize: "16px", color: "#64748b" }}>
+            {new Date().toISOString().replace("T", " ").substring(0, 16)} UTC
+          </div>
         </div>
       </div>
     </div>

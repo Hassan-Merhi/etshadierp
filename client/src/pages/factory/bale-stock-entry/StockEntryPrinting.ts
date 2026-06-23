@@ -1,11 +1,17 @@
-import { type LabelData, type A4DesignColor, generateA5LabelsHtml, generateCombinedLabelsHtml, generateStickerLabelsHtml } from "@/lib/labelHtml";
+import {
+  type LabelData,
+  type A4DesignColor,
+  generateA5LabelsHtml,
+  generateCombinedLabelsHtml,
+  generateStickerLabelsHtml,
+} from "@/lib/labelHtml";
 import { getPaperFormat } from "@/components/LabelPrintSettings";
 import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 
 export const openBrowserPrint = (
-  labels: LabelData[], 
-  designColor: A4DesignColor | undefined, 
+  labels: LabelData[],
+  designColor: A4DesignColor | undefined,
   preOpenedWindowsRef: React.MutableRefObject<{ a4: Window | null; sticker: Window | null } | null>
 ) => {
   const paperFormat = getPaperFormat();
@@ -19,8 +25,9 @@ export const openBrowserPrint = (
   if (paperFormat === "A4" && !designColor && !hasPerLabelColors && !hasPerLabelLogos) {
     if (preOpened?.a4 && !preOpened.a4.closed) preOpened.a4.close();
   } else if (labelsForA4.length > 0) {
-    const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labelsForA4) : generateCombinedLabelsHtml(labelsForA4, designColor);
-    const a4Window = (preOpened?.a4 && !preOpened.a4.closed) ? preOpened.a4 : window.open("", "_blank");
+    const labelHtml =
+      paperFormat === "A5" ? generateA5LabelsHtml(labelsForA4) : generateCombinedLabelsHtml(labelsForA4, designColor);
+    const a4Window = preOpened?.a4 && !preOpened.a4.closed ? preOpened.a4 : window.open("", "_blank");
     if (a4Window) {
       a4Window.document.write(labelHtml);
       a4Window.document.close();
@@ -28,15 +35,24 @@ export const openBrowserPrint = (
       const a4Imgs = a4Window.document.images;
       let a4Loaded = 0;
       const a4Total = a4Imgs.length;
-      const tryA4Print = () => { a4Loaded++; if (a4Loaded >= a4Total) setTimeout(() => a4Window.print(), 200); };
-      if (a4Total === 0) { setTimeout(() => a4Window.print(), 200); }
-      else { for (let i = 0; i < a4Total; i++) { if (a4Imgs[i].complete) tryA4Print(); else a4Imgs[i].onload = a4Imgs[i].onerror = tryA4Print; } }
+      const tryA4Print = () => {
+        a4Loaded++;
+        if (a4Loaded >= a4Total) setTimeout(() => a4Window.print(), 200);
+      };
+      if (a4Total === 0) {
+        setTimeout(() => a4Window.print(), 200);
+      } else {
+        for (let i = 0; i < a4Total; i++) {
+          if (a4Imgs[i].complete) tryA4Print();
+          else a4Imgs[i].onload = a4Imgs[i].onerror = tryA4Print;
+        }
+      }
     }
   } else {
     if (preOpened?.a4 && !preOpened.a4.closed) preOpened.a4.close();
   }
 
-  const stickerWindow = (preOpened?.sticker && !preOpened.sticker.closed) ? preOpened.sticker : window.open("", "_blank");
+  const stickerWindow = preOpened?.sticker && !preOpened.sticker.closed ? preOpened.sticker : window.open("", "_blank");
   if (stickerWindow) {
     stickerWindow.document.write(generateStickerLabelsHtml(labels));
     stickerWindow.document.close();
@@ -44,9 +60,18 @@ export const openBrowserPrint = (
     const imgs = stickerWindow.document.images;
     let loaded = 0;
     const total = imgs.length;
-    const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
-    if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
-    else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+    const tryPrint = () => {
+      loaded++;
+      if (loaded >= total) setTimeout(() => stickerWindow.print(), 300);
+    };
+    if (total === 0) {
+      setTimeout(() => stickerWindow.print(), 300);
+    } else {
+      for (let i = 0; i < total; i++) {
+        if (imgs[i].complete) tryPrint();
+        else imgs[i].onload = imgs[i].onerror = tryPrint;
+      }
+    }
   }
 };
 
@@ -79,7 +104,7 @@ export const printLabels = async (
       const hasLogo = cartItem?.overrideLogoId || selectedLogoId;
       const effectiveColor: A4DesignColor | null = hasLogo
         ? null
-        : ((product?.labelDesignColor as A4DesignColor | null | undefined) || null);
+        : (product?.labelDesignColor as A4DesignColor | null | undefined) || null;
       return {
         referenceNumber: bale.referenceNumber,
         articleCode: bale.articleCode || cartItem?.product.articleCode || cartItem?.product.code || "",

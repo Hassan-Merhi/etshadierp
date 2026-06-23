@@ -1,13 +1,13 @@
-import * as React from "react"
-import * as TabsPrimitive from "@radix-ui/react-tabs"
+import * as React from "react";
+import * as TabsPrimitive from "@radix-ui/react-tabs";
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
-const Tabs = TabsPrimitive.Root
+const Tabs = TabsPrimitive.Root;
 
-type TabsVariant = "pill" | "underline"
+type TabsVariant = "pill" | "underline";
 
-const TabsVariantContext = React.createContext<TabsVariant>("pill")
+const TabsVariantContext = React.createContext<TabsVariant>("pill");
 
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
@@ -28,14 +28,14 @@ const TabsList = React.forwardRef<
       {...props}
     />
   </TabsVariantContext.Provider>
-))
-TabsList.displayName = TabsPrimitive.List.displayName
+));
+TabsList.displayName = TabsPrimitive.List.displayName;
 
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
 >(({ className, ...props }, ref) => {
-  const variant = React.useContext(TabsVariantContext)
+  const variant = React.useContext(TabsVariantContext);
   return (
     <TabsPrimitive.Trigger
       ref={ref}
@@ -58,9 +58,9 @@ const TabsTrigger = React.forwardRef<
       )}
       {...props}
     />
-  )
-})
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName
+  );
+});
+TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 
 const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
@@ -74,7 +74,7 @@ const TabsContent = React.forwardRef<
     )}
     {...props}
   />
-))
-TabsContent.displayName = TabsPrimitive.Content.displayName
+));
+TabsContent.displayName = TabsPrimitive.Content.displayName;
 
-export { Tabs, TabsList, TabsTrigger, TabsContent }
+export { Tabs, TabsList, TabsTrigger, TabsContent };

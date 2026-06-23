@@ -104,10 +104,7 @@ export function PurchaseEditFormTable({
                   />
                 </td>
                 <td className="p-2">
-                  <div
-                    className="text-right font-mono font-medium"
-                    data-testid={`text-total-${index}`}
-                  >
+                  <div className="text-right font-mono font-medium" data-testid={`text-total-${index}`}>
                     {formatAmount(lineTotal)}
                   </div>
                 </td>
@@ -135,9 +132,7 @@ export function PurchaseEditFormTable({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() =>
-                  append({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })
-                }
+                onClick={() => append({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })}
                 data-testid="button-add-row"
               >
                 <Plus className="h-4 w-4 mr-2" />
@@ -145,10 +140,7 @@ export function PurchaseEditFormTable({
               </Button>
             </td>
             <td className="p-3">
-              <div
-                className="text-right font-bold font-mono"
-                data-testid="text-grand-total"
-              >
+              <div className="text-right font-bold font-mono" data-testid="text-grand-total">
                 {formatAmount(total)}
               </div>
             </td>

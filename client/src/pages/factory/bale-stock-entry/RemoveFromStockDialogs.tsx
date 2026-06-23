@@ -1,7 +1,14 @@
 import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface RemoveBaleAuthDialogProps {
@@ -77,7 +84,9 @@ export function RemoveBaleAuthDialog({
           {authError && <p className="text-xs font-medium text-destructive">{authError}</p>}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
             variant="destructive"
             onClick={onConfirm}
@@ -128,20 +137,22 @@ export function AssignWorkerDialog({
                 <SelectValue placeholder="Select worker..." />
               </SelectTrigger>
               <SelectContent>
-                {workers.filter((w: any) => w.active !== false).map((w: any) => (
-                  <SelectItem key={w.id} value={String(w.id)}>{w.name}</SelectItem>
-                ))}
+                {workers
+                  .filter((w: any) => w.active !== false)
+                  .map((w: any) => (
+                    <SelectItem key={w.id} value={String(w.id)}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button
-            onClick={onConfirm}
-            disabled={!workerIdSelected || isPending}
-            data-testid="button-assign-print"
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={onConfirm} disabled={!workerIdSelected || isPending} data-testid="button-assign-print">
             {isPending ? "Assigning..." : "Assign & Print"}
           </Button>
         </DialogFooter>

@@ -1,17 +1,31 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
-import { Play, DollarSign, Users, Loader2, ChevronDown, ChevronRight, Minus, CalendarDays, Calculator, RefreshCw } from "lucide-react";
+import {
+  Play,
+  DollarSign,
+  Users,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Minus,
+  CalendarDays,
+  Calculator,
+  RefreshCw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -49,7 +63,7 @@ function fmt(val: string | number | null | undefined) {
   return isNaN(n) ? "0.00" : n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-const today = () => new Date().toLocaleDateString('en-CA');
+const today = () => new Date().toLocaleDateString("en-CA");
 const currentMonthStart = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
@@ -85,7 +99,9 @@ export default function FactoryEmployeePayrollTab() {
   const { isLoading: previewLoading, refetch: refetchPreview } = useQuery<{ preview: PayrollPreview[] }>({
     queryKey: ["/api/factory/employee-payroll-preview", startDate, endDate],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/employee-payroll-preview?startDate=${startDate}&endDate=${endDate}`, { credentials: "include" });
+      const res = await fetch(`/api/factory/employee-payroll-preview?startDate=${startDate}&endDate=${endDate}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to load preview");
       return res.json();
     },
@@ -121,9 +137,7 @@ export default function FactoryEmployeePayrollTab() {
     return Math.max(0, sal - ded);
   };
 
-  const totalNet = useMemo(() =>
-    employees.reduce((s, e) => s + getNet(e.id), 0)
-  , [amounts, deductions, employees]);
+  const totalNet = useMemo(() => employees.reduce((s, e) => s + getNet(e.id), 0), [amounts, deductions, employees]);
 
   const payrollMutation = useMutation({
     mutationFn: async () => {
@@ -139,9 +153,17 @@ export default function FactoryEmployeePayrollTab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ deposits, date: payDate, notes: payNotes || null, effectiveDate: payEffectiveDate || null }),
+        body: JSON.stringify({
+          deposits,
+          date: payDate,
+          notes: payNotes || null,
+          effectiveDate: payEffectiveDate || null,
+        }),
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message);
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -167,13 +189,19 @@ export default function FactoryEmployeePayrollTab() {
     return map;
   }, [employees]);
 
-  const totalMonthlyBase = useMemo(() =>
-    employees.reduce((s, e) => s + parseFloat(e.monthlySalary || "0"), 0)
-  , [employees]);
-
+  const totalMonthlyBase = useMemo(
+    () => employees.reduce((s, e) => s + parseFloat(e.monthlySalary || "0"), 0),
+    [employees]
+  );
 
   if (isLoading) {
-    return <div className="space-y-2">{[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}</div>;
+    return (
+      <div className="space-y-2">
+        {[...Array(5)].map((_, i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -181,7 +209,9 @@ export default function FactoryEmployeePayrollTab() {
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div className="flex gap-4 text-sm text-muted-foreground">
           <span>{employees.length} active employees</span>
-          <span>Base payroll: <strong className="text-foreground">{fmt(totalMonthlyBase)}</strong>/mo</span>
+          <span>
+            Base payroll: <strong className="text-foreground">{fmt(totalMonthlyBase)}</strong>/mo
+          </span>
         </div>
         <Button onClick={openPayroll} disabled={previewLoading} data-testid="button-run-payroll">
           {previewLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
@@ -210,9 +240,15 @@ export default function FactoryEmployeePayrollTab() {
                 >
                   <CardHeader className="p-3 flex flex-row items-center justify-between gap-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      {isExpanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+                      {isExpanded ? (
+                        <ChevronDown className="h-4 w-4 shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 shrink-0" />
+                      )}
                       {dept}
-                      <Badge variant="secondary" className="ml-1">{emps.length}</Badge>
+                      <Badge variant="secondary" className="ml-1">
+                        {emps.length}
+                      </Badge>
                     </CardTitle>
                     <span className="text-sm font-mono text-muted-foreground">{fmt(deptTotal)}/mo</span>
                   </CardHeader>
@@ -220,28 +256,32 @@ export default function FactoryEmployeePayrollTab() {
                 {isExpanded && (
                   <CardContent className="p-0 pb-2">
                     <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader className="sticky top-0 z-30 bg-background">
-                        <TableRow>
-                          <TableHead className="pl-6">Employee</TableHead>
-                          <TableHead>Code</TableHead>
-                          <TableHead className="text-right">Monthly Salary</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {emps.map((emp) => (
-                          <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`}>
-                            <TableCell className="pl-6 font-medium">{emp.firstName} {emp.lastName}</TableCell>
-                            <TableCell className="text-muted-foreground text-sm">{emp.code || "—"}</TableCell>
-                            <TableCell className="text-right font-mono">{fmt(emp.monthlySalary)}</TableCell>
-                            <TableCell className={`text-right font-mono ${parseFloat(emp.currentBalance) > 0 ? "text-emerald-600 dark:text-emerald-400" : ""}`}>
-                              {fmt(emp.currentBalance)}
-                            </TableCell>
+                      <Table>
+                        <TableHeader className="sticky top-0 z-30 bg-background">
+                          <TableRow>
+                            <TableHead className="pl-6">Employee</TableHead>
+                            <TableHead>Code</TableHead>
+                            <TableHead className="text-right">Monthly Salary</TableHead>
+                            <TableHead className="text-right">Balance</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          {emps.map((emp) => (
+                            <TableRow key={emp.id} data-testid={`row-employee-${emp.id}`}>
+                              <TableCell className="pl-6 font-medium">
+                                {emp.firstName} {emp.lastName}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">{emp.code || "—"}</TableCell>
+                              <TableCell className="text-right font-mono">{fmt(emp.monthlySalary)}</TableCell>
+                              <TableCell
+                                className={`text-right font-mono ${parseFloat(emp.currentBalance) > 0 ? "text-emerald-600 dark:text-emerald-400" : ""}`}
+                              >
+                                {fmt(emp.currentBalance)}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
                   </CardContent>
                 )}
@@ -263,28 +303,61 @@ export default function FactoryEmployeePayrollTab() {
             <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
               <div>
                 <Label>Period Start</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} data-testid="input-payroll-start" />
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  data-testid="input-payroll-start"
+                />
               </div>
               <div>
                 <Label>Period End</Label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} data-testid="input-payroll-end" />
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  data-testid="input-payroll-end"
+                />
               </div>
               <div>
                 <Label>Payment Date</Label>
-                <Input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} data-testid="input-payroll-date" />
+                <Input
+                  type="date"
+                  value={payDate}
+                  onChange={(e) => setPayDate(e.target.value)}
+                  data-testid="input-payroll-date"
+                />
               </div>
-              <Button variant="outline" onClick={loadPreview} disabled={previewLoading} data-testid="button-recalculate-payroll" title="Recalculate salaries for selected period">
+              <Button
+                variant="outline"
+                onClick={loadPreview}
+                disabled={previewLoading}
+                data-testid="button-recalculate-payroll"
+                title="Recalculate salaries for selected period"
+              >
                 {previewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               </Button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Effective Date <span className="text-muted-foreground">(optional)</span></Label>
-                <Input type="date" value={payEffectiveDate} onChange={(e) => setPayEffectiveDate(e.target.value)} data-testid="input-payroll-effective-date" />
+                <Label>
+                  Effective Date <span className="text-muted-foreground">(optional)</span>
+                </Label>
+                <Input
+                  type="date"
+                  value={payEffectiveDate}
+                  onChange={(e) => setPayEffectiveDate(e.target.value)}
+                  data-testid="input-payroll-effective-date"
+                />
               </div>
               <div>
                 <Label>Notes</Label>
-                <Input placeholder="e.g. March 2026..." value={payNotes} onChange={(e) => setPayNotes(e.target.value)} data-testid="input-payroll-notes" />
+                <Input
+                  placeholder="e.g. March 2026..."
+                  value={payNotes}
+                  onChange={(e) => setPayNotes(e.target.value)}
+                  data-testid="input-payroll-notes"
+                />
               </div>
             </div>
 
@@ -306,9 +379,14 @@ export default function FactoryEmployeePayrollTab() {
                 const ded = parseFloat(deductions[emp.id] || "0") || 0;
                 const net = Math.max(0, sal - ded);
                 return (
-                  <div key={emp.id} className="grid grid-cols-[1fr_80px_80px_80px_24px_80px_80px] gap-x-2 items-center px-3 py-2">
+                  <div
+                    key={emp.id}
+                    className="grid grid-cols-[1fr_80px_80px_80px_24px_80px_80px] gap-x-2 items-center px-3 py-2"
+                  >
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{emp.firstName} {emp.lastName}</p>
+                      <p className="text-sm font-medium truncate">
+                        {emp.firstName} {emp.lastName}
+                      </p>
                       <p className="text-xs text-muted-foreground">{emp.code || emp.department || ""}</p>
                     </div>
                     <div className="text-right text-xs text-muted-foreground">
@@ -345,7 +423,9 @@ export default function FactoryEmployeePayrollTab() {
                       onChange={(e) => setDeductions((d) => ({ ...d, [emp.id]: e.target.value }))}
                       data-testid={`input-payroll-deduction-${emp.id}`}
                     />
-                    <div className={`text-right font-mono text-sm font-semibold ${ded > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                    <div
+                      className={`text-right font-mono text-sm font-semibold ${ded > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}
+                    >
                       {fmt(net)}
                     </div>
                   </div>
@@ -359,9 +439,19 @@ export default function FactoryEmployeePayrollTab() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPayrollOpen(false)}>Cancel</Button>
-            <Button onClick={() => payrollMutation.mutate()} disabled={payrollMutation.isPending || totalNet === 0} data-testid="button-confirm-payroll">
-              {payrollMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <DollarSign className="h-4 w-4 mr-2" />}
+            <Button variant="outline" onClick={() => setPayrollOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => payrollMutation.mutate()}
+              disabled={payrollMutation.isPending || totalNet === 0}
+              data-testid="button-confirm-payroll"
+            >
+              {payrollMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <DollarSign className="h-4 w-4 mr-2" />
+              )}
               Pay {fmt(totalNet)}
             </Button>
           </DialogFooter>

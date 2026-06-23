@@ -67,29 +67,24 @@ export default function OpeningStockSummary() {
   };
 
   // Calculate grand total rates
-  const openingRate = data?.grandTotal?.opening?.quantity && data.grandTotal.opening.quantity > 0
-    ? data.grandTotal.opening.value / data.grandTotal.opening.quantity
-    : 0;
-  const closingRate = data?.grandTotal?.closing?.quantity && data.grandTotal.closing.quantity > 0
-    ? data.grandTotal.closing.value / data.grandTotal.closing.quantity
-    : 0;
+  const openingRate =
+    data?.grandTotal?.opening?.quantity && data.grandTotal.opening.quantity > 0
+      ? data.grandTotal.opening.value / data.grandTotal.opening.quantity
+      : 0;
+  const closingRate =
+    data?.grandTotal?.closing?.quantity && data.grandTotal.closing.quantity > 0
+      ? data.grandTotal.closing.value / data.grandTotal.closing.quantity
+      : 0;
 
   return (
     <div className="p-3 sm:p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleBack}
-          data-testid="button-back"
-        >
+        <Button variant="ghost" size="icon" onClick={handleBack} data-testid="button-back">
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
           <PageHeader title="Opening Stock Summary" icon={<Package className="h-5 w-5" />} />
-          <p className="text-muted-foreground text-sm">
-            {selectedCompany?.name}
-          </p>
+          <p className="text-muted-foreground text-sm">{selectedCompany?.name}</p>
         </div>
       </div>
 
@@ -138,9 +133,7 @@ export default function OpeningStockSummary() {
                     <span className="truncate">{group.name}</span>
                   </div>
                   {/* Opening Balance */}
-                  <div className="text-right font-mono text-sm">
-                    {formatQty(group.opening.quantity)}
-                  </div>
+                  <div className="text-right font-mono text-sm">{formatQty(group.opening.quantity)}</div>
                   <div className="hidden sm:block text-right font-mono text-sm">
                     {group.opening.rate === 0 ? "" : formatAmount(group.opening.rate)}
                   </div>
@@ -161,9 +154,7 @@ export default function OpeningStockSummary() {
               ))}
             </>
           ) : (
-            <div className="p-8 text-center text-muted-foreground">
-              No opening stock data available.
-            </div>
+            <div className="p-8 text-center text-muted-foreground">No opening stock data available.</div>
           )}
         </div>
 
@@ -173,9 +164,7 @@ export default function OpeningStockSummary() {
             <div className="grid grid-cols-2 sm:grid-cols-7 p-2 sm:p-3 font-bold">
               <div className="text-xs sm:text-sm">Grand Total</div>
               {/* Opening Total */}
-              <div className="text-right font-mono">
-                {formatNumber(data.grandTotal.opening.quantity)} BL
-              </div>
+              <div className="text-right font-mono">{formatNumber(data.grandTotal.opening.quantity)} BL</div>
               <div className="hidden sm:block text-right font-mono">
                 {openingRate === 0 ? "" : formatAmount(openingRate)}
               </div>

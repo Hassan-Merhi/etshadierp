@@ -5,16 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Plus, Edit, Check, X, EyeOff, Eye, Tag, Layers,
-  Download, Upload, AlertCircle, CheckCircle2,
+  Plus,
+  Edit,
+  Check,
+  X,
+  EyeOff,
+  Eye,
+  Tag,
+  Layers,
+  Download,
+  Upload,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -152,12 +156,14 @@ function MetaList({
         <div className="flex items-center gap-2">
           <Icon className="h-5 w-5 text-muted-foreground" />
           <h3 className="text-base font-semibold">{title}</h3>
-          <Badge variant="secondary" className="text-xs">{items.filter((i: any) => i.active).length} active</Badge>
+          <Badge variant="secondary" className="text-xs">
+            {items.filter((i: any) => i.active).length} active
+          </Badge>
         </div>
         <Button
           size="sm"
           variant="ghost"
-          onClick={() => setShowInactive(v => !v)}
+          onClick={() => setShowInactive((v) => !v)}
           data-testid={`${testPrefix}-toggle-inactive`}
         >
           {showInactive ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
@@ -187,9 +193,7 @@ function MetaList({
       {isLoading ? (
         <p className="text-sm text-muted-foreground py-4 text-center">Loading...</p>
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-4 text-center">
-          No {title.toLowerCase()} found. Add one above.
-        </p>
+        <p className="text-sm text-muted-foreground py-4 text-center">No {title.toLowerCase()} found. Add one above.</p>
       ) : (
         <div className="space-y-1">
           {(items as (StockGrade | StockCategory)[]).map((item) => (
@@ -233,7 +237,9 @@ function MetaList({
                 <>
                   <span className="flex-1 text-sm">{item.name}</span>
                   {!item.active && (
-                    <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      Inactive
+                    </Badge>
                   )}
                   <Button
                     size="icon"
@@ -337,19 +343,13 @@ function BulkExportImport() {
           <div>
             <h3 className="text-base font-semibold mb-1">Bulk Grade &amp; Category Assignment</h3>
             <p className="text-sm text-muted-foreground max-w-lg">
-              Export all stock items to Excel, edit the{" "}
-              <span className="font-medium">Current Grade</span> and{" "}
-              <span className="font-medium">Current Category</span> columns, then import to
-              update in bulk. Only Grade and Category are changed — quantities, prices, and stock
-              balances are not affected.
+              Export all stock items to Excel, edit the <span className="font-medium">Current Grade</span> and{" "}
+              <span className="font-medium">Current Category</span> columns, then import to update in bulk. Only Grade
+              and Category are changed — quantities, prices, and stock balances are not affected.
             </p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              onClick={handleExport}
-              data-testid="button-export-grade-category"
-            >
+            <Button variant="outline" onClick={handleExport} data-testid="button-export-grade-category">
               <Download className="h-4 w-4 mr-2" />
               Export Template
             </Button>
@@ -382,8 +382,8 @@ function BulkExportImport() {
               Import Complete
             </DialogTitle>
             <DialogDescription>
-              Grade and category assignments have been updated. Only Grade and Category were
-              changed — all other stock item data is unchanged.
+              Grade and category assignments have been updated. Only Grade and Category were changed — all other stock
+              item data is unchanged.
             </DialogDescription>
           </DialogHeader>
 
@@ -442,7 +442,8 @@ export function GradesCategoriesManager() {
       <div>
         <h2 className="text-lg font-semibold mb-1">Grades &amp; Categories</h2>
         <p className="text-sm text-muted-foreground">
-          Manage stock item grades and categories. These are optional metadata fields that can be assigned to any stock item.
+          Manage stock item grades and categories. These are optional metadata fields that can be assigned to any stock
+          item.
         </p>
       </div>
 

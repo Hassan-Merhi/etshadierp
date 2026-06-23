@@ -10,34 +10,14 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 import { format, parseISO } from "date-fns";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  ArrowLeft,
-  ChevronRight,
-  TrendingUp,
-  TrendingDown,
-} from "lucide-react";
+import { ArrowLeft, ChevronRight, TrendingUp, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PeriodFilter, PeriodFilterValue, getDefaultPeriodValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface MonthlyData {
   month: number;
@@ -94,13 +74,12 @@ export default function LedgerMonthlySummary() {
   const handleBack = useBackToParent();
   const [, params] = useRoute("/ledger-monthly/:accountId");
   const [, factoryParams] = useRoute("/factory/ledger-monthly/:accountId");
-  const accountId = (params?.accountId || factoryParams?.accountId)
-    ? parseInt((params?.accountId || factoryParams?.accountId) as string)
-    : null;
+  const accountId =
+    params?.accountId || factoryParams?.accountId
+      ? parseInt((params?.accountId || factoryParams?.accountId) as string)
+      : null;
 
-  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(
-    getDefaultPeriodValue("this_year")
-  );
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(getDefaultPeriodValue("this_year"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
 
   useEscapeToParent();
@@ -121,12 +100,13 @@ export default function LedgerMonthlySummary() {
     enabled: !!accountId,
   });
 
-  const chartData = (Array.isArray(data?.months) ? data!.months : []).map((m) => ({
-    name: m.monthName.substring(0, 3),
-    debit: m.debit,
-    credit: m.credit,
-    balance: Math.abs(m.closingBalance),
-  })) || [];
+  const chartData =
+    (Array.isArray(data?.months) ? data!.months : []).map((m) => ({
+      name: m.monthName.substring(0, 3),
+      debit: m.debit,
+      credit: m.credit,
+      balance: Math.abs(m.closingBalance),
+    })) || [];
 
   const handleMonthClick = (month: number, year: number) => {
     window.open(`/ledger-vouchers/${accountId}/${year}/${month}`, "_blank");
@@ -162,9 +142,7 @@ export default function LedgerMonthlySummary() {
           </div>
           <div className="text-right">
             <p className="text-sm opacity-80">
-              {startDate && endDate
-                ? `${formatShortDate(startDate)} to ${formatShortDate(endDate)}`
-                : ""}
+              {startDate && endDate ? `${formatShortDate(startDate)} to ${formatShortDate(endDate)}` : ""}
             </p>
           </div>
         </div>
@@ -173,11 +151,7 @@ export default function LedgerMonthlySummary() {
       <div className="p-4 space-y-6">
         {/* Period Filter */}
         <div className="flex justify-end">
-          <PeriodFilter
-            value={periodFilter}
-            onChange={setPeriodFilter}
-            data-testid="period-filter"
-          />
+          <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
         </div>
 
         {isLoading ? (
@@ -192,28 +166,23 @@ export default function LedgerMonthlySummary() {
               <CardHeader className="pb-0">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-sm text-muted-foreground">
-                      {data.account.name}
-                    </p>
+                    <p className="text-sm text-muted-foreground">{data.account.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatShortDate(data.dateRange.startDate)} to{" "}
-                      {formatShortDate(data.dateRange.endDate)}
+                      {formatShortDate(data.dateRange.startDate)} to {formatShortDate(data.dateRange.endDate)}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-muted-foreground">
-                      Closing Balance
-                    </p>
+                    <p className="text-sm text-muted-foreground">Closing Balance</p>
                     <p
                       className={`text-xl font-bold font-mono ${
-                        data.grandTotal.closingBalance >= 0
-                          ? "text-green-600"
-                          : "text-red-600"
+                        data.grandTotal.closingBalance >= 0 ? "text-green-600" : "text-red-600"
                       }`}
                       data-testid="text-closing-balance"
                     >
                       {formatAmount(Math.abs(data.grandTotal.closingBalance))}{" "}
-                      <span className={drCrClass(data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr")}>{data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr"}</span>
+                      <span className={drCrClass(data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr")}>
+                        {data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr"}
+                      </span>
                     </p>
                   </div>
                 </div>
@@ -240,14 +209,11 @@ export default function LedgerMonthlySummary() {
                     <TableBody>
                       {/* Opening Balance */}
                       <TableRow className="bg-muted/20">
-                        <TableCell className="font-medium">
-                          Opening Balance
-                        </TableCell>
+                        <TableCell className="font-medium">Opening Balance</TableCell>
                         <TableCell className="hidden sm:table-cell"></TableCell>
                         <TableCell className="hidden sm:table-cell"></TableCell>
                         <TableCell className="text-right font-mono">
-                          {formatAmount(Math.abs(data.openingBalance))}{" "}
-                          {data.openingBalance >= 0 ? "Cr" : "Dr"}
+                          {formatAmount(Math.abs(data.openingBalance))} {data.openingBalance >= 0 ? "Cr" : "Dr"}
                         </TableCell>
                         <TableCell></TableCell>
                       </TableRow>
@@ -262,9 +228,7 @@ export default function LedgerMonthlySummary() {
                             onClick={() => handleMonthClick(month.month, year)}
                             data-testid={`row-month-${month.month}`}
                           >
-                            <TableCell className="font-medium">
-                              {month.monthName}
-                            </TableCell>
+                            <TableCell className="font-medium">{month.monthName}</TableCell>
                             <TableCell className="text-right font-mono hidden sm:table-cell">
                               {month.debit > 0 ? formatAmount(month.debit) : ""}
                             </TableCell>
@@ -273,7 +237,9 @@ export default function LedgerMonthlySummary() {
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {formatAmount(Math.abs(month.closingBalance))}{" "}
-                              <span className={`font-semibold ${drCrClass(month.closingBalance >= 0 ? "Cr" : "Dr")}`}>{month.closingBalance >= 0 ? "Cr" : "Dr"}</span>
+                              <span className={`font-semibold ${drCrClass(month.closingBalance >= 0 ? "Cr" : "Dr")}`}>
+                                {month.closingBalance >= 0 ? "Cr" : "Dr"}
+                              </span>
                             </TableCell>
                             <TableCell>
                               <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -293,7 +259,11 @@ export default function LedgerMonthlySummary() {
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {formatAmount(Math.abs(data.grandTotal.closingBalance))}{" "}
-                          <span className={`font-semibold ${drCrClass(data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr")}`}>{data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr"}</span>
+                          <span
+                            className={`font-semibold ${drCrClass(data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr")}`}
+                          >
+                            {data.grandTotal.closingBalance >= 0 ? "Cr" : "Dr"}
+                          </span>
                         </TableCell>
                         <TableCell></TableCell>
                       </TableRow>
@@ -320,11 +290,7 @@ export default function LedgerMonthlySummary() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 12 }}
-                        className="text-muted-foreground"
-                      />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} className="text-muted-foreground" />
                       <YAxis
                         tick={{ fontSize: 12 }}
                         className="text-muted-foreground"
@@ -338,12 +304,7 @@ export default function LedgerMonthlySummary() {
                           borderRadius: "6px",
                         }}
                       />
-                      <Bar
-                        dataKey="debit"
-                        fill="hsl(var(--destructive))"
-                        name="Debit"
-                        radius={[4, 4, 0, 0]}
-                      />
+                      <Bar dataKey="debit" fill="hsl(var(--destructive))" name="Debit" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -355,9 +316,7 @@ export default function LedgerMonthlySummary() {
               <Card>
                 <CardContent className="p-4 text-center">
                   <p className="text-sm text-muted-foreground">Opening Balance</p>
-                  <p className="text-lg font-bold font-mono">
-                    {formatAmount(Math.abs(data.openingBalance))}
-                  </p>
+                  <p className="text-lg font-bold font-mono">{formatAmount(Math.abs(data.openingBalance))}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -373,9 +332,7 @@ export default function LedgerMonthlySummary() {
                   <p className="text-sm text-muted-foreground">Closing Balance</p>
                   <p
                     className={`text-lg font-bold font-mono ${
-                      data.grandTotal.closingBalance >= 0
-                        ? "text-green-600"
-                        : "text-red-600"
+                      data.grandTotal.closingBalance >= 0 ? "text-green-600" : "text-red-600"
                     }`}
                   >
                     {formatAmount(Math.abs(data.grandTotal.closingBalance))}

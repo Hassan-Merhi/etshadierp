@@ -8,16 +8,44 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { PageHeader } from "@/components/PageHeader";
 import {
-  Plus, Truck, Package, Scale, DollarSign, Eye, FileText, ScanLine,
-  AlertTriangle, RotateCcw, ArrowLeft, ExternalLink, ChevronDown, ChevronUp,
+  Plus,
+  Truck,
+  Package,
+  Scale,
+  DollarSign,
+  Eye,
+  FileText,
+  ScanLine,
+  AlertTriangle,
+  RotateCcw,
+  ArrowLeft,
+  ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
@@ -79,8 +107,22 @@ interface InvoicePreview {
     remaining: number;
     totalAmount: string;
   }[];
-  rides: { id: number; rideNumber: number; truckPlate: string | null; status: string; baleCount: number | string; totalWeightKg: string; totalAmount: string }[];
-  articleLines: { articleCode: string; productName: string; qty: number | string; totalWeightKg: string; totalAmount: string }[];
+  rides: {
+    id: number;
+    rideNumber: number;
+    truckPlate: string | null;
+    status: string;
+    baleCount: number | string;
+    totalWeightKg: string;
+    totalAmount: string;
+  }[];
+  articleLines: {
+    articleCode: string;
+    productName: string;
+    qty: number | string;
+    totalWeightKg: string;
+    totalAmount: string;
+  }[];
   totals: { totalBales: number | string; totalWeightKg: string; grandTotal: string };
   loadingRides: number;
   dispatchedRides: number;
@@ -89,11 +131,11 @@ interface InvoicePreview {
 }
 
 const RIDE_STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  DRAFT:      { label: "Draft",      className: "bg-muted text-muted-foreground" },
-  LOADING:    { label: "Loading",    className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
+  DRAFT: { label: "Draft", className: "bg-muted text-muted-foreground" },
+  LOADING: { label: "Loading", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
   DISPATCHED: { label: "Dispatched", className: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
-  COMPLETED:  { label: "Completed",  className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
-  CANCELLED:  { label: "Cancelled",  className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+  COMPLETED: { label: "Completed", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  CANCELLED: { label: "Cancelled", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
 };
 
 function RideStatusBadge({ status }: { status: string }) {
@@ -102,11 +144,11 @@ function RideStatusBadge({ status }: { status: string }) {
 }
 
 const BATCH_STATUS_CONFIG = {
-  DRAFT:      { label: "Draft",      className: "bg-muted text-muted-foreground" },
-  LOADING:    { label: "Loading",    className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
+  DRAFT: { label: "Draft", className: "bg-muted text-muted-foreground" },
+  LOADING: { label: "Loading", className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
   DISPATCHED: { label: "Dispatched", className: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" },
-  INVOICED:   { label: "Invoiced",   className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
-  CANCELLED:  { label: "Cancelled",  className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+  INVOICED: { label: "Invoiced", className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
+  CANCELLED: { label: "Cancelled", className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
 } as Record<string, { label: string; className: string }>;
 
 function fmt(n: number | string, decimals = 2) {
@@ -164,11 +206,20 @@ export default function FactoryDispatchBatchDetail() {
   });
 
   interface AuditScan {
-    id: number; truckRideId: number; rideNumber: number; baleId: number;
-    baleReference: string; articleCode: string | null; productName: string | null;
-    weightKg: string; priceUsed: string; amount: string;
-    scannedBy: string | null; scannedAt: string;
-    removedAt: string | null; removalReason: string | null;
+    id: number;
+    truckRideId: number;
+    rideNumber: number;
+    baleId: number;
+    baleReference: string;
+    articleCode: string | null;
+    productName: string | null;
+    weightKg: string;
+    priceUsed: string;
+    amount: string;
+    scannedBy: string | null;
+    scannedAt: string;
+    removedAt: string | null;
+    removalReason: string | null;
   }
   const { data: auditScans = [] } = useQuery<AuditScan[]>({
     queryKey: [`/api/factory/dispatch-batches/${batchId}/audit`],
@@ -267,7 +318,11 @@ export default function FactoryDispatchBatchDetail() {
     return (
       <div className="p-6 space-y-4">
         <Skeleton className="h-16 w-full" />
-        <div className="grid grid-cols-4 gap-3">{[...Array(4)].map((_, i) => <Skeleton key={i} className="h-24" />)}</div>
+        <div className="grid grid-cols-4 gap-3">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-24" />
+          ))}
+        </div>
         <Skeleton className="h-64 w-full" />
       </div>
     );
@@ -335,7 +390,12 @@ export default function FactoryDispatchBatchDetail() {
               <Button variant="outline" onClick={() => setPreviewOpen(true)} data-testid="button-preview-invoice">
                 <Eye className="w-4 h-4 mr-1" /> Preview Invoice
               </Button>
-              <Button variant="outline" className="text-destructive" onClick={() => setCancelOpen(true)} data-testid="button-cancel-batch">
+              <Button
+                variant="outline"
+                className="text-destructive"
+                onClick={() => setCancelOpen(true)}
+                data-testid="button-cancel-batch"
+              >
                 Cancel Batch
               </Button>
             </>
@@ -357,34 +417,44 @@ export default function FactoryDispatchBatchDetail() {
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Truck className="w-4 h-4" /><span className="text-xs">Rides</span>
+                <Truck className="w-4 h-4" />
+                <span className="text-xs">Rides</span>
               </div>
-              <p className="text-2xl font-bold" data-testid="text-total-rides">{rides.length}</p>
+              <p className="text-2xl font-bold" data-testid="text-total-rides">
+                {rides.length}
+              </p>
               <p className="text-xs text-muted-foreground">
-                {rides.filter(r => r.status === "DISPATCHED").length} dispatched
+                {rides.filter((r) => r.status === "DISPATCHED").length} dispatched
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Package className="w-4 h-4" /><span className="text-xs">Bales</span>
+                <Package className="w-4 h-4" />
+                <span className="text-xs">Bales</span>
               </div>
-              <p className="text-2xl font-bold" data-testid="text-total-bales">{fmt(totalBales, 0)}</p>
+              <p className="text-2xl font-bold" data-testid="text-total-bales">
+                {fmt(totalBales, 0)}
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <Scale className="w-4 h-4" /><span className="text-xs">Weight (kg)</span>
+                <Scale className="w-4 h-4" />
+                <span className="text-xs">Weight (kg)</span>
               </div>
-              <p className="text-2xl font-bold" data-testid="text-total-weight">{fmt(totalWeight)}</p>
+              <p className="text-2xl font-bold" data-testid="text-total-weight">
+                {fmt(totalWeight)}
+              </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                <DollarSign className="w-4 h-4" /><span className="text-xs">Total Value</span>
+                <DollarSign className="w-4 h-4" />
+                <span className="text-xs">Total Value</span>
               </div>
               <p className="text-2xl font-bold" data-testid="text-total-value">
                 {batch.currency} {fmt(totalValue)}
@@ -448,34 +518,42 @@ export default function FactoryDispatchBatchDetail() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Article</th>
-                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Target</th>
-                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Scanned</th>
-                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Rem.</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {progress.map((p) => (
-                        <tr key={p.articleCode} className="border-b last:border-0" data-testid={`row-progress-${p.articleCode}`}>
-                          <td className="px-3 py-2 font-mono">{p.articleCode}</td>
-                          <td className="px-3 py-2 text-right">{p.proformaQty}</td>
-                          <td className="px-3 py-2 text-right">
-                            <span className={p.scannedQty > p.proformaQty ? "text-amber-600 font-medium" : ""}>
-                              {p.scannedQty}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            <span className={p.remaining < 0 ? "text-amber-600" : p.remaining === 0 ? "text-green-600" : ""}>
-                              {p.remaining}
-                            </span>
-                          </td>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left px-3 py-2 font-medium text-muted-foreground">Article</th>
+                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">Target</th>
+                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">Scanned</th>
+                          <th className="text-right px-3 py-2 font-medium text-muted-foreground">Rem.</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {progress.map((p) => (
+                          <tr
+                            key={p.articleCode}
+                            className="border-b last:border-0"
+                            data-testid={`row-progress-${p.articleCode}`}
+                          >
+                            <td className="px-3 py-2 font-mono">{p.articleCode}</td>
+                            <td className="px-3 py-2 text-right">{p.proformaQty}</td>
+                            <td className="px-3 py-2 text-right">
+                              <span className={p.scannedQty > p.proformaQty ? "text-amber-600 font-medium" : ""}>
+                                {p.scannedQty}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-right">
+                              <span
+                                className={
+                                  p.remaining < 0 ? "text-amber-600" : p.remaining === 0 ? "text-green-600" : ""
+                                }
+                              >
+                                {p.remaining}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </CardContent>
               </Card>
@@ -528,7 +606,9 @@ export default function FactoryDispatchBatchDetail() {
                           <TableCell className="text-right">{fmt(ride.baleCount, 0)}</TableCell>
                           <TableCell className="text-right">{fmt(ride.totalWeightKg)}</TableCell>
                           <TableCell className="text-right">{fmt(ride.totalAmount)}</TableCell>
-                          <TableCell><RideStatusBadge status={ride.status} /></TableCell>
+                          <TableCell>
+                            <RideStatusBadge status={ride.status} />
+                          </TableCell>
                           <TableCell>
                             <div className="flex gap-1.5 justify-end">
                               {(ride.status === "LOADING" || ride.status === "DRAFT") && !isReadOnly && (
@@ -545,13 +625,16 @@ export default function FactoryDispatchBatchDetail() {
                                 <Button
                                   size="sm"
                                   variant="ghost"
-                                  onClick={() => { setReopenRideId(ride.id); setReopenReason(""); }}
+                                  onClick={() => {
+                                    setReopenRideId(ride.id);
+                                    setReopenReason("");
+                                  }}
                                   data-testid={`button-reopen-ride-${ride.id}`}
                                 >
                                   <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reopen
                                 </Button>
                               )}
-                              {(ride.status === "DISPATCHED") && (
+                              {ride.status === "DISPATCHED" && (
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -575,67 +658,70 @@ export default function FactoryDispatchBatchDetail() {
       </div>
 
       {/* ── Scanned Bales Section (Developer only) ───────────────────────── */}
-      {isDeveloper && <Card className="mx-4 mb-4">
-        <CardContent className="pt-3 pb-3">
-          <button
-            className="flex items-center gap-2 w-full text-sm font-medium text-left"
-            onClick={() => setShowBales((v) => !v)}
-            data-testid="button-toggle-bales"
-          >
-            <Package className="w-4 h-4 text-muted-foreground" />
-            Scanned Bales
-            {data && (() => {
-              const tb = (data.articleTotals || []).reduce((s, a) => s + parseInt(String(a.scannedQty || 0)), 0);
-              const tw = (data.articleTotals || []).reduce((s, a) => s + parseFloat(a.scannedWeightKg || "0"), 0);
-              return (
-                <span className="text-xs text-muted-foreground font-normal ml-1">
-                  ({tb} bales · {fmt(tw)} kg)
-                </span>
-              );
-            })()}
-            <span className="ml-auto text-muted-foreground">
-              {showBales ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </span>
-          </button>
+      {isDeveloper && (
+        <Card className="mx-4 mb-4">
+          <CardContent className="pt-3 pb-3">
+            <button
+              className="flex items-center gap-2 w-full text-sm font-medium text-left"
+              onClick={() => setShowBales((v) => !v)}
+              data-testid="button-toggle-bales"
+            >
+              <Package className="w-4 h-4 text-muted-foreground" />
+              Scanned Bales
+              {data &&
+                (() => {
+                  const tb = (data.articleTotals || []).reduce((s, a) => s + parseInt(String(a.scannedQty || 0)), 0);
+                  const tw = (data.articleTotals || []).reduce((s, a) => s + parseFloat(a.scannedWeightKg || "0"), 0);
+                  return (
+                    <span className="text-xs text-muted-foreground font-normal ml-1">
+                      ({tb} bales · {fmt(tw)} kg)
+                    </span>
+                  );
+                })()}
+              <span className="ml-auto text-muted-foreground">
+                {showBales ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </span>
+            </button>
 
-          {showBales && (
-            <div className="mt-3 border-t pt-3">
-              {auditScans.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">No active bale scans found.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Ride #</TableHead>
-                        <TableHead className="text-xs">Reference</TableHead>
-                        <TableHead className="text-xs">Article</TableHead>
-                        <TableHead className="text-xs">Product</TableHead>
-                        <TableHead className="text-xs text-right">Weight (kg)</TableHead>
-                        <TableHead className="text-xs text-right">Amount</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {auditScans
-                        .filter((s) => !s.removedAt)
-                        .map((s) => (
-                          <TableRow key={s.id} data-testid={`row-scan-${s.id}`}>
-                            <TableCell className="text-xs font-mono">#{s.rideNumber}</TableCell>
-                            <TableCell className="text-xs font-mono font-medium">{s.baleReference}</TableCell>
-                            <TableCell className="text-xs">{s.articleCode || "—"}</TableCell>
-                            <TableCell className="text-xs text-muted-foreground">{s.productName || "—"}</TableCell>
-                            <TableCell className="text-xs text-right font-mono">{fmt(s.weightKg, 3)}</TableCell>
-                            <TableCell className="text-xs text-right font-mono">{fmt(s.amount)}</TableCell>
-                          </TableRow>
-                        ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>}
+            {showBales && (
+              <div className="mt-3 border-t pt-3">
+                {auditScans.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No active bale scans found.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="text-xs">Ride #</TableHead>
+                          <TableHead className="text-xs">Reference</TableHead>
+                          <TableHead className="text-xs">Article</TableHead>
+                          <TableHead className="text-xs">Product</TableHead>
+                          <TableHead className="text-xs text-right">Weight (kg)</TableHead>
+                          <TableHead className="text-xs text-right">Amount</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {auditScans
+                          .filter((s) => !s.removedAt)
+                          .map((s) => (
+                            <TableRow key={s.id} data-testid={`row-scan-${s.id}`}>
+                              <TableCell className="text-xs font-mono">#{s.rideNumber}</TableCell>
+                              <TableCell className="text-xs font-mono font-medium">{s.baleReference}</TableCell>
+                              <TableCell className="text-xs">{s.articleCode || "—"}</TableCell>
+                              <TableCell className="text-xs text-muted-foreground">{s.productName || "—"}</TableCell>
+                              <TableCell className="text-xs text-right font-mono">{fmt(s.weightKg, 3)}</TableCell>
+                              <TableCell className="text-xs text-right font-mono">{fmt(s.amount)}</TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={addRideOpen} onOpenChange={setAddRideOpen}>
         <DialogContent>
@@ -681,8 +767,14 @@ export default function FactoryDispatchBatchDetail() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddRideOpen(false)}>Cancel</Button>
-            <Button onClick={() => addRideMutation.mutate()} disabled={addRideMutation.isPending} data-testid="button-add-ride-submit">
+            <Button variant="outline" onClick={() => setAddRideOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => addRideMutation.mutate()}
+              disabled={addRideMutation.isPending}
+              data-testid="button-add-ride-submit"
+            >
               {addRideMutation.isPending ? "Adding..." : "Add & Open Scanner"}
             </Button>
           </DialogFooter>
@@ -698,7 +790,9 @@ export default function FactoryDispatchBatchDetail() {
 
           {previewLoading ? (
             <div className="space-y-2 py-4">
-              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
             </div>
           ) : preview ? (
             <div className="space-y-4">
@@ -708,7 +802,9 @@ export default function FactoryDispatchBatchDetail() {
                     <AlertTriangle className="w-4 h-4" /> Cannot generate invoice yet
                   </p>
                   {preview.blockers.map((b, i) => (
-                    <p key={i} className="text-sm text-amber-700 dark:text-amber-300">{b}</p>
+                    <p key={i} className="text-sm text-amber-700 dark:text-amber-300">
+                      {b}
+                    </p>
                   ))}
                 </div>
               )}
@@ -739,7 +835,9 @@ export default function FactoryDispatchBatchDetail() {
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <span className={p.remaining < 0 ? "text-amber-600" : p.remaining === 0 ? "text-green-600" : ""}>
+                            <span
+                              className={p.remaining < 0 ? "text-amber-600" : p.remaining === 0 ? "text-green-600" : ""}
+                            >
                               {p.remaining}
                             </span>
                           </TableCell>
@@ -801,7 +899,9 @@ export default function FactoryDispatchBatchDetail() {
           ) : null}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPreviewOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setPreviewOpen(false)}>
+              Close
+            </Button>
             {preview?.canGenerate && (
               <Button
                 onClick={() => setGenerateOpen(true)}
@@ -821,7 +921,10 @@ export default function FactoryDispatchBatchDetail() {
             <AlertDialogTitle>Generate Final Invoice?</AlertDialogTitle>
             <AlertDialogDescription>
               This will create an invoice for <strong>{preview?.totals?.totalBales || 0} bales</strong> totalling{" "}
-              <strong>{batch.currency} {fmt(preview?.totals?.grandTotal || 0)}</strong>. All scanned bales will be marked as SOLD. This action cannot be undone.
+              <strong>
+                {batch.currency} {fmt(preview?.totals?.grandTotal || 0)}
+              </strong>
+              . All scanned bales will be marked as SOLD. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -859,14 +962,24 @@ export default function FactoryDispatchBatchDetail() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={!!reopenRideId} onOpenChange={(o) => { if (!o) { setReopenRideId(null); setReopenReason(""); } }}>
+      <Dialog
+        open={!!reopenRideId}
+        onOpenChange={(o) => {
+          if (!o) {
+            setReopenRideId(null);
+            setReopenReason("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reopen Truck Ride</DialogTitle>
             <DialogDescription>Admin action. Provide a reason to reopen this dispatched ride.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label>Reason <span className="text-destructive">*</span></Label>
+            <Label>
+              Reason <span className="text-destructive">*</span>
+            </Label>
             <Textarea
               rows={3}
               placeholder="Reason for reopening..."
@@ -876,7 +989,15 @@ export default function FactoryDispatchBatchDetail() {
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setReopenRideId(null); setReopenReason(""); }}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setReopenRideId(null);
+                setReopenReason("");
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={() => reopenRideId && reopenRideMutation.mutate({ rideId: reopenRideId, reason: reopenReason })}
               disabled={!reopenReason.trim() || reopenRideMutation.isPending}

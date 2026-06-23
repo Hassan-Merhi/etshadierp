@@ -18,12 +18,13 @@ export default function CustomerLogosSettings() {
 
   const { data: allCustomers = [] } = useQuery<any[]>({
     queryKey: ["/api/factory/customers"],
-    queryFn: () => fetch("/api/factory/customers", { credentials: "include" }).then(r => r.json()),
+    queryFn: () => fetch("/api/factory/customers", { credentials: "include" }).then((r) => r.json()),
   });
 
   const { data: logos = [], isLoading } = useQuery<any[]>({
     queryKey: ["/api/factory/customers", selectedCustomerId, "logos"],
-    queryFn: () => fetch(`/api/factory/customers/${selectedCustomerId}/logos`, { credentials: "include" }).then(r => r.json()),
+    queryFn: () =>
+      fetch(`/api/factory/customers/${selectedCustomerId}/logos`, { credentials: "include" }).then((r) => r.json()),
     enabled: !!selectedCustomerId,
   });
 
@@ -100,13 +101,21 @@ export default function CustomerLogosSettings() {
           <CardTitle className="text-base">Select Customer</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={selectedCustomerId} onValueChange={(v) => { setSelectedCustomerId(v); setRenamingId(null); }}>
+          <Select
+            value={selectedCustomerId}
+            onValueChange={(v) => {
+              setSelectedCustomerId(v);
+              setRenamingId(null);
+            }}
+          >
             <SelectTrigger data-testid="select-logo-customer">
               <SelectValue placeholder="Choose a customer to manage logos..." />
             </SelectTrigger>
             <SelectContent>
               {activeCustomers.map((c: any) => (
-                <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.legalName}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -174,7 +183,8 @@ export default function CustomerLogosSettings() {
                           autoFocus
                           data-testid={`input-rename-logo-${logo.id}`}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" && renameValue.trim()) renameMutation.mutate({ id: logo.id, name: renameValue.trim() });
+                            if (e.key === "Enter" && renameValue.trim())
+                              renameMutation.mutate({ id: logo.id, name: renameValue.trim() });
                             if (e.key === "Escape") setRenamingId(null);
                           }}
                         />
@@ -186,7 +196,9 @@ export default function CustomerLogosSettings() {
                         >
                           Save
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setRenamingId(null)}>Cancel</Button>
+                        <Button size="sm" variant="outline" onClick={() => setRenamingId(null)}>
+                          Cancel
+                        </Button>
                       </div>
                     ) : (
                       <>
@@ -196,7 +208,10 @@ export default function CustomerLogosSettings() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => { setRenamingId(logo.id); setRenameValue(logo.name); }}
+                          onClick={() => {
+                            setRenamingId(logo.id);
+                            setRenameValue(logo.name);
+                          }}
                           data-testid={`button-rename-logo-${logo.id}`}
                         >
                           <Pencil className="h-4 w-4" />

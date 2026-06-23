@@ -36,7 +36,10 @@ function slugify(label: string): string {
     .slice(0, 40);
 }
 
-function rowInfo(row: { imageData: string | null; imageUpdatedAt: Date | null }): { hasCustom: boolean; lastModified: number | null } {
+function rowInfo(row: { imageData: string | null; imageUpdatedAt: Date | null }): {
+  hasCustom: boolean;
+  lastModified: number | null;
+} {
   return {
     hasCustom: !!row.imageData,
     lastModified: row.imageUpdatedAt ? row.imageUpdatedAt.getTime() : null,
@@ -73,8 +76,11 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   // ── GET /api/factory/label-design-colors — full list with image status ──────
   app.get("/api/factory/label-design-colors", requireAuth, async (_req: any, res: any) => {
     try {
-      const colors = await db.select().from(labelDesignColors).orderBy(asc(labelDesignColors.sortOrder), asc(labelDesignColors.createdAt));
-      res.json(colors.map(c => ({ ...c, imageData: undefined, ...rowInfo(c) })));
+      const colors = await db
+        .select()
+        .from(labelDesignColors)
+        .orderBy(asc(labelDesignColors.sortOrder), asc(labelDesignColors.createdAt));
+      res.json(colors.map((c) => ({ ...c, imageData: undefined, ...rowInfo(c) })));
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -83,8 +89,11 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   // ── GET /api/factory/label-banners — legacy compat (same data) ─────────────
   app.get("/api/factory/label-banners", requireAuth, async (_req: any, res: any) => {
     try {
-      const colors = await db.select().from(labelDesignColors).orderBy(asc(labelDesignColors.sortOrder), asc(labelDesignColors.createdAt));
-      res.json(colors.map(c => ({ slot: c.slug, ...rowInfo(c) })));
+      const colors = await db
+        .select()
+        .from(labelDesignColors)
+        .orderBy(asc(labelDesignColors.sortOrder), asc(labelDesignColors.createdAt));
+      res.json(colors.map((c) => ({ slot: c.slug, ...rowInfo(c) })));
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
@@ -106,12 +115,18 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
       }
 
       try {
-        const existing = await db.select({ id: labelDesignColors.id }).from(labelDesignColors).where(eq(labelDesignColors.slug, slug));
+        const existing = await db
+          .select({ id: labelDesignColors.id })
+          .from(labelDesignColors)
+          .where(eq(labelDesignColors.slug, slug));
         if (existing.length > 0) {
           return res.status(409).json({ message: `A color with slug "${slug}" already exists` });
         }
 
-        const all = await db.select({ sortOrder: labelDesignColors.sortOrder }).from(labelDesignColors).orderBy(asc(labelDesignColors.sortOrder));
+        const all = await db
+          .select({ sortOrder: labelDesignColors.sortOrder })
+          .from(labelDesignColors)
+          .orderBy(asc(labelDesignColors.sortOrder));
         const nextOrder = all.length > 0 ? (all[all.length - 1].sortOrder ?? 0) + 1 : 0;
 
         let imageData: string | undefined;
@@ -121,14 +136,17 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
           imageUpdatedAt = new Date();
         }
 
-        const [row] = await db.insert(labelDesignColors).values({
-          slug,
-          label: String(label),
-          colorHex: String(colorHex),
-          sortOrder: nextOrder,
-          isDefault: false,
-          ...(imageData ? { imageData, imageUpdatedAt } : {}),
-        }).returning();
+        const [row] = await db
+          .insert(labelDesignColors)
+          .values({
+            slug,
+            label: String(label),
+            colorHex: String(colorHex),
+            sortOrder: nextOrder,
+            isDefault: false,
+            ...(imageData ? { imageData, imageUpdatedAt } : {}),
+          })
+          .returning();
 
         res.json({ ...row, imageData: undefined, ...rowInfo(row) });
       } catch (e: any) {
@@ -148,7 +166,11 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
       if (label) updates.label = String(label);
       if (colorHex) updates.colorHex = String(colorHex);
 
-      const [updated] = await db.update(labelDesignColors).set(updates).where(eq(labelDesignColors.slug, slug)).returning();
+      const [updated] = await db
+        .update(labelDesignColors)
+        .set(updates)
+        .where(eq(labelDesignColors.slug, slug))
+        .returning();
       if (!updated) return res.status(404).json({ message: "Color not found" });
       res.json({ ...updated, imageData: undefined, ...rowInfo(updated) });
     } catch (e: any) {
@@ -181,15 +203,16 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
       if (!req.file) return res.status(400).json({ message: "No image uploaded" });
 
       try {
-        const rows = await db.select({ id: labelDesignColors.id }).from(labelDesignColors).where(eq(labelDesignColors.slug, slug));
+        const rows = await db
+          .select({ id: labelDesignColors.id })
+          .from(labelDesignColors)
+          .where(eq(labelDesignColors.slug, slug));
         if (rows.length === 0) return res.status(404).json({ message: "Color not found" });
 
         const imageData = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
         const imageUpdatedAt = new Date();
 
-        await db.update(labelDesignColors)
-          .set({ imageData, imageUpdatedAt })
-          .where(eq(labelDesignColors.slug, slug));
+        await db.update(labelDesignColors).set({ imageData, imageUpdatedAt }).where(eq(labelDesignColors.slug, slug));
 
         console.log(`[LabelBanners] "${slug}" updated in DB (${req.file.size} bytes)`);
         res.json({ slot: slug, hasCustom: true, lastModified: imageUpdatedAt.getTime() });
@@ -203,7 +226,8 @@ export function registerLabelBannersRoutes(app: any, requireAuth: any) {
   app.delete("/api/factory/label-banners/:slug", requireAuth, async (req: any, res: any) => {
     const { slug } = req.params;
     try {
-      await db.update(labelDesignColors)
+      await db
+        .update(labelDesignColors)
         .set({ imageData: null, imageUpdatedAt: null })
         .where(eq(labelDesignColors.slug, slug));
       console.log(`[LabelBanners] "${slug}" reverted to default`);

@@ -35,18 +35,11 @@ export function useDialogScrollFix() {
           document.documentElement.style.removeProperty("pointer-events");
 
           // Remove any stale aria-hidden that Radix left on non-dialog elements
-          document
-            .querySelectorAll(
-              "body > *:not([role='dialog']):not([data-radix-portal])"
-            )
-            .forEach((el) => {
-              if (
-                el.getAttribute("aria-hidden") === "true" &&
-                !el.closest('[role="dialog"]')
-              ) {
-                el.removeAttribute("aria-hidden");
-              }
-            });
+          document.querySelectorAll("body > *:not([role='dialog']):not([data-radix-portal])").forEach((el) => {
+            if (el.getAttribute("aria-hidden") === "true" && !el.closest('[role="dialog"]')) {
+              el.removeAttribute("aria-hidden");
+            }
+          });
         }
       }, DELAY_MS);
     }
@@ -55,9 +48,7 @@ export function useDialogScrollFix() {
       for (const m of mutations) {
         if (
           m.type === "attributes" &&
-          (m.attributeName === "data-state" ||
-            m.attributeName === "aria-hidden" ||
-            m.attributeName === "style")
+          (m.attributeName === "data-state" || m.attributeName === "aria-hidden" || m.attributeName === "style")
         ) {
           const el = m.target as HTMLElement;
           const state = el.getAttribute("data-state");

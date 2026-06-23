@@ -1,20 +1,8 @@
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SupplierWithBalance } from "./factorySupplierTypes";
 import { FactorySupplier } from "@shared/schema";
 import { UseMutationResult } from "@tanstack/react-query";
@@ -38,12 +26,23 @@ interface SupplierFormDialogProps {
 }
 
 export function SupplierFormDialog({
-  createOpen, setCreateOpen, editingSupplier, setEditingSupplier,
-  formData, setFormData, formRole, setFormRole, allSuppliers,
-  createSubAccountParentId, setCreateSubAccountParentId,
-  createMutation, updateMutation, resetForm, wrapAdminAction,
+  createOpen,
+  setCreateOpen,
+  editingSupplier,
+  setEditingSupplier,
+  formData,
+  setFormData,
+  formRole,
+  setFormRole,
+  allSuppliers,
+  createSubAccountParentId,
+  setCreateSubAccountParentId,
+  createMutation,
+  updateMutation,
+  resetForm,
+  wrapAdminAction,
 }: SupplierFormDialogProps) {
-  const brokers = allSuppliers.filter(s => !s.parentId && s.totalContainers > 0);
+  const brokers = allSuppliers.filter((s) => !s.parentId && s.totalContainers > 0);
 
   const handleSubmit = () => {
     if (editingSupplier) {
@@ -54,9 +53,16 @@ export function SupplierFormDialog({
   };
 
   return (
-    <Dialog open={createOpen || !!editingSupplier} onOpenChange={(open) => {
-      if (!open) { setCreateOpen(false); setEditingSupplier(null); setCreateSubAccountParentId(null); }
-    }}>
+    <Dialog
+      open={createOpen || !!editingSupplier}
+      onOpenChange={(open) => {
+        if (!open) {
+          setCreateOpen(false);
+          setEditingSupplier(null);
+          setCreateSubAccountParentId(null);
+        }
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{editingSupplier ? "Edit Supplier" : "Add New Supplier"}</DialogTitle>
@@ -95,8 +101,10 @@ export function SupplierFormDialog({
                   <SelectValue placeholder="Select broker" />
                 </SelectTrigger>
                 <SelectContent>
-                  {brokers.map(b => (
-                    <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
+                  {brokers.map((b) => (
+                    <SelectItem key={b.id} value={String(b.id)}>
+                      {b.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -107,7 +115,7 @@ export function SupplierFormDialog({
             <Label>Name</Label>
             <Input
               value={formData.name}
-              onChange={e => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="Supplier or Broker name"
               data-testid="input-supplier-name"
             />
@@ -117,15 +125,12 @@ export function SupplierFormDialog({
               <Label>Contact Person</Label>
               <Input
                 value={formData.contactPerson}
-                onChange={e => setFormData({ ...formData, contactPerson: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
               />
             </div>
             <div className="space-y-2">
               <Label>Phone</Label>
-              <Input
-                value={formData.phone}
-                onChange={e => setFormData({ ...formData, phone: e.target.value })}
-              />
+              <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
             </div>
           </div>
           <div className="space-y-2">
@@ -133,26 +138,28 @@ export function SupplierFormDialog({
             <Input
               type="email"
               value={formData.email}
-              onChange={e => setFormData({ ...formData, email: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
             />
           </div>
           <div className="space-y-2">
             <Label>Address</Label>
-            <Input
-              value={formData.address}
-              onChange={e => setFormData({ ...formData, address: e.target.value })}
-            />
+            <Input value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} />
           </div>
           <div className="space-y-2">
             <Label>Notes</Label>
-            <Input
-              value={formData.notes}
-              onChange={e => setFormData({ ...formData, notes: e.target.value })}
-            />
+            <Input value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => { setCreateOpen(false); setEditingSupplier(null); setCreateSubAccountParentId(null); resetForm(); }}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCreateOpen(false);
+              setEditingSupplier(null);
+              setCreateSubAccountParentId(null);
+              resetForm();
+            }}
+          >
             Cancel
           </Button>
           <Button

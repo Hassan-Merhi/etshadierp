@@ -7,35 +7,13 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { PeriodFilter, getDefaultPeriodValue, type PeriodFilterValue } from "@/components/ui/period-filter";
 import { useDateJump } from "@/hooks/use-date-jump";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 
 interface MonthlyData {
   month: number;
@@ -73,44 +51,51 @@ export default function StockItemHistory() {
   const [_location, navigate] = useLocation();
   const handleBack = useBackToParent();
   const { formatAmount } = useCurrencyContext();
-  
+
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [periodFilter, setPeriodFilter] = useState<PeriodFilterValue>(() => getDefaultPeriodValue("this_year"));
   useDateJump((date) => setPeriodFilter({ fromDate: date, toDate: date, preset: "custom" }));
   useEscapeToParent("/stock-items");
-  
+
   const { data, isLoading } = useQuery<StockItemSummary>({
-    queryKey: [`/api/stock-items/${stockItemId}/monthly-summary`, { year: selectedYear, startDate: periodFilter.fromDate, endDate: periodFilter.toDate }],
+    queryKey: [
+      `/api/stock-items/${stockItemId}/monthly-summary`,
+      { year: selectedYear, startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
+    ],
     queryFn: async () => {
-      const response = await fetch(`/api/stock-items/${stockItemId}/monthly-summary?year=${selectedYear}&startDate=${periodFilter.fromDate}&endDate=${periodFilter.toDate}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to fetch');
+      const response = await fetch(
+        `/api/stock-items/${stockItemId}/monthly-summary?year=${selectedYear}&startDate=${periodFilter.fromDate}&endDate=${periodFilter.toDate}`,
+        {
+          credentials: "include",
+        }
+      );
+      if (!response.ok) throw new Error("Failed to fetch");
       return response.json();
     },
     enabled: stockItemId > 0,
   });
-  
+
   const years = [];
   for (let y = currentYear; y >= currentYear - 5; y--) {
     years.push(y);
   }
-  
-  const chartData = data?.monthlyData.map(m => ({
-    name: m.monthName.substring(0, 3),
-    Inwards: m.inwardQty,
-    Outwards: m.outwardQty,
-  })) || [];
-  
+
+  const chartData =
+    data?.monthlyData.map((m) => ({
+      name: m.monthName.substring(0, 3),
+      Inwards: m.inwardQty,
+      Outwards: m.outwardQty,
+    })) || [];
+
   const handleMonthClick = (month: number) => {
     navigate(`/stock-items/${stockItemId}/history/${selectedYear}/${month}`);
   };
-  
+
   const formatNumber = (num: number, decimals = 2) => {
     return num.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
   };
-  
+
   if (isLoading) {
     return (
       <div className="container mx-auto p-3 sm:p-6 space-y-6">
@@ -119,7 +104,7 @@ export default function StockItemHistory() {
       </div>
     );
   }
-  
+
   return (
     <div className="container mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -136,13 +121,9 @@ export default function StockItemHistory() {
             )}
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-          <PeriodFilter
-            value={periodFilter}
-            onChange={setPeriodFilter}
-            data-testid="period-filter"
-          />
+          <PeriodFilter value={periodFilter} onChange={setPeriodFilter} data-testid="period-filter" />
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <Select value={selectedYear} onValueChange={setSelectedYear}>
@@ -150,15 +131,17 @@ export default function StockItemHistory() {
                 <SelectValue placeholder="Year" />
               </SelectTrigger>
               <SelectContent>
-                {years.map(y => (
-                  <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+                {years.map((y) => (
+                  <SelectItem key={y} value={y.toString()}>
+                    {y}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
         </div>
       </div>
-      
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Monthly Summary - {selectedYear}</CardTitle>
@@ -168,10 +151,18 @@ export default function StockItemHistory() {
             <Table>
               <TableHeader className="sticky top-0 z-30 bg-background">
                 <TableRow>
-                  <TableHead rowSpan={2} className="align-bottom border-r">Particulars</TableHead>
-                  <TableHead colSpan={2} className="text-center border-r">Inwards</TableHead>
-                  <TableHead colSpan={2} className="text-center border-r">Outwards</TableHead>
-                  <TableHead colSpan={2} className="text-center">Closing Balance</TableHead>
+                  <TableHead rowSpan={2} className="align-bottom border-r">
+                    Particulars
+                  </TableHead>
+                  <TableHead colSpan={2} className="text-center border-r">
+                    Inwards
+                  </TableHead>
+                  <TableHead colSpan={2} className="text-center border-r">
+                    Outwards
+                  </TableHead>
+                  <TableHead colSpan={2} className="text-center">
+                    Closing Balance
+                  </TableHead>
                 </TableRow>
                 <TableRow>
                   <TableHead className="text-right">Quantity</TableHead>
@@ -186,7 +177,7 @@ export default function StockItemHistory() {
                 {data?.monthlyData.map((month) => {
                   const hasData = month.inwardQty > 0 || month.outwardQty > 0 || month.closingQty !== 0;
                   return (
-                    <TableRow 
+                    <TableRow
                       key={month.month}
                       className={hasData ? "cursor-pointer hover:bg-muted/50" : ""}
                       onClick={() => hasData && handleMonthClick(month.month)}
@@ -214,7 +205,7 @@ export default function StockItemHistory() {
                     </TableRow>
                   );
                 })}
-                
+
                 <TableRow className="bg-muted/50 font-bold">
                   <TableCell className="border-r">Grand Total</TableCell>
                   <TableCell className="text-right tabular-nums">
@@ -262,20 +253,28 @@ export default function StockItemHistory() {
                     </div>
                     <div>
                       <div className="text-muted-foreground">Closing</div>
-                      <div className="font-mono font-medium">{month.closingQty !== 0 ? formatNumber(month.closingQty, 0) : "-"}</div>
+                      <div className="font-mono font-medium">
+                        {month.closingQty !== 0 ? formatNumber(month.closingQty, 0) : "-"}
+                      </div>
                     </div>
                   </div>
                   {hasData && (
                     <div className="grid grid-cols-3 gap-2 text-xs mt-1">
-                      <div className="font-mono text-muted-foreground">{month.inwardValue > 0 ? formatAmount(month.inwardValue) : ""}</div>
-                      <div className="font-mono text-muted-foreground">{month.outwardValue > 0 ? formatAmount(month.outwardValue) : ""}</div>
-                      <div className="font-mono text-muted-foreground">{month.closingValue !== 0 ? formatAmount(month.closingValue) : ""}</div>
+                      <div className="font-mono text-muted-foreground">
+                        {month.inwardValue > 0 ? formatAmount(month.inwardValue) : ""}
+                      </div>
+                      <div className="font-mono text-muted-foreground">
+                        {month.outwardValue > 0 ? formatAmount(month.outwardValue) : ""}
+                      </div>
+                      <div className="font-mono text-muted-foreground">
+                        {month.closingValue !== 0 ? formatAmount(month.closingValue) : ""}
+                      </div>
                     </div>
                   )}
                 </div>
               );
             })}
-            
+
             {data && (
               <div className="p-3 rounded-md border bg-muted/50 text-sm font-bold">
                 <div className="mb-2">Grand Total</div>
@@ -298,7 +297,7 @@ export default function StockItemHistory() {
           </div>
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Monthly Activity Chart</CardTitle>
@@ -310,12 +309,12 @@ export default function StockItemHistory() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="name" className="text-xs" />
                 <YAxis className="text-xs" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))', 
-                    borderColor: 'hsl(var(--border))',
-                    borderRadius: 'var(--radius)',
-                  }} 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
+                    borderColor: "hsl(var(--border))",
+                    borderRadius: "var(--radius)",
+                  }}
                 />
                 <Legend />
                 <Bar dataKey="Inwards" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />

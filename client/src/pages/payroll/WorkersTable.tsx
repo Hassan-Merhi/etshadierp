@@ -1,21 +1,8 @@
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DollarSign, Trash2, AlertCircle } from "lucide-react";
 import { ConfirmationDialog } from "@/components/ConfirmationDialog";
 import { cn } from "@/lib/utils";
@@ -46,7 +33,7 @@ export function WorkersTable({
   setWorkerOverrides,
   formatAmount,
   addWorkerToWorkerGroupMutation,
-  groupId
+  groupId,
 }: WorkersTableProps) {
   return (
     <Table>
@@ -62,7 +49,7 @@ export function WorkersTable({
                     [member.id]: {
                       ...prev[member.id],
                       selected: !!checked,
-                    }
+                    },
                   }));
                 });
               }}
@@ -70,10 +57,18 @@ export function WorkersTable({
             />
           </TableHead>
           <TableHead data-testid="header-name">Name</TableHead>
-          <TableHead data-testid="header-monthly-salary" className="text-right">Monthly Salary</TableHead>
-          <TableHead data-testid="header-advances" className="text-right">Advances</TableHead>
-          <TableHead data-testid="header-payment-amount" className="text-right">Payment Amount</TableHead>
-          <TableHead data-testid="header-actions" className="w-16">Actions</TableHead>
+          <TableHead data-testid="header-monthly-salary" className="text-right">
+            Monthly Salary
+          </TableHead>
+          <TableHead data-testid="header-advances" className="text-right">
+            Advances
+          </TableHead>
+          <TableHead data-testid="header-payment-amount" className="text-right">
+            Payment Amount
+          </TableHead>
+          <TableHead data-testid="header-actions" className="w-16">
+            Actions
+          </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -82,10 +77,10 @@ export function WorkersTable({
           const monthlySalary = parseFloat(worker.monthlySalary || "0");
           const paymentAmount = parseFloat(workerPayments[worker.id]?.amount || "0");
           const hasNegativePayment = paymentAmount < 0;
-          
+
           return (
-            <TableRow 
-              key={worker.id} 
+            <TableRow
+              key={worker.id}
               data-testid={`row-worker-${worker.id}`}
               className={workerPayments[worker.id]?.selected ? "bg-muted/50" : ""}
             >
@@ -106,7 +101,10 @@ export function WorkersTable({
                   <DollarSign className="h-3 w-3" />
                 </button>
               </TableCell>
-              <TableCell data-testid={`cell-monthly-salary-${worker.id}`} className="text-right font-mono text-muted-foreground">
+              <TableCell
+                data-testid={`cell-monthly-salary-${worker.id}`}
+                className="text-right font-mono text-muted-foreground"
+              >
                 {formatAmount(monthlySalary)}
               </TableCell>
               <TableCell data-testid={`cell-advances-${worker.id}`} className="text-right font-mono">
@@ -114,9 +112,7 @@ export function WorkersTable({
                   <span className="text-destructive">
                     {formatAmount(advanceInfo.total)}
                     {advanceInfo.count > 0 && (
-                      <span className="text-xs text-muted-foreground ml-1">
-                        ({advanceInfo.count})
-                      </span>
+                      <span className="text-xs text-muted-foreground ml-1">({advanceInfo.count})</span>
                     )}
                   </span>
                 ) : (
@@ -130,15 +126,10 @@ export function WorkersTable({
                     step="0.01"
                     value={workerPayments[worker.id]?.amount || "0"}
                     onChange={(e) => handleUpdateAmount(worker.id, e.target.value)}
-                    className={cn(
-                      "w-32 text-right font-mono",
-                      hasNegativePayment && "border-destructive"
-                    )}
+                    className={cn("w-32 text-right font-mono", hasNegativePayment && "border-destructive")}
                     data-testid={`input-amount-${worker.id}`}
                   />
-                  {hasNegativePayment && (
-                    <AlertCircle className="h-4 w-4 text-destructive" />
-                  )}
+                  {hasNegativePayment && <AlertCircle className="h-4 w-4 text-destructive" />}
                 </div>
               </TableCell>
               <TableCell>
@@ -152,14 +143,11 @@ export function WorkersTable({
                         });
                       }}
                     >
-                      <SelectTrigger
-                        className="h-8 w-32 text-xs"
-                        data-testid={`select-move-group-${worker.id}`}
-                      >
+                      <SelectTrigger className="h-8 w-32 text-xs" data-testid={`select-move-group-${worker.id}`}>
                         <SelectValue placeholder="Move to group" />
                       </SelectTrigger>
                       <SelectContent>
-                        {workerGroups.map(g => (
+                        {workerGroups.map((g) => (
                           <SelectItem key={g.id} value={String(g.id)}>
                             {g.name}
                           </SelectItem>

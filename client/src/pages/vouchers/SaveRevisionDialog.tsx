@@ -1,10 +1,10 @@
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -67,9 +67,14 @@ export function SaveRevisionDialog({
                   {revisionItems.map((item, idx) => (
                     <tr key={idx} className="border-t">
                       <td className="p-2 font-medium truncate max-w-[120px]">{item.stockItemName}</td>
-                      <td className="p-2 text-right font-mono text-muted-foreground">{formatNumber(item.originalQuantity, 0)}</td>
-                      <td className={`p-2 text-right font-mono font-semibold ${item.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}>
-                        {item.delta > 0 ? "+" : ""}{formatNumber(item.delta, 0)}
+                      <td className="p-2 text-right font-mono text-muted-foreground">
+                        {formatNumber(item.originalQuantity, 0)}
+                      </td>
+                      <td
+                        className={`p-2 text-right font-mono font-semibold ${item.delta > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"}`}
+                      >
+                        {item.delta > 0 ? "+" : ""}
+                        {formatNumber(item.delta, 0)}
                       </td>
                       <td className="p-2 text-right font-mono">{formatNumber(item.newQuantity, 0)}</td>
                     </tr>

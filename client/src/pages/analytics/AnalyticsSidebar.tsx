@@ -1,16 +1,23 @@
 import { LucideIcon } from "lucide-react";
-import { 
-  Package, 
-  FileText, 
-  Wallet, 
-  Landmark, 
-  TrendingDown, 
-  DollarSign, 
-  ShoppingCart, 
+import {
+  Package,
+  FileText,
+  Wallet,
+  Landmark,
+  TrendingDown,
+  DollarSign,
+  ShoppingCart,
   Container as ContainerIcon,
-  BarChart3
+  BarChart3,
 } from "lucide-react";
-import { SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar";
+import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+} from "@/components/ui/sidebar";
 
 export interface AnalyticsSidebarItem {
   key: string;
@@ -52,9 +59,7 @@ export const sidebarGroups: AnalyticsSidebarGroup[] = [
   },
   {
     label: "Financial Statements",
-    items: [
-      { key: "reports", label: "P&L Statement", icon: BarChart3 },
-    ],
+    items: [{ key: "reports", label: "P&L Statement", icon: BarChart3 }],
   },
 ];
 

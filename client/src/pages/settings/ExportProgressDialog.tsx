@@ -7,8 +7,16 @@ import { apiRequest } from "@/lib/queryClient";
 import { JobStatus } from "./ExportCenterTypes";
 import { StepIcon } from "./ExportCenterComponents";
 
-export function ExportProgressDialog({ jobId, mode, open, onClose }: {
-  jobId: string; mode: "download" | "email"; open: boolean; onClose: () => void;
+export function ExportProgressDialog({
+  jobId,
+  mode,
+  open,
+  onClose,
+}: {
+  jobId: string;
+  mode: "download" | "email";
+  open: boolean;
+  onClose: () => void;
 }) {
   const [job, setJob] = useState<JobStatus | null>(null);
   const [downloaded, setDownloaded] = useState(false);
@@ -24,11 +32,15 @@ export function ExportProgressDialog({ jobId, mode, open, onClose }: {
         const data = (await (await apiRequest("GET", `/api/export/job/${jobId}`)).json()) as JobStatus;
         setJob(data);
         if (data.status !== "running" && intervalRef.current) clearInterval(intervalRef.current);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
     poll();
     intervalRef.current = setInterval(poll, 600);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
   }, [open, jobId]);
 
   useEffect(() => {
@@ -51,7 +63,12 @@ export function ExportProgressDialog({ jobId, mode, open, onClose }: {
   const isRunning = !job || job.status === "running";
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v && !isRunning) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && !isRunning) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -61,9 +78,11 @@ export function ExportProgressDialog({ jobId, mode, open, onClose }: {
             {isRunning ? "Exporting..." : isDone ? "Export Succeeded" : "Export Failed"}
           </DialogTitle>
         </DialogHeader>
-        <div ref={scrollRef}
+        <div
+          ref={scrollRef}
           className="bg-muted/50 rounded-md border p-3 h-72 overflow-y-auto font-mono text-xs space-y-1.5"
-          data-testid="export-progress-log">
+          data-testid="export-progress-log"
+        >
           {(!job || job.steps.length === 0) && (
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
@@ -74,16 +93,25 @@ export function ExportProgressDialog({ jobId, mode, open, onClose }: {
             <div key={i} className="flex items-start gap-1.5">
               <StepIcon type={step.type} />
               <span className="text-muted-foreground shrink-0">{step.time}</span>
-              <span className={
-                step.type === "success" ? "text-green-600 dark:text-green-400" :
-                step.type === "error" ? "text-destructive" :
-                step.type === "warning" ? "text-amber-600" : "text-foreground"
-              }>{step.message}</span>
+              <span
+                className={
+                  step.type === "success"
+                    ? "text-green-600 dark:text-green-400"
+                    : step.type === "error"
+                      ? "text-destructive"
+                      : step.type === "warning"
+                        ? "text-amber-600"
+                        : "text-foreground"
+                }
+              >
+                {step.message}
+              </span>
             </div>
           ))}
           {isRunning && job && job.steps.length > 0 && (
             <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Loader2 className="h-3 w-3 animate-spin shrink-0" /><span>Working...</span>
+              <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+              <span>Working...</span>
             </div>
           )}
         </div>
@@ -110,8 +138,12 @@ export function ExportProgressDialog({ jobId, mode, open, onClose }: {
           </Alert>
         )}
         <div className="flex justify-end">
-          <Button variant={isDone || isError ? "default" : "outline"}
-            onClick={onClose} disabled={isRunning} data-testid="button-close-progress">
+          <Button
+            variant={isDone || isError ? "default" : "outline"}
+            onClick={onClose}
+            disabled={isRunning}
+            data-testid="button-close-progress"
+          >
             {isRunning ? "Please wait..." : "Close"}
           </Button>
         </div>

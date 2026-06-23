@@ -59,7 +59,7 @@ export function MixBatchList({
   const BATCH_PREVIEW_COUNT = 15;
 
   const visibleMixBatches = useMemo(
-    () => showAllMixBatches ? mixBatches : mixBatches.slice(0, BATCH_PREVIEW_COUNT),
+    () => (showAllMixBatches ? mixBatches : mixBatches.slice(0, BATCH_PREVIEW_COUNT)),
     [mixBatches, showAllMixBatches]
   );
 
@@ -92,7 +92,11 @@ export function MixBatchList({
               data-testid="button-send-mix-batch-whatsapp"
               className="h-8 gap-2"
             >
-              {isSendingWhatsApp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
+              {isSendingWhatsApp ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <MessageCircle className="h-3.5 w-3.5" />
+              )}
               Send WhatsApp
             </Button>
           </div>
@@ -116,24 +120,39 @@ export function MixBatchList({
         >
           <div style={{ marginBottom: "16px", borderBottom: "1px solid #374151", paddingBottom: "12px" }}>
             <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "4px" }}>
-              {new Date(mixBatchDate + "T00:00:00").toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })}
+              {new Date(mixBatchDate + "T00:00:00").toLocaleDateString("en-US", {
+                month: "2-digit",
+                day: "2-digit",
+                year: "numeric",
+              })}
             </div>
             <div style={{ fontSize: "18px", fontWeight: 700, color: "#f9fafb" }}>Mix Batch Details</div>
           </div>
 
           {mixBatchesByDate.map((batch: any) => (
             <div key={batch.id} style={{ marginBottom: "20px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyBetween: "space-between", marginBottom: "12px" }}>
+              <div
+                style={{ display: "flex", alignItems: "center", justifyBetween: "space-between", marginBottom: "12px" }}
+              >
                 <div>
-                  <div style={{ fontSize: "15px", fontWeight: 700, fontFamily: "monospace", color: "#f9fafb" }}>{batch.batchCode}</div>
-                  {batch.name && <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>{batch.name}</div>}
+                  <div style={{ fontSize: "15px", fontWeight: 700, fontFamily: "monospace", color: "#f9fafb" }}>
+                    {batch.batchCode}
+                  </div>
+                  {batch.name && (
+                    <div style={{ fontSize: "12px", color: "#9ca3af", marginTop: "2px" }}>{batch.name}</div>
+                  )}
                 </div>
-                <span style={{
-                  fontSize: "11px", fontWeight: 600, padding: "3px 10px",
-                  borderRadius: "999px", backgroundColor: batch.status === "COMPLETED" ? "#166534" : "#374151",
-                  color: batch.status === "COMPLETED" ? "#bbf7d0" : "#d1d5db",
-                  border: "1px solid " + (batch.status === "COMPLETED" ? "#16a34a" : "#4b5563"),
-                }}>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    padding: "3px 10px",
+                    borderRadius: "999px",
+                    backgroundColor: batch.status === "COMPLETED" ? "#166534" : "#374151",
+                    color: batch.status === "COMPLETED" ? "#bbf7d0" : "#d1d5db",
+                    border: "1px solid " + (batch.status === "COMPLETED" ? "#16a34a" : "#4b5563"),
+                  }}
+                >
                   {batch.status}
                 </span>
               </div>
@@ -144,9 +163,14 @@ export function MixBatchList({
                   { label: "Total Cost", value: "$" + formatNumber(batch.totalCost) },
                   { label: "Cost/kg", value: "$" + (parseFloat(batch.costPerKg) || 0).toFixed(2) },
                 ].map((stat) => (
-                  <div key={stat.label} style={{ flex: 1, backgroundColor: "#1f2937", borderRadius: "8px", padding: "10px 14px" }}>
+                  <div
+                    key={stat.label}
+                    style={{ flex: 1, backgroundColor: "#1f2937", borderRadius: "8px", padding: "10px 14px" }}
+                  >
                     <div style={{ fontSize: "10px", color: "#6b7280", marginBottom: "4px" }}>{stat.label}</div>
-                    <div style={{ fontSize: "14px", fontWeight: 700, fontFamily: "monospace", color: "#f9fafb" }}>{stat.value}</div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, fontFamily: "monospace", color: "#f9fafb" }}>
+                      {stat.value}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -156,11 +180,19 @@ export function MixBatchList({
                   <thead>
                     <tr style={{ backgroundColor: "#1f2937" }}>
                       {["SOURCE", "CONTAINER", "WEIGHT", "$/KG", "TOTAL"].map((h, i) => (
-                        <th key={h} style={{
-                          padding: "8px 10px", textAlign: i > 1 ? "right" : "left",
-                          color: "#6b7280", fontWeight: 600, fontSize: "10px",
-                          borderBottom: "1px solid #374151",
-                        }}>{h}</th>
+                        <th
+                          key={h}
+                          style={{
+                            padding: "8px 10px",
+                            textAlign: i > 1 ? "right" : "left",
+                            color: "#6b7280",
+                            fontWeight: 600,
+                            fontSize: "10px",
+                            borderBottom: "1px solid #374151",
+                          }}
+                        >
+                          {h}
+                        </th>
                       ))}
                     </tr>
                   </thead>
@@ -168,10 +200,26 @@ export function MixBatchList({
                     {batch.sources.map((src: any, idx: number) => (
                       <tr key={src.id} style={{ backgroundColor: idx % 2 === 0 ? "transparent" : "#1a2332" }}>
                         <td style={{ padding: "7px 10px", color: "#f9fafb", fontWeight: 500 }}>{src.sourceName}</td>
-                        <td style={{ padding: "7px 10px", color: "#9ca3af", fontFamily: "monospace", fontSize: "11px" }}>{src.containerNumber || "—"}</td>
-                        <td style={{ padding: "7px 10px", color: "#f9fafb", textAlign: "right", fontFamily: "monospace" }}>{formatNumber(src.weightKg)} kg</td>
-                        <td style={{ padding: "7px 10px", color: "#f9fafb", textAlign: "right", fontFamily: "monospace" }}>${(parseFloat(src.costPerKg) || 0).toFixed(2)}</td>
-                        <td style={{ padding: "7px 10px", color: "#f9fafb", textAlign: "right", fontFamily: "monospace" }}>${formatNumber(src.totalCost)}</td>
+                        <td
+                          style={{ padding: "7px 10px", color: "#9ca3af", fontFamily: "monospace", fontSize: "11px" }}
+                        >
+                          {src.containerNumber || "—"}
+                        </td>
+                        <td
+                          style={{ padding: "7px 10px", color: "#f9fafb", textAlign: "right", fontFamily: "monospace" }}
+                        >
+                          {formatNumber(src.weightKg)} kg
+                        </td>
+                        <td
+                          style={{ padding: "7px 10px", color: "#f9fafb", textAlign: "right", fontFamily: "monospace" }}
+                        >
+                          ${(parseFloat(src.costPerKg) || 0).toFixed(2)}
+                        </td>
+                        <td
+                          style={{ padding: "7px 10px", color: "#f9fafb", textAlign: "right", fontFamily: "monospace" }}
+                        >
+                          ${formatNumber(src.totalCost)}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -180,7 +228,16 @@ export function MixBatchList({
             </div>
           ))}
 
-          <div style={{ marginTop: "16px", borderTop: "1px solid #374151", paddingTop: "10px", fontSize: "10px", color: "#6b7280", textAlign: "right" }}>
+          <div
+            style={{
+              marginTop: "16px",
+              borderTop: "1px solid #374151",
+              paddingTop: "10px",
+              fontSize: "10px",
+              color: "#6b7280",
+              textAlign: "right",
+            }}
+          >
             Generated {new Date().toLocaleString()}
           </div>
         </div>
@@ -217,20 +274,19 @@ export function MixBatchList({
                       >
                         {batch.batchCode}
                       </TableCell>
-                      <TableCell
-                        className="text-sm cursor-pointer hover:underline"
-                        onClick={() => onViewDetail(batch)}
-                      >
+                      <TableCell className="text-sm cursor-pointer hover:underline" onClick={() => onViewDetail(batch)}>
                         {batch.name || <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{batch.batchDate ? formatDisplayDate(batch.batchDate) : formatDisplayDate(batch.createdAt)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {batch.batchDate ? formatDisplayDate(batch.batchDate) : formatDisplayDate(batch.createdAt)}
+                      </TableCell>
                       <TableCell className="text-right font-mono text-sm">{formatNumber(total)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         ${parseFloat(batch.costPerKg || "0").toFixed(4)}/kg
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1">
-                            <Button
+                          <Button
                             size="icon"
                             variant="ghost"
                             onClick={() => onEdit(batch)}
@@ -275,19 +331,44 @@ export function MixBatchList({
                 const sumTotal = mixBatches.reduce((s, b) => s + (parseFloat(b.totalWeightKg) || 0), 0);
                 const sumUsed = mixBatches.reduce((s, b) => s + (parseFloat(b.usedKg) || 0), 0);
                 const sumRemaining = mixBatches.reduce((s, b) => s + (parseFloat(b.remainingKg) || 0), 0);
-                const weightedCost = mixBatches.reduce((s, b) => s + (parseFloat(b.totalWeightKg) || 0) * (parseFloat(b.costPerKg) || 0), 0);
+                const weightedCost = mixBatches.reduce(
+                  (s, b) => s + (parseFloat(b.totalWeightKg) || 0) * (parseFloat(b.costPerKg) || 0),
+                  0
+                );
                 const blendedCost = sumTotal > 0 ? weightedCost / sumTotal : 0;
                 return (
                   <tfoot className="border-t-2 border-border bg-muted/40">
                     <TableRow className="hover:bg-transparent">
                       <TableCell colSpan={3} className="px-4 py-3 text-sm font-semibold text-foreground">
                         Combined Total
-                        <div className="text-xs text-muted-foreground font-normal">{mixBatches.length} batch{mixBatches.length !== 1 ? "es" : ""}</div>
+                        <div className="text-xs text-muted-foreground font-normal">
+                          {mixBatches.length} batch{mixBatches.length !== 1 ? "es" : ""}
+                        </div>
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-total">{fmtKg(sumTotal)}</TableCell>
-                      <TableCell className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-used">{fmtKg(sumUsed)}</TableCell>
-                      <TableCell className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-remaining">{fmtKg(sumRemaining)}</TableCell>
-                      <TableCell className="px-4 py-3 text-right font-mono font-semibold text-sm" data-testid="text-mix-summary-cost">${blendedCost.toFixed(4)}/kg</TableCell>
+                      <TableCell
+                        className="px-4 py-3 text-right font-mono font-semibold text-sm"
+                        data-testid="text-mix-summary-total"
+                      >
+                        {fmtKg(sumTotal)}
+                      </TableCell>
+                      <TableCell
+                        className="px-4 py-3 text-right font-mono font-semibold text-sm"
+                        data-testid="text-mix-summary-used"
+                      >
+                        {fmtKg(sumUsed)}
+                      </TableCell>
+                      <TableCell
+                        className="px-4 py-3 text-right font-mono font-semibold text-sm"
+                        data-testid="text-mix-summary-remaining"
+                      >
+                        {fmtKg(sumRemaining)}
+                      </TableCell>
+                      <TableCell
+                        className="px-4 py-3 text-right font-mono font-semibold text-sm"
+                        data-testid="text-mix-summary-cost"
+                      >
+                        ${blendedCost.toFixed(4)}/kg
+                      </TableCell>
                       <TableCell colSpan={2} />
                     </TableRow>
                   </tfoot>

@@ -2,8 +2,8 @@ import archiver from "archiver";
 import { streamCompanyWorkbookDirect } from "../services/exportExcelService";
 
 export interface ExportZipResult {
-  zip:     Buffer;
-  names:   string[];
+  zip: Buffer;
+  names: string[];
   skipped: string[];
 }
 
@@ -25,24 +25,24 @@ export interface ExportZipResult {
 export async function buildFullExportZip(
   companies: any[],
   fromDate?: string,
-  toDate?:   string,
-  onProgress?: (msg: string, level?: "info" | "success" | "warning" | "error") => void,
+  toDate?: string,
+  onProgress?: (msg: string, level?: "info" | "success" | "warning" | "error") => void
 ): Promise<ExportZipResult> {
   const log = onProgress ?? ((msg: string) => console.log(`[FullExport] ${msg}`));
 
   const dateLabel = new Date().toISOString().substring(0, 10);
 
-  const names:   string[] = [];
+  const names: string[] = [];
   const skipped: string[] = [];
 
   // Start the archiver up front so we can stream into it company-by-company.
   const chunks: Buffer[] = [];
   const arc = archiver("zip", { zlib: { level: 6 } });
-  arc.on("data",    (c: Buffer) => chunks.push(c));
-  arc.on("warning", (e: any)   => console.warn("[FullExport] archiver warning:", e?.message || e));
+  arc.on("data", (c: Buffer) => chunks.push(c));
+  arc.on("warning", (e: any) => console.warn("[FullExport] archiver warning:", e?.message || e));
 
   const zipPromise = new Promise<Buffer>((resolve, reject) => {
-    arc.on("end",   () => resolve(Buffer.concat(chunks)));
+    arc.on("end", () => resolve(Buffer.concat(chunks)));
     arc.on("error", reject);
   });
 
@@ -50,7 +50,7 @@ export async function buildFullExportZip(
     try {
       log(`[${company.name}] Building workbook (streaming, one sheet at a time)...`, "info");
 
-      const safeName  = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
+      const safeName = company.name.replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
       const entryName = `${safeName}_Export_${dateLabel}.xlsx`;
 
       // Build the workbook and get a Buffer, then append the buffer
@@ -77,6 +77,9 @@ export async function buildFullExportZip(
   arc.finalize();
   const zip = await zipPromise;
 
-  log(`ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`, "success");
+  log(
+    `ZIP ready — ${(zip.length / 1024 / 1024).toFixed(1)} MB (${names.length} companies, ${skipped.length} skipped)`,
+    "success"
+  );
   return { zip, names, skipped };
 }

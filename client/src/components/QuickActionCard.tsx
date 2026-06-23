@@ -17,10 +17,10 @@ export interface QuickActionCardProps {
 }
 
 const TONE: Record<NonNullable<QuickActionCardProps["tone"]>, string> = {
-  primary:     "bg-primary/10 text-primary",
-  success:     "bg-success-soft text-success-soft-foreground",
-  warning:     "bg-warning-soft text-warning-soft-foreground",
-  info:        "bg-info-soft text-info-soft-foreground",
+  primary: "bg-primary/10 text-primary",
+  success: "bg-success-soft text-success-soft-foreground",
+  warning: "bg-warning-soft text-warning-soft-foreground",
+  info: "bg-info-soft text-info-soft-foreground",
   destructive: "bg-destructive-soft text-destructive",
 };
 
@@ -39,14 +39,17 @@ export function QuickActionCard({
   className,
   "data-testid": testId,
 }: QuickActionCardProps) {
-  const slug = title.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const slug = title
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
   const inner = (
     <Card
       className={cn(
         "p-4 flex items-start gap-3 h-full",
         !disabled && "hover-elevate active-elevate-2 cursor-pointer",
         disabled && "opacity-60 cursor-not-allowed",
-        className,
+        className
       )}
       onClick={disabled ? undefined : onClick}
       data-testid={testId ?? `card-action-${slug}`}
@@ -56,9 +59,7 @@ export function QuickActionCard({
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold leading-tight truncate">{title}</div>
-        {description && (
-          <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{description}</p>
-        )}
+        {description && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{description}</p>}
       </div>
     </Card>
   );

@@ -79,14 +79,17 @@ export function InventoryTable({
           <tbody>
             {filteredStockItems.length === 0 ? (
               <tr>
-                <td colSpan={posUser ? (showMovement ? 5 : 3) : (showMovement ? 7 : 5)} className="text-center py-8 text-muted-foreground">
+                <td
+                  colSpan={posUser ? (showMovement ? 5 : 3) : showMovement ? 7 : 5}
+                  className="text-center py-8 text-muted-foreground"
+                >
                   {itemSearchTerm ? "No items found matching your search" : "No items in this group"}
                 </td>
               </tr>
             ) : (
               filteredStockItems.map((item, index) => {
                 const closingQty = parseFloat(item.quantity || "0");
-                const openingQty = showMovement ? (openingInventoryMap.get(item.stockItemId) || 0) : 0;
+                const openingQty = showMovement ? openingInventoryMap.get(item.stockItemId) || 0 : 0;
                 const movement = closingQty - openingQty;
                 const isNegative = closingQty < 0;
                 const isMovementNeg = movement < 0;
@@ -95,9 +98,13 @@ export function InventoryTable({
                     key={item.inventoryId ?? `si-${item.stockItemId}`}
                     data-testid={`row-item-desktop-${item.stockItemId}`}
                     className={`border-t h-12 ${
-                      index === selectedRowIndex 
-                        ? (isNegative ? "bg-red-200 dark:bg-red-800/50 ring-2 ring-primary" : "bg-accent") 
-                        : (isNegative ? "bg-rose-50 dark:bg-rose-950/30" : "hover-elevate")
+                      index === selectedRowIndex
+                        ? isNegative
+                          ? "bg-red-200 dark:bg-red-800/50 ring-2 ring-primary"
+                          : "bg-accent"
+                        : isNegative
+                          ? "bg-rose-50 dark:bg-rose-950/30"
+                          : "hover-elevate"
                     }`}
                     onClick={() => setSelectedRowIndex(index)}
                   >
@@ -112,14 +119,22 @@ export function InventoryTable({
                       >
                         <span className="flex items-center gap-2 min-w-0">
                           <span className="truncate">{item.stockItemName}</span>
-                          {item.stockItemActive === false && <Badge variant="outline" className="text-xs shrink-0">Inactive</Badge>}
+                          {item.stockItemActive === false && (
+                            <Badge variant="outline" className="text-xs shrink-0">
+                              Inactive
+                            </Badge>
+                          )}
                         </span>
                       </button>
                     </td>
                     <td className="px-3">
-                      {item.categoryName
-                        ? <Badge variant="secondary" className="text-xs font-normal">{item.categoryName}</Badge>
-                        : <span className="text-muted-foreground text-xs">—</span>}
+                      {item.categoryName ? (
+                        <Badge variant="secondary" className="text-xs font-normal">
+                          {item.categoryName}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
                     </td>
                     {showMovement ? (
                       <>
@@ -127,18 +142,27 @@ export function InventoryTable({
                           {Math.floor(openingQty).toLocaleString()} <span className="text-xs">BL</span>
                         </td>
                         <td className={`px-3 text-right font-mono font-semibold ${isNegative ? "text-red-600" : ""}`}>
-                          {Math.floor(closingQty).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">BL</span>
+                          {Math.floor(closingQty).toLocaleString()}{" "}
+                          <span className="text-xs font-normal text-muted-foreground">BL</span>
                         </td>
-                        <td className={`px-3 text-right font-mono font-semibold ${isMovementNeg ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                        <td
+                          className={`px-3 text-right font-mono font-semibold ${isMovementNeg ? "text-red-600" : movement > 0 ? "text-green-600" : "text-muted-foreground"}`}
+                        >
                           <span className="inline-flex items-center justify-end gap-1">
-                            {movement > 0 ? <TrendingUp className="h-3.5 w-3.5" /> : movement < 0 ? <TrendingDown className="h-3.5 w-3.5" /> : null}
-                            {movement > 0 ? "+" : ""}{Math.floor(movement).toLocaleString()} <span className="text-xs font-normal">BL</span>
+                            {movement > 0 ? (
+                              <TrendingUp className="h-3.5 w-3.5" />
+                            ) : movement < 0 ? (
+                              <TrendingDown className="h-3.5 w-3.5" />
+                            ) : null}
+                            {movement > 0 ? "+" : ""}
+                            {Math.floor(movement).toLocaleString()} <span className="text-xs font-normal">BL</span>
                           </span>
                         </td>
                       </>
                     ) : (
                       <td className={`px-3 text-right font-mono font-semibold ${isNegative ? "text-red-600" : ""}`}>
-                        {Math.floor(closingQty).toLocaleString()}<span className="ml-2 text-xs font-normal text-muted-foreground">BL</span>
+                        {Math.floor(closingQty).toLocaleString()}
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">BL</span>
                       </td>
                     )}
                     {!posUser && (
@@ -164,28 +188,46 @@ export function InventoryTable({
                 {showMovement ? (
                   <>
                     <td className="px-3 text-right font-mono font-bold text-muted-foreground">
-                      {Math.floor(filteredStockItems.reduce((sum, item) => sum + (openingInventoryMap.get(item.stockItemId) || 0), 0)).toLocaleString()} BL
+                      {Math.floor(
+                        filteredStockItems.reduce(
+                          (sum, item) => sum + (openingInventoryMap.get(item.stockItemId) || 0),
+                          0
+                        )
+                      ).toLocaleString()}{" "}
+                      BL
                     </td>
                     <td className="px-3 text-right font-mono font-bold">
-                      {Math.floor(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()} BL
+                      {Math.floor(
+                        filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)
+                      ).toLocaleString()}{" "}
+                      BL
                     </td>
                     <td className="px-3 text-right font-mono font-bold">
                       {(() => {
-                        const tot = filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0") - (openingInventoryMap.get(item.stockItemId) || 0), 0);
+                        const tot = filteredStockItems.reduce(
+                          (sum, item) =>
+                            sum + parseFloat(item.quantity || "0") - (openingInventoryMap.get(item.stockItemId) || 0),
+                          0
+                        );
                         return `${tot > 0 ? "+" : ""}${Math.floor(tot).toLocaleString()} BL`;
                       })()}
                     </td>
                   </>
                 ) : (
                   <td className="px-3 text-right font-mono font-bold">
-                    {Math.floor(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)).toLocaleString()}<span className="ml-3">BL</span>
+                    {Math.floor(
+                      filteredStockItems.reduce((sum, item) => sum + parseFloat(item.quantity || "0"), 0)
+                    ).toLocaleString()}
+                    <span className="ml-3">BL</span>
                   </td>
                 )}
                 {!posUser && (
                   <>
                     <td className="px-3"></td>
                     <td className="px-3 text-right font-mono font-bold">
-                      {formatAmount(filteredStockItems.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0))}
+                      {formatAmount(
+                        filteredStockItems.reduce((sum, item) => sum + parseFloat(item.totalValue || "0"), 0)
+                      )}
                     </td>
                   </>
                 )}
@@ -196,7 +238,8 @@ export function InventoryTable({
       </div>
       {filteredStockItems.length > 0 && selectedGroup && (
         <div className="mt-4 text-sm text-muted-foreground">
-          Showing {filteredStockItems.length} of {inventory.filter(i => i.stockGroupId === selectedGroup.groupId).length} items
+          Showing {filteredStockItems.length} of{" "}
+          {inventory.filter((i) => i.stockGroupId === selectedGroup.groupId).length} items
         </div>
       )}
     </Card>

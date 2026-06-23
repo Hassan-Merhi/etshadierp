@@ -2,24 +2,70 @@ import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import {
-  upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries,
-} from "./_helpers";
+import { upload, logAudit, getCurrentExchangeRate, syncEmployeeBalancesFromEntries } from "./_helpers";
 import { triggerAccountWhatsAppStatement } from "./factoryWhatsappRoutes";
 import {
-  locations, inventory, stockItems, stockGroups, ledgerAccounts, employees,
-  employeeGroups, employeeGroupMembers,
-  suppliers, customers, customerBalances, customerOrders,
-  stockTransferVouchers, stockTransferItems, stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, vouchers, voucherEntries, salesItems,
-  insertLocationSchema, insertLedgerAccountSchema, updateLedgerAccountSchema,
-  insertEmployeeSchema, insertEmployeeGroupSchema, insertSupplierSchema, insertCustomerSchema,
-  userLocations, userCompanyRoles, companies, bankAccounts, fixedAssets,
-  agentAccounts, auditLog, users, FEATURE_KEYS,
-  erpPayrollRuns, erpPayrollRunItems, salaryAdvances, salaryAdvanceDeductions,
+  locations,
+  inventory,
+  stockItems,
+  stockGroups,
+  ledgerAccounts,
+  employees,
+  employeeGroups,
+  employeeGroupMembers,
+  suppliers,
+  customers,
+  customerBalances,
+  customerOrders,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  insertLocationSchema,
+  insertLedgerAccountSchema,
+  updateLedgerAccountSchema,
+  insertEmployeeSchema,
+  insertEmployeeGroupSchema,
+  insertSupplierSchema,
+  insertCustomerSchema,
+  userLocations,
+  userCompanyRoles,
+  companies,
+  bankAccounts,
+  fixedAssets,
+  agentAccounts,
+  auditLog,
+  users,
+  FEATURE_KEYS,
+  erpPayrollRuns,
+  erpPayrollRunItems,
+  salaryAdvances,
+  salaryAdvanceDeductions,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -27,20 +73,18 @@ import { z } from "zod";
 export function registerEmployeeRoutes(app: Express) {
   app.get("/api/employees", requireAuth, async (req, res) => {
     // Disable HTTP caching - employee balances are dynamically calculated
-    res.set('Cache-Control', 'no-store');
+    res.set("Cache-Control", "no-store");
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const employees = await storage.getAllEmployees(
-        req.session.currentCompanyId,
-      );
+      const employees = await storage.getAllEmployees(req.session.currentCompanyId);
       // Ensure proper camelCase field names for frontend
-      const transformedEmployees = employees.map(emp => {
+      const transformedEmployees = employees.map((emp) => {
         // Use stored currentBalance which is kept in sync by payroll operations and journal vouchers
         // The syncEmployeePayrollBalance function updates currentBalance when vouchers are created/edited/deleted
         const currentBalance = parseFloat((emp as any).currentBalance || "0");
-        
+
         return {
           ...emp,
           firstName: emp.firstName || (emp as any).first_name,
@@ -56,7 +100,7 @@ export function registerEmployeeRoutes(app: Express) {
   });
 
   app.get("/api/employees/:id/balance", requireAuth, async (req, res) => {
-    res.set('Cache-Control', 'no-store');
+    res.set("Cache-Control", "no-store");
     try {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
@@ -105,26 +149,27 @@ export function registerEmployeeRoutes(app: Express) {
         // Check for duplicate code if manually provided
         const existing = await storage.getEmployeeByCode(parsed.code);
         if (existing) {
-          return res
-            .status(400)
-            .json({ message: "Employee code already exists" });
+          return res.status(400).json({ message: "Employee code already exists" });
         }
       }
 
       let employee = await storage.createEmployee(parsed);
-      
+
       // Initialize currentBalance to opening balance if provided
       if (parsed.openingBalance && parseFloat(parsed.openingBalance) > 0) {
-        await db.update(employees).set({
-          currentBalance: parsed.openingBalance,
-        }).where(eq(employees.id, employee.id));
-        
+        await db
+          .update(employees)
+          .set({
+            currentBalance: parsed.openingBalance,
+          })
+          .where(eq(employees.id, employee.id));
+
         employee = {
           ...employee,
           currentBalance: parsed.openingBalance,
         };
       }
-      
+
       res.status(201).json(employee);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -151,8 +196,13 @@ export function registerEmployeeRoutes(app: Express) {
       const employeeId = parseInt(req.params.id);
       const { rates } = req.body;
       if (!Array.isArray(rates)) return res.status(400).json({ message: "rates must be an array" });
-      const valid = rates.filter((r: any) => r.locationId && parseFloat(r.rate) > 0)
-        .map((r: any) => ({ locationId: parseInt(r.locationId), rate: String(parseFloat(r.rate)), sourceCompanyId: r.sourceCompanyId ? parseInt(r.sourceCompanyId) : null }));
+      const valid = rates
+        .filter((r: any) => r.locationId && parseFloat(r.rate) > 0)
+        .map((r: any) => ({
+          locationId: parseInt(r.locationId),
+          rate: String(parseFloat(r.rate)),
+          sourceCompanyId: r.sourceCompanyId ? parseInt(r.sourceCompanyId) : null,
+        }));
       await storage.setEmployeeBaleRates(employeeId, companyId, valid);
       return res.json({ ok: true });
     } catch (e: any) {
@@ -179,8 +229,13 @@ export function registerEmployeeRoutes(app: Express) {
       const employeeId = parseInt(req.params.id);
       const { rates } = req.body;
       if (!Array.isArray(rates)) return res.status(400).json({ message: "rates must be an array" });
-      const valid = rates.filter((r: any) => r.locationId && parseFloat(r.pct) > 0)
-        .map((r: any) => ({ locationId: parseInt(r.locationId), pct: String(parseFloat(r.pct)), sourceCompanyId: r.sourceCompanyId ? parseInt(r.sourceCompanyId) : null }));
+      const valid = rates
+        .filter((r: any) => r.locationId && parseFloat(r.pct) > 0)
+        .map((r: any) => ({
+          locationId: parseInt(r.locationId),
+          pct: String(parseFloat(r.pct)),
+          sourceCompanyId: r.sourceCompanyId ? parseInt(r.sourceCompanyId) : null,
+        }));
       await storage.setEmployeeBalePctRates(employeeId, companyId, valid);
       return res.json({ ok: true });
     } catch (e: any) {
@@ -196,7 +251,20 @@ export function registerEmployeeRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (isNaN(id)) return res.status(400).json({ message: "Invalid employee ID" });
 
-      const { firstName, lastName, code, monthlySalary, department, active, joinDate, employeeGroupId, salesBonusPct, salesBonusPctSourceCompanyId, salesBonusPctLocationId, balesBonusRate } = req.body;
+      const {
+        firstName,
+        lastName,
+        code,
+        monthlySalary,
+        department,
+        active,
+        joinDate,
+        employeeGroupId,
+        salesBonusPct,
+        salesBonusPctSourceCompanyId,
+        salesBonusPctLocationId,
+        balesBonusRate,
+      } = req.body;
 
       const updates: Record<string, any> = {};
       if (firstName !== undefined) updates.firstName = firstName;
@@ -206,11 +274,23 @@ export function registerEmployeeRoutes(app: Express) {
       if (department !== undefined) updates.department = department;
       if (active !== undefined) updates.active = active;
       if (joinDate !== undefined) updates.joinDate = joinDate;
-      if (employeeGroupId !== undefined) updates.employeeGroupId = employeeGroupId === null || employeeGroupId === "" || employeeGroupId === "none" ? null : parseInt(employeeGroupId);
-      if (salesBonusPct !== undefined) updates.salesBonusPct = salesBonusPct === "" || salesBonusPct === null ? null : salesBonusPct;
-      if (salesBonusPctSourceCompanyId !== undefined) updates.salesBonusPctSourceCompanyId = salesBonusPctSourceCompanyId === "" || salesBonusPctSourceCompanyId === null ? null : parseInt(salesBonusPctSourceCompanyId);
-      if (salesBonusPctLocationId !== undefined) updates.salesBonusPctLocationId = salesBonusPctLocationId === "" || salesBonusPctLocationId === null ? null : parseInt(salesBonusPctLocationId);
-      if (balesBonusRate !== undefined) updates.balesBonusRate = balesBonusRate === "" || balesBonusRate === null ? null : balesBonusRate;
+      if (employeeGroupId !== undefined)
+        updates.employeeGroupId =
+          employeeGroupId === null || employeeGroupId === "" || employeeGroupId === "none"
+            ? null
+            : parseInt(employeeGroupId);
+      if (salesBonusPct !== undefined)
+        updates.salesBonusPct = salesBonusPct === "" || salesBonusPct === null ? null : salesBonusPct;
+      if (salesBonusPctSourceCompanyId !== undefined)
+        updates.salesBonusPctSourceCompanyId =
+          salesBonusPctSourceCompanyId === "" || salesBonusPctSourceCompanyId === null
+            ? null
+            : parseInt(salesBonusPctSourceCompanyId);
+      if (salesBonusPctLocationId !== undefined)
+        updates.salesBonusPctLocationId =
+          salesBonusPctLocationId === "" || salesBonusPctLocationId === null ? null : parseInt(salesBonusPctLocationId);
+      if (balesBonusRate !== undefined)
+        updates.balesBonusRate = balesBonusRate === "" || balesBonusRate === null ? null : balesBonusRate;
 
       if (Object.keys(updates).length === 0) {
         return res.status(400).json({ message: "No fields to update" });
@@ -230,8 +310,8 @@ export function registerEmployeeRoutes(app: Express) {
       // Only Admin can delete employees
       const userRole = req.session.currentRole;
       if (userRole !== "Admin" && userRole !== "Developer") {
-        return res.status(403).json({ 
-          message: "Only Admin users can delete employees" 
+        return res.status(403).json({
+          message: "Only Admin users can delete employees",
         });
       }
 
@@ -246,15 +326,15 @@ export function registerEmployeeRoutes(app: Express) {
 
       // Get employee to verify it exists and belongs to current company
       const allEmployees = await storage.getAllEmployees(req.session.currentCompanyId);
-      const employee = allEmployees.find(e => e.id === employeeId);
-      
+      const employee = allEmployees.find((e) => e.id === employeeId);
+
       if (!employee) {
         return res.status(404).json({ message: "Employee not found" });
       }
 
       if (employee.companyId !== req.session.currentCompanyId) {
-        return res.status(403).json({ 
-          message: "Access denied: Employee belongs to a different company" 
+        return res.status(403).json({
+          message: "Access denied: Employee belongs to a different company",
         });
       }
 
@@ -270,7 +350,7 @@ export function registerEmployeeRoutes(app: Express) {
             message: result.message,
             employeeBalance: result.employeeBalance,
             ledgerBalance: result.ledgerBalance,
-            requiresConfirmation: true
+            requiresConfirmation: true,
           });
         }
         // Other errors (salary advances, transaction history)
@@ -289,9 +369,7 @@ export function registerEmployeeRoutes(app: Express) {
       if (!req.session.currentCompanyId) {
         return res.status(400).json({ message: "No company selected" });
       }
-      const groups = await storage.getAllEmployeeGroups(
-        req.session.currentCompanyId,
-      );
+      const groups = await storage.getAllEmployeeGroups(req.session.currentCompanyId);
       res.json(groups);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -335,10 +413,7 @@ export function registerEmployeeRoutes(app: Express) {
 
   app.patch("/api/employee-groups/:id", requireAuth, async (req, res) => {
     try {
-      const group = await storage.updateEmployeeGroup(
-        parseInt(req.params.id),
-        req.body,
-      );
+      const group = await storage.updateEmployeeGroup(parseInt(req.params.id), req.body);
       res.json(group);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
@@ -356,58 +431,48 @@ export function registerEmployeeRoutes(app: Express) {
 
   app.get("/api/employee-groups/:id/members", requireAuth, async (req, res) => {
     try {
-      const members = await storage.getEmployeeGroupMembers(
-        parseInt(req.params.id),
-      );
+      const members = await storage.getEmployeeGroupMembers(parseInt(req.params.id));
       res.json(members);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
 
-  app.post(
-    "/api/employee-groups/:groupId/members/:employeeId",
-    requireAuth,
-    async (req, res) => {
-      try {
-        const companyId = req.session.currentCompanyId;
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
-        const groupId = parseInt(req.params.groupId);
-        if (isNaN(groupId)) return res.status(400).json({ message: "Invalid group ID" });
-        const employeeId = parseInt(req.params.employeeId);
-        if (isNaN(employeeId)) return res.status(400).json({ message: "Invalid employee ID" });
-        const group = await storage.getEmployeeGroupById(groupId);
-        if (!group || group.companyId !== companyId) {
-          return res.status(403).json({ message: "Group not found or access denied" });
-        }
-        await storage.addEmployeeToGroup(groupId, employeeId);
-        res.status(201).send();
-      } catch (error: any) {
-        res.status(400).json({ message: error.message });
+  app.post("/api/employee-groups/:groupId/members/:employeeId", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const groupId = parseInt(req.params.groupId);
+      if (isNaN(groupId)) return res.status(400).json({ message: "Invalid group ID" });
+      const employeeId = parseInt(req.params.employeeId);
+      if (isNaN(employeeId)) return res.status(400).json({ message: "Invalid employee ID" });
+      const group = await storage.getEmployeeGroupById(groupId);
+      if (!group || group.companyId !== companyId) {
+        return res.status(403).json({ message: "Group not found or access denied" });
       }
-    },
-  );
+      await storage.addEmployeeToGroup(groupId, employeeId);
+      res.status(201).send();
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 
-  app.delete(
-    "/api/employee-groups/:groupId/members/:employeeId",
-    requireAuth,
-    async (req, res) => {
-      try {
-        const companyId = req.session.currentCompanyId;
-        if (!companyId) return res.status(400).json({ message: "No company selected" });
-        const groupId = parseInt(req.params.groupId);
-        if (isNaN(groupId)) return res.status(400).json({ message: "Invalid group ID" });
-        const group = await storage.getEmployeeGroupById(groupId);
-        if (!group || group.companyId !== companyId) {
-          return res.status(403).json({ message: "Group not found or access denied" });
-        }
-        await storage.removeEmployeeFromGroup(groupId, parseInt(req.params.employeeId));
-        res.status(204).send();
-      } catch (error: any) {
-        res.status(400).json({ message: error.message });
+  app.delete("/api/employee-groups/:groupId/members/:employeeId", requireAuth, async (req, res) => {
+    try {
+      const companyId = req.session.currentCompanyId;
+      if (!companyId) return res.status(400).json({ message: "No company selected" });
+      const groupId = parseInt(req.params.groupId);
+      if (isNaN(groupId)) return res.status(400).json({ message: "Invalid group ID" });
+      const group = await storage.getEmployeeGroupById(groupId);
+      if (!group || group.companyId !== companyId) {
+        return res.status(403).json({ message: "Group not found or access denied" });
       }
-    },
-  );
+      await storage.removeEmployeeFromGroup(groupId, parseInt(req.params.employeeId));
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 
   // Worker Groups
   app.get("/api/worker-groups", requireAuth, async (req, res) => {
@@ -434,7 +499,7 @@ export function registerEmployeeRoutes(app: Express) {
         const type = g.groupType || g.group_type;
         return type === "Worker";
       });
-      
+
       // Get members for each group, filtering by company for security
       const groupsWithMembers = await Promise.all(
         workerGroups.map(async (group: any) => {
@@ -445,12 +510,7 @@ export function registerEmployeeRoutes(app: Express) {
               const [worker] = await db
                 .select()
                 .from(employees)
-                .where(
-                  and(
-                    eq(employees.id, m.employeeId),
-                    eq(employees.companyId, companyId)
-                  )
-                );
+                .where(and(eq(employees.id, m.employeeId), eq(employees.companyId, companyId)));
               return worker;
             })
           );
@@ -502,666 +562,576 @@ export function registerEmployeeRoutes(app: Express) {
     }
   });
 
-  app.post(
-    "/api/worker-groups/:groupId/members/:workerId",
-    requireAuth,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-        const companyId = req.session.currentCompanyId;
-        const groupId = parseInt(req.params.groupId);
-        const workerId = parseInt(req.params.workerId);
-        
-        // Verify group belongs to company
-        const group = await storage.getEmployeeGroupById(groupId);
-        if (!group || group.companyId !== companyId) {
-          return res.status(403).json({ message: "Group not found or access denied" });
-        }
-        
-        // Verify worker belongs to company
-        const [worker] = await db
-          .select()
-          .from(employees)
-          .where(and(eq(employees.id, workerId), eq(employees.companyId, companyId)));
-        if (!worker) {
-          return res.status(404).json({ message: "Worker not found" });
-        }
-        
-        await storage.addEmployeeToGroup(groupId, workerId);
-        res.status(201).send();
-      } catch (error: any) {
-        res.status(400).json({ message: error.message });
+  app.post("/api/worker-groups/:groupId/members/:workerId", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
-    },
-  );
+      const companyId = req.session.currentCompanyId;
+      const groupId = parseInt(req.params.groupId);
+      const workerId = parseInt(req.params.workerId);
 
-  app.delete(
-    "/api/worker-groups/:groupId/members/:workerId",
-    requireAuth,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-        const companyId = req.session.currentCompanyId;
-        const groupId = parseInt(req.params.groupId);
-        const workerId = parseInt(req.params.workerId);
-        
-        // Verify group belongs to company
-        const group = await storage.getEmployeeGroupById(groupId);
-        if (!group || group.companyId !== companyId) {
-          return res.status(403).json({ message: "Group not found or access denied" });
-        }
-        
-        await storage.removeEmployeeFromGroup(groupId, workerId);
-        res.status(204).send();
-      } catch (error: any) {
-        res.status(400).json({ message: error.message });
+      // Verify group belongs to company
+      const group = await storage.getEmployeeGroupById(groupId);
+      if (!group || group.companyId !== companyId) {
+        return res.status(403).json({ message: "Group not found or access denied" });
       }
-    },
-  );
+
+      // Verify worker belongs to company
+      const [worker] = await db
+        .select()
+        .from(employees)
+        .where(and(eq(employees.id, workerId), eq(employees.companyId, companyId)));
+      if (!worker) {
+        return res.status(404).json({ message: "Worker not found" });
+      }
+
+      await storage.addEmployeeToGroup(groupId, workerId);
+      res.status(201).send();
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/worker-groups/:groupId/members/:workerId", requireAuth, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+      const companyId = req.session.currentCompanyId;
+      const groupId = parseInt(req.params.groupId);
+      const workerId = parseInt(req.params.workerId);
+
+      // Verify group belongs to company
+      const group = await storage.getEmployeeGroupById(groupId);
+      if (!group || group.companyId !== companyId) {
+        return res.status(403).json({ message: "Group not found or access denied" });
+      }
+
+      await storage.removeEmployeeFromGroup(groupId, workerId);
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
 
   // Payroll - Employee Balance Deposit
-  app.post(
-    "/api/payroll/deposit-employee",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
+  app.post("/api/payroll/deposit-employee", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
 
-        const { employeeId, amount, date, notes } = req.body;
+      const { employeeId, amount, date, notes } = req.body;
 
-        if (!employeeId || !amount || !date) {
-          return res
-            .status(400)
-            .json({ message: "Employee, amount, and date are required" });
-        }
+      if (!employeeId || !amount || !date) {
+        return res.status(400).json({ message: "Employee, amount, and date are required" });
+      }
 
-        const depositAmount = parseFloat(amount);
-        if (isNaN(depositAmount) || depositAmount <= 0) {
-          return res
-            .status(400)
-            .json({ message: "Amount must be a positive number" });
-        }
+      const depositAmount = parseFloat(amount);
+      if (isNaN(depositAmount) || depositAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
 
-        // Get employee
-        const [employee] = await db
-          .select()
-          .from(employees)
-          .where(eq(employees.id, employeeId));
-        if (!employee) {
-          return res.status(404).json({ message: "Employee not found" });
-        }
+      // Get employee
+      const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
 
-        // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
-        // This is used when employee deposits wages during payroll - it IS an expense
-        // because the deposit happens at payroll time as part of paying the employee
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-        let payrollDepositExpenseAccount = allAccounts.find(
-          (a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE",
-        );
+      // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
+      // This is used when employee deposits wages during payroll - it IS an expense
+      // because the deposit happens at payroll time as part of paying the employee
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let payrollDepositExpenseAccount = allAccounts.find((a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE");
 
-        if (!payrollDepositExpenseAccount) {
-          payrollDepositExpenseAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: "PAYROLL_DEPOSIT_EXPENSE",
-            name: "Payroll Deposit Expense",
-            accountType: "Indirect Expense",
-            openingBalance: "0",
-            active: true,
+      if (!payrollDepositExpenseAccount) {
+        payrollDepositExpenseAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: "PAYROLL_DEPOSIT_EXPENSE",
+          name: "Payroll Deposit Expense",
+          accountType: "Indirect Expense",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      // Create voucher
+      const voucherNumber = `SAL-DEP-${Date.now()}`;
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId: req.session.currentCompanyId,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Salary deposit for ${employee.firstName} ${employee.lastName}`,
+          totalAmount: depositAmount.toFixed(2),
+        })
+        .returning();
+
+      // Create voucher entries (double-entry)
+      // Debit: Payroll Deposit Expense (this IS an expense - affects Net Profit)
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: payrollDepositExpenseAccount.id,
+        debitAmount: depositAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Salary deposit - ${voucherNumber}`,
+      });
+
+      // Credit: Employee (using employeeId field directly instead of separate ledger account)
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: null,
+        employeeId: employee.id,
+        debitAmount: "0",
+        creditAmount: depositAmount.toFixed(2),
+        narration: `Salary deposit - ${voucherNumber}`,
+      });
+
+      // Sync employee balance from voucher entries (instead of direct update)
+      // This ensures consistent behavior with voucher edit/delete operations
+      await syncEmployeeBalancesFromEntries(
+        [
+          {
+            ledgerAccountId: null,
+            employeeId: employee.id,
+            debitAmount: "0",
+            creditAmount: depositAmount.toFixed(2),
+          },
+        ],
+        req.session.currentCompanyId!
+      );
+
+      // Get updated employee balance after sync
+      const [updatedDepositEmployee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+
+      res.json({
+        voucher,
+        employee: updatedDepositEmployee || employee,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Payroll - Bulk Employee Salary Deposit
+  app.post("/api/payroll/bulk-deposit-employees", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
+
+      const { deposits, date, notes } = req.body;
+
+      if (!deposits || !Array.isArray(deposits) || deposits.length === 0) {
+        return res.status(400).json({ message: "No deposits provided" });
+      }
+
+      if (!date) {
+        return res.status(400).json({ message: "Date is required" });
+      }
+
+      // Validate all deposit amounts
+      for (const deposit of deposits) {
+        const amount = parseFloat(deposit.amount);
+        if (isNaN(amount) || amount <= 0) {
+          return res.status(400).json({
+            message: "All deposit amounts must be positive numbers",
           });
         }
+      }
 
-        // Create voucher
-        const voucherNumber = `SAL-DEP-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Journal",
-            voucherDate: date,
-            description:
-              notes ||
-              `Salary deposit for ${employee.firstName} ${employee.lastName}`,
-            totalAmount: depositAmount.toFixed(2),
-          })
-          .returning();
+      // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
+      // This is used when employee deposits wages during payroll - it IS an expense
+      // because the deposit happens at payroll time as part of paying the employee
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let payrollDepositExpenseAccount = allAccounts.find((a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE");
 
-        // Create voucher entries (double-entry)
-        // Debit: Payroll Deposit Expense (this IS an expense - affects Net Profit)
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: payrollDepositExpenseAccount.id,
-          debitAmount: depositAmount.toFixed(2),
-          creditAmount: "0",
-          narration: `Salary deposit - ${voucherNumber}`,
+      if (!payrollDepositExpenseAccount) {
+        payrollDepositExpenseAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: "PAYROLL_DEPOSIT_EXPENSE",
+          name: "Payroll Deposit Expense",
+          accountType: "Indirect Expense",
+          openingBalance: "0",
+          active: true,
         });
+      }
 
-        // Credit: Employee (using employeeId field directly instead of separate ledger account)
+      // Calculate total amount
+      const totalAmount = deposits.reduce((sum: number, d: any) => sum + parseFloat(d.amount), 0);
+
+      // Create single voucher for all deposits
+      const voucherNumber = `SAL-DEP-BULK-${Date.now()}`;
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId: req.session.currentCompanyId,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Bulk salary deposit for ${deposits.length} employees`,
+          totalAmount: totalAmount.toFixed(2),
+        })
+        .returning();
+
+      // Create debit entry for payroll deposit expense (this IS an expense - affects Net Profit)
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: payrollDepositExpenseAccount.id,
+        debitAmount: totalAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Bulk salary deposit - ${deposits.length} employees - ${voucherNumber}`,
+      });
+
+      // Process each employee deposit
+      const results = [];
+      for (const deposit of deposits) {
+        const [employee] = await db.select().from(employees).where(eq(employees.id, deposit.employeeId));
+
+        if (!employee) {
+          continue; // Skip if employee not found
+        }
+
+        // Verify employee belongs to current company
+        if (employee.companyId !== req.session.currentCompanyId) {
+          continue;
+        }
+
+        const depositAmount = parseFloat(deposit.amount);
+
+        // Credit employee (using employeeId field directly instead of separate ledger account)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
           ledgerAccountId: null,
           employeeId: employee.id,
           debitAmount: "0",
           creditAmount: depositAmount.toFixed(2),
-          narration: `Salary deposit - ${voucherNumber}`,
+          narration: `Salary deposit for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
         });
 
-        // Sync employee balance from voucher entries (instead of direct update)
-        // This ensures consistent behavior with voucher edit/delete operations
-        await syncEmployeeBalancesFromEntries(
-          [
-            {
-              ledgerAccountId: null,
-              employeeId: employee.id,
-              debitAmount: "0",
-              creditAmount: depositAmount.toFixed(2),
-            }
-          ],
-          req.session.currentCompanyId!
-        );
-
-        // Get updated employee balance after sync
-        const [updatedDepositEmployee] = await db
-          .select()
-          .from(employees)
-          .where(eq(employees.id, employeeId));
-
-        res.json({
-          voucher,
-          employee: updatedDepositEmployee || employee,
+        results.push({
+          employeeId: employee.id,
+          name: `${employee.firstName} ${employee.lastName}`,
+          amount: depositAmount,
         });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
       }
-    },
-  );
 
-  // Payroll - Bulk Employee Salary Deposit
-  app.post(
-    "/api/payroll/bulk-deposit-employees",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
+      // Sync all employee balances from voucher entries
+      const allDepositEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
 
-        const { deposits, date, notes } = req.body;
+      await syncEmployeeBalancesFromEntries(
+        allDepositEntries.map((e) => ({
+          ledgerAccountId: e.ledgerAccountId,
+          employeeId: e.employeeId,
+          debitAmount: e.debitAmount,
+          creditAmount: e.creditAmount,
+        })),
+        req.session.currentCompanyId!
+      );
 
-        if (!deposits || !Array.isArray(deposits) || deposits.length === 0) {
-          return res.status(400).json({ message: "No deposits provided" });
-        }
-
-        if (!date) {
-          return res.status(400).json({ message: "Date is required" });
-        }
-
-        // Validate all deposit amounts
-        for (const deposit of deposits) {
-          const amount = parseFloat(deposit.amount);
-          if (isNaN(amount) || amount <= 0) {
-            return res.status(400).json({
-              message: "All deposit amounts must be positive numbers",
-            });
-          }
-        }
-
-        // Get or create PAYROLL_DEPOSIT_EXPENSE ledger account (Indirect Expense type)
-        // This is used when employee deposits wages during payroll - it IS an expense
-        // because the deposit happens at payroll time as part of paying the employee
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-        let payrollDepositExpenseAccount = allAccounts.find(
-          (a: any) => a.code === "PAYROLL_DEPOSIT_EXPENSE",
-        );
-
-        if (!payrollDepositExpenseAccount) {
-          payrollDepositExpenseAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: "PAYROLL_DEPOSIT_EXPENSE",
-            name: "Payroll Deposit Expense",
-            accountType: "Indirect Expense",
-            openingBalance: "0",
-            active: true,
-          });
-        }
-
-        // Calculate total amount
-        const totalAmount = deposits.reduce(
-          (sum: number, d: any) => sum + parseFloat(d.amount),
-          0,
-        );
-
-        // Create single voucher for all deposits
-        const voucherNumber = `SAL-DEP-BULK-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Journal",
-            voucherDate: date,
-            description:
-              notes || `Bulk salary deposit for ${deposits.length} employees`,
-            totalAmount: totalAmount.toFixed(2),
-          })
-          .returning();
-
-        // Create debit entry for payroll deposit expense (this IS an expense - affects Net Profit)
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: payrollDepositExpenseAccount.id,
-          debitAmount: totalAmount.toFixed(2),
-          creditAmount: "0",
-          narration: `Bulk salary deposit - ${deposits.length} employees - ${voucherNumber}`,
+      // Get updated balances for all employees
+      const updatedResults = [];
+      for (const result of results) {
+        const [updatedEmp] = await db.select().from(employees).where(eq(employees.id, result.employeeId));
+        updatedResults.push({
+          ...result,
+          newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
         });
-
-        // Process each employee deposit
-        const results = [];
-        for (const deposit of deposits) {
-          const [employee] = await db
-            .select()
-            .from(employees)
-            .where(eq(employees.id, deposit.employeeId));
-
-          if (!employee) {
-            continue; // Skip if employee not found
-          }
-
-          // Verify employee belongs to current company
-          if (employee.companyId !== req.session.currentCompanyId) {
-            continue;
-          }
-
-          const depositAmount = parseFloat(deposit.amount);
-
-          // Credit employee (using employeeId field directly instead of separate ledger account)
-          await db.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: null,
-            employeeId: employee.id,
-            debitAmount: "0",
-            creditAmount: depositAmount.toFixed(2),
-            narration: `Salary deposit for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
-          });
-
-          results.push({
-            employeeId: employee.id,
-            name: `${employee.firstName} ${employee.lastName}`,
-            amount: depositAmount,
-          });
-        }
-
-        // Sync all employee balances from voucher entries
-        const allDepositEntries = await db
-          .select()
-          .from(voucherEntries)
-          .where(eq(voucherEntries.voucherId, voucher.id));
-        
-        await syncEmployeeBalancesFromEntries(
-          allDepositEntries.map(e => ({
-            ledgerAccountId: e.ledgerAccountId,
-            employeeId: e.employeeId,
-            debitAmount: e.debitAmount,
-            creditAmount: e.creditAmount,
-          })),
-          req.session.currentCompanyId!
-        );
-
-        // Get updated balances for all employees
-        const updatedResults = [];
-        for (const result of results) {
-          const [updatedEmp] = await db
-            .select()
-            .from(employees)
-            .where(eq(employees.id, result.employeeId));
-          updatedResults.push({
-            ...result,
-            newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
-          });
-        }
-
-        res.json({
-          voucher,
-          deposits: updatedResults,
-          totalAmount,
-        });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
       }
-    },
-  );
+
+      res.json({
+        voucher,
+        deposits: updatedResults,
+        totalAmount,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Payroll - Bulk Employee Bonus Deposit
-  app.post(
-    "/api/payroll/bulk-bonus-employees",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
+  app.post("/api/payroll/bulk-bonus-employees", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
 
-        const { bonuses, date, notes } = req.body;
+      const { bonuses, date, notes } = req.body;
 
-        if (!bonuses || !Array.isArray(bonuses) || bonuses.length === 0) {
-          return res.status(400).json({ message: "No bonuses provided" });
-        }
+      if (!bonuses || !Array.isArray(bonuses) || bonuses.length === 0) {
+        return res.status(400).json({ message: "No bonuses provided" });
+      }
 
-        if (!date) {
-          return res.status(400).json({ message: "Date is required" });
-        }
+      if (!date) {
+        return res.status(400).json({ message: "Date is required" });
+      }
 
-        // Filter out empty/zero amounts and validate
-        const validBonuses = bonuses.filter((b: any) => {
-          const amount = parseFloat(b.amount);
-          return !isNaN(amount) && amount > 0;
+      // Filter out empty/zero amounts and validate
+      const validBonuses = bonuses.filter((b: any) => {
+        const amount = parseFloat(b.amount);
+        return !isNaN(amount) && amount > 0;
+      });
+
+      if (validBonuses.length === 0) {
+        return res.status(400).json({ message: "No valid bonus amounts provided" });
+      }
+
+      // Get or create BONUS_EXPENSE ledger account
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let bonusExpenseAccount = allAccounts.find((a: any) => a.code === "BONUS_EXPENSE");
+
+      if (!bonusExpenseAccount) {
+        bonusExpenseAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: "BONUS_EXPENSE",
+          name: "Bonus Expense",
+          accountType: "Expense",
+          openingBalance: "0",
+          active: true,
         });
+      }
 
-        if (validBonuses.length === 0) {
-          return res.status(400).json({ message: "No valid bonus amounts provided" });
+      // Calculate total amount
+      const totalAmount = validBonuses.reduce((sum: number, b: any) => sum + parseFloat(b.amount), 0);
+
+      // Create single voucher for all bonuses
+      const voucherNumber = `BONUS-BULK-${Date.now()}`;
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId: req.session.currentCompanyId,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Bulk bonus deposit for ${validBonuses.length} employees`,
+          totalAmount: totalAmount.toFixed(2),
+        })
+        .returning();
+
+      // Create debit entry for total bonus expense
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: bonusExpenseAccount.id,
+        debitAmount: totalAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Bulk bonus deposit - ${validBonuses.length} employees - ${voucherNumber}`,
+      });
+
+      // Process each employee bonus
+      const results = [];
+      for (const bonus of validBonuses) {
+        const [employee] = await db.select().from(employees).where(eq(employees.id, bonus.employeeId));
+
+        if (!employee) {
+          continue; // Skip if employee not found
         }
 
-        // Get or create BONUS_EXPENSE ledger account
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-        let bonusExpenseAccount = allAccounts.find(
-          (a: any) => a.code === "BONUS_EXPENSE",
-        );
-
-        if (!bonusExpenseAccount) {
-          bonusExpenseAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: "BONUS_EXPENSE",
-            name: "Bonus Expense",
-            accountType: "Expense",
-            openingBalance: "0",
-            active: true,
-          });
+        // Verify employee belongs to current company
+        if (employee.companyId !== req.session.currentCompanyId) {
+          continue;
         }
 
-        // Calculate total amount
-        const totalAmount = validBonuses.reduce(
-          (sum: number, b: any) => sum + parseFloat(b.amount),
-          0,
-        );
+        const bonusAmount = parseFloat(bonus.amount);
 
-        // Create single voucher for all bonuses
-        const voucherNumber = `BONUS-BULK-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Journal",
-            voucherDate: date,
-            description:
-              notes || `Bulk bonus deposit for ${validBonuses.length} employees`,
-            totalAmount: totalAmount.toFixed(2),
-          })
-          .returning();
-
-        // Create debit entry for total bonus expense
+        // Credit employee (using employeeId field directly instead of separate ledger account)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: bonusExpenseAccount.id,
-          debitAmount: totalAmount.toFixed(2),
-          creditAmount: "0",
-          narration: `Bulk bonus deposit - ${validBonuses.length} employees - ${voucherNumber}`,
+          ledgerAccountId: null,
+          employeeId: employee.id,
+          debitAmount: "0",
+          creditAmount: bonusAmount.toFixed(2),
+          narration: `Bonus for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
         });
 
-        // Process each employee bonus
-        const results = [];
-        for (const bonus of validBonuses) {
-          const [employee] = await db
-            .select()
-            .from(employees)
-            .where(eq(employees.id, bonus.employeeId));
-
-          if (!employee) {
-            continue; // Skip if employee not found
-          }
-
-          // Verify employee belongs to current company
-          if (employee.companyId !== req.session.currentCompanyId) {
-            continue;
-          }
-
-          const bonusAmount = parseFloat(bonus.amount);
-
-          // Credit employee (using employeeId field directly instead of separate ledger account)
-          await db.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: null,
-            employeeId: employee.id,
-            debitAmount: "0",
-            creditAmount: bonusAmount.toFixed(2),
-            narration: `Bonus for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
-          });
-
-          results.push({
-            employeeId: employee.id,
-            name: `${employee.firstName} ${employee.lastName}`,
-            amount: bonusAmount,
-          });
-        }
-
-        // Sync all employee balances from voucher entries
-        const allBonusEntries = await db
-          .select()
-          .from(voucherEntries)
-          .where(eq(voucherEntries.voucherId, voucher.id));
-        
-        await syncEmployeeBalancesFromEntries(
-          allBonusEntries.map(e => ({
-            ledgerAccountId: e.ledgerAccountId,
-            employeeId: e.employeeId,
-            debitAmount: e.debitAmount,
-            creditAmount: e.creditAmount,
-          })),
-          req.session.currentCompanyId!
-        );
-
-        // Get updated balances for all employees
-        const updatedBonusResults = [];
-        for (const result of results) {
-          const [updatedEmp] = await db
-            .select()
-            .from(employees)
-            .where(eq(employees.id, result.employeeId));
-          updatedBonusResults.push({
-            ...result,
-            newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
-          });
-        }
-
-        res.json({
-          voucher,
-          bonuses: updatedBonusResults,
-          totalAmount,
+        results.push({
+          employeeId: employee.id,
+          name: `${employee.firstName} ${employee.lastName}`,
+          amount: bonusAmount,
         });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
       }
-    },
-  );
+
+      // Sync all employee balances from voucher entries
+      const allBonusEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
+
+      await syncEmployeeBalancesFromEntries(
+        allBonusEntries.map((e) => ({
+          ledgerAccountId: e.ledgerAccountId,
+          employeeId: e.employeeId,
+          debitAmount: e.debitAmount,
+          creditAmount: e.creditAmount,
+        })),
+        req.session.currentCompanyId!
+      );
+
+      // Get updated balances for all employees
+      const updatedBonusResults = [];
+      for (const result of results) {
+        const [updatedEmp] = await db.select().from(employees).where(eq(employees.id, result.employeeId));
+        updatedBonusResults.push({
+          ...result,
+          newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
+        });
+      }
+
+      res.json({
+        voucher,
+        bonuses: updatedBonusResults,
+        totalAmount,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Payroll - Bulk Employee Withdrawal
-  app.post(
-    "/api/payroll/bulk-withdraw-employees",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
+  app.post("/api/payroll/bulk-withdraw-employees", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
 
-        const { withdrawals, date, notes, paymentAccountType, paymentAccountId } = req.body;
+      const { withdrawals, date, notes, paymentAccountType, paymentAccountId } = req.body;
 
-        if (!withdrawals || !Array.isArray(withdrawals) || withdrawals.length === 0) {
-          return res.status(400).json({ message: "No withdrawals provided" });
-        }
+      if (!withdrawals || !Array.isArray(withdrawals) || withdrawals.length === 0) {
+        return res.status(400).json({ message: "No withdrawals provided" });
+      }
 
-        if (!date || !paymentAccountType || !paymentAccountId) {
-          return res.status(400).json({ message: "Date, account type, and account are required" });
-        }
+      if (!date || !paymentAccountType || !paymentAccountId) {
+        return res.status(400).json({ message: "Date, account type, and account are required" });
+      }
 
-        // Filter out empty/zero amounts and validate
-        const validWithdrawals = withdrawals.filter((w: any) => {
-          const amount = parseFloat(w.amount);
-          return !isNaN(amount) && amount > 0;
-        });
+      // Filter out empty/zero amounts and validate
+      const validWithdrawals = withdrawals.filter((w: any) => {
+        const amount = parseFloat(w.amount);
+        return !isNaN(amount) && amount > 0;
+      });
 
-        if (validWithdrawals.length === 0) {
-          return res.status(400).json({ message: "No valid withdrawal amounts provided" });
-        }
+      if (validWithdrawals.length === 0) {
+        return res.status(400).json({ message: "No valid withdrawal amounts provided" });
+      }
 
-        // Calculate total amount
-        const totalAmount = validWithdrawals.reduce(
-          (sum: number, w: any) => sum + parseFloat(w.amount),
-          0,
-        );
+      // Calculate total amount
+      const totalAmount = validWithdrawals.reduce((sum: number, w: any) => sum + parseFloat(w.amount), 0);
 
-        // Get payment account (bank or cash)
-        let paymentAccount;
-        if (paymentAccountType === "bank") {
-          [paymentAccount] = await db
-            .select()
-            .from(bankAccounts)
-            .where(eq(bankAccounts.id, parseInt(paymentAccountId)));
-        } else {
-          const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-          paymentAccount = allAccounts.find((a: any) => a.id === parseInt(paymentAccountId));
-        }
-
-        if (!paymentAccount) {
-          return res.status(404).json({ message: "Payment account not found" });
-        }
-
-        // Create single voucher for all withdrawals
-        const voucherNumber = `WD-BULK-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Journal",
-            voucherDate: date,
-            description: notes || `Bulk withdrawal for ${validWithdrawals.length} employees`,
-            totalAmount: totalAmount.toFixed(2),
-          })
-          .returning();
-
-        // Create CREDIT entry for payment account (cash going OUT for withdrawal)
-        const paymentAccountId_num = parseInt(paymentAccountId);
+      // Get payment account (bank or cash)
+      let paymentAccount;
+      if (paymentAccountType === "bank") {
+        [paymentAccount] = await db
+          .select()
+          .from(bankAccounts)
+          .where(eq(bankAccounts.id, parseInt(paymentAccountId)));
+      } else {
         const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
-        let paymentLedgerAccount;
+        paymentAccount = allAccounts.find((a: any) => a.id === parseInt(paymentAccountId));
+      }
 
-        if (paymentAccountType === "bank") {
-          // For bank accounts, find the corresponding ledger account
-          paymentLedgerAccount = allAccounts.find((a: any) => a.bankAccountId === paymentAccountId_num);
-          if (!paymentLedgerAccount) {
-            return res.status(404).json({ message: "Ledger account for bank account not found" });
-          }
-        } else {
-          // For cash accounts (ledger accounts), find directly
-          paymentLedgerAccount = allAccounts.find((a: any) => a.id === paymentAccountId_num);
-          if (!paymentLedgerAccount) {
-            return res.status(404).json({ message: "Cash account not found" });
-          }
+      if (!paymentAccount) {
+        return res.status(404).json({ message: "Payment account not found" });
+      }
+
+      // Create single voucher for all withdrawals
+      const voucherNumber = `WD-BULK-${Date.now()}`;
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId: req.session.currentCompanyId,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Bulk withdrawal for ${validWithdrawals.length} employees`,
+          totalAmount: totalAmount.toFixed(2),
+        })
+        .returning();
+
+      // Create CREDIT entry for payment account (cash going OUT for withdrawal)
+      const paymentAccountId_num = parseInt(paymentAccountId);
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let paymentLedgerAccount;
+
+      if (paymentAccountType === "bank") {
+        // For bank accounts, find the corresponding ledger account
+        paymentLedgerAccount = allAccounts.find((a: any) => a.bankAccountId === paymentAccountId_num);
+        if (!paymentLedgerAccount) {
+          return res.status(404).json({ message: "Ledger account for bank account not found" });
         }
+      } else {
+        // For cash accounts (ledger accounts), find directly
+        paymentLedgerAccount = allAccounts.find((a: any) => a.id === paymentAccountId_num);
+        if (!paymentLedgerAccount) {
+          return res.status(404).json({ message: "Cash account not found" });
+        }
+      }
 
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: paymentLedgerAccount.id,
+        debitAmount: "0",
+        creditAmount: totalAmount.toFixed(2),
+        narration: `Bulk withdrawal - ${validWithdrawals.length} employees - ${voucherNumber}`,
+      });
+
+      // Process each employee withdrawal
+      const results = [];
+      for (const withdrawal of validWithdrawals) {
+        const [employee] = await db.select().from(employees).where(eq(employees.id, withdrawal.employeeId));
+
+        if (!employee) continue;
+        if (employee.companyId !== req.session.currentCompanyId) continue;
+
+        const withdrawAmount = parseFloat(withdrawal.amount);
+
+        // Debit employee (using employeeId field directly instead of separate ledger account)
         await db.insert(voucherEntries).values({
           voucherId: voucher.id,
-          ledgerAccountId: paymentLedgerAccount.id,
-          debitAmount: "0",
-          creditAmount: totalAmount.toFixed(2),
-          narration: `Bulk withdrawal - ${validWithdrawals.length} employees - ${voucherNumber}`,
+          ledgerAccountId: null,
+          employeeId: employee.id,
+          debitAmount: withdrawAmount.toFixed(2),
+          creditAmount: "0",
+          narration: `Withdrawal for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
         });
 
-        // Process each employee withdrawal
-        const results = [];
-        for (const withdrawal of validWithdrawals) {
-          const [employee] = await db
-            .select()
-            .from(employees)
-            .where(eq(employees.id, withdrawal.employeeId));
-
-          if (!employee) continue;
-          if (employee.companyId !== req.session.currentCompanyId) continue;
-
-          const withdrawAmount = parseFloat(withdrawal.amount);
-
-          // Debit employee (using employeeId field directly instead of separate ledger account)
-          await db.insert(voucherEntries).values({
-            voucherId: voucher.id,
-            ledgerAccountId: null,
-            employeeId: employee.id,
-            debitAmount: withdrawAmount.toFixed(2),
-            creditAmount: "0",
-            narration: `Withdrawal for ${employee.firstName} ${employee.lastName} - ${voucherNumber}`,
-          });
-
-          results.push({
-            employeeId: employee.id,
-            name: `${employee.firstName} ${employee.lastName}`,
-            amount: withdrawAmount,
-          });
-        }
-
-        // Sync all employee balances from voucher entries
-        const allWithdrawEntries = await db
-          .select()
-          .from(voucherEntries)
-          .where(eq(voucherEntries.voucherId, voucher.id));
-        
-        await syncEmployeeBalancesFromEntries(
-          allWithdrawEntries.map(e => ({
-            ledgerAccountId: e.ledgerAccountId,
-            employeeId: e.employeeId,
-            debitAmount: e.debitAmount,
-            creditAmount: e.creditAmount,
-          })),
-          req.session.currentCompanyId!
-        );
-
-        // Get updated balances for all employees
-        const updatedWithdrawResults = [];
-        for (const result of results) {
-          const [updatedEmp] = await db
-            .select()
-            .from(employees)
-            .where(eq(employees.id, result.employeeId));
-          updatedWithdrawResults.push({
-            ...result,
-            newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
-          });
-        }
-
-        res.json({
-          voucher,
-          withdrawals: updatedWithdrawResults,
-          totalAmount,
+        results.push({
+          employeeId: employee.id,
+          name: `${employee.firstName} ${employee.lastName}`,
+          amount: withdrawAmount,
         });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
       }
-    },
-  );
+
+      // Sync all employee balances from voucher entries
+      const allWithdrawEntries = await db.select().from(voucherEntries).where(eq(voucherEntries.voucherId, voucher.id));
+
+      await syncEmployeeBalancesFromEntries(
+        allWithdrawEntries.map((e) => ({
+          ledgerAccountId: e.ledgerAccountId,
+          employeeId: e.employeeId,
+          debitAmount: e.debitAmount,
+          creditAmount: e.creditAmount,
+        })),
+        req.session.currentCompanyId!
+      );
+
+      // Get updated balances for all employees
+      const updatedWithdrawResults = [];
+      for (const result of results) {
+        const [updatedEmp] = await db.select().from(employees).where(eq(employees.id, result.employeeId));
+        updatedWithdrawResults.push({
+          ...result,
+          newBalance: updatedEmp ? parseFloat(updatedEmp.currentBalance) : 0,
+        });
+      }
+
+      res.json({
+        voucher,
+        withdrawals: updatedWithdrawResults,
+        totalAmount,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Payroll - Sales Summary for bonus calculation
   app.get("/api/payroll/sales-summary", requireAuth, requireNonPOS, async (req, res) => {
@@ -1206,470 +1176,381 @@ export function registerEmployeeRoutes(app: Express) {
   });
 
   // Payroll - Employee Bonus
-  app.post(
-    "/api/payroll/bonus-employee",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-
-        const { employeeId, amount, date, notes } = req.body;
-
-        if (!employeeId || !amount || !date) {
-          return res
-            .status(400)
-            .json({ message: "Employee, amount, and date are required" });
-        }
-
-        const bonusAmount = parseFloat(amount);
-        if (isNaN(bonusAmount) || bonusAmount <= 0) {
-          return res
-            .status(400)
-            .json({ message: "Amount must be a positive number" });
-        }
-
-        // Get employee
-        const [employee] = await db
-          .select()
-          .from(employees)
-          .where(eq(employees.id, employeeId));
-        if (!employee) {
-          return res.status(404).json({ message: "Employee not found" });
-        }
-
-        // Get or create SALARY_EXPENSE ledger account
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-        let salaryExpenseAccount = allAccounts.find(
-          (a: any) => a.code === "SALARY_EXPENSE",
-        );
-
-        if (!salaryExpenseAccount) {
-          salaryExpenseAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: "SALARY_EXPENSE",
-            name: "Salary Expense",
-            accountType: "Expense",
-            openingBalance: "0",
-            active: true,
-          });
-        }
-
-        // Create voucher
-        const voucherNumber = `BONUS-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Journal",
-            voucherDate: date,
-            description:
-              notes ||
-              `Bonus for ${employee.firstName} ${employee.lastName}`,
-            totalAmount: bonusAmount.toFixed(2),
-          })
-          .returning();
-
-        // Create voucher entries (double-entry)
-        // Debit: Salary Expense
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: salaryExpenseAccount.id,
-          debitAmount: bonusAmount.toFixed(2),
-          creditAmount: "0",
-          narration: `Bonus payment - ${voucherNumber}`,
-        });
-
-        // Credit: Employee (using employeeId field directly instead of separate ledger account)
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: null,
-          employeeId: employee.id,
-          debitAmount: "0",
-          creditAmount: bonusAmount.toFixed(2),
-          narration: `Bonus payment - ${voucherNumber}`,
-        });
-
-        // Sync employee balance from voucher entries (instead of direct update)
-        await syncEmployeeBalancesFromEntries(
-          [
-            {
-              ledgerAccountId: null,
-              employeeId: employee.id,
-              debitAmount: "0",
-              creditAmount: bonusAmount.toFixed(2),
-            }
-          ],
-          req.session.currentCompanyId!
-        );
-
-        // Get updated employee balance
-        const [updatedBonusEmployee] = await db
-          .select()
-          .from(employees)
-          .where(eq(employees.id, employeeId));
-
-        res.json({
-          voucher,
-          employee: updatedBonusEmployee || employee,
-        });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+  app.post("/api/payroll/bonus-employee", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
-    },
-  );
+
+      const { employeeId, amount, date, notes } = req.body;
+
+      if (!employeeId || !amount || !date) {
+        return res.status(400).json({ message: "Employee, amount, and date are required" });
+      }
+
+      const bonusAmount = parseFloat(amount);
+      if (isNaN(bonusAmount) || bonusAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+
+      // Get employee
+      const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      // Get or create SALARY_EXPENSE ledger account
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+
+      if (!salaryExpenseAccount) {
+        salaryExpenseAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: "SALARY_EXPENSE",
+          name: "Salary Expense",
+          accountType: "Expense",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      // Create voucher
+      const voucherNumber = `BONUS-${Date.now()}`;
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId: req.session.currentCompanyId,
+          voucherNumber,
+          voucherType: "Journal",
+          voucherDate: date,
+          description: notes || `Bonus for ${employee.firstName} ${employee.lastName}`,
+          totalAmount: bonusAmount.toFixed(2),
+        })
+        .returning();
+
+      // Create voucher entries (double-entry)
+      // Debit: Salary Expense
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: salaryExpenseAccount.id,
+        debitAmount: bonusAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Bonus payment - ${voucherNumber}`,
+      });
+
+      // Credit: Employee (using employeeId field directly instead of separate ledger account)
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: null,
+        employeeId: employee.id,
+        debitAmount: "0",
+        creditAmount: bonusAmount.toFixed(2),
+        narration: `Bonus payment - ${voucherNumber}`,
+      });
+
+      // Sync employee balance from voucher entries (instead of direct update)
+      await syncEmployeeBalancesFromEntries(
+        [
+          {
+            ledgerAccountId: null,
+            employeeId: employee.id,
+            debitAmount: "0",
+            creditAmount: bonusAmount.toFixed(2),
+          },
+        ],
+        req.session.currentCompanyId!
+      );
+
+      // Get updated employee balance
+      const [updatedBonusEmployee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+
+      res.json({
+        voucher,
+        employee: updatedBonusEmployee || employee,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Payroll - Employee Withdrawal
-  app.post(
-    "/api/payroll/withdraw-employee",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-
-        const {
-          employeeId,
-          amount,
-          paymentAccountType,
-          paymentAccountId,
-          bankAccountId,
-          date,
-          notes,
-        } = req.body;
-
-        // Support both old (bankAccountId) and new (paymentAccountType/paymentAccountId) parameters
-        const accountType = paymentAccountType || "bank";
-        const accountId = paymentAccountId || bankAccountId;
-
-        if (!employeeId || !amount || !accountId || !date) {
-          return res
-            .status(400)
-            .json({
-              message:
-                "Employee, amount, payment account, and date are required",
-            });
-        }
-
-        const withdrawalAmount = parseFloat(amount);
-        if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
-          return res
-            .status(400)
-            .json({ message: "Amount must be a positive number" });
-        }
-
-        // Get employee
-        const [employee] = await db
-          .select()
-          .from(employees)
-          .where(eq(employees.id, employeeId));
-        if (!employee) {
-          return res.status(404).json({ message: "Employee not found" });
-        }
-
-        const currentBalance = parseFloat(employee.currentBalance);
-
-        // Create voucher
-        const voucherNumber = `SAL-WD-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Payment",
-            voucherDate: date,
-            description:
-              notes ||
-              `Salary withdrawal for ${employee.firstName} ${employee.lastName}`,
-            totalAmount: withdrawalAmount.toFixed(2),
-          })
-          .returning();
-
-        // Create voucher entries (double-entry)
-        // Debit: Employee (using employeeId field directly instead of separate ledger account)
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: null,
-          employeeId: employee.id,
-          debitAmount: withdrawalAmount.toFixed(2),
-          creditAmount: "0",
-          narration: `Salary withdrawal - ${voucherNumber}`,
-        });
-
-        // Credit: Bank/Cash Account
-        const creditEntry: any = {
-          voucherId: voucher.id,
-          debitAmount: "0",
-          creditAmount: withdrawalAmount.toFixed(2),
-          narration: `Salary withdrawal - ${voucherNumber}`,
-        };
-
-        if (accountType === "cash") {
-          creditEntry.ledgerAccountId = accountId;
-        } else {
-          creditEntry.bankAccountId = accountId;
-        }
-
-        await db.insert(voucherEntries).values(creditEntry);
-
-        // Sync employee balance from voucher entries (instead of direct update)
-        await syncEmployeeBalancesFromEntries(
-          [
-            {
-              ledgerAccountId: null,
-              employeeId: employee.id,
-              debitAmount: withdrawalAmount.toFixed(2),
-              creditAmount: "0",
-            }
-          ],
-          req.session.currentCompanyId!
-        );
-
-        // Get updated employee balance
-        const [updatedEmployee] = await db
-          .select()
-          .from(employees)
-          .where(eq(employees.id, employeeId));
-
-        res.json({
-          voucher,
-          employee: updatedEmployee || employee,
-        });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+  app.post("/api/payroll/withdraw-employee", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
-    },
-  );
+
+      const { employeeId, amount, paymentAccountType, paymentAccountId, bankAccountId, date, notes } = req.body;
+
+      // Support both old (bankAccountId) and new (paymentAccountType/paymentAccountId) parameters
+      const accountType = paymentAccountType || "bank";
+      const accountId = paymentAccountId || bankAccountId;
+
+      if (!employeeId || !amount || !accountId || !date) {
+        return res.status(400).json({
+          message: "Employee, amount, payment account, and date are required",
+        });
+      }
+
+      const withdrawalAmount = parseFloat(amount);
+      if (isNaN(withdrawalAmount) || withdrawalAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+
+      // Get employee
+      const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+      if (!employee) {
+        return res.status(404).json({ message: "Employee not found" });
+      }
+
+      const currentBalance = parseFloat(employee.currentBalance);
+
+      // Create voucher
+      const voucherNumber = `SAL-WD-${Date.now()}`;
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId: req.session.currentCompanyId,
+          voucherNumber,
+          voucherType: "Payment",
+          voucherDate: date,
+          description: notes || `Salary withdrawal for ${employee.firstName} ${employee.lastName}`,
+          totalAmount: withdrawalAmount.toFixed(2),
+        })
+        .returning();
+
+      // Create voucher entries (double-entry)
+      // Debit: Employee (using employeeId field directly instead of separate ledger account)
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: null,
+        employeeId: employee.id,
+        debitAmount: withdrawalAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Salary withdrawal - ${voucherNumber}`,
+      });
+
+      // Credit: Bank/Cash Account
+      const creditEntry: any = {
+        voucherId: voucher.id,
+        debitAmount: "0",
+        creditAmount: withdrawalAmount.toFixed(2),
+        narration: `Salary withdrawal - ${voucherNumber}`,
+      };
+
+      if (accountType === "cash") {
+        creditEntry.ledgerAccountId = accountId;
+      } else {
+        creditEntry.bankAccountId = accountId;
+      }
+
+      await db.insert(voucherEntries).values(creditEntry);
+
+      // Sync employee balance from voucher entries (instead of direct update)
+      await syncEmployeeBalancesFromEntries(
+        [
+          {
+            ledgerAccountId: null,
+            employeeId: employee.id,
+            debitAmount: withdrawalAmount.toFixed(2),
+            creditAmount: "0",
+          },
+        ],
+        req.session.currentCompanyId!
+      );
+
+      // Get updated employee balance
+      const [updatedEmployee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+
+      res.json({
+        voucher,
+        employee: updatedEmployee || employee,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Payroll - Worker Direct Payment
-  app.post(
-    "/api/payroll/pay-worker",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-
-        const { employeeId, amount, bankAccountId, date, notes } = req.body;
-
-        if (!employeeId || !amount || !bankAccountId || !date) {
-          return res
-            .status(400)
-            .json({
-              message: "Employee, amount, bank account, and date are required",
-            });
-        }
-
-        const paymentAmount = parseFloat(amount);
-        if (isNaN(paymentAmount) || paymentAmount <= 0) {
-          return res
-            .status(400)
-            .json({ message: "Amount must be a positive number" });
-        }
-
-        // Get employee/worker
-        const [employee] = await db
-          .select()
-          .from(employees)
-          .where(eq(employees.id, employeeId));
-        if (!employee) {
-          return res.status(404).json({ message: "Worker not found" });
-        }
-
-        // Get or create SALARY_EXPENSE ledger account
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-        let salaryExpenseAccount = allAccounts.find(
-          (a: any) => a.code === "SALARY_EXPENSE",
-        );
-
-        if (!salaryExpenseAccount) {
-          salaryExpenseAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: "SALARY_EXPENSE",
-            name: "Salary Expense",
-            accountType: "Expense",
-            openingBalance: "0",
-            active: true,
-          });
-        }
-
-        // Create voucher
-        const voucherNumber = `SAL-PAY-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Payment",
-            voucherDate: date,
-            description:
-              notes ||
-              `Salary payment for ${employee.firstName} ${employee.lastName}`,
-            totalAmount: paymentAmount.toFixed(2),
-          })
-          .returning();
-
-        // Create voucher entries (double-entry)
-        // Debit: Salary Expense
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: salaryExpenseAccount.id,
-          debitAmount: paymentAmount.toFixed(2),
-          creditAmount: "0",
-          narration: `Salary payment - ${voucherNumber}`,
-        });
-
-        // Credit: Bank/Cash Account
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          bankAccountId,
-          debitAmount: "0",
-          creditAmount: paymentAmount.toFixed(2),
-          narration: `Salary payment - ${voucherNumber}`,
-        });
-
-        res.json({
-          voucher,
-          employee,
-        });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+  app.post("/api/payroll/pay-worker", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
-    },
-  );
+
+      const { employeeId, amount, bankAccountId, date, notes } = req.body;
+
+      if (!employeeId || !amount || !bankAccountId || !date) {
+        return res.status(400).json({
+          message: "Employee, amount, bank account, and date are required",
+        });
+      }
+
+      const paymentAmount = parseFloat(amount);
+      if (isNaN(paymentAmount) || paymentAmount <= 0) {
+        return res.status(400).json({ message: "Amount must be a positive number" });
+      }
+
+      // Get employee/worker
+      const [employee] = await db.select().from(employees).where(eq(employees.id, employeeId));
+      if (!employee) {
+        return res.status(404).json({ message: "Worker not found" });
+      }
+
+      // Get or create SALARY_EXPENSE ledger account
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+
+      if (!salaryExpenseAccount) {
+        salaryExpenseAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: "SALARY_EXPENSE",
+          name: "Salary Expense",
+          accountType: "Expense",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      // Create voucher
+      const voucherNumber = `SAL-PAY-${Date.now()}`;
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId: req.session.currentCompanyId,
+          voucherNumber,
+          voucherType: "Payment",
+          voucherDate: date,
+          description: notes || `Salary payment for ${employee.firstName} ${employee.lastName}`,
+          totalAmount: paymentAmount.toFixed(2),
+        })
+        .returning();
+
+      // Create voucher entries (double-entry)
+      // Debit: Salary Expense
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: salaryExpenseAccount.id,
+        debitAmount: paymentAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Salary payment - ${voucherNumber}`,
+      });
+
+      // Credit: Bank/Cash Account
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        bankAccountId,
+        debitAmount: "0",
+        creditAmount: paymentAmount.toFixed(2),
+        narration: `Salary payment - ${voucherNumber}`,
+      });
+
+      res.json({
+        voucher,
+        employee,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Payroll - Bulk Worker Payment
-  app.post(
-    "/api/payroll/bulk-pay-workers",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
+  app.post("/api/payroll/bulk-pay-workers", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
+      }
 
-        const {
-          payments,
-          paymentAccountType,
-          paymentAccountId,
-          bankAccountId,
-          date,
-          notes,
-        } = req.body;
+      const { payments, paymentAccountType, paymentAccountId, bankAccountId, date, notes } = req.body;
 
-        // Support both old (bankAccountId) and new (paymentAccountType/paymentAccountId) parameters
-        const accountType = paymentAccountType || "bank";
-        const accountId = paymentAccountId || bankAccountId;
+      // Support both old (bankAccountId) and new (paymentAccountType/paymentAccountId) parameters
+      const accountType = paymentAccountType || "bank";
+      const accountId = paymentAccountId || bankAccountId;
 
-        if (!payments || !Array.isArray(payments) || payments.length === 0) {
-          return res.status(400).json({ message: "No payments provided" });
-        }
+      if (!payments || !Array.isArray(payments) || payments.length === 0) {
+        return res.status(400).json({ message: "No payments provided" });
+      }
 
-        if (!accountId || !date) {
-          return res
-            .status(400)
-            .json({ message: "Payment account and date are required" });
-        }
+      if (!accountId || !date) {
+        return res.status(400).json({ message: "Payment account and date are required" });
+      }
 
-        // Validate all payment amounts
-        for (const payment of payments) {
-          const amount = parseFloat(payment.amount);
-          if (isNaN(amount) || amount <= 0) {
-            return res
-              .status(400)
-              .json({
-                message: "All payment amounts must be positive numbers",
-              });
-          }
-        }
-
-        // Get or create SALARY_EXPENSE ledger account
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-        let salaryExpenseAccount = allAccounts.find(
-          (a: any) => a.code === "SALARY_EXPENSE",
-        );
-
-        if (!salaryExpenseAccount) {
-          salaryExpenseAccount = await storage.createLedgerAccount({
-            companyId: req.session.currentCompanyId,
-            code: "SALARY_EXPENSE",
-            name: "Salary Expense",
-            accountType: "Expense",
-            openingBalance: "0",
-            active: true,
+      // Validate all payment amounts
+      for (const payment of payments) {
+        const amount = parseFloat(payment.amount);
+        if (isNaN(amount) || amount <= 0) {
+          return res.status(400).json({
+            message: "All payment amounts must be positive numbers",
           });
         }
-
-        // Calculate total amount
-        const totalAmount = payments.reduce(
-          (sum: number, p: any) => sum + parseFloat(p.amount),
-          0,
-        );
-
-        // Create single voucher for all payments
-        const voucherNumber = `SAL-BULK-${Date.now()}`;
-        const [voucher] = await db
-          .insert(vouchers)
-          .values({
-            companyId: req.session.currentCompanyId,
-            voucherNumber,
-            voucherType: "Payment",
-            voucherDate: date,
-            description:
-              notes || `Bulk salary payment for ${payments.length} workers`,
-            totalAmount: totalAmount.toFixed(2),
-          })
-          .returning();
-
-        // Create debit entry for total salary expense
-        await db.insert(voucherEntries).values({
-          voucherId: voucher.id,
-          ledgerAccountId: salaryExpenseAccount.id,
-          debitAmount: totalAmount.toFixed(2),
-          creditAmount: "0",
-          narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
-        });
-
-        // Create credit entry for bank/cash account
-        const creditEntry: any = {
-          voucherId: voucher.id,
-          debitAmount: "0",
-          creditAmount: totalAmount.toFixed(2),
-          narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
-        };
-
-        if (accountType === "cash") {
-          creditEntry.ledgerAccountId = parseInt(accountId);
-        } else {
-          creditEntry.bankAccountId = parseInt(accountId);
-        }
-
-        await db.insert(voucherEntries).values(creditEntry);
-
-        res.json({
-          voucher,
-          paymentsProcessed: payments.length,
-          totalAmount: totalAmount.toFixed(2),
-        });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
       }
-    },
-  );
+
+      // Get or create SALARY_EXPENSE ledger account
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+      let salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
+
+      if (!salaryExpenseAccount) {
+        salaryExpenseAccount = await storage.createLedgerAccount({
+          companyId: req.session.currentCompanyId,
+          code: "SALARY_EXPENSE",
+          name: "Salary Expense",
+          accountType: "Expense",
+          openingBalance: "0",
+          active: true,
+        });
+      }
+
+      // Calculate total amount
+      const totalAmount = payments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+
+      // Create single voucher for all payments
+      const voucherNumber = `SAL-BULK-${Date.now()}`;
+      const [voucher] = await db
+        .insert(vouchers)
+        .values({
+          companyId: req.session.currentCompanyId,
+          voucherNumber,
+          voucherType: "Payment",
+          voucherDate: date,
+          description: notes || `Bulk salary payment for ${payments.length} workers`,
+          totalAmount: totalAmount.toFixed(2),
+        })
+        .returning();
+
+      // Create debit entry for total salary expense
+      await db.insert(voucherEntries).values({
+        voucherId: voucher.id,
+        ledgerAccountId: salaryExpenseAccount.id,
+        debitAmount: totalAmount.toFixed(2),
+        creditAmount: "0",
+        narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
+      });
+
+      // Create credit entry for bank/cash account
+      const creditEntry: any = {
+        voucherId: voucher.id,
+        debitAmount: "0",
+        creditAmount: totalAmount.toFixed(2),
+        narration: `Bulk salary payment - ${payments.length} workers - ${voucherNumber}`,
+      };
+
+      if (accountType === "cash") {
+        creditEntry.ledgerAccountId = parseInt(accountId);
+      } else {
+        creditEntry.bankAccountId = parseInt(accountId);
+      }
+
+      await db.insert(voucherEntries).values(creditEntry);
+
+      res.json({
+        voucher,
+        paymentsProcessed: payments.length,
+        totalAmount: totalAmount.toFixed(2),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // ── ERP Payroll Runs (draft → paid workflow) ──────────────────────────────
 
@@ -1682,7 +1563,10 @@ export function registerEmployeeRoutes(app: Express) {
       if (!date || !Array.isArray(items) || items.length === 0)
         return res.status(400).json({ message: "date and items are required" });
       const createdAt = new Date().toISOString();
-      const [run] = await db.insert(erpPayrollRuns).values({ companyId, status: "DRAFT", date, notes: notes || null, createdAt }).returning();
+      const [run] = await db
+        .insert(erpPayrollRuns)
+        .values({ companyId, status: "DRAFT", date, notes: notes || null, createdAt })
+        .returning();
       await db.insert(erpPayrollRunItems).values(
         items.map((it: any) => ({
           runId: run.id,
@@ -1695,7 +1579,9 @@ export function registerEmployeeRoutes(app: Express) {
         }))
       );
       res.json({ ...run, items });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // List payroll runs for current company
@@ -1714,18 +1600,30 @@ export function registerEmployeeRoutes(app: Express) {
         if (!hasAccess) return res.status(403).json({ message: "Access denied to this company" });
       }
 
-      const runs = await db.select().from(erpPayrollRuns)
+      const runs = await db
+        .select()
+        .from(erpPayrollRuns)
         .where(eq(erpPayrollRuns.companyId, companyId))
         .orderBy(desc(erpPayrollRuns.createdAt));
       // Attach item counts + totals
-      const result = await Promise.all(runs.map(async (run) => {
-        const items = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, run.id));
-        const totalNet = items.reduce((s, i) => s + parseFloat(i.netPay), 0);
-        const totalBase = items.reduce((s, i) => s + parseFloat(i.baseSalary), 0);
-        return { ...run, itemCount: items.length, totalNet: totalNet.toFixed(2), totalBase: totalBase.toFixed(2), items };
-      }));
+      const result = await Promise.all(
+        runs.map(async (run) => {
+          const items = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, run.id));
+          const totalNet = items.reduce((s, i) => s + parseFloat(i.netPay), 0);
+          const totalBase = items.reduce((s, i) => s + parseFloat(i.baseSalary), 0);
+          return {
+            ...run,
+            itemCount: items.length,
+            totalNet: totalNet.toFixed(2),
+            totalBase: totalBase.toFixed(2),
+            items,
+          };
+        })
+      );
       res.json(result);
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // Update a DRAFT run's items / mark as PAID
@@ -1734,7 +1632,10 @@ export function registerEmployeeRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const runId = parseInt(req.params.id);
-      const [run] = await db.select().from(erpPayrollRuns).where(and(eq(erpPayrollRuns.id, runId), eq(erpPayrollRuns.companyId, companyId)));
+      const [run] = await db
+        .select()
+        .from(erpPayrollRuns)
+        .where(and(eq(erpPayrollRuns.id, runId), eq(erpPayrollRuns.companyId, companyId)));
       if (!run) return res.status(404).json({ message: "Payroll run not found" });
 
       const { action, items, paymentAccountId, date, notes } = req.body;
@@ -1759,29 +1660,45 @@ export function registerEmployeeRoutes(app: Express) {
 
         const payDate = run.date;
         const voucherNumber = `SAL-${runId}-${Date.now()}`;
-        const [voucher] = await db.insert(vouchers).values({
-          companyId, voucherNumber, voucherType: "Payment", voucherDate: payDate,
-          description: run.notes || `Payroll run #${runId} — ${runItems.length} workers`,
-          totalAmount: totalAmount.toFixed(2),
-        }).returning();
+        const [voucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherNumber,
+            voucherType: "Payment",
+            voucherDate: payDate,
+            description: run.notes || `Payroll run #${runId} — ${runItems.length} workers`,
+            totalAmount: totalAmount.toFixed(2),
+          })
+          .returning();
 
         // Create one debit entry per worker group
         for (const [grp, grpTotal] of itemsByGroup) {
           const isDefault = grp === "__default__";
           const expCode = isDefault
             ? "SALARY_EXPENSE"
-            : `WORKER_PAY_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+            : `WORKER_PAY_${grp
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, "_")
+                .substring(0, 25)}`;
           const expName = isDefault ? "Salary Expense" : `${grp} Worker Payroll Expense`;
 
           let expAccount = allAccounts.find((a: any) => a.code === expCode);
           if (!expAccount) {
             expAccount = await storage.createLedgerAccount({
-              companyId, code: expCode, name: expName, accountType: "Expense", openingBalance: "0", active: true,
+              companyId,
+              code: expCode,
+              name: expName,
+              accountType: "Expense",
+              openingBalance: "0",
+              active: true,
             });
           }
           await db.insert(voucherEntries).values({
-            voucherId: voucher.id, ledgerAccountId: expAccount.id,
-            debitAmount: grpTotal.toFixed(2), creditAmount: "0",
+            voucherId: voucher.id,
+            ledgerAccountId: expAccount.id,
+            debitAmount: grpTotal.toFixed(2),
+            creditAmount: "0",
             narration: isDefault
               ? `Salary expense — payroll run #${runId}`
               : `${grp} worker payroll expense — run #${runId}`,
@@ -1790,13 +1707,17 @@ export function registerEmployeeRoutes(app: Express) {
 
         // Single credit entry for the total payment out
         await db.insert(voucherEntries).values({
-          voucherId: voucher.id, ledgerAccountId: parseInt(paymentAccountId),
-          debitAmount: "0", creditAmount: totalAmount.toFixed(2),
+          voucherId: voucher.id,
+          ledgerAccountId: parseInt(paymentAccountId),
+          debitAmount: "0",
+          creditAmount: totalAmount.toFixed(2),
           narration: `Cash paid — payroll run #${runId}`,
         });
-        const [updated] = await db.update(erpPayrollRuns)
+        const [updated] = await db
+          .update(erpPayrollRuns)
           .set({ status: "PAID", paymentAccountId: parseInt(paymentAccountId), paidAt: new Date().toISOString() })
-          .where(eq(erpPayrollRuns.id, runId)).returning();
+          .where(eq(erpPayrollRuns.id, runId))
+          .returning();
 
         // Deduct advance balances FIFO for each employee who has a deduction in this payroll
         const payMonth = payDate.substring(0, 7);
@@ -1804,12 +1725,16 @@ export function registerEmployeeRoutes(app: Express) {
           const deductAmt = parseFloat(item.deduction || "0");
           if (deductAmt <= 0 || !item.employeeId) continue;
 
-          const outstanding = await db.select().from(salaryAdvances)
-            .where(and(
-              eq(salaryAdvances.employeeId, item.employeeId),
-              eq(salaryAdvances.companyId, companyId),
-              eq(salaryAdvances.fullyPaid, false),
-            ))
+          const outstanding = await db
+            .select()
+            .from(salaryAdvances)
+            .where(
+              and(
+                eq(salaryAdvances.employeeId, item.employeeId),
+                eq(salaryAdvances.companyId, companyId),
+                eq(salaryAdvances.fullyPaid, false)
+              )
+            )
             .orderBy(salaryAdvances.advanceDate);
 
           let remaining = deductAmt;
@@ -1826,7 +1751,8 @@ export function registerEmployeeRoutes(app: Express) {
               payrollMonth: payMonth,
               deductionAmount: toDeduct.toFixed(2),
             });
-            await db.update(salaryAdvances)
+            await db
+              .update(salaryAdvances)
               .set({ remainingBalance: newBal.toFixed(2), fullyPaid })
               .where(eq(salaryAdvances.id, adv.id));
             remaining -= toDeduct;
@@ -1839,7 +1765,7 @@ export function registerEmployeeRoutes(app: Express) {
         try {
           waResult = await triggerAccountWhatsAppStatement({
             companyId,
-            accountId:   parseInt(paymentAccountId),
+            accountId: parseInt(paymentAccountId),
             accountType: "ledger",
             voucherType: "Payment",
             voucherDate: payDate,
@@ -1857,12 +1783,15 @@ export function registerEmployeeRoutes(app: Express) {
         const updates: any = {};
         if (notes !== undefined) updates.notes = notes;
         if (date) updates.date = date;
-        if (Object.keys(updates).length) await db.update(erpPayrollRuns).set(updates).where(eq(erpPayrollRuns.id, runId));
+        if (Object.keys(updates).length)
+          await db.update(erpPayrollRuns).set(updates).where(eq(erpPayrollRuns.id, runId));
         if (Array.isArray(items) && items.length > 0) {
           await db.delete(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
           await db.insert(erpPayrollRunItems).values(
             items.map((it: any) => ({
-              runId, employeeId: it.employeeId, employeeName: it.employeeName,
+              runId,
+              employeeId: it.employeeId,
+              employeeName: it.employeeName,
               groupName: it.groupName || null,
               baseSalary: parseFloat(it.baseSalary).toFixed(2),
               deduction: parseFloat(it.deduction || 0).toFixed(2),
@@ -1876,7 +1805,9 @@ export function registerEmployeeRoutes(app: Express) {
       }
 
       res.status(400).json({ message: "Unknown action" });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // Delete a DRAFT payroll run
@@ -1885,13 +1816,18 @@ export function registerEmployeeRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const runId = parseInt(req.params.id);
-      const [run] = await db.select().from(erpPayrollRuns).where(and(eq(erpPayrollRuns.id, runId), eq(erpPayrollRuns.companyId, companyId)));
+      const [run] = await db
+        .select()
+        .from(erpPayrollRuns)
+        .where(and(eq(erpPayrollRuns.id, runId), eq(erpPayrollRuns.companyId, companyId)));
       if (!run) return res.status(404).json({ message: "Payroll run not found" });
       if (run.status === "PAID") return res.status(400).json({ message: "Cannot delete a paid run" });
       await db.delete(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, runId));
       await db.delete(erpPayrollRuns).where(eq(erpPayrollRuns.id, runId));
       res.json({ message: "Deleted" });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // ── Undo a PAID payroll run ───────────────────────────────────────────────
@@ -1900,14 +1836,25 @@ export function registerEmployeeRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const runId = parseInt(req.params.id);
-      const [run] = await db.select().from(erpPayrollRuns).where(and(eq(erpPayrollRuns.id, runId), eq(erpPayrollRuns.companyId, companyId)));
+      const [run] = await db
+        .select()
+        .from(erpPayrollRuns)
+        .where(and(eq(erpPayrollRuns.id, runId), eq(erpPayrollRuns.companyId, companyId)));
       if (!run) return res.status(404).json({ message: "Payroll run not found" });
       if (run.status !== "PAID") return res.status(400).json({ message: "Only PAID runs can be undone" });
 
       await db.transaction(async (tx) => {
         // 1. Find and soft-delete the SAL- voucher tied to this run
-        const salVouchers = await tx.select().from(vouchers)
-          .where(and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${"SAL-" + runId + "-%"}`, isNull(vouchers.deletedAt)));
+        const salVouchers = await tx
+          .select()
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              sql`${vouchers.voucherNumber} LIKE ${"SAL-" + runId + "-%"}`,
+              isNull(vouchers.deletedAt)
+            )
+          );
         for (const v of salVouchers) {
           await tx.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, v.id));
         }
@@ -1921,14 +1868,22 @@ export function registerEmployeeRoutes(app: Express) {
           if (deductAmt <= 0 || !item.employeeId) continue;
 
           // Find advance deductions recorded for this payroll month for this employee's advances
-          const empAdvances = await tx.select({ id: salaryAdvances.id })
+          const empAdvances = await tx
+            .select({ id: salaryAdvances.id })
             .from(salaryAdvances)
             .where(and(eq(salaryAdvances.employeeId, item.employeeId), eq(salaryAdvances.companyId, companyId)));
-          const advanceIds = empAdvances.map(a => a.id);
+          const advanceIds = empAdvances.map((a) => a.id);
           if (advanceIds.length === 0) continue;
 
-          const deductions = await tx.select().from(salaryAdvanceDeductions)
-            .where(and(inArray(salaryAdvanceDeductions.salaryAdvanceId, advanceIds), eq(salaryAdvanceDeductions.payrollMonth, payMonth)));
+          const deductions = await tx
+            .select()
+            .from(salaryAdvanceDeductions)
+            .where(
+              and(
+                inArray(salaryAdvanceDeductions.salaryAdvanceId, advanceIds),
+                eq(salaryAdvanceDeductions.payrollMonth, payMonth)
+              )
+            );
 
           for (const ded of deductions) {
             const dedAmt = parseFloat(ded.deductionAmount || "0");
@@ -1937,19 +1892,25 @@ export function registerEmployeeRoutes(app: Express) {
             const restoredBal = parseFloat(adv.remainingBalance || "0") + dedAmt;
             const originalAmt = parseFloat(adv.amount || "0");
             const newBal = Math.min(restoredBal, originalAmt);
-            await tx.update(salaryAdvances).set({ remainingBalance: newBal.toFixed(2), fullyPaid: false }).where(eq(salaryAdvances.id, adv.id));
+            await tx
+              .update(salaryAdvances)
+              .set({ remainingBalance: newBal.toFixed(2), fullyPaid: false })
+              .where(eq(salaryAdvances.id, adv.id));
             await tx.delete(salaryAdvanceDeductions).where(eq(salaryAdvanceDeductions.id, ded.id));
           }
         }
 
         // 3. Reset run to DRAFT
-        await tx.update(erpPayrollRuns)
+        await tx
+          .update(erpPayrollRuns)
           .set({ status: "DRAFT", paymentAccountId: null, paidAt: null })
           .where(eq(erpPayrollRuns.id, runId));
       });
 
       res.json({ message: "Payroll run reversed to draft" });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // ── Diagnostic: what does the server see for paid payroll runs? ──
@@ -1958,38 +1919,59 @@ export function registerEmployeeRoutes(app: Express) {
       const companyId = req.session.currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const allRuns = await db.select().from(erpPayrollRuns)
-        .where(eq(erpPayrollRuns.companyId, companyId));
-      const paidRuns = allRuns.filter(r => r.status === "PAID");
+      const allRuns = await db.select().from(erpPayrollRuns).where(eq(erpPayrollRuns.companyId, companyId));
+      const paidRuns = allRuns.filter((r) => r.status === "PAID");
 
       const allAccounts = await storage.getAllLedgerAccounts(companyId);
       const salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
 
-      const runDetails = await Promise.all(paidRuns.map(async (run) => {
-        const items = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, run.id));
-        const salVouchers = await db.select().from(vouchers).where(and(
-          eq(vouchers.companyId, companyId),
-          sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
-          isNull(vouchers.deletedAt),
-        ));
-        const allVouchersForRun = await db.select().from(vouchers).where(and(
-          eq(vouchers.companyId, companyId),
-          sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
-        ));
-        return {
-          runId: run.id, status: run.status, date: run.date, itemCount: items.length,
-          itemGroupNames: [...new Set(items.map(i => i.groupName || "(none)"))],
-          salVouchersActive: salVouchers.map(v => ({ id: v.id, number: v.voucherNumber })),
-          allVouchersIncDeleted: allVouchersForRun.map(v => ({ id: v.id, number: v.voucherNumber, deleted: !!v.deletedAt })),
-        };
-      }));
+      const runDetails = await Promise.all(
+        paidRuns.map(async (run) => {
+          const items = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, run.id));
+          const salVouchers = await db
+            .select()
+            .from(vouchers)
+            .where(
+              and(
+                eq(vouchers.companyId, companyId),
+                sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
+                isNull(vouchers.deletedAt)
+              )
+            );
+          const allVouchersForRun = await db
+            .select()
+            .from(vouchers)
+            .where(
+              and(eq(vouchers.companyId, companyId), sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`)
+            );
+          return {
+            runId: run.id,
+            status: run.status,
+            date: run.date,
+            itemCount: items.length,
+            itemGroupNames: [...new Set(items.map((i) => i.groupName || "(none)"))],
+            salVouchersActive: salVouchers.map((v) => ({ id: v.id, number: v.voucherNumber })),
+            allVouchersIncDeleted: allVouchersForRun.map((v) => ({
+              id: v.id,
+              number: v.voucherNumber,
+              deleted: !!v.deletedAt,
+            })),
+          };
+        })
+      );
 
       res.json({
-        companyId, totalRuns: allRuns.length, paidRuns: paidRuns.length,
-        salaryExpenseAccount: salaryExpenseAccount ? { id: salaryExpenseAccount.id, code: salaryExpenseAccount.code } : null,
+        companyId,
+        totalRuns: allRuns.length,
+        paidRuns: paidRuns.length,
+        salaryExpenseAccount: salaryExpenseAccount
+          ? { id: salaryExpenseAccount.id, code: salaryExpenseAccount.code }
+          : null,
         runs: runDetails,
       });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // ── Migrate old PAID runs from single SALARY_EXPENSE to per-group accounts ──
@@ -2001,7 +1983,9 @@ export function registerEmployeeRoutes(app: Express) {
       const allAccounts = await storage.getAllLedgerAccounts(companyId);
       const salaryExpenseAccount = allAccounts.find((a: any) => a.code === "SALARY_EXPENSE");
 
-      const paidRuns = await db.select().from(erpPayrollRuns)
+      const paidRuns = await db
+        .select()
+        .from(erpPayrollRuns)
         .where(and(eq(erpPayrollRuns.companyId, companyId), eq(erpPayrollRuns.status, "PAID")));
 
       // Build a current group-membership lookup: employeeId → groupName
@@ -2023,28 +2007,44 @@ export function registerEmployeeRoutes(app: Express) {
 
       for (const run of paidRuns) {
         // Find the active SAL-{runId}-* voucher for this run
-        const salVouchers = await db.select().from(vouchers)
-          .where(and(
-            eq(vouchers.companyId, companyId),
-            sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
-            isNull(vouchers.deletedAt),
-          ));
-        if (salVouchers.length === 0) { noVoucher++; continue; }
+        const salVouchers = await db
+          .select()
+          .from(vouchers)
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              sql`${vouchers.voucherNumber} LIKE ${"SAL-" + run.id + "-%"}`,
+              isNull(vouchers.deletedAt)
+            )
+          );
+        if (salVouchers.length === 0) {
+          noVoucher++;
+          continue;
+        }
         const oldVoucher = salVouchers[0];
 
         // Only migrate if the voucher has a debit to SALARY_EXPENSE (old style)
         // If no SALARY_EXPENSE debit → already using per-group accounts correctly
-        if (!salaryExpenseAccount) { alreadyCorrect++; continue; }
-        const oldDebitEntries = await db.select().from(voucherEntries)
-          .where(and(
-            eq(voucherEntries.voucherId, oldVoucher.id),
-            eq(voucherEntries.ledgerAccountId, salaryExpenseAccount.id),
-          ));
-        if (oldDebitEntries.length === 0) { alreadyCorrect++; continue; }
+        if (!salaryExpenseAccount) {
+          alreadyCorrect++;
+          continue;
+        }
+        const oldDebitEntries = await db
+          .select()
+          .from(voucherEntries)
+          .where(
+            and(
+              eq(voucherEntries.voucherId, oldVoucher.id),
+              eq(voucherEntries.ledgerAccountId, salaryExpenseAccount.id)
+            )
+          );
+        if (oldDebitEntries.length === 0) {
+          alreadyCorrect++;
+          continue;
+        }
 
         // Get run items and group them — fall back to current group membership if groupName not stored
-        const runItems = await db.select().from(erpPayrollRunItems)
-          .where(eq(erpPayrollRunItems.runId, run.id));
+        const runItems = await db.select().from(erpPayrollRunItems).where(eq(erpPayrollRunItems.runId, run.id));
         const totalAmount = runItems.reduce((s, i) => s + parseFloat(i.netPay), 0);
 
         const itemsByGroup = new Map<string, number>();
@@ -2055,20 +2055,28 @@ export function registerEmployeeRoutes(app: Express) {
         }
 
         // Skip if all workers have no group (nothing to split)
-        const hasNamedGroups = [...itemsByGroup.keys()].some(k => k !== "__default__");
-        if (!hasNamedGroups) { noGroups++; continue; }
+        const hasNamedGroups = [...itemsByGroup.keys()].some((k) => k !== "__default__");
+        if (!hasNamedGroups) {
+          noGroups++;
+          continue;
+        }
 
         // Soft-delete old voucher
         await db.update(vouchers).set({ deletedAt: new Date() }).where(eq(vouchers.id, oldVoucher.id));
 
         // Create replacement voucher
         const newVoucherNumber = `SAL-${run.id}-${Date.now()}`;
-        const [newVoucher] = await db.insert(vouchers).values({
-          companyId, voucherNumber: newVoucherNumber, voucherType: "Payment",
-          voucherDate: run.date,
-          description: run.notes || `Payroll run #${run.id}`,
-          totalAmount: totalAmount.toFixed(2),
-        }).returning();
+        const [newVoucher] = await db
+          .insert(vouchers)
+          .values({
+            companyId,
+            voucherNumber: newVoucherNumber,
+            voucherType: "Payment",
+            voucherDate: run.date,
+            description: run.notes || `Payroll run #${run.id}`,
+            totalAmount: totalAmount.toFixed(2),
+          })
+          .returning();
 
         // Create per-group debit entries
         const freshAccounts = await storage.getAllLedgerAccounts(companyId);
@@ -2076,18 +2084,28 @@ export function registerEmployeeRoutes(app: Express) {
           const isDefault = grp === "__default__";
           const expCode = isDefault
             ? "SALARY_EXPENSE"
-            : `WORKER_PAY_${grp.toUpperCase().replace(/[^A-Z0-9]/g, "_").substring(0, 25)}`;
+            : `WORKER_PAY_${grp
+                .toUpperCase()
+                .replace(/[^A-Z0-9]/g, "_")
+                .substring(0, 25)}`;
           const expName = isDefault ? "Salary Expense" : `${grp} Worker Payroll Expense`;
 
           let expAccount = freshAccounts.find((a: any) => a.code === expCode);
           if (!expAccount) {
             expAccount = await storage.createLedgerAccount({
-              companyId, code: expCode, name: expName, accountType: "Expense", openingBalance: "0", active: true,
+              companyId,
+              code: expCode,
+              name: expName,
+              accountType: "Expense",
+              openingBalance: "0",
+              active: true,
             });
           }
           await db.insert(voucherEntries).values({
-            voucherId: newVoucher.id, ledgerAccountId: expAccount.id,
-            debitAmount: grpTotal.toFixed(2), creditAmount: "0",
+            voucherId: newVoucher.id,
+            ledgerAccountId: expAccount.id,
+            debitAmount: grpTotal.toFixed(2),
+            creditAmount: "0",
             narration: isDefault
               ? `Salary expense — payroll run #${run.id}`
               : `${grp} worker payroll expense — run #${run.id}`,
@@ -2097,8 +2115,10 @@ export function registerEmployeeRoutes(app: Express) {
         // Re-create the credit entry using the run's recorded payment account
         if (run.paymentAccountId) {
           await db.insert(voucherEntries).values({
-            voucherId: newVoucher.id, ledgerAccountId: run.paymentAccountId,
-            debitAmount: "0", creditAmount: totalAmount.toFixed(2),
+            voucherId: newVoucher.id,
+            ledgerAccountId: run.paymentAccountId,
+            debitAmount: "0",
+            creditAmount: totalAmount.toFixed(2),
             narration: `Cash paid — payroll run #${run.id}`,
           });
         }
@@ -2107,117 +2127,93 @@ export function registerEmployeeRoutes(app: Express) {
       }
 
       res.json({ migrated, alreadyCorrect, noGroups, noVoucher, total: paidRuns.length });
-    } catch (e: any) { res.status(500).json({ message: e.message }); }
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
   });
 
   // ── End ERP Payroll Runs ──────────────────────────────────────────────────
 
   // Get employees with calculated balances from transactions
-  app.get(
-    "/api/payroll/employees-with-balances",
-    requireAuth,
-    async (req, res) => {
-      // Disable HTTP caching - employee balances are dynamically calculated
-      res.set('Cache-Control', 'no-store');
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-
-        const employeesWithBalances = await storage.getEmployeesWithBalances(
-          req.session.currentCompanyId
-        );
-        res.json(employeesWithBalances);
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+  app.get("/api/payroll/employees-with-balances", requireAuth, async (req, res) => {
+    // Disable HTTP caching - employee balances are dynamically calculated
+    res.set("Cache-Control", "no-store");
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
+
+      const employeesWithBalances = await storage.getEmployeesWithBalances(req.session.currentCompanyId);
+      res.json(employeesWithBalances);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
-  );
+  });
 
   // Get worker payment summary (total paid to each worker)
-  app.get(
-    "/api/payroll/worker-payments-summary",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-
-        // Get all employees of type Worker for current company
-        const allEmployees = await storage.getAllEmployees(
-          req.session.currentCompanyId,
-        );
-        const workers = allEmployees.filter(
-          (emp: any) => emp.employeeType === "Worker",
-        );
-
-        // Get all ledger accounts for current company
-        const allAccounts = await storage.getAllLedgerAccounts(
-          req.session.currentCompanyId,
-        );
-
-        // Calculate total paid per worker by checking their employee liability account
-        const workerPayments = await Promise.all(
-          workers.map(async (worker: any) => {
-            // Find employee's liability account (code: EMP-{worker.code})
-            const employeeAccountCode = `EMP-${worker.code}`;
-            const employeeAccount = allAccounts.find(
-              (a: any) => a.code === employeeAccountCode,
-            );
-
-            let totalPaid = 0;
-
-            if (employeeAccount) {
-              // Get all voucher entries that credit this employee account (withdrawals/payments)
-              const entries = await db
-                .select({
-                  creditAmount: voucherEntries.creditAmount,
-                })
-                .from(voucherEntries)
-                .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-                .where(
-                  and(
-                    eq(vouchers.companyId, req.session.currentCompanyId!),
-                    eq(voucherEntries.ledgerAccountId, employeeAccount.id),
-                    isNull(vouchers.deletedAt),
-                    eq(vouchers.optional, false),
-                  ),
-                );
-
-              // Sum all credits (payments to worker)
-              totalPaid = entries.reduce(
-                (sum: number, entry: any) =>
-                  sum + parseFloat(entry.creditAmount || "0"),
-                0,
-              );
-            }
-
-            return {
-              workerId: worker.id,
-              workerCode: worker.code,
-              workerName: `${worker.firstName} ${worker.lastName}`,
-              totalPaid: totalPaid.toFixed(2),
-            };
-          }),
-        );
-
-        // Calculate grand total
-        const grandTotal = workerPayments.reduce(
-          (sum: number, wp: any) => sum + parseFloat(wp.totalPaid),
-          0,
-        );
-
-        res.json({
-          workerPayments,
-          grandTotal: grandTotal.toFixed(2),
-        });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+  app.get("/api/payroll/worker-payments-summary", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
-    },
-  );
+
+      // Get all employees of type Worker for current company
+      const allEmployees = await storage.getAllEmployees(req.session.currentCompanyId);
+      const workers = allEmployees.filter((emp: any) => emp.employeeType === "Worker");
+
+      // Get all ledger accounts for current company
+      const allAccounts = await storage.getAllLedgerAccounts(req.session.currentCompanyId);
+
+      // Calculate total paid per worker by checking their employee liability account
+      const workerPayments = await Promise.all(
+        workers.map(async (worker: any) => {
+          // Find employee's liability account (code: EMP-{worker.code})
+          const employeeAccountCode = `EMP-${worker.code}`;
+          const employeeAccount = allAccounts.find((a: any) => a.code === employeeAccountCode);
+
+          let totalPaid = 0;
+
+          if (employeeAccount) {
+            // Get all voucher entries that credit this employee account (withdrawals/payments)
+            const entries = await db
+              .select({
+                creditAmount: voucherEntries.creditAmount,
+              })
+              .from(voucherEntries)
+              .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+              .where(
+                and(
+                  eq(vouchers.companyId, req.session.currentCompanyId!),
+                  eq(voucherEntries.ledgerAccountId, employeeAccount.id),
+                  isNull(vouchers.deletedAt),
+                  eq(vouchers.optional, false)
+                )
+              );
+
+            // Sum all credits (payments to worker)
+            totalPaid = entries.reduce((sum: number, entry: any) => sum + parseFloat(entry.creditAmount || "0"), 0);
+          }
+
+          return {
+            workerId: worker.id,
+            workerCode: worker.code,
+            workerName: `${worker.firstName} ${worker.lastName}`,
+            totalPaid: totalPaid.toFixed(2),
+          };
+        })
+      );
+
+      // Calculate grand total
+      const grandTotal = workerPayments.reduce((sum: number, wp: any) => sum + parseFloat(wp.totalPaid), 0);
+
+      res.json({
+        workerPayments,
+        grandTotal: grandTotal.toFixed(2),
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Suppliers
 }

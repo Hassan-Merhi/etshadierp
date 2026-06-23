@@ -6,8 +6,16 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import {
-  Bell, Truck, FileText, ArrowLeftRight, CheckCircle2, X,
-  Loader2, Shield, Search, UserPlus,
+  Bell,
+  Truck,
+  FileText,
+  ArrowLeftRight,
+  CheckCircle2,
+  X,
+  Loader2,
+  Shield,
+  Search,
+  UserPlus,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -110,9 +118,7 @@ function UserPicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const filtered = users.filter((u) =>
-    u.username.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = users.filter((u) => u.username.toLowerCase().includes(search.toLowerCase()));
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -140,10 +146,16 @@ function UserPicker({
           <Input
             ref={inputRef}
             value={search}
-            onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setOpen(true);
+            }}
             onFocus={() => setOpen(true)}
             onKeyDown={(e) => {
-              if (e.key === "Escape") { setOpen(false); setSearch(""); }
+              if (e.key === "Escape") {
+                setOpen(false);
+                setSearch("");
+              }
               if (e.key === "Enter" && filtered.length === 1) {
                 handleSelect(filtered[0]);
               }
@@ -158,7 +170,9 @@ function UserPicker({
           size="sm"
           variant="outline"
           disabled={disabled || filtered.length === 0 || !search.trim()}
-          onClick={() => { if (filtered.length === 1) handleSelect(filtered[0]); }}
+          onClick={() => {
+            if (filtered.length === 1) handleSelect(filtered[0]);
+          }}
           className="h-8 px-3 gap-1.5 text-xs"
           data-testid={`button-add-user-${eventId}`}
         >
@@ -173,7 +187,10 @@ function UserPicker({
             <button
               key={u.id}
               className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover-elevate text-left"
-              onMouseDown={(e) => { e.preventDefault(); handleSelect(u); }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                handleSelect(u);
+              }}
               data-testid={`option-user-${u.id}`}
             >
               <span className="flex items-center justify-center h-6 w-6 rounded-full bg-muted text-[10px] font-semibold shrink-0">
@@ -252,7 +269,6 @@ export default function NotificationSettings() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 space-y-8">
-
       {/* Header */}
       <div>
         <div className="flex items-center gap-2.5 mb-1">
@@ -283,9 +299,7 @@ export default function NotificationSettings() {
             {/* Group label */}
             <div className="flex items-center gap-2">
               <GroupIcon className={`h-3.5 w-3.5 ${groupColor}`} />
-              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                {group}
-              </span>
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{group}</span>
             </div>
 
             <div className="space-y-2">
@@ -296,14 +310,12 @@ export default function NotificationSettings() {
                 const isSaving = saveMutation.isPending;
 
                 return (
-                  <div
-                    key={event.id}
-                    className="rounded-lg border bg-card"
-                    data-testid={`card-event-${event.id}`}
-                  >
+                  <div key={event.id} className="rounded-lg border bg-card" data-testid={`card-event-${event.id}`}>
                     {/* Event header */}
                     <div className="flex items-start gap-3 px-4 pt-4 pb-3">
-                      <div className={`flex items-center justify-center h-7 w-7 rounded-md ${event.bg} shrink-0 mt-0.5`}>
+                      <div
+                        className={`flex items-center justify-center h-7 w-7 rounded-md ${event.bg} shrink-0 mt-0.5`}
+                      >
                         <EventIcon className={`h-3.5 w-3.5 ${event.color}`} />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -342,9 +354,7 @@ export default function NotificationSettings() {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-muted-foreground italic">
-                          No recipients — nobody will be notified.
-                        </p>
+                        <p className="text-xs text-muted-foreground italic">No recipients — nobody will be notified.</p>
                       )}
 
                       {/* Searchable add */}

@@ -47,7 +47,6 @@ const balePhotoStorage = multer.diskStorage({
 const balePhotoUpload = multer({ storage: balePhotoStorage });
 
 export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any, db: any) {
-
   // ───────────────────────────────────────────────
   // 1. Settings CRUD
   // ───────────────────────────────────────────────
@@ -58,10 +57,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const result = await cache(`factory_settings:${companyId}`, 30_000, async () => {
-        let [settings] = await db
-          .select()
-          .from(factorySettings)
-          .where(eq(factorySettings.companyId, companyId));
+        let [settings] = await db.select().from(factorySettings).where(eq(factorySettings.companyId, companyId));
 
         if (!settings) {
           [settings] = await db
@@ -101,24 +97,54 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
   // Known DB columns — everything else goes into extraSettings JSONB
   const KNOWN_SETTINGS_COLUMNS = new Set([
-    "companyId", "dashboardEnabled", "kpisEnabled", "profitabilityEnabled", "alertsEnabled",
-    "supplierScoringEnabled", "mixOptimizerEnabled", "traceabilityEnabled", "balePhotosEnabled",
-    "wasteTrackingEnabled", "cashflowEnabled", "rolesEnabled", "netProfitEnabled",
-    "productionSummaryEnabled", "supplierReportEnabled", "supplierStatementEnabled",
-    "laborCostPerKg", "overheadPerKg", "hideSellingPrice", "hideAvgCost",
+    "companyId",
+    "dashboardEnabled",
+    "kpisEnabled",
+    "profitabilityEnabled",
+    "alertsEnabled",
+    "supplierScoringEnabled",
+    "mixOptimizerEnabled",
+    "traceabilityEnabled",
+    "balePhotosEnabled",
+    "wasteTrackingEnabled",
+    "cashflowEnabled",
+    "rolesEnabled",
+    "netProfitEnabled",
+    "productionSummaryEnabled",
+    "supplierReportEnabled",
+    "supplierStatementEnabled",
+    "laborCostPerKg",
+    "overheadPerKg",
+    "hideSellingPrice",
+    "hideAvgCost",
   ]);
 
   app.put("/api/factory/settings", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId =
+        req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const {
-        dashboardEnabled, kpisEnabled, profitabilityEnabled, alertsEnabled,
-        supplierScoringEnabled, mixOptimizerEnabled, traceabilityEnabled,
-        balePhotosEnabled, wasteTrackingEnabled, cashflowEnabled, rolesEnabled,
-        netProfitEnabled, productionSummaryEnabled, supplierReportEnabled, supplierStatementEnabled,
-        laborCostPerKg, overheadPerKg, hideSellingPrice, hideAvgCost,
+        dashboardEnabled,
+        kpisEnabled,
+        profitabilityEnabled,
+        alertsEnabled,
+        supplierScoringEnabled,
+        mixOptimizerEnabled,
+        traceabilityEnabled,
+        balePhotosEnabled,
+        wasteTrackingEnabled,
+        cashflowEnabled,
+        rolesEnabled,
+        netProfitEnabled,
+        productionSummaryEnabled,
+        supplierReportEnabled,
+        supplierStatementEnabled,
+        laborCostPerKg,
+        overheadPerKg,
+        hideSellingPrice,
+        hideAvgCost,
       } = req.body;
 
       const updateData: any = { updatedAt: new Date() };
@@ -143,10 +169,15 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       if (hideAvgCost !== undefined) updateData.hideAvgCost = hideAvgCost;
 
       // Collect any extra boolean/string settings into extraSettings JSONB
-      const extraKeys = Object.keys(req.body).filter(k => !KNOWN_SETTINGS_COLUMNS.has(k) && k !== "id" && k !== "updatedAt" && k !== "extraSettings");
+      const extraKeys = Object.keys(req.body).filter(
+        (k) => !KNOWN_SETTINGS_COLUMNS.has(k) && k !== "id" && k !== "updatedAt" && k !== "extraSettings"
+      );
       if (extraKeys.length > 0) {
         // Fetch current extraSettings to merge
-        const [current] = await db.select({ extraSettings: factorySettings.extraSettings }).from(factorySettings).where(eq(factorySettings.companyId, companyId));
+        const [current] = await db
+          .select({ extraSettings: factorySettings.extraSettings })
+          .from(factorySettings)
+          .where(eq(factorySettings.companyId, companyId));
         const currentExtra: any = (current?.extraSettings as any) ?? {};
         const newExtra: any = { ...currentExtra };
         for (const key of extraKeys) {
@@ -188,10 +219,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const wasteOnDate = await db
         .select()
         .from(factoryWasteEntries)
-        .where(and(
-          eq(factoryWasteEntries.companyId, companyId),
-          eq(factoryWasteEntries.date, dateStr)
-        ));
+        .where(and(eq(factoryWasteEntries.companyId, companyId), eq(factoryWasteEntries.date, dateStr)));
 
       const wasteBreakdownMap: Record<string, number> = {};
       let wasteTotalKg = 0;
@@ -226,10 +254,12 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const loadedOrders = await db
         .select({ id: customerOrders.id })
         .from(customerOrders)
-        .where(and(
-          eq(customerOrders.companyId, companyId),
-          sql`(${customerOrders.loadingFinalizedAt} IS NOT NULL OR (${customerOrders.status} = 'FINALIZED' AND ${customerOrders.containerNumber} IS NOT NULL))`
-        ));
+        .where(
+          and(
+            eq(customerOrders.companyId, companyId),
+            sql`(${customerOrders.loadingFinalizedAt} IS NOT NULL OR (${customerOrders.status} = 'FINALIZED' AND ${customerOrders.containerNumber} IS NOT NULL))`
+          )
+        );
 
       res.json({
         waste: { totalKg: Math.round(wasteTotalKg * 1000) / 1000, breakdown: wasteBreakdown },
@@ -273,7 +303,8 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
   app.post("/api/factory/waste", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId =
+        req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { date, mixBatchId, supplierId, containerId, wasteType, kgWaste, reason } = req.body;
@@ -335,20 +366,24 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const bales = await db
         .select()
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          sql`DATE(${factoryBales.finalizedAt}) >= ${from}`,
-          sql`DATE(${factoryBales.finalizedAt}) <= ${to}`
-        ));
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            sql`DATE(${factoryBales.finalizedAt}) >= ${from}`,
+            sql`DATE(${factoryBales.finalizedAt}) <= ${to}`
+          )
+        );
 
       const wasteEntries = await db
         .select()
         .from(factoryWasteEntries)
-        .where(and(
-          eq(factoryWasteEntries.companyId, companyId),
-          gte(factoryWasteEntries.date, from),
-          lte(factoryWasteEntries.date, to)
-        ));
+        .where(
+          and(
+            eq(factoryWasteEntries.companyId, companyId),
+            gte(factoryWasteEntries.date, from),
+            lte(factoryWasteEntries.date, to)
+          )
+        );
 
       const dailyMap: Record<string, { balesProduced: number; kgPressed: number; wasteKg: number }> = {};
 
@@ -390,20 +425,20 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const bales = await db
         .select()
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          sql`DATE(${factoryBales.finalizedAt}) >= ${from}`,
-          sql`DATE(${factoryBales.finalizedAt}) <= ${to}`
-        ));
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            sql`DATE(${factoryBales.finalizedAt}) >= ${from}`,
+            sql`DATE(${factoryBales.finalizedAt}) <= ${to}`
+          )
+        );
 
-      const workers = await db
-        .select()
-        .from(factoryWorkers)
-        .where(eq(factoryWorkers.companyId, companyId));
+      const workers = await db.select().from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
 
       const workerMap = new Map<number, any>(workers.map((w: any) => [w.id, w]));
 
-      const workerStats: Record<number, { workerId: number; workerName: string; balesCount: number; totalKg: number }> = {};
+      const workerStats: Record<number, { workerId: number; workerName: string; balesCount: number; totalKg: number }> =
+        {};
 
       for (const bale of bales) {
         const wId = bale.finalizedBy;
@@ -441,11 +476,13 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const mixes = await db
         .select()
         .from(factoryMixBatches)
-        .where(and(
-          eq(factoryMixBatches.companyId, companyId),
-          sql`DATE(${factoryMixBatches.createdAt}) >= ${from}`,
-          sql`DATE(${factoryMixBatches.createdAt}) <= ${to}`
-        ));
+        .where(
+          and(
+            eq(factoryMixBatches.companyId, companyId),
+            sql`DATE(${factoryMixBatches.createdAt}) >= ${from}`,
+            sql`DATE(${factoryMixBatches.createdAt}) <= ${to}`
+          )
+        );
 
       const mixIds = mixes.map((m: any) => m.id);
       if (mixIds.length === 0) return res.json([]);
@@ -453,15 +490,25 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const sources = await db
         .select()
         .from(factoryMixBatchSources)
-        .where(sql`${factoryMixBatchSources.mixBatchId} IN (${sql.join(mixIds.map((id: number) => sql`${id}`), sql`, `)})`);
+        .where(
+          sql`${factoryMixBatchSources.mixBatchId} IN (${sql.join(
+            mixIds.map((id: number) => sql`${id}`),
+            sql`, `
+          )})`
+        );
 
       const bales = await db
         .select()
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          sql`${factoryBales.mixBatchId} IN (${sql.join(mixIds.map((id: number) => sql`${id}`), sql`, `)})`
-        ));
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            sql`${factoryBales.mixBatchId} IN (${sql.join(
+              mixIds.map((id: number) => sql`${id}`),
+              sql`, `
+            )})`
+          )
+        );
 
       const result = mixes.map((mix: any) => {
         const mixSources = sources.filter((s: any) => s.mixBatchId === mix.id);
@@ -507,10 +554,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const to = req.query.to as string;
       if (!from || !to) return res.status(400).json({ message: "from and to dates are required" });
 
-      const [settings] = await db
-        .select()
-        .from(factorySettings)
-        .where(eq(factorySettings.companyId, companyId));
+      const [settings] = await db.select().from(factorySettings).where(eq(factorySettings.companyId, companyId));
 
       const laborCostPerKg = parseFloat(settings?.laborCostPerKg || "0");
       const overheadPerKg = parseFloat(settings?.overheadPerKg || "0");
@@ -518,31 +562,43 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const bales = await db
         .select()
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          sql`DATE(${factoryBales.finalizedAt}) >= ${from}`,
-          sql`DATE(${factoryBales.finalizedAt}) <= ${to}`
-        ));
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            sql`DATE(${factoryBales.finalizedAt}) >= ${from}`,
+            sql`DATE(${factoryBales.finalizedAt}) <= ${to}`
+          )
+        );
 
       if (bales.length === 0) return res.json([]);
 
       const mixBatchIds = Array.from(new Set(bales.map((b: any) => b.mixBatchId).filter(Boolean))) as number[];
-      const sources = mixBatchIds.length > 0
-        ? await db.select().from(factoryMixBatchSources)
-            .where(sql`${factoryMixBatchSources.mixBatchId} IN (${sql.join(mixBatchIds.map((id: number) => sql`${id}`), sql`, `)})`)
-        : [];
+      const sources =
+        mixBatchIds.length > 0
+          ? await db
+              .select()
+              .from(factoryMixBatchSources)
+              .where(
+                sql`${factoryMixBatchSources.mixBatchId} IN (${sql.join(
+                  mixBatchIds.map((id: number) => sql`${id}`),
+                  sql`, `
+                )})`
+              )
+          : [];
 
       const orderBales = await db
         .select()
         .from(customerOrderBales)
-        .where(sql`${customerOrderBales.baleId} IN (${sql.join(bales.map((b: any) => sql`${b.id}`), sql`, `)})`);
+        .where(
+          sql`${customerOrderBales.baleId} IN (${sql.join(
+            bales.map((b: any) => sql`${b.id}`),
+            sql`, `
+          )})`
+        );
 
       const orderBaleMap = new Map<number, any>(orderBales.map((ob: any) => [ob.baleId, ob]));
 
-      const freightEntries = await db
-        .select()
-        .from(containerFreight)
-        .where(eq(containerFreight.companyId, companyId));
+      const freightEntries = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
 
       const result = bales.map((bale: any) => {
         const weightKg = parseFloat(bale.weightKg || "0");
@@ -591,11 +647,13 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const containers = await db
         .select()
         .from(factoryContainers)
-        .where(and(
-          eq(factoryContainers.companyId, companyId),
-          sql`DATE(${factoryContainers.createdAt}) >= ${from}`,
-          sql`DATE(${factoryContainers.createdAt}) <= ${to}`
-        ));
+        .where(
+          and(
+            eq(factoryContainers.companyId, companyId),
+            sql`DATE(${factoryContainers.createdAt}) >= ${from}`,
+            sql`DATE(${factoryContainers.createdAt}) <= ${to}`
+          )
+        );
 
       if (containers.length === 0) return res.json([]);
 
@@ -604,34 +662,36 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const rawStockEntries = await db
         .select()
         .from(factoryRawStock)
-        .where(and(
-          eq(factoryRawStock.companyId, companyId),
-          sql`${factoryRawStock.containerId} IN (${sql.join(containerIds.map((id: number) => sql`${id}`), sql`, `)})`
-        ));
+        .where(
+          and(
+            eq(factoryRawStock.companyId, companyId),
+            sql`${factoryRawStock.containerId} IN (${sql.join(
+              containerIds.map((id: number) => sql`${id}`),
+              sql`, `
+            )})`
+          )
+        );
 
       const freightEntries = await db
         .select()
         .from(containerFreight)
-        .where(and(
-          eq(containerFreight.companyId, companyId),
-          sql`${containerFreight.containerId} IN (${sql.join(containerIds.map((id: number) => sql`${id}`), sql`, `)})`
-        ));
+        .where(
+          and(
+            eq(containerFreight.companyId, companyId),
+            sql`${containerFreight.containerId} IN (${sql.join(
+              containerIds.map((id: number) => sql`${id}`),
+              sql`, `
+            )})`
+          )
+        );
 
-      const allBales = await db
-        .select()
-        .from(factoryBales)
-        .where(eq(factoryBales.companyId, companyId));
+      const allBales = await db.select().from(factoryBales).where(eq(factoryBales.companyId, companyId));
 
-      const allOrderBales = await db
-        .select()
-        .from(customerOrderBales);
+      const allOrderBales = await db.select().from(customerOrderBales);
 
       const orderBaleMap = new Map<number, any>(allOrderBales.map((ob: any) => [ob.baleId, ob]));
 
-      const [settings] = await db
-        .select()
-        .from(factorySettings)
-        .where(eq(factorySettings.companyId, companyId));
+      const [settings] = await db.select().from(factorySettings).where(eq(factorySettings.companyId, companyId));
 
       const laborCostPerKg = parseFloat(settings?.laborCostPerKg || "0");
       const overheadPerKg = parseFloat(settings?.overheadPerKg || "0");
@@ -639,12 +699,19 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const mixSources = await db
         .select()
         .from(factoryMixBatchSources)
-        .where(sql`${factoryMixBatchSources.containerId} IN (${sql.join(containerIds.map((id: number) => sql`${id}`), sql`, `)})`);
+        .where(
+          sql`${factoryMixBatchSources.containerId} IN (${sql.join(
+            containerIds.map((id: number) => sql`${id}`),
+            sql`, `
+          )})`
+        );
 
       const result = containers.map((container: any) => {
         const containerRawStock = rawStockEntries.filter((r: any) => r.containerId === container.id);
-        const rawStockCost = containerRawStock.reduce((s: number, r: any) =>
-          s + parseFloat(r.receivedKg || "0") * parseFloat(r.costPerKg || "0"), 0);
+        const rawStockCost = containerRawStock.reduce(
+          (s: number, r: any) => s + parseFloat(r.receivedKg || "0") * parseFloat(r.costPerKg || "0"),
+          0
+        );
 
         const containerFreightTotal = freightEntries
           .filter((f: any) => f.containerId === container.id)
@@ -711,7 +778,8 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
   app.post("/api/factory/alerts/:id/read", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId =
+        req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const id = parseInt(req.params.id);
@@ -731,7 +799,8 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
   app.post("/api/factory/alerts/generate", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId =
+        req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       let newAlertCount = 0;
@@ -743,16 +812,20 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         .where(and(eq(factoryAlerts.companyId, companyId), eq(factoryAlerts.isRead, false)));
 
       const alertExists = (type: string, entityType: string, entityId: number) => {
-        return existingAlerts.some((a: any) => a.type === type && a.entityType === entityType && a.entityId === entityId);
+        return existingAlerts.some(
+          (a: any) => a.type === type && a.entityType === entityType && a.entityId === entityId
+        );
       };
 
       const requiredDocTypes = await db
         .select()
         .from(containerDocumentTypes)
-        .where(and(
-          eq(containerDocumentTypes.isRequired, true),
-          sql`(${containerDocumentTypes.companyId} = ${companyId} OR ${containerDocumentTypes.companyId} IS NULL)`
-        ));
+        .where(
+          and(
+            eq(containerDocumentTypes.isRequired, true),
+            sql`(${containerDocumentTypes.companyId} = ${companyId} OR ${containerDocumentTypes.companyId} IS NULL)`
+          )
+        );
       const requiredDocTypeCount = requiredDocTypes.length;
       const requiredDocTypeIds = requiredDocTypes.map((d: any) => d.id);
 
@@ -762,17 +835,12 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
           .from(factoryContainers)
           .where(eq(factoryContainers.companyId, companyId));
 
-        const docs = await db
-          .select()
-          .from(containerDocuments)
-          .where(eq(containerDocuments.companyId, companyId));
+        const docs = await db.select().from(containerDocuments).where(eq(containerDocuments.companyId, companyId));
 
         for (const container of allContainers) {
           const containerDocs = docs.filter((d: any) => d.containerId === container.id);
           const uploadedRequiredIds = new Set(
-            containerDocs
-              .filter((d: any) => requiredDocTypeIds.includes(d.docTypeId))
-              .map((d: any) => d.docTypeId)
+            containerDocs.filter((d: any) => requiredDocTypeIds.includes(d.docTypeId)).map((d: any) => d.docTypeId)
           );
           if (uploadedRequiredIds.size < requiredDocTypeCount) {
             if (!alertExists("MISSING_DOCS", "container", container.id)) {
@@ -791,10 +859,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         }
       }
 
-      const freightEntries = await db
-        .select()
-        .from(containerFreight)
-        .where(eq(containerFreight.companyId, companyId));
+      const freightEntries = await db.select().from(containerFreight).where(eq(containerFreight.companyId, companyId));
 
       const freightPayments = await db
         .select()
@@ -876,48 +941,48 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const rawStockEntries = await db
         .select()
         .from(factoryRawStock)
-        .where(and(
-          eq(factoryRawStock.companyId, companyId),
-          sql`DATE(${factoryRawStock.offloadedAt}) >= ${from}`,
-          sql`DATE(${factoryRawStock.offloadedAt}) <= ${to}`
-        ));
+        .where(
+          and(
+            eq(factoryRawStock.companyId, companyId),
+            sql`DATE(${factoryRawStock.offloadedAt}) >= ${from}`,
+            sql`DATE(${factoryRawStock.offloadedAt}) <= ${to}`
+          )
+        );
 
-      const containers = await db
-        .select()
-        .from(factoryContainers)
-        .where(eq(factoryContainers.companyId, companyId));
+      const containers = await db.select().from(factoryContainers).where(eq(factoryContainers.companyId, companyId));
 
       const containerMap = new Map<number, any>(containers.map((c: any) => [c.id, c]));
 
       const wasteEntries = await db
         .select()
         .from(factoryWasteEntries)
-        .where(and(
-          eq(factoryWasteEntries.companyId, companyId),
-          gte(factoryWasteEntries.date, from),
-          lte(factoryWasteEntries.date, to)
-        ));
+        .where(
+          and(
+            eq(factoryWasteEntries.companyId, companyId),
+            gte(factoryWasteEntries.date, from),
+            lte(factoryWasteEntries.date, to)
+          )
+        );
 
-      const suppliers = await db
-        .select()
-        .from(factorySuppliers)
-        .where(eq(factorySuppliers.companyId, companyId));
+      const suppliers = await db.select().from(factorySuppliers).where(eq(factorySuppliers.companyId, companyId));
 
       const supplierMap = new Map<number, any>(suppliers.map((s: any) => [s.id, s]));
 
-      const mixSources = await db
-        .select()
-        .from(factoryMixBatchSources);
+      const mixSources = await db.select().from(factoryMixBatchSources);
 
-      const allBales = await db
-        .select()
-        .from(factoryBales)
-        .where(eq(factoryBales.companyId, companyId));
+      const allBales = await db.select().from(factoryBales).where(eq(factoryBales.companyId, companyId));
 
-      const supplierStats: Record<number, {
-        supplierId: number; supplierName: string;
-        totalKg: number; totalCost: number; wasteKg: number; outputBales: number;
-      }> = {};
+      const supplierStats: Record<
+        number,
+        {
+          supplierId: number;
+          supplierName: string;
+          totalKg: number;
+          totalCost: number;
+          wasteKg: number;
+          outputBales: number;
+        }
+      > = {};
 
       for (const rs of rawStockEntries) {
         const container = containerMap.get(rs.containerId);
@@ -949,9 +1014,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       }
 
       for (const suppId of Object.keys(supplierStats).map(Number)) {
-        const supplierContainerIds = containers
-          .filter((c: any) => c.supplierId === suppId)
-          .map((c: any) => c.id);
+        const supplierContainerIds = containers.filter((c: any) => c.supplierId === suppId).map((c: any) => c.id);
 
         const supplierMixSources = mixSources.filter((s: any) => supplierContainerIds.includes(s.containerId));
         const mixBatchIds = Array.from(new Set(supplierMixSources.map((s: any) => s.mixBatchId))) as number[];
@@ -962,7 +1025,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const result = Object.values(supplierStats).map((s) => {
         const wastePct = s.totalKg > 0 ? (s.wasteKg / s.totalKg) * 100 : 0;
         const avgCostPerKg = s.totalKg > 0 ? s.totalCost / s.totalKg : 0;
-        let score = 100 - (wastePct * 2) - (avgCostPerKg * 5) + (s.outputBales * 0.5);
+        let score = 100 - wastePct * 2 - avgCostPerKg * 5 + s.outputBales * 0.5;
         score = Math.max(0, Math.min(100, score));
 
         return {
@@ -991,15 +1054,13 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
   app.post("/api/factory/mix/optimize", requireAuth, async (req: any, res: any) => {
     try {
-      const companyId = req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+      const companyId =
+        req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const { targetProductId, desiredMarginPct, availableMaterials } = req.body;
 
-      const [settings] = await db
-        .select()
-        .from(factorySettings)
-        .where(eq(factorySettings.companyId, companyId));
+      const [settings] = await db.select().from(factorySettings).where(eq(factorySettings.companyId, companyId));
 
       const laborCostPerKg = parseFloat(settings?.laborCostPerKg || "0");
       const overheadPerKg = parseFloat(settings?.overheadPerKg || "0");
@@ -1007,12 +1068,11 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const balesForProduct = await db
         .select()
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.productId, targetProductId)
-        ));
+        .where(and(eq(factoryBales.companyId, companyId), eq(factoryBales.productId, targetProductId)));
 
-      const mixBatchIds = Array.from(new Set(balesForProduct.map((b: any) => b.mixBatchId).filter(Boolean))) as number[];
+      const mixBatchIds = Array.from(
+        new Set(balesForProduct.map((b: any) => b.mixBatchId).filter(Boolean))
+      ) as number[];
 
       let suggestions: any[] = [];
 
@@ -1020,12 +1080,22 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         const mixes = await db
           .select()
           .from(factoryMixBatches)
-          .where(sql`${factoryMixBatches.id} IN (${sql.join(mixBatchIds.map((id: number) => sql`${id}`), sql`, `)})`);
+          .where(
+            sql`${factoryMixBatches.id} IN (${sql.join(
+              mixBatchIds.map((id: number) => sql`${id}`),
+              sql`, `
+            )})`
+          );
 
         const sources = await db
           .select()
           .from(factoryMixBatchSources)
-          .where(sql`${factoryMixBatchSources.mixBatchId} IN (${sql.join(mixBatchIds.map((id: number) => sql`${id}`), sql`, `)})`);
+          .where(
+            sql`${factoryMixBatchSources.mixBatchId} IN (${sql.join(
+              mixBatchIds.map((id: number) => sql`${id}`),
+              sql`, `
+            )})`
+          );
 
         const mixPerformance = mixes.map((mix: any) => {
           const mixSources = sources.filter((s: any) => s.mixBatchId === mix.id);
@@ -1047,9 +1117,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         const top3 = mixPerformance.slice(0, 3);
 
         suggestions = top3.map((perf: any) => {
-          const avgMaterialCost = perf.sourceRatios.reduce(
-            (s: number, r: any) => s + r.costPerKg * r.kgRatio, 0
-          );
+          const avgMaterialCost = perf.sourceRatios.reduce((s: number, r: any) => s + r.costPerKg * r.kgRatio, 0);
           const avgBaleWeight = 25;
           const expectedCostPerBale = (avgMaterialCost + laborCostPerKg + overheadPerKg) * avgBaleWeight;
           const expectedSalePrice = expectedCostPerBale / (1 - (desiredMarginPct || 20) / 100);
@@ -1069,21 +1137,25 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       if (suggestions.length === 0 && availableMaterials && availableMaterials.length > 0) {
         const equalRatio = 1 / availableMaterials.length;
-        const avgCost = availableMaterials.reduce((s: number, m: any) => s + parseFloat(m.costPerKg || "0"), 0) / availableMaterials.length;
+        const avgCost =
+          availableMaterials.reduce((s: number, m: any) => s + parseFloat(m.costPerKg || "0"), 0) /
+          availableMaterials.length;
         const avgBaleWeight = 25;
         const expectedCostPerBale = (avgCost + laborCostPerKg + overheadPerKg) * avgBaleWeight;
         const expectedSalePrice = expectedCostPerBale / (1 - (desiredMarginPct || 20) / 100);
         const expectedProfit = expectedSalePrice - expectedCostPerBale;
 
-        suggestions = [{
-          sources: availableMaterials.map((m: any) => ({
-            supplierId: m.supplierId,
-            kgRatio: Math.round(equalRatio * 10000) / 10000,
-          })),
-          expectedCostPerBale: Math.round(expectedCostPerBale * 100) / 100,
-          expectedProfit: Math.round(expectedProfit * 100) / 100,
-          historicalWastePct: null,
-        }];
+        suggestions = [
+          {
+            sources: availableMaterials.map((m: any) => ({
+              supplierId: m.supplierId,
+              kgRatio: Math.round(equalRatio * 10000) / 10000,
+            })),
+            expectedCostPerBale: Math.round(expectedCostPerBale * 100) / 100,
+            expectedProfit: Math.round(expectedProfit * 100) / 100,
+            historicalWastePct: null,
+          },
+        ];
       }
 
       res.json({ suggestions });
@@ -1115,10 +1187,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       let sourcesData: any[] = [];
 
       if (bale.mixBatchId) {
-        const [mb] = await db
-          .select()
-          .from(factoryMixBatches)
-          .where(eq(factoryMixBatches.id, bale.mixBatchId));
+        const [mb] = await db.select().from(factoryMixBatches).where(eq(factoryMixBatches.id, bale.mixBatchId));
         mixBatch = mb || null;
 
         if (mixBatch) {
@@ -1128,18 +1197,34 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
             .where(eq(factoryMixBatchSources.mixBatchId, mixBatch.id));
 
           const containerIds = mixSources.map((s: any) => s.containerId).filter(Boolean);
-          const containers = containerIds.length > 0
-            ? await db.select().from(factoryContainers)
-                .where(sql`${factoryContainers.id} IN (${sql.join(containerIds.map((id: number) => sql`${id}`), sql`, `)})`)
-            : [];
+          const containers =
+            containerIds.length > 0
+              ? await db
+                  .select()
+                  .from(factoryContainers)
+                  .where(
+                    sql`${factoryContainers.id} IN (${sql.join(
+                      containerIds.map((id: number) => sql`${id}`),
+                      sql`, `
+                    )})`
+                  )
+              : [];
 
           const containerMap = new Map<number, any>(containers.map((c: any) => [c.id, c]));
 
           const supplierIds = Array.from(new Set(containers.map((c: any) => c.supplierId).filter(Boolean))) as number[];
-          const suppliers = supplierIds.length > 0
-            ? await db.select().from(factorySuppliers)
-                .where(sql`${factorySuppliers.id} IN (${sql.join(supplierIds.map((id: number) => sql`${id}`), sql`, `)})`)
-            : [];
+          const suppliers =
+            supplierIds.length > 0
+              ? await db
+                  .select()
+                  .from(factorySuppliers)
+                  .where(
+                    sql`${factorySuppliers.id} IN (${sql.join(
+                      supplierIds.map((id: number) => sql`${id}`),
+                      sql`, `
+                    )})`
+                  )
+              : [];
           const supplierMap = new Map<number, any>(suppliers.map((s: any) => [s.id, s]));
 
           sourcesData = mixSources.map((s: any) => {
@@ -1156,17 +1241,11 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
 
       let shippingContainer = null;
 
-      const [orderBale] = await db
-        .select()
-        .from(customerOrderBales)
-        .where(eq(customerOrderBales.baleId, baleId));
+      const [orderBale] = await db.select().from(customerOrderBales).where(eq(customerOrderBales.baleId, baleId));
 
       let order = null;
       if (orderBale) {
-        const [o] = await db
-          .select()
-          .from(customerOrders)
-          .where(eq(customerOrders.id, orderBale.orderId));
+        const [o] = await db.select().from(customerOrders).where(eq(customerOrders.id, orderBale.orderId));
         order = o || null;
       }
 
@@ -1207,33 +1286,39 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
     }
   });
 
-  app.post("/api/factory/bales/:id/photos", requireAuth, balePhotoUpload.single("photo"), async (req: any, res: any) => {
-    try {
-      const companyId = req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.post(
+    "/api/factory/bales/:id/photos",
+    requireAuth,
+    balePhotoUpload.single("photo"),
+    async (req: any, res: any) => {
+      try {
+        const companyId =
+          req.body.companyId || (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      if (!req.file) return res.status(400).json({ message: "No photo uploaded" });
+        if (!req.file) return res.status(400).json({ message: "No photo uploaded" });
 
-      const baleId = parseInt(req.params.id);
-      const url = `/api/factory/uploads/bale-photos/${req.file.filename}`;
+        const baleId = parseInt(req.params.id);
+        const url = `/api/factory/uploads/bale-photos/${req.file.filename}`;
 
-      const [photo] = await db
-        .insert(factoryBalePhotos)
-        .values({
-          companyId,
-          baleId,
-          url,
-          fileName: req.file.originalname,
-          uploadedBy: (req.session as any).userId ? parseInt((req.session as any).userId) : null,
-        })
-        .returning();
+        const [photo] = await db
+          .insert(factoryBalePhotos)
+          .values({
+            companyId,
+            baleId,
+            url,
+            fileName: req.file.originalname,
+            uploadedBy: (req.session as any).userId ? parseInt((req.session as any).userId) : null,
+          })
+          .returning();
 
-      res.json(photo);
-    } catch (error: any) {
-      console.error("Error uploading bale photo:", error);
-      res.status(500).json({ message: error.message });
+        res.json(photo);
+      } catch (error: any) {
+        console.error("Error uploading bale photo:", error);
+        res.status(500).json({ message: error.message });
+      }
     }
-  });
+  );
 
   app.delete("/api/factory/bale-photos/:photoId", requireAuth, async (req: any, res: any) => {
     try {
@@ -1257,9 +1342,7 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
         }
       }
 
-      await db
-        .delete(factoryBalePhotos)
-        .where(eq(factoryBalePhotos.id, photoId));
+      await db.delete(factoryBalePhotos).where(eq(factoryBalePhotos.id, photoId));
 
       res.json({ success: true });
     } catch (error: any) {
@@ -1308,11 +1391,13 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const freightEntries = await db
         .select()
         .from(containerFreight)
-        .where(and(
-          eq(containerFreight.companyId, companyId),
-          gte(containerFreight.dueDate, todayStr),
-          lte(containerFreight.dueDate, futureDateStr)
-        ));
+        .where(
+          and(
+            eq(containerFreight.companyId, companyId),
+            gte(containerFreight.dueDate, todayStr),
+            lte(containerFreight.dueDate, futureDateStr)
+          )
+        );
 
       const freightPayments = await db
         .select()
@@ -1356,13 +1441,9 @@ export function registerFactoryIntelligenceRoutes(app: Express, requireAuth: any
       const pendingOrders = await db
         .select()
         .from(customerOrders)
-        .where(and(
-          eq(customerOrders.companyId, companyId),
-          eq(customerOrders.status, "FINALIZED")
-        ));
+        .where(and(eq(customerOrders.companyId, companyId), eq(customerOrders.status, "FINALIZED")));
 
-      const expectedIncome = pendingOrders.reduce((s: number, o: any) =>
-        s + parseFloat(o.grandTotal || "0"), 0);
+      const expectedIncome = pendingOrders.reduce((s: number, o: any) => s + parseFloat(o.grandTotal || "0"), 0);
 
       res.json({
         upcomingFreight,

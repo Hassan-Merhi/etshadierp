@@ -54,10 +54,7 @@ export function useRecentNav(allNavItems: NavItemLike[], companyId?: number) {
     if (!title) return;
     setRecent((prev) => {
       const filtered = prev.filter((r) => r.url !== location);
-      const next = [
-        { url: location, title, visitedAt: Date.now() },
-        ...filtered,
-      ].slice(0, MAX_ITEMS);
+      const next = [{ url: location, title, visitedAt: Date.now() }, ...filtered].slice(0, MAX_ITEMS);
       saveToStorage(next, companyId);
       return next;
     });

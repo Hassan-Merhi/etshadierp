@@ -1,22 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Keyboard } from "lucide-react";
 
-const isMac = typeof navigator !== "undefined" &&
-  /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
 
 const MOD_KEY = isMac ? "⌘" : "Ctrl";
 const ALT = isMac ? "⌥" : "Alt";
 
-interface ShortcutDef { keys: string[]; description: string }
-interface ShortcutGroup { label: string; shortcuts: ShortcutDef[] }
+interface ShortcutDef {
+  keys: string[];
+  description: string;
+}
+interface ShortcutGroup {
+  label: string;
+  shortcuts: ShortcutDef[];
+}
 
 const ERP_NAV_SHORTCUTS: ShortcutDef[] = [
   { keys: [ALT, "T"], description: "Tracking" },
@@ -63,9 +63,7 @@ const GLOBAL_SHORTCUTS: ShortcutGroup[] = [
   },
   {
     label: "Help",
-    shortcuts: [
-      { keys: ["?"], description: "Show this shortcuts panel" },
-    ],
+    shortcuts: [{ keys: ["?"], description: "Show this shortcuts panel" }],
   },
 ];
 
@@ -97,15 +95,7 @@ function ShortcutRow({ s }: { s: ShortcutDef }) {
   );
 }
 
-function ShortcutsDialog({
-  open,
-  onClose,
-  isFactory,
-}: {
-  open: boolean;
-  onClose: () => void;
-  isFactory: boolean;
-}) {
+function ShortcutsDialog({ open, onClose, isFactory }: { open: boolean; onClose: () => void; isFactory: boolean }) {
   const modeGroup: ShortcutGroup = isFactory
     ? { label: "Factory Quick Nav", shortcuts: FACTORY_NAV_SHORTCUTS }
     : { label: "ERP Quick Nav", shortcuts: ERP_NAV_SHORTCUTS };
@@ -184,10 +174,7 @@ export function KeyboardShortcuts() {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      const isTyping =
-        tag === "input" ||
-        tag === "textarea" ||
-        (e.target as HTMLElement)?.isContentEditable;
+      const isTyping = tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable;
 
       if (open && e.key === "Escape") {
         setOpen(false);
@@ -206,17 +193,21 @@ export function KeyboardShortcuts() {
 
         if ((e.key === "k" || e.key === "K") && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
           e.preventDefault();
-          document.querySelector<HTMLInputElement>(
-            'input[type="search"], input[placeholder*="earch"], input[data-testid*="search"], input[data-testid*="Search"]',
-          )?.focus();
+          document
+            .querySelector<HTMLInputElement>(
+              'input[type="search"], input[placeholder*="earch"], input[data-testid*="search"], input[data-testid*="Search"]'
+            )
+            ?.focus();
           return;
         }
 
         if (e.key === "/" && !e.ctrlKey && !e.metaKey) {
           e.preventDefault();
-          document.querySelector<HTMLInputElement>(
-            'input[type="search"], input[placeholder*="earch"], input[data-testid*="search"], input[data-testid*="Search"]',
-          )?.focus();
+          document
+            .querySelector<HTMLInputElement>(
+              'input[type="search"], input[placeholder*="earch"], input[data-testid*="search"], input[data-testid*="Search"]'
+            )
+            ?.focus();
           return;
         }
         return;
@@ -228,9 +219,24 @@ export function KeyboardShortcuts() {
       const key = e.key.toLowerCase();
 
       // Mode switching — Alt+1/2/3
-      if (e.code === "Digit1") { e.preventDefault(); clearLChord(); navigate("/"); return; }
-      if (e.code === "Digit2") { e.preventDefault(); clearLChord(); navigate("/factory/stock-entry"); return; }
-      if (e.code === "Digit3") { e.preventDefault(); clearLChord(); navigate("/properties/rental/warehouses"); return; }
+      if (e.code === "Digit1") {
+        e.preventDefault();
+        clearLChord();
+        navigate("/");
+        return;
+      }
+      if (e.code === "Digit2") {
+        e.preventDefault();
+        clearLChord();
+        navigate("/factory/stock-entry");
+        return;
+      }
+      if (e.code === "Digit3") {
+        e.preventDefault();
+        clearLChord();
+        navigate("/properties/rental/warehouses");
+        return;
+      }
 
       // ── Factory quick-nav ────────────────────────────────────────────────────
       if (isFactory) {
@@ -256,30 +262,102 @@ export function KeyboardShortcuts() {
           return;
         }
 
-        if (key === "o") { e.preventDefault(); navigate("/factory/intelligence/dashboard"); return; }
-        if (key === "d") { e.preventDefault(); navigate("/factory/daybook"); return; }
-        if (key === "a") { e.preventDefault(); navigate("/factory/accounts"); return; }
-        if (key === "s") { e.preventDefault(); navigate("/factory/stock-allocation"); return; }
-        if (key === "r") { e.preventDefault(); navigate("/factory/raw-materials"); return; }
-        if (key === "b") { e.preventDefault(); navigate("/factory/bales-hub"); return; }
-        if (key === "i") { e.preventDefault(); navigate("/factory/invoicing"); return; }
-        if (key === "c") { e.preventDefault(); navigate("/factory/containers-hub"); return; }
-        if (key === "p") { e.preventDefault(); navigate("/factory/parties"); return; }
-        if (key === "v") { e.preventDefault(); navigate("/factory/vouchers"); return; }
+        if (key === "o") {
+          e.preventDefault();
+          navigate("/factory/intelligence/dashboard");
+          return;
+        }
+        if (key === "d") {
+          e.preventDefault();
+          navigate("/factory/daybook");
+          return;
+        }
+        if (key === "a") {
+          e.preventDefault();
+          navigate("/factory/accounts");
+          return;
+        }
+        if (key === "s") {
+          e.preventDefault();
+          navigate("/factory/stock-allocation");
+          return;
+        }
+        if (key === "r") {
+          e.preventDefault();
+          navigate("/factory/raw-materials");
+          return;
+        }
+        if (key === "b") {
+          e.preventDefault();
+          navigate("/factory/bales-hub");
+          return;
+        }
+        if (key === "i") {
+          e.preventDefault();
+          navigate("/factory/invoicing");
+          return;
+        }
+        if (key === "c") {
+          e.preventDefault();
+          navigate("/factory/containers-hub");
+          return;
+        }
+        if (key === "p") {
+          e.preventDefault();
+          navigate("/factory/parties");
+          return;
+        }
+        if (key === "v") {
+          e.preventDefault();
+          navigate("/factory/vouchers");
+          return;
+        }
         return;
       }
 
       // ── ERP quick-nav ────────────────────────────────────────────────────────
-      if (key === "t") { e.preventDefault(); navigate("/tracking"); return; }
-      if (key === "d") { e.preventDefault(); navigate("/financial-overview"); return; }
-      if (key === "a") { e.preventDefault(); navigate("/accounts"); return; }
-      if (key === "v") { e.preventDefault(); navigate("/vouchers"); return; }
-      if (key === "i") { e.preventDefault(); navigate("/inventory"); return; }
-      if (key === "s") { e.preventDefault(); navigate("/settings"); return; }
-      if (key === "p") { e.preventDefault(); navigate("/parties"); return; }
-      if (key === "c") { e.preventDefault(); navigate("/containers-otw"); return; }
+      if (key === "t") {
+        e.preventDefault();
+        navigate("/tracking");
+        return;
+      }
+      if (key === "d") {
+        e.preventDefault();
+        navigate("/financial-overview");
+        return;
+      }
+      if (key === "a") {
+        e.preventDefault();
+        navigate("/accounts");
+        return;
+      }
+      if (key === "v") {
+        e.preventDefault();
+        navigate("/vouchers");
+        return;
+      }
+      if (key === "i") {
+        e.preventDefault();
+        navigate("/inventory");
+        return;
+      }
+      if (key === "s") {
+        e.preventDefault();
+        navigate("/settings");
+        return;
+      }
+      if (key === "p") {
+        e.preventDefault();
+        navigate("/parties");
+        return;
+      }
+      if (key === "c") {
+        e.preventDefault();
+        navigate("/containers-otw");
+        return;
+      }
     },
-    [open, navigate, isFactory, clearLChord],
+    [open, navigate, isFactory, clearLChord]
   );
 
   useEffect(() => {

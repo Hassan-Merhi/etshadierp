@@ -14,7 +14,9 @@ try {
     }
   }
   toDelete.forEach((k) => sessionStorage.removeItem(k));
-} catch { /* ignore — sessionStorage may be blocked in some contexts */ }
+} catch {
+  /* ignore — sessionStorage may be blocked in some contexts */
+}
 
 // Global handler: catches dynamic import failures that happen before React renders
 // (e.g. Suspense boundaries that aren't yet inside an ErrorBoundary).
@@ -30,8 +32,12 @@ window.addEventListener("unhandledrejection", (event) => {
     candidates.push(reason);
   } else if (reason && typeof reason === "object") {
     if (reason.message) candidates.push(String(reason.message));
-    if (reason.name)    candidates.push(String(reason.name));
-    try { candidates.push(reason.toString()); } catch { /* ignore */ }
+    if (reason.name) candidates.push(String(reason.name));
+    try {
+      candidates.push(reason.toString());
+    } catch {
+      /* ignore */
+    }
   }
   const combined = candidates.join(" ");
 
@@ -59,7 +65,9 @@ window.addEventListener("unhandledrejection", (event) => {
         sessionStorage.setItem(key, "1");
         window.location.href = path + "?_r=" + Date.now();
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 });
 
@@ -69,9 +77,7 @@ import("./lib/featureFlags").then(({ OFFLINE_MODE_ENABLED }) => {
   if (OFFLINE_MODE_ENABLED && "serviceWorker" in navigator) {
     navigator.serviceWorker.addEventListener("message", (event) => {
       if (event?.data?.type === "TRIGGER_SYNC") {
-        import("./lib/syncEngine")
-          .then(({ runSync }) => runSync())
-          .catch(() => {});
+        import("./lib/syncEngine").then(({ runSync }) => runSync()).catch(() => {});
       }
     });
   }

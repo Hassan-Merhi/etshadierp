@@ -1,100 +1,128 @@
-  import { useState, useEffect, useRef } from "react";
-  import { useConnectivity } from "@/contexts/ConnectivityContext";
-  import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
-  import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
-  import { useForm } from "react-hook-form";
-  import { zodResolver } from "@hookform/resolvers/zod";
-  import { z } from "zod";
-  import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-  import { Button } from "@/components/ui/button";
-  import { Input } from "@/components/ui/input";
-  import { Label } from "@/components/ui/label";
-  import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-  } from "@/components/ui/dialog";
-  import { Alert, AlertDescription } from "@/components/ui/alert";
-  import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-  } from "@/components/ui/alert-dialog";
-  import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-  } from "@/components/ui/form";
-  import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-  } from "@/components/ui/select";
-  import { Checkbox } from "@/components/ui/checkbox";
-  import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from "@/components/ui/table";
-  import { Badge } from "@/components/ui/badge";
-  import { Skeleton } from "@/components/ui/skeleton";
-  import { Switch } from "@/components/ui/switch";
-  
-  import { useToast } from "@/hooks/use-toast";
-  import { useMutation, useQuery } from "@tanstack/react-query";
-  import { queryClient, apiRequest } from "@/lib/queryClient";
-  import { useAppMode } from "@/contexts/AppModeContext";
-  import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
-  import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers } from "lucide-react";
-import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
-  import { Link } from "wouter";
-  import { useDateFormat } from "@/contexts/DateFormatContext";
-  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, FEATURE_PAGE_INFO, type FeatureKey } from "@shared/schema";
-  import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
-  import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
-  import { useCompany } from "@/contexts/CompanyContext";
-  import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
-  import { formatNumber } from "@/lib/formatNumber";
-  
-  const userFormSchema = insertUserSchema;
-  const companyFormSchema = insertCompanySchema;
-  const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
-    (data) => {
-      // If role is POS, assignedLocationId must be present
-      if (data.role === "POS" && !data.assignedLocationId) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "POS roles require an assigned location",
-      path: ["assignedLocationId"],
-    }
-  );
-  
-  type UserFormData = z.infer<typeof userFormSchema>;
-  type CompanyFormData = z.infer<typeof companyFormSchema>;
-  type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+import { useState, useEffect, useRef } from "react";
+import { useConnectivity } from "@/contexts/ConnectivityContext";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Plus,
+  Edit,
+  Building2,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  CalendarRange,
+  Settings2,
+  Wrench,
+  MapPin,
+  ChevronRight,
+  Bot,
+  MessageCircle,
+  RefreshCw,
+  Calculator,
+  Loader2,
+  Shield,
+  AlertTriangle,
+  PieChart,
+  Key,
+  Lock,
+  Package,
+  Eye,
+  History,
+  Clock,
+  Upload,
+  Download,
+  Database,
+  TrendingUp,
+  ShoppingCart,
+  Check,
+  X,
+  Copy,
+  ExternalLink,
+  ArrowLeftRight,
+  WifiOff,
+  Wifi,
+  CheckCircle2,
+  Printer,
+  Layers,
+} from "lucide-react";
+import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
+import { Link } from "wouter";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import {
+  insertUserSchema,
+  insertCompanySchema,
+  insertUserCompanyRoleSchema,
+  FEATURE_KEYS,
+  FEATURE_PAGE_INFO,
+  type FeatureKey,
+} from "@shared/schema";
+import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
+import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
+import { useCompany } from "@/contexts/CompanyContext";
+import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
+import { formatNumber } from "@/lib/formatNumber";
+
+const userFormSchema = insertUserSchema;
+const companyFormSchema = insertCompanySchema;
+const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+  (data) => {
+    // If role is POS, assignedLocationId must be present
+    if (data.role === "POS" && !data.assignedLocationId) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "POS roles require an assigned location",
+    path: ["assignedLocationId"],
+  }
+);
+
+type UserFormData = z.infer<typeof userFormSchema>;
+type CompanyFormData = z.infer<typeof companyFormSchema>;
+type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export function BulkRenameTab() {
   const { toast } = useToast();
@@ -129,11 +157,13 @@ export function BulkRenameTab() {
       const allItems = await res.json();
       const regex = buildRegex();
       if (!regex) return;
-      const matches = allItems.filter((item: any) => regex.test(item.name)).map((item: any) => ({
-        id: item.id,
-        code: item.code || "",
-        name: item.name,
-      }));
+      const matches = allItems
+        .filter((item: any) => regex.test(item.name))
+        .map((item: any) => ({
+          id: item.id,
+          code: item.code || "",
+          name: item.name,
+        }));
       regex.lastIndex = 0;
       setMatchingItems(matches);
       setSelectedIds(new Set(matches.map((m: any) => m.id)));
@@ -263,7 +293,9 @@ export function BulkRenameTab() {
               onCheckedChange={(checked) => setWholeWordOnly(checked === true)}
               data-testid="checkbox-whole-word"
             />
-            <Label htmlFor="bulk-whole-word" className="cursor-pointer">Whole word only</Label>
+            <Label htmlFor="bulk-whole-word" className="cursor-pointer">
+              Whole word only
+            </Label>
           </div>
           <div className="flex items-center gap-2">
             <Checkbox
@@ -272,7 +304,9 @@ export function BulkRenameTab() {
               onCheckedChange={(checked) => setCaseInsensitive(checked === true)}
               data-testid="checkbox-case-insensitive"
             />
-            <Label htmlFor="bulk-case-insensitive" className="cursor-pointer">Case insensitive</Label>
+            <Label htmlFor="bulk-case-insensitive" className="cursor-pointer">
+              Case insensitive
+            </Label>
           </div>
           <Button onClick={handleSearch} disabled={isSearching || !findText.trim()} data-testid="button-bulk-search">
             {isSearching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
@@ -335,7 +369,8 @@ export function BulkRenameTab() {
                   <AlertDialogHeader>
                     <AlertDialogTitle>Rename {selectedIds.size} items?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      This will replace "{findText}" with "{replaceWith}" in {selectedIds.size} selected item name(s). This action cannot be easily undone.
+                      This will replace "{findText}" with "{replaceWith}" in {selectedIds.size} selected item name(s).
+                      This action cannot be easily undone.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -356,34 +391,34 @@ export function BulkRenameTab() {
 
 // Single source of truth: derived from FactorySidebar nav — new pages appear automatically
 const ALL_FACTORY_PAGES_SETTINGS = FACTORY_NAV_PAGES;
-const FACTORY_PAGE_GROUPS_SETTINGS = Array.from(new Set(ALL_FACTORY_PAGES_SETTINGS.map(p => p.group)));
+const FACTORY_PAGE_GROUPS_SETTINGS = Array.from(new Set(ALL_FACTORY_PAGES_SETTINGS.map((p) => p.group)));
 
 // Single source of truth: derived from FEATURE_KEYS + FEATURE_PAGE_INFO in shared/schema
-const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = FEATURE_KEYS.map(key => ({
+const ALL_ERP_PAGES: { key: string; label: string; group: string }[] = FEATURE_KEYS.map((key) => ({
   key,
   label: FEATURE_PAGE_INFO[key].label,
   group: FEATURE_PAGE_INFO[key].group,
 }));
 
-const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map(p => p.group)));
+const ERP_PAGE_GROUPS = Array.from(new Set(ALL_ERP_PAGES.map((p) => p.group)));
 
 const ERP_COST_FIELDS = [
-  { key: "daybook_amounts",      label: "Transaction Amounts" },
-  { key: "accounts_balances",    label: "Account Balances" },
-  { key: "container_costs",      label: "Cost & Fee Columns" },
-  { key: "stock_rates",          label: "Rate / Price Columns" },
+  { key: "daybook_amounts", label: "Transaction Amounts" },
+  { key: "accounts_balances", label: "Account Balances" },
+  { key: "container_costs", label: "Cost & Fee Columns" },
+  { key: "stock_rates", label: "Rate / Price Columns" },
   { key: "analytics_financials", label: "Revenue & Profit" },
-  { key: "voucher_amounts",      label: "Amount Columns" },
+  { key: "voucher_amounts", label: "Amount Columns" },
 ];
 
 const FACTORY_COST_FIELDS = [
-  { key: "inventory_avg_rate",      label: "Avg Rate Column" },
-  { key: "inventory_total_value",   label: "Total Value Column" },
-  { key: "inventory_sell_price",    label: "Sell Price Column" },
-  { key: "inventory_sell_value",    label: "Sell Value Column" },
+  { key: "inventory_avg_rate", label: "Avg Rate Column" },
+  { key: "inventory_total_value", label: "Total Value Column" },
+  { key: "inventory_sell_price", label: "Sell Price Column" },
+  { key: "inventory_sell_value", label: "Sell Value Column" },
   { key: "bale_history_cost_per_kg", label: "Cost/KG Column" },
   { key: "bale_history_total_cost", label: "Total Cost Column" },
-  { key: "bales_list_cost_per_kg",  label: "Cost/kg Column" },
+  { key: "bales_list_cost_per_kg", label: "Cost/kg Column" },
 ];
 
 const PAGE_COST_FIELD_MAP: Record<string, { key: string; label: string }[]> = {
@@ -393,9 +428,12 @@ const PAGE_COST_FIELD_MAP: Record<string, { key: string; label: string }[]> = {
   stock_items: [ERP_COST_FIELDS[3]],
   analytics: [ERP_COST_FIELDS[4]],
   vouchers: [ERP_COST_FIELDS[5]],
-  "factory/location-inventory": [FACTORY_COST_FIELDS[0], FACTORY_COST_FIELDS[1], FACTORY_COST_FIELDS[2], FACTORY_COST_FIELDS[3]],
+  "factory/location-inventory": [
+    FACTORY_COST_FIELDS[0],
+    FACTORY_COST_FIELDS[1],
+    FACTORY_COST_FIELDS[2],
+    FACTORY_COST_FIELDS[3],
+  ],
   "factory/bales-history": [FACTORY_COST_FIELDS[4], FACTORY_COST_FIELDS[5]],
   "factory/stock-entry": [FACTORY_COST_FIELDS[6]],
 };
-
-

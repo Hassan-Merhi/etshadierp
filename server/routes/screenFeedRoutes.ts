@@ -16,13 +16,15 @@ export function registerScreenFeedRoutes(app: Express) {
   // GET: watched user asks "is anyone watching me right now?"
   // Must be registered BEFORE /:userId to avoid route conflict.
   app.get("/api/screen-feed/being-watched", requireLogin, (req, res) => {
-    const userId   = String(req.session.userId!);
+    const userId = String(req.session.userId!);
     const lastPoll = watcherPollStore.get(userId) ?? 0;
-    const ageMs    = Date.now() - lastPoll;
-    const watched  = lastPoll > 0 && ageMs < WATCHER_TIMEOUT_MS;
+    const ageMs = Date.now() - lastPoll;
+    const watched = lastPoll > 0 && ageMs < WATCHER_TIMEOUT_MS;
 
     if (isDev) {
-      console.log(`[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`);
+      console.log(
+        `[ScreenFeed] being-watched userId=${userId} watched=${watched} lastPollAgeMs=${lastPoll > 0 ? ageMs : "never"}`
+      );
     }
 
     res.json({ watched, ...(isDev ? { userId, lastWatcherPollAgeMs: lastPoll > 0 ? ageMs : null } : {}) });
@@ -34,8 +36,8 @@ export function registerScreenFeedRoutes(app: Express) {
   app.get("/api/screen-feed/trace/:event", requireLogin, (req, res) => {
     if (!isDev) return res.status(204).end();
     const userId = String(req.session.userId!);
-    const event  = req.params.event;
-    const extra  = req.query.d ? String(req.query.d) : "";
+    const event = req.params.event;
+    const extra = req.query.d ? String(req.query.d) : "";
     console.log(`[ScreenFeed][TRACE] userId=${userId} event=${event}${extra ? " d=" + extra : ""}`);
     res.status(204).end();
   });
@@ -43,13 +45,18 @@ export function registerScreenFeedRoutes(app: Express) {
   // POST: watched user uploads their screenshot frame + recent clicks.
   app.post("/api/screen-feed", requireLogin, (req, res) => {
     if (isDev) {
-      console.log(`[ScreenFeed] POST /api/screen-feed received from userId=${String(req.session.userId!)} body_keys=${Object.keys(req.body ?? {}).join(",")}`);
+      console.log(
+        `[ScreenFeed] POST /api/screen-feed received from userId=${String(req.session.userId!)} body_keys=${Object.keys(req.body ?? {}).join(",")}`
+      );
     }
 
     const { dataUrl, clicks } = req.body ?? {};
 
     if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
-      if (isDev) console.warn(`[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`);
+      if (isDev)
+        console.warn(
+          `[ScreenFeed] POST rejected: missing or invalid dataUrl (type=${typeof dataUrl} starts=${typeof dataUrl === "string" ? dataUrl.slice(0, 30) : "N/A"})`
+        );
       return res.status(400).end();
     }
     if (dataUrl.length > MAX_FRAME_SIZE) {
@@ -57,18 +64,20 @@ export function registerScreenFeedRoutes(app: Express) {
       return res.status(204).end();
     }
 
-    const userId   = String(req.session.userId!);
-    const username = (req.session as any).username as string || userId;
-    const now      = Date.now();
+    const userId = String(req.session.userId!);
+    const username = ((req.session as any).username as string) || userId;
+    const now = Date.now();
     const safeClicks = Array.isArray(clicks)
       ? clicks
-          .filter((c: any) => c && typeof c.x === "number" && typeof c.y === "number" && (now - c.ts) < 8000)
+          .filter((c: any) => c && typeof c.x === "number" && typeof c.y === "number" && now - c.ts < 8000)
           .slice(-50)
       : [];
     screenFeedStore.set(userId, { dataUrl, capturedAt: new Date(), userId, username, clicks: safeClicks });
 
     if (isDev) {
-      console.log(`[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`);
+      console.log(
+        `[ScreenFeed] POST frame stored userId=${userId} frameLen=${dataUrl.length} clicks=${safeClicks.length}`
+      );
     }
 
     res.status(204).end();
@@ -88,16 +97,18 @@ export function registerScreenFeedRoutes(app: Express) {
     const hasFrame = !!frame;
 
     if (isDev) {
-      const frameAgeMs = frame ? (Date.now() - frame.capturedAt.getTime()) : null;
-      console.log(`[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`);
+      const frameAgeMs = frame ? Date.now() - frame.capturedAt.getTime() : null;
+      console.log(
+        `[ScreenFeed] GET /:userId watchedUserId=${watchedUserId} hasFrame=${hasFrame} frameAgeMs=${frameAgeMs}`
+      );
     }
 
     if (!frame) return res.json(null);
     res.json({
-      dataUrl:    frame.dataUrl,
+      dataUrl: frame.dataUrl,
       capturedAt: frame.capturedAt.toISOString(),
-      username:   frame.username,
-      clicks:     frame.clicks,
+      username: frame.username,
+      clicks: frame.clicks,
     });
   });
 }

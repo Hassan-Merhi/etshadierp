@@ -44,16 +44,39 @@ export function RunRow({ run }: { run: BackupRun }) {
           <span className="font-medium text-muted-foreground">{fmtTime(run.startedAt)}</span>
         </div>
         <div className="flex items-center gap-2">
-          {run.zipSizeBytes && <span className="text-muted-foreground flex items-center gap-1"><Download className="h-3 w-3" />{fmtBytes(run.zipSizeBytes)}</span>}
-          {run.status === "success" && <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border-0">Success</Badge>}
-          {run.status === "partial_failed" && <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-0">Partial Fail</Badge>}
-          {run.status === "failed" && <Badge variant="destructive" className="border-0">Failed</Badge>}
-          {isRunning && <Badge variant="secondary" className="animate-pulse">Running</Badge>}
+          {run.zipSizeBytes && (
+            <span className="text-muted-foreground flex items-center gap-1">
+              <Download className="h-3 w-3" />
+              {fmtBytes(run.zipSizeBytes)}
+            </span>
+          )}
+          {run.status === "success" && (
+            <Badge className="bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 border-0">
+              Success
+            </Badge>
+          )}
+          {run.status === "partial_failed" && (
+            <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 border-0">
+              Partial Fail
+            </Badge>
+          )}
+          {run.status === "failed" && (
+            <Badge variant="destructive" className="border-0">
+              Failed
+            </Badge>
+          )}
+          {isRunning && (
+            <Badge variant="secondary" className="animate-pulse">
+              Running
+            </Badge>
+          )}
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-muted-foreground">
-        <div className="flex items-center gap-1"><ChevronRight className="h-3 w-3" /> {run.companiesCount || 0} companies ({run.companyFilesCount || 0} files)</div>
+        <div className="flex items-center gap-1">
+          <ChevronRight className="h-3 w-3" /> {run.companiesCount || 0} companies ({run.companyFilesCount || 0} files)
+        </div>
 
         {/* Email status */}
         {run.emailAttempted && (
@@ -61,7 +84,9 @@ export function RunRow({ run }: { run: BackupRun }) {
             <Mail className={`h-3 w-3 ${run.emailSuccess ? "text-green-600" : "text-destructive"}`} />
             <span>Email: {run.emailSuccess ? "Sent" : "Failed"}</span>
             {!run.emailSuccess && !isRunning && (
-              <button onClick={retryEmail} className="text-primary hover:underline font-medium ml-1">Retry</button>
+              <button onClick={retryEmail} className="text-primary hover:underline font-medium ml-1">
+                Retry
+              </button>
             )}
           </div>
         )}
@@ -72,7 +97,9 @@ export function RunRow({ run }: { run: BackupRun }) {
             <MessageSquare className={`h-3 w-3 ${run.whatsappSuccess ? "text-green-600" : "text-destructive"}`} />
             <span>WhatsApp: {run.whatsappSuccess ? "Sent" : "Failed"}</span>
             {!run.whatsappSuccess && !isRunning && (
-              <button onClick={retryWhatsApp} className="text-primary hover:underline font-medium ml-1">Retry</button>
+              <button onClick={retryWhatsApp} className="text-primary hover:underline font-medium ml-1">
+                Retry
+              </button>
             )}
           </div>
         )}

@@ -8,18 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export default function FactorySupplierReport() {
   const { toast } = useToast();
-  const today = new Date().toLocaleDateString('en-CA');
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-CA');
+  const today = new Date().toLocaleDateString("en-CA");
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toLocaleDateString("en-CA");
 
   const [companyId, setCompanyId] = useState<number | null>(null);
   const [startDate, setStartDate] = useState(thirtyDaysAgo);
@@ -209,7 +203,8 @@ export default function FactorySupplierReport() {
             <div>
               <p className="text-sm font-medium">What this report includes</p>
               <p className="text-sm text-muted-foreground mt-1">
-                This report includes supplier-level KG balances, cost analysis, bale production data, and mixing breakdowns for the selected date range.
+                This report includes supplier-level KG balances, cost analysis, bale production data, and mixing
+                breakdowns for the selected date range.
               </p>
             </div>
           </div>

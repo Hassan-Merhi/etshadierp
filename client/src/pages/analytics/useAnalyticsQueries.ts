@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { 
-  Location, 
-  StockGroup, 
-  Supplier, 
-  Account, 
-  LocationSales, 
-  POSTransaction, 
-  ContainerData, 
-  NetProfitStatementData, 
-  StockMovementData, 
-  OpeningStockSummaryData 
+import {
+  Location,
+  StockGroup,
+  Supplier,
+  Account,
+  LocationSales,
+  POSTransaction,
+  ContainerData,
+  NetProfitStatementData,
+  StockMovementData,
+  OpeningStockSummaryData,
 } from "./analyticsTypes";
 
 interface UseAnalyticsQueriesProps {
@@ -47,7 +47,7 @@ export function useAnalyticsQueries({
   buildStockMovementUrl,
   openingStockLocationId,
 }: UseAnalyticsQueriesProps) {
-  const locationsQuery = useQuery<Location[]>({ 
+  const locationsQuery = useQuery<Location[]>({
     queryKey: ["/api/locations", selectedCompanyId],
     queryFn: async ({ queryKey }) => {
       const response = await fetch(queryKey[0] as string, { credentials: "include" });
@@ -67,7 +67,7 @@ export function useAnalyticsQueries({
     enabled: !!selectedCompanyId,
   });
 
-  const suppliersQuery = useQuery<Supplier[]>({ 
+  const suppliersQuery = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
     queryFn: async () => {
       const response = await fetch("/api/suppliers", { credentials: "include" });
@@ -108,10 +108,9 @@ export function useAnalyticsQueries({
     queryKey: ["/api/financial/sales", selectedLocationForDetails, "transactions", detailsDateRange],
     queryFn: async () => {
       const params = new URLSearchParams(detailsDateRange as Record<string, string>);
-      const response = await fetch(
-        `/api/financial/sales/${selectedLocationForDetails}/transactions?${params}`,
-        { credentials: "include" }
-      );
+      const response = await fetch(`/api/financial/sales/${selectedLocationForDetails}/transactions?${params}`, {
+        credentials: "include",
+      });
       if (!response.ok) throw new Error("Failed to fetch transactions");
       return response.json();
     },
@@ -140,7 +139,9 @@ export function useAnalyticsQueries({
   const factorySalesByCustomerQuery = useQuery<any[]>({
     queryKey: ["/api/factory/analytics/sales-by-customer", selectedCompanyId, buildFactorySalesUrl("")],
     queryFn: async () => {
-      const res = await fetch(buildFactorySalesUrl("/api/factory/analytics/sales-by-customer"), { credentials: "include" });
+      const res = await fetch(buildFactorySalesUrl("/api/factory/analytics/sales-by-customer"), {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch factory sales");
       return res.json();
     },

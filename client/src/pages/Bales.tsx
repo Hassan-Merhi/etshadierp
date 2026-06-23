@@ -8,14 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -24,21 +17,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -81,7 +61,7 @@ export default function Bales() {
       grade: "A",
       origin: "EU",
       weight: "",
-      datePressed: new Date().toLocaleDateString('en-CA'),
+      datePressed: new Date().toLocaleDateString("en-CA"),
       price: "",
       currency: "USD",
       status: "AVAILABLE",
@@ -99,7 +79,7 @@ export default function Bales() {
       setShowBaleDialog(false);
       setScannedBale(null);
       setBarcodeInput("");
-      
+
       // Mark pending barcode as used after successful creation
       if (pendingBarcodeToMark) {
         fetch(`/api/pending-barcodes/${pendingBarcodeToMark}`, {
@@ -110,7 +90,7 @@ export default function Bales() {
         });
         setPendingBarcodeToMark(null);
       }
-      
+
       if (barcodeInputRef.current) {
         barcodeInputRef.current.value = "";
         barcodeInputRef.current.focus();
@@ -172,7 +152,7 @@ export default function Bales() {
       const pendingResponse = await fetch(`/api/pending-barcodes/${encodeURIComponent(barcode)}`, {
         credentials: "include",
       });
-      
+
       let pendingBarcode: any = null;
       if (pendingResponse.ok) {
         pendingBarcode = await pendingResponse.json();
@@ -182,12 +162,12 @@ export default function Bales() {
       if (scanMode === "quick") {
         // Quick mode - immediately create with defaults (or pending barcode data)
         if (!selectedCompany) return;
-        
+
         // Set pending barcode ID to mark as used after successful creation
         if (pendingBarcode) {
           setPendingBarcodeToMark(pendingBarcode.id);
         }
-        
+
         const newBale: z.infer<typeof insertBaleSchema> = {
           companyId: selectedCompany.id,
           barcode,
@@ -195,7 +175,7 @@ export default function Bales() {
           grade: pendingBarcode?.grade || "A",
           origin: pendingBarcode?.origin || "EU",
           weight: "1",
-          datePressed: new Date().toLocaleDateString('en-CA'),
+          datePressed: new Date().toLocaleDateString("en-CA"),
         };
         createBale.mutate(newBale);
         setBarcodeInput("");
@@ -206,12 +186,12 @@ export default function Bales() {
         if (pendingBarcode?.category) form.setValue("category", pendingBarcode.category);
         if (pendingBarcode?.grade) form.setValue("grade", pendingBarcode.grade);
         if (pendingBarcode?.origin) form.setValue("origin", pendingBarcode.origin);
-        
+
         // Set pending barcode ID to mark as used after successful creation
         if (pendingBarcode) {
           setPendingBarcodeToMark(pendingBarcode.id);
         }
-        
+
         setShowBaleDialog(true);
         setBarcodeInput("");
       }
@@ -263,7 +243,11 @@ export default function Bales() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <PageHeader title="Factory Bales" subtitle="Manage factory bale inventory with barcode scanning" icon={<Package className="h-5 w-5" />} />
+          <PageHeader
+            title="Factory Bales"
+            subtitle="Manage factory bale inventory with barcode scanning"
+            icon={<Package className="h-5 w-5" />}
+          />
         </div>
         <Button onClick={() => setShowBaleDialog(true)} data-testid="button-add-bale">
           <Plus className="h-4 w-4 mr-2" />
@@ -535,7 +519,10 @@ export default function Bales() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Container (Optional)</FormLabel>
-                      <Select onValueChange={(val) => field.onChange(val ? parseInt(val) : undefined)} value={field.value?.toString()}>
+                      <Select
+                        onValueChange={(val) => field.onChange(val ? parseInt(val) : undefined)}
+                        value={field.value?.toString()}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-bale-container">
                             <SelectValue placeholder="Select container" />
@@ -584,8 +571,13 @@ export default function Bales() {
       </Dialog>
       <DeleteConfirmDialog
         open={!!pendingDelete}
-        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
-        onConfirm={() => { pendingDelete?.(); setPendingDelete(null); }}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        onConfirm={() => {
+          pendingDelete?.();
+          setPendingDelete(null);
+        }}
       />
     </div>
   );

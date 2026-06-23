@@ -1,12 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
-import {
-  saveDraft,
-  loadDraft,
-  deleteDraft,
-  getDraftAge,
-  type DraftRecord,
-} from "@/lib/offlineDraft";
+import { saveDraft, loadDraft, deleteDraft, getDraftAge, type DraftRecord } from "@/lib/offlineDraft";
 
 interface UseFormDraftOptions {
   entityType: string;
@@ -47,27 +41,35 @@ export function useFormDraft({
     loadDraft(entityType, mode, companyId, locationId).then((d) => {
       if (!cancelled) setDraft(d);
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [entityType, mode, companyId, locationId, effectiveEnabled]);
 
-  const saveNow = useCallback(async (data: unknown) => {
-    if (!effectiveEnabled || companyId === null) return;
-    setIsSaving(true);
-    const label = `${entityType} draft`;
-    await saveDraft(entityType, mode, data, label, companyId, locationId);
-    const updated = await loadDraft(entityType, mode, companyId, locationId);
-    setDraft(updated);
-    setIsSaving(false);
-  }, [entityType, mode, companyId, locationId, effectiveEnabled]);
+  const saveNow = useCallback(
+    async (data: unknown) => {
+      if (!effectiveEnabled || companyId === null) return;
+      setIsSaving(true);
+      const label = `${entityType} draft`;
+      await saveDraft(entityType, mode, data, label, companyId, locationId);
+      const updated = await loadDraft(entityType, mode, companyId, locationId);
+      setDraft(updated);
+      setIsSaving(false);
+    },
+    [entityType, mode, companyId, locationId, effectiveEnabled]
+  );
 
-  const scheduleSave = useCallback((data: unknown) => {
-    if (!effectiveEnabled || companyId === null) return;
-    latestDataRef.current = data;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      saveNow(latestDataRef.current);
-    }, debounceMs);
-  }, [saveNow, debounceMs, effectiveEnabled, companyId]);
+  const scheduleSave = useCallback(
+    (data: unknown) => {
+      if (!effectiveEnabled || companyId === null) return;
+      latestDataRef.current = data;
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        saveNow(latestDataRef.current);
+      }, debounceMs);
+    },
+    [saveNow, debounceMs, effectiveEnabled, companyId]
+  );
 
   const discardDraft = useCallback(async () => {
     if (draft?.id !== undefined) {

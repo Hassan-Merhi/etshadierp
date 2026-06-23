@@ -77,7 +77,13 @@ export function DateJumpDialog() {
   }, [handleOpen]);
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setValue(""); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setValue("");
+      }}
+    >
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -95,30 +101,37 @@ export function DateJumpDialog() {
               placeholder="DD/MM/YYYY or DDMMYYYY"
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleConfirm();
-                if (e.key === "Escape") { setOpen(false); setValue(""); }
+                if (e.key === "Escape") {
+                  setOpen(false);
+                  setValue("");
+                }
               }}
               data-testid="input-date-jump"
               className="text-base"
             />
             <p className="text-xs text-muted-foreground min-h-[1.25rem]">
-              {displayDate
-                ? <span className="text-foreground font-medium">{displayDate}</span>
-                : value.trim()
-                  ? <span className="text-destructive">Unrecognised date — try DD/MM/YYYY</span>
-                  : "Type a date and press Enter"}
+              {displayDate ? (
+                <span className="text-foreground font-medium">{displayDate}</span>
+              ) : value.trim() ? (
+                <span className="text-destructive">Unrecognised date — try DD/MM/YYYY</span>
+              ) : (
+                "Type a date and press Enter"
+              )}
             </p>
           </div>
 
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" size="sm" onClick={() => { setOpen(false); setValue(""); }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setOpen(false);
+                setValue("");
+              }}
+            >
               Cancel
             </Button>
-            <Button
-              size="sm"
-              disabled={!isoDate}
-              onClick={handleConfirm}
-              data-testid="button-date-jump-go"
-            >
+            <Button size="sm" disabled={!isoDate} onClick={handleConfirm} data-testid="button-date-jump-go">
               Go
             </Button>
           </div>

@@ -26,7 +26,12 @@ function getCompanyId(req: any): number | null {
 function buildExportFilename(parts: (string | null | undefined)[], ext: string): string {
   const safe = parts
     .filter((p): p is string => Boolean(p && p.trim()))
-    .map((p) => p.replace(/[\\/*?:[\]<>|]/g, "").replace(/\s+/g, "_").trim())
+    .map((p) =>
+      p
+        .replace(/[\\/*?:[\]<>|]/g, "")
+        .replace(/\s+/g, "_")
+        .trim()
+    )
     .filter((p) => p.length > 0);
   const base = safe.join("_") || "export";
   return ext ? `${base}.${ext}` : base;
@@ -60,10 +65,7 @@ async function buildLoadingSummary(invoiceId: number, companyId: number, activeS
   if (!invoiceRow) return null;
 
   // 2. Invoice lines
-  const lines = await db
-    .select()
-    .from(customerOrderLines)
-    .where(eq(customerOrderLines.orderId, invoiceId));
+  const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, invoiceId));
 
   // 3. Invoice bales (exact bale membership — the official list)
   // Use SELECT * so this query succeeds even when newer columns (bale_reference,
@@ -72,17 +74,17 @@ async function buildLoadingSummary(invoiceId: number, companyId: number, activeS
   // fails at parse time with "column X does not exist", which would break the
   // entire loading page.  SELECT * returns whatever exists; JS defaults fill gaps.
   const _invoiceBalesRawResult = await db.execute(
-    sql`SELECT * FROM customer_order_bales WHERE order_id = ${invoiceId}`,
+    sql`SELECT * FROM customer_order_bales WHERE order_id = ${invoiceId}`
   );
   const _invoiceBalesRows: any[] = (_invoiceBalesRawResult as any).rows ?? (_invoiceBalesRawResult as unknown as any[]);
   const invoiceBalesRaw = _invoiceBalesRows.map((r: any) => ({
-    id:          r.id          as number,
-    baleId:      r.bale_id    as number,
-    baleReference: String(r.bale_reference ?? ''),
-    articleCode: r.article_code  != null ? String(r.article_code) : null,
-    baleName:    r.bale_name     != null ? String(r.bale_name)    : null,
-    weight:      r.weight,
-    priceUsed:   String(r.price_used ?? '0'),
+    id: r.id as number,
+    baleId: r.bale_id as number,
+    baleReference: String(r.bale_reference ?? ""),
+    articleCode: r.article_code != null ? String(r.article_code) : null,
+    baleName: r.bale_name != null ? String(r.bale_name) : null,
+    weight: r.weight,
+    priceUsed: String(r.price_used ?? "0"),
   }));
 
   // 4. All loading sessions for this invoice
@@ -99,10 +101,12 @@ async function buildLoadingSummary(invoiceId: number, companyId: number, activeS
       createdByName: factoryInvoiceLoadingSessions.createdByName,
     })
     .from(factoryInvoiceLoadingSessions)
-    .where(and(
-      eq(factoryInvoiceLoadingSessions.invoiceId, invoiceId),
-      eq(factoryInvoiceLoadingSessions.companyId, companyId),
-    ))
+    .where(
+      and(
+        eq(factoryInvoiceLoadingSessions.invoiceId, invoiceId),
+        eq(factoryInvoiceLoadingSessions.companyId, companyId)
+      )
+    )
     .orderBy(factoryInvoiceLoadingSessions.startedAt);
 
   // 5. All loading bale rows for ACTIVE (non-cancelled) sessions only
@@ -110,9 +114,15 @@ async function buildLoadingSummary(invoiceId: number, companyId: number, activeS
   const activeSessionIds = activeSessions.map((s) => s.id);
 
   let loadedBaleRows: Array<{
-    id: number; sessionId: number; baleId: number; baleReference: string;
-    articleCode: string | null; productName: string | null; weightKg: string;
-    scannedAt: Date; scannedByName: string | null;
+    id: number;
+    sessionId: number;
+    baleId: number;
+    baleReference: string;
+    articleCode: string | null;
+    productName: string | null;
+    weightKg: string;
+    scannedAt: Date;
+    scannedByName: string | null;
   }> = [];
   if (activeSessionIds.length > 0) {
     loadedBaleRows = await db
@@ -218,7 +228,6 @@ async function buildLoadingSummary(invoiceId: number, companyId: number, activeS
 // ── Route registration ─────────────────────────────────────────────────────────
 
 export function registerFactoryInvoiceLoadingRoutes(app: Express) {
-
   // GET /api/factory/invoices/:invoiceId/loading-summary
   app.get("/api/factory/invoices/:invoiceId/loading-summary", requireAuth, async (req: any, res: any) => {
     try {
@@ -278,10 +287,12 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const activeSessionRows = await db
         .select({ id: factoryInvoiceLoadingSessions.id })
         .from(factoryInvoiceLoadingSessions)
-        .where(and(
-          eq(factoryInvoiceLoadingSessions.invoiceId, invoiceId),
-          eq(factoryInvoiceLoadingSessions.companyId, companyId),
-        ));
+        .where(
+          and(
+            eq(factoryInvoiceLoadingSessions.invoiceId, invoiceId),
+            eq(factoryInvoiceLoadingSessions.companyId, companyId)
+          )
+        );
 
       const activeSessions = activeSessionRows.filter(async () => true); // all sessions
       if (activeSessions.length > 0) {
@@ -291,16 +302,20 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
           .from(factoryInvoiceLoadingBales)
           .innerJoin(
             factoryInvoiceLoadingSessions,
-            eq(factoryInvoiceLoadingBales.sessionId, factoryInvoiceLoadingSessions.id),
+            eq(factoryInvoiceLoadingBales.sessionId, factoryInvoiceLoadingSessions.id)
           )
-          .where(and(
-            eq(factoryInvoiceLoadingBales.invoiceId, invoiceId),
-            ne(factoryInvoiceLoadingSessions.status, "CANCELLED"),
-          ));
+          .where(
+            and(
+              eq(factoryInvoiceLoadingBales.invoiceId, invoiceId),
+              ne(factoryInvoiceLoadingSessions.status, "CANCELLED")
+            )
+          );
 
         const loaded = Number(loadedCount?.count || 0);
         if (loaded >= invoiceBales.length) {
-          return res.status(400).json({ message: "This invoice is fully loaded — all bales have been assigned to loading sessions" });
+          return res
+            .status(400)
+            .json({ message: "This invoice is fully loaded — all bales have been assigned to loading sessions" });
         }
       }
 
@@ -354,13 +369,13 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const [session] = await db
         .select()
         .from(factoryInvoiceLoadingSessions)
-        .where(and(
-          eq(factoryInvoiceLoadingSessions.id, sessionId),
-          eq(factoryInvoiceLoadingSessions.companyId, companyId),
-        ));
+        .where(
+          and(eq(factoryInvoiceLoadingSessions.id, sessionId), eq(factoryInvoiceLoadingSessions.companyId, companyId))
+        );
 
       if (!session) return res.status(404).json({ message: "Loading session not found" });
-      if (session.status === "COMPLETED") return res.status(400).json({ message: "This loading session is already completed" });
+      if (session.status === "COMPLETED")
+        return res.status(400).json({ message: "This loading session is already completed" });
       if (session.status === "CANCELLED") return res.status(400).json({ message: "This loading session is cancelled" });
 
       const invoiceId = session.invoiceId;
@@ -387,14 +402,16 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
           status: factoryBales.status,
         })
         .from(factoryBales)
-        .where(and(
-          eq(factoryBales.companyId, companyId),
-          not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
-          or(
-            sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
-            sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`,
-          ),
-        ))
+        .where(
+          and(
+            eq(factoryBales.companyId, companyId),
+            not(inArray(factoryBales.status, ["DELETED", "REMOVED"])),
+            or(
+              sql`LOWER(${factoryBales.referenceNumber}) = ${scanLower}`,
+              sql`LOWER(${factoryBales.baleCode}) = ${scanLower}`
+            )
+          )
+        )
         .limit(5);
 
       if (baleMatches.length === 0) {
@@ -407,7 +424,7 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       // Only select the two core columns (order_id, bale_id) that have always
       // existed — avoiding parse-time failures when newer columns are absent.
       const _linkResult = await db.execute(
-        sql`SELECT bale_id FROM customer_order_bales WHERE order_id = ${invoiceId} AND bale_id = ${bale.id} LIMIT 1`,
+        sql`SELECT bale_id FROM customer_order_bales WHERE order_id = ${invoiceId} AND bale_id = ${bale.id} LIMIT 1`
       );
       const _linkRows: any[] = (_linkResult as any).rows ?? (_linkResult as unknown as any[]);
       const invoiceBaleLink = _linkRows.length > 0 ? { baleId: _linkRows[0].bale_id as number } : undefined;
@@ -427,13 +444,15 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         .from(factoryInvoiceLoadingBales)
         .innerJoin(
           factoryInvoiceLoadingSessions,
-          eq(factoryInvoiceLoadingBales.sessionId, factoryInvoiceLoadingSessions.id),
+          eq(factoryInvoiceLoadingBales.sessionId, factoryInvoiceLoadingSessions.id)
         )
-        .where(and(
-          eq(factoryInvoiceLoadingBales.invoiceId, invoiceId),
-          eq(factoryInvoiceLoadingBales.baleId, bale.id),
-          ne(factoryInvoiceLoadingSessions.status, "CANCELLED"),
-        ))
+        .where(
+          and(
+            eq(factoryInvoiceLoadingBales.invoiceId, invoiceId),
+            eq(factoryInvoiceLoadingBales.baleId, bale.id),
+            ne(factoryInvoiceLoadingSessions.status, "CANCELLED")
+          )
+        )
         .limit(1);
 
       if (alreadyLoaded) {
@@ -474,47 +493,53 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
   });
 
   // DELETE /api/factory/invoice-loading-sessions/:sessionId/bales/:baleId
-  app.delete("/api/factory/invoice-loading-sessions/:sessionId/bales/:baleId", requireAuth, async (req: any, res: any) => {
-    try {
-      const companyId = getCompanyId(req);
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
+  app.delete(
+    "/api/factory/invoice-loading-sessions/:sessionId/bales/:baleId",
+    requireAuth,
+    async (req: any, res: any) => {
+      try {
+        const companyId = getCompanyId(req);
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
 
-      const sessionId = parseId(req.params.sessionId);
+        const sessionId = parseId(req.params.sessionId);
 
-      if (sessionId === null) return res.status(400).json({ message: "Invalid id" });
-      const baleId = parseId(req.params.baleId);
-      if (baleId === null) return res.status(400).json({ message: "Invalid id" });
-      if (isNaN(sessionId) || isNaN(baleId)) return res.status(400).json({ message: "Invalid ID" });
+        if (sessionId === null) return res.status(400).json({ message: "Invalid id" });
+        const baleId = parseId(req.params.baleId);
+        if (baleId === null) return res.status(400).json({ message: "Invalid id" });
+        if (isNaN(sessionId) || isNaN(baleId)) return res.status(400).json({ message: "Invalid ID" });
 
-      const [session] = await db
-        .select()
-        .from(factoryInvoiceLoadingSessions)
-        .where(and(
-          eq(factoryInvoiceLoadingSessions.id, sessionId),
-          eq(factoryInvoiceLoadingSessions.companyId, companyId),
-        ));
+        const [session] = await db
+          .select()
+          .from(factoryInvoiceLoadingSessions)
+          .where(
+            and(eq(factoryInvoiceLoadingSessions.id, sessionId), eq(factoryInvoiceLoadingSessions.companyId, companyId))
+          );
 
-      if (!session) return res.status(404).json({ message: "Session not found" });
-      if (session.status === "CANCELLED") return res.status(400).json({ message: "Cannot remove bales from a cancelled session" });
+        if (!session) return res.status(404).json({ message: "Session not found" });
+        if (session.status === "CANCELLED")
+          return res.status(400).json({ message: "Cannot remove bales from a cancelled session" });
 
-      const deleted = await db
-        .delete(factoryInvoiceLoadingBales)
-        .where(and(
-          eq(factoryInvoiceLoadingBales.sessionId, sessionId),
-          eq(factoryInvoiceLoadingBales.baleId, baleId),
-          eq(factoryInvoiceLoadingBales.companyId, companyId),
-        ))
-        .returning();
+        const deleted = await db
+          .delete(factoryInvoiceLoadingBales)
+          .where(
+            and(
+              eq(factoryInvoiceLoadingBales.sessionId, sessionId),
+              eq(factoryInvoiceLoadingBales.baleId, baleId),
+              eq(factoryInvoiceLoadingBales.companyId, companyId)
+            )
+          )
+          .returning();
 
-      if (deleted.length === 0) return res.status(404).json({ message: "Bale not found in this session" });
+        if (deleted.length === 0) return res.status(404).json({ message: "Bale not found in this session" });
 
-      const summary = await buildLoadingSummary(session.invoiceId, companyId, sessionId);
-      res.json({ removed: deleted[0], summary });
-    } catch (error: any) {
-      console.error("remove bale error:", error);
-      res.status(500).json({ message: error.message });
+        const summary = await buildLoadingSummary(session.invoiceId, companyId, sessionId);
+        res.json({ removed: deleted[0], summary });
+      } catch (error: any) {
+        console.error("remove bale error:", error);
+        res.status(500).json({ message: error.message });
+      }
     }
-  });
+  );
 
   // POST /api/factory/invoice-loading-sessions/:sessionId/complete
   app.post("/api/factory/invoice-loading-sessions/:sessionId/complete", requireAuth, async (req: any, res: any) => {
@@ -530,10 +555,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const [session] = await db
         .select()
         .from(factoryInvoiceLoadingSessions)
-        .where(and(
-          eq(factoryInvoiceLoadingSessions.id, sessionId),
-          eq(factoryInvoiceLoadingSessions.companyId, companyId),
-        ));
+        .where(
+          and(eq(factoryInvoiceLoadingSessions.id, sessionId), eq(factoryInvoiceLoadingSessions.companyId, companyId))
+        );
 
       if (!session) return res.status(404).json({ message: "Session not found" });
       if (session.status !== "OPEN") return res.status(400).json({ message: "Session is not OPEN" });
@@ -576,10 +600,9 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       const [session] = await db
         .select()
         .from(factoryInvoiceLoadingSessions)
-        .where(and(
-          eq(factoryInvoiceLoadingSessions.id, sessionId),
-          eq(factoryInvoiceLoadingSessions.companyId, companyId),
-        ));
+        .where(
+          and(eq(factoryInvoiceLoadingSessions.id, sessionId), eq(factoryInvoiceLoadingSessions.companyId, companyId))
+        );
 
       if (!session) return res.status(404).json({ message: "Session not found" });
       if (session.status !== "OPEN") return res.status(400).json({ message: "Session is not OPEN" });
@@ -634,7 +657,11 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
     row.height = 16;
   }
   /** Style a data cell */
-  function dataCell(cell: any, value: any, opts: { bold?: boolean; color?: string; align?: string; fill?: string } = {}) {
+  function dataCell(
+    cell: any,
+    value: any,
+    opts: { bold?: boolean; color?: string; align?: string; fill?: string } = {}
+  ) {
     cell.value = value;
     cell.font = { bold: opts.bold ?? false, color: { argb: opts.color ?? "FF111827" }, size: 10 };
     cell.alignment = { horizontal: (opts.align ?? "left") as any, vertical: "middle" };
@@ -670,7 +697,13 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       // ── Sheet 1: Summary ──
       const ws1 = wb.addWorksheet("Summary");
       ws1.columns = [
-        { width: 18 }, { width: 32 }, { width: 14 }, { width: 14 }, { width: 14 }, { width: 20 }, { width: 20 },
+        { width: 18 },
+        { width: 32 },
+        { width: 14 },
+        { width: 14 },
+        { width: 14 },
+        { width: 20 },
+        { width: 20 },
       ];
 
       // Title
@@ -704,12 +737,18 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
       });
 
       // Totals block
-      ws1.getRow(r).height = 8; r++;
+      ws1.getRow(r).height = 8;
+      r++;
       const totalsRow = ws1.getRow(r);
       const totalDefs = [
         { label: "INVOICE BALES", val: summary.totals.invoiceBales, fill: "FFE0E7FF", fc: "FF3730A3" },
         { label: "LOADED", val: summary.totals.alreadyLoaded, fill: "FFD1FAE5", fc: "FF065F46" },
-        { label: "REMAINING", val: summary.totals.remaining, fill: summary.totals.remaining === 0 ? "FFD1FAE5" : "FFFEF3C7", fc: summary.totals.remaining === 0 ? "FF065F46" : "FFB45309" },
+        {
+          label: "REMAINING",
+          val: summary.totals.remaining,
+          fill: summary.totals.remaining === 0 ? "FFD1FAE5" : "FFFEF3C7",
+          fc: summary.totals.remaining === 0 ? "FF065F46" : "FFB45309",
+        },
       ];
       totalDefs.forEach((td, i) => {
         ws1.mergeCells(r, i * 2 + 1, r, i * 2 + 2);
@@ -719,7 +758,8 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         cellFill(hc, td.fill);
         hc.alignment = { horizontal: "center" };
       });
-      totalsRow.height = 16; r++;
+      totalsRow.height = 16;
+      r++;
       const valsRow = ws1.getRow(r);
       totalDefs.forEach((td, i) => {
         ws1.mergeCells(r, i * 2 + 1, r, i * 2 + 2);
@@ -729,12 +769,16 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         cellFill(vc, td.fill);
         vc.alignment = { horizontal: "center", vertical: "middle" };
       });
-      valsRow.height = 32; r++;
+      valsRow.height = 32;
+      r++;
 
       // Summary by article
-      ws1.getRow(r).height = 8; r++;
-      sectionHeader(ws1, r, "SUMMARY BY ARTICLE", 6); r++;
-      colHeaders(ws1, r, ["Article Code", "Product Name", "Invoice Qty", "Loaded", "Remaining", "Progress"]); r++;
+      ws1.getRow(r).height = 8;
+      r++;
+      sectionHeader(ws1, r, "SUMMARY BY ARTICLE", 6);
+      r++;
+      colHeaders(ws1, r, ["Article Code", "Product Name", "Invoice Qty", "Loaded", "Remaining", "Progress"]);
+      r++;
       summary.lines.forEach((l, i) => {
         const pct = l.invoiceQty > 0 ? Math.round((l.alreadyLoaded / l.invoiceQty) * 100) : 0;
         const fillColor = l.remaining === 0 ? "FFF0FDF4" : i % 2 === 0 ? "FFFFFFFF" : "FFF8FAFC";
@@ -742,25 +786,47 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         dataCell(row.getCell(1), l.articleCode, { fill: fillColor });
         dataCell(row.getCell(2), l.productName, { fill: fillColor });
         dataCell(row.getCell(3), l.invoiceQty, { align: "right", fill: fillColor });
-        dataCell(row.getCell(4), l.alreadyLoaded, { align: "right", fill: fillColor, color: "FF065F46", bold: l.alreadyLoaded > 0 });
-        dataCell(row.getCell(5), l.remaining, { align: "right", fill: fillColor, color: l.remaining === 0 ? "FF065F46" : "FFB45309", bold: true });
-        dataCell(row.getCell(6), `${pct}%`, { align: "right", fill: fillColor, color: pct === 100 ? "FF065F46" : "FF6B7280" });
+        dataCell(row.getCell(4), l.alreadyLoaded, {
+          align: "right",
+          fill: fillColor,
+          color: "FF065F46",
+          bold: l.alreadyLoaded > 0,
+        });
+        dataCell(row.getCell(5), l.remaining, {
+          align: "right",
+          fill: fillColor,
+          color: l.remaining === 0 ? "FF065F46" : "FFB45309",
+          bold: true,
+        });
+        dataCell(row.getCell(6), `${pct}%`, {
+          align: "right",
+          fill: fillColor,
+          color: pct === 100 ? "FF065F46" : "FF6B7280",
+        });
         row.height = 15;
         r++;
       });
 
       // Loading sessions
-      ws1.getRow(r).height = 8; r++;
-      sectionHeader(ws1, r, "LOADING SESSIONS", 7); r++;
-      colHeaders(ws1, r, ["Session #", "Status", "Truck No", "Driver", "Started", "Completed", "Bales"]); r++;
+      ws1.getRow(r).height = 8;
+      r++;
+      sectionHeader(ws1, r, "LOADING SESSIONS", 7);
+      r++;
+      colHeaders(ws1, r, ["Session #", "Status", "Truck No", "Driver", "Started", "Completed", "Bales"]);
+      r++;
       summary.sessions.forEach((s, i) => {
         const fill = i % 2 === 0 ? "FFFFFFFF" : "FFF8FAFC";
         const row = ws1.getRow(r);
         dataCell(row.getCell(1), `#${s.id}`, { fill });
         const sc = row.getCell(2);
         sc.value = s.status;
-        sc.font = { bold: true, size: 10, color: { argb: s.status === "COMPLETED" ? "FF065F46" : s.status === "CANCELLED" ? "FF6B7280" : "FF1D4ED8" } };
-        cellFill(sc, fill); cellBorder(sc);
+        sc.font = {
+          bold: true,
+          size: 10,
+          color: { argb: s.status === "COMPLETED" ? "FF065F46" : s.status === "CANCELLED" ? "FF6B7280" : "FF1D4ED8" },
+        };
+        cellFill(sc, fill);
+        cellBorder(sc);
         dataCell(row.getCell(3), s.truckNo || "—", { fill });
         dataCell(row.getCell(4), s.driverName || "—", { fill });
         dataCell(row.getCell(5), s.startedAt ? new Date(s.startedAt).toLocaleString() : "", { fill });
@@ -772,9 +838,25 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 
       // ── Sheet 2: Loaded Bales ──
       const ws2 = wb.addWorksheet("Loaded Bales");
-      ws2.columns = [{ width: 6 }, { width: 20 }, { width: 16 }, { width: 32 }, { width: 14 }, { width: 12 }, { width: 24 }];
+      ws2.columns = [
+        { width: 6 },
+        { width: 20 },
+        { width: 16 },
+        { width: 32 },
+        { width: 14 },
+        { width: 12 },
+        { width: 24 },
+      ];
       sectionHeader(ws2, 1, `LOADED BALES  (${loadedBales.length} of ${summary.totals.invoiceBales})`, 7);
-      colHeaders(ws2, 2, ["#", "Bale Reference", "Article Code", "Product Name", "Weight (kg)", "Session", "Loaded At"]);
+      colHeaders(ws2, 2, [
+        "#",
+        "Bale Reference",
+        "Article Code",
+        "Product Name",
+        "Weight (kg)",
+        "Session",
+        "Loaded At",
+      ]);
       loadedBales.forEach((b, i) => {
         const row = ws2.getRow(i + 3);
         const fill = i % 2 === 0 ? "FFF0FDF4" : "FFFAFFFE";
@@ -792,7 +874,11 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         const tr = ws2.getRow(loadedBales.length + 3);
         ws2.mergeCells(loadedBales.length + 3, 1, loadedBales.length + 3, 4);
         dataCell(tr.getCell(1), `Total: ${loadedBales.length} bales`, { bold: true, fill: "FFDBEAFE" });
-        dataCell(tr.getCell(5), loadedBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3), { bold: true, align: "right", fill: "FFDBEAFE" });
+        dataCell(tr.getCell(5), loadedBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3), {
+          bold: true,
+          align: "right",
+          fill: "FFDBEAFE",
+        });
         tr.height = 16;
       }
 
@@ -824,7 +910,11 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
         const tr = ws3.getRow(remainingBales.length + 3);
         ws3.mergeCells(remainingBales.length + 3, 1, remainingBales.length + 3, 4);
         dataCell(tr.getCell(1), `Total: ${remainingBales.length} bales remaining`, { bold: true, fill: "FFFEF3C7" });
-        dataCell(tr.getCell(5), remainingBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3), { bold: true, align: "right", fill: "FFFEF3C7" });
+        dataCell(tr.getCell(5), remainingBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3), {
+          bold: true,
+          align: "right",
+          fill: "FFFEF3C7",
+        });
         tr.height = 16;
       }
 
@@ -917,10 +1007,12 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 <div class="section-title">SUMMARY BY ARTICLE</div>
 <table>
   <tr><th>Article Code</th><th>Product Name</th><th class="r">Invoice Qty</th><th class="r">Loaded</th><th class="r">Remaining</th><th class="r">Progress</th></tr>
-  ${summary.lines.map((l) => {
-    const pct = l.invoiceQty > 0 ? Math.round((l.alreadyLoaded / l.invoiceQty) * 100) : 0;
-    return `<tr${l.remaining === 0 ? ' class="loaded-row"' : ""}><td>${l.articleCode}</td><td>${l.productName || ""}</td><td class="r">${l.invoiceQty}</td><td class="r">${l.alreadyLoaded}</td><td class="r ${l.remaining === 0 ? "badge-loaded" : "badge-pending"}">${l.remaining}</td><td class="r">${pct}%</td></tr>`;
-  }).join("")}
+  ${summary.lines
+    .map((l) => {
+      const pct = l.invoiceQty > 0 ? Math.round((l.alreadyLoaded / l.invoiceQty) * 100) : 0;
+      return `<tr${l.remaining === 0 ? ' class="loaded-row"' : ""}><td>${l.articleCode}</td><td>${l.productName || ""}</td><td class="r">${l.invoiceQty}</td><td class="r">${l.alreadyLoaded}</td><td class="r ${l.remaining === 0 ? "badge-loaded" : "badge-pending"}">${l.remaining}</td><td class="r">${pct}%</td></tr>`;
+    })
+    .join("")}
 </table>
 
 <div class="section-title">LOADING SESSIONS (${summary.sessions.length})</div>
@@ -937,13 +1029,15 @@ export function registerFactoryInvoiceLoadingRoutes(app: Express) {
 </table>
 
 <div class="section-title">REMAINING BALES TO LOAD (${remainingBales.length})</div>
-${remainingBales.length === 0
-  ? `<div class="all-done">All bales have been loaded.</div>`
-  : `<table>
+${
+  remainingBales.length === 0
+    ? `<div class="all-done">All bales have been loaded.</div>`
+    : `<table>
   <tr><th>#</th><th>Bale Reference</th><th>Article Code</th><th>Product Name</th><th class="r">Weight (kg)</th></tr>
   ${remainingBales.map((b, i) => `<tr class="remaining-row"><td>${i + 1}</td><td>${b.baleReference}</td><td>${b.articleCode || ""}</td><td>${b.productName || ""}</td><td class="r">${parseFloat(b.weightKg || "0").toFixed(3)}</td></tr>`).join("")}
   <tr class="total-row"><td colspan="4">Total remaining</td><td class="r">${remainingBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3)} kg · ${remainingBales.length} bales</td></tr>
-</table>`}
+</table>`
+}
 
 </body></html>`;
 
@@ -968,18 +1062,31 @@ ${remainingBales.length === 0
       const [session] = await db
         .select()
         .from(factoryInvoiceLoadingSessions)
-        .where(and(
-          eq(factoryInvoiceLoadingSessions.id, sessionId),
-          eq(factoryInvoiceLoadingSessions.companyId, companyId),
-        ));
+        .where(
+          and(eq(factoryInvoiceLoadingSessions.id, sessionId), eq(factoryInvoiceLoadingSessions.companyId, companyId))
+        );
 
       if (!session) return res.status(404).json({ message: "Session not found" });
 
       const [sessionBalesRaw, invoice, invoiceSummary] = await Promise.all([
-        db.select().from(factoryInvoiceLoadingBales)
-          .where(and(eq(factoryInvoiceLoadingBales.sessionId, sessionId), eq(factoryInvoiceLoadingBales.companyId, companyId)))
+        db
+          .select()
+          .from(factoryInvoiceLoadingBales)
+          .where(
+            and(
+              eq(factoryInvoiceLoadingBales.sessionId, sessionId),
+              eq(factoryInvoiceLoadingBales.companyId, companyId)
+            )
+          )
           .orderBy(factoryInvoiceLoadingBales.scannedAt),
-        db.select({ invoiceNumber: customerOrders.invoiceNumber, orderDate: customerOrders.orderDate, customerName: customers.legalName, containerNumber: customerOrders.containerNumber, destination: customerOrders.destination })
+        db
+          .select({
+            invoiceNumber: customerOrders.invoiceNumber,
+            orderDate: customerOrders.orderDate,
+            customerName: customers.legalName,
+            containerNumber: customerOrders.containerNumber,
+            destination: customerOrders.destination,
+          })
           .from(customerOrders)
           .leftJoin(customers, eq(customerOrders.customerId, customers.id))
           .where(eq(customerOrders.id, session.invoiceId))
@@ -996,7 +1103,13 @@ ${remainingBales.length === 0
       // ── Sheet 1: Session ──
       const ws = wb.addWorksheet("Session");
       ws.columns = [
-        { width: 6 }, { width: 22 }, { width: 16 }, { width: 32 }, { width: 14 }, { width: 26 }, { width: 18 },
+        { width: 6 },
+        { width: 22 },
+        { width: 16 },
+        { width: 32 },
+        { width: 14 },
+        { width: 26 },
+        { width: 18 },
       ];
 
       // Title
@@ -1014,8 +1127,18 @@ ${remainingBales.length === 0
         ["Invoice", invoice?.invoiceNumber || `#${session.invoiceId}`, "Customer", invoice?.customerName || ""],
         ["Status", session.status, "Truck No", session.truckNo || "—"],
         ["Driver", session.driverName || "—", "Notes", session.notes || "—"],
-        ["Started", session.startedAt ? new Date(session.startedAt).toLocaleString() : "", "Completed", session.completedAt ? new Date(session.completedAt).toLocaleString() : "—"],
-        ["Scanned this session", sessionBalesRaw.length.toString(), "Remaining overall", remainingBales.length.toString()],
+        [
+          "Started",
+          session.startedAt ? new Date(session.startedAt).toLocaleString() : "",
+          "Completed",
+          session.completedAt ? new Date(session.completedAt).toLocaleString() : "—",
+        ],
+        [
+          "Scanned this session",
+          sessionBalesRaw.length.toString(),
+          "Remaining overall",
+          remainingBales.length.toString(),
+        ],
       ];
       let r = 3;
       metaItems.forEach((row) => {
@@ -1033,9 +1156,20 @@ ${remainingBales.length === 0
       });
 
       // Scanned bales
-      ws.getRow(r).height = 8; r++;
-      sectionHeader(ws, r, `SCANNED BALES (${sessionBalesRaw.length})`, 7); r++;
-      colHeaders(ws, r, ["#", "Bale Reference", "Article Code", "Product Name", "Weight (kg)", "Scanned At", "Scanned By"]); r++;
+      ws.getRow(r).height = 8;
+      r++;
+      sectionHeader(ws, r, `SCANNED BALES (${sessionBalesRaw.length})`, 7);
+      r++;
+      colHeaders(ws, r, [
+        "#",
+        "Bale Reference",
+        "Article Code",
+        "Product Name",
+        "Weight (kg)",
+        "Scanned At",
+        "Scanned By",
+      ]);
+      r++;
       sessionBalesRaw.forEach((b, i) => {
         const row = ws.getRow(r);
         const fill = i % 2 === 0 ? "FFF0FDF4" : "FFFAFFFE";
@@ -1054,13 +1188,20 @@ ${remainingBales.length === 0
         const tr = ws.getRow(r);
         ws.mergeCells(r, 1, r, 4);
         dataCell(tr.getCell(1), `Total: ${sessionBalesRaw.length} bales`, { bold: true, fill: "FFDBEAFE" });
-        dataCell(tr.getCell(5), sessionBalesRaw.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3), { bold: true, align: "right", fill: "FFDBEAFE" });
-        tr.height = 16; r++;
+        dataCell(tr.getCell(5), sessionBalesRaw.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3), {
+          bold: true,
+          align: "right",
+          fill: "FFDBEAFE",
+        });
+        tr.height = 16;
+        r++;
       }
 
       // Remaining bales
-      ws.getRow(r).height = 8; r++;
-      sectionHeader(ws, r, `REMAINING BALES TO LOAD (${remainingBales.length})`, 5); r++;
+      ws.getRow(r).height = 8;
+      r++;
+      sectionHeader(ws, r, `REMAINING BALES TO LOAD (${remainingBales.length})`, 5);
+      r++;
       if (remainingBales.length === 0) {
         ws.mergeCells(r, 1, r, 5);
         const dc = ws.getRow(r).getCell(1);
@@ -1070,7 +1211,8 @@ ${remainingBales.length === 0
         dc.alignment = { horizontal: "center" };
         ws.getRow(r).height = 20;
       } else {
-        colHeaders(ws, r, ["#", "Bale Reference", "Article Code", "Product Name", "Weight (kg)"]); r++;
+        colHeaders(ws, r, ["#", "Bale Reference", "Article Code", "Product Name", "Weight (kg)"]);
+        r++;
         remainingBales.forEach((b, i) => {
           const row = ws.getRow(r);
           const fill = i % 2 === 0 ? "FFFEF3C7" : "FFFFFBEB";
@@ -1085,11 +1227,18 @@ ${remainingBales.length === 0
         const tr = ws.getRow(r);
         ws.mergeCells(r, 1, r, 4);
         dataCell(tr.getCell(1), `Total remaining: ${remainingBales.length} bales`, { bold: true, fill: "FFFEF3C7" });
-        dataCell(tr.getCell(5), remainingBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3), { bold: true, align: "right", fill: "FFFEF3C7" });
+        dataCell(tr.getCell(5), remainingBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3), {
+          bold: true,
+          align: "right",
+          fill: "FFFEF3C7",
+        });
         tr.height = 16;
       }
 
-      const filename = buildExportFilename([invoice?.containerNumber, invoice?.customerName, invoice?.destination], "xlsx");
+      const filename = buildExportFilename(
+        [invoice?.containerNumber, invoice?.customerName, invoice?.destination],
+        "xlsx"
+      );
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       await wb.xlsx.write(res);
@@ -1113,18 +1262,31 @@ ${remainingBales.length === 0
       const [session] = await db
         .select()
         .from(factoryInvoiceLoadingSessions)
-        .where(and(
-          eq(factoryInvoiceLoadingSessions.id, sessionId),
-          eq(factoryInvoiceLoadingSessions.companyId, companyId),
-        ));
+        .where(
+          and(eq(factoryInvoiceLoadingSessions.id, sessionId), eq(factoryInvoiceLoadingSessions.companyId, companyId))
+        );
 
       if (!session) return res.status(404).json({ message: "Session not found" });
 
       const [sessionBales, invoice, invoiceSummary] = await Promise.all([
-        db.select().from(factoryInvoiceLoadingBales)
-          .where(and(eq(factoryInvoiceLoadingBales.sessionId, sessionId), eq(factoryInvoiceLoadingBales.companyId, companyId)))
+        db
+          .select()
+          .from(factoryInvoiceLoadingBales)
+          .where(
+            and(
+              eq(factoryInvoiceLoadingBales.sessionId, sessionId),
+              eq(factoryInvoiceLoadingBales.companyId, companyId)
+            )
+          )
           .orderBy(factoryInvoiceLoadingBales.scannedAt),
-        db.select({ invoiceNumber: customerOrders.invoiceNumber, orderDate: customerOrders.orderDate, customerName: customers.legalName, containerNumber: customerOrders.containerNumber, destination: customerOrders.destination })
+        db
+          .select({
+            invoiceNumber: customerOrders.invoiceNumber,
+            orderDate: customerOrders.orderDate,
+            customerName: customers.legalName,
+            containerNumber: customerOrders.containerNumber,
+            destination: customerOrders.destination,
+          })
           .from(customerOrders)
           .leftJoin(customers, eq(customerOrders.customerId, customers.id))
           .where(eq(customerOrders.id, session.invoiceId))
@@ -1197,13 +1359,15 @@ ${remainingBales.length === 0
 </table>
 
 <div class="section-title">REMAINING BALES TO LOAD (${remainingBales.length})</div>
-${remainingBales.length === 0
-  ? `<div class="all-done">All bales for this invoice have been loaded.</div>`
-  : `<table>
+${
+  remainingBales.length === 0
+    ? `<div class="all-done">All bales for this invoice have been loaded.</div>`
+    : `<table>
   <tr><th>#</th><th>Bale Reference</th><th>Article Code</th><th>Product Name</th><th class="r">Weight (kg)</th></tr>
   ${remainingBales.map((b, i) => `<tr class="remaining-row"><td>${i + 1}</td><td>${b.baleReference}</td><td>${b.articleCode || ""}</td><td>${b.productName || ""}</td><td class="r">${parseFloat(b.weightKg || "0").toFixed(3)}</td></tr>`).join("")}
   <tr class="total-row"><td colspan="4">Total remaining</td><td class="r">${remainingBales.reduce((s, b) => s + parseFloat(b.weightKg || "0"), 0).toFixed(3)} kg · ${remainingBales.length} bales</td></tr>
-</table>`}
+</table>`
+}
 
 </body></html>`;
 
@@ -1238,12 +1402,15 @@ ${remainingBales.length === 0
       const proformaName = `Remaining - ${invoiceLabel} - ${today}`;
 
       const result = await db.transaction(async (tx: any) => {
-        const [proforma] = await tx.insert(customerProformas).values({
-          companyId,
-          customerId: inv.customerId,
-          name: proformaName,
-          isActive: true,
-        }).returning();
+        const [proforma] = await tx
+          .insert(customerProformas)
+          .values({
+            companyId,
+            customerId: inv.customerId,
+            name: proformaName,
+            isActive: true,
+          })
+          .returning();
 
         // Build lines from the original invoice order lines
         const originalLines = summary.lines;

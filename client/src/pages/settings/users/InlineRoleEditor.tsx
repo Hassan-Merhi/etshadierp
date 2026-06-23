@@ -6,21 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Check, X, MapPin, Zap } from "lucide-react";
 import { ConfirmPasswordDialog, PermissionSummaryCard } from "./InlineRoleEditorSections";
 import { PosLocationManager } from "./PosLocationManager";
 
-const ROLE_OPTIONS = [
-  "Admin", "Owner", "Manager", "POS", "Normal User", "View Only",
-];
+const ROLE_OPTIONS = ["Admin", "Owner", "Manager", "POS", "Normal User", "View Only"];
 
 interface RolePreset {
   label: string;
@@ -29,21 +21,21 @@ interface RolePreset {
 
 const ROLE_PRESETS: Record<string, RolePreset[]> = {
   Manager: [
-    { label: "Read-only",  values: { daybookEditDays: 0, canSellNegativeStock: false, canDeleteRecords: false } },
-    { label: "Standard",   values: { daybookEditDays: 3, canSellNegativeStock: false, canDeleteRecords: true  } },
-    { label: "Power",      values: { daybookEditDays: 30, canSellNegativeStock: true,  canDeleteRecords: true  } },
+    { label: "Read-only", values: { daybookEditDays: 0, canSellNegativeStock: false, canDeleteRecords: false } },
+    { label: "Standard", values: { daybookEditDays: 3, canSellNegativeStock: false, canDeleteRecords: true } },
+    { label: "Power", values: { daybookEditDays: 30, canSellNegativeStock: true, canDeleteRecords: true } },
   ],
   Owner: [
-    { label: "Standard",     values: { daybookEditDays: 7   } },
+    { label: "Standard", values: { daybookEditDays: 7 } },
     { label: "Unrestricted", values: { daybookEditDays: 365 } },
   ],
   "Normal User": [
     { label: "View only", values: { daybookEditDays: 0 } },
-    { label: "Standard",  values: { daybookEditDays: 3 } },
+    { label: "Standard", values: { daybookEditDays: 3 } },
   ],
   POS: [
     { label: "Standard Cashier", values: { daybookEditDays: 0, canSellNegativeStock: false } },
-    { label: "Senior Cashier",   values: { daybookEditDays: 1, canSellNegativeStock: true  } },
+    { label: "Senior Cashier", values: { daybookEditDays: 1, canSellNegativeStock: true } },
   ],
 };
 
@@ -55,13 +47,7 @@ interface InlineRoleEditorProps {
   onSaved: () => void;
 }
 
-export function InlineRoleEditor({
-  userId,
-  companies,
-  editingRole,
-  onClose,
-  onSaved,
-}: InlineRoleEditorProps) {
+export function InlineRoleEditor({ userId, companies, editingRole, onClose, onSaved }: InlineRoleEditorProps) {
   const { toast } = useToast();
   const isEditing = !!editingRole;
 
@@ -123,12 +109,16 @@ export function InlineRoleEditor({
             setSelectedLocationIds(editingRole.assignedLocationId ? [editingRole.assignedLocationId] : []);
           });
 
-        fetch(`/api/user-location-cash-accounts/${editingRole.userId}/${editingRole.companyId}`, { credentials: "include" })
+        fetch(`/api/user-location-cash-accounts/${editingRole.userId}/${editingRole.companyId}`, {
+          credentials: "include",
+        })
           .then((r) => r.json())
           .then((mappings) => {
             if (Array.isArray(mappings)) {
               const record: Record<number, number> = {};
-              mappings.forEach((m: any) => { record[m.locationId] = m.cashAccountId; });
+              mappings.forEach((m: any) => {
+                record[m.locationId] = m.cashAccountId;
+              });
               setLocationCashAccounts(record);
             }
           })
@@ -180,9 +170,7 @@ export function InlineRoleEditor({
       if (isPOS && selectedLocationIds.length > 0) {
         // When posViewOnly, only the primary (first) location needs a cash account.
         // Without posViewOnly, all selected locations need one.
-        const locationsNeedingCash = posViewOnly
-          ? selectedLocationIds.slice(0, 1)
-          : selectedLocationIds;
+        const locationsNeedingCash = posViewOnly ? selectedLocationIds.slice(0, 1) : selectedLocationIds;
         const missing = locationsNeedingCash.filter((id) => !locationCashAccounts[id]);
         if (missing.length > 0) {
           const locNames = missing.map((id) => {
@@ -274,17 +262,15 @@ export function InlineRoleEditor({
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs">Company</Label>
-          <Select
-            value={companyId.toString()}
-            onValueChange={(v) => setCompanyId(parseInt(v))}
-            disabled={isEditing}
-          >
+          <Select value={companyId.toString()} onValueChange={(v) => setCompanyId(parseInt(v))} disabled={isEditing}>
             <SelectTrigger className="h-8 text-xs" data-testid="select-role-company">
               <SelectValue placeholder="Select company" />
             </SelectTrigger>
             <SelectContent>
               {companies.map((c: any) => (
-                <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+                <SelectItem key={c.id} value={c.id.toString()}>
+                  {c.name}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -292,13 +278,22 @@ export function InlineRoleEditor({
 
         <div className="space-y-1.5">
           <Label className="text-xs">Role</Label>
-          <Select value={role} onValueChange={(v) => { setRole(v); setSelectedLocationIds([]); setLocationCashAccounts({}); }}>
+          <Select
+            value={role}
+            onValueChange={(v) => {
+              setRole(v);
+              setSelectedLocationIds([]);
+              setLocationCashAccounts({});
+            }}
+          >
             <SelectTrigger className="h-8 text-xs" data-testid="select-role-type">
               <SelectValue placeholder="Select role" />
             </SelectTrigger>
             <SelectContent>
               {ROLE_OPTIONS.map((r) => (
-                <SelectItem key={r} value={r}>{r}</SelectItem>
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -361,7 +356,8 @@ export function InlineRoleEditor({
             <div className="space-y-0.5">
               <Label className="text-xs cursor-pointer">Multi-Location Stock View</Label>
               <p className="text-xs text-muted-foreground">
-                User can sell from their primary location and view stock at all other assigned locations. Cash account required for primary location only.
+                User can sell from their primary location and view stock at all other assigned locations. Cash account
+                required for primary location only.
               </p>
             </div>
           </div>
@@ -481,11 +477,7 @@ export function InlineRoleEditor({
           setConfirmPasswordOpen(false);
           saveMutation.mutate();
         }}
-        action={
-          role === "Admin"
-            ? "Grant Admin access"
-            : "Enable delete / void permissions"
-        }
+        action={role === "Admin" ? "Grant Admin access" : "Enable delete / void permissions"}
         description={
           role === "Admin"
             ? "Admin role grants full system access including deletions, exports, and user management."

@@ -124,7 +124,6 @@ export function LocationDialogs({
   formatAmount,
   navigate,
 }: LocationDialogsProps) {
-
   // Fetch stock movement data inside the component if needed, or pass it as prop
   return (
     <>
@@ -133,9 +132,7 @@ export function LocationDialogs({
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Rename Location</DialogTitle>
-            <DialogDescription>
-              Update the name and settings for this location.
-            </DialogDescription>
+            <DialogDescription>Update the name and settings for this location.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
@@ -159,17 +156,23 @@ export function LocationDialogs({
                 placeholder="0.00"
                 data-testid="input-rename-deduction"
               />
-              <p className="text-[10px] text-muted-foreground">Amount automatically deducted from SP payables for this location.</p>
+              <p className="text-[10px] text-muted-foreground">
+                Amount automatically deducted from SP payables for this location.
+              </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button
-              onClick={() => renameLocationMutation.mutate({
-                id: renamingLocation!.id,
-                name: renameInput,
-                supplierPartnerPayableDeductionPerQty: parseFloat(renameDeductionInput)
-              })}
+              onClick={() =>
+                renameLocationMutation.mutate({
+                  id: renamingLocation!.id,
+                  name: renameInput,
+                  supplierPartnerPayableDeductionPerQty: parseFloat(renameDeductionInput),
+                })
+              }
               disabled={renameLocationMutation.isPending || !renameInput.trim()}
               data-testid="button-confirm-rename"
             >
@@ -186,13 +189,17 @@ export function LocationDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Location</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete <strong>{selectedLocationLocal?.name}</strong>? This will also delete all associated inventory records. This action cannot be undone.
+              Are you sure you want to delete <strong>{selectedLocationLocal?.name}</strong>? This will also delete all
+              associated inventory records. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleDeleteLocation(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteLocation();
+              }}
               disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-delete-location"
@@ -210,14 +217,18 @@ export function LocationDialogs({
           <AlertDialogHeader>
             <AlertDialogTitle>Archive Stock Group</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to archive the group <strong>{selectedGroup?.groupName}</strong> from <strong>{selectedLocationLocal?.name}</strong>?
-              This will remove all items in this group from this godown. You can restore them later from the Orphaned Records page.
+              Are you sure you want to archive the group <strong>{selectedGroup?.groupName}</strong> from{" "}
+              <strong>{selectedLocationLocal?.name}</strong>? This will remove all items in this group from this godown.
+              You can restore them later from the Orphaned Records page.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isArchiving}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleArchiveStockGroup(); }}
+              onClick={(e) => {
+                e.preventDefault();
+                handleArchiveStockGroup();
+              }}
               disabled={isArchiving}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-confirm-archive-group"
@@ -254,38 +265,49 @@ export function LocationDialogs({
                   <Skeleton className="h-8 w-full" />
                   <Skeleton className="h-8 w-full" />
                 </div>
-              ) : waChats.filter(c => c.name.toLowerCase().includes(waGroupSearch.toLowerCase())).length === 0 ? (
+              ) : waChats.filter((c) => c.name.toLowerCase().includes(waGroupSearch.toLowerCase())).length === 0 ? (
                 <div className="p-8 text-center text-sm text-muted-foreground">No groups found</div>
               ) : (
-                waChats.filter(c => c.name.toLowerCase().includes(waGroupSearch.toLowerCase())).map(chat => (
-                  <div
-                    key={chat.id}
-                    onClick={() => setWaGroupSelectedId(chat.id)}
-                    className={cn(
-                      "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors",
-                      waGroupSelectedId === chat.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                    )}
-                  >
-                    <span className="text-sm font-medium">{chat.name}</span>
-                    {waGroupSelectedId === chat.id && <Loader2 className="h-4 w-4 animate-spin" />}
-                  </div>
-                ))
+                waChats
+                  .filter((c) => c.name.toLowerCase().includes(waGroupSearch.toLowerCase()))
+                  .map((chat) => (
+                    <div
+                      key={chat.id}
+                      onClick={() => setWaGroupSelectedId(chat.id)}
+                      className={cn(
+                        "flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-colors",
+                        waGroupSelectedId === chat.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      )}
+                    >
+                      <span className="text-sm font-medium">{chat.name}</span>
+                      {waGroupSelectedId === chat.id && <Loader2 className="h-4 w-4 animate-spin" />}
+                    </div>
+                  ))
               )}
             </div>
             {waGroupSelectedId && (
-              <Button variant="ghost" size="sm" className="w-full text-destructive" onClick={() => setWaGroupSelectedId("")}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full text-destructive"
+                onClick={() => setWaGroupSelectedId("")}
+              >
                 Clear selection / Unlink group
               </Button>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setWaGroupDialogOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setWaGroupDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button
-              onClick={() => waGroupMutation.mutate({
-                id: waGroupLocation!.id,
-                name: waGroupLocation!.name,
-                whatsappGroupChatId: waGroupSelectedId || null
-              })}
+              onClick={() =>
+                waGroupMutation.mutate({
+                  id: waGroupLocation!.id,
+                  name: waGroupLocation!.name,
+                  whatsappGroupChatId: waGroupSelectedId || null,
+                })
+              }
               disabled={waGroupMutation.isPending}
               data-testid="button-confirm-wa-group"
             >
@@ -314,8 +336,16 @@ export function LocationDialogs({
 }
 
 function fmtQ(n: number) {
-  return n === 0 ? <span className="opacity-30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</>;
+  return n === 0 ? (
+    <span className="opacity-30">—</span>
+  ) : (
+    <>{n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</>
+  );
 }
 function fmtR(n: number) {
-  return n === 0 ? <span className="opacity-30">—</span> : <>{n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>;
+  return n === 0 ? (
+    <span className="opacity-30">—</span>
+  ) : (
+    <>{n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</>
+  );
 }

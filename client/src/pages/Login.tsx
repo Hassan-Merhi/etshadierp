@@ -15,16 +15,20 @@ import { startAuthentication, startRegistration } from "@simplewebauthn/browser"
 // Set to true to re-enable passkey registration & login
 const PASSKEY_ENABLED = false;
 
-function passkeyStorageKey(username: string) { return `passkey_registered_${username}`; }
-function passkeySnoozeKey(username: string) { return `passkey_snoozed_${username}`; }
+function passkeyStorageKey(username: string) {
+  return `passkey_registered_${username}`;
+}
+function passkeySnoozeKey(username: string) {
+  return `passkey_snoozed_${username}`;
+}
 function isPasskeySnoozed(username: string) {
   const ts = localStorage.getItem(passkeySnoozeKey(username));
   if (!ts) return false;
   return Date.now() - parseInt(ts, 10) < 30 * 24 * 60 * 60 * 1000;
 }
 
-const CRED_KEY    = "biometric_creds";
-const OPT_IN_KEY  = "biometric_opted_in";
+const CRED_KEY = "biometric_creds";
+const OPT_IN_KEY = "biometric_opted_in";
 
 export async function saveBiometricCredentials(username: string, password: string) {
   await Preferences.set({ key: CRED_KEY, value: JSON.stringify({ username, password }) });
@@ -35,44 +39,48 @@ export async function clearBiometricCredentials() {
 async function loadBiometricCredentials(): Promise<{ username: string; password: string } | null> {
   const { value } = await Preferences.get({ key: CRED_KEY });
   if (!value) return null;
-  try { return JSON.parse(value); } catch { return null; }
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 const features = [
-  { icon: Boxes,        title: "Inventory Management",  description: "Real-time stock tracking across all locations" },
-  { icon: ShoppingCart, title: "Point of Sale",          description: "Fast, reliable checkout for every team" },
-  { icon: Factory,      title: "Factory Production",     description: "Attendance, payroll, and batch output" },
-  { icon: BarChart3,    title: "Business Analytics",     description: "Live reports to drive smarter decisions" },
+  { icon: Boxes, title: "Inventory Management", description: "Real-time stock tracking across all locations" },
+  { icon: ShoppingCart, title: "Point of Sale", description: "Fast, reliable checkout for every team" },
+  { icon: Factory, title: "Factory Production", description: "Attendance, payroll, and batch output" },
+  { icon: BarChart3, title: "Business Analytics", description: "Live reports to drive smarter decisions" },
 ];
 
-const GOLD       = "#D4AF37";
+const GOLD = "#D4AF37";
 const GOLD_LIGHT = "#F5C542";
-const GOLD_DARK  = "#8A6E20";
-const BTN_BG     = `linear-gradient(135deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 50%, ${GOLD_DARK} 100%)`;
+const GOLD_DARK = "#8A6E20";
+const BTN_BG = `linear-gradient(135deg, ${GOLD_DARK} 0%, ${GOLD_LIGHT} 50%, ${GOLD_DARK} 100%)`;
 const BTN_SHADOW = "0 4px 24px rgba(212,175,55,0.38)";
 
 export default function Login() {
-  const { toast }                       = useToast();
-  const [username, setUsername]         = useState("");
-  const [password, setPassword]         = useState("");
+  const { toast } = useToast();
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  const [biometryAvailable, setBiometryAvailable]   = useState(false);
-  const [biometryType, setBiometryType]             = useState<BiometryType | null>(null);
-  const [hasSavedCreds, setHasSavedCreds]           = useState(false);
-  const [biometryPending, setBiometryPending]       = useState(false);
-  const [showBioPrompt, setShowBioPrompt]           = useState(false);
-  const pendingUserData                             = useRef<any>(null);
-  const pendingCredentials                          = useRef<{ username: string; password: string } | null>(null);
+  const [biometryAvailable, setBiometryAvailable] = useState(false);
+  const [biometryType, setBiometryType] = useState<BiometryType | null>(null);
+  const [hasSavedCreds, setHasSavedCreds] = useState(false);
+  const [biometryPending, setBiometryPending] = useState(false);
+  const [showBioPrompt, setShowBioPrompt] = useState(false);
+  const pendingUserData = useRef<any>(null);
+  const pendingCredentials = useRef<{ username: string; password: string } | null>(null);
 
-  const [passKeyPending, setPassKeyPending]             = useState(false);
-  const [showPasskeyRegister, setShowPasskeyRegister]   = useState(false);
-  const [passkeyRegPending, setPasskeyRegPending]       = useState(false);
-  const [hasSavedPasskey, setHasSavedPasskey]           = useState(false);
-  const pendingPasskeyUser                              = useRef<string>("");
+  const [passKeyPending, setPassKeyPending] = useState(false);
+  const [showPasskeyRegister, setShowPasskeyRegister] = useState(false);
+  const [passkeyRegPending, setPasskeyRegPending] = useState(false);
+  const [hasSavedPasskey, setHasSavedPasskey] = useState(false);
+  const pendingPasskeyUser = useRef<string>("");
 
-  const [isDark, setIsDark] = useState(() =>
-    typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== "undefined" && document.documentElement.classList.contains("dark")
   );
   useEffect(() => {
     const el = document.documentElement;
@@ -84,7 +92,10 @@ export default function Login() {
   const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
-    if (isNative || !username) { setHasSavedPasskey(false); return; }
+    if (isNative || !username) {
+      setHasSavedPasskey(false);
+      return;
+    }
     setHasSavedPasskey(!!localStorage.getItem(passkeyStorageKey(username.trim())));
   }, [username, isNative]);
 
@@ -103,13 +114,16 @@ export default function Login() {
         if (optIn === "yes") {
           setTimeout(() => triggerBiometric(creds), 600);
         }
-      } catch { /* biometrics not available */ }
+      } catch {
+        /* biometrics not available */
+      }
     })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNative]);
 
   const [, navigate] = useLocation();
-  const passkeySupported = PASSKEY_ENABLED && !isNative && typeof window !== "undefined" && !!(window as any).PublicKeyCredential;
+  const passkeySupported =
+    PASSKEY_ENABLED && !isNative && typeof window !== "undefined" && !!(window as any).PublicKeyCredential;
 
   const finalizeLogin = () => {
     if (!pendingUserData.current) return;
@@ -161,7 +175,11 @@ export default function Login() {
     },
     onError: (error: any) => {
       if ((error as any)?._handledGlobally) return;
-      toast({ title: "Login Failed", description: error.message || "Invalid username or password", variant: "destructive" });
+      toast({
+        title: "Login Failed",
+        description: error.message || "Invalid username or password",
+        variant: "destructive",
+      });
     },
   });
 
@@ -200,7 +218,11 @@ export default function Login() {
       });
       const savedCreds = creds ?? (await loadBiometricCredentials());
       if (!savedCreds) {
-        toast({ title: "No saved credentials", description: "Please sign in with your password first.", variant: "destructive" });
+        toast({
+          title: "No saved credentials",
+          description: "Please sign in with your password first.",
+          variant: "destructive",
+        });
         return;
       }
       loginMutation.mutate(savedCreds);
@@ -219,7 +241,10 @@ export default function Login() {
       const optionsRes = await apiRequest("POST", "/api/auth/passkey/register/options", {});
       const options = await optionsRes.json();
       const regResponse = await startRegistration({ optionsJSON: options });
-      const verifyRes = await apiRequest("POST", "/api/auth/passkey/register/verify", { ...regResponse, deviceName: navigator.platform || "Browser" });
+      const verifyRes = await apiRequest("POST", "/api/auth/passkey/register/verify", {
+        ...regResponse,
+        deviceName: navigator.platform || "Browser",
+      });
       if (!verifyRes.ok) throw new Error("Passkey registration failed");
       localStorage.setItem(passkeyStorageKey(pendingPasskeyUser.current), "1");
       setHasSavedPasskey(true);
@@ -227,7 +252,11 @@ export default function Login() {
       if (err?.name === "NotAllowedError") {
         // user cancelled
       } else {
-        toast({ title: "Passkey setup failed", description: err.message || "Could not save passkey", variant: "destructive" });
+        toast({
+          title: "Passkey setup failed",
+          description: err.message || "Could not save passkey",
+          variant: "destructive",
+        });
       }
     } finally {
       setPasskeyRegPending(false);
@@ -249,7 +278,9 @@ export default function Login() {
   const handlePasskeyLogin = async () => {
     setPassKeyPending(true);
     try {
-      const optionsRes = await apiRequest("POST", "/api/auth/passkey/authenticate/options", { username: username || undefined });
+      const optionsRes = await apiRequest("POST", "/api/auth/passkey/authenticate/options", {
+        username: username || undefined,
+      });
       const options = await optionsRes.json();
       const assertion = await startAuthentication({ optionsJSON: options });
       const verifyRes = await apiRequest("POST", "/api/auth/passkey/authenticate/verify", assertion);
@@ -261,7 +292,11 @@ export default function Login() {
       window.location.href = "/";
     } catch (err: any) {
       if (err?.name === "NotAllowedError") return;
-      toast({ title: "Passkey failed", description: err.message || "Could not sign in with passkey", variant: "destructive" });
+      toast({
+        title: "Passkey failed",
+        description: err.message || "Could not sign in with passkey",
+        variant: "destructive",
+      });
     } finally {
       setPassKeyPending(false);
     }
@@ -269,14 +304,14 @@ export default function Login() {
 
   const showBiometricButton = isNative && biometryAvailable && hasSavedCreds;
   const biometricLabel = (() => {
-    if (biometryType === BiometryType.faceId)                    return "Face ID";
-    if (biometryType === BiometryType.touchId)                   return "Touch ID";
-    if (biometryType === BiometryType.faceAuthentication)        return "Face Unlock";
+    if (biometryType === BiometryType.faceId) return "Face ID";
+    if (biometryType === BiometryType.touchId) return "Touch ID";
+    if (biometryType === BiometryType.faceAuthentication) return "Face Unlock";
     if (biometryType === BiometryType.fingerprintAuthentication) return "Fingerprint";
     return "Biometrics";
   })();
-  const BiometricIcon = (biometryType === BiometryType.faceId || biometryType === BiometryType.faceAuthentication)
-    ? ScanFace : Fingerprint;
+  const BiometricIcon =
+    biometryType === BiometryType.faceId || biometryType === BiometryType.faceAuthentication ? ScanFace : Fingerprint;
 
   const cardStyle: React.CSSProperties = isDark
     ? {
@@ -294,7 +329,6 @@ export default function Login() {
 
   return (
     <div className="flex flex-col xl:flex-row min-h-full xl:h-full xl:overflow-hidden">
-
       {/* ══════════════════════════════════════════
           LEFT — Always-dark branding panel (desktop)
       ══════════════════════════════════════════ */}
@@ -303,27 +337,49 @@ export default function Login() {
         style={{ background: "linear-gradient(155deg, #050505 0%, #0C0900 25%, #0D0D0D 60%, #080810 100%)" }}
       >
         {/* Ambient glows — richer layered */}
-        <div className="pointer-events-none absolute inset-0"
-          style={{ background: "radial-gradient(ellipse 100% 55% at 50% 0%, rgba(212,175,55,0.16) 0%, transparent 65%)" }} />
-        <div className="pointer-events-none absolute top-1/3 -left-24 w-[28rem] h-[28rem] rounded-full"
-          style={{ background: "rgba(212,175,55,0.055)", filter: "blur(70px)" }} />
-        <div className="pointer-events-none absolute -bottom-20 right-8 w-80 h-80 rounded-full"
-          style={{ background: "rgba(212,175,55,0.04)", filter: "blur(55px)" }} />
-        <div className="pointer-events-none absolute top-16 right-4 w-52 h-52 rounded-full"
-          style={{ background: "rgba(212,175,55,0.04)", filter: "blur(45px)" }} />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: "radial-gradient(ellipse 100% 55% at 50% 0%, rgba(212,175,55,0.16) 0%, transparent 65%)",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute top-1/3 -left-24 w-[28rem] h-[28rem] rounded-full"
+          style={{ background: "rgba(212,175,55,0.055)", filter: "blur(70px)" }}
+        />
+        <div
+          className="pointer-events-none absolute -bottom-20 right-8 w-80 h-80 rounded-full"
+          style={{ background: "rgba(212,175,55,0.04)", filter: "blur(55px)" }}
+        />
+        <div
+          className="pointer-events-none absolute top-16 right-4 w-52 h-52 rounded-full"
+          style={{ background: "rgba(212,175,55,0.04)", filter: "blur(45px)" }}
+        />
         {/* Subtle grid / noise texture */}
-        <div className="pointer-events-none absolute inset-0 opacity-[0.015]"
-          style={{ backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(212,175,55,1) 40px, rgba(212,175,55,1) 41px), repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(212,175,55,1) 40px, rgba(212,175,55,1) 41px)" }} />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.015]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(212,175,55,1) 40px, rgba(212,175,55,1) 41px), repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(212,175,55,1) 40px, rgba(212,175,55,1) 41px)",
+          }}
+        />
 
         {/* ── Logo with enhanced glow halo ── */}
         <div className="relative z-10 flex flex-col items-start gap-5">
           <div className="relative">
             {/* Outer diffuse halo */}
-            <div className="absolute -inset-8 rounded-full"
-              style={{ background: "radial-gradient(circle, rgba(212,175,55,0.20) 0%, transparent 70%)", filter: "blur(22px)" }} />
+            <div
+              className="absolute -inset-8 rounded-full"
+              style={{
+                background: "radial-gradient(circle, rgba(212,175,55,0.20) 0%, transparent 70%)",
+                filter: "blur(22px)",
+              }}
+            />
             {/* Inner warm circle */}
-            <div className="absolute inset-0 rounded-full"
-              style={{ background: "radial-gradient(circle, rgba(212,175,55,0.12) 0%, transparent 80%)" }} />
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{ background: "radial-gradient(circle, rgba(212,175,55,0.12) 0%, transparent 80%)" }}
+            />
             <img
               src="/hmd-logo-new.jpeg"
               alt="HMD International Group"
@@ -331,8 +387,10 @@ export default function Login() {
               style={{ mixBlendMode: "screen", filter: "drop-shadow(0 0 18px rgba(212,175,55,0.30))" }}
             />
           </div>
-          <div className="w-32 h-px"
-            style={{ background: "linear-gradient(90deg, rgba(212,175,55,0.7) 0%, transparent 100%)" }} />
+          <div
+            className="w-32 h-px"
+            style={{ background: "linear-gradient(90deg, rgba(212,175,55,0.7) 0%, transparent 100%)" }}
+          />
         </div>
 
         {/* ── Headline + features ── */}
@@ -342,10 +400,14 @@ export default function Login() {
               className="text-[2.15rem] font-extrabold leading-tight tracking-tight"
               style={{ color: GOLD_LIGHT, textShadow: "0 0 40px rgba(245,197,66,0.25)" }}
             >
-              Run your business<br />with confidence.
+              Run your business
+              <br />
+              with confidence.
             </h2>
-            <div className="w-9 h-[2px] rounded-full"
-              style={{ background: `linear-gradient(90deg, ${GOLD} 0%, transparent 100%)` }} />
+            <div
+              className="w-9 h-[2px] rounded-full"
+              style={{ background: `linear-gradient(90deg, ${GOLD} 0%, transparent 100%)` }}
+            />
             <p className="text-sm leading-relaxed max-w-xs" style={{ color: "rgba(245,197,66,0.52)" }}>
               Production, inventory, payroll, invoices, and reporting — all in one unified platform.
             </p>
@@ -362,11 +424,11 @@ export default function Login() {
                   border: "1px solid rgba(212,175,55,0.10)",
                   transition: "background 0.18s ease, border-color 0.18s ease",
                 }}
-                onMouseEnter={e => {
+                onMouseEnter={(e) => {
                   (e.currentTarget as HTMLElement).style.background = "rgba(212,175,55,0.07)";
                   (e.currentTarget as HTMLElement).style.borderColor = "rgba(212,175,55,0.22)";
                 }}
-                onMouseLeave={e => {
+                onMouseLeave={(e) => {
                   (e.currentTarget as HTMLElement).style.background = "rgba(255,255,255,0.02)";
                   (e.currentTarget as HTMLElement).style.borderColor = "rgba(212,175,55,0.10)";
                 }}
@@ -382,8 +444,12 @@ export default function Login() {
                   <f.icon className="h-[15px] w-[15px]" style={{ color: GOLD }} />
                 </div>
                 <div>
-                  <p className="font-semibold text-[0.8rem] leading-tight" style={{ color: "#F2E8C0" }}>{f.title}</p>
-                  <p className="text-[0.71rem] leading-tight mt-0.5" style={{ color: "rgba(212,175,55,0.43)" }}>{f.description}</p>
+                  <p className="font-semibold text-[0.8rem] leading-tight" style={{ color: "#F2E8C0" }}>
+                    {f.title}
+                  </p>
+                  <p className="text-[0.71rem] leading-tight mt-0.5" style={{ color: "rgba(212,175,55,0.43)" }}>
+                    {f.description}
+                  </p>
                 </div>
               </div>
             ))}
@@ -400,27 +466,34 @@ export default function Login() {
           RIGHT — Premium themed panel
       ══════════════════════════════════════════ */}
       <div className="flex flex-1 flex-col relative overflow-hidden bg-[#F8F3E7] dark:bg-[#090909]">
-
         {/* Light mode: warm champagne center radial */}
         <div
           className="pointer-events-none absolute inset-0 dark:hidden"
-          style={{ background: "radial-gradient(ellipse 80% 70% at 50% 45%, rgba(212,175,55,0.07) 0%, transparent 65%)" }}
+          style={{
+            background: "radial-gradient(ellipse 80% 70% at 50% 45%, rgba(212,175,55,0.07) 0%, transparent 65%)",
+          }}
         />
         {/* Light mode: subtle warm vignette */}
         <div
           className="pointer-events-none absolute inset-0 dark:hidden"
-          style={{ background: "radial-gradient(ellipse 110% 110% at 50% 110%, rgba(180,140,20,0.06) 0%, transparent 55%)" }}
+          style={{
+            background: "radial-gradient(ellipse 110% 110% at 50% 110%, rgba(180,140,20,0.06) 0%, transparent 55%)",
+          }}
         />
 
         {/* Dark mode: deep gold ambient at bottom */}
         <div
           className="pointer-events-none absolute inset-0 hidden dark:block"
-          style={{ background: "radial-gradient(ellipse 90% 55% at 50% 100%, rgba(212,175,55,0.08) 0%, transparent 60%)" }}
+          style={{
+            background: "radial-gradient(ellipse 90% 55% at 50% 100%, rgba(212,175,55,0.08) 0%, transparent 60%)",
+          }}
         />
         {/* Dark mode: top-right subtle accent */}
         <div
           className="pointer-events-none absolute inset-0 hidden dark:block"
-          style={{ background: "radial-gradient(ellipse 55% 40% at 85% 10%, rgba(212,175,55,0.05) 0%, transparent 60%)" }}
+          style={{
+            background: "radial-gradient(ellipse 55% 40% at 85% 10%, rgba(212,175,55,0.05) 0%, transparent 60%)",
+          }}
         />
 
         {/* Gold top stripe */}
@@ -452,11 +525,12 @@ export default function Login() {
         {/* ── FORM inside premium card ── */}
         <div className="relative z-10 flex flex-1 items-center justify-center px-4 sm:px-6 py-8 xl:py-10">
           <div className="w-full max-w-[400px] rounded-2xl p-7 sm:p-9 space-y-5" style={cardStyle}>
-
             {/* Heading */}
             <div className="space-y-1">
-              <p className="hidden xl:block text-[0.58rem] font-bold tracking-[0.3em] uppercase"
-                style={{ color: isDark ? "rgba(212,175,55,0.5)" : "rgba(139,100,20,0.55)" }}>
+              <p
+                className="hidden xl:block text-[0.58rem] font-bold tracking-[0.3em] uppercase"
+                style={{ color: isDark ? "rgba(212,175,55,0.5)" : "rgba(139,100,20,0.55)" }}
+              >
                 HMD International Group
               </p>
               <h2 className="text-[1.55rem] font-bold text-foreground tracking-tight">Welcome back</h2>
@@ -466,9 +540,11 @@ export default function Login() {
             {/* Gold accent divider */}
             <div
               className="h-px w-full"
-              style={{ background: isDark
-                ? `linear-gradient(90deg, rgba(212,175,55,0.45) 0%, rgba(212,175,55,0.15) 50%, transparent 100%)`
-                : `linear-gradient(90deg, rgba(212,175,55,0.4) 0%, rgba(212,175,55,0.12) 50%, transparent 100%)` }}
+              style={{
+                background: isDark
+                  ? `linear-gradient(90deg, rgba(212,175,55,0.45) 0%, rgba(212,175,55,0.15) 50%, transparent 100%)`
+                  : `linear-gradient(90deg, rgba(212,175,55,0.4) 0%, rgba(212,175,55,0.12) 50%, transparent 100%)`,
+              }}
             />
 
             {/* Biometric quick-sign-in */}
@@ -492,16 +568,17 @@ export default function Login() {
 
             {/* Form */}
             <form onSubmit={handleLogin} className="space-y-4" noValidate>
-
               <div className="space-y-1.5">
-                <Label htmlFor="username" className="text-[0.8rem] font-medium text-foreground">Username</Label>
+                <Label htmlFor="username" className="text-[0.8rem] font-medium text-foreground">
+                  Username
+                </Label>
                 <div
                   className="rounded-lg transition-shadow duration-150"
                   style={{}}
-                  onFocusCapture={e => {
+                  onFocusCapture={(e) => {
                     (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 2px rgba(212,175,55,0.35)`;
                   }}
-                  onBlurCapture={e => {
+                  onBlurCapture={(e) => {
                     (e.currentTarget as HTMLElement).style.boxShadow = "none";
                   }}
                 >
@@ -519,13 +596,15 @@ export default function Login() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-[0.8rem] font-medium text-foreground">Password</Label>
+                <Label htmlFor="password" className="text-[0.8rem] font-medium text-foreground">
+                  Password
+                </Label>
                 <div
                   className="relative rounded-lg transition-shadow duration-150"
-                  onFocusCapture={e => {
+                  onFocusCapture={(e) => {
                     (e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 2px rgba(212,175,55,0.35)`;
                   }}
-                  onBlurCapture={e => {
+                  onBlurCapture={(e) => {
                     (e.currentTarget as HTMLElement).style.boxShadow = "none";
                   }}
                 >
@@ -563,16 +642,20 @@ export default function Login() {
                   boxShadow: BTN_SHADOW,
                   transition: "opacity 0.15s, transform 0.1s, box-shadow 0.15s",
                 }}
-                onMouseEnter={e => {
+                onMouseEnter={(e) => {
                   (e.currentTarget as HTMLElement).style.boxShadow = "0 6px 30px rgba(212,175,55,0.50)";
                   (e.currentTarget as HTMLElement).style.opacity = "0.93";
                 }}
-                onMouseLeave={e => {
+                onMouseLeave={(e) => {
                   (e.currentTarget as HTMLElement).style.boxShadow = BTN_SHADOW;
                   (e.currentTarget as HTMLElement).style.opacity = "1";
                 }}
-                onMouseDown={e => { (e.currentTarget as HTMLElement).style.transform = "scale(0.988)"; }}
-                onMouseUp={e => { (e.currentTarget as HTMLElement).style.transform = "scale(1)"; }}
+                onMouseDown={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = "scale(0.988)";
+                }}
+                onMouseUp={(e) => {
+                  (e.currentTarget as HTMLElement).style.transform = "scale(1)";
+                }}
               >
                 {loginMutation.isPending ? "Signing in…" : "Sign In"}
               </button>
@@ -597,7 +680,10 @@ export default function Login() {
             </form>
 
             {/* Footer */}
-            <p className="text-center text-[0.64rem] pt-1" style={{ color: isDark ? "rgba(212,175,55,0.30)" : "rgba(139,100,20,0.45)" }}>
+            <p
+              className="text-center text-[0.64rem] pt-1"
+              style={{ color: isDark ? "rgba(212,175,55,0.30)" : "rgba(139,100,20,0.45)" }}
+            >
               HMD International Group &mdash; ERP &amp; POS Platform
             </p>
           </div>
@@ -628,12 +714,16 @@ export default function Login() {
               <X className="h-4 w-4" />
             </button>
             <div className="flex flex-col items-center text-center gap-3 pt-1">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full"
-                style={{ background: "rgba(212,175,55,0.12)", border: `1px solid rgba(212,175,55,0.28)` }}>
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-full"
+                style={{ background: "rgba(212,175,55,0.12)", border: `1px solid rgba(212,175,55,0.28)` }}
+              >
                 <KeyRound className="h-7 w-7" style={{ color: GOLD_LIGHT }} />
               </div>
               <div>
-                <p className="font-bold text-base" style={{ color: "#f0e6c8" }}>Save a Passkey?</p>
+                <p className="font-bold text-base" style={{ color: "#f0e6c8" }}>
+                  Save a Passkey?
+                </p>
                 <p className="text-xs mt-1" style={{ color: "rgba(212,175,55,0.50)" }}>
                   Sign in instantly next time using Face ID, Touch ID, or your device passkey — no password needed.
                 </p>
@@ -686,12 +776,16 @@ export default function Login() {
               <X className="h-4 w-4" />
             </button>
             <div className="flex flex-col items-center text-center gap-3 pt-1">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full"
-                style={{ background: "rgba(212,175,55,0.12)", border: `1px solid rgba(212,175,55,0.28)` }}>
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-full"
+                style={{ background: "rgba(212,175,55,0.12)", border: `1px solid rgba(212,175,55,0.28)` }}
+              >
                 <BiometricIcon className="h-7 w-7" style={{ color: GOLD_LIGHT }} />
               </div>
               <div>
-                <p className="font-bold text-base" style={{ color: "#f0e6c8" }}>Enable {biometricLabel}?</p>
+                <p className="font-bold text-base" style={{ color: "#f0e6c8" }}>
+                  Enable {biometricLabel}?
+                </p>
                 <p className="text-xs mt-1" style={{ color: "rgba(212,175,55,0.50)" }}>
                   Sign in instantly next time using {biometricLabel} instead of your password.
                 </p>

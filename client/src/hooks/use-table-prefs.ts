@@ -22,17 +22,14 @@ export function useTablePrefs(pageKey: string) {
   const setPrefs = useCallback(
     (update: Partial<TablePrefs> | ((prev: TablePrefs) => TablePrefs)) => {
       setPrefsState((prev) => {
-        const next =
-          typeof update === "function"
-            ? update(prev)
-            : { ...prev, ...update };
+        const next = typeof update === "function" ? update(prev) : { ...prev, ...update };
         try {
           localStorage.setItem(storageKey, JSON.stringify(next));
         } catch {}
         return next;
       });
     },
-    [storageKey],
+    [storageKey]
   );
 
   const clearPrefs = useCallback(() => {

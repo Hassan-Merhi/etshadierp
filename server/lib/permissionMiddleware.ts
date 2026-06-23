@@ -61,29 +61,29 @@ async function getPermMap(req: any): Promise<Map<string, boolean>> {
 
 /** Emit a structured access-denied log line and respond with 403. */
 function sendDenied(req: any, res: Response, key: string, permType: PermMiddlewareType): void {
-  const role     = req.session?.currentRole     ?? "unknown";
-  const userId   = req.session?.userId          ?? null;
-  const username = req.session?.username        ?? null;
+  const role = req.session?.currentRole ?? "unknown";
+  const userId = req.session?.userId ?? null;
+  const username = req.session?.username ?? null;
   const companyId = req.session?.currentCompanyId ?? null;
 
   console.warn(
     JSON.stringify({
-      event:     "access_denied",
+      event: "access_denied",
       permType,
       key,
       role,
       userId,
       username,
       companyId,
-      method:    req.method,
-      path:      req.path,
-      ip:        req.ip,
-      ts:        new Date().toISOString(),
+      method: req.method,
+      path: req.path,
+      ip: req.ip,
+      ts: new Date().toISOString(),
     })
   );
 
   res.status(403).json({
-    message:  "Access denied: you do not have permission for this resource.",
+    message: "Access denied: you do not have permission for this resource.",
     key,
     permType,
   });

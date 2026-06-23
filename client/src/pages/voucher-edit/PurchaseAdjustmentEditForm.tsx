@@ -27,7 +27,7 @@ export function PurchaseEditForm({
   formatDisplayDate,
   formatAmount,
   total,
-  toggleOptionalMutation
+  toggleOptionalMutation,
 }: {
   form: UseFormReturn<any>;
   onSubmit: (data: any) => void;
@@ -78,12 +78,7 @@ export function PurchaseEditForm({
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
+                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -98,10 +93,7 @@ export function PurchaseEditForm({
                   <FormItem>
                     <FormLabel>Currency</FormLabel>
                     <FormControl>
-                      <CurrencySelector
-                        value={field.value}
-                        onChange={field.onChange}
-                      />
+                      <CurrencySelector value={field.value} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -134,7 +126,13 @@ export function PurchaseEditForm({
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
                         {fields.length > 1 && (
-                          <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} data-testid={`button-remove-purchase-mobile-${index}`}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}
+                            data-testid={`button-remove-purchase-mobile-${index}`}
+                          >
                             <X className="h-4 w-4" />
                           </Button>
                         )}
@@ -147,8 +145,18 @@ export function PurchaseEditForm({
                             <FormLabel className="text-xs">Stock Item</FormLabel>
                             <FormControl>
                               <StockItemCombobox
-                                value={form.watch(`items.${index}.stockItemId`) > 0 ? { id: form.watch(`items.${index}.stockItemId`), name: form.watch(`items.${index}.stockItemName`) } : null}
-                                onChange={(id, name) => { form.setValue(`items.${index}.stockItemId`, id); form.setValue(`items.${index}.stockItemName`, name); }}
+                                value={
+                                  form.watch(`items.${index}.stockItemId`) > 0
+                                    ? {
+                                        id: form.watch(`items.${index}.stockItemId`),
+                                        name: form.watch(`items.${index}.stockItemName`),
+                                      }
+                                    : null
+                                }
+                                onChange={(id, name) => {
+                                  form.setValue(`items.${index}.stockItemId`, id);
+                                  form.setValue(`items.${index}.stockItemName`, name);
+                                }}
                                 stockItems={stockItems}
                                 rowIndex={index}
                               />
@@ -165,7 +173,14 @@ export function PurchaseEditForm({
                             <FormItem>
                               <FormLabel className="text-xs">Quantity</FormLabel>
                               <FormControl>
-                                <Input {...field} type="number" step="0.001" placeholder="0" className="font-mono" data-testid={`input-quantity-purchase-mobile-${index}`} />
+                                <Input
+                                  {...field}
+                                  type="number"
+                                  step="0.001"
+                                  placeholder="0"
+                                  className="font-mono"
+                                  data-testid={`input-quantity-purchase-mobile-${index}`}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -178,7 +193,14 @@ export function PurchaseEditForm({
                             <FormItem>
                               <FormLabel className="text-xs">Rate</FormLabel>
                               <FormControl>
-                                <Input {...field} type="number" step="0.01" placeholder="0.00" className="font-mono" data-testid={`input-rate-purchase-mobile-${index}`} />
+                                <Input
+                                  {...field}
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="font-mono"
+                                  data-testid={`input-rate-purchase-mobile-${index}`}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -187,13 +209,21 @@ export function PurchaseEditForm({
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t">
                         <span className="text-sm text-muted-foreground">Total</span>
-                        <span className="font-mono font-medium" data-testid={`text-total-purchase-mobile-${index}`}>{formatAmount(lineTotal)}</span>
+                        <span className="font-mono font-medium" data-testid={`text-total-purchase-mobile-${index}`}>
+                          {formatAmount(lineTotal)}
+                        </span>
                       </div>
                     </div>
                   );
                 })}
                 <div className="flex items-center justify-between gap-2 pt-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => append({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })} data-testid="button-add-row-purchase-mobile">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => append({ stockItemId: 0, stockItemName: "", quantity: "", rate: "" })}
+                    data-testid="button-add-row-purchase-mobile"
+                  >
                     <Plus className="h-4 w-4 mr-2" />
                     Add Row
                   </Button>
@@ -212,12 +242,14 @@ export function PurchaseEditForm({
                 formatAmount={formatAmount}
                 total={total}
               />
-              
+
               <div className="hidden md:flex justify-end p-2 bg-muted/30 border-x border-b rounded-b-md">
                 <div className="flex items-center gap-4">
                   <span className="text-sm font-medium">Total Quantity:</span>
                   <span className="font-mono font-medium">
-                    {formatNumber(form.watch("items").reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0))}
+                    {formatNumber(
+                      form.watch("items").reduce((sum: number, item: any) => sum + (parseFloat(item.quantity) || 0), 0)
+                    )}
                   </span>
                 </div>
               </div>
@@ -238,8 +270,18 @@ export function PurchaseEditForm({
             />
 
             <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onCancel} disabled={isPending} data-testid="button-cancel">Cancel</Button>
-              <Button type="submit" disabled={isPending || total === 0} data-testid="button-save-changes">{isPending ? "Saving..." : "Save Changes"}</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={isPending}
+                data-testid="button-cancel"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPending || total === 0} data-testid="button-save-changes">
+                {isPending ? "Saving..." : "Save Changes"}
+              </Button>
             </div>
           </form>
         </Form>
@@ -260,7 +302,7 @@ export function AdjustmentEditForm({
   formatDisplayDate,
   formatAmount,
   total,
-  toggleOptionalMutation
+  toggleOptionalMutation,
 }: {
   form: UseFormReturn<any>;
   voucherType: string;
@@ -279,7 +321,7 @@ export function AdjustmentEditForm({
     control: form.control,
     name: "items",
   });
-  const location = locations.find(l => l.id === form.watch("locationId"));
+  const location = locations.find((l) => l.id === form.watch("locationId"));
 
   return (
     <Card>
@@ -314,12 +356,7 @@ export function AdjustmentEditForm({
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
+                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
                       </PopoverContent>
                     </Popover>
                     <FormMessage />
@@ -341,7 +378,9 @@ export function AdjustmentEditForm({
                 disabled={toggleOptionalMutation.isPending}
                 data-testid="switch-optional"
               />
-              <Label htmlFor="optional-toggle-adjustment" className="cursor-pointer">Optional (Does not affect books)</Label>
+              <Label htmlFor="optional-toggle-adjustment" className="cursor-pointer">
+                Optional (Does not affect books)
+              </Label>
             </div>
 
             <div>
@@ -356,20 +395,48 @@ export function AdjustmentEditForm({
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-sm font-medium text-muted-foreground">Item {index + 1}</span>
                         {fields.length > 1 && (
-                          <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} data-testid={`button-remove-adj-mobile-${index}`}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => remove(index)}
+                            data-testid={`button-remove-adj-mobile-${index}`}
+                          >
                             <X className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
                       <StockItemCombobox
-                        value={form.watch(`items.${index}.stockItemId`) > 0 ? { id: form.watch(`items.${index}.stockItemId`), name: form.watch(`items.${index}.stockItemName`) } : null}
-                        onChange={(id, name) => { form.setValue(`items.${index}.stockItemId`, id); form.setValue(`items.${index}.stockItemName`, name); }}
+                        value={
+                          form.watch(`items.${index}.stockItemId`) > 0
+                            ? {
+                                id: form.watch(`items.${index}.stockItemId`),
+                                name: form.watch(`items.${index}.stockItemName`),
+                              }
+                            : null
+                        }
+                        onChange={(id, name) => {
+                          form.setValue(`items.${index}.stockItemId`, id);
+                          form.setValue(`items.${index}.stockItemName`, name);
+                        }}
                         stockItems={stockItems}
                         rowIndex={index}
                       />
                       <div className="grid grid-cols-2 gap-3">
-                        <Input {...form.register(`items.${index}.quantity`)} type="number" step="0.001" placeholder="Qty" data-testid={`input-quantity-adj-mobile-${index}`} />
-                        <Input {...form.register(`items.${index}.rate`)} type="number" step="0.01" placeholder="Rate" data-testid={`input-rate-adj-mobile-${index}`} />
+                        <Input
+                          {...form.register(`items.${index}.quantity`)}
+                          type="number"
+                          step="0.001"
+                          placeholder="Qty"
+                          data-testid={`input-quantity-adj-mobile-${index}`}
+                        />
+                        <Input
+                          {...form.register(`items.${index}.rate`)}
+                          type="number"
+                          step="0.01"
+                          placeholder="Rate"
+                          data-testid={`input-rate-adj-mobile-${index}`}
+                        />
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t">
                         <span className="text-sm text-muted-foreground">Total</span>
@@ -387,11 +454,11 @@ export function AdjustmentEditForm({
                 stockItems={stockItems}
                 formatAmount={formatAmount}
               />
-              
+
               <div className="hidden md:flex justify-end p-2 bg-muted/30 border-x border-b rounded-b-md">
                 <div className="flex items-center gap-4">
-                   <span className="text-sm font-medium">Grand Total:</span>
-                   <span className="font-bold font-mono">{formatAmount(total)}</span>
+                  <span className="text-sm font-medium">Grand Total:</span>
+                  <span className="font-bold font-mono">{formatAmount(total)}</span>
                 </div>
               </div>
             </div>
@@ -411,8 +478,18 @@ export function AdjustmentEditForm({
             />
 
             <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" onClick={onCancel} disabled={isPending} data-testid="button-cancel">Cancel</Button>
-              <Button type="submit" disabled={isPending || total === 0} data-testid="button-save-changes">{isPending ? "Saving..." : "Save Changes"}</Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onCancel}
+                disabled={isPending}
+                data-testid="button-cancel"
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isPending || total === 0} data-testid="button-save-changes">
+                {isPending ? "Saving..." : "Save Changes"}
+              </Button>
             </div>
           </form>
         </Form>

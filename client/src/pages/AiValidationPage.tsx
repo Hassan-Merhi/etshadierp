@@ -4,21 +4,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import {
   Upload,
@@ -61,11 +48,11 @@ interface ValidationResult {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const VALIDATION_TYPES = [
-  { value: "item_code_check",         label: "Item Code Check",         twoFiles: false, implemented: true },
-  { value: "duplicate_name_check",    label: "Duplicate Name Check",    twoFiles: false, implemented: true },
-  { value: "statement_compare",       label: "Statement Compare",       twoFiles: true,  implemented: false },
-  { value: "po_compare",              label: "PO Compare",              twoFiles: true,  implemented: false },
-  { value: "amount_total_check",      label: "Amount Total Check",      twoFiles: false, implemented: false },
+  { value: "item_code_check", label: "Item Code Check", twoFiles: false, implemented: true },
+  { value: "duplicate_name_check", label: "Duplicate Name Check", twoFiles: false, implemented: true },
+  { value: "statement_compare", label: "Statement Compare", twoFiles: true, implemented: false },
+  { value: "po_compare", label: "PO Compare", twoFiles: true, implemented: false },
+  { value: "amount_total_check", label: "Amount Total Check", twoFiles: false, implemented: false },
   { value: "currency_conversion_check", label: "Currency Conversion Check", twoFiles: false, implemented: false },
 ];
 
@@ -82,12 +69,15 @@ function FileDropZone({ label, file, onFile, testId }: FileDropZoneProps) {
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    const f = e.dataTransfer.files[0];
-    if (f) onFile(f);
-  }, [onFile]);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragging(false);
+      const f = e.dataTransfer.files[0];
+      if (f) onFile(f);
+    },
+    [onFile]
+  );
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -99,7 +89,10 @@ function FileDropZone({ label, file, onFile, testId }: FileDropZoneProps) {
     <div
       data-testid={testId}
       onClick={() => inputRef.current?.click()}
-      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragging(true);
+      }}
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
       className={[
@@ -122,7 +115,10 @@ function FileDropZone({ label, file, onFile, testId }: FileDropZoneProps) {
           <Button
             size="icon"
             variant="ghost"
-            onClick={e => { e.stopPropagation(); onFile(null); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onFile(null);
+            }}
             data-testid={`${testId}-clear`}
           >
             <X className="w-4 h-4" />
@@ -148,9 +144,9 @@ interface SummaryCardProps {
 function SummaryCard({ label, value, variant = "default" }: SummaryCardProps) {
   const colors: Record<string, string> = {
     default: "text-foreground",
-    good:    "text-green-600 dark:text-green-400",
-    bad:     "text-destructive",
-    warn:    "text-amber-600 dark:text-amber-400",
+    good: "text-green-600 dark:text-green-400",
+    bad: "text-destructive",
+    warn: "text-amber-600 dark:text-amber-400",
   };
   return (
     <div className="flex flex-col gap-1 rounded-md border bg-card p-4">
@@ -169,7 +165,7 @@ export default function AiValidationPage() {
   const [validationType, setValidationType] = useState<string>("");
   const [result, setResult] = useState<ValidationResult | null>(null);
 
-  const selectedType = VALIDATION_TYPES.find(t => t.value === validationType);
+  const selectedType = VALIDATION_TYPES.find((t) => t.value === validationType);
   const needsTwoFiles = selectedType?.twoFiles ?? false;
 
   const runMutation = useMutation({
@@ -212,7 +208,7 @@ export default function AiValidationPage() {
 
   const downloadCleaned = () => {
     if (!result?.cleanedExcel) return;
-    const bytes = Uint8Array.from(atob(result.cleanedExcel), c => c.charCodeAt(0));
+    const bytes = Uint8Array.from(atob(result.cleanedExcel), (c) => c.charCodeAt(0));
     const blob = new Blob([bytes], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
@@ -230,18 +226,25 @@ export default function AiValidationPage() {
     const s = result.summary;
     const cards: SummaryCardProps[] = [];
 
-    if (typeof s.totalChecked === "number")
-      cards.push({ label: "Total Rows", value: s.totalChecked });
+    if (typeof s.totalChecked === "number") cards.push({ label: "Total Rows", value: s.totalChecked });
     if (typeof s.found === "number")
       cards.push({ label: "Found", value: s.found, variant: s.found > 0 ? "good" : "default" });
     if (typeof s.missing === "number")
       cards.push({ label: "Missing", value: s.missing, variant: s.missing > 0 ? "bad" : "good" });
     if (typeof s.duplicateInFile === "number")
-      cards.push({ label: "Duplicates (file)", value: s.duplicateInFile, variant: s.duplicateInFile > 0 ? "bad" : "good" });
+      cards.push({
+        label: "Duplicates (file)",
+        value: s.duplicateInFile,
+        variant: s.duplicateInFile > 0 ? "bad" : "good",
+      });
     if (typeof s.closeMatches === "number")
       cards.push({ label: "Close Matches", value: s.closeMatches, variant: s.closeMatches > 0 ? "warn" : "good" });
     if (typeof s.duplicateGroups === "number")
-      cards.push({ label: "Duplicate Groups", value: s.duplicateGroups, variant: s.duplicateGroups > 0 ? "warn" : "good" });
+      cards.push({
+        label: "Duplicate Groups",
+        value: s.duplicateGroups,
+        variant: s.duplicateGroups > 0 ? "warn" : "good",
+      });
     if (typeof s.duplicateItems === "number")
       cards.push({ label: "Affected Rows", value: s.duplicateItems, variant: s.duplicateItems > 0 ? "warn" : "good" });
 
@@ -270,12 +273,10 @@ export default function AiValidationPage() {
                     <SelectValue placeholder="Select type…" />
                   </SelectTrigger>
                   <SelectContent>
-                    {VALIDATION_TYPES.map(t => (
+                    {VALIDATION_TYPES.map((t) => (
                       <SelectItem key={t.value} value={t.value} data-testid={`option-${t.value}`}>
                         <span>{t.label}</span>
-                        {!t.implemented && (
-                          <span className="ml-2 text-xs text-muted-foreground">(soon)</span>
-                        )}
+                        {!t.implemented && <span className="ml-2 text-xs text-muted-foreground">(soon)</span>}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -287,20 +288,13 @@ export default function AiValidationPage() {
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   {needsTwoFiles ? "File 1" : "File"}
                 </label>
-                <FileDropZone
-                  label="Drop or click to upload"
-                  file={file1}
-                  onFile={setFile1}
-                  testId="dropzone-file1"
-                />
+                <FileDropZone label="Drop or click to upload" file={file1} onFile={setFile1} testId="dropzone-file1" />
               </div>
 
               {/* File 2 — only for two-file types */}
               {needsTwoFiles && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    File 2
-                  </label>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">File 2</label>
                   <FileDropZone
                     label="Drop or click to upload"
                     file={file2}
@@ -325,8 +319,8 @@ export default function AiValidationPage() {
           <Card>
             <CardContent className="pt-4">
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Upload an Excel or CSV file and select a validation type. Results will appear on
-                the right. A cleaned Excel file can be downloaded after validation.
+                Upload an Excel or CSV file and select a validation type. Results will appear on the right. A cleaned
+                Excel file can be downloaded after validation.
               </p>
             </CardContent>
           </Card>
@@ -355,10 +349,14 @@ export default function AiValidationPage() {
                 <div>
                   <p className="text-sm font-semibold">{result.summary.message}</p>
                   {result.summary.codeColumn && (
-                    <p className="text-xs text-muted-foreground">Code column: <span className="font-mono">{result.summary.codeColumn}</span></p>
+                    <p className="text-xs text-muted-foreground">
+                      Code column: <span className="font-mono">{result.summary.codeColumn}</span>
+                    </p>
                   )}
                   {result.summary.nameColumn && (
-                    <p className="text-xs text-muted-foreground">Name column: <span className="font-mono">{result.summary.nameColumn}</span></p>
+                    <p className="text-xs text-muted-foreground">
+                      Name column: <span className="font-mono">{result.summary.nameColumn}</span>
+                    </p>
                   )}
                 </div>
                 {result.cleanedExcel && (
@@ -372,7 +370,7 @@ export default function AiValidationPage() {
               {/* Summary cards */}
               {summaryCards().length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {summaryCards().map(card => (
+                  {summaryCards().map((card) => (
                     <SummaryCard key={card.label} {...card} />
                   ))}
                 </div>
@@ -422,7 +420,10 @@ export default function AiValidationPage() {
                     <CardTitle className="text-sm flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-amber-500" />
                       Warnings
-                      <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400" data-testid="badge-warning-count">
+                      <Badge
+                        className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                        data-testid="badge-warning-count"
+                      >
                         {result.warnings.length}
                       </Badge>
                     </CardTitle>

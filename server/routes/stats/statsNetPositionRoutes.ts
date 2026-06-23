@@ -5,35 +5,97 @@ import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } 
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "../_helpers";
 import { getClientDate } from "../../lib/dateUtils";
 import {
-  inventory, stockItems, stockGroups,
-  stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems,
-  bankAccounts, fixedAssets, ledgerAccounts, insertLedgerAccountSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertContainerSchema,
-  insertStockTransferVoucherSchema, insertStockAdjustmentVoucherSchema,
-  updateStockTransferSchema, updateStockAdjustmentSchema,
-  vouchers, voucherEntries, salesItems, suppliers, customers, customerBalances,
-  employees, locations, userLocations, userCompanyRoles, companies,
-  auditLog, users, FEATURE_KEYS, companySettings,
-  purchaseOrders, poLineItems, interCompanyTransfers,
-  insertInterCompanyTransferSchema, insertContainerSaleSchema, containerSales,
-  insertUserPreferencesSchema, userPreferences,
-  insertDraftPosSaleSchema, InsertDraftPosSale,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  fiscalPeriodClosures, wasteDispatches, wasteDispatchItems,
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  inventory,
+  stockItems,
+  stockGroups,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  bankAccounts,
+  fixedAssets,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertContainerSchema,
+  insertStockTransferVoucherSchema,
+  insertStockAdjustmentVoucherSchema,
+  updateStockTransferSchema,
+  updateStockAdjustmentSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  suppliers,
+  customers,
+  customerBalances,
+  employees,
+  locations,
+  userLocations,
+  userCompanyRoles,
+  companies,
+  auditLog,
+  users,
+  FEATURE_KEYS,
+  companySettings,
+  purchaseOrders,
+  poLineItems,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  insertContainerSaleSchema,
+  containerSales,
+  insertUserPreferencesSchema,
+  userPreferences,
+  insertDraftPosSaleSchema,
+  InsertDraftPosSale,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
-  bales, baleProducts, baleProductCategories, storedFiles,
-  stockItemLocationPrices, exchangeRates,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  storedFiles,
+  stockItemLocationPrices,
+  exchangeRates,
   factoryWorkerAdvances,
-  propertyContracts, propertyMonthlyLedger, propertyPayments,
+  propertyContracts,
+  propertyMonthlyLedger,
+  propertyPayments,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -52,7 +114,10 @@ const _statCache = new Map<string, { data: any; expiresAt: number }>();
 function _getCached(key: string): any | null {
   const e = _statCache.get(key);
   if (!e) return null;
-  if (Date.now() > e.expiresAt) { _statCache.delete(key); return null; }
+  if (Date.now() > e.expiresAt) {
+    _statCache.delete(key);
+    return null;
+  }
   return e.data;
 }
 function _setCached(key: string, data: any, ttlMs = 30_000): void {
@@ -60,10 +125,11 @@ function _setCached(key: string, data: any, ttlMs = 30_000): void {
   // Prune stale entries to prevent unbounded growth (> 500 entries is unusual)
   if (_statCache.size > 500) {
     const now = Date.now();
-    for (const [k, v] of _statCache) { if (v.expiresAt < now) _statCache.delete(k); }
+    for (const [k, v] of _statCache) {
+      if (v.expiresAt < now) _statCache.delete(k);
+    }
   }
 }
-
 
 export function registerStatsNetPositionRoutes(app: Express) {
   app.get("/api/stats/net-position-excel", requireAuth, requireNonPOS, async (req, res) => {
@@ -89,10 +155,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       ];
       if (toDate) voucherConds.push(lte(vouchers.voucherDate, toDate));
 
-      const voucherAcctConds: any[] = [
-        eq(vouchers.optional, false),
-        isNull(vouchers.deletedAt),
-      ];
+      const voucherAcctConds: any[] = [eq(vouchers.optional, false), isNull(vouchers.deletedAt)];
       if (toDate) voucherAcctConds.push(lte(vouchers.voucherDate, toDate));
 
       // Two separate queries — see net-profit route for rationale:
@@ -100,27 +163,29 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // ledgerAccEntries → ledger account balances (scoped to account's company so
       //                    migrated accounts appear correctly in the destination)
       const [companyEntries, ledgerAccEntries] = await Promise.all([
-        db.select({
-          ledgerAccountId: voucherEntries.ledgerAccountId,
-          supplierId:      voucherEntries.supplierId,
-          employeeId:      voucherEntries.employeeId,
-          debitAmount:     voucherEntries.debitAmount,
-          creditAmount:    voucherEntries.creditAmount,
-        })
-        .from(voucherEntries)
-        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .where(and(...voucherConds))
-        .execute(),
-        db.select({
-          ledgerAccountId: voucherEntries.ledgerAccountId,
-          debitAmount:     voucherEntries.debitAmount,
-          creditAmount:    voucherEntries.creditAmount,
-        })
-        .from(voucherEntries)
-        .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-        .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
-        .where(and(eq(ledgerAccounts.companyId, companyId), ...voucherAcctConds))
-        .execute(),
+        db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            supplierId: voucherEntries.supplierId,
+            employeeId: voucherEntries.employeeId,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(and(...voucherConds))
+          .execute(),
+        db
+          .select({
+            ledgerAccountId: voucherEntries.ledgerAccountId,
+            debitAmount: voucherEntries.debitAmount,
+            creditAmount: voucherEntries.creditAmount,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
+          .where(and(eq(ledgerAccounts.companyId, companyId), ...voucherAcctConds))
+          .execute(),
       ]);
 
       const accountBalances = new Map<number, { debit: number; credit: number }>();
@@ -128,13 +193,19 @@ export function registerStatsNetPositionRoutes(app: Express) {
       for (const e of ledgerAccEntries as any[]) {
         if (e.ledgerAccountId) {
           const cur = accountBalances.get(e.ledgerAccountId) || { debit: 0, credit: 0 };
-          accountBalances.set(e.ledgerAccountId, { debit: cur.debit + parseFloat(e.debitAmount || "0"), credit: cur.credit + parseFloat(e.creditAmount || "0") });
+          accountBalances.set(e.ledgerAccountId, {
+            debit: cur.debit + parseFloat(e.debitAmount || "0"),
+            credit: cur.credit + parseFloat(e.creditAmount || "0"),
+          });
         }
       }
       for (const e of companyEntries as any[]) {
         if (e.supplierId) {
           const cur = supplierBalances.get(e.supplierId) || { debit: 0, credit: 0 };
-          supplierBalances.set(e.supplierId, { debit: cur.debit + parseFloat(e.debitAmount || "0"), credit: cur.credit + parseFloat(e.creditAmount || "0") });
+          supplierBalances.set(e.supplierId, {
+            debit: cur.debit + parseFloat(e.debitAmount || "0"),
+            credit: cur.credit + parseFloat(e.creditAmount || "0"),
+          });
         }
       }
 
@@ -144,21 +215,22 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // SP formula: Cash + Stock (inventory) → What We Have; sp_payable only → What We Owe.
       const isSupplierPartner = (company as any)?.companyType === "supplier_partner";
       const accountsForClassify = isSupplierPartner
-        ? companyAccounts.filter(
-            (a: any) => a.accountType === "Cash" || a.subType === "sp_payable"
-          )
-        : companyAccounts.filter(
-            (a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing"
-          );
-      const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, { includeSupplierTypeAccounts: shouldIncludeSuppliers });
+        ? companyAccounts.filter((a: any) => a.accountType === "Cash" || a.subType === "sp_payable")
+        : companyAccounts.filter((a: any) => a.subType !== "sp_stock" && a.subType !== "sp_cost_clearing");
+      const classified = classifyNetPositionAccounts(accountsForClassify, accountBalances, {
+        includeSupplierTypeAccounts: shouldIncludeSuppliers,
+      });
       let forUsTotal = classified.forUsTotal;
-      let onUsTotal  = classified.onUsTotal;
+      let onUsTotal = classified.onUsTotal;
       const forUsAccounts: any[] = [...classified.forUsAccounts];
-      const onUsAccounts: any[]  = [...classified.onUsAccounts];
+      const onUsAccounts: any[] = [...classified.onUsAccounts];
 
       // ── 3. Stock In Hand — historical as of toDate ────────────────────────
-      const activeLocsData = await db.select({ id: locations.id }).from(locations)
-        .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt))).execute();
+      const activeLocsData = await db
+        .select({ id: locations.id })
+        .from(locations)
+        .where(and(eq(locations.companyId, companyId), eq(locations.active, true), isNull(locations.deletedAt)))
+        .execute();
       const activeLocIds = activeLocsData.map((l: any) => l.id);
       let stockOnFloor = 0;
       if (activeLocIds.length > 0) {
@@ -175,14 +247,23 @@ export function registerStatsNetPositionRoutes(app: Express) {
             }
           }
         } else {
-          const invData = await db.select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
-            .from(inventory).where(inArray(inventory.locationId, activeLocIds)).execute();
-          for (const inv of invData as any[]) stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
+          const invData = await db
+            .select({ quantity: inventory.quantity, averageRate: inventory.averageRate })
+            .from(inventory)
+            .where(inArray(inventory.locationId, activeLocIds))
+            .execute();
+          for (const inv of invData as any[])
+            stockOnFloor += parseFloat(inv.quantity || "0") * parseFloat(inv.averageRate || "0");
         }
       }
       if (stockOnFloor > 0) {
         forUsTotal += stockOnFloor;
-        forUsAccounts.push({ name: "Stock In Hand (Inventory)", code: "COMPUTED", value: stockOnFloor, category: "Inventory" });
+        forUsAccounts.push({
+          name: "Stock In Hand (Inventory)",
+          code: "COMPUTED",
+          value: stockOnFloor,
+          category: "Inventory",
+        });
       }
 
       // ── 4. Factory worker advances only (Factory Net Position is isolated from ERP) ──
@@ -190,7 +271,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // Factory workers live in factory_workers / factory_worker_advances tables, not employees.
       // Remove the "Factory Worker Advances" ledger account (replaced by table sum below).
       const fwaLedgerIdx2 = forUsAccounts.findIndex(
-        (a: any) => (a.name || "").toLowerCase() === "factory worker advances",
+        (a: any) => (a.name || "").toLowerCase() === "factory worker advances"
       );
       if (fwaLedgerIdx2 !== -1) {
         forUsTotal = round2(forUsTotal - forUsAccounts[fwaLedgerIdx2].value);
@@ -205,7 +286,12 @@ export function registerStatsNetPositionRoutes(app: Express) {
         const workerAdvances = parseFloat((fwAdvRow2 as any)?.total || "0");
         if (workerAdvances > 0) {
           forUsTotal += workerAdvances;
-          forUsAccounts.push({ name: "Worker Advances (Prepaid)", code: "COMPUTED", value: workerAdvances, category: "Worker Advances" });
+          forUsAccounts.push({
+            name: "Worker Advances (Prepaid)",
+            code: "COMPUTED",
+            value: workerAdvances,
+            category: "Worker Advances",
+          });
         }
       }
 
@@ -213,9 +299,14 @@ export function registerStatsNetPositionRoutes(app: Express) {
       if (shouldIncludeSuppliers) {
         // Only fetch suppliers that appear in this company's entries (avoids full-table scan)
         const supplierIdsWithBalance = [...supplierBalances.keys()];
-        const allSuppliers = supplierIdsWithBalance.length > 0
-          ? await db.select().from(suppliers).where(and(isNull(suppliers.deletedAt), inArray(suppliers.id, supplierIdsWithBalance))).execute()
-          : [];
+        const allSuppliers =
+          supplierIdsWithBalance.length > 0
+            ? await db
+                .select()
+                .from(suppliers)
+                .where(and(isNull(suppliers.deletedAt), inArray(suppliers.id, supplierIdsWithBalance)))
+                .execute()
+            : [];
         let supplierLiabilities = 0;
         let supplierAssets = 0;
         for (const sup of allSuppliers as any[]) {
@@ -228,7 +319,12 @@ export function registerStatsNetPositionRoutes(app: Express) {
               onUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: netBalance, category: "Supplier" });
             } else if (netBalance < 0) {
               supplierAssets += Math.abs(netBalance);
-              forUsAccounts.push({ name: sup.legalName, code: sup.code || "", value: Math.abs(netBalance), category: "Supplier Overpayment" });
+              forUsAccounts.push({
+                name: sup.legalName,
+                code: sup.code || "",
+                value: Math.abs(netBalance),
+                category: "Supplier Overpayment",
+              });
             }
           }
         }
@@ -257,7 +353,12 @@ export function registerStatsNetPositionRoutes(app: Express) {
       }
       if (stockOtwValue > 0) {
         forUsTotal += stockOtwValue;
-        forUsAccounts.push({ name: "Stock On The Way", code: "STOCK_OTW", value: stockOtwValue, category: "Stock OTW" });
+        forUsAccounts.push({
+          name: "Stock On The Way",
+          code: "STOCK_OTW",
+          value: stockOtwValue,
+          category: "Stock OTW",
+        });
       }
 
       const netPosition = round2(forUsTotal - onUsTotal);
@@ -266,20 +367,21 @@ export function registerStatsNetPositionRoutes(app: Express) {
       const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
       // ── 5. Build Excel ────────────────────────────────────────────────────
-      const ExcelJS = await import('exceljs');
+      const ExcelJS = await import("exceljs");
       const wb = new ExcelJS.default.Workbook();
       wb.creator = companyName;
       wb.created = new Date();
 
-      const DARK_GREEN  = "FF1A6B3C";
-      const DARK_RED    = "FF8B1A1A";
-      const DARK_NAVY   = "FF1F3864";
+      const DARK_GREEN = "FF1A6B3C";
+      const DARK_RED = "FF8B1A1A";
+      const DARK_NAVY = "FF1F3864";
       const LIGHT_GREEN = "FFE8F5E9";
-      const LIGHT_RED   = "FFFDECEA";
-      const ALT_ROW     = "FFF5F5F5";
-      const NUM_FMT     = '#,##0.00';
+      const LIGHT_RED = "FFFDECEA";
+      const ALT_ROW = "FFF5F5F5";
+      const NUM_FMT = "#,##0.00";
 
-      const currency = (n: number) => `$${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
+      const currency = (n: number) =>
+        `$${new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`;
 
       // ── Sheet 1: Summary ──────────────────────────────────────────────────
       // ── Merge stock accounts into one combined Inventory line (Excel) ────────
@@ -296,7 +398,12 @@ export function registerStatsNetPositionRoutes(app: Express) {
             if (isStockEntry(forUsAccounts[i])) forUsAccounts.splice(i, 1);
           }
           if (combined > 0) {
-            forUsAccounts.push({ name: "Stock In Hand / Stock on Floor", code: "COMPUTED", value: combined, category: "Inventory" });
+            forUsAccounts.push({
+              name: "Stock In Hand / Stock on Floor",
+              code: "COMPUTED",
+              value: combined,
+              category: "Inventory",
+            });
           }
         } else if (stockEntries.length === 1 && stockEntries[0].name !== "Stock In Hand / Stock on Floor") {
           stockEntries[0].name = "Stock In Hand / Stock on Floor";
@@ -307,7 +414,7 @@ export function registerStatsNetPositionRoutes(app: Express) {
       ws1.columns = [
         { key: "label", width: 35 },
         { key: "value", width: 22 },
-        { key: "note",  width: 40 },
+        { key: "note", width: 40 },
       ];
 
       const addTitle = (ws: any, text: string, argb: string) => {
@@ -331,7 +438,14 @@ export function registerStatsNetPositionRoutes(app: Express) {
 
       addTitle(ws1, `${companyName} — Net Position Report`, DARK_NAVY);
 
-      const dateRange = fromDate && toDate ? `${fromDate} to ${toDate}` : fromDate ? `From ${fromDate}` : toDate ? `Up to ${toDate}` : "All Time";
+      const dateRange =
+        fromDate && toDate
+          ? `${fromDate} to ${toDate}`
+          : fromDate
+            ? `From ${fromDate}`
+            : toDate
+              ? `Up to ${toDate}`
+              : "All Time";
       const metaRow = ws1.addRow([`Date Range: ${dateRange}`, "", `Generated: ${new Date().toLocaleDateString()}`]);
       metaRow.getCell(1).font = { italic: true, color: { argb: "FF555555" } };
       metaRow.getCell(3).font = { italic: true, color: { argb: "FF555555" } };
@@ -356,7 +470,11 @@ export function registerStatsNetPositionRoutes(app: Express) {
         cell.alignment = { horizontal: "center" };
       });
 
-      const haveRow = ws1.addRow(["What We Have (Total Assets)", currency(round2(forUsTotal)), `${forUsAccounts.length} accounts`]);
+      const haveRow = ws1.addRow([
+        "What We Have (Total Assets)",
+        currency(round2(forUsTotal)),
+        `${forUsAccounts.length} accounts`,
+      ]);
       haveRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } };
       haveRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } };
       haveRow.getCell(3).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } };
@@ -364,7 +482,11 @@ export function registerStatsNetPositionRoutes(app: Express) {
       haveRow.getCell(2).font = { bold: true, color: { argb: DARK_GREEN } };
       haveRow.getCell(2).alignment = { horizontal: "right" };
 
-      const oweRow = ws1.addRow(["What We Owe (Total Liabilities)", currency(round2(onUsTotal)), `${onUsAccounts.length} accounts`]);
+      const oweRow = ws1.addRow([
+        "What We Owe (Total Liabilities)",
+        currency(round2(onUsTotal)),
+        `${onUsAccounts.length} accounts`,
+      ]);
       oweRow.getCell(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } };
       oweRow.getCell(2).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } };
       oweRow.getCell(3).fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } };
@@ -374,7 +496,11 @@ export function registerStatsNetPositionRoutes(app: Express) {
 
       const netArgb = netPosition >= 0 ? DARK_GREEN : DARK_RED;
       const netBgArgb = netPosition >= 0 ? "FFD4EDDA" : "FFF8D7DA";
-      const netRow = ws1.addRow(["Net Position", currency(round2(netPosition)), netPosition >= 0 ? "We have more than we owe" : "We owe more than we have"]);
+      const netRow = ws1.addRow([
+        "Net Position",
+        currency(round2(netPosition)),
+        netPosition >= 0 ? "We have more than we owe" : "We owe more than we have",
+      ]);
       [1, 2, 3].forEach((col) => {
         const cell = netRow.getCell(col);
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: netBgArgb } };
@@ -388,36 +514,54 @@ export function registerStatsNetPositionRoutes(app: Express) {
       // Category breakdown — Assets
       addSubheader(ws1, "Assets Breakdown by Category", DARK_GREEN);
       const assetCatMap: Record<string, number> = {};
-      for (const a of forUsAccounts) assetCatMap[a.category || "Other"] = (assetCatMap[a.category || "Other"] || 0) + a.value;
+      for (const a of forUsAccounts)
+        assetCatMap[a.category || "Other"] = (assetCatMap[a.category || "Other"] || 0) + a.value;
       const catHdr = ws1.addRow(["Category", "Total (USD)", ""]);
-      catHdr.eachCell((cell: any) => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9EAD3" } }; });
-      Object.entries(assetCatMap).sort((a, b) => b[1] - a[1]).forEach(([cat, val], i) => {
-        const r = ws1.addRow([cat, currency(round2(val)), ""]);
-        if (i % 2 === 1) r.eachCell((c: any) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } }; });
-        r.getCell(2).alignment = { horizontal: "right" };
+      catHdr.eachCell((cell: any) => {
+        cell.font = { bold: true };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9EAD3" } };
       });
+      Object.entries(assetCatMap)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([cat, val], i) => {
+          const r = ws1.addRow([cat, currency(round2(val)), ""]);
+          if (i % 2 === 1)
+            r.eachCell((c: any) => {
+              c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } };
+            });
+          r.getCell(2).alignment = { horizontal: "right" };
+        });
 
       ws1.addRow([]);
 
       // Category breakdown — Liabilities
       addSubheader(ws1, "Liabilities Breakdown by Category", DARK_RED);
       const liabCatMap: Record<string, number> = {};
-      for (const a of onUsAccounts) liabCatMap[a.category || "Other"] = (liabCatMap[a.category || "Other"] || 0) + a.value;
+      for (const a of onUsAccounts)
+        liabCatMap[a.category || "Other"] = (liabCatMap[a.category || "Other"] || 0) + a.value;
       const liabHdr = ws1.addRow(["Category", "Total (USD)", ""]);
-      liabHdr.eachCell((cell: any) => { cell.font = { bold: true }; cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4CCCC" } }; });
-      Object.entries(liabCatMap).sort((a, b) => b[1] - a[1]).forEach(([cat, val], i) => {
-        const r = ws1.addRow([cat, currency(round2(val)), ""]);
-        if (i % 2 === 1) r.eachCell((c: any) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } }; });
-        r.getCell(2).alignment = { horizontal: "right" };
+      liabHdr.eachCell((cell: any) => {
+        cell.font = { bold: true };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF4CCCC" } };
       });
+      Object.entries(liabCatMap)
+        .sort((a, b) => b[1] - a[1])
+        .forEach(([cat, val], i) => {
+          const r = ws1.addRow([cat, currency(round2(val)), ""]);
+          if (i % 2 === 1)
+            r.eachCell((c: any) => {
+              c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } };
+            });
+          r.getCell(2).alignment = { horizontal: "right" };
+        });
 
       // ── Sheet 2: What We Have (Assets) ────────────────────────────────────
       const ws2 = wb.addWorksheet("What We Have (Assets)");
       ws2.columns = [
-        { key: "name",     width: 40, header: "Account Name" },
-        { key: "code",     width: 18, header: "Code" },
+        { key: "name", width: 40, header: "Account Name" },
+        { key: "code", width: 18, header: "Code" },
         { key: "category", width: 22, header: "Category" },
-        { key: "value",    width: 20, header: "Balance (USD)" },
+        { key: "value", width: 20, header: "Balance (USD)" },
       ];
       const ws2Hdr = ws2.getRow(1);
       ws2Hdr.height = 20;
@@ -437,25 +581,36 @@ export function registerStatsNetPositionRoutes(app: Express) {
 
       const sortedAssets = [...forUsAccounts].sort((a, b) => b.value - a.value);
       sortedAssets.forEach((acc, i) => {
-        const r = ws2.addRow({ name: acc.name, code: acc.code || "", category: acc.category || "Other", value: round2(acc.value) });
+        const r = ws2.addRow({
+          name: acc.name,
+          code: acc.code || "",
+          category: acc.category || "Other",
+          value: round2(acc.value),
+        });
         r.getCell("value").numFmt = NUM_FMT;
         r.getCell("value").alignment = { horizontal: "right" };
-        if (i % 2 === 1) r.eachCell((c: any) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } }; });
+        if (i % 2 === 1)
+          r.eachCell((c: any) => {
+            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } };
+          });
       });
 
       // Total row
       const assetTotalRow = ws2.addRow({ name: "TOTAL", code: "", category: "", value: round2(forUsTotal) });
-      assetTotalRow.eachCell((c: any) => { c.font = { bold: true, color: { argb: DARK_GREEN } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } }; });
+      assetTotalRow.eachCell((c: any) => {
+        c.font = { bold: true, color: { argb: DARK_GREEN } };
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_GREEN } };
+      });
       assetTotalRow.getCell("value").numFmt = NUM_FMT;
       assetTotalRow.getCell("value").alignment = { horizontal: "right" };
 
       // ── Sheet 3: What We Owe (Liabilities) ───────────────────────────────
       const ws3 = wb.addWorksheet("What We Owe (Liabilities)");
       ws3.columns = [
-        { key: "name",     width: 40, header: "Account Name" },
-        { key: "code",     width: 18, header: "Code" },
+        { key: "name", width: 40, header: "Account Name" },
+        { key: "code", width: 18, header: "Code" },
         { key: "category", width: 22, header: "Category" },
-        { key: "value",    width: 20, header: "Balance (USD)" },
+        { key: "value", width: 20, header: "Balance (USD)" },
       ];
       ws3.spliceRows(1, 0, [`${companyName} — What We Owe (Liabilities)  |  ${dateRange}`]);
       ws3.mergeCells("A1:D1");
@@ -473,14 +628,25 @@ export function registerStatsNetPositionRoutes(app: Express) {
 
       const sortedLiabs = [...onUsAccounts].sort((a, b) => b.value - a.value);
       sortedLiabs.forEach((acc, i) => {
-        const r = ws3.addRow({ name: acc.name, code: acc.code || "", category: acc.category || "Other", value: round2(acc.value) });
+        const r = ws3.addRow({
+          name: acc.name,
+          code: acc.code || "",
+          category: acc.category || "Other",
+          value: round2(acc.value),
+        });
         r.getCell("value").numFmt = NUM_FMT;
         r.getCell("value").alignment = { horizontal: "right" };
-        if (i % 2 === 1) r.eachCell((c: any) => { c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } }; });
+        if (i % 2 === 1)
+          r.eachCell((c: any) => {
+            c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ALT_ROW } };
+          });
       });
 
       const liabTotalRow = ws3.addRow({ name: "TOTAL", code: "", category: "", value: round2(onUsTotal) });
-      liabTotalRow.eachCell((c: any) => { c.font = { bold: true, color: { argb: DARK_RED } }; c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } }; });
+      liabTotalRow.eachCell((c: any) => {
+        c.font = { bold: true, color: { argb: DARK_RED } };
+        c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: LIGHT_RED } };
+      });
       liabTotalRow.getCell("value").numFmt = NUM_FMT;
       liabTotalRow.getCell("value").alignment = { horizontal: "right" };
 

@@ -34,8 +34,8 @@ export default function FactoryStockBaleList() {
 
   const articleCode = params.get("articleCode") || "";
   const productName = params.get("productName") || articleCode;
-  const locationId  = params.get("locationId") || "";
-  const backUrl     = params.get("back") || "";
+  const locationId = params.get("locationId") || "";
+  const backUrl = params.get("back") || "";
 
   const handleBack = () => {
     if (backUrl) navigate(backUrl);
@@ -56,8 +56,8 @@ export default function FactoryStockBaleList() {
     enabled: !!articleCode,
   });
 
-  const available = bales.filter(b => !b.lockedInLoading);
-  const locked    = bales.filter(b => b.lockedInLoading);
+  const available = bales.filter((b) => !b.lockedInLoading);
+  const locked = bales.filter((b) => b.lockedInLoading);
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto space-y-4">
@@ -113,7 +113,7 @@ export default function FactoryStockBaleList() {
                     className={cn(
                       "border-b last:border-0 transition-colors",
                       idx % 2 === 0 ? "bg-background" : "bg-muted/20",
-                      bale.lockedInLoading && "opacity-60",
+                      bale.lockedInLoading && "opacity-60"
                     )}
                     data-testid={`row-bale-${bale.referenceNumber}`}
                   >
@@ -128,11 +128,17 @@ export default function FactoryStockBaleList() {
                     <td className="px-3 py-2 text-xs text-muted-foreground">{bale.workerName || "—"}</td>
                     <td className="px-3 py-2 text-center">
                       {bale.lockedInLoading ? (
-                        <Badge variant="outline" className="text-[10px] px-1.5 h-5 text-amber-600 dark:text-amber-400 border-amber-500/40">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 h-5 text-amber-600 dark:text-amber-400 border-amber-500/40"
+                        >
                           Loading
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-[10px] px-1.5 h-5 text-green-700 dark:text-green-400 border-green-600/40">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 h-5 text-green-700 dark:text-green-400 border-green-600/40"
+                        >
                           Available
                         </Badge>
                       )}

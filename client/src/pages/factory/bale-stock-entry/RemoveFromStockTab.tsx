@@ -13,7 +13,13 @@ import { isZebraMode, printRawZpl } from "@/lib/zebraPrint";
 import { buildZplBatch } from "@/lib/zplBuilder";
 import { getPaperFormat } from "@/components/LabelPrintSettings";
 import { useLabelDesignColors } from "@/hooks/useLabelDesignColors";
-import { generateCombinedLabelsHtml, generateA5LabelsHtml, generateStickerLabelsHtml, type LabelData, type A4DesignColor } from "@/lib/labelHtml";
+import {
+  generateCombinedLabelsHtml,
+  generateA5LabelsHtml,
+  generateStickerLabelsHtml,
+  type LabelData,
+  type A4DesignColor,
+} from "@/lib/labelHtml";
 import type { FactoryBaleProduct, Location } from "@shared/schema";
 import { RemoveBaleAuthDialog, AssignWorkerDialog } from "./RemoveFromStockDialogs";
 import { RemoveFromStockTable } from "./RemoveFromStockTable";
@@ -108,7 +114,8 @@ export function RemoveFromStockTab() {
     const labelsForA4 = designColor ? labels : labels.filter((l) => l.designColor);
 
     if (labelsForA4.length > 0) {
-      const labelHtml = paperFormat === "A5" ? generateA5LabelsHtml(labelsForA4) : generateCombinedLabelsHtml(labelsForA4, designColor);
+      const labelHtml =
+        paperFormat === "A5" ? generateA5LabelsHtml(labelsForA4) : generateCombinedLabelsHtml(labelsForA4, designColor);
       const a4Window = window.open("", "_blank");
       if (a4Window) {
         a4Window.document.write(labelHtml);
@@ -117,9 +124,18 @@ export function RemoveFromStockTab() {
         const a4Imgs = a4Window.document.images;
         let a4Loaded = 0;
         const a4Total = a4Imgs.length;
-        const tryA4Print = () => { a4Loaded++; if (a4Loaded >= a4Total) setTimeout(() => a4Window.print(), 200); };
-        if (a4Total === 0) { setTimeout(() => a4Window.print(), 200); }
-        else { for (let i = 0; i < a4Total; i++) { if (a4Imgs[i].complete) tryA4Print(); else a4Imgs[i].onload = a4Imgs[i].onerror = tryA4Print; } }
+        const tryA4Print = () => {
+          a4Loaded++;
+          if (a4Loaded >= a4Total) setTimeout(() => a4Window.print(), 200);
+        };
+        if (a4Total === 0) {
+          setTimeout(() => a4Window.print(), 200);
+        } else {
+          for (let i = 0; i < a4Total; i++) {
+            if (a4Imgs[i].complete) tryA4Print();
+            else a4Imgs[i].onload = a4Imgs[i].onerror = tryA4Print;
+          }
+        }
       }
     }
 
@@ -131,9 +147,18 @@ export function RemoveFromStockTab() {
       const imgs = stickerWindow.document.images;
       let loaded = 0;
       const total = imgs.length;
-      const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
-      if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
-      else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+      const tryPrint = () => {
+        loaded++;
+        if (loaded >= total) setTimeout(() => stickerWindow.print(), 300);
+      };
+      if (total === 0) {
+        setTimeout(() => stickerWindow.print(), 300);
+      } else {
+        for (let i = 0; i < total; i++) {
+          if (imgs[i].complete) tryPrint();
+          else imgs[i].onload = imgs[i].onerror = tryPrint;
+        }
+      }
     }
   };
 
@@ -146,22 +171,33 @@ export function RemoveFromStockTab() {
       const imgs = stickerWindow.document.images;
       let loaded = 0;
       const total = imgs.length;
-      const tryPrint = () => { loaded++; if (loaded >= total) setTimeout(() => stickerWindow.print(), 300); };
-      if (total === 0) { setTimeout(() => stickerWindow.print(), 300); }
-      else { for (let i = 0; i < total; i++) { if (imgs[i].complete) tryPrint(); else imgs[i].onload = imgs[i].onerror = tryPrint; } }
+      const tryPrint = () => {
+        loaded++;
+        if (loaded >= total) setTimeout(() => stickerWindow.print(), 300);
+      };
+      if (total === 0) {
+        setTimeout(() => stickerWindow.print(), 300);
+      } else {
+        for (let i = 0; i < total; i++) {
+          if (imgs[i].complete) tryPrint();
+          else imgs[i].onload = imgs[i].onerror = tryPrint;
+        }
+      }
     }
   };
 
   const printSingleBale = async (bale: any) => {
     try {
       const labelResponse = await modeApiRequest("POST", "/api/bale-label-prints", {
-        bales: [{
-          productionBaleId: bale.id,
-          productId: bale.productId,
-          articleCode: bale.articleCode || "",
-          pieces: 1,
-          approxWeightKg: bale.weightKg || "0",
-        }],
+        bales: [
+          {
+            productionBaleId: bale.id,
+            productId: bale.productId,
+            articleCode: bale.articleCode || "",
+            pieces: 1,
+            approxWeightKg: bale.weightKg || "0",
+          },
+        ],
       });
       if (!labelResponse.ok) throw new Error("Failed to create label");
       const { labelPrints } = await labelResponse.json();
@@ -196,7 +232,9 @@ export function RemoveFromStockTab() {
     setAssigningWorker(true);
     try {
       if (printWorkerIdSelected) {
-        await modeApiRequest("PATCH", `/api/factory/bales/${printWorkerBale.id}/assign-worker`, { workerId: parseInt(printWorkerIdSelected) });
+        await modeApiRequest("PATCH", `/api/factory/bales/${printWorkerBale.id}/assign-worker`, {
+          workerId: parseInt(printWorkerIdSelected),
+        });
         queryClient.invalidateQueries({ queryKey: ["/api/factory/stock-entry/in-stock"] });
       }
       setPrintWorkerBale(null);
@@ -226,17 +264,34 @@ export function RemoveFromStockTab() {
 
   const filteredBales = inStockBales?.filter((bale: any) => {
     if (!dateFilter) return true;
-    const baleDate = bale.finalizedAt ? new Date(bale.finalizedAt).toLocaleDateString('en-CA') : null;
+    const baleDate = bale.finalizedAt ? new Date(bale.finalizedAt).toLocaleDateString("en-CA") : null;
     return baleDate === dateFilter;
   });
 
   const condensedRows = (() => {
     if (!filteredBales) return [];
-    const grouped: Record<string, { groupKey: string; articleCode: string; productName: string; qty: number; totalWeight: number; baleIds: number[] }> = {};
+    const grouped: Record<
+      string,
+      {
+        groupKey: string;
+        articleCode: string;
+        productName: string;
+        qty: number;
+        totalWeight: number;
+        baleIds: number[];
+      }
+    > = {};
     for (const bale of filteredBales) {
       const key = bale.articleCode || bale.productName || `unknown-${bale.id}`;
       if (!grouped[key]) {
-        grouped[key] = { groupKey: key, articleCode: bale.articleCode || "-", productName: bale.productName || "-", qty: 0, totalWeight: 0, baleIds: [] };
+        grouped[key] = {
+          groupKey: key,
+          articleCode: bale.articleCode || "-",
+          productName: bale.productName || "-",
+          qty: 0,
+          totalWeight: 0,
+          baleIds: [],
+        };
       }
       grouped[key].qty += 1;
       grouped[key].totalWeight += parseFloat(bale.weightKg || "0");
@@ -337,7 +392,9 @@ export function RemoveFromStockTab() {
             </Select>
           </div>
           <div className="w-40">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 ml-1">Date Filter</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1 ml-1">
+              Date Filter
+            </p>
             <Input
               type="date"
               value={dateFilter}
@@ -369,8 +426,18 @@ export function RemoveFromStockTab() {
         </div>
 
         <div className="flex items-center gap-2 self-end">
-          <Button variant="outline" size="sm" className="h-9" onClick={selectAll} data-testid="button-select-all">Select All</Button>
-          <Button variant="outline" size="sm" className="h-9" onClick={clearSelection} data-testid="button-clear-selection">Clear</Button>
+          <Button variant="outline" size="sm" className="h-9" onClick={selectAll} data-testid="button-select-all">
+            Select All
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={clearSelection}
+            data-testid="button-clear-selection"
+          >
+            Clear
+          </Button>
           <Button
             variant="destructive"
             size="sm"
@@ -424,15 +491,23 @@ export function RemoveFromStockTab() {
         <div className="flex items-center gap-6">
           <div className="flex flex-col">
             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filtered Count</span>
-            <span className="text-lg font-black tabular-nums">{totalQty} <span className="text-xs font-normal text-muted-foreground">bales</span></span>
+            <span className="text-lg font-black tabular-nums">
+              {totalQty} <span className="text-xs font-normal text-muted-foreground">bales</span>
+            </span>
           </div>
           <div className="flex flex-col border-l pl-6">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filtered Weight</span>
-            <span className="text-lg font-black tabular-nums">{totalWeight.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">kg</span></span>
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+              Filtered Weight
+            </span>
+            <span className="text-lg font-black tabular-nums">
+              {totalWeight.toFixed(1)} <span className="text-xs font-normal text-muted-foreground">kg</span>
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{selectedBaleIds.size} SELECTED</span>
+          <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+            {selectedBaleIds.size} SELECTED
+          </span>
         </div>
       </div>
 

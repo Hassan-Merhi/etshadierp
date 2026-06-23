@@ -1,22 +1,10 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,14 +43,10 @@ interface StockGroup {
   name: string;
 }
 
-export function StockItemEditDialog({
-  open,
-  onOpenChange,
-  stockItemId,
-}: StockItemEditDialogProps) {
+export function StockItemEditDialog({ open, onOpenChange, stockItemId }: StockItemEditDialogProps) {
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  
+
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [barcode, setBarcode] = useState("");
@@ -202,9 +186,7 @@ export function StockItemEditDialog({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
-          <div className="flex items-center justify-center py-8">
-            Loading...
-          </div>
+          <div className="flex items-center justify-center py-8">Loading...</div>
         </DialogContent>
       </Dialog>
     );
@@ -222,22 +204,12 @@ export function StockItemEditDialog({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="code">Code *</Label>
-                <Input
-                  id="code"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  data-testid="input-code"
-                />
+                <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} data-testid="input-code" />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="name">Name *</Label>
-                <Input
-                  id="name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  data-testid="input-name"
-                />
+                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} data-testid="input-name" />
               </div>
             </div>
 
@@ -254,12 +226,7 @@ export function StockItemEditDialog({
 
               <div className="space-y-2">
                 <Label htmlFor="uom">Unit of Measure *</Label>
-                <Input
-                  id="uom"
-                  value={uom}
-                  onChange={(e) => setUom(e.target.value)}
-                  data-testid="input-uom"
-                />
+                <Input id="uom" value={uom} onChange={(e) => setUom(e.target.value)} data-testid="input-uom" />
               </div>
             </div>
 
@@ -300,12 +267,7 @@ export function StockItemEditDialog({
             </div>
 
             <div className="flex items-center gap-2">
-              <Switch
-                id="active"
-                checked={active}
-                onCheckedChange={setActive}
-                data-testid="switch-active"
-              />
+              <Switch id="active" checked={active} onCheckedChange={setActive} data-testid="switch-active" />
               <Label htmlFor="active">Active</Label>
             </div>
           </div>
@@ -320,18 +282,10 @@ export function StockItemEditDialog({
               <Trash2 className="h-4 w-4" />
               Delete
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              data-testid="button-cancel"
-            >
+            <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
               Cancel
             </Button>
-            <Button
-              onClick={handleSave}
-              disabled={updateMutation.isPending}
-              data-testid="button-save"
-            >
+            <Button onClick={handleSave} disabled={updateMutation.isPending} data-testid="button-save">
               {updateMutation.isPending ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>

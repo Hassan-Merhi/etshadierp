@@ -10,8 +10,8 @@ function fmtEntryAmount(v: string | number): string {
 }
 
 function compareEntries(oldArr: any[], newArr: any[]) {
-  const oldMap = new Map<string, any>(oldArr.map(e => [e.account, e]));
-  const newMap = new Map<string, any>(newArr.map(e => [e.account, e]));
+  const oldMap = new Map<string, any>(oldArr.map((e) => [e.account, e]));
+  const newMap = new Map<string, any>(newArr.map((e) => [e.account, e]));
   const added: any[] = [];
   const removed: any[] = [];
   const changed: Array<{ account: string; old: any; new: any }> = [];
@@ -72,8 +72,7 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
   const entryDiff = isUpdate ? compareEntries(oldEntries, newEntries) : { added: [], removed: [], changed: [] };
 
   const voucherType =
-    changes.voucherType?.new ?? changes.voucherType?.old ??
-    changes.type?.new ?? changes.type?.old ?? "";
+    changes.voucherType?.new ?? changes.voucherType?.old ?? changes.type?.new ?? changes.type?.old ?? "";
 
   const readableFields = Object.entries(scalarChanges).filter(([k, v]) => !isLikelyTechnical(k, v));
 
@@ -85,10 +84,14 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
       if (!text) return null;
       return (
         <div key={field} className="flex gap-2 text-sm py-1.5 border-b last:border-0 items-start">
-          <span className={`font-bold shrink-0 select-none ${isAdded ? "text-green-600 dark:text-green-400" : isRemoved ? "text-destructive" : "text-muted-foreground"}`}>
+          <span
+            className={`font-bold shrink-0 select-none ${isAdded ? "text-green-600 dark:text-green-400" : isRemoved ? "text-destructive" : "text-muted-foreground"}`}
+          >
             {isAdded ? "+" : isRemoved ? "−" : "~"}
           </span>
-          <span className={isAdded ? "text-green-700 dark:text-green-300" : isRemoved ? "text-destructive/90" : ""}>{text}</span>
+          <span className={isAdded ? "text-green-700 dark:text-green-300" : isRemoved ? "text-destructive/90" : ""}>
+            {text}
+          </span>
         </div>
       );
     }
@@ -117,12 +120,15 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
   const renderedRows = readableFields.map(([field, vals]) => renderRow(field, vals)).filter(Boolean);
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-base font-medium leading-snug pr-6">
-            {getHeaderSentence(log)}
-          </DialogTitle>
+          <DialogTitle className="text-base font-medium leading-snug pr-6">{getHeaderSentence(log)}</DialogTitle>
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm rounded-md border p-3 bg-muted/30">
@@ -132,7 +138,10 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
           <span>{fmtDate(log.createdAt)}</span>
           <span className="text-muted-foreground">Action</span>
           <span>
-            <Badge variant={isDelete ? "destructive" : isCreate ? "default" : "secondary"} className="capitalize text-xs">
+            <Badge
+              variant={isDelete ? "destructive" : isCreate ? "default" : "secondary"}
+              className="capitalize text-xs"
+            >
               {log.action}
             </Badge>
           </span>
@@ -162,7 +171,11 @@ export function AuditLogDialog({ log, onClose }: { log: any; onClose: () => void
             <p className="text-sm font-semibold">Accounting Details</p>
             {/* Minimal entries summary here to keep file small */}
             <div className="text-xs text-muted-foreground">
-              {isUpdate ? "Accounting entries were modified." : isCreate ? "Accounting entries were created." : "Accounting entries were deleted."}
+              {isUpdate
+                ? "Accounting entries were modified."
+                : isCreate
+                  ? "Accounting entries were created."
+                  : "Accounting entries were deleted."}
             </div>
           </div>
         )}

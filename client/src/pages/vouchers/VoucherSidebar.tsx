@@ -51,17 +51,13 @@ export const sidebarGroups: SidebarGroup[] = [
 ];
 
 export function VoucherSidebar({ activeTab, onTabChange, isFactoryMode }: VoucherSidebarProps) {
-  const visibleSidebarGroups = isFactoryMode
-    ? sidebarGroups.filter((g) => g.label !== "Adjustments")
-    : sidebarGroups;
+  const visibleSidebarGroups = isFactoryMode ? sidebarGroups.filter((g) => g.label !== "Adjustments") : sidebarGroups;
 
   return (
     <nav className="w-full lg:w-64 flex-shrink-0 space-y-6">
       {visibleSidebarGroups.map((group) => (
         <div key={group.label} className="space-y-2">
-          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            {group.label}
-          </h3>
+          <h3 className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</h3>
           <div className="space-y-1">
             {group.items.map((item) => (
               <button
@@ -76,10 +72,7 @@ export function VoucherSidebar({ activeTab, onTabChange, isFactoryMode }: Vouche
                 data-testid={`button-tab-${item.key}`}
               >
                 <item.icon
-                  className={cn(
-                    "h-4 w-4",
-                    activeTab === item.key ? "text-primary-foreground" : ""
-                  )}
+                  className={cn("h-4 w-4", activeTab === item.key ? "text-primary-foreground" : "")}
                   style={{ color: activeTab === item.key ? undefined : group.color }}
                 />
                 {item.label}

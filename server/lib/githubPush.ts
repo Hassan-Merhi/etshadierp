@@ -94,9 +94,7 @@ export async function commitAndPush(params: {
       // use default
     }
 
-    const relPaths = files.map((f) =>
-      path.isAbsolute(f) ? path.relative(WORKSPACE_ROOT, f) : f
-    );
+    const relPaths = files.map((f) => (path.isAbsolute(f) ? path.relative(WORKSPACE_ROOT, f) : f));
     await git(["add", "--", ...relPaths]);
 
     const status = await git(["status", "--porcelain"]).catch(() => "");
@@ -104,11 +102,7 @@ export async function commitAndPush(params: {
       return { success: false, error: "Nothing to commit — the file content may already be up to date." };
     }
 
-    await git([
-      "-c", `user.name=${authorName}`,
-      "-c", `user.email=${authorEmail}`,
-      "commit", "-m", message,
-    ]);
+    await git(["-c", `user.name=${authorName}`, "-c", `user.email=${authorEmail}`, "commit", "-m", message]);
 
     const commitHash = await git(["rev-parse", "--short", "HEAD"]).catch(() => "");
 
@@ -120,7 +114,11 @@ export async function commitAndPush(params: {
     const raw: string = e.message ?? String(e);
     // Sanitize: strip any credential-bearing URLs before surfacing to callers/logs
     const msg = raw.replace(/https?:\/\/[^@\s]+@[^\s]*/gi, "<redacted-url>");
-    if (msg.includes("Authentication failed") || msg.includes("Invalid username") || msg.includes("could not read Username")) {
+    if (
+      msg.includes("Authentication failed") ||
+      msg.includes("Invalid username") ||
+      msg.includes("could not read Username")
+    ) {
       return { success: false, error: "Authentication failed. Check your GitHub token in Chatbot Settings." };
     }
     if (msg.includes("rejected") || msg.includes("non-fast-forward")) {

@@ -6,12 +6,12 @@ export interface FactoryKpiCardProps extends Omit<StatCardProps, "tone"> {
 }
 
 const METRIC_TONE: Record<NonNullable<FactoryKpiCardProps["metric"]>, StatCardProps["tone"]> = {
-  input:    "info",
-  output:   "chart-2",
-  yield:    "success",
+  input: "info",
+  output: "chart-2",
+  yield: "success",
   downtime: "warning",
-  scrap:    "destructive",
-  neutral:  "primary",
+  scrap: "destructive",
+  neutral: "primary",
 };
 
 /**

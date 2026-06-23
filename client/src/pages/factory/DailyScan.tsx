@@ -1,15 +1,23 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import {
-  ChevronLeft, ChevronRight, ScanLine, X, Download, Loader2,
-  CalendarDays, ChevronDown, ChevronUp, CheckCircle2, AlertCircle, Package,
+  ChevronLeft,
+  ChevronRight,
+  ScanLine,
+  X,
+  Download,
+  Loader2,
+  CalendarDays,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  AlertCircle,
+  Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatNumber } from "@/lib/formatNumber";
@@ -43,7 +51,15 @@ interface DayBale {
   worker_name: string | null;
 }
 
-function StatusBadge({ status, isInLoadingOrder, isDeleted }: { status: string; isInLoadingOrder: boolean; isDeleted: boolean }) {
+function StatusBadge({
+  status,
+  isInLoadingOrder,
+  isDeleted,
+}: {
+  status: string;
+  isInLoadingOrder: boolean;
+  isDeleted: boolean;
+}) {
   if (isDeleted) return <Badge className="bg-red-600 text-white border-0">Deleted</Badge>;
   const s = (status || "").toUpperCase();
   if (isInLoadingOrder || s === "LOADING" || s === "LOADED")
@@ -97,16 +113,16 @@ export default function DailyScan() {
   const { data: dayBales = [], isLoading: loadingBales } = useQuery<DayBale[]>({
     queryKey: ["/api/factory/daily-bale-scans/produced", selectedDate],
     queryFn: () =>
-      fetch(`/api/factory/daily-bale-scans/produced?date=${selectedDate}`, { credentials: "include" })
-        .then((r) => r.json()),
+      fetch(`/api/factory/daily-bale-scans/produced?date=${selectedDate}`, { credentials: "include" }).then((r) =>
+        r.json()
+      ),
     refetchInterval: 10000,
   });
 
   const { data: scans = [], isLoading: loadingScans } = useQuery<DailyScanRow[]>({
     queryKey: ["/api/factory/daily-bale-scans", selectedDate],
     queryFn: () =>
-      fetch(`/api/factory/daily-bale-scans?date=${selectedDate}`, { credentials: "include" })
-        .then((r) => r.json()),
+      fetch(`/api/factory/daily-bale-scans?date=${selectedDate}`, { credentials: "include" }).then((r) => r.json()),
     refetchInterval: 10000,
   });
 
@@ -114,9 +130,7 @@ export default function DailyScan() {
   const isToday = selectedDate === today;
 
   // Build lookup structures
-  const scannedRefMap = new Map<string, DailyScanRow>(
-    scans.map((s) => [s.reference_number, s]),
-  );
+  const scannedRefMap = new Map<string, DailyScanRow>(scans.map((s) => [s.reference_number, s]));
   const unscanned = dayBales.filter((b) => !scannedRefMap.has(b.reference_number));
   const scanned = dayBales.filter((b) => scannedRefMap.has(b.reference_number));
 
@@ -201,10 +215,8 @@ export default function DailyScan() {
       const res = await apiRequest("DELETE", `/api/factory/daily-bale-scans/${id}`);
       if (!res.ok) throw new Error("Failed to remove");
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["/api/factory/daily-bale-scans", selectedDate] }),
-    onError: () =>
-      toast({ title: "Error", description: "Could not remove scan.", variant: "destructive" }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/factory/daily-bale-scans", selectedDate] }),
+    onError: () => toast({ title: "Error", description: "Could not remove scan.", variant: "destructive" }),
   });
 
   const handleExport = async () => {
@@ -220,27 +232,37 @@ export default function DailyScan() {
 
     const ws = wb.addWorksheet(formatDisplay(selectedDate));
 
-    const NAVY   = "FF1B2A4A";
-    const WHITE  = "FFFFFFFF";
-    const LGRAY  = "FFF5F7FA";
-    const GREEN  = "FFD6F5D6";
+    const NAVY = "FF1B2A4A";
+    const WHITE = "FFFFFFFF";
+    const LGRAY = "FFF5F7FA";
+    const GREEN = "FFD6F5D6";
     const thinBorder = { style: "thin" as const, color: { argb: "FFD0D7E0" } };
     const allBorders = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
-    const solidFill  = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
+    const solidFill = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
 
     ws.columns = [
-      { key: "num",      width: 6  },
-      { key: "ref",      width: 18 },
-      { key: "art",      width: 16 },
-      { key: "name",     width: 32 },
-      { key: "wt",       width: 14 },
+      { key: "num", width: 6 },
+      { key: "ref", width: 18 },
+      { key: "art", width: 16 },
+      { key: "name", width: 32 },
+      { key: "wt", width: 14 },
       { key: "dateProd", width: 16 },
-      { key: "worker",   width: 20 },
-      { key: "status",   width: 12 },
-      { key: "time",     width: 14 },
+      { key: "worker", width: 20 },
+      { key: "status", width: 12 },
+      { key: "time", width: 14 },
     ];
 
-    const headers = ["#", "Ref Code", "Article Code", "Product Name", "Weight (kg)", "Date Produced", "Worker", "Status", "Scanned At"];
+    const headers = [
+      "#",
+      "Ref Code",
+      "Article Code",
+      "Product Name",
+      "Weight (kg)",
+      "Date Produced",
+      "Worker",
+      "Status",
+      "Scanned At",
+    ];
     const hRow = ws.addRow(headers);
     hRow.eachCell((cell) => {
       cell.fill = solidFill(NAVY);
@@ -268,18 +290,18 @@ export default function DailyScan() {
       ]);
       row.eachCell((cell) => {
         cell.border = allBorders;
-        cell.fill = solidFill(isScanned ? GREEN : (i % 2 === 0 ? WHITE : LGRAY));
+        cell.fill = solidFill(isScanned ? GREEN : i % 2 === 0 ? WHITE : LGRAY);
         cell.alignment = { vertical: "middle" };
       });
       row.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
-      row.getCell(5).alignment = { horizontal: "right",  vertical: "middle" };
+      row.getCell(5).alignment = { horizontal: "right", vertical: "middle" };
     });
 
     const totalRow = ws.addRow(["", "TOTAL", "", "", totalKg, "", "", `${scanned.length}/${totalBales} scanned`, ""]);
     totalRow.eachCell((cell, col) => {
-      cell.border  = allBorders;
-      cell.font    = { bold: true };
-      cell.fill    = solidFill("FFE8F0F8");
+      cell.border = allBorders;
+      cell.font = { bold: true };
+      cell.fill = solidFill("FFE8F0F8");
       if (col === 5) cell.alignment = { horizontal: "right", vertical: "middle" };
     });
 
@@ -338,12 +360,7 @@ export default function DailyScan() {
               {scanned.length}/{totalBales} verified · {formatNumber(scannedKg)}/{formatNumber(totalKg)} kg
             </span>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            data-testid="button-daily-scan-export"
-          >
+          <Button variant="outline" size="sm" onClick={handleExport} data-testid="button-daily-scan-export">
             <Download className="h-4 w-4 mr-1" />
             Export
           </Button>
@@ -362,11 +379,7 @@ export default function DailyScan() {
           data-testid="input-daily-scan-ref"
           disabled={scanning}
         />
-        <Button
-          onClick={handleScan}
-          disabled={scanning || !scanInput.trim()}
-          data-testid="button-daily-scan-submit"
-        >
+        <Button onClick={handleScan} disabled={scanning || !scanInput.trim()} data-testid="button-daily-scan-submit">
           {scanning ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
@@ -387,7 +400,6 @@ export default function DailyScan() {
         </div>
       ) : (
         <div className="space-y-4">
-
           {/* ── All-done banner ── */}
           {allDone && (
             <div className="flex items-center gap-2 rounded-md border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/40 px-4 py-3 text-sm text-green-800 dark:text-green-300">
@@ -431,20 +443,31 @@ export default function DailyScan() {
                           {b.product_name ?? <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {b.weight_kg
-                            ? formatNumber(parseFloat(b.weight_kg))
-                            : <span className="text-muted-foreground">—</span>}
+                          {b.weight_kg ? (
+                            formatNumber(parseFloat(b.weight_kg))
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
-                          {b.date_bale_produced
-                            ? (() => { const [y,m,d] = b.date_bale_produced.split("-"); return `${d}/${m}/${y}`; })()
-                            : <span className="text-muted-foreground">—</span>}
+                          {b.date_bale_produced ? (
+                            (() => {
+                              const [y, m, d] = b.date_bale_produced.split("-");
+                              return `${d}/${m}/${y}`;
+                            })()
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {b.worker_name ?? <span className="text-muted-foreground">—</span>}
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={b.status} isInLoadingOrder={b.is_in_loading_order} isDeleted={b.is_deleted} />
+                          <StatusBadge
+                            status={b.status}
+                            isInLoadingOrder={b.is_in_loading_order}
+                            isDeleted={b.is_deleted}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -463,11 +486,7 @@ export default function DailyScan() {
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="button-toggle-scanned-section"
               >
-                {showScanned ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+                {showScanned ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                 Scanned — {scanned.length} bale{scanned.length !== 1 ? "s" : ""} · {formatNumber(scannedKg)} kg
               </button>
@@ -495,26 +514,29 @@ export default function DailyScan() {
                         return (
                           <TableRow key={b.id} data-testid={`row-scanned-bale-${b.id}`}>
                             <TableCell className="text-muted-foreground text-sm">{i + 1}</TableCell>
-                            <TableCell className="font-mono font-medium text-muted-foreground">{b.reference_number}</TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {b.article_code ?? "—"}
+                            <TableCell className="font-mono font-medium text-muted-foreground">
+                              {b.reference_number}
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {b.product_name ?? "—"}
-                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{b.article_code ?? "—"}</TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{b.product_name ?? "—"}</TableCell>
                             <TableCell className="text-right font-mono text-sm text-muted-foreground">
                               {b.weight_kg ? formatNumber(parseFloat(b.weight_kg)) : "—"}
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground">
                               {b.date_bale_produced
-                                ? (() => { const [y,m,d] = b.date_bale_produced.split("-"); return `${d}/${m}/${y}`; })()
+                                ? (() => {
+                                    const [y, m, d] = b.date_bale_produced.split("-");
+                                    return `${d}/${m}/${y}`;
+                                  })()
                                 : "—"}
                             </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {b.worker_name ?? "—"}
-                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">{b.worker_name ?? "—"}</TableCell>
                             <TableCell>
-                              <StatusBadge status={b.status} isInLoadingOrder={b.is_in_loading_order} isDeleted={b.is_deleted} />
+                              <StatusBadge
+                                status={b.status}
+                                isInLoadingOrder={b.is_in_loading_order}
+                                isDeleted={b.is_deleted}
+                              />
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {new Date(scanRow.scanned_at).toLocaleTimeString("en-GB")}
@@ -546,11 +568,12 @@ export default function DailyScan() {
       {lastScan && (
         <div
           className={`fixed bottom-6 right-6 z-50 flex items-start gap-3 rounded-md border px-4 py-3 shadow-lg w-72
-            ${lastScan.type === "success"
-              ? "bg-green-50 border-green-200 dark:bg-green-950/60 dark:border-green-800"
-              : lastScan.type === "warn"
-              ? "bg-amber-50 border-amber-200 dark:bg-amber-950/60 dark:border-amber-800"
-              : "bg-red-50 border-red-200 dark:bg-red-950/60 dark:border-red-800"
+            ${
+              lastScan.type === "success"
+                ? "bg-green-50 border-green-200 dark:bg-green-950/60 dark:border-green-800"
+                : lastScan.type === "warn"
+                  ? "bg-amber-50 border-amber-200 dark:bg-amber-950/60 dark:border-amber-800"
+                  : "bg-red-50 border-red-200 dark:bg-red-950/60 dark:border-red-800"
             }`}
           data-testid="panel-scan-feedback"
         >
@@ -564,10 +587,15 @@ export default function DailyScan() {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className={`text-sm font-semibold font-mono truncate
-              ${lastScan.type === "success" ? "text-green-900 dark:text-green-200"
-                : lastScan.type === "warn" ? "text-amber-900 dark:text-amber-200"
-                : "text-red-900 dark:text-red-200"}`}
+            <p
+              className={`text-sm font-semibold font-mono truncate
+              ${
+                lastScan.type === "success"
+                  ? "text-green-900 dark:text-green-200"
+                  : lastScan.type === "warn"
+                    ? "text-amber-900 dark:text-amber-200"
+                    : "text-red-900 dark:text-red-200"
+              }`}
             >
               {lastScan.refCode}
             </p>
@@ -576,10 +604,15 @@ export default function DailyScan() {
                 {[lastScan.articleCode, lastScan.productName].filter(Boolean).join(" · ")}
               </p>
             )}
-            <p className={`text-xs mt-0.5
-              ${lastScan.type === "success" ? "text-green-700 dark:text-green-300"
-                : lastScan.type === "warn" ? "text-amber-700 dark:text-amber-300"
-                : "text-red-700 dark:text-red-300"}`}
+            <p
+              className={`text-xs mt-0.5
+              ${
+                lastScan.type === "success"
+                  ? "text-green-700 dark:text-green-300"
+                  : lastScan.type === "warn"
+                    ? "text-amber-700 dark:text-amber-300"
+                    : "text-red-700 dark:text-red-300"
+              }`}
             >
               {lastScan.message}
             </p>

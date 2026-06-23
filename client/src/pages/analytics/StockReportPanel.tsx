@@ -6,7 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronDown, Package, FileText } from "lucide-react";
-import { StockMovementData, OpeningStockSummaryData, Location, StockGroup, OpeningStockItemsData } from "./analyticsTypes";
+import {
+  StockMovementData,
+  OpeningStockSummaryData,
+  Location,
+  StockGroup,
+  OpeningStockItemsData,
+} from "./analyticsTypes";
 import { Fragment } from "react";
 
 interface StockReportPanelProps {
@@ -56,7 +62,7 @@ export function StockReportPanel({
   openingStockData,
   expandedStockGroups,
   toggleStockGroup,
-  stockGroupItems
+  stockGroupItems,
 }: StockReportPanelProps) {
   if (activeSection === "stock") {
     return (
@@ -143,12 +149,8 @@ export function StockReportPanel({
                 {stockMovementData.items.map((item) => (
                   <TableRow key={item.stockItemId}>
                     <TableCell className="font-medium">{item.stockItemName}</TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatNumber(item.totalQuantity)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {formatAmount(item.totalValue)}
-                    </TableCell>
+                    <TableCell className="text-right font-mono">{formatNumber(item.totalQuantity)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatAmount(item.totalValue)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -166,9 +168,7 @@ export function StockReportPanel({
             </Table>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            Select filters to load stock movement
-          </p>
+          <p className="text-sm text-muted-foreground text-center py-8">Select filters to load stock movement</p>
         )}
       </Card>
     );
@@ -226,7 +226,7 @@ export function StockReportPanel({
               <TableBody>
                 {openingStockData.stockGroups.map((group) => (
                   <Fragment key={group.id}>
-                    <TableRow 
+                    <TableRow
                       className="cursor-pointer hover-elevate font-medium"
                       onClick={() => toggleStockGroup(group.id)}
                     >
@@ -251,9 +251,13 @@ export function StockReportPanel({
                         {stockGroupItems.get(group.id)?.items.map((item) => (
                           <TableRow key={item.id} className="bg-muted/30 text-xs">
                             <TableCell className="pl-8">{item.name}</TableCell>
-                            <TableCell className="text-right font-mono">{formatNumber(item.opening.quantity)}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatNumber(item.opening.quantity)}
+                            </TableCell>
                             <TableCell className="text-right font-mono">{formatAmount(item.opening.value)}</TableCell>
-                            <TableCell className="text-right font-mono">{formatNumber(item.closing.quantity)}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {formatNumber(item.closing.quantity)}
+                            </TableCell>
                             <TableCell className="text-right font-mono">{formatAmount(item.closing.value)}</TableCell>
                           </TableRow>
                         ))}
@@ -272,18 +276,24 @@ export function StockReportPanel({
               <TableBody className="font-semibold border-t-2">
                 <TableRow>
                   <TableCell>Grand Total</TableCell>
-                  <TableCell className="text-right font-mono">{formatNumber(openingStockData.grandTotal.opening.quantity)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatAmount(openingStockData.grandTotal.opening.value)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatNumber(openingStockData.grandTotal.closing.quantity)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatAmount(openingStockData.grandTotal.closing.value)}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatNumber(openingStockData.grandTotal.opening.quantity)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatAmount(openingStockData.grandTotal.opening.value)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatNumber(openingStockData.grandTotal.closing.quantity)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatAmount(openingStockData.grandTotal.closing.value)}
+                  </TableCell>
                 </TableRow>
               </TableBody>
             </Table>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground text-center py-8">
-            Load opening stock data
-          </p>
+          <p className="text-sm text-muted-foreground text-center py-8">Load opening stock data</p>
         )}
       </Card>
     );

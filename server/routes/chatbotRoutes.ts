@@ -3,47 +3,127 @@ import rateLimit from "express-rate-limit";
 import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
-import { saveMessage, chat, getConversationHistory, getConversationHistoryForAI, getAllChatHistory, saveFeedback, getConfiguredProviders, extractPOFromText, clearERPContextCache } from "../chatService";
 import {
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, insertVoucherSchema, insertVoucherEntrySchema,
+  upload,
+  logAudit,
+  getCurrentExchangeRate,
+  calculateHistoricalLocationInventory,
+  syncEmployeeBalancesFromEntries,
+} from "./_helpers";
+import {
+  saveMessage,
+  chat,
+  getConversationHistory,
+  getConversationHistoryForAI,
+  getAllChatHistory,
+  saveFeedback,
+  getConfiguredProviders,
+  extractPOFromText,
+  clearERPContextCache,
+} from "../chatService";
+import {
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  insertVoucherSchema,
+  insertVoucherEntrySchema,
   insertSalesItemSchema,
-  suppliers, customers, customerBalances, locations, employees, userLocations,
-  auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
-  ledgerAccounts, insertLedgerAccountSchema, 
-  companies, users, userCompanyRoles, companySettings,
-  FEATURE_KEYS, fiscalPeriodClosures,
-  wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
-  bales, baleProducts, baleProductCategories, baleTransfers,
-  insertBaleSchema, insertBaleTransferSchema,
-  
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  suppliers,
+  customers,
+  customerBalances,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  companies,
+  users,
+  userCompanyRoles,
+  companySettings,
+  FEATURE_KEYS,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  insertWasteDispatchSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  baleTransfers,
+  insertBaleSchema,
+  insertBaleTransferSchema,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, 
-  pendingBarcodes, insertPendingBarcodeSchema,
-  storedFiles, spreadsheets, liveSpreadsheets,
-  agentAccounts, insertAgentAccountSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  storedFiles,
+  spreadsheets,
+  liveSpreadsheets,
+  agentAccounts,
+  insertAgentAccountSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
   chatMessages,
   supplierProformas,
-  
   systemSettings,
   aiActionLog,
   codePatchHistory,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -77,8 +157,7 @@ const chatMessageRateLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req: any) =>
-    `${req.session?.userId ?? "anon"}_${req.session?.currentCompanyId ?? "0"}`,
+  keyGenerator: (req: any) => `${req.session?.userId ?? "anon"}_${req.session?.currentCompanyId ?? "0"}`,
   handler: (_req: any, res: any) => {
     res.status(429).json({ message: "Too many messages. Please wait a moment before sending again." });
   },
@@ -91,19 +170,22 @@ export function registerChatbotRoutes(app: Express) {
       const userId = req.session.userId;
       const companyId = req.session.currentCompanyId;
       const userRole = req.session.currentRole;
-      
+
       if (!userId || !companyId) {
         return res.json({ enabled: false });
       }
 
       // Get user chatbot status
-      const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled })
-        .from(users)
-        .where(eq(users.id, userId));
+      const [user] = await db.select({ chatbotEnabled: users.chatbotEnabled }).from(users).where(eq(users.id, userId));
 
       // Get selected AI provider and check if its API key is configured
-      const providerSetting = await db.select({ value: systemSettings.value }).from(systemSettings).where(eq(systemSettings.key, "ai_provider")).limit(1);
-      const selectedProvider = (providerSetting.length > 0 && providerSetting[0].value) ? providerSetting[0].value.toLowerCase() : "gemini";
+      const providerSetting = await db
+        .select({ value: systemSettings.value })
+        .from(systemSettings)
+        .where(eq(systemSettings.key, "ai_provider"))
+        .limit(1);
+      const selectedProvider =
+        providerSetting.length > 0 && providerSetting[0].value ? providerSetting[0].value.toLowerCase() : "gemini";
       let hasApiKey = false;
       let providerName = "Gemini";
       if (selectedProvider === "chatgpt") {
@@ -145,12 +227,13 @@ export function registerChatbotRoutes(app: Express) {
       }
 
       const normalizedProvider = provider.toLowerCase();
-      
+
       // Check if setting exists
       const existing = await db.select().from(systemSettings).where(eq(systemSettings.key, "ai_provider")).limit(1);
-      
+
       if (existing.length > 0) {
-        await db.update(systemSettings)
+        await db
+          .update(systemSettings)
           .set({ value: normalizedProvider, updatedAt: new Date() })
           .where(eq(systemSettings.key, "ai_provider"));
       } else {
@@ -169,7 +252,7 @@ export function registerChatbotRoutes(app: Express) {
     try {
       const userId = req.session.userId;
       const companyId = req.session.currentCompanyId;
-      
+
       if (!userId || !companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -189,7 +272,14 @@ export function registerChatbotRoutes(app: Express) {
       const history = await getConversationHistoryForAI(sessionId, 10);
 
       // Get AI response (excluding current message from history context)
-      const result = await chat(message, companyId, history.slice(0, -1), undefined, pageContext, sessionReadFiles ?? []);
+      const result = await chat(
+        message,
+        companyId,
+        history.slice(0, -1),
+        undefined,
+        pageContext,
+        sessionReadFiles ?? []
+      );
 
       // Save assistant response
       await saveMessage(companyId, userId, "assistant", result.response, sessionId);
@@ -200,7 +290,12 @@ export function registerChatbotRoutes(app: Express) {
         actionName: "chat_message",
         inputJson: { message, sessionId },
         outputJson: {
-          hasDraft: !!(result.voucherDraft || result.stockTransferDraft || result.stockItemDraft || result.stockAdjustmentDraft),
+          hasDraft: !!(
+            result.voucherDraft ||
+            result.stockTransferDraft ||
+            result.stockItemDraft ||
+            result.stockAdjustmentDraft
+          ),
         },
         status: "success",
       });
@@ -252,7 +347,7 @@ export function registerChatbotRoutes(app: Express) {
     try {
       const companyId = req.session.currentCompanyId;
       const userRole = req.session.currentRole;
-      
+
       if (!companyId) {
         return res.status(400).json({ message: "No company selected" });
       }
@@ -263,16 +358,15 @@ export function registerChatbotRoutes(app: Express) {
       }
 
       const history = await getAllChatHistory(companyId, 200);
-      
+
       // Enrich with username and role
-      const userIds = Array.from(new Set(history.map(h => h.userId)));
-      const usersList = userIds.length > 0 
-        ? await db.select({ id: users.id, username: users.username })
-            .from(users)
-            .where(inArray(users.id, userIds))
-        : [];
-      
-      const userMap = new Map(usersList.map(u => [u.id, u.username]));
+      const userIds = Array.from(new Set(history.map((h) => h.userId)));
+      const usersList =
+        userIds.length > 0
+          ? await db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, userIds))
+          : [];
+
+      const userMap = new Map(usersList.map((u) => [u.id, u.username]));
 
       // Fetch roles for all message authors in this company
       let developerUserIds = new Set<string>();
@@ -280,21 +374,21 @@ export function registerChatbotRoutes(app: Express) {
         const roleRows = await db
           .select({ userId: userCompanyRoles.userId, role: userCompanyRoles.role })
           .from(userCompanyRoles)
-          .where(and(
-            eq(userCompanyRoles.companyId, companyId),
-            eq(userCompanyRoles.role, "Developer"),
-            inArray(userCompanyRoles.userId, userIds.map(Number)),
-          ));
-        developerUserIds = new Set(roleRows.map(r => String(r.userId)));
+          .where(
+            and(
+              eq(userCompanyRoles.companyId, companyId),
+              eq(userCompanyRoles.role, "Developer"),
+              inArray(userCompanyRoles.userId, userIds.map(Number))
+            )
+          );
+        developerUserIds = new Set(roleRows.map((r) => String(r.userId)));
       }
 
       // Admin/Owner cannot see Developer users' chats; Developer can see everything
       const isDeveloper = userRole === "Developer";
-      const filteredHistory = isDeveloper
-        ? history
-        : history.filter(h => !developerUserIds.has(String(h.userId)));
+      const filteredHistory = isDeveloper ? history : history.filter((h) => !developerUserIds.has(String(h.userId)));
 
-      const enrichedHistory = filteredHistory.map(h => ({
+      const enrichedHistory = filteredHistory.map((h) => ({
         ...h,
         username: userMap.get(h.userId) || "Unknown",
       }));
@@ -320,20 +414,19 @@ export function registerChatbotRoutes(app: Express) {
           preview: sql<string>`min(case when ${chatMessages.role} = 'user' then ${chatMessages.content} end)`,
         })
         .from(chatMessages)
-        .where(and(
-          eq(chatMessages.userId, String(userId)),
-          eq(chatMessages.companyId, companyId),
-        ))
+        .where(and(eq(chatMessages.userId, String(userId)), eq(chatMessages.companyId, companyId)))
         .groupBy(chatMessages.sessionId)
         .orderBy(desc(sql`max(${chatMessages.createdAt})`))
         .limit(100);
 
-      res.json(rows.map(r => ({
-        sessionId: r.sessionId,
-        messageCount: Number(r.messageCount),
-        preview: r.preview ? String(r.preview).slice(0, 100) : "Chat session",
-        lastMessageTime: r.lastMessageTime,
-      })));
+      res.json(
+        rows.map((r) => ({
+          sessionId: r.sessionId,
+          messageCount: Number(r.messageCount),
+          preview: r.preview ? String(r.preview).slice(0, 100) : "Chat session",
+          lastMessageTime: r.lastMessageTime,
+        }))
+      );
     } catch (error: any) {
       res.status(500).json({ message: "Internal server error" });
     }
@@ -370,11 +463,13 @@ export function registerChatbotRoutes(app: Express) {
         const ownerRoleRow = await db
           .select({ role: userCompanyRoles.role })
           .from(userCompanyRoles)
-          .where(and(
-            eq(userCompanyRoles.companyId, companyId),
-            eq(userCompanyRoles.userId, Number(ownerUserId)),
-            eq(userCompanyRoles.role, "Developer"),
-          ))
+          .where(
+            and(
+              eq(userCompanyRoles.companyId, companyId),
+              eq(userCompanyRoles.userId, Number(ownerUserId)),
+              eq(userCompanyRoles.role, "Developer")
+            )
+          )
           .limit(1);
         if (ownerRoleRow.length > 0) {
           return res.status(403).json({ message: "Cannot delete a Developer's conversation" });
@@ -386,9 +481,9 @@ export function registerChatbotRoutes(app: Express) {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      await db.delete(chatMessages).where(
-        and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.companyId, companyId))
-      );
+      await db
+        .delete(chatMessages)
+        .where(and(eq(chatMessages.sessionId, sessionId), eq(chatMessages.companyId, companyId)));
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: "Internal server error" });
@@ -408,21 +503,37 @@ export function registerChatbotRoutes(app: Express) {
         .where(eq(inventory.companyId, companyId));
 
       const stockRows = await db
-        .select({ id: stockItems.id, name: stockItems.name, code: stockItems.code, reorderLevel: stockItems.reorderLevel })
+        .select({
+          id: stockItems.id,
+          name: stockItems.name,
+          code: stockItems.code,
+          reorderLevel: stockItems.reorderLevel,
+        })
         .from(stockItems)
         .where(and(eq(stockItems.companyId, companyId), eq(stockItems.active, true)));
 
-      const invMap = new Map(inventoryRows.map(i => [i.stockItemId, parseFloat(i.quantity || "0")]));
+      const invMap = new Map(inventoryRows.map((i) => [i.stockItemId, parseFloat(i.quantity || "0")]));
       const lowStock = stockRows
-        .filter(s => {
+        .filter((s) => {
           const lvl = parseFloat(s.reorderLevel || "0");
           return lvl > 0 && (invMap.get(s.id) || 0) <= lvl;
         })
-        .map(s => ({ id: s.id, name: s.name, code: s.code, qty: invMap.get(s.id) || 0, reorderLevel: parseFloat(s.reorderLevel || "0") }));
+        .map((s) => ({
+          id: s.id,
+          name: s.name,
+          code: s.code,
+          qty: invMap.get(s.id) || 0,
+          reorderLevel: parseFloat(s.reorderLevel || "0"),
+        }));
 
       // Open POs (awaiting)
       const openPOs = await db
-        .select({ id: purchaseOrders.id, poNumber: purchaseOrders.poNumber, supplierId: purchaseOrders.supplierId, status: purchaseOrders.status })
+        .select({
+          id: purchaseOrders.id,
+          poNumber: purchaseOrders.poNumber,
+          supplierId: purchaseOrders.supplierId,
+          status: purchaseOrders.status,
+        })
         .from(purchaseOrders)
         .where(and(eq(purchaseOrders.companyId, companyId), eq(purchaseOrders.status, "Open")));
 
@@ -441,14 +552,14 @@ export function registerChatbotRoutes(app: Express) {
         .select({ id: customers.id, legalName: customers.legalName })
         .from(customers)
         .where(eq(customers.companyId, companyId));
-      const custMap = new Map(customerRows.map(c => [c.id, c.legalName]));
+      const custMap = new Map(customerRows.map((c) => [c.id, c.legalName]));
 
       const overdueCustomers = customerBalanceRows
-        .map(cb => {
+        .map((cb) => {
           const balance = parseFloat(cb.totalDebit) - parseFloat(cb.totalCredit);
           return { customerId: cb.customerId, name: custMap.get(cb.customerId) || "Unknown", balance };
         })
-        .filter(c => c.balance > 0.01)
+        .filter((c) => c.balance > 0.01)
         .slice(0, 10);
 
       // Pending payrolls (DRAFT status in factory_payrolls)
@@ -456,7 +567,12 @@ export function registerChatbotRoutes(app: Express) {
       try {
         const { factoryPayrolls } = await import("@shared/schema");
         pendingPayrolls = await db
-          .select({ id: factoryPayrolls.id, periodStart: factoryPayrolls.periodStart, periodEnd: factoryPayrolls.periodEnd, status: factoryPayrolls.status })
+          .select({
+            id: factoryPayrolls.id,
+            periodStart: factoryPayrolls.periodStart,
+            periodEnd: factoryPayrolls.periodEnd,
+            status: factoryPayrolls.status,
+          })
           .from(factoryPayrolls)
           .where(and(eq(factoryPayrolls.companyId, companyId), eq(factoryPayrolls.status, "DRAFT")))
           .limit(5);
@@ -477,7 +593,7 @@ export function registerChatbotRoutes(app: Express) {
   app.patch("/api/users/:userId/chatbot", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userRole = req.session.currentRole;
-      
+
       // Only Admin/Owner can toggle chatbot
       if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         return res.status(403).json({ message: "Access denied" });
@@ -486,9 +602,7 @@ export function registerChatbotRoutes(app: Express) {
       const { userId } = req.params;
       const { enabled } = req.body;
 
-      await db.update(users)
-        .set({ chatbotEnabled: enabled })
-        .where(eq(users.id, userId));
+      await db.update(users).set({ chatbotEnabled: enabled }).where(eq(users.id, userId));
 
       res.json({ message: `Chatbot ${enabled ? "enabled" : "disabled"} for user` });
     } catch (error: any) {
@@ -500,17 +614,18 @@ export function registerChatbotRoutes(app: Express) {
   app.get("/api/users/chatbot-status", requireAuth, requireNonPOS, async (req, res) => {
     try {
       const userRole = req.session.currentRole;
-      
+
       if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const allUsers = await db.select({
-        id: users.id,
-        username: users.username,
-        chatbotEnabled: users.chatbotEnabled,
-        active: users.active,
-      })
+      const allUsers = await db
+        .select({
+          id: users.id,
+          username: users.username,
+          chatbotEnabled: users.chatbotEnabled,
+          active: users.active,
+        })
         .from(users)
         .where(eq(users.active, true));
 
@@ -564,9 +679,11 @@ export function registerChatbotRoutes(app: Express) {
       if (denied) return res.status(denied.code).json({ message: denied.message });
 
       const { date, sourceLocationId, destinationLocationId, notes, items, sessionId, prompt } = req.body;
-      if (!sourceLocationId || !destinationLocationId) return res.status(400).json({ message: "Source and destination locations are required" });
+      if (!sourceLocationId || !destinationLocationId)
+        return res.status(400).json({ message: "Source and destination locations are required" });
       if (!items?.length) return res.status(400).json({ message: "At least one item is required" });
-      if (sourceLocationId === destinationLocationId) return res.status(400).json({ message: "Source and destination must be different" });
+      if (sourceLocationId === destinationLocationId)
+        return res.status(400).json({ message: "Source and destination must be different" });
 
       const resp = await fetch(`http://localhost:${process.env.PORT || 5000}/api/stock-transfers`, {
         method: "POST",
@@ -623,11 +740,13 @@ export function registerChatbotRoutes(app: Express) {
           totalAmount: vouchers.totalAmount,
         })
         .from(vouchers)
-        .where(and(
-          eq(vouchers.companyId, companyId),
-          isNull(vouchers.deletedAt),
-          ...(typeFilter ? [eq(vouchers.voucherType, typeFilter)] : []),
-        ))
+        .where(
+          and(
+            eq(vouchers.companyId, companyId),
+            isNull(vouchers.deletedAt),
+            ...(typeFilter ? [eq(vouchers.voucherType, typeFilter)] : [])
+          )
+        )
         .orderBy(desc(vouchers.createdAt))
         .limit(1);
 
@@ -670,11 +789,34 @@ export function registerChatbotRoutes(app: Express) {
 
       if (searchModules.includes("vouchers")) {
         const vrows = await db
-          .select({ id: vouchers.id, voucherNumber: vouchers.voucherNumber, voucherType: vouchers.voucherType, voucherDate: vouchers.voucherDate, description: vouchers.description, totalAmount: vouchers.totalAmount })
+          .select({
+            id: vouchers.id,
+            voucherNumber: vouchers.voucherNumber,
+            voucherType: vouchers.voucherType,
+            voucherDate: vouchers.voucherDate,
+            description: vouchers.description,
+            totalAmount: vouchers.totalAmount,
+          })
           .from(vouchers)
-          .where(and(eq(vouchers.companyId, companyId), isNull(vouchers.deletedAt), or(ilike(vouchers.description, `%${q}%`), ilike(vouchers.voucherNumber, `%${q}%`))))
-          .orderBy(desc(vouchers.voucherDate)).limit(5);
-        vrows.forEach(r => results.push({ module: "Voucher", id: r.id, title: r.voucherNumber, subtitle: r.description || "", meta: `${r.voucherType} · ${r.voucherDate} · ${r.totalAmount}`, path: `/vouchers` }));
+          .where(
+            and(
+              eq(vouchers.companyId, companyId),
+              isNull(vouchers.deletedAt),
+              or(ilike(vouchers.description, `%${q}%`), ilike(vouchers.voucherNumber, `%${q}%`))
+            )
+          )
+          .orderBy(desc(vouchers.voucherDate))
+          .limit(5);
+        vrows.forEach((r) =>
+          results.push({
+            module: "Voucher",
+            id: r.id,
+            title: r.voucherNumber,
+            subtitle: r.description || "",
+            meta: `${r.voucherType} · ${r.voucherDate} · ${r.totalAmount}`,
+            path: `/vouchers`,
+          })
+        );
       }
       if (searchModules.includes("customers")) {
         const crows = await db
@@ -682,23 +824,58 @@ export function registerChatbotRoutes(app: Express) {
           .from(customers)
           .where(and(eq(customers.companyId, companyId), isNull(customers.deletedAt), ilike(customers.name, `%${q}%`)))
           .limit(5);
-        crows.forEach(r => results.push({ module: "Customer", id: r.id, title: r.name, subtitle: r.phone || "", meta: "Customer", path: `/customers` }));
+        crows.forEach((r) =>
+          results.push({
+            module: "Customer",
+            id: r.id,
+            title: r.name,
+            subtitle: r.phone || "",
+            meta: "Customer",
+            path: `/customers`,
+          })
+        );
       }
       if (searchModules.includes("suppliers")) {
         const srows = await db
           .select({ id: suppliers.id, legalName: suppliers.legalName, code: suppliers.code })
           .from(suppliers)
-          .where(and(eq(suppliers.companyId, companyId), isNull(suppliers.deletedAt), ilike(suppliers.legalName, `%${q}%`)))
+          .where(
+            and(eq(suppliers.companyId, companyId), isNull(suppliers.deletedAt), ilike(suppliers.legalName, `%${q}%`))
+          )
           .limit(5);
-        srows.forEach(r => results.push({ module: "Supplier", id: r.id, title: r.legalName, subtitle: r.code || "", meta: "Supplier", path: `/suppliers` }));
+        srows.forEach((r) =>
+          results.push({
+            module: "Supplier",
+            id: r.id,
+            title: r.legalName,
+            subtitle: r.code || "",
+            meta: "Supplier",
+            path: `/suppliers`,
+          })
+        );
       }
       if (searchModules.includes("items")) {
         const irows = await db
           .select({ id: stockItems.id, name: stockItems.name, code: stockItems.code })
           .from(stockItems)
-          .where(and(eq(stockItems.companyId, companyId), isNull(stockItems.deletedAt), or(ilike(stockItems.name, `%${q}%`), ilike(stockItems.code, `%${q}%`))))
+          .where(
+            and(
+              eq(stockItems.companyId, companyId),
+              isNull(stockItems.deletedAt),
+              or(ilike(stockItems.name, `%${q}%`), ilike(stockItems.code, `%${q}%`))
+            )
+          )
           .limit(5);
-        irows.forEach(r => results.push({ module: "Stock Item", id: r.id, title: r.name, subtitle: r.code || "", meta: "Item", path: `/stock-items` }));
+        irows.forEach((r) =>
+          results.push({
+            module: "Stock Item",
+            id: r.id,
+            title: r.name,
+            subtitle: r.code || "",
+            meta: "Item",
+            path: `/stock-items`,
+          })
+        );
       }
 
       await logAIAction({
@@ -727,17 +904,17 @@ export function registerChatbotRoutes(app: Express) {
       if (denied) return res.status(denied.code).json({ message: denied.message });
 
       const fileExt = (req.file.originalname || "").toLowerCase().split(".").pop();
-      const allSuppliers  = await storage.getAllSuppliers();
+      const allSuppliers = await storage.getAllSuppliers();
       const allStockItems = await storage.getAllStockItems(companyId);
 
       // ── Helper: match supplier from raw string ──────────────────────
       function tryMatchSupplier(raw: string): { id: number; name: string } | null {
         if (!raw) return null;
         const lo = raw.toLowerCase();
-        const byCode = allSuppliers.find(s => s.code?.toLowerCase() === lo);
+        const byCode = allSuppliers.find((s) => s.code?.toLowerCase() === lo);
         if (byCode) return { id: byCode.id, name: byCode.legalName };
-        const byName = allSuppliers.find(s =>
-          s.legalName.toLowerCase().includes(lo) || lo.includes(s.legalName.toLowerCase())
+        const byName = allSuppliers.find(
+          (s) => s.legalName.toLowerCase().includes(lo) || lo.includes(s.legalName.toLowerCase())
         );
         return byName ? { id: byName.id, name: byName.legalName } : null;
       }
@@ -750,9 +927,7 @@ export function registerChatbotRoutes(app: Express) {
         }
         if (name) {
           const lo = name.toLowerCase();
-          const si = allStockItems.find(s =>
-            s.name.toLowerCase() === lo || s.code?.toLowerCase() === lo
-          );
+          const si = allStockItems.find((s) => s.name.toLowerCase() === lo || s.code?.toLowerCase() === lo);
           if (si) return { id: si.id, name: si.name };
         }
         return null;
@@ -760,11 +935,19 @@ export function registerChatbotRoutes(app: Express) {
 
       // ── Helper: build response from extracted data ──────────────────
       async function buildResponse(extracted: {
-        poNumber: string; containerNumber: string; supplierName: string; supplierCode: string;
-        importDate: string; currency: string;
+        poNumber: string;
+        containerNumber: string;
+        supplierName: string;
+        supplierCode: string;
+        importDate: string;
+        currency: string;
         items: { name: string; code: string; quantity: number; rate: number }[];
-        freight: number; surcharge: number; fumigation: number;
-        documentCharges: number; discount: number; otherCharges: number;
+        freight: number;
+        surcharge: number;
+        fumigation: number;
+        documentCharges: number;
+        discount: number;
+        otherCharges: number;
       }) {
         const supplier = tryMatchSupplier(extracted.supplierCode) || tryMatchSupplier(extracted.supplierName);
         const lines: any[] = [];
@@ -772,46 +955,51 @@ export function registerChatbotRoutes(app: Express) {
           if (item.quantity <= 0) continue;
           const matched = await tryMatchItem(item.code || "", item.name || "");
           lines.push({
-            rawName:       item.name || item.code || "Unknown",
-            rawCode:       item.code || "",
-            stockItemId:   matched?.id ?? null,
+            rawName: item.name || item.code || "Unknown",
+            rawCode: item.code || "",
+            stockItemId: matched?.id ?? null,
             stockItemName: matched?.name ?? "",
-            qty:           item.quantity.toString(),
-            rate:          (item.rate || 0).toFixed(2),
-            lineTotal:     (item.quantity * (item.rate || 0)).toFixed(2),
+            qty: item.quantity.toString(),
+            rate: (item.rate || 0).toFixed(2),
+            lineTotal: (item.quantity * (item.rate || 0)).toFixed(2),
           });
         }
-        const itemsTotal  = lines.reduce((s, l) => s + parseFloat(l.lineTotal), 0);
-        const chargesNet  = extracted.freight + extracted.surcharge + extracted.fumigation +
-                            extracted.documentCharges - extracted.discount + extracted.otherCharges;
-        const grandTotal  = itemsTotal + chargesNet;
+        const itemsTotal = lines.reduce((s, l) => s + parseFloat(l.lineTotal), 0);
+        const chargesNet =
+          extracted.freight +
+          extracted.surcharge +
+          extracted.fumigation +
+          extracted.documentCharges -
+          extracted.discount +
+          extracted.otherCharges;
+        const grandTotal = itemsTotal + chargesNet;
         const unresolvedItems = lines
-          .map((l, i) => l.stockItemId ? null : { index: i, rawName: l.rawName, rawCode: l.rawCode })
+          .map((l, i) => (l.stockItemId ? null : { index: i, rawName: l.rawName, rawCode: l.rawCode }))
           .filter(Boolean);
 
         return {
-          poNumber:          extracted.poNumber || "",
-          containerNumber:   extracted.containerNumber || "",
-          importDate:        extracted.importDate || new Date().toISOString().split("T")[0],
-          currency:          extracted.currency || "USD",
-          supplierId:        supplier?.id ?? null,
-          supplierName:      supplier?.name ?? (extracted.supplierCode || extracted.supplierName || ""),
-          supplierRaw:       extracted.supplierCode || extracted.supplierName || "",
+          poNumber: extracted.poNumber || "",
+          containerNumber: extracted.containerNumber || "",
+          importDate: extracted.importDate || new Date().toISOString().split("T")[0],
+          currency: extracted.currency || "USD",
+          supplierId: supplier?.id ?? null,
+          supplierName: supplier?.name ?? (extracted.supplierCode || extracted.supplierName || ""),
+          supplierRaw: extracted.supplierCode || extracted.supplierName || "",
           lines,
           charges: {
-            freight:         extracted.freight,
-            surcharge:       extracted.surcharge,
-            fumigation:      extracted.fumigation,
+            freight: extracted.freight,
+            surcharge: extracted.surcharge,
+            fumigation: extracted.fumigation,
             documentCharges: extracted.documentCharges,
-            discount:        extracted.discount,
-            otherCharges:    extracted.otherCharges,
+            discount: extracted.discount,
+            otherCharges: extracted.otherCharges,
           },
-          itemsTotal:        itemsTotal.toFixed(2),
-          grandTotal:        grandTotal.toFixed(2),
+          itemsTotal: itemsTotal.toFixed(2),
+          grandTotal: grandTotal.toFixed(2),
           unresolvedSupplier: !supplier,
           unresolvedItems,
-          allSuppliers:      allSuppliers.map(s => ({ id: s.id, name: s.legalName, code: s.code || "" })),
-          allStockItems:     allStockItems.map(s => ({ id: s.id, name: s.name, code: s.code || "" })),
+          allSuppliers: allSuppliers.map((s) => ({ id: s.id, name: s.legalName, code: s.code || "" })),
+          allStockItems: allStockItems.map((s) => ({ id: s.id, name: s.name, code: s.code || "" })),
         };
       }
 
@@ -819,9 +1007,8 @@ export function registerChatbotRoutes(app: Express) {
       function col(row: Record<string, any>, ...keys: string[]): string {
         for (const key of keys) {
           const norm = key.toLowerCase().replace(/[\s_]+/g, "");
-          const found = Object.keys(row).find(k => k.toLowerCase().replace(/[\s_]+/g, "") === norm);
-          if (found !== undefined && row[found] != null && row[found] !== "")
-            return String(row[found]).trim();
+          const found = Object.keys(row).find((k) => k.toLowerCase().replace(/[\s_]+/g, "") === norm);
+          if (found !== undefined && row[found] != null && row[found] !== "") return String(row[found]).trim();
         }
         return "";
       }
@@ -838,11 +1025,15 @@ export function registerChatbotRoutes(app: Express) {
         } catch (pdfErr: any) {
           return res.status(400).json({ message: `Could not read PDF: ${pdfErr.message}` });
         }
-        if (!pdfText.trim()) return res.status(400).json({ message: "PDF appears to be empty or is image-only (no extractable text)" });
+        if (!pdfText.trim())
+          return res.status(400).json({ message: "PDF appears to be empty or is image-only (no extractable text)" });
 
         const extracted = await extractPOFromText(pdfText);
         if (!extracted || !extracted.items.length) {
-          return res.status(400).json({ message: "AI could not find any purchase order items in this PDF. Make sure the PDF contains readable text." });
+          return res.status(400).json({
+            message:
+              "AI could not find any purchase order items in this PDF. Make sure the PDF contains readable text.",
+          });
         }
         return res.json(await buildResponse(extracted));
       }
@@ -853,14 +1044,16 @@ export function registerChatbotRoutes(app: Express) {
       let rows: Record<string, any>[] = [];
       if (fileExt === "csv") {
         const text = req.file.buffer.toString("utf-8");
-        const csvLines = text.split(/\r?\n/).filter(l => l.trim());
+        const csvLines = text.split(/\r?\n/).filter((l) => l.trim());
         if (csvLines.length < 2) return res.status(400).json({ message: "CSV file has no data rows" });
-        const headers = csvLines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+        const headers = csvLines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
         for (let i = 1; i < csvLines.length; i++) {
-          const vals = csvLines[i].split(",").map(v => v.trim().replace(/^"|"$/g, ""));
-          if (vals.every(v => !v)) continue;
+          const vals = csvLines[i].split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+          if (vals.every((v) => !v)) continue;
           const row: Record<string, any> = {};
-          headers.forEach((h, idx) => { row[h] = vals[idx] ?? ""; });
+          headers.forEach((h, idx) => {
+            row[h] = vals[idx] ?? "";
+          });
           rows.push(row);
         }
       } else {
@@ -880,36 +1073,92 @@ export function registerChatbotRoutes(app: Express) {
 
       // Try standard column mapping
       const first = rows[0];
-      const poNumber       = col(first, "PO_Number","PONumber","PO Number","PO#","po_number","PONo","PO No","Invoice Number","InvoiceNumber");
-      const containerNumber= col(first, "Container_Number","ContainerNumber","Container Number","Container","CONT","Container#","Shipment");
-      const supplierCode   = col(first, "Supplier_Code","SupplierCode","Supplier Code","Vendor Code","VendorCode");
-      const supplierName   = col(first, "Supplier_Name","SupplierName","Supplier","Vendor","Vendor Name","From");
-      const currency       = col(first, "Currency","currency") || "USD";
-      const importDateRaw  = col(first, "Import_Date","ImportDate","Import Date","Date","PO_Date","PODate","Invoice Date","Invoice_Date");
-      const importDate     = importDateRaw || new Date().toISOString().split("T")[0];
-      const freight        = parseFloat(col(first,"Freight","freight")||"0")||0;
-      const surcharge      = parseFloat(col(first,"Surcharge","surcharge")||"0")||0;
-      const fumigation     = parseFloat(col(first,"Fumigation","fumigation")||"0")||0;
-      const documentCharges= parseFloat(col(first,"Document_Charges","DocumentCharges","Doc Charges","DocCharges","Document Charges")||"0")||0;
-      const discount       = parseFloat(col(first,"Discount","discount")||"0")||0;
-      const otherCharges   = parseFloat(col(first,"Other_Charges","OtherCharges","Other Charges")||"0")||0;
+      const poNumber = col(
+        first,
+        "PO_Number",
+        "PONumber",
+        "PO Number",
+        "PO#",
+        "po_number",
+        "PONo",
+        "PO No",
+        "Invoice Number",
+        "InvoiceNumber"
+      );
+      const containerNumber = col(
+        first,
+        "Container_Number",
+        "ContainerNumber",
+        "Container Number",
+        "Container",
+        "CONT",
+        "Container#",
+        "Shipment"
+      );
+      const supplierCode = col(first, "Supplier_Code", "SupplierCode", "Supplier Code", "Vendor Code", "VendorCode");
+      const supplierName = col(first, "Supplier_Name", "SupplierName", "Supplier", "Vendor", "Vendor Name", "From");
+      const currency = col(first, "Currency", "currency") || "USD";
+      const importDateRaw = col(
+        first,
+        "Import_Date",
+        "ImportDate",
+        "Import Date",
+        "Date",
+        "PO_Date",
+        "PODate",
+        "Invoice Date",
+        "Invoice_Date"
+      );
+      const importDate = importDateRaw || new Date().toISOString().split("T")[0];
+      const freight = parseFloat(col(first, "Freight", "freight") || "0") || 0;
+      const surcharge = parseFloat(col(first, "Surcharge", "surcharge") || "0") || 0;
+      const fumigation = parseFloat(col(first, "Fumigation", "fumigation") || "0") || 0;
+      const documentCharges =
+        parseFloat(
+          col(first, "Document_Charges", "DocumentCharges", "Doc Charges", "DocCharges", "Document Charges") || "0"
+        ) || 0;
+      const discount = parseFloat(col(first, "Discount", "discount") || "0") || 0;
+      const otherCharges = parseFloat(col(first, "Other_Charges", "OtherCharges", "Other Charges") || "0") || 0;
 
       const mappedLines: any[] = [];
       for (const row of rows) {
-        const itemCode = col(row,"Item_Barcode","ItemBarcode","Barcode","barcode","Item_Code","ItemCode","Code","SKU","Item Code","Barcode/Code");
-        const itemName = col(row,"Item_Name","ItemName","Name","Description","Item","Product","Item Description");
-        const qty  = parseFloat(col(row,"Quantity","Qty","quantity","qty","Units","units")||"0");
-        const rate = parseFloat(col(row,"Rate","Price","Unit_Price","UnitPrice","Unit Price","rate","price","Unit Cost")||"0");
+        const itemCode = col(
+          row,
+          "Item_Barcode",
+          "ItemBarcode",
+          "Barcode",
+          "barcode",
+          "Item_Code",
+          "ItemCode",
+          "Code",
+          "SKU",
+          "Item Code",
+          "Barcode/Code"
+        );
+        const itemName = col(
+          row,
+          "Item_Name",
+          "ItemName",
+          "Name",
+          "Description",
+          "Item",
+          "Product",
+          "Item Description"
+        );
+        const qty = parseFloat(col(row, "Quantity", "Qty", "quantity", "qty", "Units", "units") || "0");
+        const rate = parseFloat(
+          col(row, "Rate", "Price", "Unit_Price", "UnitPrice", "Unit Price", "rate", "price", "Unit Cost") || "0"
+        );
         if ((!itemName && !itemCode) || qty <= 0) continue;
         const matched = await tryMatchItem(itemCode, itemName);
         mappedLines.push({
-          rawName:       itemName || itemCode,
-          rawCode:       itemCode || "",
-          stockItemId:   matched?.id ?? null,
+          rawName: itemName || itemCode,
+          rawCode: itemCode || "",
+          stockItemId: matched?.id ?? null,
           stockItemName: matched?.name ?? "",
-          qty:           qty.toString(),
-          rate:          rate.toFixed(2),
-          lineTotal:     (qty * rate).toFixed(2),
+          qty: qty.toString(),
+          rate: rate.toFixed(2),
+          lineTotal: (qty * rate).toFixed(2),
         });
       }
 
@@ -919,42 +1168,51 @@ export function registerChatbotRoutes(app: Express) {
         const itemsTotal = mappedLines.reduce((s, l) => s + parseFloat(l.lineTotal), 0);
         const chargesNet = freight + surcharge + fumigation + documentCharges - discount + otherCharges;
         const unresolvedItems = mappedLines
-          .map((l, i) => l.stockItemId ? null : { index: i, rawName: l.rawName, rawCode: l.rawCode })
+          .map((l, i) => (l.stockItemId ? null : { index: i, rawName: l.rawName, rawCode: l.rawCode }))
           .filter(Boolean);
         return res.json({
-          poNumber, containerNumber, importDate, currency,
-          supplierId:        supplier?.id ?? null,
-          supplierName:      supplier?.name ?? (supplierCode || supplierName || ""),
-          supplierRaw:       supplierCode || supplierName || "",
-          lines:             mappedLines,
-          charges:           { freight, surcharge, fumigation, documentCharges, discount, otherCharges },
-          itemsTotal:        itemsTotal.toFixed(2),
-          grandTotal:        (itemsTotal + chargesNet).toFixed(2),
+          poNumber,
+          containerNumber,
+          importDate,
+          currency,
+          supplierId: supplier?.id ?? null,
+          supplierName: supplier?.name ?? (supplierCode || supplierName || ""),
+          supplierRaw: supplierCode || supplierName || "",
+          lines: mappedLines,
+          charges: { freight, surcharge, fumigation, documentCharges, discount, otherCharges },
+          itemsTotal: itemsTotal.toFixed(2),
+          grandTotal: (itemsTotal + chargesNet).toFixed(2),
           unresolvedSupplier: !supplier,
           unresolvedItems,
-          allSuppliers:      allSuppliers.map(s => ({ id: s.id, name: s.legalName, code: s.code || "" })),
-          allStockItems:     allStockItems.map(s => ({ id: s.id, name: s.name, code: s.code || "" })),
+          allSuppliers: allSuppliers.map((s) => ({ id: s.id, name: s.legalName, code: s.code || "" })),
+          allStockItems: allStockItems.map((s) => ({ id: s.id, name: s.name, code: s.code || "" })),
         });
       }
 
       // AI fallback — flatten rows to plain text and ask AI to parse
-      const rawText = rows.map(r => Object.entries(r).map(([k,v]) => `${k}: ${v}`).join(" | ")).join("\n");
+      const rawText = rows
+        .map((r) =>
+          Object.entries(r)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(" | ")
+        )
+        .join("\n");
       const extracted = await extractPOFromText(rawText);
       if (!extracted || !extracted.items.length) {
         return res.status(400).json({
-          message: "Could not find item rows in the file. Expected columns like Item_Name / Quantity / Rate, or the file may be in an unusual layout.",
+          message:
+            "Could not find item rows in the file. Expected columns like Item_Name / Quantity / Rate, or the file may be in an unusual layout.",
           rowCount: rows.length,
           detectedColumns: Object.keys(rows[0] || {}),
         });
       }
       // Merge header-level fields we did find with AI-extracted items
-      if (!extracted.poNumber && poNumber)       extracted.poNumber = poNumber;
+      if (!extracted.poNumber && poNumber) extracted.poNumber = poNumber;
       if (!extracted.containerNumber && containerNumber) extracted.containerNumber = containerNumber;
-      if (!extracted.supplierName && supplierName)      extracted.supplierName = supplierName;
-      if (!extracted.supplierCode && supplierCode)      extracted.supplierCode = supplierCode;
-      if (!extracted.importDate && importDateRaw)       extracted.importDate = importDateRaw;
+      if (!extracted.supplierName && supplierName) extracted.supplierName = supplierName;
+      if (!extracted.supplierCode && supplierCode) extracted.supplierCode = supplierCode;
+      if (!extracted.importDate && importDateRaw) extracted.importDate = importDateRaw;
       return res.json(await buildResponse(extracted));
-
     } catch (error: any) {
       console.error("PO file parse error:", error);
       res.status(500).json({ message: "Internal server error" });
@@ -972,10 +1230,10 @@ export function registerChatbotRoutes(app: Express) {
 
       const { poNumber, containerNumber, importDate, currency, supplierId, lines, charges } = req.body;
 
-      if (!poNumber)        return res.status(400).json({ message: "PO number is required" });
+      if (!poNumber) return res.status(400).json({ message: "PO number is required" });
       if (!containerNumber) return res.status(400).json({ message: "Container number is required" });
-      if (!supplierId)      return res.status(400).json({ message: "Supplier is required" });
-      if (!lines?.length)   return res.status(400).json({ message: "At least one line item is required" });
+      if (!supplierId) return res.status(400).json({ message: "Supplier is required" });
+      if (!lines?.length) return res.status(400).json({ message: "At least one line item is required" });
 
       const unresolved = lines.filter((l: any) => !l.stockItemId);
       if (unresolved.length > 0) {
@@ -991,7 +1249,9 @@ export function registerChatbotRoutes(app: Express) {
         .where(and(eq(purchaseOrders.poNumber, poNumber), eq(purchaseOrders.companyId, companyId)))
         .limit(1);
       if (existingPO.length > 0) {
-        return res.status(409).json({ message: `A purchase order with number "${poNumber}" already exists. Please use a different PO number.` });
+        return res.status(409).json({
+          message: `A purchase order with number "${poNumber}" already exists. Please use a different PO number.`,
+        });
       }
 
       // Get or create container
@@ -1014,47 +1274,57 @@ export function registerChatbotRoutes(app: Express) {
 
         if (existingPOs.length > 0) {
           return res.status(409).json({
-            message: `Container "${containerNumber}" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p: any) => p.poNumber).join(', ')}). To avoid duplicates, please delete the existing POs first or use a different container number.`,
+            message: `Container "${containerNumber}" already has ${existingPOs.length} PO(s) imported (${existingPOs.map((p: any) => p.poNumber).join(", ")}). To avoid duplicates, please delete the existing POs first or use a different container number.`,
           });
         }
       }
 
-      const itemsTotal      = lines.reduce((s: number, l: any) => s + parseFloat(l.qty) * parseFloat(l.rate), 0);
-      const freightAmt      = parseFloat(charges?.freight       || "0") || 0;
-      const surchargeAmt    = parseFloat(charges?.surcharge     || "0") || 0;
-      const fumigationAmt   = parseFloat(charges?.fumigation    || "0") || 0;
-      const docChargesAmt   = parseFloat(charges?.documentCharges || "0") || 0;
-      const discountAmt     = parseFloat(charges?.discount      || "0") || 0;
-      const otherChargesAmt = parseFloat(charges?.otherCharges  || "0") || 0;
-      const grandTotal      = itemsTotal + freightAmt + surchargeAmt + fumigationAmt + docChargesAmt - discountAmt + otherChargesAmt;
+      const itemsTotal = lines.reduce((s: number, l: any) => s + parseFloat(l.qty) * parseFloat(l.rate), 0);
+      const freightAmt = parseFloat(charges?.freight || "0") || 0;
+      const surchargeAmt = parseFloat(charges?.surcharge || "0") || 0;
+      const fumigationAmt = parseFloat(charges?.fumigation || "0") || 0;
+      const docChargesAmt = parseFloat(charges?.documentCharges || "0") || 0;
+      const discountAmt = parseFloat(charges?.discount || "0") || 0;
+      const otherChargesAmt = parseFloat(charges?.otherCharges || "0") || 0;
+      const grandTotal =
+        itemsTotal + freightAmt + surchargeAmt + fumigationAmt + docChargesAmt - discountAmt + otherChargesAmt;
 
-      const po = await storage.createPurchaseOrder({
-        companyId,
-        poNumber,
-        containerId:      container.id,
-        supplierId:       Number(supplierId),
-        currency:         currency || "USD",
-        itemsTotal:       itemsTotal.toFixed(2),
-        freight:          freightAmt.toFixed(2),
-        surcharge:        surchargeAmt.toFixed(2),
-        fumigation:       fumigationAmt.toFixed(2),
-        documentCharges:  docChargesAmt.toFixed(2),
-        discount:         discountAmt.toFixed(2),
-        otherCharges:     otherChargesAmt.toFixed(2),
-        status:           "Open",
-        chargesEdited:    freightAmt > 0 || surchargeAmt > 0 || fumigationAmt > 0 || docChargesAmt > 0 || discountAmt > 0 || otherChargesAmt > 0,
-      }, importDate);
+      const po = await storage.createPurchaseOrder(
+        {
+          companyId,
+          poNumber,
+          containerId: container.id,
+          supplierId: Number(supplierId),
+          currency: currency || "USD",
+          itemsTotal: itemsTotal.toFixed(2),
+          freight: freightAmt.toFixed(2),
+          surcharge: surchargeAmt.toFixed(2),
+          fumigation: fumigationAmt.toFixed(2),
+          documentCharges: docChargesAmt.toFixed(2),
+          discount: discountAmt.toFixed(2),
+          otherCharges: otherChargesAmt.toFixed(2),
+          status: "Open",
+          chargesEdited:
+            freightAmt > 0 ||
+            surchargeAmt > 0 ||
+            fumigationAmt > 0 ||
+            docChargesAmt > 0 ||
+            discountAmt > 0 ||
+            otherChargesAmt > 0,
+        },
+        importDate
+      );
 
       for (const line of lines) {
         const q = parseFloat(line.qty);
         const r = parseFloat(line.rate);
         await db.insert(poLineItems).values({
-          poId:        po.id,
+          poId: po.id,
           stockItemId: Number(line.stockItemId),
-          itemName:    line.itemName || line.rawName || "Unknown Item",
-          quantity:    q.toFixed(3),
-          rate:        r.toFixed(2),
-          lineTotal:   (q * r).toFixed(2),
+          itemName: line.itemName || line.rawName || "Unknown Item",
+          quantity: q.toFixed(3),
+          rate: r.toFixed(2),
+          lineTotal: (q * r).toFixed(2),
         });
       }
 
@@ -1083,16 +1353,16 @@ export function registerChatbotRoutes(app: Express) {
 
       clearERPContextCache(companyId);
       res.json({
-        success:            true,
-        poId:               po.id,
-        poNumber:           po.poNumber,
+        success: true,
+        poId: po.id,
+        poNumber: po.poNumber,
         containerNumber,
-        containerId:        container.id,
-        supplierId:         Number(supplierId),
-        lineCount:          lines.length,
-        itemsTotal:         itemsTotal.toFixed(2),
-        grandTotal:         grandTotal.toFixed(2),
-        crossCompany:       !!(await storage.getParentCompanyId()),
+        containerId: container.id,
+        supplierId: Number(supplierId),
+        lineCount: lines.length,
+        itemsTotal: itemsTotal.toFixed(2),
+        grandTotal: grandTotal.toFixed(2),
+        crossCompany: !!(await storage.getParentCompanyId()),
         availableProformas,
       });
     } catch (error: any) {
@@ -1135,7 +1405,8 @@ export function registerChatbotRoutes(app: Express) {
         const currentContent = await readProjectFileRaw(filePath).catch(() => "");
         if (!originalContent || originalContent.trim() === "") {
           return res.status(409).json({
-            message: "Cannot overwrite an existing file without a stale-check reference. Please re-ask the AI to regenerate the patch.",
+            message:
+              "Cannot overwrite an existing file without a stale-check reference. Please re-ask the AI to regenerate the patch.",
             stale: true,
           });
         }
@@ -1167,7 +1438,9 @@ export function registerChatbotRoutes(app: Express) {
           newContent,
           appliedByUserId: String(userId),
         });
-      } catch (_) { /* Non-fatal: don't fail the request if history logging fails */ }
+      } catch (_) {
+        /* Non-fatal: don't fail the request if history logging fails */
+      }
 
       await logAIAction({
         req,
@@ -1216,54 +1489,60 @@ export function registerChatbotRoutes(app: Express) {
   });
 
   // ── Code Agent: revert a patch ────────────────────────────────────────────
-  app.post("/api/chatbot/revert-patch/:id", requireAuth, requireNonPOS, requireRole("Admin", "Owner"), async (req, res) => {
-    try {
-      const companyId = req.session.currentCompanyId;
-      if (!companyId) return res.status(400).json({ message: "No company selected" });
-
-      const patchId = parseInt(req.params.id, 10);
-      if (isNaN(patchId)) return res.status(400).json({ message: "Invalid patch id" });
-
-      const [row] = await db
-        .select()
-        .from(codePatchHistory)
-        .where(and(eq(codePatchHistory.id, patchId), eq(codePatchHistory.companyId, companyId)));
-      if (!row) return res.status(404).json({ message: "Patch not found" });
-      if (row.revertedAt) return res.status(409).json({ message: "Patch has already been reverted" });
-
-      // Write original content back to disk
-      let absPath: string;
+  app.post(
+    "/api/chatbot/revert-patch/:id",
+    requireAuth,
+    requireNonPOS,
+    requireRole("Admin", "Owner"),
+    async (req, res) => {
       try {
-        absPath = resolveWorkspacePath(row.filePath);
-      } catch (e: any) {
-        return res.status(400).json({ message: e.message });
+        const companyId = req.session.currentCompanyId;
+        if (!companyId) return res.status(400).json({ message: "No company selected" });
+
+        const patchId = parseInt(req.params.id, 10);
+        if (isNaN(patchId)) return res.status(400).json({ message: "Invalid patch id" });
+
+        const [row] = await db
+          .select()
+          .from(codePatchHistory)
+          .where(and(eq(codePatchHistory.id, patchId), eq(codePatchHistory.companyId, companyId)));
+        if (!row) return res.status(404).json({ message: "Patch not found" });
+        if (row.revertedAt) return res.status(409).json({ message: "Patch has already been reverted" });
+
+        // Write original content back to disk
+        let absPath: string;
+        try {
+          absPath = resolveWorkspacePath(row.filePath);
+        } catch (e: any) {
+          return res.status(400).json({ message: e.message });
+        }
+
+        const dir = path.dirname(absPath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(absPath, row.originalContent ?? "", "utf8");
+
+        // Mark as reverted
+        await db
+          .update(codePatchHistory)
+          .set({ revertedAt: new Date() } as any)
+          .where(eq(codePatchHistory.id, patchId));
+
+        await logAIAction({
+          req,
+          actionType: "write",
+          actionName: "revert_patch",
+          inputJson: { patchId, filePath: row.filePath },
+          outputJson: { success: true },
+          status: "success",
+        });
+
+        res.json({ success: true, filePath: row.filePath });
+      } catch (error: any) {
+        console.error("[Chatbot] revert-patch error:", error.message);
+        res.status(500).json({ message: "Internal server error" });
       }
-
-      const dir = path.dirname(absPath);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(absPath, row.originalContent ?? "", "utf8");
-
-      // Mark as reverted
-      await db
-        .update(codePatchHistory)
-        .set({ revertedAt: new Date() } as any)
-        .where(eq(codePatchHistory.id, patchId));
-
-      await logAIAction({
-        req,
-        actionType: "write",
-        actionName: "revert_patch",
-        inputJson: { patchId, filePath: row.filePath },
-        outputJson: { success: true },
-        status: "success",
-      });
-
-      res.json({ success: true, filePath: row.filePath });
-    } catch (error: any) {
-      console.error("[Chatbot] revert-patch error:", error.message);
-      res.status(500).json({ message: "Internal server error" });
     }
-  });
+  );
 
   // ── Code Agent: update commit hash after successful git-push ──────────────
   // Called internally by the git-push handler to link the history record.
@@ -1273,12 +1552,14 @@ export function registerChatbotRoutes(app: Express) {
       const [latest] = await db
         .select({ id: codePatchHistory.id })
         .from(codePatchHistory)
-        .where(and(
-          eq(codePatchHistory.companyId, companyId),
-          eq(codePatchHistory.filePath, filePath),
-          isNull(codePatchHistory.commitHash),
-          isNull(codePatchHistory.revertedAt),
-        ))
+        .where(
+          and(
+            eq(codePatchHistory.companyId, companyId),
+            eq(codePatchHistory.filePath, filePath),
+            isNull(codePatchHistory.commitHash),
+            isNull(codePatchHistory.revertedAt)
+          )
+        )
         .orderBy(desc(codePatchHistory.appliedAt))
         .limit(1);
       if (latest) {
@@ -1287,7 +1568,9 @@ export function registerChatbotRoutes(app: Express) {
           .set({ commitHash } as any)
           .where(eq(codePatchHistory.id, latest.id));
       }
-    } catch (_) { /* Non-fatal */ }
+    } catch (_) {
+      /* Non-fatal */
+    }
   }
 
   // ── Code Agent: commit and push to GitHub ─────────────────────────────────
@@ -1312,10 +1595,16 @@ export function registerChatbotRoutes(app: Express) {
 
       // Load GitHub settings from DB at request time (not from potentially stale process.env)
       const [urlRow, tokenRow] = await Promise.all([
-        db.select({ value: systemSettings.value }).from(systemSettings)
-          .where(eq(systemSettings.key, "github_repo_url")).limit(1),
-        db.select({ value: systemSettings.value }).from(systemSettings)
-          .where(eq(systemSettings.key, "github_token")).limit(1),
+        db
+          .select({ value: systemSettings.value })
+          .from(systemSettings)
+          .where(eq(systemSettings.key, "github_repo_url"))
+          .limit(1),
+        db
+          .select({ value: systemSettings.value })
+          .from(systemSettings)
+          .where(eq(systemSettings.key, "github_token"))
+          .limit(1),
       ]);
 
       const baseUrl = urlRow[0]?.value ?? process.env.GITHUB_REPO_URL ?? "";
@@ -1377,14 +1666,20 @@ export function registerChatbotRoutes(app: Express) {
       }
 
       const [urlRow, tokenRow] = await Promise.all([
-        db.select({ value: systemSettings.value }).from(systemSettings)
-          .where(eq(systemSettings.key, "github_repo_url")).limit(1),
-        db.select({ value: systemSettings.value }).from(systemSettings)
-          .where(eq(systemSettings.key, "github_token")).limit(1),
+        db
+          .select({ value: systemSettings.value })
+          .from(systemSettings)
+          .where(eq(systemSettings.key, "github_repo_url"))
+          .limit(1),
+        db
+          .select({ value: systemSettings.value })
+          .from(systemSettings)
+          .where(eq(systemSettings.key, "github_token"))
+          .limit(1),
       ]);
 
       const baseUrl = urlRow[0]?.value ?? "";
-      const hasToken = !!(tokenRow[0]?.value);
+      const hasToken = !!tokenRow[0]?.value;
 
       // Strip any embedded token from URL before returning (never expose token)
       const safeUrl = baseUrl.replace(/https?:\/\/[^@]+@/, "https://");
@@ -1409,10 +1704,14 @@ export function registerChatbotRoutes(app: Express) {
 
       // Helper to upsert a systemSettings key
       const upsertSetting = async (key: string, value: string) => {
-        const existing = await db.select({ id: systemSettings.id }).from(systemSettings)
-          .where(eq(systemSettings.key, key)).limit(1);
+        const existing = await db
+          .select({ id: systemSettings.id })
+          .from(systemSettings)
+          .where(eq(systemSettings.key, key))
+          .limit(1);
         if (existing.length > 0) {
-          await db.update(systemSettings)
+          await db
+            .update(systemSettings)
             .set({ value, updatedAt: new Date() } as any)
             .where(eq(systemSettings.key, key));
         } else {

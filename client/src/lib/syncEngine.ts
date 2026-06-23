@@ -1,16 +1,5 @@
-import {
-  db,
-  appendSyncLog,
-  upsertGlobalSyncState,
-  addConflict,
-  type SyncQueueItem,
-} from "./db";
-import {
-  getQueue,
-  removeFromQueue,
-  updateItemStatus as updateLegacyStatus,
-  setLastSynced,
-} from "./offlineQueue";
+import { db, appendSyncLog, upsertGlobalSyncState, addConflict, type SyncQueueItem } from "./db";
+import { getQueue, removeFromQueue, updateItemStatus as updateLegacyStatus, setLastSynced } from "./offlineQueue";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -53,9 +42,7 @@ function classifyStatus(status: number): ErrorAction {
 
 // ─── IDB Queue Processor ─────────────────────────────────────────────────────
 
-async function processIdbItem(
-  item: SyncQueueItem
-): Promise<"ok" | "failed" | "conflict" | "auth" | "skipped"> {
+async function processIdbItem(item: SyncQueueItem): Promise<"ok" | "failed" | "conflict" | "auth" | "skipped"> {
   const now = Date.now();
 
   if (item.nextRetryAt && item.nextRetryAt > now) return "skipped";
@@ -88,7 +75,9 @@ async function processIdbItem(
 
     const errText = await res.text().catch(() => `HTTP ${res.status}`);
     let errMsg = errText;
-    try { errMsg = JSON.parse(errText)?.message || errText; } catch {}
+    try {
+      errMsg = JSON.parse(errText)?.message || errText;
+    } catch {}
 
     const action = classifyStatus(res.status);
 
@@ -128,7 +117,6 @@ async function processIdbItem(
     });
     await appendSyncLog("item_failed", `Retry ${newCount}/${MAX_RETRY_COUNT}: ${item.description}`, { url: item.url });
     return "failed";
-
   } catch (err: any) {
     const msg = err?.message || "Network error";
     const newCount = (item.retryCount || 0) + 1;
@@ -144,9 +132,7 @@ async function processIdbItem(
 
 // ─── Legacy localStorage Queue Processor ──────────────────────────────────────
 
-async function processLegacyItem(
-  item: ReturnType<typeof getQueue>[0]
-): Promise<"ok" | "failed" | "auth"> {
+async function processLegacyItem(item: ReturnType<typeof getQueue>[0]): Promise<"ok" | "failed" | "auth"> {
   try {
     const res = await fetch(item.url, {
       method: item.method,
@@ -167,7 +153,9 @@ async function processLegacyItem(
 
     const errText = await res.text().catch(() => `HTTP ${res.status}`);
     let errMsg = errText;
-    try { errMsg = JSON.parse(errText)?.message || errText; } catch {}
+    try {
+      errMsg = JSON.parse(errText)?.message || errText;
+    } catch {}
     updateLegacyStatus(item.id, "failed", errMsg);
     return "failed";
   } catch {
@@ -229,26 +217,32 @@ export async function runSync(): Promise<void> {
 
     // 1. Process IDB queue — only items past their backoff window
     const now = Date.now();
-    const idbPending = await db.syncQueue
-      .where("status").equals("pending")
-      .toArray();
+    const idbPending = await db.syncQueue.where("status").equals("pending").toArray();
 
-    const readyItems = idbPending.filter(i => !i.nextRetryAt || i.nextRetryAt <= now);
+    const readyItems = idbPending.filter((i) => !i.nextRetryAt || i.nextRetryAt <= now);
 
     for (const item of readyItems) {
       const result = await processIdbItem(item);
-      if (result === "auth") { authFailed = true; break; }
+      if (result === "auth") {
+        authFailed = true;
+        break;
+      }
       if (result === "ok") successCount++;
-      if (result === "conflict") { conflictDetected = true; }
+      if (result === "conflict") {
+        conflictDetected = true;
+      }
       if (result === "failed") failCount++;
     }
 
     // 2. Process legacy localStorage queue
     if (!authFailed) {
-      const legacyPending = getQueue().filter(i => i.status === "pending");
+      const legacyPending = getQueue().filter((i) => i.status === "pending");
       for (const item of legacyPending) {
         const result = await processLegacyItem(item);
-        if (result === "auth") { authFailed = true; break; }
+        if (result === "auth") {
+          authFailed = true;
+          break;
+        }
         if (result === "ok") successCount++;
         if (result === "failed") failCount++;
       }
@@ -264,8 +258,10 @@ export async function runSync(): Promise<void> {
     });
 
     emitSyncEvent({ syncing: false, lastSyncedAt: ts, conflictDetected });
-    await appendSyncLog("sync_end", `Sync done: ${successCount} ok, ${failCount} failed${conflictDetected ? ", conflicts detected" : ""}`);
-
+    await appendSyncLog(
+      "sync_end",
+      `Sync done: ${successCount} ok, ${failCount} failed${conflictDetected ? ", conflicts detected" : ""}`
+    );
   } catch (err: any) {
     const msg = err?.message || "Sync error";
     await upsertGlobalSyncState({ status: "error", errorMessage: msg });

@@ -11,28 +11,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   Trash2,
   Search,
@@ -66,7 +47,7 @@ function fmtKg(n: number) {
 }
 
 function today() {
-  return new Date().toLocaleDateString('en-CA');
+  return new Date().toLocaleDateString("en-CA");
 }
 
 function isWasteCategory(name: string) {
@@ -253,11 +234,14 @@ export default function WasteDispatch() {
     return groups.sort((a, b) => a.productName.localeCompare(b.productName));
   }, [bales]);
 
-  const grandTotals = useMemo(() => ({
-    bales: bales.length,
-    weight: bales.reduce((s, b) => s + b.weightKg, 0),
-    cost: bales.reduce((s, b) => s + b.totalCost, 0),
-  }), [bales]);
+  const grandTotals = useMemo(
+    () => ({
+      bales: bales.length,
+      weight: bales.reduce((s, b) => s + b.weightKg, 0),
+      cost: bales.reduce((s, b) => s + b.totalCost, 0),
+    }),
+    [bales]
+  );
 
   const toggleBale = (id: number) => {
     setSelected((prev) => {
@@ -339,8 +323,9 @@ export default function WasteDispatch() {
     const totalW = dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || 0), 0);
     const totalC = dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.totalCost || 0), 0);
     const baleRows = dispatchBales
-      .map((b: any) =>
-        `<tr>
+      .map(
+        (b: any) =>
+          `<tr>
           <td style="border:1px solid #ccc;padding:5px 8px;font-family:monospace">${b.referenceNumber}</td>
           <td style="border:1px solid #ccc;padding:5px 8px">${b.productName || ""}</td>
           <td style="border:1px solid #ccc;padding:5px 8px;text-align:right">${fmtKg(parseFloat(b.weightKg || 0))}</td>
@@ -474,7 +459,7 @@ export default function WasteDispatch() {
         const preOpened = preOpenedStickerRef.current;
         preOpenedStickerRef.current = null;
         prefetchBarcodeDataUrls(rawLabels).then((labels) => {
-          const win = (preOpened && !preOpened.closed) ? preOpened : window.open("", "_blank");
+          const win = preOpened && !preOpened.closed ? preOpened : window.open("", "_blank");
           if (win) {
             win.document.write(generateStickerLabelsHtml(labels));
             win.document.close();
@@ -526,7 +511,11 @@ export default function WasteDispatch() {
       {/* Page Header */}
       <div className="flex items-center justify-between gap-3 px-6 py-3 border-b flex-wrap">
         <div>
-          <PageHeader title="Waste Dispatch" subtitle="Manage waste bales — dispatch or create new entries" icon={<Trash2 className="h-5 w-5" />} />
+          <PageHeader
+            title="Waste Dispatch"
+            subtitle="Manage waste bales — dispatch or create new entries"
+            icon={<Trash2 className="h-5 w-5" />}
+          />
         </div>
       </div>
 
@@ -561,12 +550,29 @@ export default function WasteDispatch() {
               <CardContent className="p-3">
                 <div className="flex flex-wrap gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Dispatch Date</label>
-                    <Input type="date" value={dispatchDate} onChange={(e) => setDispatchDate(e.target.value)} className="w-40" data-testid="input-dispatch-date" />
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Dispatch Date
+                    </label>
+                    <Input
+                      type="date"
+                      value={dispatchDate}
+                      onChange={(e) => setDispatchDate(e.target.value)}
+                      className="w-40"
+                      data-testid="input-dispatch-date"
+                    />
                   </div>
                   <div className="flex flex-col gap-1 flex-1 min-w-40">
-                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes (optional)</label>
-                    <Textarea placeholder="Reason for disposal..." value={notes} onChange={(e) => setNotes(e.target.value)} rows={1} className="resize-none" data-testid="input-notes" />
+                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Notes (optional)
+                    </label>
+                    <Textarea
+                      placeholder="Reason for disposal..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={1}
+                      className="resize-none"
+                      data-testid="input-notes"
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -640,124 +646,148 @@ export default function WasteDispatch() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/40">
-                      <TableHead className="w-8 py-2 px-3"></TableHead>
-                      <TableHead className="py-2 px-3 text-xs">Product</TableHead>
-                      <TableHead className="py-2 px-3 text-xs">Category</TableHead>
-                      <TableHead className="py-2 px-3 text-right text-xs">Bales</TableHead>
-                      <TableHead className="py-2 px-3 text-right text-xs">Weight (kg)</TableHead>
-                      <TableHead className="py-2 px-3 text-right text-xs">Avg Rate</TableHead>
-                      <TableHead className="py-2 px-3 text-right text-xs">Total Cost</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {productGroups.map((group) => {
-                      const isExpanded = expandedGroups.has(group.key);
-                      const groupSelectedCount = group.bales.filter((b) => selected.has(b.id)).length;
-                      const allGroupSelected = groupSelectedCount === group.bales.length;
-                      const someGroupSelected = groupSelectedCount > 0 && !allGroupSelected;
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40">
+                        <TableHead className="w-8 py-2 px-3"></TableHead>
+                        <TableHead className="py-2 px-3 text-xs">Product</TableHead>
+                        <TableHead className="py-2 px-3 text-xs">Category</TableHead>
+                        <TableHead className="py-2 px-3 text-right text-xs">Bales</TableHead>
+                        <TableHead className="py-2 px-3 text-right text-xs">Weight (kg)</TableHead>
+                        <TableHead className="py-2 px-3 text-right text-xs">Avg Rate</TableHead>
+                        <TableHead className="py-2 px-3 text-right text-xs">Total Cost</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {productGroups.map((group) => {
+                        const isExpanded = expandedGroups.has(group.key);
+                        const groupSelectedCount = group.bales.filter((b) => selected.has(b.id)).length;
+                        const allGroupSelected = groupSelectedCount === group.bales.length;
+                        const someGroupSelected = groupSelectedCount > 0 && !allGroupSelected;
 
-                      return (
-                        <>
-                          <TableRow
-                            key={group.key}
-                            className={`cursor-pointer font-medium ${allGroupSelected ? "bg-destructive/5" : someGroupSelected ? "bg-destructive/3" : ""} hover:bg-muted/30`}
-                            data-testid={`row-group-${group.key}`}
-                          >
-                            <TableCell className="py-2 px-3">
-                              <Checkbox
-                                checked={allGroupSelected}
-                                data-state={someGroupSelected ? "indeterminate" : allGroupSelected ? "checked" : "unchecked"}
-                                onCheckedChange={() => toggleGroup(group)}
-                                onClick={(e) => e.stopPropagation()}
-                                data-testid={`checkbox-group-${group.key}`}
-                              />
-                            </TableCell>
-                            <TableCell className="py-2 px-3" onClick={() => toggleExpandGroup(group.key)}>
-                              <div className="flex items-center gap-2">
-                                {isExpanded ? (
-                                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                ) : (
-                                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                                )}
-                                <span className="text-sm font-semibold">{group.productName}</span>
-                                {groupSelectedCount > 0 && (
-                                  <Badge variant="outline" className="text-xs text-destructive border-destructive/30 ml-1">
-                                    {groupSelectedCount} selected
-                                  </Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-2 px-3" onClick={() => toggleExpandGroup(group.key)}>
-                              <Badge variant="outline" className="text-xs">{group.categoryName}</Badge>
-                            </TableCell>
-                            <TableCell className="py-2 px-3 text-right text-sm" onClick={() => toggleExpandGroup(group.key)}>
-                              {group.bales.length}
-                            </TableCell>
-                            <TableCell className="py-2 px-3 text-right text-sm" onClick={() => toggleExpandGroup(group.key)}>
-                              {fmtKg(group.totalWeight)}
-                            </TableCell>
-                            <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground" onClick={() => toggleExpandGroup(group.key)}>
-                              {group.avgRate > 0 ? fmt(group.avgRate) : "—"}
-                            </TableCell>
-                            <TableCell className="py-2 px-3 text-right text-sm font-medium" onClick={() => toggleExpandGroup(group.key)}>
-                              {group.totalCost > 0 ? fmt(group.totalCost) : "—"}
-                            </TableCell>
-                          </TableRow>
-
-                          {isExpanded && group.bales.map((b) => (
+                        return (
+                          <>
                             <TableRow
-                              key={b.id}
-                              className={`cursor-pointer text-xs ${selected.has(b.id) ? "bg-destructive/8" : "bg-muted/10"} hover:bg-muted/20`}
-                              onClick={() => toggleBale(b.id)}
-                              data-testid={`row-bale-${b.id}`}
+                              key={group.key}
+                              className={`cursor-pointer font-medium ${allGroupSelected ? "bg-destructive/5" : someGroupSelected ? "bg-destructive/3" : ""} hover:bg-muted/30`}
+                              data-testid={`row-group-${group.key}`}
                             >
-                              <TableCell className="py-1.5 px-3 pl-5" onClick={(e) => e.stopPropagation()}>
+                              <TableCell className="py-2 px-3">
                                 <Checkbox
-                                  checked={selected.has(b.id)}
-                                  onCheckedChange={() => toggleBale(b.id)}
-                                  data-testid={`checkbox-bale-${b.id}`}
+                                  checked={allGroupSelected}
+                                  data-state={
+                                    someGroupSelected ? "indeterminate" : allGroupSelected ? "checked" : "unchecked"
+                                  }
+                                  onCheckedChange={() => toggleGroup(group)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  data-testid={`checkbox-group-${group.key}`}
                                 />
                               </TableCell>
-                              <TableCell className="py-1.5 px-3 pl-8" colSpan={2}>
+                              <TableCell className="py-2 px-3" onClick={() => toggleExpandGroup(group.key)}>
                                 <div className="flex items-center gap-2">
-                                  <span className="font-mono text-xs font-semibold text-primary">{b.referenceNumber}</span>
-                                  <span className="text-xs text-muted-foreground">{b.locationName}</span>
+                                  {isExpanded ? (
+                                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                  ) : (
+                                    <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                                  )}
+                                  <span className="text-sm font-semibold">{group.productName}</span>
+                                  {groupSelectedCount > 0 && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs text-destructive border-destructive/30 ml-1"
+                                    >
+                                      {groupSelectedCount} selected
+                                    </Badge>
+                                  )}
                                 </div>
                               </TableCell>
-                              <TableCell className="py-1.5 px-3 text-right text-xs">1</TableCell>
-                              <TableCell className="py-1.5 px-3 text-right text-xs">{fmtKg(b.weightKg)}</TableCell>
-                              <TableCell className="py-1.5 px-3 text-right text-xs text-muted-foreground">
-                                {b.totalCost > 0 ? fmt(b.totalCost) : "—"}
+                              <TableCell className="py-2 px-3" onClick={() => toggleExpandGroup(group.key)}>
+                                <Badge variant="outline" className="text-xs">
+                                  {group.categoryName}
+                                </Badge>
                               </TableCell>
-                              <TableCell className="py-1.5 px-3 text-right text-xs">
-                                {b.totalCost > 0 ? fmt(b.totalCost) : "—"}
+                              <TableCell
+                                className="py-2 px-3 text-right text-sm"
+                                onClick={() => toggleExpandGroup(group.key)}
+                              >
+                                {group.bales.length}
+                              </TableCell>
+                              <TableCell
+                                className="py-2 px-3 text-right text-sm"
+                                onClick={() => toggleExpandGroup(group.key)}
+                              >
+                                {fmtKg(group.totalWeight)}
+                              </TableCell>
+                              <TableCell
+                                className="py-2 px-3 text-right text-xs text-muted-foreground"
+                                onClick={() => toggleExpandGroup(group.key)}
+                              >
+                                {group.avgRate > 0 ? fmt(group.avgRate) : "—"}
+                              </TableCell>
+                              <TableCell
+                                className="py-2 px-3 text-right text-sm font-medium"
+                                onClick={() => toggleExpandGroup(group.key)}
+                              >
+                                {group.totalCost > 0 ? fmt(group.totalCost) : "—"}
                               </TableCell>
                             </TableRow>
-                          ))}
-                        </>
-                      );
-                    })}
 
-                    {/* Grand total row */}
-                    <TableRow className="bg-muted/50 font-bold border-t-2">
-                      <TableCell className="py-2 px-3"></TableCell>
-                      <TableCell className="py-2 px-3 text-xs" colSpan={2}>
-                        TOTAL — {productGroups.length} product{productGroups.length !== 1 ? "s" : ""}
-                      </TableCell>
-                      <TableCell className="py-2 px-3 text-right text-xs">{grandTotals.bales}</TableCell>
-                      <TableCell className="py-2 px-3 text-right text-xs">{fmtKg(grandTotals.weight)}</TableCell>
-                      <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">
-                        {grandTotals.bales > 0 && grandTotals.cost > 0 ? fmt(grandTotals.cost / grandTotals.bales) : "—"}
-                      </TableCell>
-                      <TableCell className="py-2 px-3 text-right text-xs">
-                        {grandTotals.cost > 0 ? fmt(grandTotals.cost) : "—"}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
+                            {isExpanded &&
+                              group.bales.map((b) => (
+                                <TableRow
+                                  key={b.id}
+                                  className={`cursor-pointer text-xs ${selected.has(b.id) ? "bg-destructive/8" : "bg-muted/10"} hover:bg-muted/20`}
+                                  onClick={() => toggleBale(b.id)}
+                                  data-testid={`row-bale-${b.id}`}
+                                >
+                                  <TableCell className="py-1.5 px-3 pl-5" onClick={(e) => e.stopPropagation()}>
+                                    <Checkbox
+                                      checked={selected.has(b.id)}
+                                      onCheckedChange={() => toggleBale(b.id)}
+                                      data-testid={`checkbox-bale-${b.id}`}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="py-1.5 px-3 pl-8" colSpan={2}>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-mono text-xs font-semibold text-primary">
+                                        {b.referenceNumber}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">{b.locationName}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="py-1.5 px-3 text-right text-xs">1</TableCell>
+                                  <TableCell className="py-1.5 px-3 text-right text-xs">{fmtKg(b.weightKg)}</TableCell>
+                                  <TableCell className="py-1.5 px-3 text-right text-xs text-muted-foreground">
+                                    {b.totalCost > 0 ? fmt(b.totalCost) : "—"}
+                                  </TableCell>
+                                  <TableCell className="py-1.5 px-3 text-right text-xs">
+                                    {b.totalCost > 0 ? fmt(b.totalCost) : "—"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                          </>
+                        );
+                      })}
+
+                      {/* Grand total row */}
+                      <TableRow className="bg-muted/50 font-bold border-t-2">
+                        <TableCell className="py-2 px-3"></TableCell>
+                        <TableCell className="py-2 px-3 text-xs" colSpan={2}>
+                          TOTAL — {productGroups.length} product{productGroups.length !== 1 ? "s" : ""}
+                        </TableCell>
+                        <TableCell className="py-2 px-3 text-right text-xs">{grandTotals.bales}</TableCell>
+                        <TableCell className="py-2 px-3 text-right text-xs">{fmtKg(grandTotals.weight)}</TableCell>
+                        <TableCell className="py-2 px-3 text-right text-xs text-muted-foreground">
+                          {grandTotals.bales > 0 && grandTotals.cost > 0
+                            ? fmt(grandTotals.cost / grandTotals.bales)
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="py-2 px-3 text-right text-xs">
+                          {grandTotals.cost > 0 ? fmt(grandTotals.cost) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
                 </div>
               )}
             </CardContent>
@@ -777,7 +807,9 @@ export default function WasteDispatch() {
                     </div>
                     <div className="flex items-center gap-1.5">
                       <Weight className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="text-sm" data-testid="text-total-weight">{fmtKg(totalWeight)} kg</span>
+                      <span className="text-sm" data-testid="text-total-weight">
+                        {fmtKg(totalWeight)} kg
+                      </span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       <DollarSign className="w-3.5 h-3.5 text-muted-foreground" />
@@ -790,7 +822,12 @@ export default function WasteDispatch() {
                     <Button variant="outline" size="sm" onClick={() => setSelected(new Set())} className="gap-1.5">
                       <X className="w-3.5 h-3.5" /> Clear
                     </Button>
-                    <Button variant="destructive" onClick={() => setConfirming(true)} data-testid="button-dispatch-waste" className="gap-2">
+                    <Button
+                      variant="destructive"
+                      onClick={() => setConfirming(true)}
+                      data-testid="button-dispatch-waste"
+                      className="gap-2"
+                    >
                       <Trash2 className="w-4 h-4" />
                       Dispatch {selected.size} Bale{selected.size !== 1 ? "s" : ""}
                     </Button>
@@ -808,7 +845,9 @@ export default function WasteDispatch() {
                 Dispatch History
               </CardTitle>
               {history.length > 0 && (
-                <span className="text-xs text-muted-foreground">{history.length} dispatch{history.length !== 1 ? "es" : ""}</span>
+                <span className="text-xs text-muted-foreground">
+                  {history.length} dispatch{history.length !== 1 ? "es" : ""}
+                </span>
               )}
             </CardHeader>
             <CardContent className="p-0">
@@ -836,8 +875,12 @@ export default function WasteDispatch() {
                             </div>
                           </div>
                           <div className="flex items-center gap-3 text-xs">
-                            <span className="text-muted-foreground">{d.totalBales} bale{d.totalBales !== 1 ? "s" : ""}</span>
-                            <span className="text-muted-foreground">{fmtKg(parseFloat(d.totalWeightKg || "0"))} kg</span>
+                            <span className="text-muted-foreground">
+                              {d.totalBales} bale{d.totalBales !== 1 ? "s" : ""}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {fmtKg(parseFloat(d.totalWeightKg || "0"))} kg
+                            </span>
                             <Badge variant="outline" className="text-destructive border-destructive/30 text-xs">
                               {fmt(parseFloat(d.totalCostWrittenOff || "0"))}
                             </Badge>
@@ -845,7 +888,10 @@ export default function WasteDispatch() {
                               size="sm"
                               variant="ghost"
                               className="gap-1 h-6 px-2 text-xs"
-                              onClick={(e) => { e.stopPropagation(); handleHistoryPrint(d); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleHistoryPrint(d);
+                              }}
                               data-testid={`button-reprint-${d.id}`}
                             >
                               <Printer className="w-3 h-3" />
@@ -867,7 +913,9 @@ export default function WasteDispatch() {
                                   <tr className="border-b">
                                     <th className="text-left py-1.5 font-semibold text-muted-foreground">Reference</th>
                                     <th className="text-left py-1.5 font-semibold text-muted-foreground">Product</th>
-                                    <th className="text-right py-1.5 font-semibold text-muted-foreground">Weight (kg)</th>
+                                    <th className="text-right py-1.5 font-semibold text-muted-foreground">
+                                      Weight (kg)
+                                    </th>
                                     <th className="text-right py-1.5 font-semibold text-muted-foreground">Cost W/O</th>
                                   </tr>
                                 </thead>
@@ -883,12 +931,18 @@ export default function WasteDispatch() {
                                 </tbody>
                                 <tfoot>
                                   <tr className="border-t font-semibold">
-                                    <td className="pt-1.5" colSpan={2}>TOTAL — {dispatchBales.length} bale{dispatchBales.length !== 1 ? "s" : ""}</td>
+                                    <td className="pt-1.5" colSpan={2}>
+                                      TOTAL — {dispatchBales.length} bale{dispatchBales.length !== 1 ? "s" : ""}
+                                    </td>
                                     <td className="pt-1.5 text-right">
-                                      {fmtKg(dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || 0), 0))}
+                                      {fmtKg(
+                                        dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.weightKg || 0), 0)
+                                      )}
                                     </td>
                                     <td className="pt-1.5 text-right text-destructive">
-                                      {fmt(dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.totalCost || 0), 0))}
+                                      {fmt(
+                                        dispatchBales.reduce((s: number, b: any) => s + parseFloat(b.totalCost || 0), 0)
+                                      )}
                                     </td>
                                   </tr>
                                 </tfoot>
@@ -904,13 +958,15 @@ export default function WasteDispatch() {
                   {history.length > 10 && (
                     <div className="px-4 py-3 flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">
-                        {showAllHistory ? `Showing all ${history.length} dispatches` : `Showing 10 of ${history.length} dispatches`}
+                        {showAllHistory
+                          ? `Showing all ${history.length} dispatches`
+                          : `Showing 10 of ${history.length} dispatches`}
                       </span>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-xs h-7 px-3"
-                        onClick={() => setShowAllHistory(v => !v)}
+                        onClick={() => setShowAllHistory((v) => !v)}
                         data-testid="button-toggle-history"
                       >
                         {showAllHistory ? "Show less" : `Show all ${history.length}`}
@@ -947,7 +1003,9 @@ export default function WasteDispatch() {
                     </SelectTrigger>
                     <SelectContent>
                       {wasteProducts.length === 0 ? (
-                        <SelectItem value="__empty" disabled>No Garbage/Wiper products found</SelectItem>
+                        <SelectItem value="__empty" disabled>
+                          No Garbage/Wiper products found
+                        </SelectItem>
                       ) : (
                         wasteProducts.map((p: any) => (
                           <SelectItem key={p.id} value={String(p.id)}>
@@ -969,7 +1027,9 @@ export default function WasteDispatch() {
                     </SelectTrigger>
                     <SelectContent>
                       {allLocations.map((l: any) => (
-                        <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
+                        <SelectItem key={l.id} value={String(l.id)}>
+                          {l.name}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -977,7 +1037,9 @@ export default function WasteDispatch() {
 
                 {/* Weight per bale */}
                 <div className="flex flex-col gap-1 w-32">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Weight / Bale (kg)</label>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Weight / Bale (kg)
+                  </label>
                   <Input
                     type="number"
                     min="0.1"
@@ -1004,7 +1066,9 @@ export default function WasteDispatch() {
 
                 {/* Entry Date */}
                 <div className="flex flex-col gap-1 w-36">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Entry Date</label>
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Entry Date
+                  </label>
                   <Input
                     type="date"
                     value={entryDate}
@@ -1037,7 +1101,8 @@ export default function WasteDispatch() {
                 <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground border rounded-md px-3 py-2 bg-muted/30">
                   <Package className="w-3.5 h-3.5 shrink-0" />
                   <span>
-                    <span className="font-medium text-foreground">{entryQty || 1}</span> bale{Number(entryQty) !== 1 ? "s" : ""} ×{" "}
+                    <span className="font-medium text-foreground">{entryQty || 1}</span> bale
+                    {Number(entryQty) !== 1 ? "s" : ""} ×{" "}
                     <span className="font-medium text-foreground">{entryWeight} kg</span> ={" "}
                     <span className="font-medium text-foreground">
                       {fmtKg((Number(entryQty) || 1) * (parseFloat(entryWeight) || 0))} kg
@@ -1058,7 +1123,9 @@ export default function WasteDispatch() {
                     <Truck className="w-4 h-4 text-muted-foreground" />
                     Active Loadings
                   </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">Resume an existing loading or create a new one.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Resume an existing loading or create a new one.
+                  </p>
                 </div>
                 <Button
                   size="sm"
@@ -1104,9 +1171,7 @@ export default function WasteDispatch() {
                             {o.proformaName && (
                               <span className="text-xs text-muted-foreground">· {o.proformaName}</span>
                             )}
-                            {o.orderDate && (
-                              <span className="text-xs text-muted-foreground">{o.orderDate}</span>
-                            )}
+                            {o.orderDate && <span className="text-xs text-muted-foreground">{o.orderDate}</span>}
                           </div>
                         </div>
                       </div>
@@ -1114,7 +1179,9 @@ export default function WasteDispatch() {
                         {(o.totalQtyBales > 0 || o.totalWeightKg) && (
                           <div className="text-right">
                             <p className="text-sm font-medium">{o.totalQtyBales || 0} bales</p>
-                            <p className="text-xs text-muted-foreground">{fmtKg(parseFloat(o.totalWeightKg || "0"))} kg</p>
+                            <p className="text-xs text-muted-foreground">
+                              {fmtKg(parseFloat(o.totalWeightKg || "0"))} kg
+                            </p>
                           </div>
                         )}
                         <Button
@@ -1175,19 +1242,30 @@ export default function WasteDispatch() {
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              This will remove these bales from inventory and log a waste disposal expense in the
-              factory daybook. This action cannot be undone.
+              This will remove these bales from inventory and log a waste disposal expense in the factory daybook. This
+              action cannot be undone.
             </p>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setConfirming(false)} disabled={submitMutation.isPending}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={() => submitMutation.mutate()} disabled={submitMutation.isPending} data-testid="button-confirm-dispatch">
+            <Button
+              variant="destructive"
+              onClick={() => submitMutation.mutate()}
+              disabled={submitMutation.isPending}
+              data-testid="button-confirm-dispatch"
+            >
               {submitMutation.isPending ? (
-                <><Loader2 className="w-4 h-4 animate-spin mr-2" />Processing...</>
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Processing...
+                </>
               ) : (
-                <><Trash2 className="w-4 h-4 mr-2" />Confirm Disposal</>
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Confirm Disposal
+                </>
               )}
             </Button>
           </DialogFooter>
@@ -1216,7 +1294,16 @@ export default function WasteDispatch() {
                 <thead>
                   <tr>
                     {["Reference", "Weight (kg)", "Cost Written Off"].map((h, i) => (
-                      <th key={h} style={{ border: "1px solid #ccc", padding: "6px 8px", background: "#f3f4f6", textAlign: i === 0 ? "left" : "right", fontWeight: "bold" }}>
+                      <th
+                        key={h}
+                        style={{
+                          border: "1px solid #ccc",
+                          padding: "6px 8px",
+                          background: "#f3f4f6",
+                          textAlign: i === 0 ? "left" : "right",
+                          fontWeight: "bold",
+                        }}
+                      >
                         {h}
                       </th>
                     ))}
@@ -1225,9 +1312,15 @@ export default function WasteDispatch() {
                 <tbody>
                   {printData.bales.map((b: any) => (
                     <tr key={b.id}>
-                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontFamily: "monospace" }}>{b.referenceNumber}</td>
-                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>{fmtKg(b.weightKg)}</td>
-                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>{fmt(b.totalCost)}</td>
+                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", fontFamily: "monospace" }}>
+                        {b.referenceNumber}
+                      </td>
+                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>
+                        {fmtKg(b.weightKg)}
+                      </td>
+                      <td style={{ border: "1px solid #ccc", padding: "5px 8px", textAlign: "right" }}>
+                        {fmt(b.totalCost)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1236,21 +1329,34 @@ export default function WasteDispatch() {
                     <td style={{ border: "1px solid #ccc", padding: "6px 8px", fontWeight: "bold" }}>
                       TOTAL — {printData.totalBales} bale(s)
                     </td>
-                    <td style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}>
+                    <td
+                      style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold" }}
+                    >
                       {fmtKg(printData.totalWeightKg)}
                     </td>
-                    <td style={{ border: "1px solid #ccc", padding: "6px 8px", textAlign: "right", fontWeight: "bold", color: "#dc2626" }}>
+                    <td
+                      style={{
+                        border: "1px solid #ccc",
+                        padding: "6px 8px",
+                        textAlign: "right",
+                        fontWeight: "bold",
+                        color: "#dc2626",
+                      }}
+                    >
                       {fmt(printData.totalCostWrittenOff)}
                     </td>
                   </tr>
                 </tfoot>
               </table>
               <p style={{ marginTop: 24, fontSize: 10, color: "#777" }}>
-                This document confirms the waste disposal of factory bales. A daybook expense entry has been created automatically.
+                This document confirms the waste disposal of factory bales. A daybook expense entry has been created
+                automatically.
               </p>
             </div>
             <DialogFooter className="gap-2">
-              <Button variant="outline" onClick={() => setPrintData(null)}>Close</Button>
+              <Button variant="outline" onClick={() => setPrintData(null)}>
+                Close
+              </Button>
               <Button onClick={handlePrint} className="gap-2">
                 <Printer className="w-4 h-4" /> Print
               </Button>
@@ -1271,14 +1377,24 @@ export default function WasteDispatch() {
           <div className="space-y-4 py-2">
             {/* Customer */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium">Customer <span className="text-destructive">*</span></label>
-              <Select value={nlCustomerId} onValueChange={(v) => { setNlCustomerId(v); setNlProformaId("none"); }}>
+              <label className="text-sm font-medium">
+                Customer <span className="text-destructive">*</span>
+              </label>
+              <Select
+                value={nlCustomerId}
+                onValueChange={(v) => {
+                  setNlCustomerId(v);
+                  setNlProformaId("none");
+                }}
+              >
                 <SelectTrigger data-testid="select-nl-customer">
                   <SelectValue placeholder="Select customer…" />
                 </SelectTrigger>
                 <SelectContent>
                   {customers.map((c: any) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.legalName}</SelectItem>
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.legalName}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1306,7 +1422,11 @@ export default function WasteDispatch() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setNewLoadingOpen(false)} disabled={createLoadingMutation.isPending}>
+            <Button
+              variant="outline"
+              onClick={() => setNewLoadingOpen(false)}
+              disabled={createLoadingMutation.isPending}
+            >
               Cancel
             </Button>
             <Button

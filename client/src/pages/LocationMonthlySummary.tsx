@@ -3,7 +3,19 @@ import { useParams, useLocation } from "wouter";
 import { useBackToParent } from "@/hooks/use-back-to-parent";
 import { hasAnyOpenDialog } from "@/hooks/use-escape-back";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import { ArrowLeft, MapPin, Globe, Eye, TrendingUp, TrendingDown, ArrowDownToLine, ArrowUpFromLine, Package, DollarSign, ArrowRight } from "lucide-react";
+import {
+  ArrowLeft,
+  MapPin,
+  Globe,
+  Eye,
+  TrendingUp,
+  TrendingDown,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Package,
+  DollarSign,
+  ArrowRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,14 +127,20 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
     : `/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary?startDate=${periodFilter.fromDate}&endDate=${periodFilter.toDate}`;
 
   const queryKey = isAllLocationsMode
-    ? [`/api/stock-items/${stockItemId}/monthly-summary`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }]
-    : [`/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary`, { startDate: periodFilter.fromDate, endDate: periodFilter.toDate }];
+    ? [
+        `/api/stock-items/${stockItemId}/monthly-summary`,
+        { startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
+      ]
+    : [
+        `/api/locations/${locationId}/stock-items/${stockItemId}/monthly-summary`,
+        { startDate: periodFilter.fromDate, endDate: periodFilter.toDate },
+      ];
 
   const { data, isLoading } = useQuery<LocationMonthlySummaryData>({
     queryKey,
     queryFn: async () => {
-      const response = await fetch(apiUrl, { credentials: 'include' });
-      if (!response.ok) throw new Error('Failed to fetch');
+      const response = await fetch(apiUrl, { credentials: "include" });
+      if (!response.ok) throw new Error("Failed to fetch");
       return response.json();
     },
     enabled: stockItemId > 0,
@@ -168,11 +186,11 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
 
       if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedRowIndex(prev => Math.max(-1, prev - 1));
+        setSelectedRowIndex((prev) => Math.max(-1, prev - 1));
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
         if (selectedRowIndex === -1) setSelectedRowIndex(0);
-        else if (selectedRowIndex < visibleRows.length - 1) setSelectedRowIndex(prev => prev + 1);
+        else if (selectedRowIndex < visibleRows.length - 1) setSelectedRowIndex((prev) => prev + 1);
       } else if (e.key === "Enter") {
         e.preventDefault();
         if (!isAllLocationsMode && selectedRowIndex >= 0) {
@@ -187,19 +205,20 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
   useEffect(() => {
     if (selectedRowIndex < 0 || !tableScrollContainer.current) return;
     const rowElement = tableScrollContainer.current.querySelector(`[data-row-index="${selectedRowIndex}"]`);
-    if (rowElement) rowElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (rowElement) rowElement.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [selectedRowIndex]);
 
   useEffect(() => {
     registerCursorNav({
       canNavigateUp: selectedRowIndex > -1,
       canNavigateDown: visibleRows.length > 0 && (selectedRowIndex === -1 || selectedRowIndex < visibleRows.length - 1),
-      onUp: () => setSelectedRowIndex(prev => Math.max(-1, prev - 1)),
-      onDown: () => setSelectedRowIndex(prev => {
-        if (prev === -1) return 0;
-        if (prev < visibleRows.length - 1) return prev + 1;
-        return prev;
-      }),
+      onUp: () => setSelectedRowIndex((prev) => Math.max(-1, prev - 1)),
+      onDown: () =>
+        setSelectedRowIndex((prev) => {
+          if (prev === -1) return 0;
+          if (prev < visibleRows.length - 1) return prev + 1;
+          return prev;
+        }),
     });
     return () => clearCursorNav();
   }, [selectedRowIndex, visibleRows]);
@@ -231,9 +250,15 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
                 <span className="text-muted-foreground/50">({data.stockItem.code})</span>
                 <span>•</span>
                 {isAllLocationsMode ? (
-                  <><Globe className="h-3.5 w-3.5" /><span>All Locations</span></>
+                  <>
+                    <Globe className="h-3.5 w-3.5" />
+                    <span>All Locations</span>
+                  </>
                 ) : (
-                  <><MapPin className="h-3.5 w-3.5" /><span>{data.location?.name || 'Unknown'}</span></>
+                  <>
+                    <MapPin className="h-3.5 w-3.5" />
+                    <span>{data.location?.name || "Unknown"}</span>
+                  </>
                 )}
               </div>
             )}
@@ -244,7 +269,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
           <Button
             variant={showAllMonths ? "default" : "outline"}
             size="sm"
-            onClick={() => setShowAllMonths(v => !v)}
+            onClick={() => setShowAllMonths((v) => !v)}
             data-testid="button-show-all-months"
           >
             <Eye className="h-4 w-4 mr-1.5" />
@@ -263,9 +288,12 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
               Total Stock In
             </div>
             <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-              {fmtQty(data.grandTotal.inwardQty)} <span className="text-sm font-normal text-muted-foreground">{uom}</span>
+              {fmtQty(data.grandTotal.inwardQty)}{" "}
+              <span className="text-sm font-normal text-muted-foreground">{uom}</span>
             </div>
-            {!posUser && <div className="text-xs font-mono text-muted-foreground">{fmtVal(data.grandTotal.inwardValue)}</div>}
+            {!posUser && (
+              <div className="text-xs font-mono text-muted-foreground">{fmtVal(data.grandTotal.inwardValue)}</div>
+            )}
           </div>
 
           <div className="flex items-center self-center text-muted-foreground/40">
@@ -278,9 +306,12 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
               Total Stock Out
             </div>
             <div className="text-xl font-bold font-mono text-rose-600 dark:text-rose-400">
-              {fmtQty(data.grandTotal.outwardQty)} <span className="text-sm font-normal text-muted-foreground">{uom}</span>
+              {fmtQty(data.grandTotal.outwardQty)}{" "}
+              <span className="text-sm font-normal text-muted-foreground">{uom}</span>
             </div>
-            {!posUser && <div className="text-xs font-mono text-muted-foreground">{fmtVal(data.grandTotal.outwardValue)}</div>}
+            {!posUser && (
+              <div className="text-xs font-mono text-muted-foreground">{fmtVal(data.grandTotal.outwardValue)}</div>
+            )}
           </div>
 
           <div className="flex items-center self-center text-muted-foreground/40">
@@ -292,10 +323,15 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
               <Package className="h-3.5 w-3.5 text-primary" />
               Closing Stock
             </div>
-            <div className={`text-xl font-bold font-mono ${data.grandTotal.closingQty < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}>
-              {fmtQty(data.grandTotal.closingQty)} <span className="text-sm font-normal text-muted-foreground">{uom}</span>
+            <div
+              className={`text-xl font-bold font-mono ${data.grandTotal.closingQty < 0 ? "text-rose-600 dark:text-rose-400" : "text-foreground"}`}
+            >
+              {fmtQty(data.grandTotal.closingQty)}{" "}
+              <span className="text-sm font-normal text-muted-foreground">{uom}</span>
             </div>
-            {!posUser && <div className="text-xs font-mono text-muted-foreground">{fmtVal(data.grandTotal.closingValue)}</div>}
+            {!posUser && (
+              <div className="text-xs font-mono text-muted-foreground">{fmtVal(data.grandTotal.closingValue)}</div>
+            )}
           </div>
 
           {!posUser && (
@@ -308,9 +344,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
                   <DollarSign className="h-3.5 w-3.5 text-primary" />
                   Closing Value
                 </div>
-                <div className="text-xl font-bold font-mono text-primary">
-                  {fmtVal(data.grandTotal.closingValue)}
-                </div>
+                <div className="text-xl font-bold font-mono text-primary">{fmtVal(data.grandTotal.closingValue)}</div>
                 <div className="text-xs font-mono text-muted-foreground">
                   avg {fmtRate(data.grandTotal.closingRate)} / {uom}
                 </div>
@@ -321,7 +355,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
       )}
 
       {/* Tally-style Stock Movement Table */}
-      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: 'calc(100vh - 340px)' }}>
+      <Card className="overflow-hidden flex flex-col" style={{ maxHeight: "calc(100vh - 340px)" }}>
         <CardHeader className="pb-2 flex-shrink-0">
           <CardTitle className="text-base">
             Monthly Stock Movement
@@ -329,24 +363,69 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
           </CardTitle>
         </CardHeader>
         <CardContent className="overflow-auto flex-1 p-0" ref={tableScrollContainer}>
-          <table className="w-full text-sm border-collapse" style={{ minWidth: '900px' }}>
+          <table className="w-full text-sm border-collapse" style={{ minWidth: "900px" }}>
             <thead className="sticky top-0 z-30">
               <tr className="bg-muted border-b">
-                <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">Month</th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground">Opening</th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400">Stock In</th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400">Stock Out</th>
-                <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 font-semibold text-primary">Closing</th>
+                <th rowSpan={2} className="text-left align-bottom px-3 py-2 border-r font-semibold w-28">
+                  Month
+                </th>
+                <th
+                  colSpan={posUser ? 1 : 3}
+                  className="text-center px-2 py-1.5 border-r font-semibold text-muted-foreground"
+                >
+                  Opening
+                </th>
+                <th
+                  colSpan={posUser ? 1 : 3}
+                  className="text-center px-2 py-1.5 border-r font-semibold text-green-700 dark:text-green-400"
+                >
+                  Stock In
+                </th>
+                <th
+                  colSpan={posUser ? 1 : 3}
+                  className="text-center px-2 py-1.5 border-r font-semibold text-red-700 dark:text-red-400"
+                >
+                  Stock Out
+                </th>
+                <th colSpan={posUser ? 1 : 3} className="text-center px-2 py-1.5 font-semibold text-primary">
+                  Closing
+                </th>
               </tr>
               <tr className="bg-muted/70 border-b text-xs">
                 <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Qty</th>
-                {!posUser && <><th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Rate</th><th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Value</th></>}
+                {!posUser && (
+                  <>
+                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Rate</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-muted-foreground border-r">Value</th>
+                  </>
+                )}
                 <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Qty</th>
-                {!posUser && <><th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Rate</th><th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">Value</th></>}
+                {!posUser && (
+                  <>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">
+                      Rate
+                    </th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-green-700 dark:text-green-400">
+                      Value
+                    </th>
+                  </>
+                )}
                 <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Qty</th>
-                {!posUser && <><th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Rate</th><th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Value</th></>}
+                {!posUser && (
+                  <>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">Rate</th>
+                    <th className="text-right px-3 py-1.5 font-medium border-r text-red-700 dark:text-red-400">
+                      Value
+                    </th>
+                  </>
+                )}
                 <th className="text-right px-3 py-1.5 font-medium text-primary">Qty</th>
-                {!posUser && <><th className="text-right px-3 py-1.5 font-medium text-primary">Rate</th><th className="text-right px-3 py-1.5 font-medium text-primary">Value</th></>}
+                {!posUser && (
+                  <>
+                    <th className="text-right px-3 py-1.5 font-medium text-primary">Rate</th>
+                    <th className="text-right px-3 py-1.5 font-medium text-primary">Value</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -365,7 +444,7 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
                 return (
                   <tr
                     key={month.month}
-                    className={`border-b transition-colors ${isClickable ? 'cursor-pointer' : ''} ${isSelected ? 'bg-primary/10 ring-1 ring-inset ring-primary' : isActive && isClickable ? 'hover:bg-muted/40' : 'text-muted-foreground/60'}`}
+                    className={`border-b transition-colors ${isClickable ? "cursor-pointer" : ""} ${isSelected ? "bg-primary/10 ring-1 ring-inset ring-primary" : isActive && isClickable ? "hover:bg-muted/40" : "text-muted-foreground/60"}`}
                     onClick={() => isClickable && isActive && handleMonthClick(month.month)}
                     data-testid={`row-month-${month.month}`}
                     data-row-index={idx}
@@ -373,11 +452,19 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
                     <td className="font-medium px-3 py-2.5 border-r">{month.monthName}</td>
 
                     {/* Opening */}
-                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtQty(month.openingQty)}</td>
-                    {!posUser && <>
-                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtRate(month.openingRate)}</td>
-                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtVal(month.openingValue)}</td>
-                    </>}
+                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">
+                      {fmtQty(month.openingQty)}
+                    </td>
+                    {!posUser && (
+                      <>
+                        <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">
+                          {fmtRate(month.openingRate)}
+                        </td>
+                        <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">
+                          {fmtVal(month.openingValue)}
+                        </td>
+                      </>
+                    )}
 
                     {/* Stock In */}
                     <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400 font-medium">
@@ -396,12 +483,20 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
                         >
                           {fmtQty(month.inwardQty)}
                         </button>
-                      ) : fmtQty(month.inwardQty)}
+                      ) : (
+                        fmtQty(month.inwardQty)
+                      )}
                     </td>
-                    {!posUser && <>
-                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtRate(month.inwardRate)}</td>
-                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtVal(month.inwardValue)}</td>
-                    </>}
+                    {!posUser && (
+                      <>
+                        <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">
+                          {fmtRate(month.inwardRate)}
+                        </td>
+                        <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">
+                          {fmtVal(month.inwardValue)}
+                        </td>
+                      </>
+                    )}
 
                     {/* Stock Out */}
                     <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400 font-medium">
@@ -420,19 +515,35 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
                         >
                           {fmtQty(month.outwardQty)}
                         </button>
-                      ) : fmtQty(month.outwardQty)}
+                      ) : (
+                        fmtQty(month.outwardQty)
+                      )}
                     </td>
-                    {!posUser && <>
-                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtRate(month.outwardRate)}</td>
-                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtVal(month.outwardValue)}</td>
-                    </>}
+                    {!posUser && (
+                      <>
+                        <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">
+                          {fmtRate(month.outwardRate)}
+                        </td>
+                        <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">
+                          {fmtVal(month.outwardValue)}
+                        </td>
+                      </>
+                    )}
 
                     {/* Closing */}
-                    <td className="text-right px-3 py-2.5 tabular-nums font-semibold text-foreground">{fmtQty(month.closingQty)}</td>
-                    {!posUser && <>
-                      <td className="text-right px-3 py-2.5 tabular-nums font-medium">{fmtRate(month.closingRate)}</td>
-                      <td className="text-right px-3 py-2.5 tabular-nums font-medium">{fmtVal(month.closingValue)}</td>
-                    </>}
+                    <td className="text-right px-3 py-2.5 tabular-nums font-semibold text-foreground">
+                      {fmtQty(month.closingQty)}
+                    </td>
+                    {!posUser && (
+                      <>
+                        <td className="text-right px-3 py-2.5 tabular-nums font-medium">
+                          {fmtRate(month.closingRate)}
+                        </td>
+                        <td className="text-right px-3 py-2.5 tabular-nums font-medium">
+                          {fmtVal(month.closingValue)}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 );
               })}
@@ -445,32 +556,60 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
                   <td className="px-3 py-2.5 border-r">Total</td>
 
                   {/* Opening total */}
-                  <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtQty(data.grandTotal.openingQty)}</td>
-                  {!posUser && <>
-                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtRate(data.grandTotal.openingRate)}</td>
-                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">{fmtVal(data.grandTotal.openingValue)}</td>
-                  </>}
+                  <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">
+                    {fmtQty(data.grandTotal.openingQty)}
+                  </td>
+                  {!posUser && (
+                    <>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">
+                        {fmtRate(data.grandTotal.openingRate)}
+                      </td>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-muted-foreground">
+                        {fmtVal(data.grandTotal.openingValue)}
+                      </td>
+                    </>
+                  )}
 
                   {/* In total */}
-                  <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtQty(data.grandTotal.inwardQty)}</td>
-                  {!posUser && <>
-                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtRate(data.grandTotal.inwardRate)}</td>
-                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">{fmtVal(data.grandTotal.inwardValue)}</td>
-                  </>}
+                  <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">
+                    {fmtQty(data.grandTotal.inwardQty)}
+                  </td>
+                  {!posUser && (
+                    <>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">
+                        {fmtRate(data.grandTotal.inwardRate)}
+                      </td>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-green-700 dark:text-green-400">
+                        {fmtVal(data.grandTotal.inwardValue)}
+                      </td>
+                    </>
+                  )}
 
                   {/* Out total */}
-                  <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtQty(data.grandTotal.outwardQty)}</td>
-                  {!posUser && <>
-                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtRate(data.grandTotal.outwardRate)}</td>
-                    <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">{fmtVal(data.grandTotal.outwardValue)}</td>
-                  </>}
+                  <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">
+                    {fmtQty(data.grandTotal.outwardQty)}
+                  </td>
+                  {!posUser && (
+                    <>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">
+                        {fmtRate(data.grandTotal.outwardRate)}
+                      </td>
+                      <td className="text-right px-3 py-2.5 tabular-nums border-r text-red-700 dark:text-red-400">
+                        {fmtVal(data.grandTotal.outwardValue)}
+                      </td>
+                    </>
+                  )}
 
                   {/* Closing total */}
-                  <td className="text-right px-3 py-2.5 tabular-nums text-foreground">{fmtQty(data.grandTotal.closingQty)}</td>
-                  {!posUser && <>
-                    <td className="text-right px-3 py-2.5 tabular-nums">{fmtRate(data.grandTotal.closingRate)}</td>
-                    <td className="text-right px-3 py-2.5 tabular-nums">{fmtVal(data.grandTotal.closingValue)}</td>
-                  </>}
+                  <td className="text-right px-3 py-2.5 tabular-nums text-foreground">
+                    {fmtQty(data.grandTotal.closingQty)}
+                  </td>
+                  {!posUser && (
+                    <>
+                      <td className="text-right px-3 py-2.5 tabular-nums">{fmtRate(data.grandTotal.closingRate)}</td>
+                      <td className="text-right px-3 py-2.5 tabular-nums">{fmtVal(data.grandTotal.closingValue)}</td>
+                    </>
+                  )}
                 </tr>
               </tfoot>
             )}
@@ -496,7 +635,9 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
                 <span className="text-red-700 dark:text-red-400">Stock Out</span>
               )}
               <span className="text-muted-foreground font-normal">—</span>
-              <span>{detailMonthName} {detailYear}</span>
+              <span>
+                {detailMonthName} {detailYear}
+              </span>
             </DialogTitle>
             <DialogDescription>
               {data?.stockItem?.name} · {data?.location?.name}
@@ -506,87 +647,100 @@ export default function LocationMonthlySummary({ posUser }: { posUser?: any } = 
           <div className="flex-1 overflow-auto min-h-0 border rounded-md">
             {detailLoading ? (
               <div className="space-y-2 p-4">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-8 w-full" />
+                ))}
               </div>
-            ) : (() => {
-              const rows = detailDirection === "in"
-                ? (detailData?.inTransactions ?? [])
-                : (detailData?.outTransactions ?? []);
+            ) : (
+              (() => {
+                const rows =
+                  detailDirection === "in" ? (detailData?.inTransactions ?? []) : (detailData?.outTransactions ?? []);
 
-              const typeBadgeClass = (type: string) => {
-                if (type === "Sale") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
-                if (type.startsWith("Transfer In")) return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
-                if (type.startsWith("Transfer Out")) return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
-                if (type.startsWith("Adjustment")) return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
-                if (type === "Credit Note") return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
-                return "bg-muted text-muted-foreground";
-              };
+                const typeBadgeClass = (type: string) => {
+                  if (type === "Sale") return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+                  if (type.startsWith("Transfer In"))
+                    return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+                  if (type.startsWith("Transfer Out"))
+                    return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+                  if (type.startsWith("Adjustment"))
+                    return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+                  if (type === "Credit Note")
+                    return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+                  return "bg-muted text-muted-foreground";
+                };
 
-              if (!rows.length) {
+                if (!rows.length) {
+                  return (
+                    <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+                      No transactions found for this period.
+                    </div>
+                  );
+                }
+
+                const totalQty = rows.reduce((s: number, r: any) => s + (r.qty || 0), 0);
+                const totalValue = rows.reduce((s: number, r: any) => s + (r.value || 0), 0);
+                const avgRate = totalQty > 0 ? totalValue / totalQty : 0;
+
                 return (
-                  <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
-                    No transactions found for this period.
-                  </div>
-                );
-              }
-
-              const totalQty   = rows.reduce((s: number, r: any) => s + (r.qty   || 0), 0);
-              const totalValue = rows.reduce((s: number, r: any) => s + (r.value || 0), 0);
-              const avgRate    = totalQty > 0 ? totalValue / totalQty : 0;
-
-              return (
-                <table className="w-full text-sm border-collapse">
-                  <thead className="sticky top-0 z-10 bg-muted border-b">
-                    <tr>
-                      <th className="text-left px-3 py-2 font-medium">Type</th>
-                      <th className="text-left px-3 py-2 font-medium">Date</th>
-                      <th className="text-left px-3 py-2 font-medium">Reference</th>
-                      <th className="text-right px-3 py-2 font-medium">Qty</th>
-                      <th className="text-right px-3 py-2 font-medium">Rate</th>
-                      <th className="text-right px-3 py-2 font-medium">Value</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((tx: any, i: number) => (
-                      <tr key={i} className="border-b hover:bg-muted/30 transition-colors">
-                        <td className="px-3 py-2">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeBadgeClass(tx.type)}`}>
-                            {tx.type}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground">{tx.date}</td>
-                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{tx.reference}</td>
-                        <td className="text-right px-3 py-2 tabular-nums font-medium">
-                          {(tx.qty || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                        </td>
-                        <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">
-                          {(tx.rate || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <table className="w-full text-sm border-collapse">
+                    <thead className="sticky top-0 z-10 bg-muted border-b">
+                      <tr>
+                        <th className="text-left px-3 py-2 font-medium">Type</th>
+                        <th className="text-left px-3 py-2 font-medium">Date</th>
+                        <th className="text-left px-3 py-2 font-medium">Reference</th>
+                        <th className="text-right px-3 py-2 font-medium">Qty</th>
+                        <th className="text-right px-3 py-2 font-medium">Rate</th>
+                        <th className="text-right px-3 py-2 font-medium">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((tx: any, i: number) => (
+                        <tr key={i} className="border-b hover:bg-muted/30 transition-colors">
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${typeBadgeClass(tx.type)}`}
+                            >
+                              {tx.type}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">{tx.date}</td>
+                          <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{tx.reference}</td>
+                          <td className="text-right px-3 py-2 tabular-nums font-medium">
+                            {(tx.qty || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="text-right px-3 py-2 tabular-nums text-muted-foreground">
+                            {(tx.rate || 0).toLocaleString(undefined, {
+                              minimumFractionDigits: 2,
+                              maximumFractionDigits: 2,
+                            })}
+                          </td>
+                          <td className="text-right px-3 py-2 tabular-nums">{formatAmount(tx.value || 0)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="sticky bottom-0 bg-muted border-t-2 font-semibold">
+                      <tr>
+                        <td colSpan={3} className="px-3 py-2 text-xs text-muted-foreground">
+                          {rows.length} transaction{rows.length !== 1 ? "s" : ""} · Avg rate:{" "}
+                          {avgRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </td>
                         <td className="text-right px-3 py-2 tabular-nums">
-                          {formatAmount(tx.value || 0)}
+                          {totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                         </td>
+                        <td />
+                        <td className="text-right px-3 py-2 tabular-nums">{formatAmount(totalValue)}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                  <tfoot className="sticky bottom-0 bg-muted border-t-2 font-semibold">
-                    <tr>
-                      <td colSpan={3} className="px-3 py-2 text-xs text-muted-foreground">
-                        {rows.length} transaction{rows.length !== 1 ? "s" : ""} · Avg rate: {avgRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td className="text-right px-3 py-2 tabular-nums">
-                        {totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                      </td>
-                      <td />
-                      <td className="text-right px-3 py-2 tabular-nums">{formatAmount(totalValue)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              );
-            })()}
+                    </tfoot>
+                  </table>
+                );
+              })()
+            )}
           </div>
 
           <DialogFooter className="flex-shrink-0 pt-2">
-            <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
+            <Button variant="outline" onClick={() => setDetailOpen(false)}>
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

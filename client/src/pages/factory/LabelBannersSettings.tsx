@@ -7,9 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Loader2, Upload, RotateCcw, ImageIcon, CheckCircle, Plus, Pencil, Trash2, X, Check,
-} from "lucide-react";
+import { Loader2, Upload, RotateCcw, ImageIcon, CheckCircle, Plus, Pencil, Trash2, X, Check } from "lucide-react";
 
 interface ColorRow {
   id: number;
@@ -54,7 +52,7 @@ export default function LabelBannersSettings() {
   const { data: rawColors, isLoading } = useQuery<ColorRow[]>({
     queryKey: ["/api/factory/label-design-colors"],
     queryFn: () =>
-      fetch("/api/factory/label-design-colors", { credentials: "include" }).then(async r => {
+      fetch("/api/factory/label-design-colors", { credentials: "include" }).then(async (r) => {
         if (!r.ok) throw new Error(await r.text());
         return r.json();
       }),
@@ -80,7 +78,10 @@ export default function LabelBannersSettings() {
       if (!res.ok) throw new Error((await res.json()).message ?? "Upload failed");
       return res.json();
     },
-    onSuccess: () => { toast({ title: "Banner image updated" }); invalidate(); },
+    onSuccess: () => {
+      toast({ title: "Banner image updated" });
+      invalidate();
+    },
     onError: (e: Error) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
     onSettled: () => setUploadingSlot(null),
   });
@@ -96,7 +97,10 @@ export default function LabelBannersSettings() {
       if (!res.ok) throw new Error((await res.json()).message ?? "Revert failed");
       return res.json();
     },
-    onSuccess: () => { toast({ title: "Banner reverted to default" }); invalidate(); },
+    onSuccess: () => {
+      toast({ title: "Banner reverted to default" });
+      invalidate();
+    },
     onError: (e: Error) => toast({ title: "Revert failed", description: e.message, variant: "destructive" }),
     onSettled: () => setRevertingSlot(null),
   });
@@ -113,7 +117,11 @@ export default function LabelBannersSettings() {
       if (!res.ok) throw new Error((await res.json()).message ?? "Update failed");
       return res.json();
     },
-    onSuccess: () => { toast({ title: "Color updated" }); setEditingSlug(null); invalidate(); },
+    onSuccess: () => {
+      toast({ title: "Color updated" });
+      setEditingSlug(null);
+      invalidate();
+    },
     onError: (e: Error) => toast({ title: "Update failed", description: e.message, variant: "destructive" }),
   });
 
@@ -127,7 +135,10 @@ export default function LabelBannersSettings() {
       if (!res.ok) throw new Error((await res.json()).message ?? "Delete failed");
       return res.json();
     },
-    onSuccess: () => { toast({ title: "Color deleted" }); invalidate(); },
+    onSuccess: () => {
+      toast({ title: "Color deleted" });
+      invalidate();
+    },
     onError: (e: Error) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
@@ -204,7 +215,7 @@ export default function LabelBannersSettings() {
                       {isEditing ? (
                         <Input
                           value={editLabel}
-                          onChange={e => setEditLabel(e.target.value)}
+                          onChange={(e) => setEditLabel(e.target.value)}
                           className="h-7 text-sm font-semibold"
                           data-testid={`input-edit-label-${c.slug}`}
                         />
@@ -225,11 +236,17 @@ export default function LabelBannersSettings() {
                             size="icon"
                             variant="ghost"
                             className="h-7 w-7"
-                            onClick={() => editMutation.mutate({ slug: c.slug, label: editLabel, colorHex: editColorHex })}
+                            onClick={() =>
+                              editMutation.mutate({ slug: c.slug, label: editLabel, colorHex: editColorHex })
+                            }
                             disabled={editMutation.isPending}
                             data-testid={`button-save-edit-${c.slug}`}
                           >
-                            {editMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                            {editMutation.isPending ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
                           </Button>
                           <Button
                             size="icon"
@@ -274,7 +291,7 @@ export default function LabelBannersSettings() {
                       <input
                         type="color"
                         value={editColorHex}
-                        onChange={e => setEditColorHex(e.target.value)}
+                        onChange={(e) => setEditColorHex(e.target.value)}
                         className="h-7 w-12 rounded cursor-pointer border border-border bg-transparent p-0.5"
                         data-testid={`input-edit-hex-${c.slug}`}
                       />
@@ -294,7 +311,9 @@ export default function LabelBannersSettings() {
                       src={`/labels/hmd-${c.slug}.jpg?t=${ts}`}
                       alt={`${c.label} banner`}
                       className="w-full h-full object-cover"
-                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = "none";
+                      }}
                       data-testid={`img-banner-preview-${c.slug}`}
                     />
                     {(isUploading || isReverting) && (
@@ -306,11 +325,13 @@ export default function LabelBannersSettings() {
 
                   <div className="flex gap-2 flex-wrap">
                     <input
-                      ref={el => { fileInputRefs.current[c.slug] = el; }}
+                      ref={(el) => {
+                        fileInputRefs.current[c.slug] = el;
+                      }}
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       className="sr-only"
-                      onChange={e => {
+                      onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) uploadMutation.mutate({ slug: c.slug, file });
                         e.target.value = "";
@@ -324,7 +345,11 @@ export default function LabelBannersSettings() {
                       onClick={() => fileInputRefs.current[c.slug]?.click()}
                       data-testid={`button-upload-banner-${c.slug}`}
                     >
-                      {isUploading ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
+                      {isUploading ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5 mr-1.5" />
+                      )}
                       {isUploading ? "Uploading…" : "Upload"}
                     </Button>
                     {c.hasCustom && (
@@ -335,7 +360,11 @@ export default function LabelBannersSettings() {
                         onClick={() => revertMutation.mutate(c.slug)}
                         data-testid={`button-revert-banner-${c.slug}`}
                       >
-                        {isReverting ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5 mr-1.5" />}
+                        {isReverting ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                        )}
                         Revert
                       </Button>
                     )}
@@ -363,7 +392,16 @@ export default function LabelBannersSettings() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center justify-between flex-wrap gap-1">
                   Add New Color
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setAddOpen(false); setAddLabel(""); setAddFile(null); }}>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      setAddOpen(false);
+                      setAddLabel("");
+                      setAddFile(null);
+                    }}
+                  >
                     <X className="h-3.5 w-3.5" />
                   </Button>
                 </CardTitle>
@@ -374,7 +412,7 @@ export default function LabelBannersSettings() {
                   <Input
                     placeholder="e.g. Blue Ocean"
                     value={addLabel}
-                    onChange={e => setAddLabel(e.target.value)}
+                    onChange={(e) => setAddLabel(e.target.value)}
                     data-testid="input-add-color-label"
                   />
                   {addLabel && (
@@ -390,7 +428,7 @@ export default function LabelBannersSettings() {
                     <input
                       type="color"
                       value={addColorHex}
-                      onChange={e => setAddColorHex(e.target.value)}
+                      onChange={(e) => setAddColorHex(e.target.value)}
                       className="h-8 w-14 rounded cursor-pointer border border-border bg-transparent p-0.5"
                       data-testid="input-add-color-hex"
                     />
@@ -399,13 +437,15 @@ export default function LabelBannersSettings() {
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="text-xs">Banner Image <span className="text-muted-foreground">(optional)</span></Label>
+                  <Label className="text-xs">
+                    Banner Image <span className="text-muted-foreground">(optional)</span>
+                  </Label>
                   <input
                     ref={addFileInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     className="sr-only"
-                    onChange={e => setAddFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => setAddFile(e.target.files?.[0] ?? null)}
                     data-testid="input-add-color-file"
                   />
                   <Button
@@ -421,7 +461,10 @@ export default function LabelBannersSettings() {
                     <button
                       type="button"
                       className="ml-2 text-xs text-muted-foreground underline"
-                      onClick={() => { setAddFile(null); if (addFileInputRef.current) addFileInputRef.current.value = ""; }}
+                      onClick={() => {
+                        setAddFile(null);
+                        if (addFileInputRef.current) addFileInputRef.current.value = "";
+                      }}
                     >
                       Clear
                     </button>
@@ -435,7 +478,11 @@ export default function LabelBannersSettings() {
                   onClick={handleAddSubmit}
                   data-testid="button-add-color-submit"
                 >
-                  {addingColor ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Plus className="h-3.5 w-3.5 mr-1.5" />}
+                  {addingColor ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5 mr-1.5" />
+                  )}
                   {addingColor ? "Adding…" : "Add Color"}
                 </Button>
               </CardContent>
@@ -453,12 +500,12 @@ export default function LabelBannersSettings() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           <p>
-            Each color slot maps to a design option that can be assigned to a bale product. When printing
-            an A4 label, the banner image for that color fills the top of the page.
+            Each color slot maps to a design option that can be assigned to a bale product. When printing an A4 label,
+            the banner image for that color fills the top of the page.
           </p>
           <p>
-            Built-in colors (purple, green, gold, white, red) cannot be deleted, but you can upload a custom
-            banner for any of them. Custom colors you add here appear in the design picker on all product forms.
+            Built-in colors (purple, green, gold, white, red) cannot be deleted, but you can upload a custom banner for
+            any of them. Custom colors you add here appear in the design picker on all product forms.
           </p>
           <p>
             Recommended banner size: <strong>1240 × 350 px</strong> · JPG gives the best file size for photos.

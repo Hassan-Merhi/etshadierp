@@ -1,12 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  useRef,
-  useCallback,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useState, useRef, useCallback, type ReactNode } from "react";
 import { OFFLINE_MODE_ENABLED } from "@/lib/featureFlags";
 
 export type ConnectivityStatus = "online" | "offline" | "syncing" | "error";
@@ -104,11 +96,11 @@ function FullConnectivityProvider({ children }: Props) {
         .catch(() => {})
     );
     if (navigator.onLine) {
-      import("@/lib/refPool")
-        .then(({ ensurePoolReady }) => ensurePoolReady())
-        .catch(() => {});
+      import("@/lib/refPool").then(({ ensurePoolReady }) => ensurePoolReady()).catch(() => {});
     }
-    return () => { isMountedRef.current = false; };
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   const refreshCounts = useCallback(async () => {
@@ -127,7 +119,9 @@ function FullConnectivityProvider({ children }: Props) {
         setFailedCount(idbFailed + legacyFailed);
         setConflictCount(conflicts);
       }
-    } catch { /* Non-critical */ }
+    } catch {
+      /* Non-critical */
+    }
   }, []);
 
   const triggerSync = useCallback(() => {
@@ -183,7 +177,12 @@ function FullConnectivityProvider({ children }: Props) {
 
   useEffect(() => {
     const handler = async (e: Event) => {
-      const evt = e as CustomEvent<{ syncing?: boolean; lastSyncedAt?: number; error?: string; conflictDetected?: boolean }>;
+      const evt = e as CustomEvent<{
+        syncing?: boolean;
+        lastSyncedAt?: number;
+        error?: string;
+        conflictDetected?: boolean;
+      }>;
       if (!isMountedRef.current) return;
       if (evt.detail.syncing !== undefined) setIsSyncing(evt.detail.syncing);
       if (evt.detail.lastSyncedAt) {
@@ -202,7 +201,19 @@ function FullConnectivityProvider({ children }: Props) {
   const status: ConnectivityStatus = !isOnline ? "offline" : isSyncing ? "syncing" : "online";
 
   return (
-    <ConnectivityContext.Provider value={{ status, isOnline, isSyncing, lastSyncedAt, pendingCount, failedCount, conflictCount, triggerSync, refreshCounts }}>
+    <ConnectivityContext.Provider
+      value={{
+        status,
+        isOnline,
+        isSyncing,
+        lastSyncedAt,
+        pendingCount,
+        failedCount,
+        conflictCount,
+        triggerSync,
+        refreshCounts,
+      }}
+    >
       {children}
     </ConnectivityContext.Provider>
   );

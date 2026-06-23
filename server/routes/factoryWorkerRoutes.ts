@@ -46,16 +46,16 @@ const workerUpload = multer({
 
 function computeMonthlyPay(salary: number, startStr: string, endStr: string): number {
   const start = new Date(startStr + "T00:00:00");
-  const end   = new Date(endStr   + "T00:00:00");
+  const end = new Date(endStr + "T00:00:00");
   let total = 0;
   let cur = new Date(start.getFullYear(), start.getMonth(), 1);
   while (cur <= end) {
-    const year  = cur.getFullYear();
+    const year = cur.getFullYear();
     const month = cur.getMonth();
-    const monthLastDay    = new Date(year, month + 1, 0);
+    const monthLastDay = new Date(year, month + 1, 0);
     const daysInThisMonth = monthLastDay.getDate();
     const segStart = new Date(Math.max(cur.getTime(), start.getTime()));
-    const segEnd   = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
+    const segEnd = new Date(Math.min(monthLastDay.getTime(), end.getTime()));
     const daysInSeg = Math.floor((segEnd.getTime() - segStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     total += salary * (daysInSeg / daysInThisMonth);
     cur = new Date(year, month + 1, 1);
@@ -89,46 +89,74 @@ function computeMonthlyPayFromAttendance(baseSalary: number, periodStart: string
 import { registerFactoryWorkerPayrollRoutes } from "./factoryWorkerPayrollRoutes";
 
 export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: any) {
-
-  async function writeDaybookEntry(dbOrTx: any, opts: {
-    companyId: number; txDate: string; txType: string;
-    referenceId?: number; referenceTable?: string; description: string;
-    metaJson?: string; currencyCode?: string; amountCurrency?: number;
-    fxRateToUsd?: number; amountUsd?: number; createdBy?: number;
-  }) {
+  async function writeDaybookEntry(
+    dbOrTx: any,
+    opts: {
+      companyId: number;
+      txDate: string;
+      txType: string;
+      referenceId?: number;
+      referenceTable?: string;
+      description: string;
+      metaJson?: string;
+      currencyCode?: string;
+      amountCurrency?: number;
+      fxRateToUsd?: number;
+      amountUsd?: number;
+      createdBy?: number;
+    }
+  ) {
     const currency = opts.currencyCode || "USD";
     const fxRate = opts.fxRateToUsd || 1;
     const amtCurrency = opts.amountCurrency || 0;
-    const amtUsd = opts.amountUsd !== undefined ? opts.amountUsd : (currency === "USD" ? amtCurrency : amtCurrency * fxRate);
+    const amtUsd =
+      opts.amountUsd !== undefined ? opts.amountUsd : currency === "USD" ? amtCurrency : amtCurrency * fxRate;
     await dbOrTx.insert(factoryDaybookEntries).values({
-      companyId: opts.companyId, txDate: opts.txDate, txType: opts.txType,
-      referenceId: opts.referenceId || null, referenceTable: opts.referenceTable || null,
-      description: opts.description, metaJson: opts.metaJson || null,
-      currencyCode: currency, amountCurrency: String(amtCurrency),
-      fxRateToUsd: String(fxRate), amountUsd: String(amtUsd), createdBy: opts.createdBy || null,
+      companyId: opts.companyId,
+      txDate: opts.txDate,
+      txType: opts.txType,
+      referenceId: opts.referenceId || null,
+      referenceTable: opts.referenceTable || null,
+      description: opts.description,
+      metaJson: opts.metaJson || null,
+      currencyCode: currency,
+      amountCurrency: String(amtCurrency),
+      fxRateToUsd: String(fxRate),
+      amountUsd: String(amtUsd),
+      createdBy: opts.createdBy || null,
     });
   }
 
   async function findOrCreateLedger(companyId: number, name: string, accountType: string): Promise<{ id: number }> {
-    let [found] = await db.select({ id: ledgerAccounts.id })
+    let [found] = await db
+      .select({ id: ledgerAccounts.id })
       .from(ledgerAccounts)
       .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name)));
     if (found) return found;
 
     for (let attempt = 0; attempt < 10; attempt++) {
-      const [maxRow] = await db.select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
+      const [maxRow] = await db
+        .select({ maxCode: sql`MAX(CAST(code AS INTEGER))` })
         .from(ledgerAccounts)
         .where(and(eq(ledgerAccounts.companyId, companyId), sql`code ~ '^\d+$'`));
       const nextCode = String((parseInt(maxRow?.maxCode || "0") || 0) + 1 + attempt);
       try {
-        [found] = await db.insert(ledgerAccounts).values({
-          companyId, code: nextCode, name, accountType,
-          active: true, isHidden: false,
-        }).returning();
+        [found] = await db
+          .insert(ledgerAccounts)
+          .values({
+            companyId,
+            code: nextCode,
+            name,
+            accountType,
+            active: true,
+            isHidden: false,
+          })
+          .returning();
         if (found) return found;
       } catch (err: any) {
         if (err?.message?.includes("company_code_unique")) {
-          const [nowFound] = await db.select({ id: ledgerAccounts.id })
+          const [nowFound] = await db
+            .select({ id: ledgerAccounts.id })
             .from(ledgerAccounts)
             .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.name, name)));
           if (nowFound) return nowFound;
@@ -169,10 +197,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
           total: sql<string>`COALESCE(SUM(${factoryPayrolls.netSalary}), 0)`,
         })
         .from(factoryPayrolls)
-        .where(and(
-          eq(factoryPayrolls.companyId, companyId),
-          sql`${factoryPayrolls.status} = 'PAID'`,
-        ))
+        .where(and(eq(factoryPayrolls.companyId, companyId), sql`${factoryPayrolls.status} = 'PAID'`))
         .groupBy(factoryPayrolls.workerId);
 
       const advanceMap = new Map(advanceTotals.map((r) => [r.workerId, parseFloat(r.total)]));
@@ -256,14 +281,43 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const wb = new ExcelJS.Workbook();
       const sheet = wb.addWorksheet("Workers");
       const headers = [
-        "Full Name", "Employee Code", "National ID", "Passport Number", "Date of Birth", "Nationality",
-        "Gender", "Marital Status", "Phone 1", "Phone 2", "Emergency Contact Name", "Emergency Contact Phone",
-        "Address", "City", "Country", "Position", "Department", "Date Joined", "Contract Start",
-        "Salary Type", "Base Salary", "Per Bale Rate", "Per KG Rate",
-        "Pay Frequency", "Hourly Rate", "Weekly Salary", "Bi-Weekly Salary",
-        "Visa Number", "Visa Expiry", "Work Permit Number", "Work Permit Expiry",
-        "Residential Permit", "Residential Permit Expiry", "Bank Name", "Bank Account Number",
-        "Payment Method", "Notes",
+        "Full Name",
+        "Employee Code",
+        "National ID",
+        "Passport Number",
+        "Date of Birth",
+        "Nationality",
+        "Gender",
+        "Marital Status",
+        "Phone 1",
+        "Phone 2",
+        "Emergency Contact Name",
+        "Emergency Contact Phone",
+        "Address",
+        "City",
+        "Country",
+        "Position",
+        "Department",
+        "Date Joined",
+        "Contract Start",
+        "Salary Type",
+        "Base Salary",
+        "Per Bale Rate",
+        "Per KG Rate",
+        "Pay Frequency",
+        "Hourly Rate",
+        "Weekly Salary",
+        "Bi-Weekly Salary",
+        "Visa Number",
+        "Visa Expiry",
+        "Work Permit Number",
+        "Work Permit Expiry",
+        "Residential Permit",
+        "Residential Permit Expiry",
+        "Bank Name",
+        "Bank Account Number",
+        "Payment Method",
+        "Notes",
       ];
       const headerRow = sheet.addRow(headers);
       headerRow.font = { bold: true };
@@ -274,14 +328,43 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       // Hint row: valid values for key columns
       const hintValues = [
-        "", "", "", "", "YYYY-MM-DD", "",
-        "Male / Female", "Single / Married / Divorced", "", "", "", "",
-        "", "", "", "", "", "YYYY-MM-DD", "YYYY-MM-DD",
-        "Monthly / Daily / Per Bale / Per KG", "number", "number", "number",
-        "Monthly / Hourly / Weekly / Bi-Weekly", "number", "number", "number",
-        "", "YYYY-MM-DD", "", "YYYY-MM-DD",
-        "", "YYYY-MM-DD", "", "",
-        "Cash / Bank / Transfer", "",
+        "",
+        "",
+        "",
+        "",
+        "YYYY-MM-DD",
+        "",
+        "Male / Female",
+        "Single / Married / Divorced",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "YYYY-MM-DD",
+        "YYYY-MM-DD",
+        "Monthly / Daily / Per Bale / Per KG",
+        "number",
+        "number",
+        "number",
+        "Monthly / Hourly / Weekly / Bi-Weekly",
+        "number",
+        "number",
+        "number",
+        "",
+        "YYYY-MM-DD",
+        "",
+        "YYYY-MM-DD",
+        "",
+        "YYYY-MM-DD",
+        "",
+        "",
+        "Cash / Bank / Transfer",
+        "",
       ];
       const hintRow = sheet.addRow(hintValues);
       hintRow.eachCell((cell: any) => {
@@ -293,14 +376,43 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       // Example data row
       const exampleRow = sheet.addRow([
-        "Ahmed Hassan", "FW-001", "A12345678", "P9876543", "1990-05-15", "Moroccan",
-        "Male", "Married", "+212-600-123456", "+212-600-000000", "Fatima Hassan", "+212-600-654321",
-        "123 Rue Mohammed V", "Casablanca", "Morocco", "Sorter", "Production", "2024-01-15", "2024-01-15",
-        "Monthly", "3000", "2.50", "0.15",
-        "Monthly", "0", "0", "0",
-        "V2024-001", "2026-01-14", "WP2024-001", "2026-01-14",
-        "RP2024-001", "2026-01-14", "Attijariwafa Bank", "007-123456789",
-        "Bank", "Example row — delete before importing",
+        "Ahmed Hassan",
+        "FW-001",
+        "A12345678",
+        "P9876543",
+        "1990-05-15",
+        "Moroccan",
+        "Male",
+        "Married",
+        "+212-600-123456",
+        "+212-600-000000",
+        "Fatima Hassan",
+        "+212-600-654321",
+        "123 Rue Mohammed V",
+        "Casablanca",
+        "Morocco",
+        "Sorter",
+        "Production",
+        "2024-01-15",
+        "2024-01-15",
+        "Monthly",
+        "3000",
+        "2.50",
+        "0.15",
+        "Monthly",
+        "0",
+        "0",
+        "0",
+        "V2024-001",
+        "2026-01-14",
+        "WP2024-001",
+        "2026-01-14",
+        "RP2024-001",
+        "2026-01-14",
+        "Attijariwafa Bank",
+        "007-123456789",
+        "Bank",
+        "Example row — delete before importing",
       ]);
       exampleRow.eachCell((cell: any) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFDE7" } };
@@ -309,7 +421,9 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       // Label in the first cell to make it obvious
       exampleRow.getCell(1).font = { bold: true, italic: true, color: { argb: "5D4037" } };
 
-      headers.forEach((_, i) => { sheet.getColumn(i + 1).width = 22; });
+      headers.forEach((_, i) => {
+        sheet.getColumn(i + 1).width = 22;
+      });
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", 'attachment; filename="worker_import_template.xlsx"');
       await wb.xlsx.write(res);
@@ -321,121 +435,187 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
   });
 
   // POST /api/factory/workers/import-excel - Bulk import/update workers from Excel
-  app.post("/api/factory/workers/import-excel", requireAuth, workerUpload.single("file"), async (req: any, res: any) => {
-    try {
-      // Always use the session's current company; never trust client-provided companyId
-      const companyId = getFactoryCompanyId(req);
-      if (!companyId) return res.status(400).json({ message: "companyId required" });
-      if (!req.file) return res.status(400).json({ message: "No file uploaded" });
+  app.post(
+    "/api/factory/workers/import-excel",
+    requireAuth,
+    workerUpload.single("file"),
+    async (req: any, res: any) => {
+      try {
+        // Always use the session's current company; never trust client-provided companyId
+        const companyId = getFactoryCompanyId(req);
+        if (!companyId) return res.status(400).json({ message: "companyId required" });
+        if (!req.file) return res.status(400).json({ message: "No file uploaded" });
 
-      // Parse xlsx
-      const workbook = XLSX.readFile(req.file.path);
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-      fs.unlinkSync(req.file.path);
+        // Parse xlsx
+        const workbook = XLSX.readFile(req.file.path);
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        fs.unlinkSync(req.file.path);
 
-      // Case-insensitive column mapping
-      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const colMap: Record<string, string> = {
-        fullname: "fullName", employeecode: "employeeCode", nationalid: "nationalId",
-        passportnumber: "passportNumber", dateofbirth: "dateOfBirth", nationality: "nationality",
-        gender: "gender", maritalstatus: "maritalStatus", phone1: "phone1", phone2: "phone2",
-        emergencycontactname: "emergencyContactName", emergencycontactphone: "emergencyContactPhone",
-        address: "address", city: "city", country: "country", position: "position",
-        department: "department", datejoined: "dateJoined", contractstart: "contractStartDate",
-        salarytype: "salaryType", basesalary: "baseSalary", perbalerate: "perBaleRate",
-        perkgrate: "perKgRate", payfrequency: "payFrequency", hourlyrate: "hourlyRate",
-        weeklysalary: "weeklySalary", biweeklysalary: "biWeeklySalary",
-        visanumber: "visaNumber", visaexpiry: "visaExpiry",
-        workpermitnumber: "workPermitNumber", workpermitexpiry: "workPermitExpiry",
-        residentialpermit: "residentialPermit", residentialpermitexpiry: "residentialPermitExpiry",
-        bankname: "bankName", bankaccountnumber: "bankAccountNumber",
-        paymentmethod: "paymentMethod", notes: "notes",
-      };
+        // Case-insensitive column mapping
+        const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const colMap: Record<string, string> = {
+          fullname: "fullName",
+          employeecode: "employeeCode",
+          nationalid: "nationalId",
+          passportnumber: "passportNumber",
+          dateofbirth: "dateOfBirth",
+          nationality: "nationality",
+          gender: "gender",
+          maritalstatus: "maritalStatus",
+          phone1: "phone1",
+          phone2: "phone2",
+          emergencycontactname: "emergencyContactName",
+          emergencycontactphone: "emergencyContactPhone",
+          address: "address",
+          city: "city",
+          country: "country",
+          position: "position",
+          department: "department",
+          datejoined: "dateJoined",
+          contractstart: "contractStartDate",
+          salarytype: "salaryType",
+          basesalary: "baseSalary",
+          perbalerate: "perBaleRate",
+          perkgrate: "perKgRate",
+          payfrequency: "payFrequency",
+          hourlyrate: "hourlyRate",
+          weeklysalary: "weeklySalary",
+          biweeklysalary: "biWeeklySalary",
+          visanumber: "visaNumber",
+          visaexpiry: "visaExpiry",
+          workpermitnumber: "workPermitNumber",
+          workpermitexpiry: "workPermitExpiry",
+          residentialpermit: "residentialPermit",
+          residentialpermitexpiry: "residentialPermitExpiry",
+          bankname: "bankName",
+          bankaccountnumber: "bankAccountNumber",
+          paymentmethod: "paymentMethod",
+          notes: "notes",
+        };
 
-      let created = 0, updated = 0, skipped = 0;
-      const errors: string[] = [];
+        let created = 0,
+          updated = 0,
+          skipped = 0;
+        const errors: string[] = [];
 
-      // Load existing workers for fast lookup
-      const existingWorkers = await db.select().from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
+        // Load existing workers for fast lookup
+        const existingWorkers = await db.select().from(factoryWorkers).where(eq(factoryWorkers.companyId, companyId));
 
-      // Determine next HMD code number for auto-assignment during import
-      const importPrefix = "HMD";
-      let nextHmdNum = existingWorkers.reduce((max, w: any) => {
-        if (!w.employeeCode) return max;
-        const m = w.employeeCode.match(new RegExp(`^${importPrefix}(\\d+)$`));
-        return m ? Math.max(max, parseInt(m[1], 10)) : max;
-      }, 0);
-      const byCode = new Map(existingWorkers.filter((w: any) => w.employeeCode).map((w: any) => [w.employeeCode, w]));
-      const byPassport = new Map(existingWorkers.filter((w: any) => w.passportNumber).map((w: any) => [w.passportNumber, w]));
-      const byNationalId = new Map(existingWorkers.filter((w: any) => w.nationalId).map((w: any) => [w.nationalId, w]));
+        // Determine next HMD code number for auto-assignment during import
+        const importPrefix = "HMD";
+        let nextHmdNum = existingWorkers.reduce((max, w: any) => {
+          if (!w.employeeCode) return max;
+          const m = w.employeeCode.match(new RegExp(`^${importPrefix}(\\d+)$`));
+          return m ? Math.max(max, parseInt(m[1], 10)) : max;
+        }, 0);
+        const byCode = new Map(existingWorkers.filter((w: any) => w.employeeCode).map((w: any) => [w.employeeCode, w]));
+        const byPassport = new Map(
+          existingWorkers.filter((w: any) => w.passportNumber).map((w: any) => [w.passportNumber, w])
+        );
+        const byNationalId = new Map(
+          existingWorkers.filter((w: any) => w.nationalId).map((w: any) => [w.nationalId, w])
+        );
 
-      const parseDate = (v: any): string | null => {
-        if (!v) return null;
-        if (typeof v === "number") {
-          // Excel serial date
-          const d = new Date(Math.round((v - 25569) * 86400 * 1000));
-          return d.toISOString().split("T")[0];
-        }
-        const s = String(v).trim();
-        if (!s) return null;
-        const d = new Date(s);
-        return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
-      };
-
-      for (let i = 0; i < rows.length; i++) {
-        const raw = rows[i];
-        try {
-          // Map raw keys to field names
-          const mapped: any = {};
-          for (const [rawKey, rawVal] of Object.entries(raw)) {
-            const key = colMap[normalize(rawKey)];
-            if (key) mapped[key] = rawVal;
+        const parseDate = (v: any): string | null => {
+          if (!v) return null;
+          if (typeof v === "number") {
+            // Excel serial date
+            const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+            return d.toISOString().split("T")[0];
           }
-          if (!mapped.fullName) { skipped++; errors.push(`Row ${i + 2}: missing Full Name`); continue; }
+          const s = String(v).trim();
+          if (!s) return null;
+          const d = new Date(s);
+          return isNaN(d.getTime()) ? null : d.toISOString().split("T")[0];
+        };
 
-          // Date fields
-          for (const f of ["dateOfBirth", "dateJoined", "contractStartDate", "visaExpiry", "workPermitExpiry", "residentialPermitExpiry"]) {
-            if (mapped[f] !== undefined) mapped[f] = parseDate(mapped[f]);
-          }
-          // Numeric fields
-          for (const f of ["baseSalary", "perBaleRate", "perKgRate", "hourlyRate", "weeklySalary", "biWeeklySalary"]) {
-            if (mapped[f] !== undefined && mapped[f] !== "") mapped[f] = String(parseFloat(mapped[f]) || 0);
-          }
-
-          // Find existing worker
-          const existing = byCode.get(mapped.employeeCode) || byPassport.get(mapped.passportNumber) || byNationalId.get(mapped.nationalId);
-          if (existing) {
-            await db.update(factoryWorkers).set({ ...mapped, updatedAt: new Date() }).where(and(eq(factoryWorkers.id, existing.id), eq(factoryWorkers.companyId, companyId)));
-            updated++;
-          } else {
-            const [newWorker] = await db.insert(factoryWorkers).values({ ...mapped, companyId }).returning();
-            if (!newWorker.employeeCode) {
-              nextHmdNum++;
-              const autoCode = `${importPrefix}${String(nextHmdNum).padStart(3, "0")}`;
-              await db.update(factoryWorkers).set({ employeeCode: autoCode }).where(eq(factoryWorkers.id, newWorker.id));
+        for (let i = 0; i < rows.length; i++) {
+          const raw = rows[i];
+          try {
+            // Map raw keys to field names
+            const mapped: any = {};
+            for (const [rawKey, rawVal] of Object.entries(raw)) {
+              const key = colMap[normalize(rawKey)];
+              if (key) mapped[key] = rawVal;
             }
-            created++;
+            if (!mapped.fullName) {
+              skipped++;
+              errors.push(`Row ${i + 2}: missing Full Name`);
+              continue;
+            }
+
+            // Date fields
+            for (const f of [
+              "dateOfBirth",
+              "dateJoined",
+              "contractStartDate",
+              "visaExpiry",
+              "workPermitExpiry",
+              "residentialPermitExpiry",
+            ]) {
+              if (mapped[f] !== undefined) mapped[f] = parseDate(mapped[f]);
+            }
+            // Numeric fields
+            for (const f of [
+              "baseSalary",
+              "perBaleRate",
+              "perKgRate",
+              "hourlyRate",
+              "weeklySalary",
+              "biWeeklySalary",
+            ]) {
+              if (mapped[f] !== undefined && mapped[f] !== "") mapped[f] = String(parseFloat(mapped[f]) || 0);
+            }
+
+            // Find existing worker
+            const existing =
+              byCode.get(mapped.employeeCode) ||
+              byPassport.get(mapped.passportNumber) ||
+              byNationalId.get(mapped.nationalId);
+            if (existing) {
+              await db
+                .update(factoryWorkers)
+                .set({ ...mapped, updatedAt: new Date() })
+                .where(and(eq(factoryWorkers.id, existing.id), eq(factoryWorkers.companyId, companyId)));
+              updated++;
+            } else {
+              const [newWorker] = await db
+                .insert(factoryWorkers)
+                .values({ ...mapped, companyId })
+                .returning();
+              if (!newWorker.employeeCode) {
+                nextHmdNum++;
+                const autoCode = `${importPrefix}${String(nextHmdNum).padStart(3, "0")}`;
+                await db
+                  .update(factoryWorkers)
+                  .set({ employeeCode: autoCode })
+                  .where(eq(factoryWorkers.id, newWorker.id));
+              }
+              created++;
+            }
+          } catch (e: any) {
+            skipped++;
+            errors.push(`Row ${i + 2}: ${e.message}`);
           }
-        } catch (e: any) {
-          skipped++;
-          errors.push(`Row ${i + 2}: ${e.message}`);
         }
+
+        const today = getClientDate(req);
+        await writeDaybookEntry(db, {
+          companyId,
+          txDate: today,
+          txType: "WORKER_IMPORT",
+          description: `Worker import: ${created} created, ${updated} updated, ${skipped} skipped`,
+          createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
+        });
+
+        res.json({ created, updated, skipped, errors });
+      } catch (error: any) {
+        console.error("Error importing workers:", error);
+        res.status(500).json({ message: error.message });
       }
-
-      const today = getClientDate(req);
-      await writeDaybookEntry(db, {
-        companyId, txDate: today, txType: "WORKER_IMPORT",
-        description: `Worker import: ${created} created, ${updated} updated, ${skipped} skipped`,
-        createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
-      });
-
-      res.json({ created, updated, skipped, errors });
-    } catch (error: any) {
-      console.error("Error importing workers:", error);
-      res.status(500).json({ message: error.message });
     }
-  });
+  );
 
   // POST /api/factory/workers/reassign-codes - Bulk reassign HMD001, HMD002... codes
   app.post("/api/factory/workers/reassign-codes", requireAuth, async (req: any, res: any) => {
@@ -522,13 +702,30 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const rawData = { ...req.body, companyId };
-      for (const f of ["dateOfBirth", "dateJoined", "contractStartDate", "contractEndDate", "visaExpiry", "workPermitExpiry", "residentialPermitExpiry"]) {
+      for (const f of [
+        "dateOfBirth",
+        "dateJoined",
+        "contractStartDate",
+        "contractEndDate",
+        "visaExpiry",
+        "workPermitExpiry",
+        "residentialPermitExpiry",
+      ]) {
         if (rawData[f] === "" || rawData[f] === undefined) rawData[f] = null;
       }
-      for (const f of ["baseSalary", "perBaleRate", "perKgRate", "overtimeRate", "hourlyRate", "weeklySalary", "biWeeklySalary"]) {
+      for (const f of [
+        "baseSalary",
+        "perBaleRate",
+        "perKgRate",
+        "overtimeRate",
+        "hourlyRate",
+        "weeklySalary",
+        "biWeeklySalary",
+      ]) {
         if (rawData[f] === "" || rawData[f] === undefined) rawData[f] = "0";
       }
-      if (rawData.transportAllowance === "" || rawData.transportAllowance === undefined) rawData.transportAllowance = null;
+      if (rawData.transportAllowance === "" || rawData.transportAllowance === undefined)
+        rawData.transportAllowance = null;
       if (rawData.numberOfChildren === "" || rawData.numberOfChildren === undefined) rawData.numberOfChildren = 0;
       const parsed = insertFactoryWorkerSchema.parse(rawData);
       const [worker] = await db.insert(factoryWorkers).values(parsed).returning();
@@ -587,7 +784,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         if (absentRecords.length > 0) {
           const BATCH = 500;
           for (let i = 0; i < absentRecords.length; i += BATCH) {
-            await db.insert(factoryAttendance).values(absentRecords.slice(i, i + BATCH)).onConflictDoNothing();
+            await db
+              .insert(factoryAttendance)
+              .values(absentRecords.slice(i, i + BATCH))
+              .onConflictDoNothing();
           }
         }
       }
@@ -609,14 +809,31 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const updateData = { ...req.body };
-      for (const f of ["dateOfBirth", "dateJoined", "contractStartDate", "contractEndDate", "visaExpiry", "workPermitExpiry", "residentialPermitExpiry"]) {
+      for (const f of [
+        "dateOfBirth",
+        "dateJoined",
+        "contractStartDate",
+        "contractEndDate",
+        "visaExpiry",
+        "workPermitExpiry",
+        "residentialPermitExpiry",
+      ]) {
         if (updateData[f] === "" || updateData[f] === undefined) updateData[f] = null;
       }
-      for (const f of ["baseSalary", "perBaleRate", "perKgRate", "overtimeRate", "hourlyRate", "weeklySalary", "biWeeklySalary"]) {
+      for (const f of [
+        "baseSalary",
+        "perBaleRate",
+        "perKgRate",
+        "overtimeRate",
+        "hourlyRate",
+        "weeklySalary",
+        "biWeeklySalary",
+      ]) {
         if (updateData[f] === "" || updateData[f] === undefined) updateData[f] = "0";
       }
       if (updateData.transportAllowance === "") updateData.transportAllowance = null;
-      if (updateData.numberOfChildren === "" || updateData.numberOfChildren === undefined) updateData.numberOfChildren = 0;
+      if (updateData.numberOfChildren === "" || updateData.numberOfChildren === undefined)
+        updateData.numberOfChildren = 0;
       const [updated] = await db
         .update(factoryWorkers)
         .set({ ...updateData, updatedAt: new Date() })
@@ -814,16 +1031,19 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         console.warn("Worker doc disk cache write failed (non-fatal):", cacheErr);
       }
 
-      const [doc] = await db.insert(factoryWorkerDocuments).values({
-        companyId,
-        workerId,
-        fileName: generatedFilename,
-        originalName: req.file.originalname,
-        fileUrl,
-        fileType: req.file.mimetype,
-        fileSize: req.file.size,
-        fileData,
-      }).returning();
+      const [doc] = await db
+        .insert(factoryWorkerDocuments)
+        .values({
+          companyId,
+          workerId,
+          fileName: generatedFilename,
+          originalName: req.file.originalname,
+          fileUrl,
+          fileType: req.file.mimetype,
+          fileSize: req.file.size,
+          fileData,
+        })
+        .returning();
       res.json(doc);
     } catch (error: any) {
       console.error("Error uploading worker document:", error);
@@ -841,17 +1061,19 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (!companyId) return res.status(400).json({ message: "No company selected" });
       const workerId = parseId(req.params.id);
       if (workerId === null) return res.status(400).json({ message: "Invalid id" });
-      const docs = await db.select({
-        id:           factoryWorkerDocuments.id,
-        companyId:    factoryWorkerDocuments.companyId,
-        workerId:     factoryWorkerDocuments.workerId,
-        fileName:     factoryWorkerDocuments.fileName,
-        originalName: factoryWorkerDocuments.originalName,
-        fileUrl:      factoryWorkerDocuments.fileUrl,
-        fileType:     factoryWorkerDocuments.fileType,
-        fileSize:     factoryWorkerDocuments.fileSize,
-        uploadedAt:   factoryWorkerDocuments.uploadedAt,
-      }).from(factoryWorkerDocuments)
+      const docs = await db
+        .select({
+          id: factoryWorkerDocuments.id,
+          companyId: factoryWorkerDocuments.companyId,
+          workerId: factoryWorkerDocuments.workerId,
+          fileName: factoryWorkerDocuments.fileName,
+          originalName: factoryWorkerDocuments.originalName,
+          fileUrl: factoryWorkerDocuments.fileUrl,
+          fileType: factoryWorkerDocuments.fileType,
+          fileSize: factoryWorkerDocuments.fileSize,
+          uploadedAt: factoryWorkerDocuments.uploadedAt,
+        })
+        .from(factoryWorkerDocuments)
         .where(and(eq(factoryWorkerDocuments.workerId, workerId), eq(factoryWorkerDocuments.companyId, companyId)))
         .orderBy(desc(factoryWorkerDocuments.uploadedAt));
       res.json(docs);
@@ -869,8 +1091,16 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (workerId === null) return res.status(400).json({ message: "Invalid id" });
       const docId = parseId(req.params.docId);
       if (docId === null) return res.status(400).json({ message: "Invalid id" });
-      const [doc] = await db.select().from(factoryWorkerDocuments)
-        .where(and(eq(factoryWorkerDocuments.id, docId), eq(factoryWorkerDocuments.workerId, workerId), eq(factoryWorkerDocuments.companyId, companyId)));
+      const [doc] = await db
+        .select()
+        .from(factoryWorkerDocuments)
+        .where(
+          and(
+            eq(factoryWorkerDocuments.id, docId),
+            eq(factoryWorkerDocuments.workerId, workerId),
+            eq(factoryWorkerDocuments.companyId, companyId)
+          )
+        );
       if (!doc) return res.status(404).json({ message: "Document not found" });
       const filePath = path.join(process.cwd(), "uploads", "workers", "docs", doc.fileName);
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -902,11 +1132,13 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       }
 
       // Disk miss — fall back to the DB copy.
-      const [doc] = await db.select({
-        fileData:     factoryWorkerDocuments.fileData,
-        fileType:     factoryWorkerDocuments.fileType,
-        originalName: factoryWorkerDocuments.originalName,
-      }).from(factoryWorkerDocuments)
+      const [doc] = await db
+        .select({
+          fileData: factoryWorkerDocuments.fileData,
+          fileType: factoryWorkerDocuments.fileType,
+          originalName: factoryWorkerDocuments.originalName,
+        })
+        .from(factoryWorkerDocuments)
         .where(eq(factoryWorkerDocuments.fileName, filename))
         .limit(1);
 
@@ -947,10 +1179,7 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { startDate, endDate } = req.query;
 
-      const conditions: any[] = [
-        eq(factoryBales.finalizedBy, id),
-        eq(factoryBales.companyId, companyId),
-      ];
+      const conditions: any[] = [eq(factoryBales.finalizedBy, id), eq(factoryBales.companyId, companyId)];
 
       if (startDate) {
         conditions.push(sql`${factoryBales.finalizedAt} >= ${startDate}::timestamp`);
@@ -984,7 +1213,10 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { startDate, endDate, hoursWorked, dryRun, payNow, cashAccountId, skipSettlement } = req.body;
 
-      const [worker] = await db.select().from(factoryWorkers).where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)));
+      const [worker] = await db
+        .select()
+        .from(factoryWorkers)
+        .where(and(eq(factoryWorkers.id, id), eq(factoryWorkers.companyId, companyId)));
       if (!worker) return res.status(404).json({ message: "Worker not found" });
       if (!worker.active) return res.status(400).json({ message: "Worker contract already ended" });
 
@@ -992,12 +1224,19 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       if (skipSettlement) {
         const today = getClientDate(req);
         const endEffective = endDate || today;
-        await db.update(factoryWorkers).set({ active: false, contractEndDate: endEffective, updatedAt: new Date() }).where(eq(factoryWorkers.id, id));
+        await db
+          .update(factoryWorkers)
+          .set({ active: false, contractEndDate: endEffective, updatedAt: new Date() })
+          .where(eq(factoryWorkers.id, id));
         await writeDaybookEntry(db, {
-          companyId, txDate: today, txType: "CONTRACT_ENDED",
-          referenceId: id, referenceTable: "factory_workers",
+          companyId,
+          txDate: today,
+          txType: "CONTRACT_ENDED",
+          referenceId: id,
+          referenceTable: "factory_workers",
           description: `Contract ended (no settlement) for ${worker.fullName}`,
-          amountCurrency: 0, amountUsd: 0,
+          amountCurrency: 0,
+          amountUsd: 0,
           createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
         });
         return res.json({ skipped: true, workerUpdated: true });
@@ -1014,17 +1253,34 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       const effectiveStart = workerJoinDate && workerJoinDate > startDate ? workerJoinDate : startDate;
 
       if (effectiveStart > endDate && dryRun) {
-        return res.json({ earned: "0.00", paid: "0.00", advances: "0.00", balance: "0.00", effectiveStart, dryRun: true });
+        return res.json({
+          earned: "0.00",
+          paid: "0.00",
+          advances: "0.00",
+          balance: "0.00",
+          effectiveStart,
+          dryRun: true,
+        });
       }
 
       // Helper functions
-      const daysInPeriod = (s: string, e: string) => Math.floor((new Date(e).getTime() - new Date(s).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const daysInPeriod = (s: string, e: string) =>
+        Math.floor((new Date(e).getTime() - new Date(s).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       const countWeekdays = (s: string, e: string) => {
-        let count = 0; const cur = new Date(s); const end = new Date(e);
-        while (cur <= end) { const d = cur.getDay(); if (d !== 0 && d !== 6) count++; cur.setDate(cur.getDate() + 1); }
+        let count = 0;
+        const cur = new Date(s);
+        const end = new Date(e);
+        while (cur <= end) {
+          const d = cur.getDay();
+          if (d !== 0 && d !== 6) count++;
+          cur.setDate(cur.getDate() + 1);
+        }
         return count;
       };
-      const daysInMonth = (dateStr: string) => { const d = new Date(dateStr); return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); };
+      const daysInMonth = (dateStr: string) => {
+        const d = new Date(dateStr);
+        return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      };
 
       const days = daysInPeriod(effectiveStart, endDate);
       const weekdays = countWeekdays(effectiveStart, endDate);
@@ -1047,12 +1303,17 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       } else if (salType === "Daily") {
         earned = weekdays * baseSal;
       } else if (salType === "Per Bale" || salType === "Per KG") {
-        const bales = await db.select().from(factoryBales).where(and(
-          eq(factoryBales.companyId, companyId),
-          eq(factoryBales.finalizedBy, id),
-          gte(factoryBales.finalizedAt, new Date(effectiveStart)),
-          lte(factoryBales.finalizedAt, new Date(endDate + "T23:59:59.999Z")),
-        ));
+        const bales = await db
+          .select()
+          .from(factoryBales)
+          .where(
+            and(
+              eq(factoryBales.companyId, companyId),
+              eq(factoryBales.finalizedBy, id),
+              gte(factoryBales.finalizedAt, new Date(effectiveStart)),
+              lte(factoryBales.finalizedAt, new Date(endDate + "T23:59:59.999Z"))
+            )
+          );
         if (salType === "Per Bale") {
           earned = bales.length * parseFloat(worker.perBaleRate || "0");
         } else {
@@ -1061,12 +1322,17 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
         }
       } else {
         // Monthly: base pay on actual attendance records in the effective period
-        const attendanceRows = await db.select().from(factoryAttendance).where(and(
-          eq(factoryAttendance.workerId, id),
-          eq(factoryAttendance.companyId, companyId),
-          gte(factoryAttendance.attendanceDate, effectiveStart),
-          lte(factoryAttendance.attendanceDate, endDate),
-        ));
+        const attendanceRows = await db
+          .select()
+          .from(factoryAttendance)
+          .where(
+            and(
+              eq(factoryAttendance.workerId, id),
+              eq(factoryAttendance.companyId, companyId),
+              gte(factoryAttendance.attendanceDate, effectiveStart),
+              lte(factoryAttendance.attendanceDate, endDate)
+            )
+          );
         if (attendanceRows.length === 0) {
           // No attendance records — fall back to calendar-day proration
           earned = computeMonthlyPay(baseSal, effectiveStart, endDate);
@@ -1087,61 +1353,88 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
       // Adding back the advances column gives us the gross salary amount, which correctly matches
       // the gross "earned" figure from attendance/calendar — and outstanding advance debt is
       // tracked separately in the advances field of the response.
-      const paidPayrolls = await db.select().from(factoryPayrolls).where(and(
-        eq(factoryPayrolls.workerId, id),
-        eq(factoryPayrolls.companyId, companyId),
-        lte(factoryPayrolls.periodStart, endDate),
-        gte(factoryPayrolls.periodEnd, effectiveStart),
-        inArray(factoryPayrolls.status, ["APPROVED", "PAID"]),
-      ));
-      const totalPaid = paidPayrolls.reduce((s: number, p: any) =>
-        s + parseFloat(p.netSalary || "0") + parseFloat(p.advances || "0") + parseFloat(p.deductions || "0"), 0);
+      const paidPayrolls = await db
+        .select()
+        .from(factoryPayrolls)
+        .where(
+          and(
+            eq(factoryPayrolls.workerId, id),
+            eq(factoryPayrolls.companyId, companyId),
+            lte(factoryPayrolls.periodStart, endDate),
+            gte(factoryPayrolls.periodEnd, effectiveStart),
+            inArray(factoryPayrolls.status, ["APPROVED", "PAID"])
+          )
+        );
+      const totalPaid = paidPayrolls.reduce(
+        (s: number, p: any) =>
+          s + parseFloat(p.netSalary || "0") + parseFloat(p.advances || "0") + parseFloat(p.deductions || "0"),
+        0
+      );
 
       // Compute outstanding advances (remaining balance not yet recovered)
-      const outstandingAdvances = await db.select().from(factoryWorkerAdvances).where(and(
-        eq(factoryWorkerAdvances.workerId, id),
-        eq(factoryWorkerAdvances.companyId, companyId),
-        eq(factoryWorkerAdvances.fullyPaid, false),
-      ));
-      const totalAdvances = outstandingAdvances.reduce((s: number, a: any) => s + parseFloat(a.remainingBalance || "0"), 0);
+      const outstandingAdvances = await db
+        .select()
+        .from(factoryWorkerAdvances)
+        .where(
+          and(
+            eq(factoryWorkerAdvances.workerId, id),
+            eq(factoryWorkerAdvances.companyId, companyId),
+            eq(factoryWorkerAdvances.fullyPaid, false)
+          )
+        );
+      const totalAdvances = outstandingAdvances.reduce(
+        (s: number, a: any) => s + parseFloat(a.remainingBalance || "0"),
+        0
+      );
 
       const balance = earned - totalPaid - totalAdvances;
 
       // dryRun: just return calculation, no DB changes
       if (dryRun) {
-        return res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), advances: totalAdvances.toFixed(2), balance: balance.toFixed(2), effectiveStart, dryRun: true });
+        return res.json({
+          earned: earned.toFixed(2),
+          paid: totalPaid.toFixed(2),
+          advances: totalAdvances.toFixed(2),
+          balance: balance.toFixed(2),
+          effectiveStart,
+          dryRun: true,
+        });
       }
 
       const settlementStatus = payNow ? "PAID" : "APPROVED";
       const settlementPaidAt = payNow ? new Date() : null;
 
       // Insert settlement payroll record
-      const [settlement] = await db.insert(factoryPayrolls).values({
-        companyId,
-        workerId: id,
-        periodStart: effectiveStart,
-        periodEnd: endDate,
-        baseSalary: String(earned.toFixed(2)),
-        baleEarnings: "0",
-        kgEarnings: "0",
-        overtimePay: "0",
-        bonuses: "0",
-        deductions: String(totalPaid.toFixed(2)),
-        advances: String(totalAdvances.toFixed(2)),
-        netSalary: String(balance.toFixed(2)),
-        balesCount: 0,
-        kgProcessed: "0",
-        overtimeHours: "0",
-        status: settlementStatus,
-        notes: "Settlement - contract ended",
-        cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
-        paidAt: settlementPaidAt,
-      } as any).returning();
+      const [settlement] = await db
+        .insert(factoryPayrolls)
+        .values({
+          companyId,
+          workerId: id,
+          periodStart: effectiveStart,
+          periodEnd: endDate,
+          baseSalary: String(earned.toFixed(2)),
+          baleEarnings: "0",
+          kgEarnings: "0",
+          overtimePay: "0",
+          bonuses: "0",
+          deductions: String(totalPaid.toFixed(2)),
+          advances: String(totalAdvances.toFixed(2)),
+          netSalary: String(balance.toFixed(2)),
+          balesCount: 0,
+          kgProcessed: "0",
+          overtimeHours: "0",
+          status: settlementStatus,
+          notes: "Settlement - contract ended",
+          cashAccountId: cashAccountId ? parseInt(cashAccountId) : null,
+          paidAt: settlementPaidAt,
+        } as any)
+        .returning();
 
       // Mark all outstanding advances as fully paid (recovered on settlement)
       if (outstandingAdvances.length > 0) {
         for (const adv of outstandingAdvances) {
-          await db.update(factoryWorkerAdvances)
+          await db
+            .update(factoryWorkerAdvances)
             .set({ fullyPaid: true, remainingBalance: "0" })
             .where(eq(factoryWorkerAdvances.id, adv.id));
         }
@@ -1149,17 +1442,32 @@ export function registerFactoryWorkerRoutes(app: Express, requireAuth: any, db: 
 
       // Deactivate worker
       const today = getClientDate(req);
-      await db.update(factoryWorkers).set({ active: false, contractEndDate: endDate, updatedAt: new Date() }).where(eq(factoryWorkers.id, id));
+      await db
+        .update(factoryWorkers)
+        .set({ active: false, contractEndDate: endDate, updatedAt: new Date() })
+        .where(eq(factoryWorkers.id, id));
 
       await writeDaybookEntry(db, {
-        companyId, txDate: today, txType: "CONTRACT_SETTLED",
-        referenceId: id, referenceTable: "factory_workers",
+        companyId,
+        txDate: today,
+        txType: "CONTRACT_SETTLED",
+        referenceId: id,
+        referenceTable: "factory_workers",
         description: `Settlement for ${worker.fullName}: earned $${earned.toFixed(2)}, paid $${totalPaid.toFixed(2)}, advances $${totalAdvances.toFixed(2)}, balance $${balance.toFixed(2)}`,
-        amountCurrency: Math.abs(balance), amountUsd: Math.abs(balance),
+        amountCurrency: Math.abs(balance),
+        amountUsd: Math.abs(balance),
         createdBy: (req.session as any).userId ? parseInt((req.session as any).userId) : undefined,
       });
 
-      res.json({ earned: earned.toFixed(2), paid: totalPaid.toFixed(2), advances: totalAdvances.toFixed(2), balance: balance.toFixed(2), effectiveStart, settlementPayrollId: settlement.id, workerUpdated: true });
+      res.json({
+        earned: earned.toFixed(2),
+        paid: totalPaid.toFixed(2),
+        advances: totalAdvances.toFixed(2),
+        balance: balance.toFixed(2),
+        effectiveStart,
+        settlementPayrollId: settlement.id,
+        workerUpdated: true,
+      });
     } catch (error: any) {
       console.error("Error settling worker contract:", error);
       res.status(500).json({ message: error.message });

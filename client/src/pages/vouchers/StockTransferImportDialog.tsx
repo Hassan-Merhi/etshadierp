@@ -1,10 +1,4 @@
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription 
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -76,7 +70,8 @@ export function StockTransferImportDialog({
             Import Stock Transfer from Excel
           </DialogTitle>
           <DialogDescription>
-            Upload an Excel file with columns: Source Location, Barcode, Quantity. Each row can have a different source location.
+            Upload an Excel file with columns: Source Location, Barcode, Quantity. Each row can have a different source
+            location.
           </DialogDescription>
         </DialogHeader>
 
@@ -92,11 +87,7 @@ export function StockTransferImportDialog({
                 className="mt-1"
                 data-testid="input-import-file"
               />
-              {importFile && (
-                <p className="text-sm text-muted-foreground mt-1">
-                  Selected: {importFile.name}
-                </p>
-              )}
+              {importFile && <p className="text-sm text-muted-foreground mt-1">Selected: {importFile.name}</p>}
             </div>
             <Button
               variant="outline"
@@ -118,11 +109,13 @@ export function StockTransferImportDialog({
                   <SelectValue placeholder="Select destination..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {[...locations].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((location) => (
-                    <SelectItem key={location.id} value={location.id.toString()}>
-                      {location.name}
-                    </SelectItem>
-                  ))}
+                  {[...locations]
+                    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+                    .map((location) => (
+                      <SelectItem key={location.id} value={location.id.toString()}>
+                        {location.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -185,7 +178,11 @@ export function StockTransferImportDialog({
               data-testid="button-import-submit"
             >
               <Upload className="h-4 w-4 mr-2" />
-              {importMutationPending ? "Importing..." : importHasErrors ? `Import Transfer (${importValidItemsCount} valid)` : "Import Transfer"}
+              {importMutationPending
+                ? "Importing..."
+                : importHasErrors
+                  ? `Import Transfer (${importValidItemsCount} valid)`
+                  : "Import Transfer"}
             </Button>
           </div>
 
@@ -225,13 +222,17 @@ export function StockTransferImportDialog({
                       const hasError = validation?.error;
 
                       return (
-                        <TableRow key={index} className={hasError ? "bg-destructive/10" : ""} data-testid={`import-preview-row-${index}`}>
-                          <TableCell className="sticky left-0 bg-background z-10">{item.sourceLocation || "-"}</TableCell>
+                        <TableRow
+                          key={index}
+                          className={hasError ? "bg-destructive/10" : ""}
+                          data-testid={`import-preview-row-${index}`}
+                        >
+                          <TableCell className="sticky left-0 bg-background z-10">
+                            {item.sourceLocation || "-"}
+                          </TableCell>
                           <TableCell className="font-mono">{item.barcode}</TableCell>
                           <TableCell>
-                            {validation?.stockItemName || (
-                              <span className="text-muted-foreground italic">Unknown</span>
-                            )}
+                            {validation?.stockItemName || <span className="text-muted-foreground italic">Unknown</span>}
                           </TableCell>
                           <TableCell className="text-right">{item.quantity}</TableCell>
                           <TableCell className="text-right">
@@ -276,9 +277,7 @@ export function StockTransferImportDialog({
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium truncate">
-                          {validation?.stockItemName || (
-                            <span className="text-muted-foreground italic">Unknown</span>
-                          )}
+                          {validation?.stockItemName || <span className="text-muted-foreground italic">Unknown</span>}
                         </span>
                         {validation ? (
                           hasError ? (
@@ -293,12 +292,17 @@ export function StockTransferImportDialog({
                         <span className="font-mono">Code: {item.barcode}</span>
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                        <span>Qty: <span className="font-mono">{item.quantity}</span></span>
-                        <span>Avail: <span className="font-mono">{validation?.currentStock !== undefined ? formatNumber(validation.currentStock) : "-"}</span></span>
+                        <span>
+                          Qty: <span className="font-mono">{item.quantity}</span>
+                        </span>
+                        <span>
+                          Avail:{" "}
+                          <span className="font-mono">
+                            {validation?.currentStock !== undefined ? formatNumber(validation.currentStock) : "-"}
+                          </span>
+                        </span>
                       </div>
-                      {hasError && (
-                        <div className="text-xs text-destructive">{validation.error}</div>
-                      )}
+                      {hasError && <div className="text-xs text-destructive">{validation.error}</div>}
                     </div>
                   );
                 })}

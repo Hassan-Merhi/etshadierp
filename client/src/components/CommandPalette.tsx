@@ -95,9 +95,9 @@ const DESCRIPTIONS: Record<string, string> = {
   "/factory/containers-hub": "Factory containers and stock on the way",
   "/factory/intelligence/dashboard": "KPIs and insights",
   "/factory/intelligence/kpis": "Key performance indicators",
-  "/factory/intelligence/supplier-hub":    "Supplier reports, statements and scores",
-  "/factory/intelligence/financial-hub":   "Net profit, net position, cash flow and profitability",
-  "/factory/intelligence/production-hub":  "Production summary, waste tracking and mix optimizer",
+  "/factory/intelligence/supplier-hub": "Supplier reports, statements and scores",
+  "/factory/intelligence/financial-hub": "Net profit, net position, cash flow and profitability",
+  "/factory/intelligence/production-hub": "Production summary, waste tracking and mix optimizer",
   "/factory/bale-products": "Finished bale products",
   "/factory/bale-relabeling": "Relabel and reassign bales",
   "/properties/rental/warehouses": "Properties (warehouses) rented out",
@@ -111,82 +111,257 @@ const DESCRIPTIONS: Record<string, string> = {
 /** Extra entries that aren't part of any nav section but should appear in the palette. */
 const ERP_EXTRAS: PageEntry[] = [
   { label: "Container Dashboard", description: DESCRIPTIONS["/"], path: "/", icon: LayoutDashboard },
-  { label: "Financial Overview", description: DESCRIPTIONS["/financial-overview"], path: "/financial-overview", icon: LayoutDashboard },
+  {
+    label: "Financial Overview",
+    description: DESCRIPTIONS["/financial-overview"],
+    path: "/financial-overview",
+    icon: LayoutDashboard,
+  },
   { label: "Chat", description: "Internal messaging", path: "/chat", icon: MessageSquare },
 ];
 
 /** ERP hub tab entries — each tab inside a hub page gets its own searchable entry. */
 const ERP_HUB_TABS: PageEntry[] = [
-  { label: "Stock Transfers",  description: "Transfer stock between locations", path: "/sales-tools?tab=transfers", icon: ArrowLeftRight },
-  { label: "Price List",       description: "Product price list",               path: "/sales-tools?tab=pricelist", icon: Tag            },
-  { label: "Suppliers",        description: "Supplier management",              path: "/parties?tab=suppliers",     icon: Truck          },
-  { label: "Customers",        description: "Customer accounts",                path: "/parties?tab=customers",     icon: Users          },
+  {
+    label: "Stock Transfers",
+    description: "Transfer stock between locations",
+    path: "/sales-tools?tab=transfers",
+    icon: ArrowLeftRight,
+  },
+  { label: "Price List", description: "Product price list", path: "/sales-tools?tab=pricelist", icon: Tag },
+  { label: "Suppliers", description: "Supplier management", path: "/parties?tab=suppliers", icon: Truck },
+  { label: "Customers", description: "Customer accounts", path: "/parties?tab=customers", icon: Users },
 ];
 
 /** Factory routes that aren't in FACTORY_NAV_SECTIONS but were historically in the palette. */
 const FACTORY_EXTRAS_ALWAYS: PageEntry[] = [
-  { label: "Factory Daybook",   description: DESCRIPTIONS["/factory/daybook"],        path: "/factory/daybook",   icon: Calendar    },
-  { label: "Factory Chat",      description: "Internal messaging",                    path: "/factory/chat",      icon: MessageSquare },
-  { label: "Bale Relabeling",   description: DESCRIPTIONS["/factory/bale-relabeling"],path: "/factory/bale-relabeling", icon: Archive },
+  { label: "Factory Daybook", description: DESCRIPTIONS["/factory/daybook"], path: "/factory/daybook", icon: Calendar },
+  { label: "Factory Chat", description: "Internal messaging", path: "/factory/chat", icon: MessageSquare },
+  {
+    label: "Bale Relabeling",
+    description: DESCRIPTIONS["/factory/bale-relabeling"],
+    path: "/factory/bale-relabeling",
+    icon: Archive,
+  },
 ];
 
 /** Factory hub tab entries — each tab in a hub page gets its own searchable entry. */
 const FACTORY_HUB_TABS: PageEntry[] = [
-  { label: "Bales",               description: "All bale stock",                    path: "/factory/bales-hub?tab=history",             icon: Box           },
-  { label: "Barcode Lookup",      description: "Look up bales by barcode",          path: "/factory/bales-hub?tab=barcode",             icon: Archive       },
-  { label: "Bale Products",       description: DESCRIPTIONS["/factory/bale-products"], path: "/factory/bales-hub?tab=products",         icon: Box           },
-  { label: "Import History",      description: "Bale import history",               path: "/factory/bales-hub?tab=imports",             icon: Archive       },
-  { label: "Proformas",           description: "Proforma invoices",                 path: "/factory/invoicing?tab=proformas",           icon: FileText      },
-  { label: "Invoices",            description: "Finalized factory invoices",        path: "/factory/invoicing?tab=invoices",            icon: FileText      },
-  { label: "Container Loadings",  description: "Manage container loadings",         path: "/factory/sales/loadings?tab=loadings",       icon: Ship          },
-  { label: "Pending Loadings",    description: "Loadings pending confirmation",     path: "/factory/sales/loadings?tab=pending",        icon: Ship          },
-  { label: "Payroll",           description: "Workers and employees payroll",   path: "/factory/payroll-hub",            icon: HardHat  },
-  { label: "Workers",           description: "Worker payroll and attendance",   path: "/factory/payroll-hub?section=workers",    icon: HardHat  },
-  { label: "Employees",         description: "Employee records and payroll",    path: "/factory/payroll-hub?section=employees",  icon: Users    },
-  { label: "Parties",           description: "Factory customers and suppliers",  path: "/factory/parties",                        icon: Users    },
-  { label: "Customers",         description: "Factory customer accounts",         path: "/factory/parties?section=customers",       icon: Users    },
-  { label: "Factory Suppliers", description: "Factory supplier management",       path: "/factory/parties?section=suppliers",       icon: Truck    },
-  { label: "Factory Vouchers",    description: DESCRIPTIONS["/factory/vouchers"],                    path: "/factory/vouchers",                                         icon: FileText },
-  { label: "Factory Accounts",    description: DESCRIPTIONS["/factory/accounts"],                    path: "/factory/accounts",                                         icon: PieChart },
-  { label: "Supplier Report",     description: "Supplier performance report",                        path: "/factory/intelligence/supplier-hub?section=report",         icon: FileText },
-  { label: "Supplier Statement",  description: "Supplier account statement",                         path: "/factory/intelligence/supplier-hub?section=statement",      icon: FileText },
-  { label: "Supplier Scores",     description: "Supplier scoring and evaluation",                    path: "/factory/intelligence/supplier-hub?section=scores",         icon: PieChart },
-  { label: "Net Profit",          description: "Net profit analytics",                               path: "/factory/intelligence/financial-hub?section=net-profit",    icon: PieChart },
-  { label: "Net Position",        description: "Assets vs liabilities net position",                 path: "/factory/intelligence/financial-hub?section=net-position",  icon: PieChart },
-  { label: "Cash Flow",           description: "Cashflow intelligence",                              path: "/factory/intelligence/financial-hub?section=cashflow",      icon: PieChart },
-  { label: "Profitability",       description: "Profitability analysis",                             path: "/factory/intelligence/financial-hub?section=profitability", icon: PieChart },
-  { label: "Production Summary",  description: "Production output summary",                          path: "/factory/intelligence/production-hub?section=production-summary", icon: BarChart3 },
-  { label: "Waste Tracking",      description: "Production waste tracking",                          path: "/factory/intelligence/production-hub?section=waste",        icon: BarChart3 },
-  { label: "Mix Optimizer",       description: "Raw material mix optimizer",                         path: "/factory/intelligence/production-hub?section=mix-optimizer", icon: BarChart3 },
+  { label: "Bales", description: "All bale stock", path: "/factory/bales-hub?tab=history", icon: Box },
+  {
+    label: "Barcode Lookup",
+    description: "Look up bales by barcode",
+    path: "/factory/bales-hub?tab=barcode",
+    icon: Archive,
+  },
+  {
+    label: "Bale Products",
+    description: DESCRIPTIONS["/factory/bale-products"],
+    path: "/factory/bales-hub?tab=products",
+    icon: Box,
+  },
+  {
+    label: "Import History",
+    description: "Bale import history",
+    path: "/factory/bales-hub?tab=imports",
+    icon: Archive,
+  },
+  { label: "Proformas", description: "Proforma invoices", path: "/factory/invoicing?tab=proformas", icon: FileText },
+  {
+    label: "Invoices",
+    description: "Finalized factory invoices",
+    path: "/factory/invoicing?tab=invoices",
+    icon: FileText,
+  },
+  {
+    label: "Container Loadings",
+    description: "Manage container loadings",
+    path: "/factory/sales/loadings?tab=loadings",
+    icon: Ship,
+  },
+  {
+    label: "Pending Loadings",
+    description: "Loadings pending confirmation",
+    path: "/factory/sales/loadings?tab=pending",
+    icon: Ship,
+  },
+  { label: "Payroll", description: "Workers and employees payroll", path: "/factory/payroll-hub", icon: HardHat },
+  {
+    label: "Workers",
+    description: "Worker payroll and attendance",
+    path: "/factory/payroll-hub?section=workers",
+    icon: HardHat,
+  },
+  {
+    label: "Employees",
+    description: "Employee records and payroll",
+    path: "/factory/payroll-hub?section=employees",
+    icon: Users,
+  },
+  { label: "Parties", description: "Factory customers and suppliers", path: "/factory/parties", icon: Users },
+  {
+    label: "Customers",
+    description: "Factory customer accounts",
+    path: "/factory/parties?section=customers",
+    icon: Users,
+  },
+  {
+    label: "Factory Suppliers",
+    description: "Factory supplier management",
+    path: "/factory/parties?section=suppliers",
+    icon: Truck,
+  },
+  {
+    label: "Factory Vouchers",
+    description: DESCRIPTIONS["/factory/vouchers"],
+    path: "/factory/vouchers",
+    icon: FileText,
+  },
+  {
+    label: "Factory Accounts",
+    description: DESCRIPTIONS["/factory/accounts"],
+    path: "/factory/accounts",
+    icon: PieChart,
+  },
+  {
+    label: "Supplier Report",
+    description: "Supplier performance report",
+    path: "/factory/intelligence/supplier-hub?section=report",
+    icon: FileText,
+  },
+  {
+    label: "Supplier Statement",
+    description: "Supplier account statement",
+    path: "/factory/intelligence/supplier-hub?section=statement",
+    icon: FileText,
+  },
+  {
+    label: "Supplier Scores",
+    description: "Supplier scoring and evaluation",
+    path: "/factory/intelligence/supplier-hub?section=scores",
+    icon: PieChart,
+  },
+  {
+    label: "Net Profit",
+    description: "Net profit analytics",
+    path: "/factory/intelligence/financial-hub?section=net-profit",
+    icon: PieChart,
+  },
+  {
+    label: "Net Position",
+    description: "Assets vs liabilities net position",
+    path: "/factory/intelligence/financial-hub?section=net-position",
+    icon: PieChart,
+  },
+  {
+    label: "Cash Flow",
+    description: "Cashflow intelligence",
+    path: "/factory/intelligence/financial-hub?section=cashflow",
+    icon: PieChart,
+  },
+  {
+    label: "Profitability",
+    description: "Profitability analysis",
+    path: "/factory/intelligence/financial-hub?section=profitability",
+    icon: PieChart,
+  },
+  {
+    label: "Production Summary",
+    description: "Production output summary",
+    path: "/factory/intelligence/production-hub?section=production-summary",
+    icon: BarChart3,
+  },
+  {
+    label: "Waste Tracking",
+    description: "Production waste tracking",
+    path: "/factory/intelligence/production-hub?section=waste",
+    icon: BarChart3,
+  },
+  {
+    label: "Mix Optimizer",
+    description: "Raw material mix optimizer",
+    path: "/factory/intelligence/production-hub?section=mix-optimizer",
+    icon: BarChart3,
+  },
 ];
 
 const PROPERTIES_EXTRAS: PageEntry[] = [
   { label: "Properties Daybook", description: "Daily transaction log", path: "/properties/daybook", icon: Calendar },
-  { label: "Properties Dashboard", description: "Properties overview", path: "/properties/dashboard", icon: LayoutDashboard },
+  {
+    label: "Properties Dashboard",
+    description: "Properties overview",
+    path: "/properties/dashboard",
+    icon: LayoutDashboard,
+  },
   { label: "Properties Analytics", description: "Properties analytics", path: "/properties/analytics", icon: PieChart },
   { label: "My Settings", description: "Personal preferences", path: "/my-settings", icon: Settings },
 ];
 
 const PROPERTIES_ADMIN_EXTRAS: PageEntry[] = [
-  { label: "Properties Settings", description: "Properties module configuration", path: "/properties/settings", icon: Settings },
+  {
+    label: "Properties Settings",
+    description: "Properties module configuration",
+    path: "/properties/settings",
+    icon: Settings,
+  },
 ];
 
 const adminPages: PageEntry[] = [
   { label: "Settings", description: "App configuration and system tools", path: "/settings", icon: Settings },
   { label: "Chatbot Settings", description: "AI assistant configuration", path: "/chatbot-settings", icon: Bot },
-  { label: "Notification Settings", description: "Configure notification recipients per event type", path: "/notification-settings", icon: Bell },
+  {
+    label: "Notification Settings",
+    description: "Configure notification recipients per event type",
+    path: "/notification-settings",
+    icon: Bell,
+  },
   { label: "Deleted Items", description: "View and restore deleted records", path: "/deleted-items", icon: Trash2 },
-  { label: "Orphaned Records", description: "Records with missing references", path: "/orphaned-records", icon: LinkIcon },
+  {
+    label: "Orphaned Records",
+    description: "Records with missing references",
+    path: "/orphaned-records",
+    icon: LinkIcon,
+  },
   { label: "Inventory Repair", description: "Fix inventory discrepancies", path: "/inventory-repair", icon: Wrench },
-  { label: "Balance Repair", description: "Fix rent ledger drift, missing voucher entries, orphaned transfers, deposit flags", path: "/balance-repair", icon: Wrench },
-  { label: "Net Position Details", description: "Detailed net position breakdown (assets vs liabilities)", path: "/net-position-details", icon: PieChart },
-  { label: "Import Cycle Diagnostics", description: "Diagnose import cycle issues", path: "/import-cycle-diagnostics", icon: AlertTriangle },
-  { label: "Account Migration", description: "Move a ledger account with its full statement to another company", path: "/account-migration", icon: ArrowRight },
-  { label: "Intercompany Links", description: "Configure cross-company payment notification links", path: "/intercompany-links", icon: ArrowRight },
+  {
+    label: "Balance Repair",
+    description: "Fix rent ledger drift, missing voucher entries, orphaned transfers, deposit flags",
+    path: "/balance-repair",
+    icon: Wrench,
+  },
+  {
+    label: "Net Position Details",
+    description: "Detailed net position breakdown (assets vs liabilities)",
+    path: "/net-position-details",
+    icon: PieChart,
+  },
+  {
+    label: "Import Cycle Diagnostics",
+    description: "Diagnose import cycle issues",
+    path: "/import-cycle-diagnostics",
+    icon: AlertTriangle,
+  },
+  {
+    label: "Account Migration",
+    description: "Move a ledger account with its full statement to another company",
+    path: "/account-migration",
+    icon: ArrowRight,
+  },
+  {
+    label: "Intercompany Links",
+    description: "Configure cross-company payment notification links",
+    path: "/intercompany-links",
+    icon: ArrowRight,
+  },
 ];
 
 const intercompanyPages: PageEntry[] = [
-  { label: "Intercompany Requests", description: "Review and approve intercompany payment notifications", path: "/intercompany-requests", icon: ArrowRight },
+  {
+    label: "Intercompany Requests",
+    description: "Review and approve intercompany payment notifications",
+    path: "/intercompany-requests",
+    icon: ArrowRight,
+  },
 ];
 
 const posPages: PageEntry[] = [
@@ -205,22 +380,27 @@ function navItemToEntry(item: NavItem): PageEntry {
   };
 }
 
-function buildEntries(
-  sections: NavSection[],
-  extras: PageEntry[] = [],
-  extraNavItems: NavItem[] = [],
-): PageEntry[] {
+function buildEntries(sections: NavSection[], extras: PageEntry[] = [], extraNavItems: NavItem[] = []): PageEntry[] {
   const seen = new Set<string>();
   const out: PageEntry[] = [];
   for (const e of extras) {
-    if (!seen.has(e.path)) { seen.add(e.path); out.push(e); }
+    if (!seen.has(e.path)) {
+      seen.add(e.path);
+      out.push(e);
+    }
   }
   for (const item of extraNavItems) {
-    if (!seen.has(item.url)) { seen.add(item.url); out.push(navItemToEntry(item)); }
+    if (!seen.has(item.url)) {
+      seen.add(item.url);
+      out.push(navItemToEntry(item));
+    }
   }
   for (const section of sections) {
     for (const item of section.items) {
-      if (!seen.has(item.url)) { seen.add(item.url); out.push(navItemToEntry(item)); }
+      if (!seen.has(item.url)) {
+        seen.add(item.url);
+        out.push(navItemToEntry(item));
+      }
     }
   }
   return out;
@@ -238,9 +418,7 @@ function PaletteItem({ page, onSelect }: { page: PageEntry; onSelect: (path: str
       <Icon className="mr-2 h-4 w-4 text-muted-foreground" />
       <div className="flex flex-col">
         <span>{page.label}</span>
-        {page.description && (
-          <span className="text-xs text-muted-foreground">{page.description}</span>
-        )}
+        {page.description && <span className="text-xs text-muted-foreground">{page.description}</span>}
       </div>
     </CommandItem>
   );
@@ -293,11 +471,13 @@ export function CommandPalette({
   const factoryVis = useFactoryVisibleSections(hasFactoryAccess && !isPOS ? user : undefined);
 
   const erpPages = useMemo(
-    () => buildEntries(erpVis.sections, [...ERP_EXTRAS, ...ERP_HUB_TABS], [
-      ...erpVis.visiblePinnedItems,
-      ...erpVis.visibleUtilityItems,
-    ]),
-    [erpVis.sections, erpVis.visiblePinnedItems, erpVis.visibleUtilityItems],
+    () =>
+      buildEntries(
+        erpVis.sections,
+        [...ERP_EXTRAS, ...ERP_HUB_TABS],
+        [...erpVis.visiblePinnedItems, ...erpVis.visibleUtilityItems]
+      ),
+    [erpVis.sections, erpVis.visiblePinnedItems, erpVis.visibleUtilityItems]
   );
 
   const factoryPages = useMemo(() => {
@@ -305,14 +485,9 @@ export function CommandPalette({
   }, [factoryVis.sections]);
 
   const propertiesPages = useMemo(
-    () => buildEntries(
-      PROPERTIES_NAV_SECTIONS,
-      [
-        ...PROPERTIES_EXTRAS,
-        ...(isAdminOwner ? PROPERTIES_ADMIN_EXTRAS : []),
-      ],
-    ),
-    [isAdminOwner],
+    () =>
+      buildEntries(PROPERTIES_NAV_SECTIONS, [...PROPERTIES_EXTRAS, ...(isAdminOwner ? PROPERTIES_ADMIN_EXTRAS : [])]),
+    [isAdminOwner]
   );
 
   const showErp = !isPOS && hasErpAccess;
@@ -330,13 +505,17 @@ export function CommandPalette({
 
         {isPOS && (
           <CommandGroup heading="POS">
-            {posPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
+            {posPages.map((p) => (
+              <PaletteItem key={p.path} page={p} onSelect={navigate} />
+            ))}
           </CommandGroup>
         )}
 
         {showErp && (
           <CommandGroup heading="ERP">
-            {erpPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
+            {erpPages.map((p) => (
+              <PaletteItem key={p.path} page={p} onSelect={navigate} />
+            ))}
           </CommandGroup>
         )}
 
@@ -344,7 +523,9 @@ export function CommandPalette({
 
         {showFactory && (
           <CommandGroup heading="Factory">
-            {factoryPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
+            {factoryPages.map((p) => (
+              <PaletteItem key={p.path} page={p} onSelect={navigate} />
+            ))}
           </CommandGroup>
         )}
 
@@ -352,7 +533,9 @@ export function CommandPalette({
 
         {showProperties && (
           <CommandGroup heading="Properties">
-            {propertiesPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
+            {propertiesPages.map((p) => (
+              <PaletteItem key={p.path} page={p} onSelect={navigate} />
+            ))}
           </CommandGroup>
         )}
 
@@ -360,13 +543,17 @@ export function CommandPalette({
 
         {showAdmin && (
           <CommandGroup heading="Admin & Settings">
-            {adminPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
+            {adminPages.map((p) => (
+              <PaletteItem key={p.path} page={p} onSelect={navigate} />
+            ))}
           </CommandGroup>
         )}
 
         <CommandSeparator />
         <CommandGroup heading="Intercompany">
-          {intercompanyPages.map((p) => <PaletteItem key={p.path} page={p} onSelect={navigate} />)}
+          {intercompanyPages.map((p) => (
+            <PaletteItem key={p.path} page={p} onSelect={navigate} />
+          ))}
         </CommandGroup>
 
         <CommandSeparator />

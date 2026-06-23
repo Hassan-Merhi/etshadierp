@@ -60,8 +60,12 @@ export function KpiCards({
           </div>
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-0.5">Free Available</p>
-            <p className="text-2xl font-bold font-mono tabular-nums leading-tight text-emerald-600 dark:text-emerald-400" data-testid="text-total-free">
-              {fmtKg(totalFree)} <span className="text-sm font-medium text-emerald-600/70 dark:text-emerald-400/70">kg</span>
+            <p
+              className="text-2xl font-bold font-mono tabular-nums leading-tight text-emerald-600 dark:text-emerald-400"
+              data-testid="text-total-free"
+            >
+              {fmtKg(totalFree)}{" "}
+              <span className="text-sm font-medium text-emerald-600/70 dark:text-emerald-400/70">kg</span>
             </p>
             <p className="text-xs text-muted-foreground font-mono mt-0.5" data-testid="text-total-value">
               Stock Value: <span className="text-foreground font-semibold">${formatNumber(totalValue)}</span>

@@ -83,17 +83,53 @@ export default function CustomerInvoices() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "DRAFT":
-        return <Badge variant="secondary" data-testid={`badge-status-draft`}>Draft</Badge>;
+        return (
+          <Badge variant="secondary" data-testid={`badge-status-draft`}>
+            Draft
+          </Badge>
+        );
       case "LOADING":
-        return <Badge variant="outline" className="border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-400" data-testid={`badge-status-loading`}>Loading</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="border-blue-300 text-blue-700 dark:border-blue-600 dark:text-blue-400"
+            data-testid={`badge-status-loading`}
+          >
+            Loading
+          </Badge>
+        );
       case "PENDING_VERIFICATION":
-        return <Badge variant="outline" className="border-yellow-300 text-yellow-700 dark:border-yellow-600 dark:text-yellow-400" data-testid={`badge-status-pending`}>Pending Verification</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="border-yellow-300 text-yellow-700 dark:border-yellow-600 dark:text-yellow-400"
+            data-testid={`badge-status-pending`}
+          >
+            Pending Verification
+          </Badge>
+        );
       case "VERIFIED":
-        return <Badge variant="outline" className="border-green-300 text-green-700 dark:border-green-600 dark:text-green-400" data-testid={`badge-status-verified`}>Verified</Badge>;
+        return (
+          <Badge
+            variant="outline"
+            className="border-green-300 text-green-700 dark:border-green-600 dark:text-green-400"
+            data-testid={`badge-status-verified`}
+          >
+            Verified
+          </Badge>
+        );
       case "FINALIZED":
-        return <Badge variant="default" data-testid={`badge-status-finalized`}>Finalized</Badge>;
+        return (
+          <Badge variant="default" data-testid={`badge-status-finalized`}>
+            Finalized
+          </Badge>
+        );
       case "CANCELLED":
-        return <Badge variant="destructive" data-testid={`badge-status-cancelled`}>Cancelled</Badge>;
+        return (
+          <Badge variant="destructive" data-testid={`badge-status-cancelled`}>
+            Cancelled
+          </Badge>
+        );
       default:
         return <Badge variant="secondary">{status}</Badge>;
     }
@@ -170,7 +206,11 @@ export default function CustomerInvoices() {
             <TableBody>
               {orders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8" data-testid="text-no-orders">
+                  <TableCell
+                    colSpan={8}
+                    className="text-center text-muted-foreground py-8"
+                    data-testid="text-no-orders"
+                  >
                     No invoices found
                   </TableCell>
                 </TableRow>
@@ -185,25 +225,30 @@ export default function CustomerInvoices() {
                     <TableCell className="font-mono" data-testid={`text-invoice-number-${order.id}`}>
                       {order.invoiceNumber || `Draft #${order.id}`}
                     </TableCell>
-                    <TableCell data-testid={`text-customer-name-${order.id}`}>
-                      {order.customerName}
-                    </TableCell>
+                    <TableCell data-testid={`text-customer-name-${order.id}`}>{order.customerName}</TableCell>
                     <TableCell className="font-mono text-sm" data-testid={`text-order-date-${order.id}`}>
                       {order.orderDate ? formatDisplayDate(order.orderDate) : "-"}
                     </TableCell>
-                    <TableCell>
-                      {getStatusBadge(order.status)}
-                    </TableCell>
+                    <TableCell>{getStatusBadge(order.status)}</TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-total-bales-${order.id}`}>
                       {order.totalQtyBales ?? "-"}
                     </TableCell>
                     <TableCell className="text-right font-mono" data-testid={`text-total-weight-${order.id}`}>
                       {parseFloat(order.totalWeightKg || "0") > 0
-                        ? parseFloat(order.totalWeightKg!).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+                        ? parseFloat(order.totalWeightKg!).toLocaleString(undefined, {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 2,
+                          })
                         : "-"}
                     </TableCell>
-                    <TableCell className="text-right font-mono font-semibold" data-testid={`text-grand-total-${order.id}`}>
-                      {parseFloat(order.grandTotal || "0").toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                    <TableCell
+                      className="text-right font-mono font-semibold"
+                      data-testid={`text-grand-total-${order.id}`}
+                    >
+                      {parseFloat(order.grandTotal || "0").toLocaleString(undefined, {
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 2,
+                      })}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -218,11 +263,7 @@ export default function CustomerInvoices() {
                         {order.status !== "FINALIZED" && (
                           <ConfirmDialog
                             trigger={
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                data-testid={`button-delete-order-${order.id}`}
-                              >
+                              <Button variant="ghost" size="icon" data-testid={`button-delete-order-${order.id}`}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             }

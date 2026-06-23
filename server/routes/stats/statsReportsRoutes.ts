@@ -5,35 +5,97 @@ import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } 
 import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory } from "../_helpers";
 import { getClientDate } from "../../lib/dateUtils";
 import {
-  inventory, stockItems, stockGroups,
-  stockTransferVouchers, stockTransferItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems,
-  bankAccounts, fixedAssets, ledgerAccounts, insertLedgerAccountSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertContainerSchema,
-  insertStockTransferVoucherSchema, insertStockAdjustmentVoucherSchema,
-  updateStockTransferSchema, updateStockAdjustmentSchema,
-  vouchers, voucherEntries, salesItems, suppliers, customers, customerBalances,
-  employees, locations, userLocations, userCompanyRoles, companies,
-  auditLog, users, FEATURE_KEYS, companySettings,
-  purchaseOrders, poLineItems, interCompanyTransfers,
-  insertInterCompanyTransferSchema, insertContainerSaleSchema, containerSales,
-  insertUserPreferencesSchema, userPreferences,
-  insertDraftPosSaleSchema, InsertDraftPosSale,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  fiscalPeriodClosures, wasteDispatches, wasteDispatchItems,
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  inventory,
+  stockItems,
+  stockGroups,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  bankAccounts,
+  fixedAssets,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertContainerSchema,
+  insertStockTransferVoucherSchema,
+  insertStockAdjustmentVoucherSchema,
+  updateStockTransferSchema,
+  updateStockAdjustmentSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  suppliers,
+  customers,
+  customerBalances,
+  employees,
+  locations,
+  userLocations,
+  userCompanyRoles,
+  companies,
+  auditLog,
+  users,
+  FEATURE_KEYS,
+  companySettings,
+  purchaseOrders,
+  poLineItems,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  insertContainerSaleSchema,
+  containerSales,
+  insertUserPreferencesSchema,
+  userPreferences,
+  insertDraftPosSaleSchema,
+  InsertDraftPosSale,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, pendingBarcodes, insertPendingBarcodeSchema,
-  bales, baleProducts, baleProductCategories, storedFiles,
-  stockItemLocationPrices, exchangeRates,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  storedFiles,
+  stockItemLocationPrices,
+  exchangeRates,
   factoryWorkerAdvances,
-  propertyContracts, propertyMonthlyLedger, propertyPayments,
+  propertyContracts,
+  propertyMonthlyLedger,
+  propertyPayments,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -52,7 +114,10 @@ const _statCache = new Map<string, { data: any; expiresAt: number }>();
 function _getCached(key: string): any | null {
   const e = _statCache.get(key);
   if (!e) return null;
-  if (Date.now() > e.expiresAt) { _statCache.delete(key); return null; }
+  if (Date.now() > e.expiresAt) {
+    _statCache.delete(key);
+    return null;
+  }
   return e.data;
 }
 function _setCached(key: string, data: any, ttlMs = 30_000): void {
@@ -60,10 +125,11 @@ function _setCached(key: string, data: any, ttlMs = 30_000): void {
   // Prune stale entries to prevent unbounded growth (> 500 entries is unusual)
   if (_statCache.size > 500) {
     const now = Date.now();
-    for (const [k, v] of _statCache) { if (v.expiresAt < now) _statCache.delete(k); }
+    for (const [k, v] of _statCache) {
+      if (v.expiresAt < now) _statCache.delete(k);
+    }
   }
 }
-
 
 export function registerStatsReportsRoutes(app: Express) {
   app.get("/api/reports/sales", requireAuth, requireNonPOS, async (req, res) => {
@@ -84,9 +150,7 @@ export function registerStatsReportsRoutes(app: Express) {
         conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
       }
       if (locationId) {
-        conditions.push(
-          eq(vouchers.locationId, parseInt(locationId as string)),
-        );
+        conditions.push(eq(vouchers.locationId, parseInt(locationId as string)));
       }
 
       let salesQuery = db
@@ -116,27 +180,13 @@ export function registerStatsReportsRoutes(app: Express) {
 
       // Filter by stock group if provided
       if (stockGroupId) {
-        salesData = salesData.filter(
-          (s) => s.stockGroupId === parseInt(stockGroupId as string),
-        );
+        salesData = salesData.filter((s) => s.stockGroupId === parseInt(stockGroupId as string));
       }
 
-      const totalQuantity = salesData.reduce(
-        (sum, item) => sum + parseFloat(item.quantity),
-        0,
-      );
-      const totalSales = salesData.reduce(
-        (sum, item) => sum + parseFloat(item.totalSales),
-        0,
-      );
-      const totalCost = salesData.reduce(
-        (sum, item) => sum + parseFloat(item.totalCost),
-        0,
-      );
-      const totalProfit = salesData.reduce(
-        (sum, item) => sum + parseFloat(item.profit),
-        0,
-      );
+      const totalQuantity = salesData.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
+      const totalSales = salesData.reduce((sum, item) => sum + parseFloat(item.totalSales), 0);
+      const totalCost = salesData.reduce((sum, item) => sum + parseFloat(item.totalCost), 0);
+      const totalProfit = salesData.reduce((sum, item) => sum + parseFloat(item.profit), 0);
 
       res.json({
         items: salesData,
@@ -145,8 +195,7 @@ export function registerStatsReportsRoutes(app: Express) {
           totalSales,
           totalCost,
           totalProfit,
-          grossProfitMargin:
-            totalSales > 0 ? (totalProfit / totalSales) * 100 : 0,
+          grossProfitMargin: totalSales > 0 ? (totalProfit / totalSales) * 100 : 0,
         },
         filters: {
           startDate: startDate || null,
@@ -175,18 +224,14 @@ export function registerStatsReportsRoutes(app: Express) {
 
       // Filter by stock group if provided
       const stockItemsToReport = stockGroupId
-        ? allStockItems.filter(
-            (item) => item.stockGroupId === parseInt(stockGroupId as string),
-          )
+        ? allStockItems.filter((item) => item.stockGroupId === parseInt(stockGroupId as string))
         : allStockItems;
 
       // Get all inventory records
       const inventoryConditions = [eq(locations.companyId, companyId)];
 
       if (locationId) {
-        inventoryConditions.push(
-          eq(inventory.locationId, parseInt(locationId as string)),
-        );
+        inventoryConditions.push(eq(inventory.locationId, parseInt(locationId as string)));
       }
 
       const inventoryRecords = await db
@@ -214,13 +259,10 @@ export function registerStatsReportsRoutes(app: Express) {
       const movementData = stockItemsToReport
         .map((item) => {
           const itemInventory = inventoryByItem.get(item.id) || [];
-          const totalQuantity = itemInventory.reduce(
-            (sum, inv) => sum + parseFloat(inv.quantity),
-            0,
-          );
+          const totalQuantity = itemInventory.reduce((sum, inv) => sum + parseFloat(inv.quantity), 0);
           const totalValue = itemInventory.reduce(
             (sum, inv) => sum + parseFloat(inv.quantity) * parseFloat(inv.averageRate),
-            0,
+            0
           );
 
           return {
@@ -244,14 +286,8 @@ export function registerStatsReportsRoutes(app: Express) {
         })
         .filter((item) => item.totalQuantity > 0);
 
-      const grandTotalQuantity = movementData.reduce(
-        (sum, item) => sum + item.totalQuantity,
-        0,
-      );
-      const grandTotalValue = movementData.reduce(
-        (sum, item) => sum + item.totalValue,
-        0,
-      );
+      const grandTotalQuantity = movementData.reduce((sum, item) => sum + item.totalQuantity, 0);
+      const grandTotalValue = movementData.reduce((sum, item) => sum + item.totalValue, 0);
 
       res.json({
         items: movementData,
@@ -294,7 +330,8 @@ export function registerStatsReportsRoutes(app: Express) {
           const userCompanies = await storage.getUserCompaniesWithRoles(req.user!.id);
           companyIds = userCompanies.map((uc) => uc.companyId);
         }
-        companyCondition = companyIds.length > 0 ? inArray(containers.companyId, companyIds) : eq(containers.companyId, companyId);
+        companyCondition =
+          companyIds.length > 0 ? inArray(containers.companyId, companyIds) : eq(containers.companyId, companyId);
       } else if (specificCompanyId) {
         companyCondition = eq(containers.companyId, parseInt(specificCompanyId as string));
       } else {
@@ -312,9 +349,7 @@ export function registerStatsReportsRoutes(app: Express) {
         conditions.push(eq(containers.status, dbStatus));
       }
       if (supplierId) {
-        conditions.push(
-          eq(containers.supplierId, parseInt(supplierId as string)),
-        );
+        conditions.push(eq(containers.supplierId, parseInt(supplierId as string)));
       }
 
       // Date filtering — offloaded containers use offloadDate; OTW use importDate
@@ -344,20 +379,13 @@ export function registerStatsReportsRoutes(app: Express) {
         .innerJoin(suppliers, eq(containers.supplierId, suppliers.id))
         .innerJoin(companies, eq(containers.companyId, companies.id))
         .where(and(...conditions))
-        .orderBy(isOffloaded ? sql`${containers.offloadDate} DESC NULLS LAST` : sql`${containers.importDate} DESC NULLS LAST`);
+        .orderBy(
+          isOffloaded ? sql`${containers.offloadDate} DESC NULLS LAST` : sql`${containers.importDate} DESC NULLS LAST`
+        );
 
-      const totalItemsTotal = containerData.reduce(
-        (sum, c) => sum + parseFloat(c.itemsTotal || "0"),
-        0,
-      );
-      const totalChargesTotal = containerData.reduce(
-        (sum, c) => sum + parseFloat(c.chargesTotal || "0"),
-        0,
-      );
-      const totalGrandTotal = containerData.reduce(
-        (sum, c) => sum + parseFloat(c.grandTotal || "0"),
-        0,
-      );
+      const totalItemsTotal = containerData.reduce((sum, c) => sum + parseFloat(c.itemsTotal || "0"), 0);
+      const totalChargesTotal = containerData.reduce((sum, c) => sum + parseFloat(c.chargesTotal || "0"), 0);
+      const totalGrandTotal = containerData.reduce((sum, c) => sum + parseFloat(c.grandTotal || "0"), 0);
 
       res.json({
         containers: containerData,
@@ -392,18 +420,10 @@ export function registerStatsReportsRoutes(app: Express) {
       // Get all ledger accounts
       const companyAccounts = await storage.getAllLedgerAccounts(companyId, true); // Include hidden accounts for financial calculations
 
-      const incomeAccountIds = companyAccounts
-        .filter((acc) => acc.accountType === "Income")
-        .map((acc) => acc.id);
-      const expenseAccountIds = companyAccounts
-        .filter((acc) => acc.accountType === "Expense")
-        .map((acc) => acc.id);
-      const assetAccountIds = companyAccounts
-        .filter((acc) => acc.accountType === "Asset")
-        .map((acc) => acc.id);
-      const liabilityAccountIds = companyAccounts
-        .filter((acc) => acc.accountType === "Liability")
-        .map((acc) => acc.id);
+      const incomeAccountIds = companyAccounts.filter((acc) => acc.accountType === "Income").map((acc) => acc.id);
+      const expenseAccountIds = companyAccounts.filter((acc) => acc.accountType === "Expense").map((acc) => acc.id);
+      const assetAccountIds = companyAccounts.filter((acc) => acc.accountType === "Asset").map((acc) => acc.id);
+      const liabilityAccountIds = companyAccounts.filter((acc) => acc.accountType === "Liability").map((acc) => acc.id);
 
       const _ratiosCacheKey = `ratios:${companyId}:${startDate ?? ""}:${endDate ?? ""}`;
       const _ratiosCached = _getCached(_ratiosCacheKey);
@@ -474,28 +494,16 @@ export function registerStatsReportsRoutes(app: Express) {
         .where(and(...salesConditions))
         .execute();
 
-      const totalSales = salesData.reduce(
-        (sum, s) => sum + parseFloat(s.totalSales),
-        0,
-      );
-      const totalCost = salesData.reduce(
-        (sum, s) => sum + parseFloat(s.totalCost),
-        0,
-      );
+      const totalSales = salesData.reduce((sum, s) => sum + parseFloat(s.totalSales), 0);
+      const totalCost = salesData.reduce((sum, s) => sum + parseFloat(s.totalCost), 0);
       const grossProfit = totalSales - totalCost;
 
       // Calculate ratios
       const netProfit = totalIncome - totalExpenses;
-      const grossProfitMargin =
-        totalSales > 0 ? (grossProfit / totalSales) * 100 : 0;
-      const netProfitMargin =
-        totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
-      const currentRatio =
-        totalLiabilities > 0 ? totalAssets / totalLiabilities : 0;
-      const debtToEquity =
-        totalAssets - totalLiabilities > 0
-          ? totalLiabilities / (totalAssets - totalLiabilities)
-          : 0;
+      const grossProfitMargin = totalSales > 0 ? (grossProfit / totalSales) * 100 : 0;
+      const netProfitMargin = totalIncome > 0 ? (netProfit / totalIncome) * 100 : 0;
+      const currentRatio = totalLiabilities > 0 ? totalAssets / totalLiabilities : 0;
+      const debtToEquity = totalAssets - totalLiabilities > 0 ? totalLiabilities / (totalAssets - totalLiabilities) : 0;
 
       const _ratiosResult = {
         ratios: {
@@ -539,10 +547,10 @@ export function registerStatsReportsRoutes(app: Express) {
 
       // Get all stock groups for the company
       const allStockGroups = await storage.getAllStockGroups(companyId);
-      
+
       // Get all stock items for the company
       const allStockItems = await storage.getAllStockItems(companyId);
-      
+
       // Get inventory data with optional location filter
       // IMPORTANT: Use innerJoin + active=true to exclude inventory from deleted/inactive locations
       let inventoryData;
@@ -576,12 +584,7 @@ export function registerStatsReportsRoutes(app: Express) {
           })
           .from(inventory)
           .innerJoin(locations, eq(inventory.locationId, locations.id))
-          .where(
-            and(
-              eq(inventory.companyId, companyId),
-              eq(locations.active, true)
-            )
-          )
+          .where(and(eq(inventory.companyId, companyId), eq(locations.active, true)))
           .execute();
       }
 
@@ -592,7 +595,7 @@ export function registerStatsReportsRoutes(app: Express) {
         const qty = parseFloat(inv.quantity) || 0;
         const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
-        
+
         if (inventoryByItem.has(inv.stockItemId)) {
           const existing = inventoryByItem.get(inv.stockItemId)!;
           existing.quantity += qty;
@@ -606,50 +609,52 @@ export function registerStatsReportsRoutes(app: Express) {
       }
 
       // Build stock groups summary
-      const stockGroupSummary = allStockGroups.map((group) => {
-        // Get items in this group
-        const groupItems = allStockItems.filter((item) => item.stockGroupId === group.id);
-        
-        // Calculate opening balance from stock items
-        let openingQty = 0;
-        let openingValue = 0;
-        
-        // Calculate closing balance from inventory
-        let closingQty = 0;
-        let closingValue = 0;
+      const stockGroupSummary = allStockGroups
+        .map((group) => {
+          // Get items in this group
+          const groupItems = allStockItems.filter((item) => item.stockGroupId === group.id);
 
-        for (const item of groupItems) {
-          // Opening balance from stock item master data
-          const itemOpeningQty = parseFloat(item.openingQty || "0");
-          const itemOpeningValue = parseFloat(item.openingValue || "0");
-          openingQty += itemOpeningQty;
-          openingValue += itemOpeningValue;
+          // Calculate opening balance from stock items
+          let openingQty = 0;
+          let openingValue = 0;
 
-          // Closing balance from current inventory
-          const inv = inventoryByItem.get(item.id);
-          if (inv) {
-            closingQty += inv.quantity;
-            closingValue += inv.totalValue;
+          // Calculate closing balance from inventory
+          let closingQty = 0;
+          let closingValue = 0;
+
+          for (const item of groupItems) {
+            // Opening balance from stock item master data
+            const itemOpeningQty = parseFloat(item.openingQty || "0");
+            const itemOpeningValue = parseFloat(item.openingValue || "0");
+            openingQty += itemOpeningQty;
+            openingValue += itemOpeningValue;
+
+            // Closing balance from current inventory
+            const inv = inventoryByItem.get(item.id);
+            if (inv) {
+              closingQty += inv.quantity;
+              closingValue += inv.totalValue;
+            }
           }
-        }
 
-        return {
-          id: group.id,
-          code: group.code,
-          name: group.name,
-          opening: {
-            quantity: openingQty,
-            rate: openingQty > 0 ? openingValue / openingQty : 0,
-            value: openingValue,
-          },
-          closing: {
-            quantity: closingQty,
-            rate: closingQty > 0 ? closingValue / closingQty : 0,
-            value: closingValue,
-          },
-          itemCount: groupItems.length,
-        };
-      }).filter((g) => g.opening.quantity > 0 || g.closing.quantity > 0);
+          return {
+            id: group.id,
+            code: group.code,
+            name: group.name,
+            opening: {
+              quantity: openingQty,
+              rate: openingQty > 0 ? openingValue / openingQty : 0,
+              value: openingValue,
+            },
+            closing: {
+              quantity: closingQty,
+              rate: closingQty > 0 ? closingValue / closingQty : 0,
+              value: closingValue,
+            },
+            itemCount: groupItems.length,
+          };
+        })
+        .filter((g) => g.opening.quantity > 0 || g.closing.quantity > 0);
 
       // Calculate grand totals
       const grandTotal = {
@@ -671,9 +676,10 @@ export function registerStatsReportsRoutes(app: Express) {
         },
         notes: {
           opening: "Opening balances are from stock item master data (not location-specific)",
-          closing: locationId && locationId !== "all" 
-            ? "Closing balances are filtered by the selected location" 
-            : "Closing balances are aggregated across all locations",
+          closing:
+            locationId && locationId !== "all"
+              ? "Closing balances are filtered by the selected location"
+              : "Closing balances are aggregated across all locations",
         },
       });
     } catch (error: any) {
@@ -696,18 +702,13 @@ export function registerStatsReportsRoutes(app: Express) {
       const groupItems = await db
         .select()
         .from(stockItems)
-        .where(
-          and(
-            eq(stockItems.companyId, companyId),
-            eq(stockItems.stockGroupId, parseInt(stockGroupId))
-          )
-        )
+        .where(and(eq(stockItems.companyId, companyId), eq(stockItems.stockGroupId, parseInt(stockGroupId))))
         .execute();
 
       // Get inventory data for these items
       // IMPORTANT: Use innerJoin + active=true to exclude inventory from deleted/inactive locations
       const itemIds = groupItems.map((i) => i.id);
-      
+
       let inventoryData: any[] = [];
       if (itemIds.length > 0) {
         const conditions = [
@@ -718,7 +719,7 @@ export function registerStatsReportsRoutes(app: Express) {
         if (locationId && locationId !== "all") {
           conditions.push(eq(inventory.locationId, parseInt(locationId as string)));
         }
-        
+
         inventoryData = await db
           .select({
             stockItemId: inventory.stockItemId,
@@ -738,7 +739,7 @@ export function registerStatsReportsRoutes(app: Express) {
         const qty = parseFloat(inv.quantity) || 0;
         const rate = parseFloat(inv.averageRate) || 0;
         const val = qty * rate;
-        
+
         if (inventoryByItem.has(inv.stockItemId)) {
           const existing = inventoryByItem.get(inv.stockItemId)!;
           existing.quantity += qty;
@@ -752,33 +753,35 @@ export function registerStatsReportsRoutes(app: Express) {
       }
 
       // Build items with opening and closing balances
-      const items = groupItems.map((item) => {
-        const openingQty = parseFloat(item.openingQty || "0");
-        const openingRate = parseFloat(item.openingRate || "0");
-        const openingValue = parseFloat(item.openingValue || "0");
+      const items = groupItems
+        .map((item) => {
+          const openingQty = parseFloat(item.openingQty || "0");
+          const openingRate = parseFloat(item.openingRate || "0");
+          const openingValue = parseFloat(item.openingValue || "0");
 
-        const inv = inventoryByItem.get(item.id);
-        const closingQty = inv?.quantity || 0;
-        const closingValue = inv?.totalValue || 0;
-        const closingRate = closingQty > 0 ? closingValue / closingQty : 0;
+          const inv = inventoryByItem.get(item.id);
+          const closingQty = inv?.quantity || 0;
+          const closingValue = inv?.totalValue || 0;
+          const closingRate = closingQty > 0 ? closingValue / closingQty : 0;
 
-        return {
-          id: item.id,
-          code: item.code,
-          name: item.name,
-          uom: item.uom,
-          opening: {
-            quantity: openingQty,
-            rate: openingRate,
-            value: openingValue,
-          },
-          closing: {
-            quantity: closingQty,
-            rate: closingRate,
-            value: closingValue,
-          },
-        };
-      }).filter((i) => i.opening.quantity > 0 || i.closing.quantity > 0);
+          return {
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            uom: item.uom,
+            opening: {
+              quantity: openingQty,
+              rate: openingRate,
+              value: openingValue,
+            },
+            closing: {
+              quantity: closingQty,
+              rate: closingRate,
+              value: closingValue,
+            },
+          };
+        })
+        .filter((i) => i.opening.quantity > 0 || i.closing.quantity > 0);
 
       // Calculate totals
       const grandTotal = {
@@ -798,11 +801,13 @@ export function registerStatsReportsRoutes(app: Express) {
       res.json({
         items,
         grandTotal,
-        stockGroup: stockGroup ? {
-          id: stockGroup.id,
-          code: stockGroup.code,
-          name: stockGroup.name,
-        } : null,
+        stockGroup: stockGroup
+          ? {
+              id: stockGroup.id,
+              code: stockGroup.code,
+              name: stockGroup.name,
+            }
+          : null,
       });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

@@ -19,12 +19,7 @@ import { apiRequest, queryClient, getAppDate } from "@/lib/queryClient";
 import { useCurrencyContext, type Currency } from "@/contexts/CurrencyContext";
 import { useToast } from "@/hooks/use-toast";
 import { useReactToPrint } from "react-to-print";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 
 import { SaleGrid } from "./pos-components/SaleGrid";
 import { InventoryPicker } from "./pos-components/InventoryPicker";
@@ -96,19 +91,27 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const activeLocation = posUser ? posSelectedLocation : selectedLocation;
 
-  const { data: apiInventory = [], isLoading: inventoryLoading, error: inventoryError } = useQuery<APIInventoryItem[]>({
+  const {
+    data: apiInventory = [],
+    isLoading: inventoryLoading,
+    error: inventoryError,
+  } = useQuery<APIInventoryItem[]>({
     queryKey: activeLocation ? [`/api/locations/${activeLocation.id}/inventory`] : [],
     enabled: !!activeLocation,
   });
 
-  const inventory = useMemo(() => (Array.isArray(apiInventory) ? apiInventory : []).map((item) => ({
-    code: (item.stockItemCode || "").trim(),
-    name: (item.stockItemName || "Unknown Item").trim(),
-    stock: parseFloat(item.quantity),
-    price: parseFloat(item.lastSellingPrice || item.averageRate),
-    configuredPrice: parseFloat(item.lastSellingPrice || "0"),
-    stockItemId: item.stockItemId,
-  })), [apiInventory]);
+  const inventory = useMemo(
+    () =>
+      (Array.isArray(apiInventory) ? apiInventory : []).map((item) => ({
+        code: (item.stockItemCode || "").trim(),
+        name: (item.stockItemName || "Unknown Item").trim(),
+        stock: parseFloat(item.quantity),
+        price: parseFloat(item.lastSellingPrice || item.averageRate),
+        configuredPrice: parseFloat(item.lastSellingPrice || "0"),
+        stockItemId: item.stockItemId,
+      })),
+    [apiInventory]
+  );
 
   const { data: bankAccounts = [] } = useQuery<any[]>({
     queryKey: ["/api/bank-accounts"],
@@ -120,8 +123,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     enabled: !!activeLocation,
   });
 
-  const cashLedgerAccounts = useMemo(() => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Cash"), [allLedgerAccounts]);
-  const customerAccounts = useMemo(() => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Asset"), [allLedgerAccounts]);
+  const cashLedgerAccounts = useMemo(
+    () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Cash"),
+    [allLedgerAccounts]
+  );
+  const customerAccounts = useMemo(
+    () => (Array.isArray(allLedgerAccounts) ? allLedgerAccounts : []).filter((acc: any) => acc.accountType === "Asset"),
+    [allLedgerAccounts]
+  );
 
   const { data: drafts = [], refetch: refetchDrafts } = useQuery<any[]>({
     queryKey: activeLocation ? [`/api/pos/drafts?locationId=${activeLocation.id}`] : [],
@@ -152,7 +161,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const activeCurrency: Currency = displayCurrency ? selectedCurrency : "USD";
   const exchangeRate = dailyExchangeRate;
-  const selectedCustomer = isCreditSale && selectedCustomerId ? posCustomers.find((c: any) => String(c.id) === selectedCustomerId) : null;
+  const selectedCustomer =
+    isCreditSale && selectedCustomerId ? posCustomers.find((c: any) => String(c.id) === selectedCustomerId) : null;
 
   useEffect(() => {
     if (posUser && posAssignedLocations.length > 0 && !posSelectedLocation) {
@@ -215,11 +225,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
   };
 
   const selectItem = (item: any, targetRowOverride?: number) => {
-    const targetRow = targetRowOverride ?? activeRow ?? rows.findIndex(r => !r.itemName);
+    const targetRow = targetRowOverride ?? activeRow ?? rows.findIndex((r) => !r.itemName);
     const newRows = [...rows];
     const rateUSD = lastSoldPrices[item.stockItemId] ? parseFloat(lastSoldPrices[item.stockItemId]) : item.price;
     const displayRate = activeCurrency === "CFA" ? Math.round(rateUSD * exchangeRate) : rateUSD;
-    
+
     newRows[targetRow] = {
       ...newRows[targetRow],
       itemName: item.name,
@@ -279,7 +289,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       <div className="flex flex-col items-center justify-center h-full p-8 gap-6">
         <h1 className="text-3xl font-bold">Point of Sale</h1>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-4xl">
-          {allLocations.map(loc => (
+          {allLocations.map((loc) => (
             <Card key={loc.id} className="p-6 cursor-pointer hover-elevate" onClick={() => setSelectedLocation(loc)}>
               <h3 className="text-lg font-bold">{loc.name}</h3>
             </Card>
@@ -289,19 +299,31 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
     );
   }
 
-  const formatDisplayAmount = (v: number) => activeCurrency === "CFA" ? `CFA ${Math.round(v).toLocaleString()}` : `$ ${v.toLocaleString()}`;
-  const validItemCount = rows.filter(r => r.amount > 0).length;
+  const formatDisplayAmount = (v: number) =>
+    activeCurrency === "CFA" ? `CFA ${Math.round(v).toLocaleString()}` : `$ ${v.toLocaleString()}`;
+  const validItemCount = rows.filter((r) => r.amount > 0).length;
 
   return (
     <div className="flex flex-col h-full bg-background overflow-hidden relative pb-20 md:pb-0">
       <POSHeader
-        posUser={posUser} editVoucherId={editVoucherId} activeLocation={activeLocation}
-        posAssignedLocations={posAssignedLocations} posSelectedLocation={posSelectedLocation} setPosSelectedLocation={setPosSelectedLocation}
-        allLocations={allLocations} setSelectedLocation={setSelectedLocation}
+        posUser={posUser}
+        editVoucherId={editVoucherId}
+        activeLocation={activeLocation}
+        posAssignedLocations={posAssignedLocations}
+        posSelectedLocation={posSelectedLocation}
+        setPosSelectedLocation={setPosSelectedLocation}
+        allLocations={allLocations}
+        setSelectedLocation={setSelectedLocation}
         hasOpenShift={!posUser || (!!currentShift && currentShift.status === "open")}
-        currentShift={currentShift} showPosImport={!posUser || companySettings?.posExcelImportEnabled}
-        onExportInventory={() => {}} onImportClick={() => {}} onShowStockReport={() => setShowStockPrompt(true)} navigate={navigate}
-        saveMutation={saveMutation} hasValidItems={hasValidItems} handleSaveSale={handleSaveSale}
+        currentShift={currentShift}
+        showPosImport={!posUser || companySettings?.posExcelImportEnabled}
+        onExportInventory={() => {}}
+        onImportClick={() => {}}
+        onShowStockReport={() => setShowStockPrompt(true)}
+        navigate={navigate}
+        saveMutation={saveMutation}
+        hasValidItems={hasValidItems}
+        handleSaveSale={handleSaveSale}
       />
 
       {/* Inline checkout strip */}
@@ -312,7 +334,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             <Select
               value={activeLocation?.id?.toString()}
               onValueChange={(val) => {
-                const loc = allLocations.find(l => l.id.toString() === val);
+                const loc = allLocations.find((l) => l.id.toString() === val);
                 if (loc) setSelectedLocation(loc);
               }}
             >
@@ -322,7 +344,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               </SelectTrigger>
               <SelectContent>
                 {allLocations.map((loc) => (
-                  <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
+                  <SelectItem key={loc.id} value={loc.id.toString()}>
+                    {loc.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -357,12 +381,15 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 <SelectContent>
                   {paymentAccountType === "bank"
                     ? (Array.isArray(bankAccounts) ? bankAccounts : []).map((acc: any) => (
-                        <SelectItem key={acc.id} value={String(acc.id)}>{acc.name} ({acc.code})</SelectItem>
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name} ({acc.code})
+                        </SelectItem>
                       ))
                     : cashLedgerAccounts.map((acc: any) => (
-                        <SelectItem key={acc.id} value={String(acc.id)}>{acc.name}</SelectItem>
-                      ))
-                  }
+                        <SelectItem key={acc.id} value={String(acc.id)}>
+                          {acc.name}
+                        </SelectItem>
+                      ))}
                 </SelectContent>
               </Select>
             </>
@@ -376,7 +403,9 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               onCheckedChange={setIsCreditSale}
               data-testid="toggle-credit-sale"
             />
-            <Label htmlFor="credit-sale-strip" className="text-sm cursor-pointer">Credit</Label>
+            <Label htmlFor="credit-sale-strip" className="text-sm cursor-pointer">
+              Credit
+            </Label>
           </div>
 
           {/* Customer picker when credit */}
@@ -387,7 +416,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                   <User className="h-4 w-4 text-muted-foreground" />
                   <span className="truncate max-w-[140px]">
                     {selectedCustomerId
-                      ? (customerAccounts.find((a: any) => String(a.id) === selectedCustomerId)?.name || "Customer")
+                      ? customerAccounts.find((a: any) => String(a.id) === selectedCustomerId)?.name || "Customer"
                       : "Select customer…"}
                   </span>
                   <ChevronDown className="h-4 w-4 opacity-50" />
@@ -403,9 +432,14 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                         <CommandItem
                           key={acc.id}
                           value={acc.name}
-                          onSelect={() => { setSelectedCustomerId(String(acc.id)); setCustomerComboOpen(false); }}
+                          onSelect={() => {
+                            setSelectedCustomerId(String(acc.id));
+                            setCustomerComboOpen(false);
+                          }}
                         >
-                          <Check className={`mr-2 h-4 w-4 shrink-0 ${selectedCustomerId === String(acc.id) ? "opacity-100" : "opacity-0"}`} />
+                          <Check
+                            className={`mr-2 h-4 w-4 shrink-0 ${selectedCustomerId === String(acc.id) ? "opacity-100" : "opacity-0"}`}
+                          />
                           {acc.name}
                         </CommandItem>
                       ))}
@@ -423,28 +457,39 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           {/* Left: sale grid + footer totals */}
           <div className="flex-1 flex flex-col overflow-hidden min-w-0">
             <SaleGrid
-              rows={rows} columns={[
+              rows={rows}
+              columns={[
                 { key: "itemName", label: "Item", width: "flex-1" },
                 { key: "quantity", label: "Qty", width: "w-20" },
                 { key: "rate", label: "Rate", width: "w-24" },
                 { key: "amount", label: "Amt", width: "w-28" },
                 { key: "plBale", label: "P/L", width: "w-20" },
                 { key: "totalPL", label: "T.P/L", width: "w-20" },
-                { key: "delete", label: "", width: "w-12" }
+                { key: "delete", label: "", width: "w-12" },
               ]}
-              selectedCell={selectedCell} setSelectedCell={setSelectedCell}
-              updateRow={updateRow} handleDeleteRow={(i) => setRows(rows.filter((_, idx) => idx !== i))}
-              handleKeyDown={(e, r, c) => {}} setActiveRow={setActiveRow} setSearchTerm={setSearchTerm} setHighlightedIndex={setHighlightedIndex}
-              getStockWarning={() => null} formatDisplayAmount={formatDisplayAmount}
-              activeCurrency={activeCurrency} exchangeRate={exchangeRate} inputRefs={inputRefs} clearActiveRowTimerRef={clearActiveRowTimerRef}
-              focusCell={focusCell} toast={toast}
+              selectedCell={selectedCell}
+              setSelectedCell={setSelectedCell}
+              updateRow={updateRow}
+              handleDeleteRow={(i) => setRows(rows.filter((_, idx) => idx !== i))}
+              handleKeyDown={(e, r, c) => {}}
+              setActiveRow={setActiveRow}
+              setSearchTerm={setSearchTerm}
+              setHighlightedIndex={setHighlightedIndex}
+              getStockWarning={() => null}
+              formatDisplayAmount={formatDisplayAmount}
+              activeCurrency={activeCurrency}
+              exchangeRate={exchangeRate}
+              inputRefs={inputRefs}
+              clearActiveRowTimerRef={clearActiveRowTimerRef}
+              focusCell={focusCell}
+              toast={toast}
             />
 
             {/* Footer: totals row */}
             <div className="mt-2 flex flex-wrap items-center gap-3 px-1">
               <span className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">{validItemCount}</span> Items&nbsp;&nbsp;
-                Qty <span className="font-semibold text-foreground font-mono">{totalQty.toFixed(2)}</span>
+                <span className="font-semibold text-foreground">{validItemCount}</span> Items&nbsp;&nbsp; Qty{" "}
+                <span className="font-semibold text-foreground font-mono">{totalQty.toFixed(2)}</span>
               </span>
               <span className="text-sm ml-auto font-semibold">
                 Total&nbsp;
@@ -464,29 +509,58 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
           {/* Inventory picker: always on the right */}
           <InventoryPicker
-            searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-            getFilteredInventory={() => inventory.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase()))}
-            selectItem={selectItem} itemListRef={itemListRef} highlightedIndex={highlightedIndex}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            getFilteredInventory={() =>
+              inventory.filter((i) => i.name.toLowerCase().includes(searchTerm.toLowerCase()))
+            }
+            selectItem={selectItem}
+            itemListRef={itemListRef}
+            highlightedIndex={highlightedIndex}
           />
         </div>
       </div>
 
       <POSDialogs
-        zeroStockAlert={zeroStockAlert} setZeroStockAlert={setZeroStockAlert} zeroStockItem={zeroStockItem}
-        showDraftDialog={showDraftDialog} setShowDraftDialog={setShowDraftDialog} drafts={drafts}
-        handleLoadDraft={(id) => {}} deleteDraftMutation={deleteDraftMutation}
-        showPrintDialog={showPrintDialog} setShowPrintDialog={setShowPrintDialog} editVoucherId={editVoucherId}
-        handleNewSale={handleNewSale} navigate={navigate} activeLocation={activeLocation}
-        invoiceWaStatus={invoiceWaStatus} handleSendInvoiceWhatsApp={() => {}} sendingInvoiceWhatsApp={sendingInvoiceWhatsApp}
-        stockWaStatus={stockWaStatus} handleSendStockWhatsApp={() => {}} sendingWhatsApp={sendingWhatsApp}
-        handlePrint={handlePrint} isCreditSale={isCreditSale} showStockPrompt={showStockPrompt} setShowStockPrompt={setShowStockPrompt}
-        stockInventoryLoading={false} handleStockPrint={() => {}} handleSendWhatsAppReport={() => {}}
-        stockInventory={[]} stockPrintRef={stockPrintRef}
+        zeroStockAlert={zeroStockAlert}
+        setZeroStockAlert={setZeroStockAlert}
+        zeroStockItem={zeroStockItem}
+        showDraftDialog={showDraftDialog}
+        setShowDraftDialog={setShowDraftDialog}
+        drafts={drafts}
+        handleLoadDraft={(id) => {}}
+        deleteDraftMutation={deleteDraftMutation}
+        showPrintDialog={showPrintDialog}
+        setShowPrintDialog={setShowPrintDialog}
+        editVoucherId={editVoucherId}
+        handleNewSale={handleNewSale}
+        navigate={navigate}
+        activeLocation={activeLocation}
+        invoiceWaStatus={invoiceWaStatus}
+        handleSendInvoiceWhatsApp={() => {}}
+        sendingInvoiceWhatsApp={sendingInvoiceWhatsApp}
+        stockWaStatus={stockWaStatus}
+        handleSendStockWhatsApp={() => {}}
+        sendingWhatsApp={sendingWhatsApp}
+        handlePrint={handlePrint}
+        isCreditSale={isCreditSale}
+        showStockPrompt={showStockPrompt}
+        setShowStockPrompt={setShowStockPrompt}
+        stockInventoryLoading={false}
+        handleStockPrint={() => {}}
+        handleSendWhatsAppReport={() => {}}
+        stockInventory={[]}
+        stockPrintRef={stockPrintRef}
       />
 
       <InvoiceTemplate
-        printRef={printRef} savedSale={savedSale} printUserName={posUser?.fullName || authUser?.fullName || "User"}
-        selectedCompany={selectedCompany} exchangeRate={exchangeRate} fmtPrint={(v) => String(v)} fmtPrintCurrency={(v) => String(v)}
+        printRef={printRef}
+        savedSale={savedSale}
+        printUserName={posUser?.fullName || authUser?.fullName || "User"}
+        selectedCompany={selectedCompany}
+        exchangeRate={exchangeRate}
+        fmtPrint={(v) => String(v)}
+        fmtPrintCurrency={(v) => String(v)}
       />
     </div>
   );

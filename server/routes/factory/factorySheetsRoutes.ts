@@ -41,13 +41,13 @@ function toNumber(v: CellVal): number {
 
 function findSheet(sheets: SSheet[], name: string): SSheet | undefined {
   const n = name.trim().toLowerCase();
-  return sheets.find(s => s.name.trim().toLowerCase().includes(n));
+  return sheets.find((s) => s.name.trim().toLowerCase().includes(n));
 }
 
 function findColumnIndex(sheet: SSheet, names: string[]): number {
   for (const name of names) {
     const n = name.trim().toLowerCase();
-    const idx = sheet.columns.findIndex(c => getColLabel(c).trim().toLowerCase() === n);
+    const idx = sheet.columns.findIndex((c) => getColLabel(c).trim().toLowerCase() === n);
     if (idx !== -1) return idx;
   }
   return -1;
@@ -60,54 +60,49 @@ function sumColumn(sheet: SSheet | undefined, names: string[]): number {
   return sheet.rows.reduce((sum, row) => sum + toNumber(getCellRawValue(row.cells[idx])), 0);
 }
 
-function buildStatusSheet(
-  sheets: SSheet[],
-  existingStatus?: SSheet,
-): { columns: string[]; rows: SRow[] } {
+function buildStatusSheet(sheets: SSheet[], existingStatus?: SSheet): { columns: string[]; rows: SRow[] } {
   // Read persisted BEFORE values from the existing STATUS sheet (so edits survive recalc)
   const getExistingBefore = (labelFragment: string, defaultVal: number): number => {
     if (!existingStatus) return defaultVal;
     const beforeIdx = findColumnIndex(existingStatus, ["BEFORE"]);
     if (beforeIdx === -1) return defaultVal;
-    const row = existingStatus.rows.find(r =>
-      r.label.trim().toLowerCase().includes(labelFragment.toLowerCase()),
-    );
+    const row = existingStatus.rows.find((r) => r.label.trim().toLowerCase().includes(labelFragment.toLowerCase()));
     if (!row) return defaultVal;
     const v = toNumber(getCellRawValue(row.cells[beforeIdx]));
     return v !== 0 ? v : defaultVal;
   };
 
   // Source sheets
-  const prodSheet  = findSheet(sheets, "PRODUCTION");
+  const prodSheet = findSheet(sheets, "PRODUCTION");
   const stockSheet = findSheet(sheets, "STOCK IN");
-  const ioSheet    = findSheet(sheets, "IO");
+  const ioSheet = findSheet(sheets, "IO");
 
   // DIFF values
-  const prodDiff  = -Math.abs(sumColumn(prodSheet,  ["DIFF", "Diff", "فرق"]));
-  const stockDiff = -Math.abs(sumColumn(stockSheet, ["فرق",  "DIFF", "Diff"]));
-  const ioDiff    =           sumColumn(ioSheet,    ["WEIGHT", "Weight"]);
+  const prodDiff = -Math.abs(sumColumn(prodSheet, ["DIFF", "Diff", "فرق"]));
+  const stockDiff = -Math.abs(sumColumn(stockSheet, ["فرق", "DIFF", "Diff"]));
+  const ioDiff = sumColumn(ioSheet, ["WEIGHT", "Weight"]);
 
   // BEFORE values
-  const prodBefore  = getExistingBefore("PRODUCTION", -183221);
-  const stockBefore = getExistingBefore("STOCK IN",    -46020);
-  const ioBefore    = getExistingBefore("IO",          -69011);
+  const prodBefore = getExistingBefore("PRODUCTION", -183221);
+  const stockBefore = getExistingBefore("STOCK IN", -46020);
+  const ioBefore = getExistingBefore("IO", -69011);
 
   // AFTER = BEFORE + DIFF
-  const prodAfter  = prodBefore  + prodDiff;
+  const prodAfter = prodBefore + prodDiff;
   const stockAfter = stockBefore + stockDiff;
-  const ioAfter    = ioBefore    + ioDiff;
+  const ioAfter = ioBefore + ioDiff;
 
   // DIFFERENCE totals row
-  const totalBefore = prodBefore  + stockBefore + ioBefore;
-  const totalDiff   = prodDiff    + stockDiff   + ioDiff;
-  const totalAfter  = prodAfter   + stockAfter  + ioAfter;
+  const totalBefore = prodBefore + stockBefore + ioBefore;
+  const totalDiff = prodDiff + stockDiff + ioDiff;
+  const totalAfter = prodAfter + stockAfter + ioAfter;
 
   const columns = ["BEFORE", "DIFF", "AFTER"];
   const rows: SRow[] = [
-    { id: "status_row_production", label: "PRODUCTION اجراء اعمال", cells: [prodBefore,  prodDiff,  prodAfter] },
-    { id: "status_row_stockin",    label: "STOCK IN",               cells: [stockBefore, stockDiff, stockAfter] },
-    { id: "status_row_io",         label: "IO",                     cells: [ioBefore,    ioDiff,    ioAfter] },
-    { id: "status_row_difference", label: "DIFFERENCE",             cells: [totalBefore, totalDiff, totalAfter] },
+    { id: "status_row_production", label: "PRODUCTION اجراء اعمال", cells: [prodBefore, prodDiff, prodAfter] },
+    { id: "status_row_stockin", label: "STOCK IN", cells: [stockBefore, stockDiff, stockAfter] },
+    { id: "status_row_io", label: "IO", cells: [ioBefore, ioDiff, ioAfter] },
+    { id: "status_row_difference", label: "DIFFERENCE", cells: [totalBefore, totalDiff, totalAfter] },
   ];
 
   return { columns, rows };
@@ -117,14 +112,10 @@ function buildStatusSheet(
 // Pass in already-fetched source sheets to avoid redundant DB calls.
 async function upsertStatusSheet(companyId: number, sourceSheets: SSheet[]): Promise<void> {
   // Exclude STATUS itself from source data
-  const nonStatus = sourceSheets.filter(
-    s => s.name.trim().toUpperCase() !== STATUS_NAME,
-  );
+  const nonStatus = sourceSheets.filter((s) => s.name.trim().toUpperCase() !== STATUS_NAME);
 
   // Find the existing STATUS record so we can preserve BEFORE values
-  const existingStatus = sourceSheets.find(
-    s => s.name.trim().toUpperCase() === STATUS_NAME,
-  );
+  const existingStatus = sourceSheets.find((s) => s.name.trim().toUpperCase() === STATUS_NAME);
 
   const { columns, rows } = buildStatusSheet(nonStatus, existingStatus);
 
@@ -160,7 +151,6 @@ async function upsertStatusSheet(companyId: number, sourceSheets: SSheet[]): Pro
 }
 
 export function registerFactorySheetsRoutes(app: Express) {
-
   // ── List all sheets for current company ───────────────────────────────────
   app.get("/api/factory/sheets", requireAuth, async (req, res) => {
     try {
@@ -189,9 +179,7 @@ export function registerFactorySheetsRoutes(app: Express) {
         .where(eq(factorySheets.companyId, companyId))
         .orderBy(asc(factorySheets.orderIndex));
 
-      const maxOrder = existing.length > 0
-        ? Math.max(...existing.map(r => r.orderIndex))
-        : -1;
+      const maxOrder = existing.length > 0 ? Math.max(...existing.map((r) => r.orderIndex)) : -1;
 
       const [created] = await db
         .insert(factorySheets)
@@ -245,13 +233,13 @@ export function registerFactorySheetsRoutes(app: Express) {
 
         await upsertStatusSheet(
           companyId,
-          allSheets.map(s => ({
+          allSheets.map((s) => ({
             id: s.id,
             name: s.name,
             columns: (s.columns as string[]) ?? [],
             rows: (s.rows as SRow[]) ?? [],
             orderIndex: s.orderIndex,
-          })),
+          }))
         );
       }
 
@@ -300,13 +288,16 @@ export function registerFactorySheetsRoutes(app: Express) {
 
         if (!rawData || rawData.length === 0) {
           // Empty sheet — just create blank
-          const [s] = await db.insert(factorySheets).values({
-            companyId,
-            name: sheetName,
-            orderIndex: sheetIdx,
-            columns: [],
-            rows: [],
-          }).returning();
+          const [s] = await db
+            .insert(factorySheets)
+            .values({
+              companyId,
+              name: sheetName,
+              orderIndex: sheetIdx,
+              columns: [],
+              rows: [],
+            })
+            .returning();
           created.push(s);
           continue;
         }
@@ -314,9 +305,7 @@ export function registerFactorySheetsRoutes(app: Express) {
         // First row = column headers (skip empty leading cells in first col)
         const headerRow = rawData[0] ?? [];
         // Col 0 is the row-label column; cols 1..N are data columns
-        const columns: string[] = headerRow.slice(1).map((h: any) =>
-          h == null ? "" : String(h)
-        );
+        const columns: string[] = headerRow.slice(1).map((h: any) => (h == null ? "" : String(h)));
 
         const rows: { label: string; cells: (number | string | null)[] }[] = [];
         for (let r = 1; r < rawData.length; r++) {
@@ -356,13 +345,16 @@ export function registerFactorySheetsRoutes(app: Express) {
           rows.push({ label, cells: cells.slice(0, columns.length) });
         }
 
-        const [s] = await db.insert(factorySheets).values({
-          companyId,
-          name: sheetName,
-          orderIndex: sheetIdx,
-          columns,
-          rows,
-        }).returning();
+        const [s] = await db
+          .insert(factorySheets)
+          .values({
+            companyId,
+            name: sheetName,
+            orderIndex: sheetIdx,
+            columns,
+            rows,
+          })
+          .returning();
         created.push(s);
       }
 
@@ -375,13 +367,13 @@ export function registerFactorySheetsRoutes(app: Express) {
 
       await upsertStatusSheet(
         companyId,
-        allSheets.map(s => ({
+        allSheets.map((s) => ({
           id: s.id,
           name: s.name,
           columns: (s.columns as string[]) ?? [],
           rows: (s.rows as SRow[]) ?? [],
           orderIndex: s.orderIndex,
-        })),
+        }))
       );
 
       // Return the final list including STATUS
@@ -405,9 +397,9 @@ export function registerFactorySheetsRoutes(app: Express) {
       // Sheet 1 — Production Tracking example
       const sheet1: any[][] = [
         ["Label", "Week 1", "Week 2", "Week 3", "Week 4"],
-        ["Target",  150,  150,  150,  150],
-        ["Actual",  120,  135,  140,  155],
-        ["Variance", -30, -15, -10,    5],
+        ["Target", 150, 150, 150, 150],
+        ["Actual", 120, 135, 140, 155],
+        ["Variance", -30, -15, -10, 5],
       ];
       const ws1 = xlsxUtils.aoa_to_sheet(sheet1);
       ws1["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
@@ -415,11 +407,11 @@ export function registerFactorySheetsRoutes(app: Express) {
 
       // Sheet 2 — Inventory example
       const sheet2: any[][] = [
-        ["Label",        "Mon", "Tue", "Wed", "Thu", "Fri"],
-        ["Opening Stock", 500,   470,   490,   460,  480],
-        ["Received",      100,   150,    80,   120,   90],
-        ["Dispatched",    130,   130,   110,   100,  140],
-        ["Closing Stock", 470,   490,   460,   480,  430],
+        ["Label", "Mon", "Tue", "Wed", "Thu", "Fri"],
+        ["Opening Stock", 500, 470, 490, 460, 480],
+        ["Received", 100, 150, 80, 120, 90],
+        ["Dispatched", 130, 130, 110, 100, 140],
+        ["Closing Stock", 470, 490, 460, 480, 430],
       ];
       const ws2 = xlsxUtils.aoa_to_sheet(sheet2);
       ws2["!cols"] = [{ wch: 20 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }];
@@ -453,7 +445,7 @@ export function registerFactorySheetsRoutes(app: Express) {
 
         // Build the 2D array: header row + data rows + difference row
         const headerRow = ["", ...colLabels];
-        const dataRows = rows.map(r => [r.label, ...r.cells.map((c: any) => getCellRawValue(c) ?? "")]);
+        const dataRows = rows.map((r) => [r.label, ...r.cells.map((c: any) => getCellRawValue(c) ?? "")]);
 
         // Difference row = sum of all cells per column (using raw values)
         const diffCells = colLabels.map((_, colIdx) => {

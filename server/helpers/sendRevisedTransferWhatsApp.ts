@@ -36,7 +36,9 @@ export interface SendRevisedTransferWAOptions {
 export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOptions): Promise<void> {
   const { sourceLocationId, sourceLocationName, destLocationName, items, voucherNumber, voucherDate } = opts;
 
-  console.log(`[RevisedTransferWA] Starting for ${voucherNumber} → srcLocId=${sourceLocationId}, items=${items.length}`);
+  console.log(
+    `[RevisedTransferWA] Starting for ${voucherNumber} → srcLocId=${sourceLocationId}, items=${items.length}`
+  );
 
   if (!items || items.length === 0) {
     console.warn(`[RevisedTransferWA] No items for ${voucherNumber} — skipping`);
@@ -68,9 +70,13 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
 
   // Look up stock item names
   const uniqueIds = [...new Set(items.map((i) => i.stockItemId).filter((id) => id > 0))];
-  const itemRows = uniqueIds.length > 0
-    ? await db.select({ id: stockItems.id, name: stockItems.name, uom: stockItems.uom }).from(stockItems).where(inArray(stockItems.id, uniqueIds))
-    : [];
+  const itemRows =
+    uniqueIds.length > 0
+      ? await db
+          .select({ id: stockItems.id, name: stockItems.name, uom: stockItems.uom })
+          .from(stockItems)
+          .where(inArray(stockItems.id, uniqueIds))
+      : [];
   const itemMap = new Map(itemRows.map((r) => [r.id, r]));
 
   const imageItems = items.map((i) => {
@@ -85,7 +91,11 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
   });
 
   let displayDate = voucherDate;
-  try { displayDate = format(new Date(voucherDate), "dd MMM yyyy"); } catch { /* keep raw */ }
+  try {
+    displayDate = format(new Date(voucherDate), "dd MMM yyyy");
+  } catch {
+    /* keep raw */
+  }
 
   const caption = [
     `*Stock Transfer Revision*`,
@@ -106,7 +116,9 @@ export async function sendRevisedTransferWhatsApp(opts: SendRevisedTransferWAOpt
     });
     console.log(`[RevisedTransferWA] PNG generated (${pngBuffer.length} bytes).`);
   } catch (imgErr: any) {
-    console.warn(`[RevisedTransferWA] Image generation failed for ${voucherNumber} — falling back to text. Error: ${imgErr?.message}`);
+    console.warn(
+      `[RevisedTransferWA] Image generation failed for ${voucherNumber} — falling back to text. Error: ${imgErr?.message}`
+    );
   }
 
   const safeVoucher = voucherNumber.replace(/[^a-zA-Z0-9_-]/g, "_");

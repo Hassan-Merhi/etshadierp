@@ -9,7 +9,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Save, Search, ArrowRight, CheckCircle, Wrench, Upload, Download, WifiOff, ToggleRight, DollarSign, AlertTriangle, FileSpreadsheet, Images, MessageCircle, Plus, Trash2 } from "lucide-react";
+import {
+  Loader2,
+  Save,
+  Search,
+  ArrowRight,
+  CheckCircle,
+  Wrench,
+  Upload,
+  Download,
+  WifiOff,
+  ToggleRight,
+  DollarSign,
+  AlertTriangle,
+  FileSpreadsheet,
+  Images,
+  MessageCircle,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
 import { ImportBalesTab } from "./bale-stock-entry/ImportBalesTab";
@@ -117,7 +135,6 @@ interface RenamePreviewItem {
   newName: string;
 }
 
-
 function RecalculateBaleCostsCard() {
   const { toast } = useToast();
   const [result, setResult] = useState<{ balesUpdated: number } | null>(null);
@@ -143,16 +160,12 @@ function RecalculateBaleCostsCard() {
           Recalculate Old Bale Costs
         </CardTitle>
         <CardDescription>
-          Updates the cost/kg and total cost on all existing bales to match their mix batch's current blended rate.
-          Run this once to fix bales that were pressed before post-offload charges were added to their container.
+          Updates the cost/kg and total cost on all existing bales to match their mix batch's current blended rate. Run
+          this once to fix bales that were pressed before post-offload charges were added to their container.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        {result && (
-          <p className="text-sm text-muted-foreground">
-            Last run: updated {result.balesUpdated} bale(s).
-          </p>
-        )}
+        {result && <p className="text-sm text-muted-foreground">Last run: updated {result.balesUpdated} bale(s).</p>}
         <Button
           onClick={() => mutation.mutate()}
           disabled={mutation.isPending}
@@ -176,7 +189,10 @@ function MigrateVoucherDescriptionsCard() {
     },
     onSuccess: (data: any) => {
       setResult(data);
-      toast({ title: "Update complete", description: `Fixed ${data.chargesFixed} charge entries and ${data.narrationFixed} narrations.` });
+      toast({
+        title: "Update complete",
+        description: `Fixed ${data.chargesFixed} charge entries and ${data.narrationFixed} narrations.`,
+      });
     },
     onError: (error: any) => {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
@@ -191,7 +207,8 @@ function MigrateVoucherDescriptionsCard() {
           Fix Old Voucher Descriptions
         </CardTitle>
         <CardDescription>
-          Updates old charge descriptions to use container numbers, and cleans up auto-generated narrations on payments, receipts, and journals to show only the description you wrote.
+          Updates old charge descriptions to use container numbers, and cleans up auto-generated narrations on payments,
+          receipts, and journals to show only the description you wrote.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -205,7 +222,11 @@ function MigrateVoucherDescriptionsCard() {
           disabled={migrateMutation.isPending}
           data-testid="button-migrate-voucher-descriptions"
         >
-          {migrateMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Wrench className="h-4 w-4 mr-2" />}
+          {migrateMutation.isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Wrench className="h-4 w-4 mr-2" />
+          )}
           Run Update
         </Button>
       </CardContent>
@@ -213,7 +234,11 @@ function MigrateVoucherDescriptionsCard() {
   );
 }
 
-interface WaChat { id: string; name: string; type: string; }
+interface WaChat {
+  id: string;
+  name: string;
+  type: string;
+}
 
 export default function FactorySettings() {
   const { toast } = useToast();
@@ -234,29 +259,52 @@ export default function FactorySettings() {
   const [replaceStr, setReplaceStr] = useState(" ");
   const [renamePreview, setRenamePreview] = useState<RenamePreviewItem[] | null>(null);
   const [excelFile, setExcelFile] = useState<File | null>(null);
-  const [excelResult, setExcelResult] = useState<{ created: number; updated: number; categoriesCreated: number } | null>(null);
+  const [excelResult, setExcelResult] = useState<{
+    created: number;
+    updated: number;
+    categoriesCreated: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [baleImportFile, setBaleImportFile] = useState<File | null>(null);
-  const [baleImportResult, setBaleImportResult] = useState<{ totalBalesCreated: number; skippedRows: number; skippedDetails: string[] } | null>(null);
+  const [baleImportResult, setBaleImportResult] = useState<{
+    totalBalesCreated: number;
+    skippedRows: number;
+    skippedDetails: string[];
+  } | null>(null);
   const baleFileInputRef = useRef<HTMLInputElement>(null);
   const [baleImportLocationId, setBaleImportLocationId] = useState<string>("");
   const [baleValidationResult, setBaleValidationResult] = useState<{
     totalRows: number;
-    validRows: { rowIndex: number; articleCode: string; productName: string; productId: number; quantity: number; weight: number; productionDate: string }[];
+    validRows: {
+      rowIndex: number;
+      articleCode: string;
+      productName: string;
+      productId: number;
+      quantity: number;
+      weight: number;
+      productionDate: string;
+    }[];
     skippedRows: { rowIndex: number; articleCode: string; reason: string }[];
     totalBales: number;
     totalWeight: number;
     totalProducts: number;
   } | null>(null);
 
-  type OcContainer = { containerId: number; containerNumber: string; charges: { id: number; description: string; amount: string; currencyCode: string }[] };
+  type OcContainer = {
+    containerId: number;
+    containerNumber: string;
+    charges: { id: number; description: string; amount: string; currencyCode: string }[];
+  };
   const [ocPreview, setOcPreview] = useState<OcContainer[] | null>(null);
   const [ocFixResult, setOcFixResult] = useState<{ fixed: number } | null>(null);
 
   const ocPreviewMutation = useMutation({
     mutationFn: async () => {
       const res = await factoryApiRequest("GET", "/api/factory/admin/other-charges-currency-preview");
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed"); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message || "Failed");
+      }
       return res.json() as Promise<{ containers: OcContainer[] }>;
     },
     onSuccess: (data) => {
@@ -266,13 +314,19 @@ export default function FactorySettings() {
         toast({ title: "All clear", description: "No other charges found with non-USD currency." });
       }
     },
-    onError: (err: Error) => { if (err?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const ocFixMutation = useMutation({
     mutationFn: async (containerIds: number[]) => {
       const res = await factoryApiRequest("POST", "/api/factory/admin/fix-other-charges-currency", { containerIds });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Failed"); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message || "Failed");
+      }
       return res.json() as Promise<{ fixed: number }>;
     },
     onSuccess: (data) => {
@@ -284,7 +338,10 @@ export default function FactorySettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/factory/daybook"] });
       queryClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
     },
-    onError: (err: Error) => { if (err?._handledGlobally) return; toast({ title: "Error", description: err.message, variant: "destructive" }); },
+    onError: (err: Error) => {
+      if (err?._handledGlobally) return;
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
   });
 
   const previewMutation = useMutation({
@@ -299,7 +356,10 @@ export default function FactorySettings() {
     onSuccess: (data: { total: number; matches: RenamePreviewItem[] }) => {
       setRenamePreview(data.matches);
       if (data.matches.length === 0) {
-        toast({ title: "No matches", description: `Found ${data.total} products with code prefix "${codePrefix}" but none have "${findStr}" in their name.` });
+        toast({
+          title: "No matches",
+          description: `Found ${data.total} products with code prefix "${codePrefix}" but none have "${findStr}" in their name.`,
+        });
       }
     },
     onError: (error: Error) => {
@@ -316,7 +376,7 @@ export default function FactorySettings() {
     onSuccess: (data: { updated: number }) => {
       toast({ title: "Renamed successfully", description: `${data.updated} product name(s) updated.` });
       setRenamePreview(null);
-      queryClient.invalidateQueries({ queryKey: ['/api/factory/bale-products'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/bale-products"] });
     },
     onError: (error: Error) => {
       if (error?._handledGlobally) return;
@@ -374,9 +434,16 @@ export default function FactorySettings() {
       setBaleValidationResult(data);
       setBaleImportResult(null);
       if (data.validRows.length === 0) {
-        toast({ title: "No valid rows", description: `All ${data.totalRows} rows were skipped. Check the details below.`, variant: "destructive" });
+        toast({
+          title: "No valid rows",
+          description: `All ${data.totalRows} rows were skipped. Check the details below.`,
+          variant: "destructive",
+        });
       } else {
-        toast({ title: "Validation complete", description: `${data.validRows.length} row(s) ready to import (${data.totalBales} bales, ${data.totalWeight.toFixed(1)} kg)` });
+        toast({
+          title: "Validation complete",
+          description: `${data.validRows.length} row(s) ready to import (${data.totalBales} bales, ${data.totalWeight.toFixed(1)} kg)`,
+        });
       }
     },
     onError: (error: Error) => {
@@ -421,7 +488,7 @@ export default function FactorySettings() {
   const { data: locations } = useQuery<Location[]>({ queryKey: ["/api/locations"] });
 
   const { data, isLoading } = useQuery<FactorySettingsData>({
-    queryKey: ['/api/factory/settings'],
+    queryKey: ["/api/factory/settings"],
   });
 
   useEffect(() => {
@@ -466,7 +533,10 @@ export default function FactorySettings() {
   const saveWeeklyWaGroupMutation = useMutation({
     mutationFn: async (chatId: string) => {
       const res = await factoryApiRequest("PATCH", "/api/factory/weekly-report-wa-settings", { groupChatId: chatId });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Save failed"); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message || "Save failed");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -489,7 +559,10 @@ export default function FactorySettings() {
       const res = await factoryApiRequest("PUT", "/api/factory/settings", {
         productionWorkerMatrixWhatsappGroupId: chatId,
       });
-      if (!res.ok) { const e = await res.json(); throw new Error(e.message || "Save failed"); }
+      if (!res.ok) {
+        const e = await res.json();
+        throw new Error(e.message || "Save failed");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -503,8 +576,8 @@ export default function FactorySettings() {
     },
   });
 
-  const filteredWaChats = waChats.filter(c =>
-    !prodWaSearch || c.name?.toLowerCase().includes(prodWaSearch.toLowerCase())
+  const filteredWaChats = waChats.filter(
+    (c) => !prodWaSearch || c.name?.toLowerCase().includes(prodWaSearch.toLowerCase())
   );
 
   const mutation = useMutation({
@@ -513,7 +586,7 @@ export default function FactorySettings() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/factory/settings'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/factory/settings"] });
       toast({ title: "Settings saved", description: "Factory settings have been updated successfully." });
     },
     onError: (error: Error) => {
@@ -589,7 +662,9 @@ export default function FactorySettings() {
 
   const toggleItem = (label: string, key: keyof FactorySettingsData) => (
     <div className="flex items-center justify-between gap-4 py-3" key={key} data-testid={`toggle-row-${key}`}>
-      <Label htmlFor={key} className="text-sm font-medium cursor-pointer">{label}</Label>
+      <Label htmlFor={key} className="text-sm font-medium cursor-pointer">
+        {label}
+      </Label>
       <Switch
         id={key}
         checked={!!settings[key]}
@@ -606,7 +681,12 @@ export default function FactorySettings() {
           <PageHeader title="Factory Settings" subtitle="Toggle factory intelligence features on or off" />
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleEnableAll} disabled={mutation.isPending} data-testid="button-enable-all">
+          <Button
+            variant="outline"
+            onClick={handleEnableAll}
+            disabled={mutation.isPending}
+            data-testid="button-enable-all"
+          >
             <ToggleRight className="h-4 w-4 mr-2" />
             Enable All
           </Button>
@@ -683,9 +763,7 @@ export default function FactorySettings() {
             <CardTitle data-testid="text-section-pages">Page Visibility</CardTitle>
             <CardDescription>Show or hide entire pages for all users</CardDescription>
           </CardHeader>
-          <CardContent className="divide-y">
-            {toggleItem("Daybook", "daybookEnabled")}
-          </CardContent>
+          <CardContent className="divide-y">{toggleItem("Daybook", "daybookEnabled")}</CardContent>
         </Card>
 
         <Card>
@@ -719,7 +797,9 @@ export default function FactorySettings() {
             {toggleItem("Container Profitability tab", "profitabilityTabContainersEnabled")}
             <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Workers List</p>
             {toggleItem("Categories tab", "workersTabCategoriesEnabled")}
-            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">Worker Profile</p>
+            <p className="text-xs text-muted-foreground pt-3 pb-1 font-medium uppercase tracking-wide">
+              Worker Profile
+            </p>
             {toggleItem("Statement tab", "workerDetailTabStatementEnabled")}
             {toggleItem("Advances tab", "workerDetailTabAdvancesEnabled")}
             {toggleItem("Bales tab", "workerDetailTabBalesEnabled")}
@@ -789,7 +869,10 @@ export default function FactorySettings() {
               <Input
                 id="codePrefix"
                 value={codePrefix}
-                onChange={(e) => { setCodePrefix(e.target.value); setRenamePreview(null); }}
+                onChange={(e) => {
+                  setCodePrefix(e.target.value);
+                  setRenamePreview(null);
+                }}
                 placeholder="e.g. HMD13"
                 data-testid="input-code-prefix"
               />
@@ -799,7 +882,10 @@ export default function FactorySettings() {
               <Input
                 id="findStr"
                 value={findStr}
-                onChange={(e) => { setFindStr(e.target.value); setRenamePreview(null); }}
+                onChange={(e) => {
+                  setFindStr(e.target.value);
+                  setRenamePreview(null);
+                }}
                 placeholder="e.g. -"
                 data-testid="input-find-str"
               />
@@ -809,7 +895,10 @@ export default function FactorySettings() {
               <Input
                 id="replaceStr"
                 value={replaceStr}
-                onChange={(e) => { setReplaceStr(e.target.value); setRenamePreview(null); }}
+                onChange={(e) => {
+                  setReplaceStr(e.target.value);
+                  setRenamePreview(null);
+                }}
                 placeholder="e.g. (space)"
                 data-testid="input-replace-str"
               />
@@ -820,15 +909,17 @@ export default function FactorySettings() {
             disabled={previewMutation.isPending || !codePrefix.trim() || !findStr}
             data-testid="button-preview-rename"
           >
-            {previewMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+            {previewMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Search className="h-4 w-4 mr-2" />
+            )}
             Preview Changes
           </Button>
 
           {renamePreview && renamePreview.length > 0 && (
             <div className="space-y-3">
-              <div className="text-sm text-muted-foreground">
-                {renamePreview.length} product(s) will be renamed:
-              </div>
+              <div className="text-sm text-muted-foreground">{renamePreview.length} product(s) will be renamed:</div>
               <div className="max-h-80 overflow-y-auto border rounded-md">
                 <Table>
                   <TableHeader className="sticky top-0 z-30 bg-background">
@@ -844,7 +935,9 @@ export default function FactorySettings() {
                       <TableRow key={item.id} data-testid={`row-rename-${item.id}`}>
                         <TableCell className="font-mono text-xs">{item.code}</TableCell>
                         <TableCell>{item.currentName}</TableCell>
-                        <TableCell><ArrowRight className="h-4 w-4 text-muted-foreground" /></TableCell>
+                        <TableCell>
+                          <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                        </TableCell>
                         <TableCell className="font-medium">{item.newName}</TableCell>
                       </TableRow>
                     ))}
@@ -856,7 +949,11 @@ export default function FactorySettings() {
                 disabled={applyMutation.isPending}
                 data-testid="button-apply-rename"
               >
-                {applyMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle className="h-4 w-4 mr-2" />}
+                {applyMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                )}
                 Apply {renamePreview.length} Rename(s)
               </Button>
             </div>
@@ -870,17 +967,29 @@ export default function FactorySettings() {
             <Upload className="h-5 w-5 text-muted-foreground" />
             <CardTitle data-testid="text-section-excel-import">Excel Product Import</CardTitle>
           </div>
-          <CardDescription>Upload an Excel file to update bale product names, weights, and categories by matching on article code</CardDescription>
+          <CardDescription>
+            Upload an Excel file to update bale product names, weights, and categories by matching on article code
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground space-y-1">
             <p>Your Excel file should have these column headers:</p>
             <ul className="list-disc list-inside ml-2 space-y-0.5">
-              <li><span className="font-mono text-xs">articleCode</span> (required) - matches existing products</li>
-              <li><span className="font-mono text-xs">name</span> - new product name</li>
-              <li><span className="font-mono text-xs">weightPerBaleKg</span> - weight per bale in KG</li>
-              <li><span className="font-mono text-xs">category</span> - product category (auto-created if new)</li>
-              <li><span className="font-mono text-xs">description</span> - product description (optional)</li>
+              <li>
+                <span className="font-mono text-xs">articleCode</span> (required) - matches existing products
+              </li>
+              <li>
+                <span className="font-mono text-xs">name</span> - new product name
+              </li>
+              <li>
+                <span className="font-mono text-xs">weightPerBaleKg</span> - weight per bale in KG
+              </li>
+              <li>
+                <span className="font-mono text-xs">category</span> - product category (auto-created if new)
+              </li>
+              <li>
+                <span className="font-mono text-xs">description</span> - product description (optional)
+              </li>
             </ul>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
@@ -900,14 +1009,21 @@ export default function FactorySettings() {
               disabled={!excelFile || excelUploadMutation.isPending}
               data-testid="button-upload-excel"
             >
-              {excelUploadMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+              {excelUploadMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
               {excelUploadMutation.isPending ? "Importing..." : "Import"}
             </Button>
           </div>
           {excelResult && (
             <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm" data-testid="text-excel-result">
               <CheckCircle className="h-4 w-4 text-green-600" />
-              <span>{excelResult.updated} product(s) updated, {excelResult.created} new product(s) created{excelResult.categoriesCreated > 0 ? `, ${excelResult.categoriesCreated} new category(ies)` : ""}</span>
+              <span>
+                {excelResult.updated} product(s) updated, {excelResult.created} new product(s) created
+                {excelResult.categoriesCreated > 0 ? `, ${excelResult.categoriesCreated} new category(ies)` : ""}
+              </span>
             </div>
           )}
         </CardContent>
@@ -919,17 +1035,29 @@ export default function FactorySettings() {
             <Upload className="h-5 w-5 text-muted-foreground" />
             <CardTitle data-testid="text-section-bale-import">Import Historical Bales</CardTitle>
           </div>
-          <CardDescription>Upload an Excel file to import old stock as bales. Each row creates bales with automatic REF codes and the specified production date.</CardDescription>
+          <CardDescription>
+            Upload an Excel file to import old stock as bales. Each row creates bales with automatic REF codes and the
+            specified production date.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="text-sm text-muted-foreground space-y-1">
             <p>Your Excel file should have these column headers:</p>
             <ul className="list-disc list-inside ml-2 space-y-0.5">
-              <li><span className="font-mono text-xs">ITEM BARCODE</span> (required) - article code to match existing products (e.g. HMD11298)</li>
-              <li><span className="font-mono text-xs">QUANTITY</span> - number of bales to create (default: 1)</li>
-              <li><span className="font-mono text-xs">PRODUCTION DATE</span> - date the bales were produced (required)</li>
+              <li>
+                <span className="font-mono text-xs">ITEM BARCODE</span> (required) - article code to match existing
+                products (e.g. HMD11298)
+              </li>
+              <li>
+                <span className="font-mono text-xs">QUANTITY</span> - number of bales to create (default: 1)
+              </li>
+              <li>
+                <span className="font-mono text-xs">PRODUCTION DATE</span> - date the bales were produced (required)
+              </li>
             </ul>
-            <p className="mt-2 text-xs">Products must already exist in the system. The weight will be taken from the product definition.</p>
+            <p className="mt-2 text-xs">
+              Products must already exist in the system. The weight will be taken from the product definition.
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Location / Warehouse</Label>
@@ -939,7 +1067,9 @@ export default function FactorySettings() {
               </SelectTrigger>
               <SelectContent>
                 {locations?.map((loc) => (
-                  <SelectItem key={loc.id} value={String(loc.id)}>{loc.name}</SelectItem>
+                  <SelectItem key={loc.id} value={String(loc.id)}>
+                    {loc.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -982,7 +1112,11 @@ export default function FactorySettings() {
               disabled={!baleImportFile || baleValidateMutation.isPending}
               data-testid="button-validate-bales"
             >
-              {baleValidateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+              {baleValidateMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Search className="h-4 w-4 mr-2" />
+              )}
               {baleValidateMutation.isPending ? "Validating..." : "Validate"}
             </Button>
           </div>
@@ -990,11 +1124,24 @@ export default function FactorySettings() {
           {baleValidationResult && (
             <div className="space-y-3">
               <div className="flex items-center gap-4 flex-wrap p-3 rounded-md bg-muted text-sm">
-                <span>Total rows: <strong>{baleValidationResult.totalRows}</strong></span>
-                <span>Valid: <strong className="text-green-600">{baleValidationResult.validRows.length}</strong></span>
-                <span>Skipped: <strong className={baleValidationResult.skippedRows.length > 0 ? "text-destructive" : ""}>{baleValidationResult.skippedRows.length}</strong></span>
-                <span>Bales to create: <strong>{baleValidationResult.totalBales}</strong></span>
-                <span>Total weight: <strong>{baleValidationResult.totalWeight.toFixed(1)} kg</strong></span>
+                <span>
+                  Total rows: <strong>{baleValidationResult.totalRows}</strong>
+                </span>
+                <span>
+                  Valid: <strong className="text-green-600">{baleValidationResult.validRows.length}</strong>
+                </span>
+                <span>
+                  Skipped:{" "}
+                  <strong className={baleValidationResult.skippedRows.length > 0 ? "text-destructive" : ""}>
+                    {baleValidationResult.skippedRows.length}
+                  </strong>
+                </span>
+                <span>
+                  Bales to create: <strong>{baleValidationResult.totalBales}</strong>
+                </span>
+                <span>
+                  Total weight: <strong>{baleValidationResult.totalWeight.toFixed(1)} kg</strong>
+                </span>
               </div>
 
               {baleValidationResult.validRows.length > 0 && (
@@ -1044,8 +1191,14 @@ export default function FactorySettings() {
                     disabled={!baleImportFile || baleImportMutation.isPending || !baleImportLocationId}
                     data-testid="button-finalize-import-bales"
                   >
-                    {baleImportMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                    {baleImportMutation.isPending ? "Importing..." : `Finalize Import (${baleValidationResult.totalBales} bales)`}
+                    {baleImportMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Upload className="h-4 w-4 mr-2" />
+                    )}
+                    {baleImportMutation.isPending
+                      ? "Importing..."
+                      : `Finalize Import (${baleValidationResult.totalBales} bales)`}
                   </Button>
                   <Button
                     variant="outline"
@@ -1068,9 +1221,15 @@ export default function FactorySettings() {
 
           {baleImportResult && (
             <div className="space-y-2">
-              <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm" data-testid="text-bale-import-result">
+              <div
+                className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm"
+                data-testid="text-bale-import-result"
+              >
                 <CheckCircle className="h-4 w-4 text-green-600" />
-                <span>{baleImportResult.totalBalesCreated} bale(s) created with automatic REF codes{baleImportResult.skippedRows > 0 ? ` | ${baleImportResult.skippedRows} row(s) skipped` : ""}</span>
+                <span>
+                  {baleImportResult.totalBalesCreated} bale(s) created with automatic REF codes
+                  {baleImportResult.skippedRows > 0 ? ` | ${baleImportResult.skippedRows} row(s) skipped` : ""}
+                </span>
               </div>
               {baleImportResult.skippedDetails.length > 0 && (
                 <div className="text-xs text-muted-foreground p-2 rounded-md border space-y-0.5">
@@ -1086,104 +1245,121 @@ export default function FactorySettings() {
       </Card>
 
       {/* ── Fix Other Charges Currency ───────────────────────── */}
-      {isDeveloper && <Card data-testid="card-fix-oc-currency">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <DollarSign className="h-5 w-5 text-muted-foreground" />
-            Fix Other Charges Currency
-          </CardTitle>
-          <CardDescription>
-            If other charges were accidentally entered in EUR instead of USD, this tool
-            re-posts their accounting entries in USD without reversing the offload.
-            Click "Preview" first to see which containers are affected, then "Apply Fix".
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              onClick={() => ocPreviewMutation.mutate()}
-              disabled={ocPreviewMutation.isPending || ocFixMutation.isPending}
-              data-testid="button-oc-currency-preview"
-            >
-              {ocPreviewMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
-              Preview
-            </Button>
-            {ocPreview && ocPreview.length > 0 && (
+      {isDeveloper && (
+        <Card data-testid="card-fix-oc-currency">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-muted-foreground" />
+              Fix Other Charges Currency
+            </CardTitle>
+            <CardDescription>
+              If other charges were accidentally entered in EUR instead of USD, this tool re-posts their accounting
+              entries in USD without reversing the offload. Click "Preview" first to see which containers are affected,
+              then "Apply Fix".
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
-                onClick={() => ocFixMutation.mutate(ocPreview.map(c => c.containerId))}
-                disabled={ocFixMutation.isPending}
-                data-testid="button-oc-currency-apply"
+                variant="outline"
+                onClick={() => ocPreviewMutation.mutate()}
+                disabled={ocPreviewMutation.isPending || ocFixMutation.isPending}
+                data-testid="button-oc-currency-preview"
               >
-                {ocFixMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <DollarSign className="h-4 w-4 mr-2" />}
-                Apply Fix — Re-post as USD ({ocPreview.length} container{ocPreview.length !== 1 ? "s" : ""})
+                {ocPreviewMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4 mr-2" />
+                )}
+                Preview
               </Button>
-            )}
-          </div>
+              {ocPreview && ocPreview.length > 0 && (
+                <Button
+                  onClick={() => ocFixMutation.mutate(ocPreview.map((c) => c.containerId))}
+                  disabled={ocFixMutation.isPending}
+                  data-testid="button-oc-currency-apply"
+                >
+                  {ocFixMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <DollarSign className="h-4 w-4 mr-2" />
+                  )}
+                  Apply Fix — Re-post as USD ({ocPreview.length} container{ocPreview.length !== 1 ? "s" : ""})
+                </Button>
+              )}
+            </div>
 
-          {ocPreview && ocPreview.length > 0 && (
-            <div className="space-y-2" data-testid="section-oc-preview">
-              <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400 p-2 bg-amber-50 dark:bg-amber-950/30 rounded-md">
-                <AlertTriangle className="h-4 w-4 shrink-0" />
+            {ocPreview && ocPreview.length > 0 && (
+              <div className="space-y-2" data-testid="section-oc-preview">
+                <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400 p-2 bg-amber-50 dark:bg-amber-950/30 rounded-md">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>
+                    Found <strong>{ocPreview.length}</strong> container{ocPreview.length !== 1 ? "s" : ""} with non-USD
+                    other charges. The existing EUR vouchers will be deleted and replaced with USD ones. The offload
+                    data is not affected.
+                  </span>
+                </div>
+                <div className="border rounded-md overflow-hidden">
+                  <Table>
+                    <TableHeader className="sticky top-0 z-30 bg-background">
+                      <TableRow>
+                        <TableHead>Container</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-center">Current Currency</TableHead>
+                        <TableHead className="text-center">Will Become</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ocPreview.flatMap((container) =>
+                        container.charges.map((charge, chargeIdx) => (
+                          <TableRow
+                            key={`${container.containerId}-${chargeIdx}`}
+                            data-testid={`row-oc-preview-${container.containerId}-${chargeIdx}`}
+                          >
+                            {chargeIdx === 0 && (
+                              <TableCell rowSpan={container.charges.length} className="font-medium align-top">
+                                {container.containerNumber}
+                              </TableCell>
+                            )}
+                            <TableCell className="text-muted-foreground">{charge.description}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {parseFloat(charge.amount).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                                {charge.currencyCode}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
+                                USD
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+
+            {ocFixResult && (
+              <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm" data-testid="text-oc-fix-result">
+                <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
                 <span>
-                  Found <strong>{ocPreview.length}</strong> container{ocPreview.length !== 1 ? "s" : ""} with non-USD other charges.
-                  The existing EUR vouchers will be deleted and replaced with USD ones. The offload data is not affected.
+                  Done — {ocFixResult.fixed} container{ocFixResult.fixed !== 1 ? "s" : ""} re-posted in USD. The
+                  accounting ledger now shows USD for those other charges.
                 </span>
               </div>
-              <div className="border rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader className="sticky top-0 z-30 bg-background">
-                    <TableRow>
-                      <TableHead>Container</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-center">Current Currency</TableHead>
-                      <TableHead className="text-center">Will Become</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {ocPreview.flatMap(container =>
-                      container.charges.map((charge, chargeIdx) => (
-                        <TableRow key={`${container.containerId}-${chargeIdx}`} data-testid={`row-oc-preview-${container.containerId}-${chargeIdx}`}>
-                          {chargeIdx === 0 && (
-                            <TableCell rowSpan={container.charges.length} className="font-medium align-top">
-                              {container.containerNumber}
-                            </TableCell>
-                          )}
-                          <TableCell className="text-muted-foreground">{charge.description}</TableCell>
-                          <TableCell className="text-right font-mono">
-                            {parseFloat(charge.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
-                              {charge.currencyCode}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300">
-                              USD
-                            </span>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
-
-          {ocFixResult && (
-            <div className="flex items-center gap-2 p-3 rounded-md bg-muted text-sm" data-testid="text-oc-fix-result">
-              <CheckCircle className="h-4 w-4 text-green-600 shrink-0" />
-              <span>
-                Done — {ocFixResult.fixed} container{ocFixResult.fixed !== 1 ? "s" : ""} re-posted in USD.
-                The accounting ledger now shows USD for those other charges.
-              </span>
-            </div>
-          )}
-        </CardContent>
-      </Card>}
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Import Bales ─────────────────────────────────────── */}
       <Card>
@@ -1192,9 +1368,7 @@ export default function FactorySettings() {
             <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
             Import Bales
           </CardTitle>
-          <CardDescription>
-            Bulk import bales from an Excel spreadsheet template.
-          </CardDescription>
+          <CardDescription>Bulk import bales from an Excel spreadsheet template.</CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
           <ImportBalesTab />
@@ -1209,13 +1383,14 @@ export default function FactorySettings() {
             Label Banner Images
           </CardTitle>
           <CardDescription>
-            Replace the colored HMD header banners printed on A4 bale labels. Upload your own image for each of the 5 design colors (purple, green, gold, white, red).
+            Replace the colored HMD header banners printed on A4 bale labels. Upload your own image for each of the 5
+            design colors (purple, green, gold, white, red).
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
           <Button
             variant="outline"
-            onClick={() => window.location.href = "/factory/label-banners"}
+            onClick={() => (window.location.href = "/factory/label-banners")}
             data-testid="button-open-label-banners"
           >
             <Images className="h-4 w-4 mr-2" />
@@ -1233,13 +1408,14 @@ export default function FactorySettings() {
             Product Images
           </CardTitle>
           <CardDescription>
-            Upload and manage product images for each article code. Images can be attached to any bale product and used for catalogues, labels, or reference.
+            Upload and manage product images for each article code. Images can be attached to any bale product and used
+            for catalogues, labels, or reference.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
           <Button
             variant="outline"
-            onClick={() => window.location.href = "/factory/bale-product-images"}
+            onClick={() => (window.location.href = "/factory/bale-product-images")}
             data-testid="button-open-product-images"
           >
             <Images className="h-4 w-4 mr-2" />
@@ -1257,14 +1433,15 @@ export default function FactorySettings() {
             Production WhatsApp Group
           </CardTitle>
           <CardDescription>
-            Select the WhatsApp group that receives the Worker Matrix PDF when production is ended. This group is also used for manual sends from Stock Entry History.
+            Select the WhatsApp group that receives the Worker Matrix PDF when production is ended. This group is also
+            used for manual sends from Stock Entry History.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {prodWaGroupId && !prodWaPickerOpen && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium" data-testid="text-prod-wa-group">
-                {waChats.find(c => c.id === prodWaGroupId)?.name ?? prodWaGroupId}
+                {waChats.find((c) => c.id === prodWaGroupId)?.name ?? prodWaGroupId}
               </span>
               <Button
                 variant="outline"
@@ -1292,19 +1469,20 @@ export default function FactorySettings() {
               <Input
                 placeholder="Search chats…"
                 value={prodWaSearch}
-                onChange={e => setProdWaSearch(e.target.value)}
+                onChange={(e) => setProdWaSearch(e.target.value)}
                 data-testid="input-prod-wa-search"
               />
               <div className="border rounded-md max-h-48 overflow-y-auto text-sm">
                 {waChatsLoading && (
                   <p className="text-muted-foreground text-center py-4">
-                    <Loader2 className="h-4 w-4 inline mr-1 animate-spin" />Loading chats…
+                    <Loader2 className="h-4 w-4 inline mr-1 animate-spin" />
+                    Loading chats…
                   </p>
                 )}
                 {!waChatsLoading && filteredWaChats.length === 0 && (
                   <p className="text-muted-foreground text-center py-4">No chats found</p>
                 )}
-                {filteredWaChats.map(chat => (
+                {filteredWaChats.map((chat) => (
                   <button
                     key={chat.id}
                     type="button"
@@ -1321,9 +1499,10 @@ export default function FactorySettings() {
               </div>
               {prodWaGroupId && (
                 <p className="text-xs text-muted-foreground">
-                  Selected: <span className="font-medium">{
-                    waChats.find(c => c.id === prodWaGroupId)?.name ?? prodWaGroupId
-                  }</span>
+                  Selected:{" "}
+                  <span className="font-medium">
+                    {waChats.find((c) => c.id === prodWaGroupId)?.name ?? prodWaGroupId}
+                  </span>
                 </p>
               )}
               <div className="flex gap-2">
@@ -1333,15 +1512,20 @@ export default function FactorySettings() {
                   disabled={!prodWaGroupId || saveProdWaGroupMutation.isPending}
                   data-testid="button-save-prod-wa-group"
                 >
-                  {saveProdWaGroupMutation.isPending
-                    ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    : <CheckCircle className="h-3 w-3 mr-1" />}
+                  {saveProdWaGroupMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                  )}
                   Save
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setProdWaPickerOpen(false); setProdWaSearch(""); }}
+                  onClick={() => {
+                    setProdWaPickerOpen(false);
+                    setProdWaSearch("");
+                  }}
                   data-testid="button-cancel-prod-wa-group"
                 >
                   Cancel
@@ -1360,14 +1544,15 @@ export default function FactorySettings() {
             Weekly Report WhatsApp Group
           </CardTitle>
           <CardDescription>
-            Select the WhatsApp group that receives the Weekly Production Report Excel file when you press "Send" on the report panel.
+            Select the WhatsApp group that receives the Weekly Production Report Excel file when you press "Send" on the
+            report panel.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {weeklyWaGroupId && !weeklyWaPickerOpen && (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium" data-testid="text-weekly-wa-group">
-                {weeklyWaChats.find(c => c.id === weeklyWaGroupId)?.name ?? weeklyWaGroupId}
+                {weeklyWaChats.find((c) => c.id === weeklyWaGroupId)?.name ?? weeklyWaGroupId}
               </span>
               <Button
                 variant="outline"
@@ -1395,19 +1580,20 @@ export default function FactorySettings() {
               <Input
                 placeholder="Search chats…"
                 value={weeklyWaSearch}
-                onChange={e => setWeeklyWaSearch(e.target.value)}
+                onChange={(e) => setWeeklyWaSearch(e.target.value)}
                 data-testid="input-weekly-wa-search"
               />
               <div className="border rounded-md max-h-48 overflow-y-auto text-sm">
                 {weeklyWaChatsLoading && (
                   <p className="text-muted-foreground text-center py-4">
-                    <Loader2 className="h-4 w-4 inline mr-1 animate-spin" />Loading chats…
+                    <Loader2 className="h-4 w-4 inline mr-1 animate-spin" />
+                    Loading chats…
                   </p>
                 )}
                 {!weeklyWaChatsLoading && filteredWeeklyWaChats.length === 0 && (
                   <p className="text-muted-foreground text-center py-4">No chats found</p>
                 )}
-                {filteredWeeklyWaChats.map(chat => (
+                {filteredWeeklyWaChats.map((chat) => (
                   <button
                     key={chat.id}
                     type="button"
@@ -1424,9 +1610,10 @@ export default function FactorySettings() {
               </div>
               {weeklyWaGroupId && (
                 <p className="text-xs text-muted-foreground">
-                  Selected: <span className="font-medium">{
-                    weeklyWaChats.find(c => c.id === weeklyWaGroupId)?.name ?? weeklyWaGroupId
-                  }</span>
+                  Selected:{" "}
+                  <span className="font-medium">
+                    {weeklyWaChats.find((c) => c.id === weeklyWaGroupId)?.name ?? weeklyWaGroupId}
+                  </span>
                 </p>
               )}
               <div className="flex gap-2">
@@ -1436,15 +1623,20 @@ export default function FactorySettings() {
                   disabled={!weeklyWaGroupId || saveWeeklyWaGroupMutation.isPending}
                   data-testid="button-save-weekly-wa-group"
                 >
-                  {saveWeeklyWaGroupMutation.isPending
-                    ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    : <CheckCircle className="h-3 w-3 mr-1" />}
+                  {saveWeeklyWaGroupMutation.isPending ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : (
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                  )}
                   Save
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setWeeklyWaPickerOpen(false); setWeeklyWaSearch(""); }}
+                  onClick={() => {
+                    setWeeklyWaPickerOpen(false);
+                    setWeeklyWaSearch("");
+                  }}
                   data-testid="button-cancel-weekly-wa-group"
                 >
                   Cancel
@@ -1463,8 +1655,8 @@ export default function FactorySettings() {
             Offline Mode
           </CardTitle>
           <CardDescription>
-            Download all factory data to this device so it works without internet. Mutations
-            made while offline are queued and auto-synced when the connection returns.
+            Download all factory data to this device so it works without internet. Mutations made while offline are
+            queued and auto-synced when the connection returns.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -15,30 +15,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-  FormDescription,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -47,22 +26,24 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CalendarRange, AlertTriangle, CheckCircle } from "lucide-react";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
-const fiscalCloseSchema = z.object({
-  periodStartDate: z.string().min(1, "Start date is required"),
-  periodEndDate: z.string().min(1, "End date is required"),
-  retainedEarningsAccountId: z.string().min(1, "Retained earnings account is required"),
-  notes: z.string().optional(),
-}).refine(
-  (data) => {
-    const start = new Date(data.periodStartDate);
-    const end = new Date(data.periodEndDate);
-    return start <= end;
-  },
-  {
-    message: "Start date must be before or equal to end date",
-    path: ["periodEndDate"],
-  }
-);
+const fiscalCloseSchema = z
+  .object({
+    periodStartDate: z.string().min(1, "Start date is required"),
+    periodEndDate: z.string().min(1, "End date is required"),
+    retainedEarningsAccountId: z.string().min(1, "Retained earnings account is required"),
+    notes: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      const start = new Date(data.periodStartDate);
+      const end = new Date(data.periodEndDate);
+      return start <= end;
+    },
+    {
+      message: "Start date must be before or equal to end date",
+      path: ["periodEndDate"],
+    }
+  );
 
 type FiscalCloseFormData = z.infer<typeof fiscalCloseSchema>;
 
@@ -119,7 +100,8 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
     onSuccess: () => {
       toast({
         title: "Fiscal Period Closed",
-        description: "The fiscal period has been successfully closed. All Income and Expense accounts have been transferred to Retained Earnings.",
+        description:
+          "The fiscal period has been successfully closed. All Income and Expense accounts have been transferred to Retained Earnings.",
       });
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/fiscal-period/closures"] });
@@ -158,9 +140,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
 
   if (!currentCompanyId) {
     return (
-      <div className="p-6 text-center text-muted-foreground">
-        Please select a company to manage fiscal periods.
-      </div>
+      <div className="p-6 text-center text-muted-foreground">Please select a company to manage fiscal periods.</div>
     );
   }
 
@@ -178,9 +158,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-500 mt-0.5" />
             <div>
-              <p className="font-medium text-amber-900 dark:text-amber-200">
-                Read-Only Access
-              </p>
+              <p className="font-medium text-amber-900 dark:text-amber-200">Read-Only Access</p>
               <p className="text-sm text-amber-800 dark:text-amber-300">
                 Only Admins and Owners can close fiscal periods. You can view the closure history below.
               </p>
@@ -209,9 +187,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                         data-testid="input-period-start-date"
                       />
                     </FormControl>
-                    <FormDescription>
-                      First day of the fiscal period
-                    </FormDescription>
+                    <FormDescription>First day of the fiscal period</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -231,9 +207,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                         data-testid="input-period-end-date"
                       />
                     </FormControl>
-                    <FormDescription>
-                      Last day of the fiscal period
-                    </FormDescription>
+                    <FormDescription>Last day of the fiscal period</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -274,9 +248,7 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                       )}
                     </SelectContent>
                   </Select>
-                  <FormDescription>
-                    Net income will be transferred to this account
-                  </FormDescription>
+                  <FormDescription>Net income will be transferred to this account</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -318,13 +290,9 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-4">Fiscal Period Closure History</h3>
         {isLoadingClosures ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Loading closures...
-          </div>
+          <div className="text-center py-8 text-muted-foreground">Loading closures...</div>
         ) : closures.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            No fiscal periods have been closed yet.
-          </div>
+          <div className="text-center py-8 text-muted-foreground">No fiscal periods have been closed yet.</div>
         ) : (
           <Table>
             <TableHeader>
@@ -346,20 +314,21 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                 return (
                   <TableRow key={closure.id} data-testid={`row-closure-${closure.id}`}>
                     <TableCell data-testid={`text-period-${closure.id}`}>
-                      {formatDisplayDate(closure.periodStartDate)} -{" "}
-                      {formatDisplayDate(closure.periodEndDate)}
+                      {formatDisplayDate(closure.periodStartDate)} - {formatDisplayDate(closure.periodEndDate)}
                     </TableCell>
                     <TableCell data-testid={`text-closed-date-${closure.id}`}>
                       {formatDisplayDate(closure.createdAt)}
                     </TableCell>
                     <TableCell data-testid={`text-total-income-${closure.id}`}>
-                      ${parseFloat(closure.totalIncome || "0").toLocaleString(undefined, {
+                      $
+                      {parseFloat(closure.totalIncome || "0").toLocaleString(undefined, {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 2,
                       })}
                     </TableCell>
                     <TableCell data-testid={`text-total-expense-${closure.id}`}>
-                      ${parseFloat(closure.totalExpense || "0").toLocaleString(undefined, {
+                      $
+                      {parseFloat(closure.totalExpense || "0").toLocaleString(undefined, {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 2,
                       })}
@@ -368,20 +337,22 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                       className={isProfit ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}
                       data-testid={`text-net-income-${closure.id}`}
                     >
-                      {isProfit ? "+" : ""}${netIncome.toLocaleString(undefined, {
+                      {isProfit ? "+" : ""}$
+                      {netIncome.toLocaleString(undefined, {
                         minimumFractionDigits: 0,
                         maximumFractionDigits: 2,
                       })}
                     </TableCell>
                     <TableCell data-testid={`text-status-${closure.id}`}>
-                      <Badge variant="outline" className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/50">
+                      <Badge
+                        variant="outline"
+                        className="bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/50"
+                      >
                         <CheckCircle className="h-3 w-3 mr-1" />
                         {closure.status}
                       </Badge>
                     </TableCell>
-                    <TableCell data-testid={`text-notes-${closure.id}`}>
-                      {closure.notes || "-"}
-                    </TableCell>
+                    <TableCell data-testid={`text-notes-${closure.id}`}>{closure.notes || "-"}</TableCell>
                   </TableRow>
                 );
               })}
@@ -400,18 +371,18 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3 text-left">
               <p>
-                This action will close the fiscal period and create closing vouchers that transfer all Income and Expense account balances to Retained Earnings. This operation cannot be undone.
+                This action will close the fiscal period and create closing vouchers that transfer all Income and
+                Expense account balances to Retained Earnings. This operation cannot be undone.
               </p>
               {pendingFormData && (
                 <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
                   <div>
-                    <span className="font-medium">Period:</span>{" "}
-                    {formatDisplayDate(pendingFormData.periodStartDate)} to{" "}
+                    <span className="font-medium">Period:</span> {formatDisplayDate(pendingFormData.periodStartDate)} to{" "}
                     {formatDisplayDate(pendingFormData.periodEndDate)}
                   </div>
                   <div>
-                    <span className="font-medium">Retained Earnings Account:</span>{" "}
-                    {selectedAccount?.name} ({selectedAccount?.code})
+                    <span className="font-medium">Retained Earnings Account:</span> {selectedAccount?.name} (
+                    {selectedAccount?.code})
                   </div>
                   {pendingFormData.notes && (
                     <div>
@@ -420,16 +391,11 @@ export function FiscalPeriodTab({ currentCompanyId, userRole }: FiscalPeriodTabP
                   )}
                 </div>
               )}
-              <p className="text-destructive font-medium">
-                Are you sure you want to proceed?
-              </p>
+              <p className="text-destructive font-medium">Are you sure you want to proceed?</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel
-              disabled={closePeriodMutation.isPending}
-              data-testid="button-cancel-close"
-            >
+            <AlertDialogCancel disabled={closePeriodMutation.isPending} data-testid="button-cancel-close">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction

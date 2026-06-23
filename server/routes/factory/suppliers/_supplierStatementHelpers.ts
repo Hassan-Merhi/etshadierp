@@ -7,44 +7,111 @@ import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import { sqlArray } from "../../../lib/sqlArray";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  factorySupplierCategories, insertFactorySupplierCategorySchema,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
+  factorySupplierCategories,
+  insertFactorySupplierCategorySchema,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -53,24 +120,22 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-const PAYABLE_CONTAINER_STATUSES = new Set([
-  "OFFLOADED",
-  "RECEIVED",
-  "PARTIALLY_RECEIVED",
-]);
+const PAYABLE_CONTAINER_STATUSES = new Set(["OFFLOADED", "RECEIVED", "PARTIALLY_RECEIVED"]);
 
-const isPayableContainer = (c: any) =>
-  PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
-
+const isPayableContainer = (c: any) => PAYABLE_CONTAINER_STATUSES.has(String(c.status || "").toUpperCase());
 
 export async function buildBrokerStatement(brokerId: number, companyId: number, includeOtw = false) {
   // Fetch broker
-  const [broker] = await db.select().from(factorySuppliers)
+  const [broker] = await db
+    .select()
+    .from(factorySuppliers)
     .where(and(eq(factorySuppliers.id, brokerId), eq(factorySuppliers.companyId, companyId)));
   if (!broker) return null;
 
   // Linked suppliers
-  const linkedRaw = await db.select().from(factorySuppliers)
+  const linkedRaw = await db
+    .select()
+    .from(factorySuppliers)
     .where(and(eq(factorySuppliers.parentId, brokerId), eq(factorySuppliers.companyId, companyId)));
 
   const allSuppliers = [broker, ...linkedRaw];
@@ -80,98 +145,135 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
 
   // Containers — exclude OTW unless caller opts in; always exclude soft-deleted
   const containersWhereClause = includeOtw
-    ? and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds), isNull(factoryContainers.deletedAt))
-    : and(eq(factoryContainers.companyId, companyId), inArray(factoryContainers.supplierId, allSupplierIds), isNull(factoryContainers.deletedAt), sql`${factoryContainers.status} NOT IN ('PENDING', 'IN_TRANSIT')`);
-  const allContainers = allSupplierIds.length > 0
-    ? await db.select().from(factoryContainers)
-        .where(containersWhereClause)
-        .orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt)
-    : [];
+    ? and(
+        eq(factoryContainers.companyId, companyId),
+        inArray(factoryContainers.supplierId, allSupplierIds),
+        isNull(factoryContainers.deletedAt)
+      )
+    : and(
+        eq(factoryContainers.companyId, companyId),
+        inArray(factoryContainers.supplierId, allSupplierIds),
+        isNull(factoryContainers.deletedAt),
+        sql`${factoryContainers.status} NOT IN ('PENDING', 'IN_TRANSIT')`
+      );
+  const allContainers =
+    allSupplierIds.length > 0
+      ? await db
+          .select()
+          .from(factoryContainers)
+          .where(containersWhereClause)
+          .orderBy(factoryContainers.arrivalDate, factoryContainers.createdAt)
+      : [];
   // Build a Set of the filtered container IDs so charge queries can be scoped to the same set.
   const filteredContainerIdSet = new Set((allContainers as any[]).map((c: any) => c.id as number));
 
   // Payments (direct)
-  const allPayments = allSupplierIds.length > 0
-    ? await db.select().from(factorySupplierPayments)
-        .where(and(eq(factorySupplierPayments.companyId, companyId), inArray(factorySupplierPayments.supplierId, allSupplierIds)))
-        .orderBy(factorySupplierPayments.date)
-    : [];
+  const allPayments =
+    allSupplierIds.length > 0
+      ? await db
+          .select()
+          .from(factorySupplierPayments)
+          .where(
+            and(
+              eq(factorySupplierPayments.companyId, companyId),
+              inArray(factorySupplierPayments.supplierId, allSupplierIds)
+            )
+          )
+          .orderBy(factorySupplierPayments.date)
+      : [];
 
   // Voucher-based payments (from general accounting, linked via factorySupplierId)
-  const allVoucherPayments = allSupplierIds.length > 0
-    ? await db.select({
-        id: voucherEntries.id,
-        debitAmount: voucherEntries.debitAmount,
-        supplierId: voucherEntries.factorySupplierId,
-        voucherDate: vouchers.voucherDate,
-        description: vouchers.description,
-        voucherNumber: vouchers.voucherNumber,
-        currency: vouchers.currency,
-        optional: vouchers.optional,
-      })
-      .from(voucherEntries)
-      .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
-      .where(and(
-        inArray(voucherEntries.factorySupplierId as any, allSupplierIds),
-        sql`${voucherEntries.debitAmount}::numeric > 0`,
-        sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
-      ))
-      .orderBy(vouchers.voucherDate)
-    : [];
+  const allVoucherPayments =
+    allSupplierIds.length > 0
+      ? await db
+          .select({
+            id: voucherEntries.id,
+            debitAmount: voucherEntries.debitAmount,
+            supplierId: voucherEntries.factorySupplierId,
+            voucherDate: vouchers.voucherDate,
+            description: vouchers.description,
+            voucherNumber: vouchers.voucherNumber,
+            currency: vouchers.currency,
+            optional: vouchers.optional,
+          })
+          .from(voucherEntries)
+          .innerJoin(vouchers, eq(voucherEntries.voucherId, vouchers.id))
+          .where(
+            and(
+              inArray(voucherEntries.factorySupplierId as any, allSupplierIds),
+              sql`${voucherEntries.debitAmount}::numeric > 0`,
+              sql`${vouchers.voucherNumber} NOT LIKE 'FACTORY-PAY-%'`
+            )
+          )
+          .orderBy(vouchers.voucherDate)
+      : [];
 
   // FX transfers (involving any of the suppliers)
-  const allFx = allSupplierIds.length > 0
-    ? await db.select().from(factorySupplierFxTransfers)
-        .where(and(
-          eq(factorySupplierFxTransfers.companyId, companyId),
-          sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${sqlArray(allSupplierIds)}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${sqlArray(allSupplierIds)}))`
-        ))
-        .orderBy(factorySupplierFxTransfers.date)
-    : [];
+  const allFx =
+    allSupplierIds.length > 0
+      ? await db
+          .select()
+          .from(factorySupplierFxTransfers)
+          .where(
+            and(
+              eq(factorySupplierFxTransfers.companyId, companyId),
+              sql`(${factorySupplierFxTransfers.fromSupplierId} = ANY(${sqlArray(allSupplierIds)}) OR ${factorySupplierFxTransfers.toSupplierId} = ANY(${sqlArray(allSupplierIds)}))`
+            )
+          )
+          .orderBy(factorySupplierFxTransfers.date)
+      : [];
 
   // Offload additional charges explicitly assigned to any of the broker's suppliers.
   // Only rows where supplierId IS NOT NULL are included — if a charge was posted to a ledger
   // account (loan, payable, etc.) its supplierId is null intentionally and must NOT appear here.
-  const allOffloadCharges = allSupplierIds.length > 0
-    ? await db.select({
-        id: factoryOffloadAdditionalCharges.id,
-        containerId: factoryOffloadAdditionalCharges.containerId,
-        description: factoryOffloadAdditionalCharges.description,
-        amount: factoryOffloadAdditionalCharges.amount,
-        currencyCode: factoryOffloadAdditionalCharges.currencyCode,
-        fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
-        createdAt: factoryOffloadAdditionalCharges.createdAt,
-        supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
-      })
-      .from(factoryOffloadAdditionalCharges)
-      .where(and(
-        eq(factoryOffloadAdditionalCharges.companyId, companyId),
-        sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
-      ))
-      .orderBy(factoryOffloadAdditionalCharges.createdAt)
-    : [];
+  const allOffloadCharges =
+    allSupplierIds.length > 0
+      ? await db
+          .select({
+            id: factoryOffloadAdditionalCharges.id,
+            containerId: factoryOffloadAdditionalCharges.containerId,
+            description: factoryOffloadAdditionalCharges.description,
+            amount: factoryOffloadAdditionalCharges.amount,
+            currencyCode: factoryOffloadAdditionalCharges.currencyCode,
+            fxRateToUsd: factoryOffloadAdditionalCharges.fxRateToUsd,
+            createdAt: factoryOffloadAdditionalCharges.createdAt,
+            supplierId: (factoryOffloadAdditionalCharges as any).supplierId,
+          })
+          .from(factoryOffloadAdditionalCharges)
+          .where(
+            and(
+              eq(factoryOffloadAdditionalCharges.companyId, companyId),
+              sql`${(factoryOffloadAdditionalCharges as any).supplierId} = ANY(${sqlArray(allSupplierIds)})`
+            )
+          )
+          .orderBy(factoryOffloadAdditionalCharges.createdAt)
+      : [];
 
   // Container-level other charges (entered per-container, use charge's own currency first)
-  const allContainerOtherCharges = allSupplierIds.length > 0
-    ? await db.select({
-        id: factoryContainerOtherCharges.id,
-        containerId: factoryContainerOtherCharges.containerId,
-        description: factoryContainerOtherCharges.description,
-        amount: factoryContainerOtherCharges.amount,
-        createdAt: factoryContainerOtherCharges.createdAt,
-        supplierId: factoryContainers.supplierId,
-        chargeCurrencyCode: factoryContainerOtherCharges.currencyCode,
-        containerCurrencyCode: factoryContainers.currencyCode,
-        containerNumber: factoryContainers.containerNumber,
-      })
-      .from(factoryContainerOtherCharges)
-      .innerJoin(factoryContainers, eq(factoryContainerOtherCharges.containerId, factoryContainers.id))
-      .where(and(
-        eq(factoryContainerOtherCharges.companyId, companyId),
-        inArray(factoryContainers.supplierId, allSupplierIds)
-      ))
-      .orderBy(factoryContainerOtherCharges.createdAt)
-    : [];
+  const allContainerOtherCharges =
+    allSupplierIds.length > 0
+      ? await db
+          .select({
+            id: factoryContainerOtherCharges.id,
+            containerId: factoryContainerOtherCharges.containerId,
+            description: factoryContainerOtherCharges.description,
+            amount: factoryContainerOtherCharges.amount,
+            createdAt: factoryContainerOtherCharges.createdAt,
+            supplierId: factoryContainers.supplierId,
+            chargeCurrencyCode: factoryContainerOtherCharges.currencyCode,
+            containerCurrencyCode: factoryContainers.currencyCode,
+            containerNumber: factoryContainers.containerNumber,
+          })
+          .from(factoryContainerOtherCharges)
+          .innerJoin(factoryContainers, eq(factoryContainerOtherCharges.containerId, factoryContainers.id))
+          .where(
+            and(
+              eq(factoryContainerOtherCharges.companyId, companyId),
+              inArray(factoryContainers.supplierId, allSupplierIds)
+            )
+          )
+          .orderBy(factoryContainerOtherCharges.createdAt)
+      : [];
 
   type LedgerRow = {
     date: string | null;
@@ -193,7 +295,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   // Container rows
   // Always use totalKg (declared/agreed weight) — weight differences at offload affect inventory
   // only, not what is owed to the supplier. This matches computeBalance and computeStats.
-  for (const c of (allContainers as any[])) {
+  for (const c of allContainers as any[]) {
     const supplierName = supplierNameMap[c.supplierId] || "Unknown";
     const cc = c.currencyCode || "USD";
     const kg = parseFloat(c.totalKg || "0");
@@ -206,7 +308,11 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
     const mainAmt = kg * rate;
     const commAmt = parseFloat(c.commissionAmount || "0");
     const commCc = c.commissionCurrencyCode || "USD";
-    const dateVal = c.arrivalDate ? String(c.arrivalDate) : c.createdAt ? new Date(c.createdAt).toISOString().split("T")[0] : null;
+    const dateVal = c.arrivalDate
+      ? String(c.arrivalDate)
+      : c.createdAt
+        ? new Date(c.createdAt).toISOString().split("T")[0]
+        : null;
 
     addRow(cc, {
       date: dateVal,
@@ -282,7 +388,7 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
     if (p.optional) continue;
     const cc = p.currency || "USD";
     const suppId = p.supplierId;
-    const supplierName = suppId ? (supplierNameMap[suppId] || "Unknown") : "Unknown";
+    const supplierName = suppId ? supplierNameMap[suppId] || "Unknown" : "Unknown";
     addRow(cc, {
       date: p.voucherDate ? String(p.voucherDate) : null,
       type: "payment",
@@ -395,27 +501,30 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
 
   // factory_containers.other_charges column where other_charges_supplier_id is in the broker group
   // (distinct from the factoryContainerOtherCharges table which is a separate multi-row charges table)
-  const containerColOtherCharges = allSupplierIds.length > 0
-    ? await db
-        .select({
-          id: factoryContainers.id,
-          containerNumber: factoryContainers.containerNumber,
-          otherCharges: factoryContainers.otherCharges,
-          otherChargesSupplierId: factoryContainers.otherChargesSupplierId,
-          otherChargesCurrencyCode: (factoryContainers as any).otherChargesCurrencyCode,
-          containerCurrencyCode: factoryContainers.currencyCode,
-          arrivalDate: factoryContainers.arrivalDate,
-          createdAt: factoryContainers.createdAt,
-          supplierId: factoryContainers.supplierId,
-        })
-        .from(factoryContainers)
-        .where(and(
-          eq(factoryContainers.companyId, companyId),
-          sql`${factoryContainers.otherChargesSupplierId} = ANY(${sqlArray(allSupplierIds)})`,
-          sql`${factoryContainers.otherCharges}::numeric > 0`,
-          isNull(factoryContainers.deletedAt)
-        ))
-    : [];
+  const containerColOtherCharges =
+    allSupplierIds.length > 0
+      ? await db
+          .select({
+            id: factoryContainers.id,
+            containerNumber: factoryContainers.containerNumber,
+            otherCharges: factoryContainers.otherCharges,
+            otherChargesSupplierId: factoryContainers.otherChargesSupplierId,
+            otherChargesCurrencyCode: (factoryContainers as any).otherChargesCurrencyCode,
+            containerCurrencyCode: factoryContainers.currencyCode,
+            arrivalDate: factoryContainers.arrivalDate,
+            createdAt: factoryContainers.createdAt,
+            supplierId: factoryContainers.supplierId,
+          })
+          .from(factoryContainers)
+          .where(
+            and(
+              eq(factoryContainers.companyId, companyId),
+              sql`${factoryContainers.otherChargesSupplierId} = ANY(${sqlArray(allSupplierIds)})`,
+              sql`${factoryContainers.otherCharges}::numeric > 0`,
+              isNull(factoryContainers.deletedAt)
+            )
+          )
+      : [];
 
   for (const c of containerColOtherCharges as any[]) {
     // Skip charges tied to OTW containers when toggle is off
@@ -424,7 +533,11 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
     const amt = parseFloat(c.otherCharges || "0");
     const chargeSupplierName = supplierNameMap[c.otherChargesSupplierId] || "Unknown";
     const containerSupplierName = supplierNameMap[c.supplierId] || "Unknown";
-    const dateVal = c.arrivalDate ? String(c.arrivalDate) : c.createdAt ? new Date(c.createdAt).toISOString().split("T")[0] : null;
+    const dateVal = c.arrivalDate
+      ? String(c.arrivalDate)
+      : c.createdAt
+        ? new Date(c.createdAt).toISOString().split("T")[0]
+        : null;
     addRow(cc, {
       date: dateVal,
       type: "other_charge",
@@ -463,42 +576,44 @@ export async function buildBrokerStatement(brokerId: number, companyId: number, 
   }
 
   // Build ledgers with running balance
-  const currencyLedgers = Object.entries(ledgerByCurrency).map(([cc, rows]) => {
-    let runBal = 0;
-    const rowsWithBal = rows.map((row) => {
-      // Commission is excluded from the broker balance until explicitly transferred.
-      // commissionAmount is always null now, but guard defensively.
-      runBal += row.amount;
-      return { ...row, runningBalance: runBal };
-    });
-    const containerRows = rows.filter(r => r.type === "container");
-    const totalContainers = containerRows.length;
-    const totalValue = containerRows.reduce((s, r) => s + r.amount, 0);
-    const totalPaid = Math.abs(rows.filter(r => r.type === "payment").reduce((s, r) => s + r.amount, 0));
-    const totalFxOut = Math.abs(rows.filter(r => r.type === "fx_out").reduce((s, r) => s + r.amount, 0));
-    const totalFxIn = rows.filter(r => r.type === "fx_in").reduce((s, r) => s + r.amount, 0);
-    const totalOtherCharges = rows.filter(r => r.type === "other_charge").reduce((s, r) => s + r.amount, 0);
-    const totalFreight = rows.filter(r => r.type === "freight").reduce((s, r) => s + r.amount, 0);
-    // A "broker pool" section is the USD section that has no containers —
-    // it represents USD the broker has received from FX settlements and commission transfers.
-    // Its balance is an ASSET (received), not a payable, so CR/DR labels are inverted vs normal sections.
-    const isBrokerPool = cc === "USD" && totalContainers === 0 && totalFxIn > 0;
-    return {
-      currencyCode: cc,
-      rows: rowsWithBal,
-      totalContainers,
-      totalValue: totalValue.toFixed(2),
-      totalFreight: totalFreight.toFixed(2),
-      totalOtherCharges: totalOtherCharges.toFixed(2),
-      totalPaid: totalPaid.toFixed(2),
-      totalFxOut: totalFxOut.toFixed(2),
-      totalFxIn: totalFxIn.toFixed(2),
-      netBalance: runBal.toFixed(2),
-      isBrokerPool,
-    };
-  }).sort((a, b) => (a.currencyCode === "USD" ? 1 : b.currencyCode === "USD" ? -1 : a.currencyCode.localeCompare(b.currencyCode)));
+  const currencyLedgers = Object.entries(ledgerByCurrency)
+    .map(([cc, rows]) => {
+      let runBal = 0;
+      const rowsWithBal = rows.map((row) => {
+        // Commission is excluded from the broker balance until explicitly transferred.
+        // commissionAmount is always null now, but guard defensively.
+        runBal += row.amount;
+        return { ...row, runningBalance: runBal };
+      });
+      const containerRows = rows.filter((r) => r.type === "container");
+      const totalContainers = containerRows.length;
+      const totalValue = containerRows.reduce((s, r) => s + r.amount, 0);
+      const totalPaid = Math.abs(rows.filter((r) => r.type === "payment").reduce((s, r) => s + r.amount, 0));
+      const totalFxOut = Math.abs(rows.filter((r) => r.type === "fx_out").reduce((s, r) => s + r.amount, 0));
+      const totalFxIn = rows.filter((r) => r.type === "fx_in").reduce((s, r) => s + r.amount, 0);
+      const totalOtherCharges = rows.filter((r) => r.type === "other_charge").reduce((s, r) => s + r.amount, 0);
+      const totalFreight = rows.filter((r) => r.type === "freight").reduce((s, r) => s + r.amount, 0);
+      // A "broker pool" section is the USD section that has no containers —
+      // it represents USD the broker has received from FX settlements and commission transfers.
+      // Its balance is an ASSET (received), not a payable, so CR/DR labels are inverted vs normal sections.
+      const isBrokerPool = cc === "USD" && totalContainers === 0 && totalFxIn > 0;
+      return {
+        currencyCode: cc,
+        rows: rowsWithBal,
+        totalContainers,
+        totalValue: totalValue.toFixed(2),
+        totalFreight: totalFreight.toFixed(2),
+        totalOtherCharges: totalOtherCharges.toFixed(2),
+        totalPaid: totalPaid.toFixed(2),
+        totalFxOut: totalFxOut.toFixed(2),
+        totalFxIn: totalFxIn.toFixed(2),
+        netBalance: runBal.toFixed(2),
+        isBrokerPool,
+      };
+    })
+    .sort((a, b) =>
+      a.currencyCode === "USD" ? 1 : b.currencyCode === "USD" ? -1 : a.currencyCode.localeCompare(b.currencyCode)
+    );
 
   return { supplier: broker, linkedSuppliers: linkedRaw, currencyLedgers };
 }
-
-

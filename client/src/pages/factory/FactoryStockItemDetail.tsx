@@ -91,7 +91,9 @@ export default function FactoryStockItemDetail() {
         <Button variant="ghost" onClick={handleBack} className="gap-2">
           <ArrowLeft className="h-4 w-4" /> Back
         </Button>
-        <Card><CardContent className="p-6 text-center text-muted-foreground">Product not found</CardContent></Card>
+        <Card>
+          <CardContent className="p-6 text-center text-muted-foreground">Product not found</CardContent>
+        </Card>
       </div>
     );
   }
@@ -114,9 +116,7 @@ export default function FactoryStockItemDetail() {
       ) : (
         <div>
           <PageHeader title={data?.product.name ?? "Loading..."} />
-          {data?.product.articleCode && (
-            <p className="text-sm text-muted-foreground">{data.product.articleCode}</p>
-          )}
+          {data?.product.articleCode && <p className="text-sm text-muted-foreground">{data.product.articleCode}</p>}
         </div>
       )}
 
@@ -132,7 +132,6 @@ export default function FactoryStockItemDetail() {
         </Card>
       ) : !data ? null : (
         <div className="space-y-4 sm:space-y-6">
-
           {/* Box 0: Current Stock */}
           <Card>
             <CardHeader className="pb-3">
@@ -149,11 +148,16 @@ export default function FactoryStockItemDetail() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-md border px-4 py-3">
                       <p className="text-xs text-muted-foreground mb-1">Total Bales</p>
-                      <p className="text-2xl font-bold font-mono" data-testid="text-current-stock-qty">{data.currentStock.totalQty}</p>
+                      <p className="text-2xl font-bold font-mono" data-testid="text-current-stock-qty">
+                        {data.currentStock.totalQty}
+                      </p>
                     </div>
                     <div className="rounded-md border px-4 py-3">
                       <p className="text-xs text-muted-foreground mb-1">Total Weight</p>
-                      <p className="text-2xl font-bold font-mono" data-testid="text-current-stock-weight">{fmt(data.currentStock.totalWeight)} <span className="text-sm font-normal text-muted-foreground">kg</span></p>
+                      <p className="text-2xl font-bold font-mono" data-testid="text-current-stock-weight">
+                        {fmt(data.currentStock.totalWeight)}{" "}
+                        <span className="text-sm font-normal text-muted-foreground">kg</span>
+                      </p>
                     </div>
                   </div>
                   {data.currentStock.locations.length > 0 && (
@@ -214,7 +218,9 @@ export default function FactoryStockItemDetail() {
                     <TableBody>
                       {data.pressed.map((row, i) => (
                         <TableRow key={i} data-testid={`row-pressed-${i}`}>
-                          <TableCell className="text-sm">{formatDisplayDate(new Date(row.date + "T00:00:00"))}</TableCell>
+                          <TableCell className="text-sm">
+                            {formatDisplayDate(new Date(row.date + "T00:00:00"))}
+                          </TableCell>
                           <TableCell className="text-right font-mono text-sm">{row.qty}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{fmt(row.totalWeight)}</TableCell>
                         </TableRow>
@@ -223,8 +229,12 @@ export default function FactoryStockItemDetail() {
                     <TableFooter className="sticky bottom-0 z-20 bg-background">
                       <TableRow className="font-semibold text-sm">
                         <TableCell>Total</TableCell>
-                        <TableCell className="text-right font-mono">{data.pressed.reduce((s, r) => s + r.qty, 0)}</TableCell>
-                        <TableCell className="text-right font-mono">{fmt(data.pressed.reduce((s, r) => s + r.totalWeight, 0))}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {data.pressed.reduce((s, r) => s + r.qty, 0)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {fmt(data.pressed.reduce((s, r) => s + r.totalWeight, 0))}
+                        </TableCell>
                       </TableRow>
                     </TableFooter>
                   </Table>
@@ -260,11 +270,15 @@ export default function FactoryStockItemDetail() {
                     <TableBody>
                       {data.sales.map((row, i) => (
                         <TableRow key={i} data-testid={`row-sale-${i}`}>
-                          <TableCell className="text-sm whitespace-nowrap">{formatDisplayDate(new Date(row.orderDate + "T00:00:00"))}</TableCell>
+                          <TableCell className="text-sm whitespace-nowrap">
+                            {formatDisplayDate(new Date(row.orderDate + "T00:00:00"))}
+                          </TableCell>
                           <TableCell className="text-sm">{row.customerName}</TableCell>
                           <TableCell className="text-sm font-mono">{row.invoiceNumber}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{row.qty}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{fmt(parseFloat(row.pricePerBale))}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">
+                            {fmt(parseFloat(row.pricePerBale))}
+                          </TableCell>
                           <TableCell className="text-right font-mono text-sm">{fmt(parseFloat(row.total))}</TableCell>
                         </TableRow>
                       ))}
@@ -272,9 +286,13 @@ export default function FactoryStockItemDetail() {
                     <TableFooter className="sticky bottom-0 z-20 bg-background">
                       <TableRow className="font-semibold text-sm">
                         <TableCell colSpan={3}>Total</TableCell>
-                        <TableCell className="text-right font-mono">{data.sales.reduce((s, r) => s + r.qty, 0)}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {data.sales.reduce((s, r) => s + r.qty, 0)}
+                        </TableCell>
                         <TableCell></TableCell>
-                        <TableCell className="text-right font-mono">{fmt(data.sales.reduce((s, r) => s + parseFloat(r.total), 0))}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {fmt(data.sales.reduce((s, r) => s + parseFloat(r.total), 0))}
+                        </TableCell>
                       </TableRow>
                     </TableFooter>
                   </Table>
@@ -320,8 +338,12 @@ export default function FactoryStockItemDetail() {
                     <TableFooter className="sticky bottom-0 z-20 bg-background">
                       <TableRow className="font-semibold text-sm">
                         <TableCell colSpan={3}>Total</TableCell>
-                        <TableCell className="text-right font-mono">{data.loaded.reduce((s, r) => s + r.qty, 0)}</TableCell>
-                        <TableCell className="text-right font-mono">{fmt(data.loaded.reduce((s, r) => s + parseFloat(r.total), 0))}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {data.loaded.reduce((s, r) => s + r.qty, 0)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono">
+                          {fmt(data.loaded.reduce((s, r) => s + parseFloat(r.total), 0))}
+                        </TableCell>
                       </TableRow>
                     </TableFooter>
                   </Table>
@@ -329,7 +351,6 @@ export default function FactoryStockItemDetail() {
               )}
             </CardContent>
           </Card>
-
         </div>
       )}
     </div>

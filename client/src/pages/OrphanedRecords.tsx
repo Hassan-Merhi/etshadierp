@@ -12,14 +12,7 @@ import { useDateFormat } from "@/contexts/DateFormatContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { AlertCircle, RefreshCw, AlertTriangle, Archive, RotateCcw, Trash2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface OrphanedVoucher {
   id: number;
@@ -130,9 +123,9 @@ export default function OrphanedRecordsPage() {
       return modeApiRequest("POST", "/api/orphaned-records/reassign", data);
     },
     onSuccess: (data: any) => {
-      toast({ 
-        title: "Success", 
-        description: `${data.updated} records reassigned to ${data.newLocationName}` 
+      toast({
+        title: "Success",
+        description: `${data.updated} records reassigned to ${data.newLocationName}`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/orphaned-records"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
@@ -151,9 +144,9 @@ export default function OrphanedRecordsPage() {
       return res.json();
     },
     onSuccess: (data: any) => {
-      toast({ 
-        title: "Deleted", 
-        description: `${data.deleted} orphaned vouchers permanently deleted` 
+      toast({
+        title: "Deleted",
+        description: `${data.deleted} orphaned vouchers permanently deleted`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/orphaned-records"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales-report"] });
@@ -169,16 +162,12 @@ export default function OrphanedRecordsPage() {
     if (selectedVouchers.length === orphanedRecords.length) {
       setSelectedVouchers([]);
     } else {
-      setSelectedVouchers(orphanedRecords.map(v => v.id));
+      setSelectedVouchers(orphanedRecords.map((v) => v.id));
     }
   };
 
   const handleToggleVoucher = (id: number) => {
-    setSelectedVouchers(prev => 
-      prev.includes(id) 
-        ? prev.filter(v => v !== id) 
-        : [...prev, id]
-    );
+    setSelectedVouchers((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   };
 
   const handleReassign = () => {
@@ -210,7 +199,9 @@ export default function OrphanedRecordsPage() {
         <div className="flex items-center gap-3 mb-4">
           <AlertTriangle className="h-6 w-6 text-red-500" />
           <div>
-            <h2 className="text-lg md:text-xl font-semibold" data-testid="heading-unbalanced-vouchers">Unbalanced Vouchers</h2>
+            <h2 className="text-lg md:text-xl font-semibold" data-testid="heading-unbalanced-vouchers">
+              Unbalanced Vouchers
+            </h2>
             <p className="text-sm text-muted-foreground">Vouchers where debits do not equal credits</p>
           </div>
         </div>
@@ -225,74 +216,75 @@ export default function OrphanedRecordsPage() {
           </div>
         ) : (
           <>
-          <div className="hidden md:block">
-          <Table>
-            <TableHeader className="sticky top-0 z-30 bg-background">
-              <TableRow>
-                <TableHead>Voucher #</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead className="text-right">Total Debits</TableHead>
-                <TableHead className="text-right">Total Credits</TableHead>
-                <TableHead className="text-right">Imbalance</TableHead>
-                <TableHead>Description</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader className="sticky top-0 z-30 bg-background">
+                  <TableRow>
+                    <TableHead>Voucher #</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="text-right">Total Debits</TableHead>
+                    <TableHead className="text-right">Total Credits</TableHead>
+                    <TableHead className="text-right">Imbalance</TableHead>
+                    <TableHead>Description</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {unbalancedRecords.map((voucher) => (
+                    <TableRow key={voucher.id} data-testid={`row-unbalanced-${voucher.id}`}>
+                      <TableCell className="font-mono" data-testid={`text-unbalanced-number-${voucher.id}`}>
+                        {voucher.voucherNumber}
+                      </TableCell>
+                      <TableCell data-testid={`text-unbalanced-type-${voucher.id}`}>{voucher.voucherType}</TableCell>
+                      <TableCell data-testid={`text-unbalanced-date-${voucher.id}`}>{voucher.voucherDate}</TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-debits-${voucher.id}`}>
+                        {formatAmount(voucher.totalDebits)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-credits-${voucher.id}`}>
+                        {formatAmount(voucher.totalCredits)}
+                      </TableCell>
+                      <TableCell
+                        className="text-right font-mono text-red-600 font-bold"
+                        data-testid={`text-imbalance-${voucher.id}`}
+                      >
+                        {formatAmount(voucher.imbalance)}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate" data-testid={`text-unbalanced-desc-${voucher.id}`}>
+                        {voucher.description || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="md:hidden space-y-3">
               {unbalancedRecords.map((voucher) => (
-                <TableRow key={voucher.id} data-testid={`row-unbalanced-${voucher.id}`}>
-                  <TableCell className="font-mono" data-testid={`text-unbalanced-number-${voucher.id}`}>
-                    {voucher.voucherNumber}
-                  </TableCell>
-                  <TableCell data-testid={`text-unbalanced-type-${voucher.id}`}>
-                    {voucher.voucherType}
-                  </TableCell>
-                  <TableCell data-testid={`text-unbalanced-date-${voucher.id}`}>
-                    {voucher.voucherDate}
-                  </TableCell>
-                  <TableCell className="text-right font-mono" data-testid={`text-debits-${voucher.id}`}>
-                    {formatAmount(voucher.totalDebits)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono" data-testid={`text-credits-${voucher.id}`}>
-                    {formatAmount(voucher.totalCredits)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-red-600 font-bold" data-testid={`text-imbalance-${voucher.id}`}>
-                    {formatAmount(voucher.imbalance)}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate" data-testid={`text-unbalanced-desc-${voucher.id}`}>
-                    {voucher.description || "-"}
-                  </TableCell>
-                </TableRow>
+                <Card key={voucher.id} className="p-3" data-testid={`card-unbalanced-${voucher.id}`}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="font-mono text-sm font-medium">{voucher.voucherNumber}</span>
+                    <Badge variant="outline">{voucher.voucherType}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{voucher.voucherDate}</p>
+                  <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Debits</p>
+                      <p className="font-mono">{formatAmount(voucher.totalDebits)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Credits</p>
+                      <p className="font-mono">{formatAmount(voucher.totalCredits)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Imbalance</p>
+                      <p className="font-mono text-red-600 font-bold">{formatAmount(voucher.imbalance)}</p>
+                    </div>
+                  </div>
+                  {voucher.description && (
+                    <p className="text-xs text-muted-foreground mt-2 truncate">{voucher.description}</p>
+                  )}
+                </Card>
               ))}
-            </TableBody>
-          </Table>
-          </div>
-          <div className="md:hidden space-y-3">
-            {unbalancedRecords.map((voucher) => (
-              <Card key={voucher.id} className="p-3" data-testid={`card-unbalanced-${voucher.id}`}>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="font-mono text-sm font-medium">{voucher.voucherNumber}</span>
-                  <Badge variant="outline">{voucher.voucherType}</Badge>
-                </div>
-                <p className="text-sm text-muted-foreground">{voucher.voucherDate}</p>
-                <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Debits</p>
-                    <p className="font-mono">{formatAmount(voucher.totalDebits)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Credits</p>
-                    <p className="font-mono">{formatAmount(voucher.totalCredits)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Imbalance</p>
-                    <p className="font-mono text-red-600 font-bold">{formatAmount(voucher.imbalance)}</p>
-                  </div>
-                </div>
-                {voucher.description && <p className="text-xs text-muted-foreground mt-2 truncate">{voucher.description}</p>}
-              </Card>
-            ))}
-          </div>
+            </div>
           </>
         )}
       </Card>
@@ -315,13 +307,13 @@ export default function OrphanedRecordsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button 
-              onClick={handleReassign} 
+            <Button
+              onClick={handleReassign}
               disabled={reassignMutation.isPending || selectedVouchers.length === 0 || !selectedLocation}
               data-testid="button-reassign"
             >
               {reassignMutation.isPending && <RefreshCw className="w-4 h-4 mr-2 animate-spin" />}
-              Reassign {selectedVouchers.length} Record{selectedVouchers.length !== 1 ? 's' : ''}
+              Reassign {selectedVouchers.length} Record{selectedVouchers.length !== 1 ? "s" : ""}
             </Button>
           </div>
         </Card>
@@ -337,7 +329,7 @@ export default function OrphanedRecordsPage() {
             </div>
           </div>
           {orphanedRecords.length > 0 && (
-            <Button 
+            <Button
               variant="destructive"
               onClick={() => deleteAllMutation.mutate()}
               disabled={deleteAllMutation.isPending}
@@ -360,88 +352,84 @@ export default function OrphanedRecordsPage() {
           </div>
         ) : (
           <>
-          <div className="hidden md:block">
-          <Table>
-            <TableHeader className="sticky top-0 z-30 bg-background">
-              <TableRow>
-                <TableHead className="w-12">
-                  <Checkbox 
-                    checked={selectedVouchers.length === orphanedRecords.length && orphanedRecords.length > 0}
-                    onCheckedChange={handleSelectAll}
-                    data-testid="checkbox-select-all"
-                  />
-                </TableHead>
-                <TableHead>Voucher #</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Saved Location Name</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Description</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader className="sticky top-0 z-30 bg-background">
+                  <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedVouchers.length === orphanedRecords.length && orphanedRecords.length > 0}
+                        onCheckedChange={handleSelectAll}
+                        data-testid="checkbox-select-all"
+                      />
+                    </TableHead>
+                    <TableHead>Voucher #</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Saved Location Name</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Description</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orphanedRecords.map((voucher) => (
+                    <TableRow key={voucher.id} data-testid={`row-voucher-${voucher.id}`}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedVouchers.includes(voucher.id)}
+                          onCheckedChange={() => handleToggleVoucher(voucher.id)}
+                          data-testid={`checkbox-voucher-${voucher.id}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-mono" data-testid={`text-voucher-number-${voucher.id}`}>
+                        {voucher.voucherNumber}
+                      </TableCell>
+                      <TableCell data-testid={`text-voucher-type-${voucher.id}`}>{voucher.voucherType}</TableCell>
+                      <TableCell data-testid={`text-voucher-date-${voucher.id}`}>{voucher.voucherDate}</TableCell>
+                      <TableCell data-testid={`text-location-name-${voucher.id}`}>
+                        {voucher.locationName || <span className="text-muted-foreground">Not saved</span>}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-amount-${voucher.id}`}>
+                        {formatAmount(voucher.totalAmount)}
+                      </TableCell>
+                      <TableCell className="max-w-[200px] truncate" data-testid={`text-description-${voucher.id}`}>
+                        {voucher.description || "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="md:hidden space-y-3">
+              <div className="flex items-center gap-2 mb-2">
+                <Checkbox
+                  checked={selectedVouchers.length === orphanedRecords.length && orphanedRecords.length > 0}
+                  onCheckedChange={handleSelectAll}
+                  data-testid="checkbox-select-all-mobile"
+                />
+                <span className="text-sm text-muted-foreground">Select All</span>
+              </div>
               {orphanedRecords.map((voucher) => (
-                <TableRow key={voucher.id} data-testid={`row-voucher-${voucher.id}`}>
-                  <TableCell>
-                    <Checkbox 
+                <Card key={voucher.id} className="p-3" data-testid={`card-voucher-${voucher.id}`}>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
                       checked={selectedVouchers.includes(voucher.id)}
                       onCheckedChange={() => handleToggleVoucher(voucher.id)}
-                      data-testid={`checkbox-voucher-${voucher.id}`}
+                      className="mt-1"
                     />
-                  </TableCell>
-                  <TableCell className="font-mono" data-testid={`text-voucher-number-${voucher.id}`}>
-                    {voucher.voucherNumber}
-                  </TableCell>
-                  <TableCell data-testid={`text-voucher-type-${voucher.id}`}>
-                    {voucher.voucherType}
-                  </TableCell>
-                  <TableCell data-testid={`text-voucher-date-${voucher.id}`}>
-                    {voucher.voucherDate}
-                  </TableCell>
-                  <TableCell data-testid={`text-location-name-${voucher.id}`}>
-                    {voucher.locationName || <span className="text-muted-foreground">Not saved</span>}
-                  </TableCell>
-                  <TableCell className="text-right font-mono" data-testid={`text-amount-${voucher.id}`}>
-                    {formatAmount(voucher.totalAmount)}
-                  </TableCell>
-                  <TableCell className="max-w-[200px] truncate" data-testid={`text-description-${voucher.id}`}>
-                    {voucher.description || "-"}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          </div>
-          <div className="md:hidden space-y-3">
-            <div className="flex items-center gap-2 mb-2">
-              <Checkbox 
-                checked={selectedVouchers.length === orphanedRecords.length && orphanedRecords.length > 0}
-                onCheckedChange={handleSelectAll}
-                data-testid="checkbox-select-all-mobile"
-              />
-              <span className="text-sm text-muted-foreground">Select All</span>
-            </div>
-            {orphanedRecords.map((voucher) => (
-              <Card key={voucher.id} className="p-3" data-testid={`card-voucher-${voucher.id}`}>
-                <div className="flex items-start gap-3">
-                  <Checkbox 
-                    checked={selectedVouchers.includes(voucher.id)}
-                    onCheckedChange={() => handleToggleVoucher(voucher.id)}
-                    className="mt-1"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-mono text-sm font-medium">{voucher.voucherNumber}</span>
-                      <Badge variant="outline">{voucher.voucherType}</Badge>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-sm font-medium">{voucher.voucherNumber}</span>
+                        <Badge variant="outline">{voucher.voucherType}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{voucher.voucherDate}</p>
+                      {voucher.locationName && <p className="text-sm">{voucher.locationName}</p>}
+                      <p className="text-sm font-mono text-right mt-1">{formatAmount(voucher.totalAmount)}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">{voucher.voucherDate}</p>
-                    {voucher.locationName && <p className="text-sm">{voucher.locationName}</p>}
-                    <p className="text-sm font-mono text-right mt-1">{formatAmount(voucher.totalAmount)}</p>
                   </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
           </>
         )}
       </Card>
@@ -451,8 +439,12 @@ export default function OrphanedRecordsPage() {
         <div className="flex items-center gap-3 mb-4">
           <Archive className="h-6 w-6 text-blue-500" />
           <div>
-            <h2 className="text-xl font-semibold" data-testid="heading-archived-stock-groups">Archived Stock Groups</h2>
-            <p className="text-sm text-muted-foreground">Stock groups that have been cleared from locations (can be restored or permanently deleted)</p>
+            <h2 className="text-xl font-semibold" data-testid="heading-archived-stock-groups">
+              Archived Stock Groups
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Stock groups that have been cleared from locations (can be restored or permanently deleted)
+            </p>
           </div>
         </div>
 
@@ -462,108 +454,118 @@ export default function OrphanedRecordsPage() {
           <div className="text-center py-8">
             <Archive className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <p className="text-lg font-medium">No archived stock groups</p>
-            <p className="text-muted-foreground">Archive stock groups from Location Inventory to clear and backup inventory data</p>
+            <p className="text-muted-foreground">
+              Archive stock groups from Location Inventory to clear and backup inventory data
+            </p>
           </div>
         ) : (
           <>
-          <div className="hidden md:block">
-          <Table>
-            <TableHeader className="sticky top-0 z-30 bg-background">
-              <TableRow>
-                <TableHead>Stock Group</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead className="text-right">Items</TableHead>
-                <TableHead className="text-right">Total Qty</TableHead>
-                <TableHead className="text-right">Total Value</TableHead>
-                <TableHead>Archived Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+            <div className="hidden md:block">
+              <Table>
+                <TableHeader className="sticky top-0 z-30 bg-background">
+                  <TableRow>
+                    <TableHead>Stock Group</TableHead>
+                    <TableHead>Location</TableHead>
+                    <TableHead className="text-right">Items</TableHead>
+                    <TableHead className="text-right">Total Qty</TableHead>
+                    <TableHead className="text-right">Total Value</TableHead>
+                    <TableHead>Archived Date</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stockGroupArchives.map((archive) => (
+                    <TableRow key={archive.id} data-testid={`row-archive-${archive.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-archive-group-${archive.id}`}>
+                        {archive.stockGroupName}
+                      </TableCell>
+                      <TableCell data-testid={`text-archive-location-${archive.id}`}>{archive.locationName}</TableCell>
+                      <TableCell className="text-right" data-testid={`text-archive-items-${archive.id}`}>
+                        {archive.itemCount}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-archive-qty-${archive.id}`}>
+                        {parseFloat(archive.totalQuantity).toFixed(3)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-archive-value-${archive.id}`}>
+                        {formatAmount(archive.totalValue)}
+                      </TableCell>
+                      <TableCell data-testid={`text-archive-date-${archive.id}`}>
+                        {formatDisplayDate(archive.archivedAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => restoreArchiveMutation.mutate(archive.id)}
+                            disabled={restoreArchiveMutation.isPending}
+                            data-testid={`button-restore-archive-${archive.id}`}
+                          >
+                            <RotateCcw className="h-4 w-4 mr-1" />
+                            Restore
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => deleteArchiveMutation.mutate({ archiveId: archive.id, permanent: true })}
+                            disabled={deleteArchiveMutation.isPending}
+                            data-testid={`button-delete-archive-${archive.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="md:hidden space-y-3">
               {stockGroupArchives.map((archive) => (
-                <TableRow key={archive.id} data-testid={`row-archive-${archive.id}`}>
-                  <TableCell className="font-medium" data-testid={`text-archive-group-${archive.id}`}>
-                    {archive.stockGroupName}
-                  </TableCell>
-                  <TableCell data-testid={`text-archive-location-${archive.id}`}>
-                    {archive.locationName}
-                  </TableCell>
-                  <TableCell className="text-right" data-testid={`text-archive-items-${archive.id}`}>
-                    {archive.itemCount}
-                  </TableCell>
-                  <TableCell className="text-right font-mono" data-testid={`text-archive-qty-${archive.id}`}>
-                    {parseFloat(archive.totalQuantity).toFixed(3)}
-                  </TableCell>
-                  <TableCell className="text-right font-mono" data-testid={`text-archive-value-${archive.id}`}>
-                    {formatAmount(archive.totalValue)}
-                  </TableCell>
-                  <TableCell data-testid={`text-archive-date-${archive.id}`}>
-                    {formatDisplayDate(archive.archivedAt)}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => restoreArchiveMutation.mutate(archive.id)}
-                        disabled={restoreArchiveMutation.isPending}
-                        data-testid={`button-restore-archive-${archive.id}`}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-1" />
-                        Restore
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => deleteArchiveMutation.mutate({ archiveId: archive.id, permanent: true })}
-                        disabled={deleteArchiveMutation.isPending}
-                        data-testid={`button-delete-archive-${archive.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
+                <Card key={archive.id} className="p-3" data-testid={`card-archive-${archive.id}`}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="font-medium text-sm">{archive.stockGroupName}</span>
+                    <span className="text-sm text-muted-foreground">{archive.locationName}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-sm mb-2">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Items</p>
+                      <p>{archive.itemCount}</p>
                     </div>
-                  </TableCell>
-                </TableRow>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Qty</p>
+                      <p className="font-mono">{parseFloat(archive.totalQuantity).toFixed(3)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Value</p>
+                      <p className="font-mono">{formatAmount(archive.totalValue)}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">{formatDisplayDate(archive.archivedAt)}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => restoreArchiveMutation.mutate(archive.id)}
+                      disabled={restoreArchiveMutation.isPending}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                      Restore
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => deleteArchiveMutation.mutate({ archiveId: archive.id, permanent: true })}
+                      disabled={deleteArchiveMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  </div>
+                </Card>
               ))}
-            </TableBody>
-          </Table>
-          </div>
-          <div className="md:hidden space-y-3">
-            {stockGroupArchives.map((archive) => (
-              <Card key={archive.id} className="p-3" data-testid={`card-archive-${archive.id}`}>
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <span className="font-medium text-sm">{archive.stockGroupName}</span>
-                  <span className="text-sm text-muted-foreground">{archive.locationName}</span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-sm mb-2">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Items</p>
-                    <p>{archive.itemCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Qty</p>
-                    <p className="font-mono">{parseFloat(archive.totalQuantity).toFixed(3)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Value</p>
-                    <p className="font-mono">{formatAmount(archive.totalValue)}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-muted-foreground mb-2">{formatDisplayDate(archive.archivedAt)}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => restoreArchiveMutation.mutate(archive.id)} disabled={restoreArchiveMutation.isPending}>
-                    <RotateCcw className="h-4 w-4 mr-1" />
-                    Restore
-                  </Button>
-                  <Button size="sm" variant="destructive" onClick={() => deleteArchiveMutation.mutate({ archiveId: archive.id, permanent: true })} disabled={deleteArchiveMutation.isPending}>
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
-                </div>
-              </Card>
-            ))}
-          </div>
+            </div>
           </>
         )}
       </Card>
@@ -571,9 +573,18 @@ export default function OrphanedRecordsPage() {
       <Card className="p-4 bg-muted/50">
         <h3 className="font-semibold mb-2">How this works:</h3>
         <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-          <li><strong>Unbalanced Vouchers:</strong> These have accounting errors where debits don't equal credits. Review and fix manually in the voucher editor.</li>
-          <li><strong>Deleted Location Vouchers:</strong> These reference locations that have been deleted. Select records and reassign to a valid location.</li>
-          <li><strong>Archived Stock Groups:</strong> Stock groups that have been cleared from a location. Restore to recover the inventory, or permanently delete after re-importing.</li>
+          <li>
+            <strong>Unbalanced Vouchers:</strong> These have accounting errors where debits don't equal credits. Review
+            and fix manually in the voucher editor.
+          </li>
+          <li>
+            <strong>Deleted Location Vouchers:</strong> These reference locations that have been deleted. Select records
+            and reassign to a valid location.
+          </li>
+          <li>
+            <strong>Archived Stock Groups:</strong> Stock groups that have been cleared from a location. Restore to
+            recover the inventory, or permanently delete after re-importing.
+          </li>
           <li>The location name is saved on vouchers to preserve history if the location is deleted in the future.</li>
         </ul>
       </Card>

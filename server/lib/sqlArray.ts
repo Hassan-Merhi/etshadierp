@@ -18,9 +18,10 @@ import { sql } from "drizzle-orm";
  *   sql`WHERE status = ANY(${sqlArray(statuses)})`
  */
 export const sqlArray = (arr: (string | number)[]) => {
-  const joined = sql.join(arr.map(v => sql`${v}`), sql`, `);
-  const isNumeric = arr.length > 0 && arr.every(v => typeof v === "number");
-  return isNumeric
-    ? sql`ARRAY[${joined}]::int[]`
-    : sql`ARRAY[${joined}]::text[]`;
+  const joined = sql.join(
+    arr.map((v) => sql`${v}`),
+    sql`, `
+  );
+  const isNumeric = arr.length > 0 && arr.every((v) => typeof v === "number");
+  return isNumeric ? sql`ARRAY[${joined}]::int[]` : sql`ARRAY[${joined}]::text[]`;
 };

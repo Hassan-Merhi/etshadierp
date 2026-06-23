@@ -13,7 +13,21 @@ import { useAppMode } from "@/contexts/AppModeContext";
 import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
-import { ArrowLeft, Check, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, Pencil, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  RotateCcw,
+  Ship,
+  Truck,
+  AlertTriangle,
+  CheckCircle,
+  Package,
+  Trash2,
+  Plus,
+  Wrench,
+  Pencil,
+  X,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -137,7 +151,9 @@ export default function PendingInvoiceVerify() {
   const { data: verification, isLoading: verificationLoading } = useQuery<VerificationSummary>({
     queryKey: ["/api/factory/customer-orders", orderId, "verification"],
     queryFn: async () => {
-      const res = await fetch(`/api/factory/customer-orders/${orderId}/verification-summary`, { credentials: "include" });
+      const res = await fetch(`/api/factory/customer-orders/${orderId}/verification-summary`, {
+        credentials: "include",
+      });
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         throw new Error(errBody.message || `Server error ${res.status} on verification-summary`);
@@ -164,7 +180,8 @@ export default function PendingInvoiceVerify() {
     queryKey: ["/api/auth/me"],
     retry: false,
   });
-  const isAdminOrOwner = currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
+  const isAdminOrOwner =
+    currentUser?.role === "Admin" || currentUser?.role === "Owner" || currentUser?.role === "Developer";
   const isDeveloper = currentUser?.role === "Developer";
 
   const { data: ledgerAccounts = [] } = useQuery<{ id: number; name: string; code: string; accountType: string }[]>({
@@ -357,15 +374,36 @@ export default function PendingInvoiceVerify() {
   const getStatusBadge = (status: ComparisonItem["status"]) => {
     switch (status) {
       case "LOADED_NOT_IN_PROFORMA":
-        return <Badge variant="destructive" data-testid="badge-loaded-not-in-proforma">Not in Proforma</Badge>;
+        return (
+          <Badge variant="destructive" data-testid="badge-loaded-not-in-proforma">
+            Not in Proforma
+          </Badge>
+        );
       case "MISSING_FROM_LOADED":
-        return <Badge variant="destructive" data-testid="badge-missing-from-loaded">Missing</Badge>;
+        return (
+          <Badge variant="destructive" data-testid="badge-missing-from-loaded">
+            Missing
+          </Badge>
+        );
       case "UNDER_LOADED":
-        return <Badge variant="outline" className="status-warning" data-testid="badge-under-loaded">Under Loaded</Badge>;
+        return (
+          <Badge variant="outline" className="status-warning" data-testid="badge-under-loaded">
+            Under Loaded
+          </Badge>
+        );
       case "OVER_LOADED":
-        return <Badge variant="outline" className="status-success" data-testid="badge-over-loaded">Over Loaded</Badge>;
+        return (
+          <Badge variant="outline" className="status-success" data-testid="badge-over-loaded">
+            Over Loaded
+          </Badge>
+        );
       case "MATCH":
-        return <Badge variant="outline" className="status-success" data-testid="badge-match"><CheckCircle className="h-3 w-3 mr-1" />Match</Badge>;
+        return (
+          <Badge variant="outline" className="status-success" data-testid="badge-match">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Match
+          </Badge>
+        );
       default:
         return null;
     }
@@ -403,7 +441,9 @@ export default function PendingInvoiceVerify() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Verify Order #{orderId}</h1>
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+              Verify Order #{orderId}
+            </h1>
             <p className="text-muted-foreground text-sm">Review loaded bales against proforma</p>
           </div>
         </div>
@@ -461,17 +501,17 @@ export default function PendingInvoiceVerify() {
             const getProformaRowClass = (articleCode: string) => {
               const cmp = comparisonMap.get(articleCode);
               if (!cmp) return "";
-              if (cmp.status === "UNDER_LOADED" || cmp.status === "MISSING_FROM_LOADED")
-                return "status-danger";
-              if (cmp.status === "OVER_LOADED")
-                return "status-success";
+              if (cmp.status === "UNDER_LOADED" || cmp.status === "MISSING_FROM_LOADED") return "status-danger";
+              if (cmp.status === "OVER_LOADED") return "status-success";
               return "";
             };
 
             return (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">Proforma Expected <span className="text-muted-foreground font-normal">(mismatches only)</span></h3>
+                  <h3 className="font-semibold text-sm mb-3" data-testid="text-proforma-header">
+                    Proforma Expected <span className="text-muted-foreground font-normal">(mismatches only)</span>
+                  </h3>
                   {filteredProformaLines.length > 0 ? (
                     <Table wrapperClassName="max-h-[50vh] overflow-auto">
                       <TableHeader className="sticky top-0 z-30 bg-background">
@@ -487,8 +527,15 @@ export default function PendingInvoiceVerify() {
                         {filteredProformaLines.map((line, i) => {
                           const cmp = comparisonMap.get(line.articleCode);
                           return (
-                            <TableRow key={i} className={getProformaRowClass(line.articleCode)} data-testid={`row-proforma-${line.articleCode}`}>
-                              <TableCell className="font-mono text-sm" data-testid={`text-proforma-article-${line.articleCode}`}>
+                            <TableRow
+                              key={i}
+                              className={getProformaRowClass(line.articleCode)}
+                              data-testid={`row-proforma-${line.articleCode}`}
+                            >
+                              <TableCell
+                                className="font-mono text-sm"
+                                data-testid={`text-proforma-article-${line.articleCode}`}
+                              >
                                 {line.articleCode}
                               </TableCell>
                               <TableCell className="text-sm">{line.productName}</TableCell>
@@ -501,12 +548,16 @@ export default function PendingInvoiceVerify() {
                       </TableBody>
                     </Table>
                   ) : (
-                    <p className="text-sm text-muted-foreground" data-testid="text-no-proforma-mismatches">All proforma items matched - no mismatches</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-proforma-mismatches">
+                      All proforma items matched - no mismatches
+                    </p>
                   )}
                 </div>
 
                 <div>
-                  <h3 className="font-semibold text-sm mb-3" data-testid="text-loaded-header">Loaded Bales</h3>
+                  <h3 className="font-semibold text-sm mb-3" data-testid="text-loaded-header">
+                    Loaded Bales
+                  </h3>
                   {verification?.loadedItems && verification.loadedItems.length > 0 ? (
                     <Table wrapperClassName="max-h-[50vh] overflow-auto">
                       <TableHeader className="sticky top-0 z-30 bg-background">
@@ -524,12 +575,17 @@ export default function PendingInvoiceVerify() {
                           const isEditing = editingPrice?.articleCode === group.articleCode;
                           return (
                             <TableRow key={i} data-testid={`row-loaded-${group.articleCode}`}>
-                              <TableCell className="font-mono text-sm" data-testid={`text-loaded-article-${group.articleCode}`}>
+                              <TableCell
+                                className="font-mono text-sm"
+                                data-testid={`text-loaded-article-${group.articleCode}`}
+                              >
                                 {group.articleCode}
                               </TableCell>
                               <TableCell className="text-sm">{group.productName}</TableCell>
                               <TableCell className="text-right font-mono">{group.qty}</TableCell>
-                              <TableCell className="text-right font-mono">{(group.totalWeight || 0).toFixed(2)}</TableCell>
+                              <TableCell className="text-right font-mono">
+                                {(group.totalWeight || 0).toFixed(2)}
+                              </TableCell>
                               <TableCell className="text-right">
                                 {isEditing ? (
                                   <div className="flex items-center justify-end gap-1">
@@ -539,7 +595,9 @@ export default function PendingInvoiceVerify() {
                                       step="0.01"
                                       className="w-24 h-7 text-right text-sm font-mono px-2"
                                       value={editingPrice!.value}
-                                      onChange={(e) => setEditingPrice({ articleCode: group.articleCode, value: e.target.value })}
+                                      onChange={(e) =>
+                                        setEditingPrice({ articleCode: group.articleCode, value: e.target.value })
+                                      }
                                       onKeyDown={(e) => {
                                         if (e.key === "Enter") handleSavePrice(group.articleCode);
                                         if (e.key === "Escape") setEditingPrice(null);
@@ -570,22 +628,33 @@ export default function PendingInvoiceVerify() {
                                 ) : (
                                   <div
                                     className="flex items-center justify-end gap-1 group cursor-pointer"
-                                    onClick={() => setEditingPrice({ articleCode: group.articleCode, value: String(group.pricePerBale || "0") })}
+                                    onClick={() =>
+                                      setEditingPrice({
+                                        articleCode: group.articleCode,
+                                        value: String(group.pricePerBale || "0"),
+                                      })
+                                    }
                                     data-testid={`cell-price-${group.articleCode}`}
                                   >
-                                    <span className="font-mono text-sm">{parseFloat(group.pricePerBale || "0").toFixed(2)}</span>
+                                    <span className="font-mono text-sm">
+                                      {parseFloat(group.pricePerBale || "0").toFixed(2)}
+                                    </span>
                                     <Pencil className="h-3 w-3 text-muted-foreground invisible group-hover:visible" />
                                   </div>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right font-mono text-sm">{(group.totalPrice || 0).toFixed(2)}</TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {(group.totalPrice || 0).toFixed(2)}
+                              </TableCell>
                             </TableRow>
                           );
                         })}
                       </TableBody>
                     </Table>
                   ) : (
-                    <p className="text-sm text-muted-foreground" data-testid="text-no-loaded">No loaded bales</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-no-loaded">
+                      No loaded bales
+                    </p>
                   )}
                 </div>
               </div>
@@ -597,12 +666,20 @@ export default function PendingInvoiceVerify() {
       {(() => {
         const comparison = verification?.comparison || [];
         const overloadedItems = comparison.filter((c) => c.status === "OVER_LOADED");
-        const lessLoadedItems = comparison.filter((c) => c.status === "UNDER_LOADED" || c.status === "MISSING_FROM_LOADED");
+        const lessLoadedItems = comparison.filter(
+          (c) => c.status === "UNDER_LOADED" || c.status === "MISSING_FROM_LOADED"
+        );
         const loadedNotRequestedItems = comparison.filter((c) => c.status === "LOADED_NOT_IN_PROFORMA");
         const formatTotal = (item: ComparisonItem) => {
           const w = Number(item.totalWeight) || 0;
           const p = Number(item.totalPrice) || 0;
-          if (w > 0 && p > 0) return <><div>{w.toFixed(2)} kg</div><div className="text-muted-foreground text-xs">${p.toFixed(2)}</div></>;
+          if (w > 0 && p > 0)
+            return (
+              <>
+                <div>{w.toFixed(2)} kg</div>
+                <div className="text-muted-foreground text-xs">${p.toFixed(2)}</div>
+              </>
+            );
           if (w > 0) return <>{w.toFixed(2)} kg</>;
           if (p > 0) return <>${p.toFixed(2)}</>;
           return <>-</>;
@@ -611,7 +688,9 @@ export default function PendingInvoiceVerify() {
         const renderSummaryTable = (title: string, items: ComparisonItem[], colorClass: string, testId: string) => (
           <Card className="mb-4">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold">{title} ({items.length})</CardTitle>
+              <CardTitle className="text-sm font-semibold">
+                {title} ({items.length})
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {items.length > 0 ? (
@@ -642,7 +721,9 @@ export default function PendingInvoiceVerify() {
                   </TableBody>
                 </Table>
               ) : (
-                <p className="text-sm text-muted-foreground" data-testid={`text-none-${testId}`}>None</p>
+                <p className="text-sm text-muted-foreground" data-testid={`text-none-${testId}`}>
+                  None
+                </p>
               )}
             </CardContent>
           </Card>
@@ -656,7 +737,12 @@ export default function PendingInvoiceVerify() {
             </h2>
             {renderSummaryTable("Overloaded", overloadedItems, "bg-green-50 dark:bg-green-950", "overloaded")}
             {renderSummaryTable("Less Loaded", lessLoadedItems, "bg-red-50 dark:bg-red-950", "less-loaded")}
-            {renderSummaryTable("Loaded Not Requested", loadedNotRequestedItems, "bg-red-50 dark:bg-red-950", "not-requested")}
+            {renderSummaryTable(
+              "Loaded Not Requested",
+              loadedNotRequestedItems,
+              "bg-red-50 dark:bg-red-950",
+              "not-requested"
+            )}
           </div>
         );
       })()}
@@ -713,7 +799,9 @@ export default function PendingInvoiceVerify() {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-sm">Freight &amp; Charges</CardTitle>
-          <p className="text-xs text-muted-foreground">These will be billed to the customer and posted to the selected account</p>
+          <p className="text-xs text-muted-foreground">
+            These will be billed to the customer and posted to the selected account
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
           {charges.length > 0 && (
@@ -721,13 +809,19 @@ export default function PendingInvoiceVerify() {
               {charges.map((charge) => {
                 const acct = ledgerAccounts.find((a) => a.id === charge.ledgerAccountId);
                 return (
-                  <div key={charge.id} className="flex items-center justify-between gap-2" data-testid={`row-charge-${charge.id}`}>
+                  <div
+                    key={charge.id}
+                    className="flex items-center justify-between gap-2"
+                    data-testid={`row-charge-${charge.id}`}
+                  >
                     <div className="flex flex-col min-w-0">
                       <span className="text-sm font-medium">{charge.name}</span>
                       {acct && <span className="text-xs text-muted-foreground">{acct.name}</span>}
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>{parseFloat(charge.amount).toFixed(2)}</span>
+                      <span className="font-mono text-sm" data-testid={`text-charge-amount-${charge.id}`}>
+                        {parseFloat(charge.amount).toFixed(2)}
+                      </span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -921,11 +1015,15 @@ export default function PendingInvoiceVerify() {
               <div className="flex flex-wrap items-center gap-4">
                 <div className="text-sm">
                   <span className="text-muted-foreground">Bales in order:</span>{" "}
-                  <span className="font-semibold" data-testid="text-preview-total">{finalizePreview.totalBalesInOrder}</span>
+                  <span className="font-semibold" data-testid="text-preview-total">
+                    {finalizePreview.totalBalesInOrder}
+                  </span>
                 </div>
                 <div className="text-sm">
                   <span className="text-muted-foreground">Will be removed from stock:</span>{" "}
-                  <span className="font-semibold" data-testid="text-preview-removable">{finalizePreview.baleCount}</span>
+                  <span className="font-semibold" data-testid="text-preview-removable">
+                    {finalizePreview.baleCount}
+                  </span>
                 </div>
               </div>
 
@@ -968,7 +1066,11 @@ export default function PendingInvoiceVerify() {
               )}
 
               <div className="flex items-center justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowFinalizePreview(false)} data-testid="button-cancel-finalize">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowFinalizePreview(false)}
+                  data-testid="button-cancel-finalize"
+                >
                   Cancel
                 </Button>
                 <Button
@@ -993,17 +1095,14 @@ export default function PendingInvoiceVerify() {
           <AlertDialogHeader>
             <AlertDialogTitle>Fix Bale Statuses</AlertDialogTitle>
             <AlertDialogDescription>
-              This will mark all bales attached to this order as SOLD, removing them from inventory.
-              Use this only if bales were accidentally returned to stock after a previous finalization.
-              This does not create invoices or customer balance entries.
+              This will mark all bales attached to this order as SOLD, removing them from inventory. Use this only if
+              bales were accidentally returned to stock after a previous finalization. This does not create invoices or
+              customer balance entries.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-cancel-fix-bales">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => forceSyncMutation.mutate()}
-              data-testid="button-confirm-fix-bales"
-            >
+            <AlertDialogAction onClick={() => forceSyncMutation.mutate()} data-testid="button-confirm-fix-bales">
               <Wrench className="mr-2 h-4 w-4" />
               Fix Bale Statuses
             </AlertDialogAction>

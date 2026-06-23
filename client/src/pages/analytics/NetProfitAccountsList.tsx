@@ -8,8 +8,8 @@ interface NetProfitAccountsListProps {
 }
 
 export function NetProfitAccountsList({ accts, appMode }: NetProfitAccountsListProps) {
-  const nonZero = accts.filter(a => Number(a.debit) !== 0 || Number(a.credit) !== 0);
-  
+  const nonZero = accts.filter((a) => Number(a.debit) !== 0 || Number(a.credit) !== 0);
+
   if (nonZero.length === 0) {
     return (
       <TableRow>
@@ -20,7 +20,7 @@ export function NetProfitAccountsList({ accts, appMode }: NetProfitAccountsListP
     );
   }
 
-  return nonZero.map(acc => (
+  return nonZero.map((acc) => (
     <TableRow
       key={acc.id}
       className="hover-elevate cursor-pointer"

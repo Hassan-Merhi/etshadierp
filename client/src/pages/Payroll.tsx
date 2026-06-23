@@ -14,7 +14,16 @@ import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useDateFormat } from "@/contexts/DateFormatContext";
 
 import ERPRunPayroll from "@/components/ERPRunPayroll";
-import { depositSchema, withdrawalSchema, bulkPaymentSchema, getThisMonthRange, type DepositFormData, type WithdrawalFormData, type BulkPaymentFormData, type SalaryAdvance } from "./payroll/payrollSchemas";
+import {
+  depositSchema,
+  withdrawalSchema,
+  bulkPaymentSchema,
+  getThisMonthRange,
+  type DepositFormData,
+  type WithdrawalFormData,
+  type BulkPaymentFormData,
+  type SalaryAdvance,
+} from "./payroll/payrollSchemas";
 
 import { DepositDialog } from "./payroll/DepositDialog";
 import { WithdrawalDialog } from "./payroll/WithdrawalDialog";
@@ -42,7 +51,7 @@ export default function Payroll() {
   const { selectedCompany, companies } = useCompany();
 
   const [selectedTab, setSelectedTab] = useState("employees");
-  
+
   // Shared state for dialogs
   const [empSearch, setEmpSearch] = useState("");
   const [empStatusFilter, setEmpStatusFilter] = useState("Active");
@@ -53,12 +62,25 @@ export default function Payroll() {
   const [bonusSalesLocationId, setBonusSalesLocationId] = useState<string>("");
   const [bonusSalesStart, setBonusSalesStart] = useState<string>("");
   const [bonusSalesEnd, setBonusSalesEnd] = useState<string>("");
-  const [bonusSalesPreview, setBonusSalesPreview] = useState<{ totalSalesAmount: string; totalQuantity: string; locationName: string } | null>(null);
+  const [bonusSalesPreview, setBonusSalesPreview] = useState<{
+    totalSalesAmount: string;
+    totalQuantity: string;
+    locationName: string;
+  } | null>(null);
   const [bonusSalesLoading, setBonusSalesLoading] = useState(false);
   const [bonusSalesCustomPct, setBonusSalesCustomPct] = useState<string>("");
-  const [bonusDate, setBonusDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [bonusDate, setBonusDate] = useState<string>(new Date().toLocaleDateString("en-CA"));
   const [bonusNotes, setBonusNotes] = useState<string>("");
-  const [balesRows, setBalesRows] = useState<Array<{ locationId: string; sourceCompanyId: string; qty: string; rate: string; preview: string | null; loading: boolean }>>([{ locationId: "", sourceCompanyId: "", qty: "", rate: "", preview: null, loading: false }]);
+  const [balesRows, setBalesRows] = useState<
+    Array<{
+      locationId: string;
+      sourceCompanyId: string;
+      qty: string;
+      rate: string;
+      preview: string | null;
+      loading: boolean;
+    }>
+  >([{ locationId: "", sourceCompanyId: "", qty: "", rate: "", preview: null, loading: false }]);
   const [balesPeriod, setBalesPeriod] = useState<"thisMonth" | "custom">("thisMonth");
   const [balesStart, setBalesStart] = useState<string>("");
   const [balesEnd, setBalesEnd] = useState<string>("");
@@ -73,11 +95,21 @@ export default function Payroll() {
   const [newWorkerDialogOpen, setNewWorkerDialogOpen] = useState(false);
   const [editWorkerDialogOpen, setEditWorkerDialogOpen] = useState(false);
   const [selectedWorkerForEdit, setSelectedWorkerForEdit] = useState<Employee | null>(null);
-  const [workerOverrides, setWorkerOverrides] = useState<Record<number, { amount?: string; selected?: boolean; manuallyEdited?: boolean }>>({});
+  const [workerOverrides, setWorkerOverrides] = useState<
+    Record<number, { amount?: string; selected?: boolean; manuallyEdited?: boolean }>
+  >({});
   const [createEmployeeDialogOpen, setCreateEmployeeDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
-  const [deleteConflict, setDeleteConflict] = useState<{ employee: Employee; employeeBalance: number; ledgerBalance: number } | null>(null);
-  const [deleteWorkerConflict, setDeleteWorkerConflict] = useState<{ employee: Employee; employeeBalance: number; ledgerBalance: number } | null>(null);
+  const [deleteConflict, setDeleteConflict] = useState<{
+    employee: Employee;
+    employeeBalance: number;
+    ledgerBalance: number;
+  } | null>(null);
+  const [deleteWorkerConflict, setDeleteWorkerConflict] = useState<{
+    employee: Employee;
+    employeeBalance: number;
+    ledgerBalance: number;
+  } | null>(null);
   const [statementEmployee, setStatementEmployee] = useState<(Employee & { calculatedBalance?: string }) | null>(null);
   const [statementExpanded, setStatementExpanded] = useState(false);
   const [editEmployeeDialogOpen, setEditEmployeeDialogOpen] = useState(false);
@@ -88,24 +120,30 @@ export default function Payroll() {
   const [workerDeductionDate, setWorkerDeductionDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [bulkDepositSelections, setBulkDepositSelections] = useState<Record<number, boolean>>({});
   const [bulkDepositDialogOpen, setBulkDepositDialogOpen] = useState(false);
-  const [bulkDepositDate, setBulkDepositDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [bulkDepositDate, setBulkDepositDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [bulkDepositNotes, setBulkDepositNotes] = useState("");
-  const [editBaleRates, setEditBaleRates] = useState<{ locationId: string; rate: string; sourceCompanyId: string }[]>([]);
-  const [editBalePctRates, setEditBalePctRates] = useState<{ locationId: string; pct: string; sourceCompanyId: string }[]>([]);
+  const [editBaleRates, setEditBaleRates] = useState<{ locationId: string; rate: string; sourceCompanyId: string }[]>(
+    []
+  );
+  const [editBalePctRates, setEditBalePctRates] = useState<
+    { locationId: string; pct: string; sourceCompanyId: string }[]
+  >([]);
   const [bulkBonusAutoMonth, setBulkBonusAutoMonth] = useState<"thisMonth" | "custom">("thisMonth");
   const [bulkBonusAutoStart, setBulkBonusAutoStart] = useState(() => getThisMonthRange().start);
   const [bulkBonusAutoEnd, setBulkBonusAutoEnd] = useState(() => getThisMonthRange().end);
   const [bulkBonusAutoLoading, setBulkBonusAutoLoading] = useState(false);
   const [bulkBonusAutoPctLocationId, setBulkBonusAutoPctLocationId] = useState<string>("");
   const [bulkBonusDialogOpen, setBulkBonusDialogOpen] = useState(false);
-  const [bulkBonusDate, setBulkBonusDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [bulkBonusDate, setBulkBonusDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [bulkBonusNotes, setBulkBonusNotes] = useState("");
   const [bulkBonusAmounts, setBulkBonusAmounts] = useState<Record<number, string>>({});
   const [bulkBonusBreakdowns, setBulkBonusBreakdowns] = useState<Record<number, string[]>>({});
   const [bulkBonusStep, setBulkBonusStep] = useState<"edit" | "preview">("edit");
-  const [pendingBonuses, setPendingBonuses] = useState<Record<number, { amount: number; description: string; employeeName: string }>>({});
+  const [pendingBonuses, setPendingBonuses] = useState<
+    Record<number, { amount: number; description: string; employeeName: string }>
+  >({});
   const [bulkWithdrawalDialogOpen, setBulkWithdrawalDialogOpen] = useState(false);
-  const [bulkWithdrawalDate, setBulkWithdrawalDate] = useState(new Date().toLocaleDateString('en-CA'));
+  const [bulkWithdrawalDate, setBulkWithdrawalDate] = useState(new Date().toLocaleDateString("en-CA"));
   const [bulkWithdrawalNotes, setBulkWithdrawalNotes] = useState("");
   const [bulkWithdrawalAmounts, setBulkWithdrawalAmounts] = useState<Record<number, string>>({});
   const [bulkWithdrawalAccountType, setBulkWithdrawalAccountType] = useState<"bank" | "cash">("cash");
@@ -117,7 +155,9 @@ export default function Payroll() {
   const [groupMembersDialogOpen, setGroupMembersDialogOpen] = useState(false);
 
   // Queries
-  const { data: employees = [], isLoading: employeesLoading } = useQuery<Array<Employee & { calculatedBalance: string }>>({
+  const { data: employees = [], isLoading: employeesLoading } = useQuery<
+    Array<Employee & { calculatedBalance: string }>
+  >({
     queryKey: ["/api/employees", selectedCompany?.id],
     enabled: !!selectedCompany,
   });
@@ -142,9 +182,11 @@ export default function Payroll() {
     enabled: !!selectedCompany?.id,
   });
 
-  const otherCompanies = companies.filter(c => c.id !== selectedCompany?.id);
-  const { data: allCompanyLocations = [] } = useQuery<Array<{ id: number; name: string; companyId: number; companyName: string }>>({
-    queryKey: ["/api/all-company-locations", companies.map(c => c.id).join(",")],
+  const otherCompanies = companies.filter((c) => c.id !== selectedCompany?.id);
+  const { data: allCompanyLocations = [] } = useQuery<
+    Array<{ id: number; name: string; companyId: number; companyName: string }>
+  >({
+    queryKey: ["/api/all-company-locations", companies.map((c) => c.id).join(",")],
     queryFn: async () => {
       const results: Array<{ id: number; name: string; companyId: number; companyName: string }> = [];
       for (const company of otherCompanies) {
@@ -163,15 +205,16 @@ export default function Payroll() {
     enabled: otherCompanies.length > 0,
   });
 
-  const employeeStaff = useMemo(() => employees.filter(e => e.employeeType === "Employee"), [employees]);
-  const workerStaff = useMemo(() => employees.filter(e => e.employeeType === "Worker"), [employees]);
-  
+  const employeeStaff = useMemo(() => employees.filter((e) => e.employeeType === "Employee"), [employees]);
+  const workerStaff = useMemo(() => employees.filter((e) => e.employeeType === "Worker"), [employees]);
+
   const filteredEmployeeStaff = useMemo(() => {
     return employeeStaff.filter((emp) => {
-      const matchesSearch = `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(empSearch.toLowerCase()) || 
-                           (emp.code && emp.code.toLowerCase().includes(empSearch.toLowerCase()));
-      const matchesStatus = empStatusFilter === "All" ? true : 
-                          empStatusFilter === "Active" ? emp.active !== false : emp.active === false;
+      const matchesSearch =
+        `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(empSearch.toLowerCase()) ||
+        (emp.code && emp.code.toLowerCase().includes(empSearch.toLowerCase()));
+      const matchesStatus =
+        empStatusFilter === "All" ? true : empStatusFilter === "Active" ? emp.active !== false : emp.active === false;
       return matchesSearch && matchesStatus;
     });
   }, [employeeStaff, empSearch, empStatusFilter]);
@@ -198,7 +241,7 @@ export default function Payroll() {
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
       setDepositDialogOpen(false);
       depositForm.reset();
-    }
+    },
   });
 
   const withdrawalMutation = useMutation({
@@ -211,13 +254,13 @@ export default function Payroll() {
       queryClient.invalidateQueries({ queryKey: ["/api/employees", selectedCompany?.id] });
       setWithdrawalDialogOpen(false);
       withdrawalForm.reset();
-    }
+    },
   });
 
   // Handlers
   const handleDeposit = (emp: Employee) => {
     setSelectedEmployee(emp);
-    depositForm.reset({ amount: emp.monthlySalary || "", date: new Date().toLocaleDateString('en-CA'), notes: "" });
+    depositForm.reset({ amount: emp.monthlySalary || "", date: new Date().toLocaleDateString("en-CA"), notes: "" });
     setDepositDialogOpen(true);
   };
 
@@ -246,13 +289,13 @@ export default function Payroll() {
       setWorkerDeductionTarget(null);
       setWorkerDeductionAmount("");
       setWorkerDeductionReason("");
-    }
+    },
   });
 
   return (
     <div className="container mx-auto p-4 space-y-4">
       <PageHeader title="Payroll Management" />
-      
+
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList className="grid grid-cols-5 w-full max-w-2xl">
           <TabsTrigger value="employees">Employees</TabsTrigger>
@@ -263,7 +306,7 @@ export default function Payroll() {
         </TabsList>
 
         <TabsContent value="employees">
-          <EmployeesTab 
+          <EmployeesTab
             empSearch={empSearch}
             setEmpSearch={setEmpSearch}
             empStatusFilter={empStatusFilter}
@@ -291,7 +334,7 @@ export default function Payroll() {
         </TabsContent>
 
         <TabsContent value="workers">
-          <WorkersTab 
+          <WorkersTab
             workerStaff={workerStaff}
             workerPaymentSummary={null}
             selectedPayments={[]}
@@ -341,7 +384,7 @@ export default function Payroll() {
         form={depositForm}
         mutation={depositMutation}
       />
-      
+
       <WithdrawalDialog
         open={withdrawalDialogOpen}
         onOpenChange={setWithdrawalDialogOpen}
@@ -353,7 +396,7 @@ export default function Payroll() {
         bankAccountsLoading={bankAccountsLoading}
       />
 
-      <WorkerDeductionDialog 
+      <WorkerDeductionDialog
         target={workerDeductionTarget}
         onClose={() => setWorkerDeductionTarget(null)}
         amount={workerDeductionAmount}

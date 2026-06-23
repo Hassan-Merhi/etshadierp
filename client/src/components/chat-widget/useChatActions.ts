@@ -42,24 +42,44 @@ interface ChatActionsState {
 export function useChatActions(state: ChatActionsState) {
   const queryClient = useQueryClient();
   const {
-    sessionId, location, sessionReadFiles,
-    setMessage, setLastUsedProvider, setSuggestions,
-    setPendingVoucher, setPendingStockAdj, setPendingStockTransfer,
-    setVoucherSearchResults, setPendingStockItem, setPendingPriceUpdate,
-    setAccountQueryResult, setVerifyContainerDraft, setDataQueryResult,
-    setPendingFilePatches, setAppliedPatchFiles, setPerFilePushResult,
-    setSessionReadFiles, refetchHistory,
-    pendingFilePatches, appliedPatchFiles,
+    sessionId,
+    location,
+    sessionReadFiles,
+    setMessage,
+    setLastUsedProvider,
+    setSuggestions,
+    setPendingVoucher,
+    setPendingStockAdj,
+    setPendingStockTransfer,
+    setVoucherSearchResults,
+    setPendingStockItem,
+    setPendingPriceUpdate,
+    setAccountQueryResult,
+    setVerifyContainerDraft,
+    setDataQueryResult,
+    setPendingFilePatches,
+    setAppliedPatchFiles,
+    setPerFilePushResult,
+    setSessionReadFiles,
+    refetchHistory,
+    pendingFilePatches,
+    appliedPatchFiles,
   } = state;
 
   const sendMutation = useMutation({
     mutationFn: async (msg: string) => {
-      const response = await apiRequest("POST", "/api/chatbot/message", {
-        message: msg,
-        sessionId,
-        pageContext: { currentRoute: location },
-        sessionReadFiles: sessionReadFiles.length > 0 ? sessionReadFiles : undefined,
-      }, false, 120000);
+      const response = await apiRequest(
+        "POST",
+        "/api/chatbot/message",
+        {
+          message: msg,
+          sessionId,
+          pageContext: { currentRoute: location },
+          sessionReadFiles: sessionReadFiles.length > 0 ? sessionReadFiles : undefined,
+        },
+        false,
+        120000
+      );
       return response.json() as Promise<ChatResponse>;
     },
     onSuccess: (data) => {
@@ -83,9 +103,7 @@ export function useChatActions(state: ChatActionsState) {
         setPendingStockTransfer(null);
       }
       setVoucherSearchResults(
-        data.voucherSearchResults && data.voucherSearchResults.length > 0
-          ? data.voucherSearchResults
-          : null
+        data.voucherSearchResults && data.voucherSearchResults.length > 0 ? data.voucherSearchResults : null
       );
       setPendingStockItem(data.stockItemDraft ?? null);
       setPendingPriceUpdate(data.priceUpdateDraft ?? null);
@@ -100,7 +118,7 @@ export function useChatActions(state: ChatActionsState) {
         setPendingFilePatches([]);
       }
       if (data.readFiles && data.readFiles.length > 0) {
-        setSessionReadFiles(prev => {
+        setSessionReadFiles((prev) => {
           const next = [...prev];
           for (const f of data.readFiles!) {
             if (!next.includes(f)) next.push(f);
@@ -122,7 +140,7 @@ export function useChatActions(state: ChatActionsState) {
           description: edited.description,
           optional: edited.optional ?? false,
         },
-        entries: edited.entries.map(e => ({
+        entries: edited.entries.map((e) => ({
           ledgerAccountId: e.accountId,
           debitAmount: String(e.debit || 0),
           creditAmount: String(e.credit || 0),
@@ -133,10 +151,16 @@ export function useChatActions(state: ChatActionsState) {
       const resData = await res.json();
       setPendingVoucher(null);
       apiRequest("POST", "/api/chatbot/log-action", {
-        sessionId, prompt: edited.description, draftJson: edited,
-        actionType: "voucher", createdRecordId: resData?.id || null, status: "confirmed",
+        sessionId,
+        prompt: edited.description,
+        draftJson: edited,
+        actionType: "voucher",
+        createdRecordId: resData?.id || null,
+        status: "confirmed",
       }).catch(() => {});
-      sendMutation.mutate(`Voucher created: ${edited.type} of $${Math.max(...edited.entries.map(e => e.debit || e.credit))} on ${edited.date}`);
+      sendMutation.mutate(
+        `Voucher created: ${edited.type} of $${Math.max(...edited.entries.map((e) => e.debit || e.credit))} on ${edited.date}`
+      );
     } catch (err: any) {
       sendMutation.mutate(`Voucher creation failed: ${err.message}`);
     }
@@ -152,7 +176,7 @@ export function useChatActions(state: ChatActionsState) {
           sourceLocationId: resolved.sourceLocationId,
           destinationLocationId: resolved.destinationLocationId,
           notes: resolved.notes || "",
-          items: resolved.items.map(i => ({ stockItemId: i.stockItemId, quantity: i.quantity })),
+          items: resolved.items.map((i) => ({ stockItemId: i.stockItemId, quantity: i.quantity })),
           sessionId,
           prompt: `Transfer stock from ${resolved.sourceLocationName} to ${resolved.destinationLocationName}`,
         }),
@@ -162,7 +186,9 @@ export function useChatActions(state: ChatActionsState) {
       if (!resp.ok) throw new Error(data.message || "Transfer failed");
       setPendingStockTransfer(null);
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      sendMutation.mutate(`Stock transfer created from "${resolved.sourceLocationName}" to "${resolved.destinationLocationName}" on ${resolved.date}. ${resolved.items.length} item(s) transferred.`);
+      sendMutation.mutate(
+        `Stock transfer created from "${resolved.sourceLocationName}" to "${resolved.destinationLocationName}" on ${resolved.date}. ${resolved.items.length} item(s) transferred.`
+      );
     } catch (err: any) {
       sendMutation.mutate(`Stock transfer failed: ${err.message}`);
     }
@@ -170,13 +196,14 @@ export function useChatActions(state: ChatActionsState) {
 
   const handleConfirmStockAdj = async (resolved: StockAdjustmentDraft) => {
     try {
-      const hasP = resolved.items.some(i => i.type === "PRODUCE");
-      const hasC = resolved.items.some(i => i.type === "CONSUME");
+      const hasP = resolved.items.some((i) => i.type === "PRODUCE");
+      const hasC = resolved.items.some((i) => i.type === "CONSUME");
       const adjType = hasP && hasC ? "Mixed" : hasP ? "Production" : "Consumption";
       const totalAmount = resolved.items.reduce((sum, i) => sum + i.quantity * i.rate, 0);
       const voucherNumber = `AI-${Date.now()}`;
       const voucherRes = await apiRequest("POST", "/api/vouchers", {
-        voucherNumber, voucherType: adjType,
+        voucherNumber,
+        voucherType: adjType,
         voucherDate: resolved.date,
         description: resolved.notes || `${adjType} voucher`,
         totalAmount: String(totalAmount),
@@ -188,14 +215,16 @@ export function useChatActions(state: ChatActionsState) {
         locationId: resolved.locationId,
         adjustmentType: adjType,
         notes: resolved.notes || "",
-        items: resolved.items.map(i => ({
+        items: resolved.items.map((i) => ({
           stockItemId: i.stockItemId,
           quantity: i.type === "CONSUME" ? -Math.abs(i.quantity) : Math.abs(i.quantity),
           rate: i.rate,
         })),
       });
       setPendingStockAdj(null);
-      sendMutation.mutate(`Stock adjustment created: ${adjType} voucher on ${resolved.date} at ${resolved.locationName}`);
+      sendMutation.mutate(
+        `Stock adjustment created: ${adjType} voucher on ${resolved.date} at ${resolved.locationName}`
+      );
     } catch (err: any) {
       sendMutation.mutate(`Stock adjustment failed: ${err.message}`);
     }
@@ -205,12 +234,16 @@ export function useChatActions(state: ChatActionsState) {
     if (!resolved.stockGroupId) return;
     try {
       await apiRequest("POST", "/api/stock-items", {
-        name: resolved.name, code: resolved.code,
-        uom: resolved.uom, stockGroupId: resolved.stockGroupId,
+        name: resolved.name,
+        code: resolved.code,
+        uom: resolved.uom,
+        stockGroupId: resolved.stockGroupId,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/stock-items"] });
       setPendingStockItem(null);
-      sendMutation.mutate(`Stock item "${resolved.name}" (${resolved.code}) created successfully in group "${resolved.stockGroupName}".`);
+      sendMutation.mutate(
+        `Stock item "${resolved.name}" (${resolved.code}) created successfully in group "${resolved.stockGroupName}".`
+      );
     } catch (err: any) {
       sendMutation.mutate(`Failed to create stock item: ${err.message}`);
     }
@@ -226,17 +259,20 @@ export function useChatActions(state: ChatActionsState) {
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list-by-masters"] });
       queryClient.invalidateQueries({ queryKey: ["/api/pos/price-list"] });
       setPendingPriceUpdate(null);
-      const cascadeNote = resolved.followerCount > 0
-        ? ` (cascaded to ${resolved.followerCount} follower location${resolved.followerCount !== 1 ? "s" : ""})`
-        : "";
-      sendMutation.mutate(`Price updated: "${resolved.stockItemName}" set to ${resolved.newPrice} for "${resolved.locationName}"${cascadeNote}.`);
+      const cascadeNote =
+        resolved.followerCount > 0
+          ? ` (cascaded to ${resolved.followerCount} follower location${resolved.followerCount !== 1 ? "s" : ""})`
+          : "";
+      sendMutation.mutate(
+        `Price updated: "${resolved.stockItemName}" set to ${resolved.newPrice} for "${resolved.locationName}"${cascadeNote}.`
+      );
     } catch (err: any) {
       sendMutation.mutate(`Failed to update price: ${err.message}`);
     }
   };
 
   const handleApplyPatch = async (patch: FilePatchDraft) => {
-    setPerFilePushResult(prev => ({ ...prev }));
+    setPerFilePushResult((prev) => ({ ...prev }));
     try {
       const res = await apiRequest("POST", "/api/chatbot/apply-patch", {
         filePath: patch.filePath,
@@ -249,7 +285,7 @@ export function useChatActions(state: ChatActionsState) {
         sendMutation.mutate(`Failed to apply patch to ${patch.filePath}: ${err.message}`);
         return;
       }
-      setAppliedPatchFiles(prev => new Set([...prev, patch.filePath]));
+      setAppliedPatchFiles((prev) => new Set([...prev, patch.filePath]));
     } catch (err: any) {
       sendMutation.mutate(`Failed to apply patch: ${err.message}`);
     }
@@ -263,7 +299,7 @@ export function useChatActions(state: ChatActionsState) {
   };
 
   const handleGitPush = async (filePath: string, commitMsg: string) => {
-    setPerFilePushResult(prev => ({ ...prev, [filePath]: { success: false } }));
+    setPerFilePushResult((prev) => ({ ...prev, [filePath]: { success: false } }));
     try {
       const res = await apiRequest("POST", "/api/chatbot/git-push", {
         files: [filePath],
@@ -271,12 +307,18 @@ export function useChatActions(state: ChatActionsState) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setPerFilePushResult(prev => ({ ...prev, [filePath]: { success: false, error: data.error ?? data.message ?? "Unknown error" } }));
+        setPerFilePushResult((prev) => ({
+          ...prev,
+          [filePath]: { success: false, error: data.error ?? data.message ?? "Unknown error" },
+        }));
         return;
       }
-      setPerFilePushResult(prev => ({ ...prev, [filePath]: { success: true, commitHash: data.commitHash, branch: data.branch } }));
+      setPerFilePushResult((prev) => ({
+        ...prev,
+        [filePath]: { success: true, commitHash: data.commitHash, branch: data.branch },
+      }));
     } catch (err: any) {
-      setPerFilePushResult(prev => ({ ...prev, [filePath]: { success: false, error: err.message } }));
+      setPerFilePushResult((prev) => ({ ...prev, [filePath]: { success: false, error: err.message } }));
     }
   };
 

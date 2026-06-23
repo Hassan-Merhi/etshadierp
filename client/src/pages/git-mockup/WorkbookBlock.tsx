@@ -7,10 +7,20 @@ export function WorkbookLegend() {
   return (
     <div className="flex items-center gap-3 flex-wrap text-xs text-muted-foreground px-1">
       <span className="font-medium">Row colour:</span>
-      <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-yellow-200 border border-yellow-400" /> Upcoming ETA, docs pending</span>
-      <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-rose-200 border border-rose-400" /> At port, docs missing</span>
-      <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-amber-100 border border-amber-300" /> Docs ready, not sent to truck</span>
-      <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-red-200 border border-red-400" /> Offload overdue</span>
+      <span className="flex items-center gap-1">
+        <span className="inline-block w-3 h-3 rounded-sm bg-yellow-200 border border-yellow-400" /> Upcoming ETA, docs
+        pending
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="inline-block w-3 h-3 rounded-sm bg-rose-200 border border-rose-400" /> At port, docs missing
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="inline-block w-3 h-3 rounded-sm bg-amber-100 border border-amber-300" /> Docs ready, not sent
+        to truck
+      </span>
+      <span className="flex items-center gap-1">
+        <span className="inline-block w-3 h-3 rounded-sm bg-red-200 border border-red-400" /> Offload overdue
+      </span>
     </div>
   );
 }
@@ -32,12 +42,16 @@ function WorkbookDataRow({ r }: { r: EnrichedContainerApi }) {
         {r.daysDelayed ? <span className="ml-1 text-[10px]">+{r.daysDelayed}d</span> : null}
       </td>
       <td className="py-0.5 px-2 text-center">
-        {r.docReceived
-          ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
-          : <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />}
+        {r.docReceived ? (
+          <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mx-auto" />
+        ) : (
+          <XCircle className="h-3.5 w-3.5 text-red-500 mx-auto" />
+        )}
       </td>
       <td className="py-0.5 px-2">{r.transporter ?? "—"}</td>
-      <td className="py-0.5 px-2 text-right">{parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}</td>
+      <td className="py-0.5 px-2 text-right">
+        {parseNum(r.transportFee) > 0 ? `$${fmt(parseNum(r.transportFee), 0)}` : "—"}
+      </td>
       <td className="py-0.5 px-2">{r.agent ?? "—"}</td>
       <td className="py-0.5 px-2 text-right">{parseNum(r.dutyFee) > 0 ? `$${fmt(parseNum(r.dutyFee), 0)}` : "—"}</td>
       <td className="py-0.5 px-2 max-w-40 truncate text-muted-foreground italic">{r.trackingDescription ?? "—"}</td>
@@ -47,17 +61,29 @@ function WorkbookDataRow({ r }: { r: EnrichedContainerApi }) {
 
 function SupplierGroupedRows({ rows }: { rows: EnrichedContainerApi[] }) {
   const groups = groupBySupplier(rows);
-  if (groups.length <= 1) return <>{rows.map(r => <WorkbookDataRow key={r.id} r={r} />)}</>;
+  if (groups.length <= 1)
+    return (
+      <>
+        {rows.map((r) => (
+          <WorkbookDataRow key={r.id} r={r} />
+        ))}
+      </>
+    );
   return (
     <>
       {groups.map(({ name, rows: sRows }) => (
         <>
           <tr key={`sup-${name}`} className="bg-muted/40 border-t border-border">
-            <td colSpan={WORKBOOK_COLS} className="py-0.5 px-2 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            <td
+              colSpan={WORKBOOK_COLS}
+              className="py-0.5 px-2 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground"
+            >
               {name} — {sRows.length}
             </td>
           </tr>
-          {sRows.map(r => <WorkbookDataRow key={r.id} r={r} />)}
+          {sRows.map((r) => (
+            <WorkbookDataRow key={r.id} r={r} />
+          ))}
         </>
       ))}
     </>
@@ -65,7 +91,10 @@ function SupplierGroupedRows({ rows }: { rows: EnrichedContainerApi[] }) {
 }
 
 export function RealWorkbookBlock({
-  companyName, rows, headerBg, headerText,
+  companyName,
+  rows,
+  headerBg,
+  headerText,
 }: {
   companyName: string;
   rows: EnrichedContainerApi[];
@@ -74,20 +103,18 @@ export function RealWorkbookBlock({
 }) {
   const total = {
     amount: rows.reduce((s, r) => s + parseNum(r.grandTotal), 0),
-    fee:    rows.reduce((s, r) => s + parseNum(r.transportFee), 0),
-    duty:   rows.reduce((s, r) => s + parseNum(r.dutyFee), 0),
+    fee: rows.reduce((s, r) => s + parseNum(r.transportFee), 0),
+    duty: rows.reduce((s, r) => s + parseNum(r.dutyFee), 0),
   };
 
   const shopGroups: Array<{ name: string; rows: EnrichedContainerApi[] }> = [];
   for (const r of rows) {
     const key = r.shopName ?? companyName;
-    const existing = shopGroups.find(g => g.name === key);
+    const existing = shopGroups.find((g) => g.name === key);
     if (existing) existing.rows.push(r);
     else shopGroups.push({ name: key, rows: [r] });
   }
-  shopGroups.sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" })
-  );
+  shopGroups.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
   const hasShops = shopGroups.length > 1;
 
   const columnHeaders = (
@@ -113,7 +140,9 @@ export function RealWorkbookBlock({
     <div className="rounded-md border overflow-hidden">
       <div className={cn("flex items-center justify-center gap-3 px-3 py-1.5", headerBg, headerText)}>
         <span className="text-sm font-bold tracking-wide">{companyName}</span>
-        <span className="text-xs font-semibold opacity-90">{rows.length} containers — ${fmt(total.amount, 2)}</span>
+        <span className="text-xs font-semibold opacity-90">
+          {rows.length} containers — ${fmt(total.amount, 2)}
+        </span>
       </div>
 
       {hasShops ? (
@@ -121,14 +150,18 @@ export function RealWorkbookBlock({
           {shopGroups.map(({ name, rows: shopRows }) => {
             const st = {
               amount: shopRows.reduce((s, r) => s + parseNum(r.grandTotal), 0),
-              fee:    shopRows.reduce((s, r) => s + parseNum(r.transportFee), 0),
-              duty:   shopRows.reduce((s, r) => s + parseNum(r.dutyFee), 0),
+              fee: shopRows.reduce((s, r) => s + parseNum(r.transportFee), 0),
+              duty: shopRows.reduce((s, r) => s + parseNum(r.dutyFee), 0),
             };
             return (
               <div key={name}>
                 <div className="flex items-center justify-center gap-3 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 border-b border-yellow-300 dark:border-yellow-700">
-                  <span className="text-xs font-bold uppercase tracking-wide text-yellow-900 dark:text-yellow-300">{name}</span>
-                  <span className="text-xs text-yellow-800 dark:text-yellow-400">{shopRows.length} container{shopRows.length !== 1 ? "s" : ""} — ${fmt(st.amount, 2)}</span>
+                  <span className="text-xs font-bold uppercase tracking-wide text-yellow-900 dark:text-yellow-300">
+                    {name}
+                  </span>
+                  <span className="text-xs text-yellow-800 dark:text-yellow-400">
+                    {shopRows.length} container{shopRows.length !== 1 ? "s" : ""} — ${fmt(st.amount, 2)}
+                  </span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs whitespace-nowrap border-collapse">
@@ -166,7 +199,11 @@ export function RealWorkbookBlock({
             <thead>{columnHeaders}</thead>
             <tbody>
               {rows.length === 0 ? (
-                <tr><td colSpan={WORKBOOK_COLS} className="py-3 text-center text-muted-foreground italic text-xs">No containers</td></tr>
+                <tr>
+                  <td colSpan={WORKBOOK_COLS} className="py-3 text-center text-muted-foreground italic text-xs">
+                    No containers
+                  </td>
+                </tr>
               ) : (
                 <SupplierGroupedRows rows={rows} />
               )}

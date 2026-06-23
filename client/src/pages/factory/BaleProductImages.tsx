@@ -83,22 +83,33 @@ export default function BaleProductImages() {
     onError: (e: any) => toast({ title: "Delete failed", description: e.message, variant: "destructive" }),
   });
 
-  const handleFiles = useCallback((files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    Array.from(files).forEach((f) => {
-      if (f.type.startsWith("image/")) uploadMutation.mutate(f);
-    });
-  }, [uploadMutation]);
+  const handleFiles = useCallback(
+    (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach((f) => {
+        if (f.type.startsWith("image/")) uploadMutation.mutate(f);
+      });
+    },
+    [uploadMutation]
+  );
 
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    handleFiles(e.dataTransfer.files);
-  }, [handleFiles]);
+  const onDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragging(false);
+      handleFiles(e.dataTransfer.files);
+    },
+    [handleFiles]
+  );
 
   const filteredProducts = (productsQuery.data ?? []).filter((p) => {
     const q = search.toLowerCase();
-    return !q || p.name.toLowerCase().includes(q) || p.articleCode.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
+    return (
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      p.articleCode.toLowerCase().includes(q) ||
+      p.code.toLowerCase().includes(q)
+    );
   });
 
   const images = imagesQuery.data ?? [];
@@ -106,9 +117,13 @@ export default function BaleProductImages() {
   return (
     <div className="flex flex-col md:flex-row h-full min-h-0">
       {/* ── Left: Product List ─────────────────────────────────── */}
-      <div className={`flex-shrink-0 flex-col md:w-72 md:border-r ${showList ? "flex border-b md:border-b-0" : "hidden md:flex"}`}>
+      <div
+        className={`flex-shrink-0 flex-col md:w-72 md:border-r ${showList ? "flex border-b md:border-b-0" : "hidden md:flex"}`}
+      >
         <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold mb-3" data-testid="text-product-list-title">Bale Products</h2>
+          <h2 className="text-lg font-semibold mb-3" data-testid="text-product-list-title">
+            Bale Products
+          </h2>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -136,7 +151,10 @@ export default function BaleProductImages() {
                   className={`w-full text-left px-4 py-3 hover-elevate transition-colors ${
                     selectedProduct?.id === p.id ? "bg-accent text-accent-foreground" : ""
                   }`}
-                  onClick={() => { setSelectedProduct(p); setShowList(false); }}
+                  onClick={() => {
+                    setSelectedProduct(p);
+                    setShowList(false);
+                  }}
                   data-testid={`button-product-${p.id}`}
                 >
                   <div className="font-medium text-sm truncate">{p.name}</div>
@@ -197,7 +215,10 @@ export default function BaleProductImages() {
 
             {/* Drop zone */}
             <div
-              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
               onClick={() => fileInputRef.current?.click()}

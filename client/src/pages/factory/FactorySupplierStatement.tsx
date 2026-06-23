@@ -8,26 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatNumber } from "@/lib/formatNumber";
 
 const CURRENCIES = ["USD", "EUR", "GBP", "AUD", "LBP", "XOF", "XAF"];
@@ -134,7 +117,9 @@ export default function FactorySupplierStatement() {
     : 0;
 
   const currenciesInStatement: string[] = statement?.currencyGroups
-    ? [...new Set<string>(statement.currencyGroups.map((g: any) => g.currencyCode as string))].filter((c) => c !== "USD")
+    ? [...new Set<string>(statement.currencyGroups.map((g: any) => g.currencyCode as string))].filter(
+        (c) => c !== "USD"
+      )
     : [];
 
   return (
@@ -154,14 +139,19 @@ export default function FactorySupplierStatement() {
                 <Label className="text-xs text-muted-foreground">Company</Label>
                 <Select
                   value={companyId ? String(companyId) : ""}
-                  onValueChange={(val) => { setCompanyId(Number(val)); setSupplierId(""); }}
+                  onValueChange={(val) => {
+                    setCompanyId(Number(val));
+                    setSupplierId("");
+                  }}
                 >
                   <SelectTrigger className="w-48" data-testid="select-company">
                     <SelectValue placeholder="Select company" />
                   </SelectTrigger>
                   <SelectContent>
                     {companies.map((c: any) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -180,7 +170,9 @@ export default function FactorySupplierStatement() {
                 </SelectTrigger>
                 <SelectContent>
                   {suppliers.map((s: any) => (
-                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                    <SelectItem key={s.id} value={String(s.id)}>
+                      {s.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -201,13 +193,13 @@ export default function FactorySupplierStatement() {
         <>
           {statement.currencyGroups?.map((group: any) => {
             // Goods value owed to this supplier (before commission deduction)
-            const groupTotalValue  = parseFloat(group.totalValue  || "0");
+            const groupTotalValue = parseFloat(group.totalValue || "0");
             // Effective commission — what goes to the BROKER, deducted from supplier payment
-            const groupCommission  = parseFloat(group.totalCommission || group.totalDirectCommission || "0");
+            const groupCommission = parseFloat(group.totalCommission || group.totalDirectCommission || "0");
             // Net owed to this goods supplier = goods − broker commission
             const groupNetToSupplier = groupTotalValue - groupCommission;
             // Already-paid amount
-            const groupPaid        = parseFloat(group.totalPaid || "0");
+            const groupPaid = parseFloat(group.totalPaid || "0");
             // Outstanding = netPayable from backend (cross-checked)
             const groupOutstanding = parseFloat(group.netPayable || "0");
 
@@ -234,7 +226,9 @@ export default function FactorySupplierStatement() {
                           <TableHead className="text-right">Rate</TableHead>
                           <TableHead className="text-right">
                             Goods Value
-                            <span className="block text-xs font-normal text-muted-foreground">({group.currencyCode})</span>
+                            <span className="block text-xs font-normal text-muted-foreground">
+                              ({group.currencyCode})
+                            </span>
                           </TableHead>
                           <TableHead className="text-right">
                             <span className="flex items-center justify-end gap-1">
@@ -257,7 +251,7 @@ export default function FactorySupplierStatement() {
                       </TableHeader>
                       <TableBody>
                         {group.containers.map((c: any) => {
-                          const rowTotal    = getRowTotalOwed(c);
+                          const rowTotal = getRowTotalOwed(c);
                           const isCanonical = rowUsesCanonical(c);
                           const { amount: commAmt, currency: commCcy } = rowCommissionDisplay(c);
                           return (
@@ -285,17 +279,20 @@ export default function FactorySupplierStatement() {
                                 {commAmt > 0 ? (
                                   <span className="text-amber-600 dark:text-amber-400">
                                     {formatNumber(commAmt)}
-                                    {commCcy !== group.currencyCode && (
-                                      <span className="ml-1 text-xs">{commCcy}</span>
-                                    )}
+                                    {commCcy !== group.currencyCode && <span className="ml-1 text-xs">{commCcy}</span>}
                                     <span className="block text-xs text-muted-foreground font-normal">
                                       {isCanonical ? "canonical" : "est."}
                                     </span>
                                   </span>
-                                ) : "—"}
+                                ) : (
+                                  "—"
+                                )}
                               </TableCell>
                               {/* Total owed = finalPayableAmount (all-in) post-offload, or goods value pre-offload */}
-                              <TableCell className="text-right font-mono font-medium" data-testid={`text-row-total-${c.id}`}>
+                              <TableCell
+                                className="text-right font-mono font-medium"
+                                data-testid={`text-row-total-${c.id}`}
+                              >
                                 {formatNumber(rowTotal)}
                                 {isCanonical ? (
                                   <span className="block text-xs text-muted-foreground font-normal">all-in</span>
@@ -341,7 +338,10 @@ export default function FactorySupplierStatement() {
 
                       <div className="flex justify-between gap-8 border-t pt-1">
                         <span className="font-medium">Net Owed to Supplier</span>
-                        <span className="font-mono font-bold" data-testid={`text-group-net-supplier-${group.currencyCode}`}>
+                        <span
+                          className="font-mono font-bold"
+                          data-testid={`text-group-net-supplier-${group.currencyCode}`}
+                        >
                           {formatNumber(groupNetToSupplier)} {group.currencyCode}
                         </span>
                       </div>
@@ -371,10 +371,10 @@ export default function FactorySupplierStatement() {
                   </div>
 
                   <p className="text-xs text-muted-foreground mt-3">
-                    <span className="font-medium">Row "Total Owed"</span>: post-offload rows show the all-in backend cost (base + freight + OC + commission + duty).
-                    Pre-offload rows show goods value only (est.).
-                    <span className="ml-1 font-medium">Group totals</span> are always computed by the server.
-                    Commission is a broker deduction — it reduces what this supplier receives.
+                    <span className="font-medium">Row "Total Owed"</span>: post-offload rows show the all-in backend
+                    cost (base + freight + OC + commission + duty). Pre-offload rows show goods value only (est.).
+                    <span className="ml-1 font-medium">Group totals</span> are always computed by the server. Commission
+                    is a broker deduction — it reduces what this supplier receives.
                   </p>
                 </CardContent>
               </Card>
@@ -387,14 +387,16 @@ export default function FactorySupplierStatement() {
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
                   Estimated USD Outstanding
-                  <Badge variant="outline" className="ml-1">Admin Only</Badge>
+                  <Badge variant="outline" className="ml-1">
+                    Admin Only
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Approximate USD equivalent of what is still outstanding to this supplier (after commission deduction and payments).
-                  This is a helper estimate only and does not affect accounting balances.
-                  Set exchange rates below to compute the conversion.
+                  Approximate USD equivalent of what is still outstanding to this supplier (after commission deduction
+                  and payments). This is a helper estimate only and does not affect accounting balances. Set exchange
+                  rates below to compute the conversion.
                 </p>
 
                 {currenciesInStatement.length > 0 && (
@@ -464,8 +466,8 @@ export default function FactorySupplierStatement() {
                   Commission Earned (as Broker)
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Containers where this supplier earns commission as broker on <em>another</em> supplier's goods.
-                  This is a separate obligation and does not overlap with the goods payable above.
+                  Containers where this supplier earns commission as broker on <em>another</em> supplier's goods. This
+                  is a separate obligation and does not overlap with the goods payable above.
                 </p>
               </CardHeader>
               <CardContent>
@@ -506,15 +508,17 @@ export default function FactorySupplierStatement() {
                 <div className="mt-3 flex justify-end">
                   <div className="text-sm font-medium">
                     Total Commission Earned:{" "}
-                    <span className="font-mono text-green-600 dark:text-green-400" data-testid="text-broker-commission-total">
+                    <span
+                      className="font-mono text-green-600 dark:text-green-400"
+                      data-testid="text-broker-commission-total"
+                    >
                       {formatNumber(parseFloat(statement.summary?.totalBrokerCommission || "0"))}
                     </span>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  This is commission earned by acting as broker on another supplier's container.
-                  It is a separate receivable and does not affect the goods payable shown above.
-                  The two sections never overlap.
+                  This is commission earned by acting as broker on another supplier's container. It is a separate
+                  receivable and does not affect the goods payable shown above. The two sections never overlap.
                 </p>
               </CardContent>
             </Card>

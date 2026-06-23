@@ -106,10 +106,13 @@ export function POSDialogs({
           </AlertDialogHeader>
           <div className="max-h-[300px] overflow-y-auto space-y-2 my-4">
             {drafts.map((draft) => (
-              <div key={draft.id} className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors">
+              <div
+                key={draft.id}
+                className="flex items-center justify-between p-3 border rounded-md hover:bg-muted/50 transition-colors"
+              >
                 <div className="flex-1 min-w-0 mr-4 cursor-pointer" onClick={() => handleLoadDraft(draft.id)}>
                   <p className="text-sm font-medium truncate">
-                    {draft.items?.[0]?.stockItemName || "No items"} 
+                    {draft.items?.[0]?.stockItemName || "No items"}
                     {draft.items?.length > 1 && ` (+${draft.items.length - 1} more)`}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -117,12 +120,17 @@ export function POSDialogs({
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => handleLoadDraft(draft.id)} data-testid={`button-load-draft-${draft.id}`}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleLoadDraft(draft.id)}
+                    data-testid={`button-load-draft-${draft.id}`}
+                  >
                     <Check className="h-4 w-4 text-green-600" />
                   </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => deleteDraftMutation.mutate(draft.id)}
                     disabled={deleteDraftMutation.isPending}
                     data-testid={`button-delete-draft-${draft.id}`}
@@ -142,7 +150,15 @@ export function POSDialogs({
       </AlertDialog>
 
       {/* Print Dialog */}
-      <AlertDialog open={showPrintDialog} onOpenChange={(open) => { if (!open) { if (editVoucherId) setShowPrintDialog(false); else handleNewSale(); } }}>
+      <AlertDialog
+        open={showPrintDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (editVoucherId) setShowPrintDialog(false);
+            else handleNewSale();
+          }
+        }}
+      >
         <AlertDialogContent className="max-w-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Print Invoice</AlertDialogTitle>
@@ -150,9 +166,20 @@ export function POSDialogs({
               Sale has been saved successfully. Would you like to print the invoice?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
+
           <AlertDialogFooter>
-            <Button variant="outline" onClick={() => { if (editVoucherId) { setShowPrintDialog(false); navigate("/pos-daybook"); } else { handleNewSale(); } }} data-testid="button-cancel-print">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (editVoucherId) {
+                  setShowPrintDialog(false);
+                  navigate("/pos-daybook");
+                } else {
+                  handleNewSale();
+                }
+              }}
+              data-testid="button-cancel-print"
+            >
               Close
             </Button>
             {!editVoucherId && (
@@ -161,76 +188,97 @@ export function POSDialogs({
                 New Sale
               </Button>
             )}
-            {(activeLocation as any)?.whatsappGroupChatId && (() => {
-              if (invoiceWaStatus === "sending") {
+            {(activeLocation as any)?.whatsappGroupChatId &&
+              (() => {
+                if (invoiceWaStatus === "sending") {
+                  return (
+                    <Button variant="outline" disabled className="gap-2" data-testid="button-invoice-wa-sending">
+                      <span className="animate-spin inline-block">
+                        <Send className="h-4 w-4" />
+                      </span>
+                      Sending Invoice…
+                    </Button>
+                  );
+                }
+                if (invoiceWaStatus === "sent") {
+                  return (
+                    <Button
+                      variant="outline"
+                      disabled
+                      className="gap-2 opacity-60"
+                      data-testid="button-invoice-wa-sent"
+                    >
+                      <Send className="h-4 w-4" />
+                      Invoice Sent
+                    </Button>
+                  );
+                }
                 return (
-                  <Button variant="outline" disabled className="gap-2" data-testid="button-invoice-wa-sending">
-                    <span className="animate-spin inline-block"><Send className="h-4 w-4" /></span>
-                    Sending Invoice…
-                  </Button>
-                );
-              }
-              if (invoiceWaStatus === "sent") {
-                return (
-                  <Button variant="outline" disabled className="gap-2 opacity-60" data-testid="button-invoice-wa-sent">
+                  <Button
+                    variant="outline"
+                    onClick={handleSendInvoiceWhatsApp}
+                    disabled={sendingInvoiceWhatsApp}
+                    className="gap-2"
+                    data-testid="button-send-whatsapp-invoice"
+                  >
                     <Send className="h-4 w-4" />
-                    Invoice Sent
+                    {invoiceWaStatus === "failed" ? "Retry Invoice" : "Resend Invoice"}
                   </Button>
                 );
-              }
-              return (
-                <Button
-                  variant="outline"
-                  onClick={handleSendInvoiceWhatsApp}
-                  disabled={sendingInvoiceWhatsApp}
-                  className="gap-2"
-                  data-testid="button-send-whatsapp-invoice"
-                >
-                  <Send className="h-4 w-4" />
-                  {invoiceWaStatus === "failed" ? "Retry Invoice" : "Resend Invoice"}
-                </Button>
-              );
-            })()}
-            {!editVoucherId && (() => {
-              const hasWa = !!(activeLocation as any)?.whatsappGroupChatId;
-              if (stockWaStatus === "sending") {
+              })()}
+            {!editVoucherId &&
+              (() => {
+                const hasWa = !!(activeLocation as any)?.whatsappGroupChatId;
+                if (stockWaStatus === "sending") {
+                  return (
+                    <Button variant="outline" disabled className="gap-2" data-testid="button-stock-wa-sending">
+                      <span className="animate-spin inline-block">
+                        <Send className="h-4 w-4" />
+                      </span>
+                      Sending Stock…
+                    </Button>
+                  );
+                }
+                if (stockWaStatus === "sent") {
+                  return (
+                    <Button variant="outline" disabled className="gap-2 opacity-60" data-testid="button-stock-wa-sent">
+                      <Send className="h-4 w-4" />
+                      Stock Sent
+                    </Button>
+                  );
+                }
+                if (stockWaStatus === "not_configured") {
+                  return (
+                    <Button
+                      variant="outline"
+                      disabled
+                      className="gap-2 opacity-60"
+                      data-testid="button-stock-wa-none"
+                      title="WhatsApp group not configured for this location"
+                    >
+                      <Send className="h-4 w-4" />
+                      No WhatsApp Group
+                    </Button>
+                  );
+                }
                 return (
-                  <Button variant="outline" disabled className="gap-2" data-testid="button-stock-wa-sending">
-                    <span className="animate-spin inline-block"><Send className="h-4 w-4" /></span>
-                    Sending Stock…
-                  </Button>
-                );
-              }
-              if (stockWaStatus === "sent") {
-                return (
-                  <Button variant="outline" disabled className="gap-2 opacity-60" data-testid="button-stock-wa-sent">
+                  <Button
+                    variant="outline"
+                    onClick={handleSendStockWhatsApp}
+                    disabled={sendingWhatsApp || !hasWa}
+                    className="gap-2"
+                    data-testid="button-send-whatsapp-stock"
+                    title={
+                      hasWa
+                        ? "Send current stock levels to WhatsApp group"
+                        : "WhatsApp group not configured for this location"
+                    }
+                  >
                     <Send className="h-4 w-4" />
-                    Stock Sent
+                    {stockWaStatus === "failed" ? "Retry Stock" : "Send Stock"}
                   </Button>
                 );
-              }
-              if (stockWaStatus === "not_configured") {
-                return (
-                  <Button variant="outline" disabled className="gap-2 opacity-60" data-testid="button-stock-wa-none" title="WhatsApp group not configured for this location">
-                    <Send className="h-4 w-4" />
-                    No WhatsApp Group
-                  </Button>
-                );
-              }
-              return (
-                <Button
-                  variant="outline"
-                  onClick={handleSendStockWhatsApp}
-                  disabled={sendingWhatsApp || !hasWa}
-                  className="gap-2"
-                  data-testid="button-send-whatsapp-stock"
-                  title={hasWa ? "Send current stock levels to WhatsApp group" : "WhatsApp group not configured for this location"}
-                >
-                  <Send className="h-4 w-4" />
-                  {stockWaStatus === "failed" ? "Retry Stock" : "Send Stock"}
-                </Button>
-              );
-            })()}
+              })()}
             <Button onClick={() => handlePrint()} className="gap-2" data-testid="button-confirm-print">
               <Check className="h-4 w-4" />
               Print Now
@@ -274,7 +322,9 @@ export function POSDialogs({
                   ))}
                   {stockInventory.length === 0 && (
                     <tr>
-                      <td colSpan={2} className="p-8 text-center text-muted-foreground">No inventory items found.</td>
+                      <td colSpan={2} className="p-8 text-center text-muted-foreground">
+                        No inventory items found.
+                      </td>
                     </tr>
                   )}
                 </tbody>
@@ -286,9 +336,9 @@ export function POSDialogs({
             <Button variant="outline" onClick={() => setShowStockPrompt(false)} data-testid="button-close-stock-report">
               Close
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleSendWhatsAppReport} 
+            <Button
+              variant="outline"
+              onClick={handleSendWhatsAppReport}
               disabled={sendingWhatsApp || !(activeLocation as any)?.whatsappGroupChatId}
               className="gap-2"
               data-testid="button-share-stock-wa"
@@ -296,8 +346,8 @@ export function POSDialogs({
               <Send className="h-4 w-4" />
               Share on WhatsApp
             </Button>
-            <Button 
-              onClick={handleStockPrint} 
+            <Button
+              onClick={handleStockPrint}
               disabled={stockInventoryLoading}
               className="gap-2"
               data-testid="button-print-stock-report"
@@ -310,11 +360,17 @@ export function POSDialogs({
       </AlertDialog>
 
       {/* Hidden printer template for stock report */}
-      <div style={{ display: 'none' }}>
-        <div ref={stockPrintRef} className="p-8 bg-white text-black" style={{ width: '800px', fontFamily: 'monospace' }}>
+      <div style={{ display: "none" }}>
+        <div
+          ref={stockPrintRef}
+          className="p-8 bg-white text-black"
+          style={{ width: "800px", fontFamily: "monospace" }}
+        >
           <div className="text-center border-b-2 border-black pb-4 mb-4">
             <h1 className="text-2xl font-bold uppercase">Stock Level Report</h1>
-            <p className="text-lg">Location: {(activeLocation as any)?.name} ({(activeLocation as any)?.code})</p>
+            <p className="text-lg">
+              Location: {(activeLocation as any)?.name} ({(activeLocation as any)?.code})
+            </p>
             <p className="text-sm">Printed: {new Date().toLocaleString()}</p>
           </div>
           <table className="w-full border-collapse">
@@ -336,7 +392,9 @@ export function POSDialogs({
             </tbody>
             <tfoot>
               <tr className="border-t-2 border-black">
-                <td colSpan={2} className="py-2 font-bold text-right">TOTAL UNITS:</td>
+                <td colSpan={2} className="py-2 font-bold text-right">
+                  TOTAL UNITS:
+                </td>
                 <td className="py-2 text-right font-bold">
                   {stockInventory.reduce((sum, item) => sum + (parseFloat(item.stock) || 0), 0)}
                 </td>

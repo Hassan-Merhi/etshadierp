@@ -1,7 +1,14 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,26 +60,44 @@ export function DeductStockDialog({
         <div className="space-y-4">
           <div className="rounded-md bg-muted/50 p-3 text-sm">
             <p className="font-medium">{deductingRow?.supplierName}</p>
-            <p className="text-muted-foreground mt-1">Available to deduct: {deductingRow?.freeKg || deductingRow?.receivedKg} kg</p>
+            <p className="text-muted-foreground mt-1">
+              Available to deduct: {deductingRow?.freeKg || deductingRow?.receivedKg} kg
+            </p>
           </div>
 
           <div className="space-y-1">
             <Label>Quantity to Deduct (KG)</Label>
-            <Input type="number" step="0.001" value={deductKg} onChange={e => setDeductKg(e.target.value)} placeholder="0.000" />
+            <Input
+              type="number"
+              step="0.001"
+              value={deductKg}
+              onChange={(e) => setDeductKg(e.target.value)}
+              placeholder="0.000"
+            />
           </div>
 
           <div className="space-y-1">
             <Label>Reference (optional)</Label>
-            <Input value={deductReference} onChange={e => setDeductReference(e.target.value)} placeholder="e.g. Waste Log #55" />
+            <Input
+              value={deductReference}
+              onChange={(e) => setDeductReference(e.target.value)}
+              placeholder="e.g. Waste Log #55"
+            />
           </div>
 
           <div className="space-y-1">
             <Label>Notes (optional)</Label>
-            <Textarea value={deductNotes} onChange={e => setDeductNotes(e.target.value)} placeholder="Reason for deduction..." />
+            <Textarea
+              value={deductNotes}
+              onChange={(e) => setDeductNotes(e.target.value)}
+              placeholder="Reason for deduction..."
+            />
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               onClick={() => wrapAdminAction(handleSubmit, "Deduct Stock")}

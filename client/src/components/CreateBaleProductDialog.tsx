@@ -2,31 +2,12 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Palette } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -52,12 +33,7 @@ interface CreateBaleProductDialogProps {
   onClose?: () => void;
 }
 
-export function CreateBaleProductDialog({
-  open,
-  onOpenChange,
-  adminAuth,
-  onClose,
-}: CreateBaleProductDialogProps) {
+export function CreateBaleProductDialog({ open, onOpenChange, adminAuth, onClose }: CreateBaleProductDialogProps) {
   const { toast } = useToast();
   const { colors } = useLabelDesignColors();
 
@@ -124,9 +100,7 @@ export function CreateBaleProductDialog({
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create Bale Product</DialogTitle>
-          <DialogDescription>
-            Select a grade to auto-generate the article code.
-          </DialogDescription>
+          <DialogDescription>Select a grade to auto-generate the article code.</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -166,11 +140,7 @@ export function CreateBaleProductDialog({
                 <FormItem>
                   <FormLabel>Product Name *</FormLabel>
                   <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="e.g., T-Shirt Mix Grade A"
-                      data-testid="input-name"
-                    />
+                    <Input {...field} placeholder="e.g., T-Shirt Mix Grade A" data-testid="input-name" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -193,11 +163,13 @@ export function CreateBaleProductDialog({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">Uncategorized</SelectItem>
-                        {categories?.filter(c => c.isActive).map((cat) => (
-                          <SelectItem key={cat.id} value={String(cat.id)}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
+                        {categories
+                          ?.filter((c) => c.isActive)
+                          .map((cat) => (
+                            <SelectItem key={cat.id} value={String(cat.id)}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -212,13 +184,7 @@ export function CreateBaleProductDialog({
                   <FormItem>
                     <FormLabel>Weight/Bale (kg)</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        placeholder="e.g., 45"
-                        type="number"
-                        step="0.01"
-                        data-testid="input-weight"
-                      />
+                      <Input {...field} placeholder="e.g., 45" type="number" step="0.01" data-testid="input-weight" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -279,11 +245,7 @@ export function CreateBaleProductDialog({
                 <FormItem>
                   <FormLabel>Description (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Product details..."
-                      data-testid="input-description"
-                    />
+                    <Textarea {...field} placeholder="Product details..." data-testid="input-description" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -324,10 +286,8 @@ export function CreateBaleProductDialog({
                   {field.value && (
                     <p className="text-xs text-muted-foreground mt-1">
                       Labels will print with the{" "}
-                      <span className="font-medium">
-                        {colors.find(o => o.value === field.value)?.label}
-                      </span>{" "}
-                      design automatically.
+                      <span className="font-medium">{colors.find((o) => o.value === field.value)?.label}</span> design
+                      automatically.
                     </p>
                   )}
                   <FormMessage />
@@ -336,19 +296,10 @@ export function CreateBaleProductDialog({
             />
 
             <div className="flex justify-end gap-2 pt-1">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                data-testid="button-cancel"
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={createMutation.isPending}
-                data-testid="button-submit"
-              >
+              <Button type="submit" disabled={createMutation.isPending} data-testid="button-submit">
                 {createMutation.isPending ? "Creating..." : "Create Product"}
               </Button>
             </div>

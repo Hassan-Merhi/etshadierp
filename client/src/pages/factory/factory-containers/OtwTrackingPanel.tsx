@@ -1,36 +1,25 @@
 import { useState } from "react";
 import { useMutation, useQueryClient as useTQClient } from "@tanstack/react-query";
-import {
-  Loader2, RefreshCw, Settings2, AlertTriangle, Boxes, XCircle, Clock,
-} from "lucide-react";
+import { Loader2, RefreshCw, Settings2, AlertTriangle, Boxes, XCircle, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Radio } from "lucide-react";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip, TooltipContent, TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { factoryApiRequest } from "@/lib/factoryApi";
 import type { FactorySupplier } from "@shared/schema";
 import type { ContainerWithSupplier } from "./otwHelpers";
 import { ContainerStatusBadge } from "./ContainerBadges";
-import {
-  trackingStatusBadge,
-  TrackNowProgressLog,
-  EventTimelineSheet,
-  TrackingSettingsSheet,
-} from "./TrackingSheets";
+import { trackingStatusBadge, TrackNowProgressLog, EventTimelineSheet, TrackingSettingsSheet } from "./TrackingSheets";
 
 const OTW_FILTER_LABELS: Record<string, string> = {
-  all:               "All",
-  PENDING:           "Pending",
-  IN_TRANSIT:        "In Transit",
-  ARRIVED:           "Arrived",
-  PARTIALLY_RECEIVED:"Partially Offloaded",
+  all: "All",
+  PENDING: "Pending",
+  IN_TRANSIT: "In Transit",
+  ARRIVED: "Arrived",
+  PARTIALLY_RECEIVED: "Partially Offloaded",
 };
 
 interface OtwTrackingPanelProps {
@@ -48,9 +37,8 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
   const [settingsContainer, setSettingsContainer] = useState<ContainerWithSupplier | null>(null);
   const [otwStatusFilter, setOtwStatusFilter] = useState<string>("PENDING");
 
-  const filteredPanelContainers = otwStatusFilter === "all"
-    ? containers
-    : containers.filter((c) => c.status === otwStatusFilter);
+  const filteredPanelContainers =
+    otwStatusFilter === "all" ? containers : containers.filter((c) => c.status === otwStatusFilter);
 
   const today = new Date().toDateString();
   const checkedToday = containers.filter((c) => {
@@ -65,7 +53,9 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
       const res = await factoryApiRequest("POST", `/api/factory/container-tracking/${containerId}/track-now`, {});
       return res as any;
     },
-    onMutate: (id) => { setTrackingNowId(id); },
+    onMutate: (id) => {
+      setTrackingNowId(id);
+    },
     onSuccess: (data) => {
       setTrackingNowId(null);
       tqClient.invalidateQueries({ queryKey: ["/api/factory/containers"] });
@@ -111,7 +101,9 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
         <div className="flex items-center gap-3 px-4 py-3">
           <Boxes className="h-4 w-4 text-muted-foreground" />
           <div>
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold leading-none mb-0.5">Total Weight</p>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold leading-none mb-0.5">
+              Total Weight
+            </p>
             <p className="text-xl font-bold tabular-nums leading-none">
               {totalWeightKg > 0 ? `${totalWeightKg.toLocaleString(undefined, { maximumFractionDigits: 0 })} kg` : "—"}
             </p>
@@ -129,7 +121,7 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
           </div>
           <div className="flex gap-1 flex-wrap">
             {Object.entries(OTW_FILTER_LABELS).map(([key, label]) => {
-              const count = key === "all" ? containers.length : containers.filter(c => c.status === key).length;
+              const count = key === "all" ? containers.length : containers.filter((c) => c.status === key).length;
               if (count === 0 && key !== "all") return null;
               return (
                 <Button
@@ -149,14 +141,30 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
           <Table>
             <TableHeader>
               <TableRow className="bg-muted border-b-2 border-border/60 hover:bg-muted">
-                <TableHead className="pl-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Container</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Supplier</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Status</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Tracking Status</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Location</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">ETA</TableHead>
-                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Last Checked</TableHead>
-                <TableHead className="pr-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">Actions</TableHead>
+                <TableHead className="pl-4 text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">
+                  Container
+                </TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">
+                  Supplier
+                </TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">
+                  Status
+                </TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">
+                  Tracking Status
+                </TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">
+                  Location
+                </TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">
+                  ETA
+                </TableHead>
+                <TableHead className="text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">
+                  Last Checked
+                </TableHead>
+                <TableHead className="pr-4 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide py-2">
+                  Actions
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -203,7 +211,8 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
                           {trackingStatusBadge(fc.trackingLastStatus)}
                           <span className="text-xs text-destructive flex items-center gap-1">
                             <XCircle className="h-3 w-3" />
-                            {fc.trackingError?.slice(0, 60)}{fc.trackingError?.length > 60 ? "…" : ""}
+                            {fc.trackingError?.slice(0, 60)}
+                            {fc.trackingError?.length > 60 ? "…" : ""}
                           </span>
                         </div>
                       ) : (
@@ -215,7 +224,9 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
                     </TableCell>
                     <TableCell className="text-sm">
                       {c.arrivalDate ? (
-                        <span className={`font-mono ${new Date(c.arrivalDate) < new Date() ? "text-amber-600 dark:text-amber-400" : ""}`}>
+                        <span
+                          className={`font-mono ${new Date(c.arrivalDate) < new Date() ? "text-amber-600 dark:text-amber-400" : ""}`}
+                        >
                           {c.arrivalDate}
                         </span>
                       ) : (
@@ -226,7 +237,8 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
                       {lastChecked ? (
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {lastChecked.toLocaleDateString()} {lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          {lastChecked.toLocaleDateString()}{" "}
+                          {lastChecked.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </div>
                       ) : (
                         <span className="text-muted-foreground/40">Never</span>
@@ -264,7 +276,11 @@ export function OtwTrackingPanel({ containers, isLoading, trackingNowId, setTrac
                             </Button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {!isEnabled ? "Tracking disabled" : !isValidNum ? "Invalid container number format" : "Track Now"}
+                            {!isEnabled
+                              ? "Tracking disabled"
+                              : !isValidNum
+                                ? "Invalid container number format"
+                                : "Track Now"}
                           </TooltipContent>
                         </Tooltip>
                       </div>

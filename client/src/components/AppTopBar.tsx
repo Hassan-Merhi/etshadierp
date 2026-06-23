@@ -51,7 +51,6 @@ export function AppTopBar({
 
       {/* Right zone */}
       <div className="flex flex-nowrap items-center gap-1 sm:gap-1.5 ml-auto min-w-0">
-
         {/* Extra actions slot (e.g. "Switch to ERP") */}
         {extraActions}
 
@@ -110,7 +109,9 @@ export function AppTopBar({
         {/* Divider */}
         <div className="hidden sm:block h-5 w-px bg-border/60 mx-1" />
 
-        <span className="hidden sm:block"><CurrencyToggle /></span>
+        <span className="hidden sm:block">
+          <CurrencyToggle />
+        </span>
         <CompanySelector />
         <ThemeToggle />
       </div>

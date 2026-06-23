@@ -26,9 +26,7 @@ function LocationProviderInner({ children }: { children: ReactNode }) {
   }, [selectedCompany?.id]);
 
   return (
-    <LocationContext.Provider value={{ selectedLocation, setSelectedLocation }}>
-      {children}
-    </LocationContext.Provider>
+    <LocationContext.Provider value={{ selectedLocation, setSelectedLocation }}>{children}</LocationContext.Provider>
   );
 }
 

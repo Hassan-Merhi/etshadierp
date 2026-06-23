@@ -7,10 +7,10 @@ export async function searchStockItems(companyId: number, query: string, limit =
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(w => w.length > 1);
+    .filter((w) => w.length > 1);
 
-  const nameConditions = terms.map(t => ilike(schema.stockItems.name, `%${t}%`));
-  const codeConditions = terms.map(t => ilike(schema.stockItems.code, `%${t}%`));
+  const nameConditions = terms.map((t) => ilike(schema.stockItems.name, `%${t}%`));
+  const codeConditions = terms.map((t) => ilike(schema.stockItems.code, `%${t}%`));
   const searchCondition = or(...nameConditions, ...codeConditions);
 
   const rows = await db
@@ -22,17 +22,19 @@ export async function searchStockItems(companyId: number, query: string, limit =
       reorderLevel: schema.stockItems.reorderLevel,
     })
     .from(schema.stockItems)
-    .where(and(
-      eq(schema.stockItems.companyId, companyId),
-      eq(schema.stockItems.active, true),
-      isNull(schema.stockItems.deletedAt),
-      searchCondition,
-    ))
+    .where(
+      and(
+        eq(schema.stockItems.companyId, companyId),
+        eq(schema.stockItems.active, true),
+        isNull(schema.stockItems.deletedAt),
+        searchCondition
+      )
+    )
     .limit(limit);
 
   if (rows.length === 0) return [];
 
-  const ids = rows.map(r => r.id);
+  const ids = rows.map((r) => r.id);
   const invRows = await db
     .select({
       stockItemId: schema.inventory.stockItemId,
@@ -41,15 +43,12 @@ export async function searchStockItems(companyId: number, query: string, limit =
       avgRate: sql<string>`COALESCE(AVG(NULLIF(CAST(${schema.inventory.averageRate} AS NUMERIC), 0)), 0)`,
     })
     .from(schema.inventory)
-    .where(and(
-      eq(schema.inventory.companyId, companyId),
-      inArray(schema.inventory.stockItemId, ids),
-    ))
+    .where(and(eq(schema.inventory.companyId, companyId), inArray(schema.inventory.stockItemId, ids)))
     .groupBy(schema.inventory.stockItemId);
 
-  const invMap = new Map(invRows.map(i => [i.stockItemId, i]));
+  const invMap = new Map(invRows.map((i) => [i.stockItemId, i]));
 
-  return rows.map(item => {
+  return rows.map((item) => {
     const inv = invMap.get(item.id);
     const sellPrice = parseFloat(item.sellingPrice || "0");
     const avgCost = parseFloat(inv?.avgRate || "0");
@@ -63,9 +62,14 @@ export async function searchStockItems(companyId: number, query: string, limit =
       reorderLevel: parseFloat(item.reorderLevel || "0").toFixed(2),
       totalQty: totalQty.toFixed(3),
       totalValue: parseFloat(inv?.totalValue || "0").toFixed(2),
-      pricingStatus: avgCost > 0
-        ? (sellPrice < avgCost ? "LOSING" : sellPrice === avgCost ? "BREAK_EVEN" : "PROFITABLE")
-        : "UNKNOWN",
+      pricingStatus:
+        avgCost > 0
+          ? sellPrice < avgCost
+            ? "LOSING"
+            : sellPrice === avgCost
+              ? "BREAK_EVEN"
+              : "PROFITABLE"
+          : "UNKNOWN",
     };
   });
 }
@@ -79,33 +83,27 @@ export async function getStockByLocation(companyId: number, stockItemId: number)
       totalValue: schema.inventory.totalValue,
     })
     .from(schema.inventory)
-    .where(and(
-      eq(schema.inventory.companyId, companyId),
-      eq(schema.inventory.stockItemId, stockItemId),
-    ));
+    .where(and(eq(schema.inventory.companyId, companyId), eq(schema.inventory.stockItemId, stockItemId)));
 
-  const locationIds = rows.map(r => r.locationId).filter((id): id is number => id != null);
+  const locationIds = rows.map((r) => r.locationId).filter((id): id is number => id != null);
   let locationMap = new Map<number, string>();
   if (locationIds.length > 0) {
     const locs = await db
       .select({ id: schema.locations.id, name: schema.locations.name, code: schema.locations.code })
       .from(schema.locations)
-      .where(and(
-        eq(schema.locations.companyId, companyId),
-        inArray(schema.locations.id, locationIds),
-      ));
-    locationMap = new Map(locs.map(l => [l.id, `${l.name} (${l.code})`]));
+      .where(and(eq(schema.locations.companyId, companyId), inArray(schema.locations.id, locationIds)));
+    locationMap = new Map(locs.map((l) => [l.id, `${l.name} (${l.code})`]));
   }
 
   return rows
-    .map(r => ({
+    .map((r) => ({
       locationId: r.locationId,
       location: locationMap.get(r.locationId!) || "Unknown",
       quantity: parseFloat(r.quantity || "0").toFixed(3),
       avgCost: parseFloat(r.averageRate || "0").toFixed(2),
       totalValue: parseFloat(r.totalValue || "0").toFixed(2),
     }))
-    .filter(r => parseFloat(r.quantity) > 0);
+    .filter((r) => parseFloat(r.quantity) > 0);
 }
 
 export async function searchSuppliers(companyId: number, query: string, limit = 15) {
@@ -113,9 +111,9 @@ export async function searchSuppliers(companyId: number, query: string, limit = 
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(w => w.length > 1);
+    .filter((w) => w.length > 1);
 
-  const conditions = terms.map(t =>
+  const conditions = terms.map((t) =>
     or(ilike(schema.suppliers.legalName, `%${t}%`), ilike(schema.suppliers.code, `%${t}%`))
   );
 
@@ -129,15 +127,17 @@ export async function searchSuppliers(companyId: number, query: string, limit = 
       openingBalance: schema.suppliers.openingBalance,
     })
     .from(schema.suppliers)
-    .where(and(
-      eq(schema.suppliers.companyId, companyId),
-      eq(schema.suppliers.active, true),
-      isNull(schema.suppliers.deletedAt),
-      or(...conditions),
-    ))
+    .where(
+      and(
+        eq(schema.suppliers.companyId, companyId),
+        eq(schema.suppliers.active, true),
+        isNull(schema.suppliers.deletedAt),
+        or(...conditions)
+      )
+    )
     .limit(limit);
 
-  return rows.map(s => ({
+  return rows.map((s) => ({
     id: s.id,
     code: s.code || "",
     name: s.legalName || "Unknown",
@@ -152,13 +152,13 @@ export async function searchCustomers(companyId: number, query: string, limit = 
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(w => w.length > 1);
+    .filter((w) => w.length > 1);
 
-  const conditions = terms.map(t =>
+  const conditions = terms.map((t) =>
     or(
       ilike(schema.customers.legalName, `%${t}%`),
       ilike(schema.customers.name, `%${t}%`),
-      ilike(schema.customers.code, `%${t}%`),
+      ilike(schema.customers.code, `%${t}%`)
     )
   );
 
@@ -171,15 +171,17 @@ export async function searchCustomers(companyId: number, query: string, limit = 
       phone: schema.customers.phone,
     })
     .from(schema.customers)
-    .where(and(
-      eq(schema.customers.companyId, companyId),
-      eq(schema.customers.active, true),
-      isNull(schema.customers.deletedAt),
-      or(...conditions),
-    ))
+    .where(
+      and(
+        eq(schema.customers.companyId, companyId),
+        eq(schema.customers.active, true),
+        isNull(schema.customers.deletedAt),
+        or(...conditions)
+      )
+    )
     .limit(limit);
 
-  return rows.map(c => ({
+  return rows.map((c) => ({
     id: c.id,
     code: c.code || "",
     name: c.legalName || c.name || "Unknown",
@@ -192,9 +194,9 @@ export async function searchLedgerAccounts(companyId: number, query: string, lim
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(w => w.length > 1);
+    .filter((w) => w.length > 1);
 
-  const conditions = terms.map(t =>
+  const conditions = terms.map((t) =>
     or(ilike(schema.ledgerAccounts.name, `%${t}%`), ilike(schema.ledgerAccounts.code, `%${t}%`))
   );
 
@@ -208,15 +210,17 @@ export async function searchLedgerAccounts(companyId: number, query: string, lim
       openingBalanceSide: schema.ledgerAccounts.openingBalanceSide,
     })
     .from(schema.ledgerAccounts)
-    .where(and(
-      eq(schema.ledgerAccounts.companyId, companyId),
-      eq(schema.ledgerAccounts.active, true),
-      isNull(schema.ledgerAccounts.deletedAt),
-      or(...conditions),
-    ))
+    .where(
+      and(
+        eq(schema.ledgerAccounts.companyId, companyId),
+        eq(schema.ledgerAccounts.active, true),
+        isNull(schema.ledgerAccounts.deletedAt),
+        or(...conditions)
+      )
+    )
     .limit(limit);
 
-  return rows.map(a => ({
+  return rows.map((a) => ({
     id: a.id,
     code: a.code || "",
     name: a.name,
@@ -231,13 +235,10 @@ export async function searchVouchers(companyId: number, query: string, limit = 2
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
-    .filter(w => w.length > 1);
+    .filter((w) => w.length > 1);
 
-  const conditions = terms.map(t =>
-    or(
-      ilike(schema.vouchers.description, `%${t}%`),
-      ilike(schema.vouchers.voucherNumber, `%${t}%`),
-    )
+  const conditions = terms.map((t) =>
+    or(ilike(schema.vouchers.description, `%${t}%`), ilike(schema.vouchers.voucherNumber, `%${t}%`))
   );
 
   const rows = await db
@@ -250,15 +251,11 @@ export async function searchVouchers(companyId: number, query: string, limit = 2
       description: schema.vouchers.description,
     })
     .from(schema.vouchers)
-    .where(and(
-      eq(schema.vouchers.companyId, companyId),
-      isNull(schema.vouchers.deletedAt),
-      or(...conditions),
-    ))
+    .where(and(eq(schema.vouchers.companyId, companyId), isNull(schema.vouchers.deletedAt), or(...conditions)))
     .orderBy(desc(schema.vouchers.voucherDate))
     .limit(limit);
 
-  return rows.map(v => ({
+  return rows.map((v) => ({
     id: v.id,
     number: v.voucherNumber,
     type: v.voucherType,
@@ -278,12 +275,14 @@ export async function getLowStockItems(companyId: number, limit = 20) {
         reorderLevel: schema.stockItems.reorderLevel,
       })
       .from(schema.stockItems)
-      .where(and(
-        eq(schema.stockItems.companyId, companyId),
-        eq(schema.stockItems.active, true),
-        isNull(schema.stockItems.deletedAt),
-        sql`CAST(${schema.stockItems.reorderLevel} AS NUMERIC) > 0`,
-      )),
+      .where(
+        and(
+          eq(schema.stockItems.companyId, companyId),
+          eq(schema.stockItems.active, true),
+          isNull(schema.stockItems.deletedAt),
+          sql`CAST(${schema.stockItems.reorderLevel} AS NUMERIC) > 0`
+        )
+      ),
 
     db
       .select({
@@ -295,18 +294,18 @@ export async function getLowStockItems(companyId: number, limit = 20) {
       .groupBy(schema.inventory.stockItemId),
   ]);
 
-  const invMap = new Map(invRows.map(i => [i.stockItemId, parseFloat(i.totalQty || "0")]));
+  const invMap = new Map(invRows.map((i) => [i.stockItemId, parseFloat(i.totalQty || "0")]));
 
   return items
-    .map(item => {
+    .map((item) => {
       const qty = invMap.get(item.id) ?? 0;
       const reorder = parseFloat(item.reorderLevel || "0");
       return { id: item.id, code: item.code || "", name: item.name, qty, reorderLevel: reorder };
     })
-    .filter(item => item.qty <= item.reorderLevel)
+    .filter((item) => item.qty <= item.reorderLevel)
     .sort((a, b) => a.qty - b.qty)
     .slice(0, limit)
-    .map(item => ({
+    .map((item) => ({
       id: item.id,
       code: item.code,
       name: item.name,
@@ -326,11 +325,13 @@ export async function getPricingHealth(companyId: number, limit = 20) {
         sellingPrice: schema.stockItems.sellingPrice,
       })
       .from(schema.stockItems)
-      .where(and(
-        eq(schema.stockItems.companyId, companyId),
-        eq(schema.stockItems.active, true),
-        isNull(schema.stockItems.deletedAt),
-      )),
+      .where(
+        and(
+          eq(schema.stockItems.companyId, companyId),
+          eq(schema.stockItems.active, true),
+          isNull(schema.stockItems.deletedAt)
+        )
+      ),
 
     db
       .select({
@@ -344,10 +345,10 @@ export async function getPricingHealth(companyId: number, limit = 20) {
       .groupBy(schema.inventory.stockItemId),
   ]);
 
-  const invMap = new Map(invRows.map(i => [i.stockItemId, i]));
+  const invMap = new Map(invRows.map((i) => [i.stockItemId, i]));
 
   return items
-    .map(item => {
+    .map((item) => {
       const inv = invMap.get(item.id);
       const avgCost = parseFloat(inv?.avgRate || "0");
       const sellPrice = parseFloat(item.sellingPrice || "0");
@@ -366,7 +367,7 @@ export async function getPricingHealth(companyId: number, limit = 20) {
         potentialLoss: qty > 0 && gap < 0 ? (Math.abs(gap) * qty).toFixed(2) : "0",
       };
     })
-    .filter(item => parseFloat(item.avgCost) > 0)
+    .filter((item) => parseFloat(item.avgCost) > 0)
     .sort((a, b) => parseFloat(a.priceGap) - parseFloat(b.priceGap))
     .slice(0, limit);
 }
@@ -385,15 +386,17 @@ export async function getSalesForItem(companyId: number, stockItemId: number, li
     })
     .from(schema.salesItems)
     .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-    .where(and(
-      eq(schema.vouchers.companyId, companyId),
-      eq(schema.salesItems.stockItemId, stockItemId),
-      isNull(schema.vouchers.deletedAt),
-    ))
+    .where(
+      and(
+        eq(schema.vouchers.companyId, companyId),
+        eq(schema.salesItems.stockItemId, stockItemId),
+        isNull(schema.vouchers.deletedAt)
+      )
+    )
     .orderBy(desc(schema.vouchers.voucherDate))
     .limit(limit);
 
-  return rows.map(r => ({
+  return rows.map((r) => ({
     voucherNumber: r.voucherNumber,
     date: r.voucherDate,
     qty: parseFloat(r.quantity || "0").toFixed(3),
@@ -406,45 +409,48 @@ export async function getSalesForItem(companyId: number, stockItemId: number, li
 
 export async function getBusinessSummary(companyId: number) {
   const todayStr = new Date().toISOString().split("T")[0];
-  const monthStartStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-    .toISOString()
-    .split("T")[0];
+  const monthStartStr = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
 
   const salesCols = {
-    revenue:          sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC)), 0)`,
-    cost:             sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC)), 0)`,
-    profit:           sql<string>`COALESCE(SUM(CAST(${schema.salesItems.profit} AS NUMERIC)), 0)`,
+    revenue: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC)), 0)`,
+    cost: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.totalCost} AS NUMERIC)), 0)`,
+    profit: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.profit} AS NUMERIC)), 0)`,
     transactionCount: sql<number>`COUNT(DISTINCT ${schema.salesItems.voucherId})`,
-    unitsSold:        sql<string>`COALESCE(SUM(CAST(${schema.salesItems.quantity} AS NUMERIC)), 0)`,
+    unitsSold: sql<string>`COALESCE(SUM(CAST(${schema.salesItems.quantity} AS NUMERIC)), 0)`,
   };
 
   const [todayRaw, monthRaw, openPOs, topItems] = await Promise.all([
-    db.select(salesCols)
+    db
+      .select(salesCols)
       .from(schema.salesItems)
       .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        eq(schema.vouchers.voucherDate, todayStr),
-        isNull(schema.vouchers.deletedAt),
-      )),
+      .where(
+        and(
+          eq(schema.vouchers.companyId, companyId),
+          eq(schema.vouchers.voucherDate, todayStr),
+          isNull(schema.vouchers.deletedAt)
+        )
+      ),
 
-    db.select(salesCols)
+    db
+      .select(salesCols)
       .from(schema.salesItems)
       .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        gte(schema.vouchers.voucherDate, monthStartStr),
-        isNull(schema.vouchers.deletedAt),
-      )),
+      .where(
+        and(
+          eq(schema.vouchers.companyId, companyId),
+          gte(schema.vouchers.voucherDate, monthStartStr),
+          isNull(schema.vouchers.deletedAt)
+        )
+      ),
 
-    db.select({ count: sql<number>`COUNT(*)` })
+    db
+      .select({ count: sql<number>`COUNT(*)` })
       .from(schema.purchaseOrders)
-      .where(and(
-        eq(schema.purchaseOrders.companyId, companyId),
-        eq(schema.purchaseOrders.status, "Open"),
-      )),
+      .where(and(eq(schema.purchaseOrders.companyId, companyId), eq(schema.purchaseOrders.status, "Open"))),
 
-    db.select({
+    db
+      .select({
         stockItemId: schema.salesItems.stockItemId,
         itemName: schema.stockItems.name,
         itemCode: schema.stockItems.code,
@@ -455,17 +461,19 @@ export async function getBusinessSummary(companyId: number) {
       .from(schema.salesItems)
       .innerJoin(schema.vouchers, eq(schema.salesItems.voucherId, schema.vouchers.id))
       .innerJoin(schema.stockItems, eq(schema.salesItems.stockItemId, schema.stockItems.id))
-      .where(and(
-        eq(schema.vouchers.companyId, companyId),
-        gte(schema.vouchers.voucherDate, monthStartStr),
-        isNull(schema.vouchers.deletedAt),
-      ))
+      .where(
+        and(
+          eq(schema.vouchers.companyId, companyId),
+          gte(schema.vouchers.voucherDate, monthStartStr),
+          isNull(schema.vouchers.deletedAt)
+        )
+      )
       .groupBy(schema.salesItems.stockItemId, schema.stockItems.name, schema.stockItems.code)
       .orderBy(desc(sql`SUM(CAST(${schema.salesItems.totalSales} AS NUMERIC))`))
       .limit(5),
   ]);
 
-  function summarise(row: typeof todayRaw[0], label: string) {
+  function summarise(row: (typeof todayRaw)[0], label: string) {
     const rev = parseFloat(row.revenue || "0");
     const prof = parseFloat(row.profit || "0");
     return {
@@ -484,7 +492,7 @@ export async function getBusinessSummary(companyId: number) {
     today: { date: todayStr, ...summarise(todayRaw[0], "Today") },
     thisMonth: { monthStart: monthStartStr, ...summarise(monthRaw[0], "This Month") },
     openPurchaseOrders: openPOs[0]?.count || 0,
-    topItemsThisMonth: topItems.map(i => ({
+    topItemsThisMonth: topItems.map((i) => ({
       name: i.itemName || "Unknown",
       code: i.itemCode || "",
       revenue: parseFloat(i.totalRevenue || "0").toFixed(2),

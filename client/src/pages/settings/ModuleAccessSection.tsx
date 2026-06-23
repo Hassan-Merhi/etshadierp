@@ -102,9 +102,7 @@ export function ModuleAccessSection() {
                 </tr>
                 {keys.map((featureKey) => (
                   <tr key={featureKey} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
-                    <td className="py-2.5 px-4 font-medium">
-                      {FEATURE_PAGE_INFO[featureKey].label}
-                    </td>
+                    <td className="py-2.5 px-4 font-medium">{FEATURE_PAGE_INFO[featureKey].label}</td>
                     {CONFIGURABLE_ROLES.map((role) => (
                       <td key={role} className="text-center py-2.5 px-3">
                         <div className="flex justify-center">

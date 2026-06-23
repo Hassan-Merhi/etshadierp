@@ -1,21 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import {
-  EnrichedContainerRow,
-  DrawerForm,
-  seedForm,
-} from "./gitContainerTypes";
+import { EnrichedContainerRow, DrawerForm, seedForm } from "./gitContainerTypes";
 import { ContainerDrawerForm } from "./ContainerDrawerForm";
 import { ContainerDrawerTracking } from "./ContainerDrawerTracking";
 
@@ -51,13 +41,9 @@ export function ContainerDrawer({
     }
   }, [open, container?.id, lastId]);
 
-  const set = (field: keyof DrawerForm, val: any) =>
-    setForm((prev) => prev ? { ...prev, [field]: val } : prev);
+  const set = (field: keyof DrawerForm, val: any) => setForm((prev) => (prev ? { ...prev, [field]: val } : prev));
 
-  const canEdit =
-    sessionCompanyId === null ||
-    !container ||
-    container.companyId === sessionCompanyId;
+  const canEdit = sessionCompanyId === null || !container || container.companyId === sessionCompanyId;
 
   const maxOffload = (() => {
     if (!form?.borderDate) return null;
@@ -156,9 +142,10 @@ export function ContainerDrawer({
           description: `${result.provider ?? "unknown"} — ${etaLine}`,
         });
       } else {
-        const tried = result.attempts?.length > 0
-          ? result.attempts.map((a) => `${a.provider}: ${a.status}`).join(" → ")
-          : "No providers available";
+        const tried =
+          result.attempts?.length > 0
+            ? result.attempts.map((a) => `${a.provider}: ${a.status}`).join(" → ")
+            : "No providers available";
         toast({
           title: "All providers failed",
           description: tried,
@@ -185,7 +172,9 @@ export function ContainerDrawer({
         try {
           const res = await fetch(`/api/container-tracking/${container.id}/progress`, { credentials: "include" });
           if (res.ok) setTrackProgress(await res.json());
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }, 600);
     } else {
       if (trackProgressIntervalRef.current) {
@@ -235,13 +224,16 @@ export function ContainerDrawer({
   if (!container || !form) return null;
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Sheet
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader className="pb-2">
           <SheetTitle className="text-base font-mono">{container.containerNumber}</SheetTitle>
-          <SheetDescription className="text-xs">
-            {container.companyName} — Container Logistics
-          </SheetDescription>
+          <SheetDescription className="text-xs">{container.companyName} — Container Logistics</SheetDescription>
         </SheetHeader>
 
         <ContainerDrawerForm

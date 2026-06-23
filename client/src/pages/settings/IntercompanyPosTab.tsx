@@ -1,100 +1,128 @@
-  import { useState, useEffect, useRef } from "react";
-  import { useConnectivity } from "@/contexts/ConnectivityContext";
-  import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
-  import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
-  import { useForm } from "react-hook-form";
-  import { zodResolver } from "@hookform/resolvers/zod";
-  import { z } from "zod";
-  import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-  import { Button } from "@/components/ui/button";
-  import { Input } from "@/components/ui/input";
-  import { Label } from "@/components/ui/label";
-  import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-  } from "@/components/ui/dialog";
-  import { Alert, AlertDescription } from "@/components/ui/alert";
-  import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
-  } from "@/components/ui/alert-dialog";
-  import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-  } from "@/components/ui/form";
-  import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-  } from "@/components/ui/select";
-  import { Checkbox } from "@/components/ui/checkbox";
-  import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-  } from "@/components/ui/table";
-  import { Badge } from "@/components/ui/badge";
-  import { Skeleton } from "@/components/ui/skeleton";
-  import { Switch } from "@/components/ui/switch";
-  
-  import { useToast } from "@/hooks/use-toast";
-  import { useMutation, useQuery } from "@tanstack/react-query";
-  import { queryClient, apiRequest } from "@/lib/queryClient";
-  import { useAppMode } from "@/contexts/AppModeContext";
-  import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
-  import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-  import { Plus, Edit, Building2, Users, ChevronDown, ChevronUp, Trash2, CalendarRange, Settings2, Wrench, MapPin, ChevronRight, Bot, MessageCircle, RefreshCw, Calculator, Loader2, Shield, AlertTriangle, PieChart, Key, Lock, Package, Eye, History, Clock, Upload, Download, Database, TrendingUp, ShoppingCart, Check, X, Copy, ExternalLink, ArrowLeftRight, WifiOff, Wifi, CheckCircle2, Printer, Layers } from "lucide-react";
-import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
-  import { Link } from "wouter";
-  import { useDateFormat } from "@/contexts/DateFormatContext";
-  import { insertUserSchema, insertCompanySchema, insertUserCompanyRoleSchema, FEATURE_KEYS, FEATURE_PAGE_INFO, type FeatureKey } from "@shared/schema";
-  import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
-  import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
-  import { useCompany } from "@/contexts/CompanyContext";
-  import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
-  import { formatNumber } from "@/lib/formatNumber";
-  
-  const userFormSchema = insertUserSchema;
-  const companyFormSchema = insertCompanySchema;
-  const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
-    (data) => {
-      // If role is POS, assignedLocationId must be present
-      if (data.role === "POS" && !data.assignedLocationId) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "POS roles require an assigned location",
-      path: ["assignedLocationId"],
-    }
-  );
-  
-  type UserFormData = z.infer<typeof userFormSchema>;
-  type CompanyFormData = z.infer<typeof companyFormSchema>;
-  type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
+import { useState, useEffect, useRef } from "react";
+import { useConnectivity } from "@/contexts/ConnectivityContext";
+import { DeleteConfirmDialog } from "@/components/ConfirmationDialog";
+import { OfflinePrepPanel } from "@/components/OfflinePrepPanel";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useAppMode } from "@/contexts/AppModeContext";
+import { getApiRequest, factoryApiRequest } from "@/lib/factoryApi";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Plus,
+  Edit,
+  Building2,
+  Users,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+  CalendarRange,
+  Settings2,
+  Wrench,
+  MapPin,
+  ChevronRight,
+  Bot,
+  MessageCircle,
+  RefreshCw,
+  Calculator,
+  Loader2,
+  Shield,
+  AlertTriangle,
+  PieChart,
+  Key,
+  Lock,
+  Package,
+  Eye,
+  History,
+  Clock,
+  Upload,
+  Download,
+  Database,
+  TrendingUp,
+  ShoppingCart,
+  Check,
+  X,
+  Copy,
+  ExternalLink,
+  ArrowLeftRight,
+  WifiOff,
+  Wifi,
+  CheckCircle2,
+  Printer,
+  Layers,
+} from "lucide-react";
+import { utils, writeFile, readFile, read, ExcelJS } from "@/lib/excelHelper";
+import { Link } from "wouter";
+import { useDateFormat } from "@/contexts/DateFormatContext";
+import {
+  insertUserSchema,
+  insertCompanySchema,
+  insertUserCompanyRoleSchema,
+  FEATURE_KEYS,
+  FEATURE_PAGE_INFO,
+  type FeatureKey,
+} from "@shared/schema";
+import { FACTORY_NAV_PAGES } from "@/components/FactorySidebar";
+import { FiscalPeriodTab } from "@/components/FiscalPeriodTab";
+import { useCompany } from "@/contexts/CompanyContext";
+import { ExchangeRateSettings } from "@/components/ExchangeRateSettings";
+import { formatNumber } from "@/lib/formatNumber";
+
+const userFormSchema = insertUserSchema;
+const companyFormSchema = insertCompanySchema;
+const roleAssignmentSchema = insertUserCompanyRoleSchema.refine(
+  (data) => {
+    // If role is POS, assignedLocationId must be present
+    if (data.role === "POS" && !data.assignedLocationId) {
+      return false;
+    }
+    return true;
+  },
+  {
+    message: "POS roles require an assigned location",
+    path: ["assignedLocationId"],
+  }
+);
+
+type UserFormData = z.infer<typeof userFormSchema>;
+type CompanyFormData = z.infer<typeof companyFormSchema>;
+type RoleAssignmentData = z.infer<typeof roleAssignmentSchema>;
 
 export function POSReceiptSettings() {
   return (
@@ -103,10 +131,13 @@ export function POSReceiptSettings() {
         <div className="flex-1">
           <div className="font-medium text-sm">Profit/Loss Comparison on POS Receipts</div>
           <div className="text-xs text-muted-foreground mt-1">
-            All POS invoices automatically include P/L Bale and Total P/L columns showing profit or loss vs. configured price per item.
+            All POS invoices automatically include P/L Bale and Total P/L columns showing profit or loss vs. configured
+            price per item.
           </div>
         </div>
-        <Badge variant="secondary" className="shrink-0">Always On</Badge>
+        <Badge variant="secondary" className="shrink-0">
+          Always On
+        </Badge>
       </div>
     </div>
   );
@@ -143,7 +174,9 @@ export function IntercompanyPosTab() {
     queryKey: ["/api/intercompany-pos-config/dest-accounts", destCompanyId],
     queryFn: async () => {
       if (!destCompanyId) return [];
-      const res = await fetch(`/api/intercompany-pos-config/dest-accounts?companyId=${destCompanyId}`, { credentials: "include" });
+      const res = await fetch(`/api/intercompany-pos-config/dest-accounts?companyId=${destCompanyId}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to load dest accounts");
       return res.json();
     },
@@ -220,7 +253,8 @@ export function IntercompanyPosTab() {
       </div>
       <p className="text-muted-foreground text-sm">
         When enabled, each cash POS sale in this company automatically creates a consolidated journal voucher
-        transferring the sale amount to the intercompany account. A mirror voucher is created in the destination company.
+        transferring the sale amount to the intercompany account. A mirror voucher is created in the destination
+        company.
       </p>
 
       <Card>
@@ -236,13 +270,11 @@ export function IntercompanyPosTab() {
               <div className="flex items-center justify-between">
                 <div>
                   <Label className="text-sm font-medium">Enable auto-transfer</Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">When off, no vouchers are created for POS sales.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    When off, no vouchers are created for POS sales.
+                  </p>
                 </div>
-                <Switch
-                  data-testid="switch-interco-enabled"
-                  checked={enabled}
-                  onCheckedChange={setEnabled}
-                />
+                <Switch data-testid="switch-interco-enabled" checked={enabled} onCheckedChange={setEnabled} />
               </div>
 
               {/* Skip source voucher toggle */}
@@ -282,7 +314,11 @@ export function IntercompanyPosTab() {
               {/* Source interco account */}
               <div className="space-y-1.5">
                 <Label>Source Intercompany Account (this company)</Label>
-                <Select value={sourceIntercoAccountId} onValueChange={setSourceIntercoAccountId} data-testid="select-src-account">
+                <Select
+                  value={sourceIntercoAccountId}
+                  onValueChange={setSourceIntercoAccountId}
+                  data-testid="select-src-account"
+                >
                   <SelectTrigger data-testid="select-src-account-trigger">
                     <SelectValue placeholder="Select account…" />
                   </SelectTrigger>
@@ -305,7 +341,11 @@ export function IntercompanyPosTab() {
                 {!destCompanyId ? (
                   <p className="text-xs text-muted-foreground italic">Select a destination company first.</p>
                 ) : (
-                  <Select value={destIntercoAccountId} onValueChange={setDestIntercoAccountId} data-testid="select-dest-account">
+                  <Select
+                    value={destIntercoAccountId}
+                    onValueChange={setDestIntercoAccountId}
+                    data-testid="select-dest-account"
+                  >
                     <SelectTrigger data-testid="select-dest-account-trigger">
                       <SelectValue placeholder={destAccountsLoading ? "Loading…" : "Select account…"} />
                     </SelectTrigger>
@@ -330,7 +370,10 @@ export function IntercompanyPosTab() {
                   data-testid="button-save-interco-config"
                 >
                   {saveMutation.isPending ? (
-                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Saving…</>
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Saving…
+                    </>
                   ) : (
                     "Save Configuration"
                   )}
@@ -346,11 +389,21 @@ export function IntercompanyPosTab() {
           <CardContent className="pt-6">
             <p className="text-sm font-medium mb-3">Current Configuration</p>
             <div className="space-y-1 text-sm text-muted-foreground">
-              <p>Status: <span className={config.enabled ? "text-green-600 font-medium" : "text-red-600 font-medium"}>{config.enabled ? "Enabled" : "Disabled"}</span></p>
+              <p>
+                Status:{" "}
+                <span className={config.enabled ? "text-green-600 font-medium" : "text-red-600 font-medium"}>
+                  {config.enabled ? "Enabled" : "Disabled"}
+                </span>
+              </p>
               <p>Destination company ID: {config.destCompanyId}</p>
               <p>Source interco account ID: {config.sourceIntercoAccountId}</p>
               <p>Dest interco account ID: {config.destIntercoAccountId}</p>
-              <p>Skip source voucher: <span className={config.skipSourceVoucher ? "text-amber-600 font-medium" : "text-muted-foreground"}>{config.skipSourceVoucher ? "Yes (dest-only mode)" : "No"}</span></p>
+              <p>
+                Skip source voucher:{" "}
+                <span className={config.skipSourceVoucher ? "text-amber-600 font-medium" : "text-muted-foreground"}>
+                  {config.skipSourceVoucher ? "Yes (dest-only mode)" : "No"}
+                </span>
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -358,4 +411,3 @@ export function IntercompanyPosTab() {
     </div>
   );
 }
-

@@ -77,10 +77,7 @@ export default function CombinedInventory() {
     queryKey: ["/api/containers"],
   });
 
-  const otwContainers = useMemo(
-    () => containers.filter((c) => c.status === "OTW"),
-    [containers]
-  );
+  const otwContainers = useMemo(() => containers.filter((c) => c.status === "OTW"), [containers]);
 
   const containerDetailsQueries = useQueries({
     queries: otwContainers.map((container) => ({
@@ -110,20 +107,18 @@ export default function CombinedInventory() {
     //   - stockItemId is null/0 (legacy rows)     → "name:<normalised name>"
     const map = new Map<string, CombinedRow>();
 
-    const idKey   = (id: number | null | undefined) =>
-      id != null && id !== 0 ? `id:${id}` : null;
-    const nameKey = (name: string) =>
-      `name:${(name || "").toLowerCase().trim()}`;
+    const idKey = (id: number | null | undefined) => (id != null && id !== 0 ? `id:${id}` : null);
+    const nameKey = (name: string) => `name:${(name || "").toLowerCase().trim()}`;
 
     containerDetailsQueries.forEach((q) => {
       if (!q.data) return;
       const containerData = q.data as any;
       containerData?.pos?.forEach((po: any) => {
         po.items?.forEach((item: any) => {
-          const qty  = parseFloat(item.quantity || "0");
+          const qty = parseFloat(item.quantity || "0");
           const rate = parseFloat(item.rate || "0");
           const itemName = item.stockItemName || item.itemName || "";
-          const key  = idKey(item.stockItemId) ?? nameKey(itemName);
+          const key = idKey(item.stockItemId) ?? nameKey(itemName);
 
           const existing = map.get(key);
           if (existing) {
@@ -150,13 +145,13 @@ export default function CombinedInventory() {
     });
 
     inventoryRows.forEach((inv) => {
-      const qty   = parseFloat(inv.quantity   || "0");
+      const qty = parseFloat(inv.quantity || "0");
       const value = parseFloat(inv.totalValue || "0");
 
       // Try ID key first; if OTW data for this item was stored under a name
       // key (because its stockItemId was null at the time), find it that way.
-      const primaryKey   = idKey(inv.stockItemId);
-      const fallbackKey  = nameKey(inv.stockItemName);
+      const primaryKey = idKey(inv.stockItemId);
+      const fallbackKey = nameKey(inv.stockItemName);
       let key = primaryKey ?? fallbackKey;
 
       if (primaryKey && !map.has(primaryKey) && map.has(fallbackKey)) {
@@ -164,7 +159,7 @@ export default function CombinedInventory() {
         const otwEntry = map.get(fallbackKey)!;
         otwEntry.stockItemId = inv.stockItemId;
         if (!otwEntry.stockGroupId && inv.stockGroupId) {
-          otwEntry.stockGroupId  = inv.stockGroupId;
+          otwEntry.stockGroupId = inv.stockGroupId;
           otwEntry.stockGroupName = inv.stockGroupName;
         }
         map.set(primaryKey, otwEntry);
@@ -175,11 +170,11 @@ export default function CombinedInventory() {
       const existing = map.get(key);
       if (existing) {
         existing.inHandQty += qty;
-        existing.totalQty  += qty;
+        existing.totalQty += qty;
         existing.inHandValue += value;
         // Backfill group info if the OTW entry lacked it
         if (!existing.stockGroupId && inv.stockGroupId) {
-          existing.stockGroupId   = inv.stockGroupId;
+          existing.stockGroupId = inv.stockGroupId;
           existing.stockGroupName = inv.stockGroupName;
         }
         // Prefer the canonical name from inventory (from stockItems.name join)
@@ -235,10 +230,7 @@ export default function CombinedInventory() {
       row.combinedValue = row.avgRate * row.totalQty;
     });
 
-    return Array.from(map.values()).sort((a, b) =>
-      a.stockItemName.localeCompare(b.stockItemName)
-    );
-
+    return Array.from(map.values()).sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
   }, [containerDetailsQueries, inventoryRows, allStockItems, includeZero]);
 
   const searchLower = search.trim().toLowerCase();
@@ -250,7 +242,7 @@ export default function CombinedInventory() {
 
   const stockGroups = useMemo((): StockGroupSummary[] => {
     const groupMap = new Map<string, StockGroupSummary>();
-    const key = (id: number | null) => id === null ? "__null__" : String(id);
+    const key = (id: number | null) => (id === null ? "__null__" : String(id));
 
     filteredAll.forEach((row) => {
       const k = key(row.stockGroupId);
@@ -276,9 +268,7 @@ export default function CombinedInventory() {
       }
     });
 
-    return Array.from(groupMap.values()).sort((a, b) =>
-      a.stockGroupName.localeCompare(b.stockGroupName)
-    );
+    return Array.from(groupMap.values()).sort((a, b) => a.stockGroupName.localeCompare(b.stockGroupName));
   }, [filteredAll]);
 
   const groupItems = useMemo(() => {
@@ -286,17 +276,18 @@ export default function CombinedInventory() {
     return filteredAll.filter((r) => r.stockGroupId === selectedGroupId);
   }, [filteredAll, selectedGroupId]);
 
-  const totals = useMemo(() => ({
-    items: filteredAll.length,
-    otwQty: filteredAll.reduce((s, r) => s + r.otwQty, 0),
-    inHandQty: filteredAll.reduce((s, r) => s + r.inHandQty, 0),
-    totalQty: filteredAll.reduce((s, r) => s + r.totalQty, 0),
-    combinedValue: filteredAll.reduce((s, r) => s + r.combinedValue, 0),
-  }), [filteredAll]);
+  const totals = useMemo(
+    () => ({
+      items: filteredAll.length,
+      otwQty: filteredAll.reduce((s, r) => s + r.otwQty, 0),
+      inHandQty: filteredAll.reduce((s, r) => s + r.inHandQty, 0),
+      totalQty: filteredAll.reduce((s, r) => s + r.totalQty, 0),
+      combinedValue: filteredAll.reduce((s, r) => s + r.combinedValue, 0),
+    }),
+    [filteredAll]
+  );
 
-  const drillGroup = selectedGroupId !== undefined
-    ? stockGroups.find((g) => g.stockGroupId === selectedGroupId)
-    : null;
+  const drillGroup = selectedGroupId !== undefined ? stockGroups.find((g) => g.stockGroupId === selectedGroupId) : null;
 
   const isDrillMode = viewMode === "groups" && selectedGroupId !== undefined;
 
@@ -329,11 +320,15 @@ export default function CombinedInventory() {
     return (
       <div className="space-y-4">
         <div className="flex flex-wrap gap-3">
-          {[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-32 rounded-lg" />)}
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-10 w-32 rounded-lg" />
+          ))}
         </div>
         <Skeleton className="h-10 w-full rounded-md" />
         <div className="space-y-2">
-          {[1, 2, 3, 4, 5, 6].map((i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />)}
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Skeleton key={i} className="h-14 w-full rounded-xl" />
+          ))}
         </div>
       </div>
     );
@@ -354,10 +349,7 @@ export default function CombinedInventory() {
           </Button>
           <div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
-              <button
-                className="hover:text-foreground transition-colors"
-                onClick={() => setSelectedGroupId(undefined)}
-              >
+              <button className="hover:text-foreground transition-colors" onClick={() => setSelectedGroupId(undefined)}>
                 Combined Inventory
               </button>
               <ChevronRight className="h-3 w-3" />
@@ -375,12 +367,7 @@ export default function CombinedInventory() {
           subtitle="In-transit (OTW) + in-hand stock combined per item"
           icon={<Layers className="h-5 w-5" />}
         >
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            data-testid="button-export-excel"
-          >
+          <Button variant="outline" size="sm" onClick={handleExport} data-testid="button-export-excel">
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Export Excel
           </Button>
@@ -390,13 +377,13 @@ export default function CombinedInventory() {
       {/* Stats bar */}
       <div className="flex flex-wrap gap-3">
         <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
-          <span className="text-sm font-semibold" data-testid="stat-items">{totals.items.toLocaleString()}</span>
+          <span className="text-sm font-semibold" data-testid="stat-items">
+            {totals.items.toLocaleString()}
+          </span>
           <span className="text-xs text-muted-foreground">Items</span>
         </div>
         <div className="flex items-center gap-2 bg-blue-500/10 rounded-lg px-3 py-2">
-          {isLoadingOtw ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
-          ) : null}
+          {isLoadingOtw ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" /> : null}
           <span className="text-sm font-semibold font-mono text-blue-700 dark:text-blue-300" data-testid="stat-otw">
             {formatNumber(totals.otwQty, 0)}
           </span>
@@ -405,11 +392,15 @@ export default function CombinedInventory() {
           </span>
         </div>
         <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
-          <span className="text-sm font-semibold font-mono" data-testid="stat-inhand">{formatNumber(totals.inHandQty, 0)}</span>
+          <span className="text-sm font-semibold font-mono" data-testid="stat-inhand">
+            {formatNumber(totals.inHandQty, 0)}
+          </span>
           <span className="text-xs text-muted-foreground">In-Hand Qty</span>
         </div>
         <div className="flex items-center gap-2 bg-muted/60 rounded-lg px-3 py-2">
-          <span className="text-sm font-semibold font-mono" data-testid="stat-total">{formatNumber(totals.totalQty, 0)}</span>
+          <span className="text-sm font-semibold font-mono" data-testid="stat-total">
+            {formatNumber(totals.totalQty, 0)}
+          </span>
           <span className="text-xs text-muted-foreground">Total Qty</span>
         </div>
         <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2">
@@ -435,7 +426,10 @@ export default function CombinedInventory() {
             <Button
               size="sm"
               variant={viewMode === "groups" ? "default" : "outline"}
-              onClick={() => { setViewMode("groups"); setSelectedGroupId(undefined); }}
+              onClick={() => {
+                setViewMode("groups");
+                setSelectedGroupId(undefined);
+              }}
               data-testid="button-view-groups"
             >
               <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
@@ -453,20 +447,11 @@ export default function CombinedInventory() {
           </div>
         )}
         <label className="flex items-center gap-2 cursor-pointer select-none" data-testid="toggle-include-zero">
-          <Checkbox
-            checked={includeZero}
-            onCheckedChange={(v) => setIncludeZero(!!v)}
-            id="include-zero"
-          />
+          <Checkbox checked={includeZero} onCheckedChange={(v) => setIncludeZero(!!v)} id="include-zero" />
           <span className="text-sm text-muted-foreground">Include zero stock</span>
         </label>
         {isDrillMode && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-            data-testid="button-export-excel"
-          >
+          <Button variant="outline" size="sm" onClick={handleExport} data-testid="button-export-excel">
             <Download className="h-3.5 w-3.5 mr-1.5" />
             Export
           </Button>
@@ -565,9 +550,7 @@ function GroupsView({
             </div>
             <div className="text-right hidden md:block">
               <p className="text-xs text-muted-foreground">Value</p>
-              <p className="text-sm font-mono">
-                {g.combinedValue > 0 ? formatAmount(g.combinedValue) : "—"}
-              </p>
+              <p className="text-sm font-mono">{g.combinedValue > 0 ? formatAmount(g.combinedValue) : "—"}</p>
             </div>
           </div>
 
@@ -584,25 +567,36 @@ function GroupsView({
       {/* Totals footer */}
       <div className="bg-muted/40 rounded-xl px-4 py-3 flex items-center gap-4">
         <div className="flex-1">
-          <span className="text-sm font-semibold">Total ({groups.length} group{groups.length !== 1 ? "s" : ""})</span>
+          <span className="text-sm font-semibold">
+            Total ({groups.length} group{groups.length !== 1 ? "s" : ""})
+          </span>
         </div>
         <div className="hidden sm:flex items-center gap-6 flex-shrink-0">
           <div className="text-right w-16">
             <p className="text-xs text-muted-foreground">OTW</p>
             <p className="text-sm font-mono font-semibold text-blue-600 dark:text-blue-400" data-testid="total-otw-qty">
-              {formatNumber(groups.reduce((s, g) => s + g.otwQty, 0), 0)}
+              {formatNumber(
+                groups.reduce((s, g) => s + g.otwQty, 0),
+                0
+              )}
             </p>
           </div>
           <div className="text-right w-20">
             <p className="text-xs text-muted-foreground">In-Hand</p>
             <p className="text-sm font-mono font-semibold" data-testid="total-inhand-qty">
-              {formatNumber(groups.reduce((s, g) => s + g.inHandQty, 0), 0)}
+              {formatNumber(
+                groups.reduce((s, g) => s + g.inHandQty, 0),
+                0
+              )}
             </p>
           </div>
           <div className="text-right w-20">
             <p className="text-xs text-muted-foreground">Total</p>
             <p className="text-sm font-mono font-semibold" data-testid="total-combined-qty">
-              {formatNumber(groups.reduce((s, g) => s + g.totalQty, 0), 0)}
+              {formatNumber(
+                groups.reduce((s, g) => s + g.totalQty, 0),
+                0
+              )}
             </p>
           </div>
           <div className="text-right hidden md:block w-28">
@@ -627,12 +621,15 @@ function ItemsTable({
   formatAmount: (v: number) => string;
   emptyMessage: string;
 }) {
-  const totals = useMemo(() => ({
-    otwQty: rows.reduce((s, r) => s + r.otwQty, 0),
-    inHandQty: rows.reduce((s, r) => s + r.inHandQty, 0),
-    totalQty: rows.reduce((s, r) => s + r.totalQty, 0),
-    combinedValue: rows.reduce((s, r) => s + r.combinedValue, 0),
-  }), [rows]);
+  const totals = useMemo(
+    () => ({
+      otwQty: rows.reduce((s, r) => s + r.otwQty, 0),
+      inHandQty: rows.reduce((s, r) => s + r.inHandQty, 0),
+      totalQty: rows.reduce((s, r) => s + r.totalQty, 0),
+      combinedValue: rows.reduce((s, r) => s + r.combinedValue, 0),
+    }),
+    [rows]
+  );
 
   if (rows.length === 0) {
     return (
@@ -663,41 +660,58 @@ function ItemsTable({
           </TableHeader>
           <TableBody>
             {rows.map((row) => (
-              <TableRow key={row.stockItemId ?? row.stockItemName} data-testid={`row-combined-${row.stockItemId ?? row.stockItemName}`}>
+              <TableRow
+                key={row.stockItemId ?? row.stockItemName}
+                data-testid={`row-combined-${row.stockItemId ?? row.stockItemName}`}
+              >
                 <TableCell className="font-medium">
                   {row.stockItemName}
                   {row.stockGroupName && (
                     <span className="ml-2">
-                      <Badge variant="outline" className="text-xs font-normal">{row.stockGroupName}</Badge>
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {row.stockGroupName}
+                      </Badge>
                     </span>
                   )}
                 </TableCell>
                 <TableCell className="text-right font-mono">
                   {row.otwQty > 0 ? (
-                    <span className="text-blue-600 dark:text-blue-400 font-semibold">{formatNumber(row.otwQty, 0)}</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-semibold">
+                      {formatNumber(row.otwQty, 0)}
+                    </span>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {row.inHandQty > 0 ? formatNumber(row.inHandQty, 0) : <span className="text-muted-foreground">—</span>}
+                  {row.inHandQty > 0 ? (
+                    formatNumber(row.inHandQty, 0)
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
-                <TableCell className="text-right font-mono font-semibold">
-                  {formatNumber(row.totalQty, 0)}
-                </TableCell>
+                <TableCell className="text-right font-mono font-semibold">{formatNumber(row.totalQty, 0)}</TableCell>
                 <TableCell className="text-right font-mono text-muted-foreground">
                   {row.avgRate > 0 ? formatAmount(row.avgRate) : <span>—</span>}
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {row.combinedValue > 0 ? formatAmount(row.combinedValue) : <span className="text-muted-foreground">—</span>}
+                  {row.combinedValue > 0 ? (
+                    formatAmount(row.combinedValue)
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
           <TableFooter className="bg-muted/40">
             <TableRow className="font-semibold">
-              <TableCell>Total ({rows.length} item{rows.length !== 1 ? "s" : ""})</TableCell>
-              <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">{formatNumber(totals.otwQty, 0)}</TableCell>
+              <TableCell>
+                Total ({rows.length} item{rows.length !== 1 ? "s" : ""})
+              </TableCell>
+              <TableCell className="text-right font-mono text-blue-600 dark:text-blue-400">
+                {formatNumber(totals.otwQty, 0)}
+              </TableCell>
               <TableCell className="text-right font-mono">{formatNumber(totals.inHandQty, 0)}</TableCell>
               <TableCell className="text-right font-mono">{formatNumber(totals.totalQty, 0)}</TableCell>
               <TableCell className="text-right font-mono"></TableCell>
@@ -718,9 +732,7 @@ function ItemsTable({
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-sm">{row.stockItemName}</p>
-                {row.stockGroupName && (
-                  <p className="text-xs text-muted-foreground mt-0.5">{row.stockGroupName}</p>
-                )}
+                {row.stockGroupName && <p className="text-xs text-muted-foreground mt-0.5">{row.stockGroupName}</p>}
               </div>
               <p className="text-sm font-mono font-semibold flex-shrink-0">
                 {row.combinedValue > 0 ? formatAmount(row.combinedValue) : "—"}
@@ -730,7 +742,9 @@ function ItemsTable({
               {row.otwQty > 0 && (
                 <div>
                   <span className="text-muted-foreground">OTW </span>
-                  <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">{formatNumber(row.otwQty, 0)}</span>
+                  <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                    {formatNumber(row.otwQty, 0)}
+                  </span>
                 </div>
               )}
               {row.inHandQty > 0 && (

@@ -3,44 +3,116 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { requireAuth, requireRole, canDelete, requireNonPOS, checkPOSLocation } from "../auth";
 import { getClientDate } from "../lib/dateUtils";
-import { upload, logAudit, getCurrentExchangeRate, calculateHistoricalLocationInventory, syncEmployeeBalancesFromEntries } from "./_helpers";
 import {
-  inventory, stockItems, stockGroups, stockItemCodeAliases,
-  stockItemLocationPrices, stockTransferVouchers, stockTransferItems,
-  stockTransferRevisions, stockTransferRevisionItems,
-  stockAdjustmentVouchers, stockAdjustmentItems,
-  containers, containerOffloads, containerOffloadItems, containerSales,
-  containerCharges, containerTrackingImportRowSchema, updateContainerTrackingSchema,
-  bankAccounts, fixedAssets, insertBankAccountSchema, insertFixedAssetSchema,
-  insertStockGroupSchema, insertStockItemSchema, insertStockItemCodeAliasSchema,
-  insertContainerSchema, offloadRequestSchema,
-  purchaseOrders, poLineItems, insertContainerSaleSchema,
-  vouchers, voucherEntries, salesItems, insertVoucherSchema, insertVoucherEntrySchema,
+  upload,
+  logAudit,
+  getCurrentExchangeRate,
+  calculateHistoricalLocationInventory,
+  syncEmployeeBalancesFromEntries,
+} from "./_helpers";
+import {
+  inventory,
+  stockItems,
+  stockGroups,
+  stockItemCodeAliases,
+  stockItemLocationPrices,
+  stockTransferVouchers,
+  stockTransferItems,
+  stockTransferRevisions,
+  stockTransferRevisionItems,
+  stockAdjustmentVouchers,
+  stockAdjustmentItems,
+  containers,
+  containerOffloads,
+  containerOffloadItems,
+  containerSales,
+  containerCharges,
+  containerTrackingImportRowSchema,
+  updateContainerTrackingSchema,
+  bankAccounts,
+  fixedAssets,
+  insertBankAccountSchema,
+  insertFixedAssetSchema,
+  insertStockGroupSchema,
+  insertStockItemSchema,
+  insertStockItemCodeAliasSchema,
+  insertContainerSchema,
+  offloadRequestSchema,
+  purchaseOrders,
+  poLineItems,
+  insertContainerSaleSchema,
+  vouchers,
+  voucherEntries,
+  salesItems,
+  insertVoucherSchema,
+  insertVoucherEntrySchema,
   insertSalesItemSchema,
-  suppliers, customers, customerBalances, locations, employees, userLocations,
-  auditLog, interCompanyTransfers, insertInterCompanyTransferSchema,
-  ledgerAccounts, insertLedgerAccountSchema, 
-  companies, users, userCompanyRoles, companySettings,
-  FEATURE_KEYS, fiscalPeriodClosures,
-  wasteDispatches, wasteDispatchItems, insertWasteDispatchSchema,
-  bales, baleProducts, baleProductCategories, baleTransfers,
-  insertBaleSchema, insertBaleTransferSchema,
-  
-  dashboardCashAccounts, dashboardPayableAccounts, dashboardAccountSelections,
-  insertDashboardCashAccountSchema, insertDashboardPayableAccountSchema,
+  suppliers,
+  customers,
+  customerBalances,
+  locations,
+  employees,
+  userLocations,
+  auditLog,
+  interCompanyTransfers,
+  insertInterCompanyTransferSchema,
+  ledgerAccounts,
+  insertLedgerAccountSchema,
+  companies,
+  users,
+  userCompanyRoles,
+  companySettings,
+  FEATURE_KEYS,
+  fiscalPeriodClosures,
+  wasteDispatches,
+  wasteDispatchItems,
+  insertWasteDispatchSchema,
+  bales,
+  baleProducts,
+  baleProductCategories,
+  baleTransfers,
+  insertBaleSchema,
+  insertBaleTransferSchema,
+  dashboardCashAccounts,
+  dashboardPayableAccounts,
+  dashboardAccountSelections,
+  insertDashboardCashAccountSchema,
+  insertDashboardPayableAccountSchema,
   insertDashboardAccountSelectionSchema,
-  creditNoteItems, 
-  pendingBarcodes, insertPendingBarcodeSchema,
-  storedFiles, spreadsheets, liveSpreadsheets,
-  agentAccounts, insertAgentAccountSchema,
-  salaryAdvances, salaryAdvanceDeductions,
-  insertSalaryAdvanceSchema, insertSalaryAdvanceDeductionSchema,
+  creditNoteItems,
+  pendingBarcodes,
+  insertPendingBarcodeSchema,
+  storedFiles,
+  spreadsheets,
+  liveSpreadsheets,
+  agentAccounts,
+  insertAgentAccountSchema,
+  salaryAdvances,
+  salaryAdvanceDeductions,
+  insertSalaryAdvanceSchema,
+  insertSalaryAdvanceDeductionSchema,
   chatMessages,
-  
-  updateStockTransferSchema, updateStockAdjustmentSchema,
+  updateStockTransferSchema,
+  updateStockAdjustmentSchema,
 } from "@shared/schema";
 import {
-  eq, and, or, desc, asc, lt, gt, ne, inArray, sql, isNull, isNotNull, not, gte, lte, like, ilike,
+  eq,
+  and,
+  or,
+  desc,
+  asc,
+  lt,
+  gt,
+  ne,
+  inArray,
+  sql,
+  isNull,
+  isNotNull,
+  not,
+  gte,
+  lte,
+  like,
+  ilike,
 } from "drizzle-orm";
 import { format } from "date-fns";
 import { z } from "zod";
@@ -58,8 +130,8 @@ export function registerFiscalTransferRoutes(app: Express) {
       // Check role authorization - use currentRole from session
       const userRole = req.session.currentRole;
       if (userRole !== "Admin" && userRole !== "Owner" && userRole !== "Developer") {
-        return res.status(403).json({ 
-          message: "Only Admins and Owners can close fiscal periods" 
+        return res.status(403).json({
+          message: "Only Admins and Owners can close fiscal periods",
         });
       }
 
@@ -67,59 +139,54 @@ export function registerFiscalTransferRoutes(app: Express) {
         return res.status(400).json({ message: "No company selected" });
       }
 
-      const { 
-        periodStartDate, 
-        periodEndDate, 
-        retainedEarningsAccountId, 
-        notes 
-      } = req.body;
+      const { periodStartDate, periodEndDate, retainedEarningsAccountId, notes } = req.body;
 
       // Validate required fields
       if (!periodStartDate || !periodEndDate || !retainedEarningsAccountId) {
-        return res.status(400).json({ 
-          message: "Period start date, end date, and retained earnings account are required" 
+        return res.status(400).json({
+          message: "Period start date, end date, and retained earnings account are required",
         });
       }
 
       // Parse and validate retained earnings account ID
       const accountId = parseInt(retainedEarningsAccountId);
       if (isNaN(accountId)) {
-        return res.status(400).json({ 
-          message: "Invalid retained earnings account ID" 
+        return res.status(400).json({
+          message: "Invalid retained earnings account ID",
         });
       }
 
       // Validate dates are valid and in correct order
       const startDate = new Date(periodStartDate);
       const endDate = new Date(periodEndDate);
-      
+
       if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        return res.status(400).json({ 
-          message: "Invalid date format. Use YYYY-MM-DD" 
+        return res.status(400).json({
+          message: "Invalid date format. Use YYYY-MM-DD",
         });
       }
 
       if (startDate > endDate) {
-        return res.status(400).json({ 
-          message: "Period start date must be before or equal to end date" 
+        return res.status(400).json({
+          message: "Period start date must be before or equal to end date",
         });
       }
 
       // Validate retained earnings account exists and is an Equity account
       const retainedEarningsAccount = await storage.getLedgerAccountById(accountId);
       if (!retainedEarningsAccount) {
-        return res.status(400).json({ 
-          message: "Retained earnings account not found" 
+        return res.status(400).json({
+          message: "Retained earnings account not found",
         });
       }
       if (retainedEarningsAccount.accountType !== "Equity") {
-        return res.status(400).json({ 
-          message: "Retained earnings account must be an Equity account" 
+        return res.status(400).json({
+          message: "Retained earnings account must be an Equity account",
         });
       }
       if (retainedEarningsAccount.companyId !== req.session.currentCompanyId) {
-        return res.status(403).json({ 
-          message: "Retained earnings account belongs to a different company" 
+        return res.status(403).json({
+          message: "Retained earnings account belongs to a different company",
         });
       }
 
@@ -260,71 +327,66 @@ export function registerFiscalTransferRoutes(app: Express) {
   });
 
   // Get detailed sales info for a specific location
-  app.get(
-    "/api/financial/sales/:locationId/details",
-    requireAuth,
-    checkPOSLocation,
-    async (req, res) => {
-      try {
-        if (!req.session.currentCompanyId) {
-          return res.status(400).json({ message: "No company selected" });
-        }
-
-        const locationId = parseInt(req.params.locationId);
-        if (isNaN(locationId)) {
-          return res.status(400).json({ message: "Invalid location ID" });
-        }
-
-        const { startDate, endDate } = req.query;
-
-        // Build query conditions
-        const conditions = [
-          eq(vouchers.companyId, req.session.currentCompanyId),
-          eq(vouchers.voucherType, "Sales"),
-          eq(vouchers.locationId, locationId),
-          isNull(vouchers.deletedAt),
-          eq(vouchers.optional, false),
-        ];
-
-        if (startDate) {
-          conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
-        }
-
-        if (endDate) {
-          conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
-        }
-
-        // Get all sales vouchers for this location
-        const salesVouchers = await db
-          .select()
-          .from(vouchers)
-          .where(and(...conditions));
-
-        // Get all voucher entries and inventory changes
-        // We need to sum up quantities sold across all sales
-        let totalQuantity = 0;
-        let totalAmount = 0;
-
-        for (const voucher of salesVouchers) {
-          totalAmount += parseFloat(voucher.totalAmount || "0");
-
-          // Get inventory items sold in this voucher
-          // This requires getting stock items from inventory updates
-          // For now, we'll just count transactions as the quantity metric
-          totalQuantity += 1; // Each voucher is one transaction
-        }
-
-        res.json({
-          locationId,
-          totalQuantity,
-          totalAmount,
-          totalTransactions: salesVouchers.length,
-        });
-      } catch (error: any) {
-        res.status(500).json({ message: error.message });
+  app.get("/api/financial/sales/:locationId/details", requireAuth, checkPOSLocation, async (req, res) => {
+    try {
+      if (!req.session.currentCompanyId) {
+        return res.status(400).json({ message: "No company selected" });
       }
-    },
-  );
+
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) {
+        return res.status(400).json({ message: "Invalid location ID" });
+      }
+
+      const { startDate, endDate } = req.query;
+
+      // Build query conditions
+      const conditions = [
+        eq(vouchers.companyId, req.session.currentCompanyId),
+        eq(vouchers.voucherType, "Sales"),
+        eq(vouchers.locationId, locationId),
+        isNull(vouchers.deletedAt),
+        eq(vouchers.optional, false),
+      ];
+
+      if (startDate) {
+        conditions.push(sql`${vouchers.voucherDate} >= ${startDate}`);
+      }
+
+      if (endDate) {
+        conditions.push(sql`${vouchers.voucherDate} <= ${endDate}`);
+      }
+
+      // Get all sales vouchers for this location
+      const salesVouchers = await db
+        .select()
+        .from(vouchers)
+        .where(and(...conditions));
+
+      // Get all voucher entries and inventory changes
+      // We need to sum up quantities sold across all sales
+      let totalQuantity = 0;
+      let totalAmount = 0;
+
+      for (const voucher of salesVouchers) {
+        totalAmount += parseFloat(voucher.totalAmount || "0");
+
+        // Get inventory items sold in this voucher
+        // This requires getting stock items from inventory updates
+        // For now, we'll just count transactions as the quantity metric
+        totalQuantity += 1; // Each voucher is one transaction
+      }
+
+      res.json({
+        locationId,
+        totalQuantity,
+        totalAmount,
+        totalTransactions: salesVouchers.length,
+      });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Get individual POS transactions for a specific location
   app.get(
@@ -378,7 +440,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           .orderBy(sql`${vouchers.voucherDate} DESC, ${vouchers.createdAt} DESC`);
 
         // Batch-fetch all sales items and cash account names in parallel
-        const voucherIds = salesVouchers.map(v => v.id);
+        const voucherIds = salesVouchers.map((v) => v.id);
         const [allSalesItems, cashEntries] = await Promise.all([
           voucherIds.length > 0
             ? db
@@ -404,11 +466,13 @@ export function registerFiscalTransferRoutes(app: Express) {
                 })
                 .from(voucherEntries)
                 .innerJoin(ledgerAccounts, eq(voucherEntries.ledgerAccountId, ledgerAccounts.id))
-                .where(and(
-                  inArray(voucherEntries.voucherId, voucherIds),
-                  eq(ledgerAccounts.accountType, "Cash"),
-                  sql`${voucherEntries.debitAmount}::numeric > 0`,
-                ))
+                .where(
+                  and(
+                    inArray(voucherEntries.voucherId, voucherIds),
+                    eq(ledgerAccounts.accountType, "Cash"),
+                    sql`${voucherEntries.debitAmount}::numeric > 0`
+                  )
+                )
             : Promise.resolve([]),
         ]);
 
@@ -428,30 +492,30 @@ export function registerFiscalTransferRoutes(app: Express) {
         }
 
         const transactions = salesVouchers.map((voucher) => {
-            const items = itemsByVoucher.get(voucher.id) || [];
-            const totalQty = items.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
-            const totalAmt = parseFloat(voucher.totalAmount || "0");
+          const items = itemsByVoucher.get(voucher.id) || [];
+          const totalQty = items.reduce((sum, item) => sum + parseFloat(item.quantity), 0);
+          const totalAmt = parseFloat(voucher.totalAmount || "0");
 
-            return {
-              id: voucher.id,
-              voucherNumber: voucher.voucherNumber,
-              voucherDate: voucher.voucherDate,
-              createdAt: voucher.createdAt,
-              description: voucher.description,
-              customerName: voucher.customerName ?? null,
-              cashAccountName: cashAccountByVoucher.get(voucher.id) ?? null,
-              totalAmount: totalAmt,
-              totalQuantity: totalQty,
-              itemCount: items.length,
-              items,
-            };
-          });
+          return {
+            id: voucher.id,
+            voucherNumber: voucher.voucherNumber,
+            voucherDate: voucher.voucherDate,
+            createdAt: voucher.createdAt,
+            description: voucher.description,
+            customerName: voucher.customerName ?? null,
+            cashAccountName: cashAccountByVoucher.get(voucher.id) ?? null,
+            totalAmount: totalAmt,
+            totalQuantity: totalQty,
+            itemCount: items.length,
+            items,
+          };
+        });
 
         res.json(transactions);
       } catch (error: any) {
         res.status(500).json({ message: error.message });
       }
-    },
+    }
   );
 
   app.get("/api/stock-transfers/list", requireAuth, async (req, res) => {
@@ -460,7 +524,7 @@ export function registerFiscalTransferRoutes(app: Express) {
       if (!companyId) return res.status(400).json({ message: "No company selected" });
 
       const startDate = req.query.startDate ? String(req.query.startDate) : null;
-      const endDate   = req.query.endDate   ? String(req.query.endDate)   : null;
+      const endDate = req.query.endDate ? String(req.query.endDate) : null;
 
       // Fetch all stock transfer vouchers for this company via vouchers join
       const voucherConditions: any[] = [
@@ -469,19 +533,19 @@ export function registerFiscalTransferRoutes(app: Express) {
         isNull(vouchers.deletedAt),
       ];
       if (startDate) voucherConditions.push(gte(vouchers.voucherDate, startDate));
-      if (endDate)   voucherConditions.push(lte(vouchers.voucherDate, endDate));
+      if (endDate) voucherConditions.push(lte(vouchers.voucherDate, endDate));
 
       const rows = await db
         .select({
-          transferId:            stockTransferVouchers.id,
-          voucherId:             vouchers.id,
-          voucherNumber:         vouchers.voucherNumber,
-          voucherDate:           vouchers.voucherDate,
-          notes:                 stockTransferVouchers.notes,
-          inventoryApplied:      stockTransferVouchers.inventoryApplied,
-          sourceLocationId:      stockTransferVouchers.sourceLocationId,
+          transferId: stockTransferVouchers.id,
+          voucherId: vouchers.id,
+          voucherNumber: vouchers.voucherNumber,
+          voucherDate: vouchers.voucherDate,
+          notes: stockTransferVouchers.notes,
+          inventoryApplied: stockTransferVouchers.inventoryApplied,
+          sourceLocationId: stockTransferVouchers.sourceLocationId,
           destinationLocationId: stockTransferVouchers.destinationLocationId,
-          createdAt:             stockTransferVouchers.createdAt,
+          createdAt: stockTransferVouchers.createdAt,
         })
         .from(stockTransferVouchers)
         .innerJoin(vouchers, eq(stockTransferVouchers.voucherId, vouchers.id))
@@ -494,7 +558,7 @@ export function registerFiscalTransferRoutes(app: Express) {
       // Batch-fetch location names
       const locationIds = new Set<number>();
       for (const r of rows) {
-        if (r.sourceLocationId)      locationIds.add(r.sourceLocationId);
+        if (r.sourceLocationId) locationIds.add(r.sourceLocationId);
         if (r.destinationLocationId) locationIds.add(r.destinationLocationId);
       }
       // Determine if this is a POS user and their assigned location
@@ -505,22 +569,24 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       if (posLocationIdList) locationIds.add(posLocationIdList);
 
-      const locationRows = locationIds.size > 0
-        ? await db.select({ id: locations.id, name: locations.name })
-            .from(locations)
-            .where(inArray(locations.id, Array.from(locationIds)))
-            .execute()
-        : [];
-      const locationMap = new Map(locationRows.map(l => [l.id, l.name]));
+      const locationRows =
+        locationIds.size > 0
+          ? await db
+              .select({ id: locations.id, name: locations.name })
+              .from(locations)
+              .where(inArray(locations.id, Array.from(locationIds)))
+              .execute()
+          : [];
+      const locationMap = new Map(locationRows.map((l) => [l.id, l.name]));
 
       // Batch-fetch item counts and totals per transfer
-      const transferIds = rows.map(r => r.transferId);
+      const transferIds = rows.map((r) => r.transferId);
       const itemRows = await db
         .select({
-          transferId:       stockTransferItems.transferId,
-          totalAmount:      stockTransferItems.totalAmount,
-          stockItemId:      stockTransferItems.stockItemId,
-          quantity:         stockTransferItems.quantity,
+          transferId: stockTransferItems.transferId,
+          totalAmount: stockTransferItems.totalAmount,
+          stockItemId: stockTransferItems.stockItemId,
+          quantity: stockTransferItems.quantity,
           sourceLocationId: stockTransferItems.sourceLocationId,
         })
         .from(stockTransferItems)
@@ -528,14 +594,16 @@ export function registerFiscalTransferRoutes(app: Express) {
         .execute();
 
       // Batch-fetch stock item names
-      const stockItemIds = [...new Set(itemRows.map(i => i.stockItemId).filter(Boolean))] as number[];
-      const stockItemRows = stockItemIds.length > 0
-        ? await db.select({ id: stockItems.id, name: stockItems.name })
-            .from(stockItems)
-            .where(inArray(stockItems.id, stockItemIds))
-            .execute()
-        : [];
-      const stockItemMap = new Map(stockItemRows.map(s => [s.id, s.name]));
+      const stockItemIds = [...new Set(itemRows.map((i) => i.stockItemId).filter(Boolean))] as number[];
+      const stockItemRows =
+        stockItemIds.length > 0
+          ? await db
+              .select({ id: stockItems.id, name: stockItems.name })
+              .from(stockItems)
+              .where(inArray(stockItems.id, stockItemIds))
+              .execute()
+          : [];
+      const stockItemMap = new Map(stockItemRows.map((s) => [s.id, s.name]));
 
       // Group all items by transfer
       const itemsByTransfer = new Map<number, typeof itemRows>();
@@ -550,53 +618,61 @@ export function registerFiscalTransferRoutes(app: Express) {
         }
       }
 
-      const allResult = rows.map(r => {
+      const allResult = rows.map((r) => {
         const allItems = itemsByTransfer.get(r.transferId) || [];
         // Destination-side POS users see all items; source-side see only their items:
         //   - Items with item-level sourceLocationId matching their location
         //   - Items with no item-level sourceLocationId AND voucher-level source matches
         const isDestUser = posLocationIdList !== null && r.destinationLocationId === posLocationIdList;
-        const myItems = posLocationIdList !== null
-          ? isDestUser
-            ? allItems
-            : allItems.filter(i =>
-                i.sourceLocationId === posLocationIdList ||
-                (i.sourceLocationId === null && r.sourceLocationId === posLocationIdList)
-              )
-          : allItems;
+        const myItems =
+          posLocationIdList !== null
+            ? isDestUser
+              ? allItems
+              : allItems.filter(
+                  (i) =>
+                    i.sourceLocationId === posLocationIdList ||
+                    (i.sourceLocationId === null && r.sourceLocationId === posLocationIdList)
+                )
+            : allItems;
         const totalAmount = myItems.reduce((s, i) => s + parseFloat(i.totalAmount || "0"), 0);
-        const stockItemNames = [...new Set(
-          myItems.map(i => stockItemMap.get(i.stockItemId) ?? "").filter(Boolean)
-        )];
+        const stockItemNames = [...new Set(myItems.map((i) => stockItemMap.get(i.stockItemId) ?? "").filter(Boolean))];
         return {
-          transferId:              r.transferId,
-          voucherId:               r.voucherId,
-          voucherNumber:           r.voucherNumber,
-          voucherDate:             r.voucherDate,
-          notes:                   r.notes,
-          inventoryApplied:        r.inventoryApplied,
-          sourceLocationId:        isDestUser ? r.sourceLocationId : (posLocationIdList ?? r.sourceLocationId),
-          sourceLocationName:      isDestUser
-            ? (r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source")
-            : (posLocationIdList ? (locationMap.get(posLocationIdList) ?? "Unknown") : (r.sourceLocationId ? (locationMap.get(r.sourceLocationId) ?? "Multi-source") : "Multi-source")),
-          destinationLocationId:   r.destinationLocationId,
+          transferId: r.transferId,
+          voucherId: r.voucherId,
+          voucherNumber: r.voucherNumber,
+          voucherDate: r.voucherDate,
+          notes: r.notes,
+          inventoryApplied: r.inventoryApplied,
+          sourceLocationId: isDestUser ? r.sourceLocationId : (posLocationIdList ?? r.sourceLocationId),
+          sourceLocationName: isDestUser
+            ? r.sourceLocationId
+              ? (locationMap.get(r.sourceLocationId) ?? "Multi-source")
+              : "Multi-source"
+            : posLocationIdList
+              ? (locationMap.get(posLocationIdList) ?? "Unknown")
+              : r.sourceLocationId
+                ? (locationMap.get(r.sourceLocationId) ?? "Multi-source")
+                : "Multi-source",
+          destinationLocationId: r.destinationLocationId,
           destinationLocationName: locationMap.get(r.destinationLocationId) ?? "Unknown",
-          itemCount:               myItems.length,
-          totalAmount:             Math.round(totalAmount * 100) / 100,
+          itemCount: myItems.length,
+          totalAmount: Math.round(totalAmount * 100) / 100,
           stockItemNames,
-          createdAt:               r.createdAt,
+          createdAt: r.createdAt,
         };
       });
 
       // For POS users: show transfers where their location is destination OR source
       // (Kolwezi/Kolwezi 2 are destinations; Hadi 1/2/3/4 are sources)
-      const result = posLocationIdList !== null
-        ? allResult.filter(r =>
-            r.destinationLocationId === posLocationIdList ||
-            r.sourceLocationId === posLocationIdList ||
-            transfersWithMySourceItem.has(r.transferId)
-          )
-        : allResult;
+      const result =
+        posLocationIdList !== null
+          ? allResult.filter(
+              (r) =>
+                r.destinationLocationId === posLocationIdList ||
+                r.sourceLocationId === posLocationIdList ||
+                transfersWithMySourceItem.has(r.transferId)
+            )
+          : allResult;
 
       res.json(result);
     } catch (error: any) {
@@ -605,184 +681,202 @@ export function registerFiscalTransferRoutes(app: Express) {
   });
 
   // Stock Transfers - GET endpoint
-  app.get(
-    "/api/stock-transfers",
-    requireAuth,
-    async (req, res) => {
-      try {
-        const voucherId = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
-        
-        if (!voucherId) {
-          return res.status(400).json({ message: "voucherId query parameter is required" });
-        }
+  app.get("/api/stock-transfers", requireAuth, async (req, res) => {
+    try {
+      const voucherId = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
 
-        const transfer = await storage.getStockTransferByVoucherId(voucherId);
-        res.json(transfer);
-      } catch (error: any) {
-        console.error("[Stock Transfer GET] Error:", error.message);
-        res.status(500).json({ message: error.message });
+      if (!voucherId) {
+        return res.status(400).json({ message: "voucherId query parameter is required" });
       }
-    },
-  );
+
+      const transfer = await storage.getStockTransferByVoucherId(voucherId);
+      res.json(transfer);
+    } catch (error: any) {
+      console.error("[Stock Transfer GET] Error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Stock Transfers - POST endpoint (supports both creating new and using existing voucher)
-  app.post(
-    "/api/stock-transfers",
-    requireAuth,
-    async (req, res) => {
-      try {
-        const { voucherId, sourceLocationId, destinationLocationId, notes, items, allowNegativeInventory, voucherDate, optional } = req.body;
-        
-        // Log if user confirmed negative inventory override
-        if (allowNegativeInventory) {
-          console.log(`[AUDIT] User ${req.session.userId} confirmed negative inventory override for stock transfer. Items: ${JSON.stringify(items.map((i: any) => ({ stockItemId: i.stockItemId, quantity: i.quantity, sourceLocationId: i.sourceLocationId })))}`);
+  app.post("/api/stock-transfers", requireAuth, async (req, res) => {
+    try {
+      const {
+        voucherId,
+        sourceLocationId,
+        destinationLocationId,
+        notes,
+        items,
+        allowNegativeInventory,
+        voucherDate,
+        optional,
+      } = req.body;
+
+      // Log if user confirmed negative inventory override
+      if (allowNegativeInventory) {
+        console.log(
+          `[AUDIT] User ${req.session.userId} confirmed negative inventory override for stock transfer. Items: ${JSON.stringify(items.map((i: any) => ({ stockItemId: i.stockItemId, quantity: i.quantity, sourceLocationId: i.sourceLocationId })))}`
+        );
+      }
+      const companyId = req.session.currentCompanyId;
+
+      // Branch: Create new transfer from scratch (sourceLocationId provided, no voucherId)
+      if (
+        !voucherId &&
+        (sourceLocationId || (items && items.length > 0 && items.every((i: any) => i.sourceLocationId)))
+      ) {
+        if (!companyId) {
+          return res.status(400).json({ message: "No company selected" });
         }
-        const companyId = req.session.currentCompanyId;
+        if (!destinationLocationId) {
+          return res.status(400).json({ message: "Destination location is required" });
+        }
+        if (!items || !Array.isArray(items) || items.length === 0) {
+          return res.status(400).json({ message: "Items are required" });
+        }
+        // Input validation assertions for inventory safety
+        for (const item of items) {
+          const itemSourceId = item.sourceLocationId || sourceLocationId;
+          if (!itemSourceId || isNaN(Number(itemSourceId))) {
+            return res
+              .status(400)
+              .json({ message: `Invalid sourceLocationId for item ${item.stockItemId}: ${itemSourceId}` });
+          }
+          if (!item.stockItemId || isNaN(Number(item.stockItemId))) {
+            return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
+          }
+          const qty = parseFloat(item.quantity);
+          if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
+            return res.status(400).json({ message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` });
+          }
+        }
+        if (isNaN(Number(destinationLocationId))) {
+          return res.status(400).json({ message: `Invalid destinationLocationId: ${destinationLocationId}` });
+        }
 
-        // Branch: Create new transfer from scratch (sourceLocationId provided, no voucherId)
-        if (!voucherId && (sourceLocationId || (items && items.length > 0 && items.every((i: any) => i.sourceLocationId)))) {
-          if (!companyId) {
-            return res.status(400).json({ message: "No company selected" });
+        // Compute multi-source detection
+        const uniqueSourceIds = new Set(items.map((i: any) => i.sourceLocationId || sourceLocationId).filter(Boolean));
+        const resolvedHeaderSourceId = uniqueSourceIds.size === 1 ? Array.from(uniqueSourceIds)[0] : null;
+
+        // Validate source/dest not the same (only for single-source mode)
+        if (resolvedHeaderSourceId && resolvedHeaderSourceId === destinationLocationId) {
+          return res.status(400).json({ message: "Source and destination must be different" });
+        }
+
+        // Validate destination location exists
+        const destLocation = await storage.getLocationById(destinationLocationId);
+        if (!destLocation) {
+          return res.status(404).json({ message: "Destination location not found" });
+        }
+
+        // Validate each item has a valid source location
+        for (const item of items) {
+          const itemSourceId = item.sourceLocationId || sourceLocationId;
+          if (!itemSourceId) {
+            return res.status(400).json({ message: "Each item must have a source location" });
           }
-          if (!destinationLocationId) {
-            return res.status(400).json({ message: "Destination location is required" });
+          if (itemSourceId === destinationLocationId) {
+            return res
+              .status(400)
+              .json({ message: `Item ${item.stockItemId}: Source and destination cannot be the same` });
           }
-          if (!items || !Array.isArray(items) || items.length === 0) {
-            return res.status(400).json({ message: "Items are required" });
-          }
-          // Input validation assertions for inventory safety
+        }
+        // Create Stock Transfer voucher, items, and update inventory atomically
+        const voucherNumber = `ST-${Date.now()}`;
+        const effectiveDate = voucherDate || getClientDate(req);
+
+        const txResult = await db.transaction(async (tx) => {
+          const [newVoucher] = await tx
+            .insert(vouchers)
+            .values({
+              companyId,
+              voucherType: "Stock Transfer",
+              voucherNumber,
+              voucherDate: effectiveDate,
+              description: notes || null,
+              totalAmount: "0",
+              optional: optional === true,
+            })
+            .returning();
+
+          const [transfer] = await tx
+            .insert(stockTransferVouchers)
+            .values({
+              voucherId: newVoucher.id,
+              sourceLocationId: resolvedHeaderSourceId,
+              destinationLocationId,
+              notes: notes || null,
+              inventoryApplied: optional !== true,
+            })
+            .returning();
+
+          let totalAmount = 0;
+          const transferItems = [];
+
           for (const item of items) {
-            const itemSourceId = item.sourceLocationId || sourceLocationId;
-            if (!itemSourceId || isNaN(Number(itemSourceId))) {
-              return res.status(400).json({ message: `Invalid sourceLocationId for item ${item.stockItemId}: ${itemSourceId}` });
-            }
-            if (!item.stockItemId || isNaN(Number(item.stockItemId))) {
-              return res.status(400).json({ message: `Invalid stockItemId: ${item.stockItemId}` });
-            }
-            const qty = parseFloat(item.quantity);
-            if (isNaN(qty) || !isFinite(qty) || qty <= 0) {
-              return res.status(400).json({ message: `Invalid quantity for item ${item.stockItemId}: ${item.quantity}` });
-            }
-          }
-          if (isNaN(Number(destinationLocationId))) {
-            return res.status(400).json({ message: `Invalid destinationLocationId: ${destinationLocationId}` });
-          }
+            const quantity = parseFloat(item.quantity);
 
-          // Compute multi-source detection
-          const uniqueSourceIds = new Set(items.map((i: any) => i.sourceLocationId || sourceLocationId).filter(Boolean));
-          const resolvedHeaderSourceId = uniqueSourceIds.size === 1 ? Array.from(uniqueSourceIds)[0] : null;
-
-          // Validate source/dest not the same (only for single-source mode)
-          if (resolvedHeaderSourceId && resolvedHeaderSourceId === destinationLocationId) {
-            return res.status(400).json({ message: "Source and destination must be different" });
-          }
-
-          // Validate destination location exists
-          const destLocation = await storage.getLocationById(destinationLocationId);
-          if (!destLocation) {
-            return res.status(404).json({ message: "Destination location not found" });
-          }
-
-          // Validate each item has a valid source location
-          for (const item of items) {
-            const itemSourceId = item.sourceLocationId || sourceLocationId;
-            if (!itemSourceId) {
-              return res.status(400).json({ message: "Each item must have a source location" });
-            }
-            if (itemSourceId === destinationLocationId) {
-              return res.status(400).json({ message: `Item ${item.stockItemId}: Source and destination cannot be the same` });
-            }
-          }
-          // Create Stock Transfer voucher, items, and update inventory atomically
-          const voucherNumber = `ST-${Date.now()}`;
-          const effectiveDate = voucherDate || getClientDate(req);
-
-          const txResult = await db.transaction(async (tx) => {
-            const [newVoucher] = await tx
-              .insert(vouchers)
-              .values({
-                companyId,
-                voucherType: "Stock Transfer",
-                voucherNumber,
-                voucherDate: effectiveDate,
-                description: notes || null,
-                totalAmount: "0",
-                optional: optional === true,
-              })
-              .returning();
-
-            const [transfer] = await tx
-              .insert(stockTransferVouchers)
-              .values({
-                voucherId: newVoucher.id,
-                sourceLocationId: resolvedHeaderSourceId,
-                destinationLocationId,
-                notes: notes || null,
-                inventoryApplied: optional !== true,
-              })
-              .returning();
-
-            let totalAmount = 0;
-            const transferItems = [];
-
-            for (const item of items) {
-              const quantity = parseFloat(item.quantity);
-
-              const [sourceInv] = await tx
-                .select({ averageRate: inventory.averageRate, quantity: inventory.quantity })
-                .from(inventory)
-                .where(
-                  and(
-                    eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
-                    eq(inventory.stockItemId, item.stockItemId)
-                  )
+            const [sourceInv] = await tx
+              .select({ averageRate: inventory.averageRate, quantity: inventory.quantity })
+              .from(inventory)
+              .where(
+                and(
+                  eq(inventory.locationId, item.sourceLocationId || sourceLocationId),
+                  eq(inventory.stockItemId, item.stockItemId)
                 )
-                .limit(1);
+              )
+              .limit(1);
 
-              const rate = parseFloat(sourceInv?.averageRate || "0");
-              const totalItemAmount = quantity * rate;
-              totalAmount += totalItemAmount;
+            const rate = parseFloat(sourceInv?.averageRate || "0");
+            const totalItemAmount = quantity * rate;
+            totalAmount += totalItemAmount;
 
-              const [insertedItem] = await tx
-                .insert(stockTransferItems)
-                .values({
-                  transferId: transfer.id,
-                  stockItemId: item.stockItemId,
-                  sourceLocationId: item.sourceLocationId || sourceLocationId,
-                  quantity: quantity.toString(),
-                  rate: rate.toFixed(2),
-                  totalAmount: totalItemAmount.toFixed(2),
-                })
-                .returning();
+            const [insertedItem] = await tx
+              .insert(stockTransferItems)
+              .values({
+                transferId: transfer.id,
+                stockItemId: item.stockItemId,
+                sourceLocationId: item.sourceLocationId || sourceLocationId,
+                quantity: quantity.toString(),
+                rate: rate.toFixed(2),
+                totalAmount: totalItemAmount.toFixed(2),
+              })
+              .returning();
 
-              transferItems.push(insertedItem);
+            transferItems.push(insertedItem);
 
-              // Only update inventory for non-optional (confirmed) transfers
-              if (!optional) {
-                // Deduct from source location (transfer out = negative delta)
-                await adjustInventory(tx, item.sourceLocationId || sourceLocationId, item.stockItemId, -quantity, companyId!);
+            // Only update inventory for non-optional (confirmed) transfers
+            if (!optional) {
+              // Deduct from source location (transfer out = negative delta)
+              await adjustInventory(
+                tx,
+                item.sourceLocationId || sourceLocationId,
+                item.stockItemId,
+                -quantity,
+                companyId!
+              );
 
-                // Add to destination location (transfer in = positive delta with rate)
-                await adjustInventory(tx, destinationLocationId, item.stockItemId, quantity, companyId!, rate);
-              }
+              // Add to destination location (transfer in = positive delta with rate)
+              await adjustInventory(tx, destinationLocationId, item.stockItemId, quantity, companyId!, rate);
             }
+          }
 
-            await tx
-              .update(vouchers)
-              .set({ totalAmount: totalAmount.toFixed(2) })
-              .where(eq(vouchers.id, newVoucher.id));
+          await tx
+            .update(vouchers)
+            .set({ totalAmount: totalAmount.toFixed(2) })
+            .where(eq(vouchers.id, newVoucher.id));
 
-            return { transfer, transferItems, newVoucher };
-          });
+          return { transfer, transferItems, newVoucher };
+        });
 
-          res.status(201).json({
-            transfer: txResult.transfer,
-            items: txResult.transferItems,
-            voucher: txResult.newVoucher,
-          });
+        res.status(201).json({
+          transfer: txResult.transfer,
+          items: txResult.transferItems,
+          voucher: txResult.newVoucher,
+        });
 
-          // Fire-and-forget: send transfer image to destination WA group (POS users only)
-          if (req.user?.role === "POS") setImmediate(async () => {
+        // Fire-and-forget: send transfer image to destination WA group (POS users only)
+        if (req.user?.role === "POS")
+          setImmediate(async () => {
             try {
               const waSourceId = txResult.transfer.sourceLocationId;
               let sourceName = "Multiple Sources";
@@ -808,92 +902,72 @@ export function registerFiscalTransferRoutes(app: Express) {
               console.error("[TransferWA] Failed to send:", e.message);
             }
           });
-          return;
+        return;
+      }
+
+      // Original flow: Use existing voucher (voucherId required)
+      if (!voucherId) {
+        return res.status(400).json({ message: "Either voucherId or sourceLocationId is required" });
+      }
+      if (!destinationLocationId) {
+        return res.status(400).json({ message: "Destination location is required" });
+      }
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Items are required" });
+      }
+
+      // Validate that destination location exists
+      const destLocation = await storage.getLocationById(destinationLocationId);
+      if (!destLocation) {
+        return res.status(404).json({ message: "Destination location not found" });
+      }
+
+      // Validate that voucher exists
+      const voucher = await storage.getVoucherById(voucherId);
+      if (!voucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Validate items and their source locations
+      for (const item of items) {
+        if (!item.sourceLocationId) {
+          return res.status(400).json({ message: "Source location is required for all items" });
+        }
+        if (!item.stockItemId) {
+          return res.status(400).json({ message: "Stock item ID is required for all items" });
+        }
+        if (!item.quantity || parseFloat(item.quantity) <= 0) {
+          return res.status(400).json({ message: "Quantity must be positive for all items" });
+        }
+        if (!item.rate || parseFloat(item.rate) < 0) {
+          return res.status(400).json({ message: "Rate must be non-negative for all items" });
         }
 
-        // Original flow: Use existing voucher (voucherId required)
-        if (!voucherId) {
-          return res.status(400).json({ message: "Either voucherId or sourceLocationId is required" });
-        }
-        if (!destinationLocationId) {
-          return res
-            .status(400)
-            .json({ message: "Destination location is required" });
-        }
-        if (!items || !Array.isArray(items) || items.length === 0) {
-          return res.status(400).json({ message: "Items are required" });
+        // Validate that source and destination are different for each item
+        if (item.sourceLocationId === destinationLocationId) {
+          return res.status(400).json({
+            message: "Source and destination locations must be different for each item",
+          });
         }
 
-        // Validate that destination location exists
-        const destLocation = await storage.getLocationById(
-          destinationLocationId,
-        );
-        if (!destLocation) {
-          return res
-            .status(404)
-            .json({ message: "Destination location not found" });
+        // Validate that source location exists
+        const sourceLocation = await storage.getLocationById(item.sourceLocationId);
+        if (!sourceLocation) {
+          return res.status(404).json({
+            message: `Source location with ID ${item.sourceLocationId} not found`,
+          });
         }
+      }
 
-        // Validate that voucher exists
-        const voucher = await storage.getVoucherById(voucherId);
-        if (!voucher) {
-          return res.status(404).json({ message: "Voucher not found" });
-        }
+      console.log("[Stock Transfer] Creating transfer:", {
+        voucherId,
+        destinationLocationId,
+        itemCount: items.length,
+      });
 
-        // Validate items and their source locations
-        for (const item of items) {
-          if (!item.sourceLocationId) {
-            return res
-              .status(400)
-              .json({ message: "Source location is required for all items" });
-          }
-          if (!item.stockItemId) {
-            return res
-              .status(400)
-              .json({ message: "Stock item ID is required for all items" });
-          }
-          if (!item.quantity || parseFloat(item.quantity) <= 0) {
-            return res
-              .status(400)
-              .json({ message: "Quantity must be positive for all items" });
-          }
-          if (!item.rate || parseFloat(item.rate) < 0) {
-            return res
-              .status(400)
-              .json({ message: "Rate must be non-negative for all items" });
-          }
-
-          // Validate that source and destination are different for each item
-          if (item.sourceLocationId === destinationLocationId) {
-            return res
-              .status(400)
-              .json({
-                message:
-                  "Source and destination locations must be different for each item",
-              });
-          }
-
-          // Validate that source location exists
-          const sourceLocation = await storage.getLocationById(
-            item.sourceLocationId,
-          );
-          if (!sourceLocation) {
-            return res
-              .status(404)
-              .json({
-                message: `Source location with ID ${item.sourceLocationId} not found`,
-              });
-          }
-        }
-
-        console.log("[Stock Transfer] Creating transfer:", {
-          voucherId,
-          destinationLocationId,
-          itemCount: items.length,
-        });
-
-        // Auto-fill rate from inventory for items with no rate (e.g. POS users who don't see cost)
-        const itemsWithRate = await Promise.all(items.map(async (item: any) => {
+      // Auto-fill rate from inventory for items with no rate (e.g. POS users who don't see cost)
+      const itemsWithRate = await Promise.all(
+        items.map(async (item: any) => {
           if (!item.rate || parseFloat(item.rate) === 0) {
             const [invRow] = await db
               .select({ averageRate: inventory.averageRate })
@@ -904,36 +978,41 @@ export function registerFiscalTransferRoutes(app: Express) {
             return { ...item, rate: resolvedRate.toFixed(2) };
           }
           return item;
-        }));
+        })
+      );
 
-        const transfer = await storage.createStockTransfer(
-          voucherId,
-          destinationLocationId,
-          notes || "",
-          itemsWithRate,
-        );
+      const transfer = await storage.createStockTransfer(voucherId, destinationLocationId, notes || "", itemsWithRate);
 
-        // Update voucher totalAmount based on actual rates (important for POS transfers where rate starts at 0)
-        const actualTotal = itemsWithRate.reduce((sum: number, item: any) => {
-          return sum + (parseFloat(item.quantity) * parseFloat(item.rate));
-        }, 0);
-        if (actualTotal > 0) {
-          await db.update(vouchers).set({ totalAmount: actualTotal.toFixed(2) }).where(eq(vouchers.id, voucherId));
-        }
+      // Update voucher totalAmount based on actual rates (important for POS transfers where rate starts at 0)
+      const actualTotal = itemsWithRate.reduce((sum: number, item: any) => {
+        return sum + parseFloat(item.quantity) * parseFloat(item.rate);
+      }, 0);
+      if (actualTotal > 0) {
+        await db
+          .update(vouchers)
+          .set({ totalAmount: actualTotal.toFixed(2) })
+          .where(eq(vouchers.id, voucherId));
+      }
 
-        console.log("[Stock Transfer] Transfer created successfully:", {
-          transferId: transfer.transfer.id,
-          itemsCount: transfer.items.length,
-        });
-        res.status(201).json(transfer);
+      console.log("[Stock Transfer] Transfer created successfully:", {
+        transferId: transfer.transfer.id,
+        itemsCount: transfer.items.length,
+      });
+      res.status(201).json(transfer);
 
-        // Fire-and-forget: send transfer image to destination WA group (POS users only, original-flow / voucherId path)
-        if (req.user?.role === "POS") setImmediate(async () => {
+      // Fire-and-forget: send transfer image to destination WA group (POS users only, original-flow / voucherId path)
+      if (req.user?.role === "POS")
+        setImmediate(async () => {
           try {
-            const uniqueSrcIds = [...new Set(itemsWithRate.map((i: any) => Number(i.sourceLocationId)).filter(Boolean))];
+            const uniqueSrcIds = [
+              ...new Set(itemsWithRate.map((i: any) => Number(i.sourceLocationId)).filter(Boolean)),
+            ];
             let sourceName = "Multiple Sources";
             if (uniqueSrcIds.length === 1) {
-              const [srcLoc] = await db.select({ name: locations.name }).from(locations).where(eq(locations.id, uniqueSrcIds[0]));
+              const [srcLoc] = await db
+                .select({ name: locations.name })
+                .from(locations)
+                .where(eq(locations.id, uniqueSrcIds[0]));
               if (srcLoc?.name) sourceName = srcLoc.name;
             }
             await sendTransferWhatsApp({
@@ -951,16 +1030,11 @@ export function registerFiscalTransferRoutes(app: Express) {
             console.error("[TransferWA] Failed to send (original-flow):", e.message);
           }
         });
-      } catch (error: any) {
-        console.error(
-          "[Stock Transfer] Error creating transfer:",
-          error.message,
-          error.stack,
-        );
-        res.status(500).json({ message: error.message });
-      }
-    },
-  );
+    } catch (error: any) {
+      console.error("[Stock Transfer] Error creating transfer:", error.message, error.stack);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Stock Transfers - PATCH endpoint (notes-only update)
   app.patch("/api/stock-transfers/:id", requireAuth, requireNonPOS, async (req, res) => {
@@ -1006,16 +1080,23 @@ export function registerFiscalTransferRoutes(app: Express) {
         })
       );
 
-      const optionalRevs = allRevWithItems.filter(r => r.optional);
-      const nonOptionalRevs = allRevWithItems.filter(r => !r.optional);
+      const optionalRevs = allRevWithItems.filter((r) => r.optional);
+      const nonOptionalRevs = allRevWithItems.filter((r) => !r.optional);
       let finalRevisions = [...nonOptionalRevs];
 
       if (optionalRevs.length > 0) {
-        const netMap = new Map<string, {
-          stockItemId: number; stockItemName: string;
-          sourceLocationId: number | null; sourceLocationName: string | null;
-          originalQuantity: string; newQuantity: string; delta: string;
-        }>();
+        const netMap = new Map<
+          string,
+          {
+            stockItemId: number;
+            stockItemName: string;
+            sourceLocationId: number | null;
+            sourceLocationName: string | null;
+            originalQuantity: string;
+            newQuantity: string;
+            delta: string;
+          }
+        >();
 
         for (const rev of optionalRevs) {
           for (const item of rev.items) {
@@ -1084,19 +1165,26 @@ export function registerFiscalTransferRoutes(app: Express) {
       );
 
       // Split optional (POS) and non-optional (admin) revisions
-      const optionalRevs = allRevWithItems.filter(r => r.optional);
-      const nonOptionalRevs = allRevWithItems.filter(r => !r.optional);
+      const optionalRevs = allRevWithItems.filter((r) => r.optional);
+      const nonOptionalRevs = allRevWithItems.filter((r) => !r.optional);
 
       let finalRevisions = [...nonOptionalRevs];
 
       if (optionalRevs.length > 0) {
         // Merge all optional revisions into one, computing net delta per item
         // Key: `${stockItemId}:${sourceLocationId}`
-        const netMap = new Map<string, {
-          stockItemId: number; stockItemName: string;
-          sourceLocationId: number | null; sourceLocationName: string | null;
-          originalQuantity: string; newQuantity: string; delta: string;
-        }>();
+        const netMap = new Map<
+          string,
+          {
+            stockItemId: number;
+            stockItemName: string;
+            sourceLocationId: number | null;
+            sourceLocationName: string | null;
+            originalQuantity: string;
+            newQuantity: string;
+            delta: string;
+          }
+        >();
 
         for (const rev of optionalRevs) {
           for (const item of rev.items) {
@@ -1140,9 +1228,7 @@ export function registerFiscalTransferRoutes(app: Express) {
           _mergedCount: optionalRevs.length,
         };
 
-        finalRevisions = [mergedRevision, ...nonOptionalRevs].sort(
-          (a, b) => a.revisionNumber - b.revisionNumber
-        );
+        finalRevisions = [mergedRevision, ...nonOptionalRevs].sort((a, b) => a.revisionNumber - b.revisionNumber);
       }
 
       res.json(finalRevisions);
@@ -1164,14 +1250,16 @@ export function registerFiscalTransferRoutes(app: Express) {
       if (!transferRow) return res.status(404).json({ message: "Transfer not found" });
 
       const [voucherRow] = await db
-        .select({ voucherNumber: vouchers.voucherNumber, voucherDate: vouchers.voucherDate, optional: vouchers.optional })
+        .select({
+          voucherNumber: vouchers.voucherNumber,
+          voucherDate: vouchers.voucherDate,
+          optional: vouchers.optional,
+        })
         .from(vouchers)
         .where(eq(vouchers.id, voucherId));
 
       const isPosUser = req.user?.role === "POS";
-      const posLocationId = isPosUser
-        ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null)
-        : null;
+      const posLocationId = isPosUser ? (req.user?.assignedLocationId ?? req.session?.currentLocationId ?? null) : null;
 
       const allTransferItems = await db
         .select()
@@ -1186,17 +1274,22 @@ export function registerFiscalTransferRoutes(app: Express) {
       const transferItems = posLocationId
         ? isDestinationUser
           ? allTransferItems
-          : allTransferItems.filter(i =>
-              i.sourceLocationId === posLocationId ||
-              (i.sourceLocationId === null && posLocationId === transferRow.sourceLocationId)
+          : allTransferItems.filter(
+              (i) =>
+                i.sourceLocationId === posLocationId ||
+                (i.sourceLocationId === null && posLocationId === transferRow.sourceLocationId)
             )
         : allTransferItems;
 
-      const stockItemIdSet = [...new Set(transferItems.map(i => i.stockItemId).filter(Boolean))] as number[];
-      const stockItemRows = stockItemIdSet.length > 0
-        ? await db.select({ id: stockItems.id, name: stockItems.name }).from(stockItems).where(inArray(stockItems.id, stockItemIdSet))
-        : [];
-      const stockItemMap = new Map(stockItemRows.map(s => [s.id, s.name]));
+      const stockItemIdSet = [...new Set(transferItems.map((i) => i.stockItemId).filter(Boolean))] as number[];
+      const stockItemRows =
+        stockItemIdSet.length > 0
+          ? await db
+              .select({ id: stockItems.id, name: stockItems.name })
+              .from(stockItems)
+              .where(inArray(stockItems.id, stockItemIdSet))
+          : [];
+      const stockItemMap = new Map(stockItemRows.map((s) => [s.id, s.name]));
 
       const locationIds = new Set<number>();
       if (transferRow.sourceLocationId) locationIds.add(transferRow.sourceLocationId);
@@ -1205,10 +1298,14 @@ export function registerFiscalTransferRoutes(app: Express) {
       for (const item of transferItems) {
         if (item.sourceLocationId) locationIds.add(item.sourceLocationId);
       }
-      const locationRows = locationIds.size > 0
-        ? await db.select({ id: locations.id, name: locations.name }).from(locations).where(inArray(locations.id, Array.from(locationIds)))
-        : [];
-      const locationMap = new Map(locationRows.map(l => [l.id, l.name]));
+      const locationRows =
+        locationIds.size > 0
+          ? await db
+              .select({ id: locations.id, name: locations.name })
+              .from(locations)
+              .where(inArray(locations.id, Array.from(locationIds)))
+          : [];
+      const locationMap = new Map(locationRows.map((l) => [l.id, l.name]));
 
       const revisionRows = await db
         .select()
@@ -1217,16 +1314,17 @@ export function registerFiscalTransferRoutes(app: Express) {
         .orderBy(asc(stockTransferRevisions.revisionNumber));
 
       // POS users only see their own revisions; non-POS users (admins) see all
-      const visibleRevisionRows = isPosUser
-        ? revisionRows.filter(r => r.createdBy === req.user?.id)
-        : revisionRows;
+      const visibleRevisionRows = isPosUser ? revisionRows.filter((r) => r.createdBy === req.user?.id) : revisionRows;
 
       const revisions = await Promise.all(
         visibleRevisionRows.map(async (rev) => {
-          const items = await db.select().from(stockTransferRevisionItems).where(eq(stockTransferRevisionItems.revisionId, rev.id));
+          const items = await db
+            .select()
+            .from(stockTransferRevisionItems)
+            .where(eq(stockTransferRevisionItems.revisionId, rev.id));
           return {
             ...rev,
-            items: items.map(item => ({
+            items: items.map((item) => ({
               ...item,
               sourceLocationName: item.sourceLocationId
                 ? (locationMap.get(item.sourceLocationId) ?? item.sourceLocationName)
@@ -1243,14 +1341,22 @@ export function registerFiscalTransferRoutes(app: Express) {
         voucherDate: voucherRow?.voucherDate,
         optional: voucherRow?.optional,
         inventoryApplied: transferRow.inventoryApplied,
-        sourceLocationId: isDestinationUser ? transferRow.sourceLocationId : (posLocationId ?? transferRow.sourceLocationId),
+        sourceLocationId: isDestinationUser
+          ? transferRow.sourceLocationId
+          : (posLocationId ?? transferRow.sourceLocationId),
         sourceLocationName: isDestinationUser
-          ? (transferRow.sourceLocationId ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown") : "Multi-source")
-          : (posLocationId ? (locationMap.get(posLocationId) ?? "Unknown") : (transferRow.sourceLocationId ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown") : "Multi-source")),
+          ? transferRow.sourceLocationId
+            ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown")
+            : "Multi-source"
+          : posLocationId
+            ? (locationMap.get(posLocationId) ?? "Unknown")
+            : transferRow.sourceLocationId
+              ? (locationMap.get(transferRow.sourceLocationId) ?? "Unknown")
+              : "Multi-source",
         destinationLocationId: transferRow.destinationLocationId,
         destinationLocationName: locationMap.get(transferRow.destinationLocationId) ?? "Unknown",
         notes: transferRow.notes,
-        items: transferItems.map(i => ({
+        items: transferItems.map((i) => ({
           ...i,
           stockItemName: stockItemMap.get(i.stockItemId) ?? "Unknown",
           sourceLocationName: i.sourceLocationId ? (locationMap.get(i.sourceLocationId) ?? null) : null,
@@ -1283,11 +1389,13 @@ export function registerFiscalTransferRoutes(app: Express) {
         const [existingOptional] = await db
           .select()
           .from(stockTransferRevisions)
-          .where(and(
-            eq(stockTransferRevisions.transferId, transferId),
-            eq(stockTransferRevisions.optional, true),
-            eq(stockTransferRevisions.createdBy, req.user.id),
-          ))
+          .where(
+            and(
+              eq(stockTransferRevisions.transferId, transferId),
+              eq(stockTransferRevisions.optional, true),
+              eq(stockTransferRevisions.createdBy, req.user.id)
+            )
+          )
           .orderBy(asc(stockTransferRevisions.revisionNumber))
           .limit(1);
 
@@ -1301,14 +1409,15 @@ export function registerFiscalTransferRoutes(app: Express) {
             .where(eq(stockTransferRevisionItems.revisionId, existingOptional.id));
 
           const existingByKey = new Map(
-            existingRevItems.map(i => [`${i.stockItemId}:${i.sourceLocationId ?? ""}`, i])
+            existingRevItems.map((i) => [`${i.stockItemId}:${i.sourceLocationId ?? ""}`, i])
           );
 
           for (const item of items as any[]) {
             const key = `${item.stockItemId}:${item.sourceLocationId ?? ""}`;
             const existing = existingByKey.get(key);
             if (existing) {
-              await db.update(stockTransferRevisionItems)
+              await db
+                .update(stockTransferRevisionItems)
                 .set({
                   delta: String(item.delta),
                   newQuantity: String(item.newQuantity),
@@ -1350,7 +1459,13 @@ export function registerFiscalTransferRoutes(app: Express) {
 
         const [newRev] = await db
           .insert(stockTransferRevisions)
-          .values({ transferId, revisionNumber: nextNum, note: note?.trim() || null, optional: isOptional, createdBy: req.user?.id ?? null })
+          .values({
+            transferId,
+            revisionNumber: nextNum,
+            note: note?.trim() || null,
+            optional: isOptional,
+            createdBy: req.user?.id ?? null,
+          })
           .returning();
         revision = newRev;
       }
@@ -1376,10 +1491,14 @@ export function registerFiscalTransferRoutes(app: Express) {
       res.json({ ...revision, items: savedItems });
 
       // Fire-and-forget: send revised transfer image for POS-submitted (optional) revisions only
-      if (isOptional) setImmediate(async () => {
+      if (isOptional)
+        setImmediate(async () => {
           try {
             const [transfer] = await db
-              .select({ destinationLocationId: stockTransferVouchers.destinationLocationId, voucherId: stockTransferVouchers.voucherId })
+              .select({
+                destinationLocationId: stockTransferVouchers.destinationLocationId,
+                voucherId: stockTransferVouchers.voucherId,
+              })
               .from(stockTransferVouchers)
               .where(eq(stockTransferVouchers.id, transferId));
             if (!transfer) return;
@@ -1435,10 +1554,7 @@ export function registerFiscalTransferRoutes(app: Express) {
       const id = parseInt(req.params.id);
       if (!id) return res.status(400).json({ message: "Revision ID required" });
       const { optional } = req.body;
-      await db
-        .update(stockTransferRevisions)
-        .set({ optional: !!optional })
-        .where(eq(stockTransferRevisions.id, id));
+      await db.update(stockTransferRevisions).set({ optional: !!optional }).where(eq(stockTransferRevisions.id, id));
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -1453,35 +1569,57 @@ export function registerFiscalTransferRoutes(app: Express) {
 
       await db.transaction(async (tx) => {
         // Load revision
-        const [revision] = await tx.select().from(stockTransferRevisions).where(eq(stockTransferRevisions.id, revisionId));
+        const [revision] = await tx
+          .select()
+          .from(stockTransferRevisions)
+          .where(eq(stockTransferRevisions.id, revisionId));
         if (!revision) throw new Error("Revision not found");
 
         // Load the transfer
-        const [transfer] = await tx.select().from(stockTransferVouchers).where(eq(stockTransferVouchers.id, revision.transferId));
+        const [transfer] = await tx
+          .select()
+          .from(stockTransferVouchers)
+          .where(eq(stockTransferVouchers.id, revision.transferId));
         if (!transfer) throw new Error("Transfer not found");
 
         // Load ALL optional revisions for this transfer and compute net delta per item
         // (mirrors the merge logic in the GET endpoint so approval matches what admin sees)
-        const allOptionalRevs = await tx.select().from(stockTransferRevisions)
-          .where(and(eq(stockTransferRevisions.transferId, revision.transferId), eq(stockTransferRevisions.optional, true)))
+        const allOptionalRevs = await tx
+          .select()
+          .from(stockTransferRevisions)
+          .where(
+            and(eq(stockTransferRevisions.transferId, revision.transferId), eq(stockTransferRevisions.optional, true))
+          )
           .orderBy(asc(stockTransferRevisions.revisionNumber));
 
-        const allOptionalRevIds = allOptionalRevs.map(r => r.id);
-        const allOptionalItems = allOptionalRevIds.length > 0
-          ? await tx.select().from(stockTransferRevisionItems).where(inArray(stockTransferRevisionItems.revisionId, allOptionalRevIds))
-          : [];
+        const allOptionalRevIds = allOptionalRevs.map((r) => r.id);
+        const allOptionalItems =
+          allOptionalRevIds.length > 0
+            ? await tx
+                .select()
+                .from(stockTransferRevisionItems)
+                .where(inArray(stockTransferRevisionItems.revisionId, allOptionalRevIds))
+            : [];
 
         if (allOptionalItems.length === 0) throw new Error("Revision has no items");
 
         // Compute net delta per item (same key logic as GET endpoint)
-        const netMap = new Map<string, { stockItemId: number; sourceLocationId: number | null; originalQuantity: string; newQuantity: string }>();
+        const netMap = new Map<
+          string,
+          { stockItemId: number; sourceLocationId: number | null; originalQuantity: string; newQuantity: string }
+        >();
         for (const rev of allOptionalRevs) {
-          const items = allOptionalItems.filter(i => i.revisionId === rev.id);
+          const items = allOptionalItems.filter((i) => i.revisionId === rev.id);
           for (const item of items) {
             const key = `${item.stockItemId}:${item.sourceLocationId ?? ""}`;
             const existing = netMap.get(key);
             if (!existing) {
-              netMap.set(key, { stockItemId: item.stockItemId, sourceLocationId: item.sourceLocationId, originalQuantity: item.originalQuantity, newQuantity: item.newQuantity });
+              netMap.set(key, {
+                stockItemId: item.stockItemId,
+                sourceLocationId: item.sourceLocationId,
+                originalQuantity: item.originalQuantity,
+                newQuantity: item.newQuantity,
+              });
             } else {
               netMap.set(key, { ...existing, newQuantity: item.newQuantity });
             }
@@ -1491,11 +1629,17 @@ export function registerFiscalTransferRoutes(app: Express) {
         // Use the transfer's own company (from its voucher) for inventory adjustments.
         // Stock is always per-company — never use the destination location's company
         // as that can cross company boundaries.
-        const [transferVoucherRow] = await tx.select({ companyId: vouchers.companyId }).from(vouchers).where(eq(vouchers.id, transfer.voucherId));
+        const [transferVoucherRow] = await tx
+          .select({ companyId: vouchers.companyId })
+          .from(vouchers)
+          .where(eq(vouchers.id, transfer.voucherId));
         const companyId = transferVoucherRow?.companyId ?? req.session.currentCompanyId ?? null;
 
         // Load existing transfer items
-        const existingItems = await tx.select().from(stockTransferItems).where(eq(stockTransferItems.transferId, transfer.id));
+        const existingItems = await tx
+          .select()
+          .from(stockTransferItems)
+          .where(eq(stockTransferItems.transferId, transfer.id));
 
         for (const [, netItem] of netMap) {
           const origQty = parseFloat(netItem.originalQuantity);
@@ -1504,9 +1648,10 @@ export function registerFiscalTransferRoutes(app: Express) {
           if (netDelta === 0) continue;
 
           // Find the matching transfer item by stockItemId (+ sourceLocationId if set)
-          const match = existingItems.find(i =>
-            i.stockItemId === netItem.stockItemId &&
-            (!netItem.sourceLocationId || i.sourceLocationId === netItem.sourceLocationId)
+          const match = existingItems.find(
+            (i) =>
+              i.stockItemId === netItem.stockItemId &&
+              (!netItem.sourceLocationId || i.sourceLocationId === netItem.sourceLocationId)
           );
 
           if (match) {
@@ -1521,7 +1666,14 @@ export function registerFiscalTransferRoutes(app: Express) {
             // Apply inventory delta only if transfer was already applied to inventory
             if (transfer.inventoryApplied && netItem.sourceLocationId) {
               await adjustInventory(tx, netItem.sourceLocationId, netItem.stockItemId, -netDelta, companyId!);
-              await adjustInventory(tx, transfer.destinationLocationId, netItem.stockItemId, netDelta, companyId!, rate);
+              await adjustInventory(
+                tx,
+                transfer.destinationLocationId,
+                netItem.stockItemId,
+                netDelta,
+                companyId!,
+                rate
+              );
             }
           } else if (newQty > 0) {
             // New item added by POS user that doesn't exist in the original transfer — insert it.
@@ -1533,10 +1685,12 @@ export function registerFiscalTransferRoutes(app: Express) {
               const [invRow] = await tx
                 .select({ averageRate: inventory.averageRate })
                 .from(inventory)
-                .where(and(
-                  eq(inventory.locationId, netItem.sourceLocationId),
-                  eq(inventory.stockItemId, netItem.stockItemId)
-                ))
+                .where(
+                  and(
+                    eq(inventory.locationId, netItem.sourceLocationId),
+                    eq(inventory.stockItemId, netItem.stockItemId)
+                  )
+                )
                 .limit(1);
               const parsed = parseFloat(invRow?.averageRate ?? "0");
               rate = isNaN(parsed) ? 0 : parsed;
@@ -1561,17 +1715,25 @@ export function registerFiscalTransferRoutes(app: Express) {
         }
 
         // Recalculate total from all items (including ones not in this revision)
-        const allItems = await tx.select({ qty: stockTransferItems.quantity, rate: stockTransferItems.rate })
-          .from(stockTransferItems).where(eq(stockTransferItems.transferId, transfer.id));
+        const allItems = await tx
+          .select({ qty: stockTransferItems.quantity, rate: stockTransferItems.rate })
+          .from(stockTransferItems)
+          .where(eq(stockTransferItems.transferId, transfer.id));
         const fullTotal = allItems.reduce((s, i) => s + parseFloat(i.qty) * parseFloat(i.rate ?? "0"), 0);
 
         // Update voucher total
-        await tx.update(vouchers).set({ totalAmount: fullTotal.toFixed(2) }).where(eq(vouchers.id, transfer.voucherId));
+        await tx
+          .update(vouchers)
+          .set({ totalAmount: fullTotal.toFixed(2) })
+          .where(eq(vouchers.id, transfer.voucherId));
 
         // Mark ALL optional revisions for this transfer as approved (handles merged display case)
-        await tx.update(stockTransferRevisions)
+        await tx
+          .update(stockTransferRevisions)
           .set({ optional: false })
-          .where(and(eq(stockTransferRevisions.transferId, revision.transferId), eq(stockTransferRevisions.optional, true)));
+          .where(
+            and(eq(stockTransferRevisions.transferId, revision.transferId), eq(stockTransferRevisions.optional, true))
+          );
       });
 
       res.json({ success: true });
@@ -1595,239 +1757,196 @@ export function registerFiscalTransferRoutes(app: Express) {
   });
 
   // Stock Transfers - PUT endpoint (update)
-  app.put(
-    "/api/stock-transfers/:id",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const id = parseInt(req.params.id);
-        if (!id) {
-          return res.status(400).json({ message: "Transfer ID is required" });
-        }
-
-        // Validate request body using Zod
-        const parseResult = updateStockTransferSchema.safeParse(req.body);
-        if (!parseResult.success) {
-          return res.status(400).json({
-            message: "Invalid request data",
-            errors: parseResult.error.errors,
-          });
-        }
-
-        const { destinationLocationId, notes, items } = parseResult.data;
-
-        // Validate that source !== destination for each item
-        const invalidItem = items.find(item => item.sourceLocationId === destinationLocationId);
-        if (invalidItem) {
-          return res.status(400).json({ message: "Source and destination locations must be different for each item" });
-        }
-
-        // Convert numbers back to strings with fixed precision for storage layer
-        const itemsForStorage = items.map(item => ({
-          sourceLocationId: item.sourceLocationId,
-          stockItemId: item.stockItemId,
-          quantity: item.quantity.toFixed(3),
-          rate: item.rate.toFixed(2),
-        }));
-
-        // Update the stock transfer using the storage method
-        const updated = await storage.updateStockTransfer(id, destinationLocationId, notes || "", itemsForStorage);
-        
-        // Recalculate voucher totalAmount based on updated items
-        const newTotalAmount = items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
-        await db.update(vouchers)
-          .set({ totalAmount: newTotalAmount.toFixed(2) })
-          .where(eq(vouchers.id, updated.transfer.voucherId));
-        
-        res.json(updated);
-      } catch (error: any) {
-        console.error("[Stock Transfer PUT] Error:", error.message);
-        
-        // Check if this is a legacy transfer validation error (400) vs server error (500)
-        if (error.message && error.message.includes("missing source location data")) {
-          return res.status(400).json({ message: error.message });
-        }
-        
-        res.status(500).json({ message: error.message });
+  app.put("/api/stock-transfers/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) {
+        return res.status(400).json({ message: "Transfer ID is required" });
       }
-    },
-  );
+
+      // Validate request body using Zod
+      const parseResult = updateStockTransferSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          message: "Invalid request data",
+          errors: parseResult.error.errors,
+        });
+      }
+
+      const { destinationLocationId, notes, items } = parseResult.data;
+
+      // Validate that source !== destination for each item
+      const invalidItem = items.find((item) => item.sourceLocationId === destinationLocationId);
+      if (invalidItem) {
+        return res.status(400).json({ message: "Source and destination locations must be different for each item" });
+      }
+
+      // Convert numbers back to strings with fixed precision for storage layer
+      const itemsForStorage = items.map((item) => ({
+        sourceLocationId: item.sourceLocationId,
+        stockItemId: item.stockItemId,
+        quantity: item.quantity.toFixed(3),
+        rate: item.rate.toFixed(2),
+      }));
+
+      // Update the stock transfer using the storage method
+      const updated = await storage.updateStockTransfer(id, destinationLocationId, notes || "", itemsForStorage);
+
+      // Recalculate voucher totalAmount based on updated items
+      const newTotalAmount = items.reduce((sum, item) => sum + item.quantity * item.rate, 0);
+      await db
+        .update(vouchers)
+        .set({ totalAmount: newTotalAmount.toFixed(2) })
+        .where(eq(vouchers.id, updated.transfer.voucherId));
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Stock Transfer PUT] Error:", error.message);
+
+      // Check if this is a legacy transfer validation error (400) vs server error (500)
+      if (error.message && error.message.includes("missing source location data")) {
+        return res.status(400).json({ message: error.message });
+      }
+
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Stock Adjustments - GET endpoint
-  app.get(
-    "/api/stock-adjustments",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const voucherId = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
-        
-        if (!voucherId) {
-          return res.status(400).json({ message: "voucherId query parameter is required" });
-        }
+  app.get("/api/stock-adjustments", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const voucherId = req.query.voucherId ? parseInt(req.query.voucherId as string) : null;
 
-        const adjustment = await storage.getStockAdjustmentByVoucherId(voucherId);
-        res.json(adjustment);
-      } catch (error: any) {
-        console.error("[Stock Adjustment GET] Error:", error.message);
-        res.status(500).json({ message: error.message });
+      if (!voucherId) {
+        return res.status(400).json({ message: "voucherId query parameter is required" });
       }
-    },
-  );
+
+      const adjustment = await storage.getStockAdjustmentByVoucherId(voucherId);
+      res.json(adjustment);
+    } catch (error: any) {
+      console.error("[Stock Adjustment GET] Error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Stock Adjustments - POST endpoint
-  app.post(
-    "/api/stock-adjustments",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const { voucherId, locationId, adjustmentType, notes, items } =
-          req.body;
+  app.post("/api/stock-adjustments", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const { voucherId, locationId, adjustmentType, notes, items } = req.body;
 
-        // Validate required fields
-        if (!voucherId) {
-          return res.status(400).json({ message: "Voucher ID is required" });
-        }
-        if (!locationId) {
-          return res.status(400).json({ message: "Location is required" });
-        }
-        if (!adjustmentType) {
-          return res
-            .status(400)
-            .json({ message: "Adjustment type is required" });
-        }
-        if (
-          adjustmentType !== "Production" &&
-          adjustmentType !== "Consumption" &&
-          adjustmentType !== "Mixed"
-        ) {
-          return res
-            .status(400)
-            .json({
-              message:
-                "Adjustment type must be 'Production', 'Consumption', or 'Mixed'",
-            });
-        }
-        if (!items || !Array.isArray(items) || items.length === 0) {
-          return res.status(400).json({ message: "Items are required" });
-        }
-
-        // Validate that location exists
-        const location = await storage.getLocationById(locationId);
-        if (!location) {
-          return res.status(404).json({ message: "Location not found" });
-        }
-
-        // Validate that voucher exists
-        const voucher = await storage.getVoucherById(voucherId);
-        if (!voucher) {
-          return res.status(404).json({ message: "Voucher not found" });
-        }
-
-        // Validate items
-        for (const item of items) {
-          if (!item.stockItemId) {
-            return res
-              .status(400)
-              .json({ message: "Stock item ID is required for all items" });
-          }
-          if (!item.quantity || parseFloat(item.quantity) === 0) {
-            return res
-              .status(400)
-              .json({ message: "Quantity cannot be zero for any items" });
-          }
-          // Note: Negative quantities are allowed for consumption items
-          if (!item.rate || parseFloat(item.rate) < 0) {
-            return res
-              .status(400)
-              .json({ message: "Rate must be non-negative for all items" });
-          }
-        }
-
-        console.log("[Stock Adjustment] Creating adjustment:", {
-          voucherId,
-          locationId,
-          adjustmentType,
-          itemCount: items.length,
-        });
-
-        const adjustment = await storage.createStockAdjustment(
-          voucherId,
-          locationId,
-          adjustmentType,
-          notes || "",
-          items,
-        );
-
-        console.log("[Stock Adjustment] Adjustment created successfully:", {
-          adjustmentId: adjustment.adjustment.id,
-          itemsCount: adjustment.items.length,
-        });
-        res.status(201).json(adjustment);
-      } catch (error: any) {
-        console.error(
-          "[Stock Adjustment] Error creating adjustment:",
-          error.message,
-          error.stack,
-        );
-        res.status(500).json({ message: error.message });
+      // Validate required fields
+      if (!voucherId) {
+        return res.status(400).json({ message: "Voucher ID is required" });
       }
-    },
-  );
+      if (!locationId) {
+        return res.status(400).json({ message: "Location is required" });
+      }
+      if (!adjustmentType) {
+        return res.status(400).json({ message: "Adjustment type is required" });
+      }
+      if (adjustmentType !== "Production" && adjustmentType !== "Consumption" && adjustmentType !== "Mixed") {
+        return res.status(400).json({
+          message: "Adjustment type must be 'Production', 'Consumption', or 'Mixed'",
+        });
+      }
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Items are required" });
+      }
+
+      // Validate that location exists
+      const location = await storage.getLocationById(locationId);
+      if (!location) {
+        return res.status(404).json({ message: "Location not found" });
+      }
+
+      // Validate that voucher exists
+      const voucher = await storage.getVoucherById(voucherId);
+      if (!voucher) {
+        return res.status(404).json({ message: "Voucher not found" });
+      }
+
+      // Validate items
+      for (const item of items) {
+        if (!item.stockItemId) {
+          return res.status(400).json({ message: "Stock item ID is required for all items" });
+        }
+        if (!item.quantity || parseFloat(item.quantity) === 0) {
+          return res.status(400).json({ message: "Quantity cannot be zero for any items" });
+        }
+        // Note: Negative quantities are allowed for consumption items
+        if (!item.rate || parseFloat(item.rate) < 0) {
+          return res.status(400).json({ message: "Rate must be non-negative for all items" });
+        }
+      }
+
+      console.log("[Stock Adjustment] Creating adjustment:", {
+        voucherId,
+        locationId,
+        adjustmentType,
+        itemCount: items.length,
+      });
+
+      const adjustment = await storage.createStockAdjustment(voucherId, locationId, adjustmentType, notes || "", items);
+
+      console.log("[Stock Adjustment] Adjustment created successfully:", {
+        adjustmentId: adjustment.adjustment.id,
+        itemsCount: adjustment.items.length,
+      });
+      res.status(201).json(adjustment);
+    } catch (error: any) {
+      console.error("[Stock Adjustment] Error creating adjustment:", error.message, error.stack);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // Stock Adjustments - PUT endpoint (update)
-  app.put(
-    "/api/stock-adjustments/:id",
-    requireAuth,
-    requireNonPOS,
-    async (req, res) => {
-      try {
-        const id = parseInt(req.params.id);
-        if (!id) {
-          return res.status(400).json({ message: "Adjustment ID is required" });
-        }
-
-        // Validate request body using Zod
-        const parseResult = updateStockAdjustmentSchema.safeParse(req.body);
-        if (!parseResult.success) {
-          return res.status(400).json({
-            message: "Invalid request data",
-            errors: parseResult.error.errors,
-          });
-        }
-
-        const { locationId, adjustmentType, notes, items } = parseResult.data;
-
-        // Convert numbers back to strings with fixed precision for storage layer
-        const itemsForStorage = items.map(item => ({
-          stockItemId: item.stockItemId,
-          quantity: item.quantity.toFixed(3),
-          rate: item.rate.toFixed(2),
-        }));
-
-        // Update the stock adjustment using the storage method
-        const updated = await storage.updateStockAdjustment(id, locationId, adjustmentType, notes || "", itemsForStorage);
-        
-        // Recalculate voucher totalAmount based on updated items
-        // For Mixed: net = production (positive qty) - consumption (negative qty)
-        // For Production/Consumption only: use absolute value sum
-        const { adjustmentType: updatedAdjType } = parseResult.data;
-        const newTotalAmount = updatedAdjType === "Mixed"
-          ? items.reduce((sum, item) => sum + (item.quantity * item.rate), 0)
-          : items.reduce((sum, item) => sum + (Math.abs(item.quantity) * item.rate), 0);
-        await db.update(vouchers)
-          .set({ totalAmount: newTotalAmount.toFixed(2) })
-          .where(eq(vouchers.id, updated.adjustment.voucherId));
-        
-        res.json(updated);
-      } catch (error: any) {
-        console.error("[Stock Adjustment PUT] Error:", error.message);
-        res.status(500).json({ message: error.message });
+  app.put("/api/stock-adjustments/:id", requireAuth, requireNonPOS, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (!id) {
+        return res.status(400).json({ message: "Adjustment ID is required" });
       }
-    },
-  );
+
+      // Validate request body using Zod
+      const parseResult = updateStockAdjustmentSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          message: "Invalid request data",
+          errors: parseResult.error.errors,
+        });
+      }
+
+      const { locationId, adjustmentType, notes, items } = parseResult.data;
+
+      // Convert numbers back to strings with fixed precision for storage layer
+      const itemsForStorage = items.map((item) => ({
+        stockItemId: item.stockItemId,
+        quantity: item.quantity.toFixed(3),
+        rate: item.rate.toFixed(2),
+      }));
+
+      // Update the stock adjustment using the storage method
+      const updated = await storage.updateStockAdjustment(id, locationId, adjustmentType, notes || "", itemsForStorage);
+
+      // Recalculate voucher totalAmount based on updated items
+      // For Mixed: net = production (positive qty) - consumption (negative qty)
+      // For Production/Consumption only: use absolute value sum
+      const { adjustmentType: updatedAdjType } = parseResult.data;
+      const newTotalAmount =
+        updatedAdjType === "Mixed"
+          ? items.reduce((sum, item) => sum + item.quantity * item.rate, 0)
+          : items.reduce((sum, item) => sum + Math.abs(item.quantity) * item.rate, 0);
+      await db
+        .update(vouchers)
+        .set({ totalAmount: newTotalAmount.toFixed(2) })
+        .where(eq(vouchers.id, updated.adjustment.voucherId));
+
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[Stock Adjustment PUT] Error:", error.message);
+      res.status(500).json({ message: error.message });
+    }
+  });
 
   // ===== WASTE DISPATCHES =====
 
@@ -1966,26 +2085,27 @@ export function registerFiscalTransferRoutes(app: Express) {
       );
 
       // Calculate total from actual rates used
-      const totalAmount = adjResult.items.reduce(
-        (sum: number, item: any) => sum + parseFloat(item.totalAmount),
-        0
-      );
+      const totalAmount = adjResult.items.reduce((sum: number, item: any) => sum + parseFloat(item.totalAmount), 0);
 
       // Update voucher with actual total
-      await db.update(vouchers)
+      await db
+        .update(vouchers)
         .set({ totalAmount: totalAmount.toFixed(2) })
         .where(eq(vouchers.id, voucher.id));
 
       // Create waste dispatch record
-      const [dispatch] = await db.insert(wasteDispatches).values({
-        companyId,
-        locationId,
-        voucherId: voucher.id,
-        dispatchNumber,
-        dispatchDate,
-        notes: notes || null,
-        totalAmount: totalAmount.toFixed(2),
-      }).returning();
+      const [dispatch] = await db
+        .insert(wasteDispatches)
+        .values({
+          companyId,
+          locationId,
+          voucherId: voucher.id,
+          dispatchNumber,
+          dispatchDate,
+          notes: notes || null,
+          totalAmount: totalAmount.toFixed(2),
+        })
+        .returning();
 
       // Create waste dispatch items
       for (let i = 0; i < adjResult.items.length; i++) {
@@ -2034,5 +2154,4 @@ export function registerFiscalTransferRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 }

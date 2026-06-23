@@ -5,29 +5,37 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Users } from "lucide-react";
 
 interface GreenChat {
-  id:   string;
+  id: string;
   name: string;
   type: string;
 }
 
 interface CompanyWaSetting {
-  companyId:   number;
+  companyId: number;
   companyName: string;
   groupChatId: string;
 }
 
 interface CompanyRowProps {
-  company:        CompanyWaSetting;
-  chats:          GreenChat[];
-  chatsLoading:   boolean;
+  company: CompanyWaSetting;
+  chats: GreenChat[];
+  chatsLoading: boolean;
   hasCredentials: boolean;
-  onLoadChats:    () => void;
-  onSave:         (companyId: number, groupChatId: string) => void;
-  isSaving:       boolean;
+  onLoadChats: () => void;
+  onSave: (companyId: number, groupChatId: string) => void;
+  isSaving: boolean;
 }
 
-export function CompanyRow({ company, chats, chatsLoading, hasCredentials, onLoadChats, onSave, isSaving }: CompanyRowProps) {
-  const [groupChatId,     setGroupChatId]     = useState(company.groupChatId);
+export function CompanyRow({
+  company,
+  chats,
+  chatsLoading,
+  hasCredentials,
+  onLoadChats,
+  onSave,
+  isSaving,
+}: CompanyRowProps) {
+  const [groupChatId, setGroupChatId] = useState(company.groupChatId);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
 
   const selectedChat = chats.find((c) => c.id === groupChatId);
@@ -45,7 +53,9 @@ export function CompanyRow({ company, chats, chatsLoading, hasCredentials, onLoa
             {selectedChat?.name ?? groupChatId}
           </Badge>
         ) : (
-          <Badge variant="outline" className="text-xs">Not set</Badge>
+          <Badge variant="outline" className="text-xs">
+            Not set
+          </Badge>
         )}
       </div>
 
@@ -56,7 +66,10 @@ export function CompanyRow({ company, chats, chatsLoading, hasCredentials, onLoa
               size="sm"
               variant="ghost"
               className="h-7 text-xs"
-              onClick={() => { setGroupChatId(""); setShowGroupPicker(false); }}
+              onClick={() => {
+                setGroupChatId("");
+                setShowGroupPicker(false);
+              }}
               data-testid={`button-clear-transfer-wa-group-${company.companyId}`}
             >
               Clear group
@@ -68,14 +81,23 @@ export function CompanyRow({ company, chats, chatsLoading, hasCredentials, onLoa
           <Button
             size="sm"
             variant="outline"
-            onClick={() => { onLoadChats(); setShowGroupPicker(true); }}
+            onClick={() => {
+              onLoadChats();
+              setShowGroupPicker(true);
+            }}
             disabled={chatsLoading || !hasCredentials}
             data-testid={`button-load-transfer-wa-chats-${company.companyId}`}
           >
             {chatsLoading ? (
-              <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Loading groups…</>
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                Loading groups…
+              </>
             ) : (
-              <><Users className="h-3.5 w-3.5 mr-1.5" />{groupChatId ? "Change Group" : "Select Group"}</>
+              <>
+                <Users className="h-3.5 w-3.5 mr-1.5" />
+                {groupChatId ? "Change Group" : "Select Group"}
+              </>
             )}
           </Button>
         )}
@@ -89,7 +111,10 @@ export function CompanyRow({ company, chats, chatsLoading, hasCredentials, onLoa
                 className={`w-full text-left px-3 py-2 rounded text-xs hover-elevate ${
                   groupChatId === c.id ? "bg-primary/10 text-primary font-medium" : ""
                 }`}
-                onClick={() => { setGroupChatId(c.id); setShowGroupPicker(false); }}
+                onClick={() => {
+                  setGroupChatId(c.id);
+                  setShowGroupPicker(false);
+                }}
                 data-testid={`option-transfer-wa-group-${company.companyId}-${c.id}`}
               >
                 {c.name}

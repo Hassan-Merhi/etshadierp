@@ -24,39 +24,43 @@ import CryptoJS from "crypto-js";
 function buildValidatedUrl(baseUrl: string, dateISO: string, currencyCode: string): string {
   try {
     const url = new URL(baseUrl);
-    const allowedDomains = ['api.frankfurter.app'];
-    if (!allowedDomains.includes(url.hostname)) throw new Error('Invalid host');
-    if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Invalid protocol');
-    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dateISO)) throw new Error('Invalid parameter');
-    if (!/^[A-Z]{3}$/.test(currencyCode)) throw new Error('Invalid parameter');
+    const allowedDomains = ["api.frankfurter.app"];
+    if (!allowedDomains.includes(url.hostname)) throw new Error("Invalid host");
+    if (!["http:", "https:"].includes(url.protocol)) throw new Error("Invalid protocol");
+    if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dateISO)) throw new Error("Invalid parameter");
+    if (!/^[A-Z]{3}$/.test(currencyCode)) throw new Error("Invalid parameter");
     url.pathname = `/${dateISO}`;
-    url.searchParams.set('from', currencyCode);
-    url.searchParams.set('to', 'USD');
+    url.searchParams.set("from", currencyCode);
+    url.searchParams.set("to", "USD");
     return url.href;
   } catch {
-    throw new Error('Invalid URL');
+    throw new Error("Invalid URL");
   }
 }
 
-export async function writeDaybookEntry(dbOrTx: any, opts: {
-  companyId: number;
-  txDate: string;
-  txType: string;
-  referenceId?: number;
-  referenceTable?: string;
-  description: string;
-  metaJson?: string;
-  currencyCode?: string;
-  amountCurrency?: number;
-  fxRateToUsd?: number;
-  amountUsd?: number;
-  createdBy?: string | null;
-  effectiveDate?: string | null;
-}) {
+export async function writeDaybookEntry(
+  dbOrTx: any,
+  opts: {
+    companyId: number;
+    txDate: string;
+    txType: string;
+    referenceId?: number;
+    referenceTable?: string;
+    description: string;
+    metaJson?: string;
+    currencyCode?: string;
+    amountCurrency?: number;
+    fxRateToUsd?: number;
+    amountUsd?: number;
+    createdBy?: string | null;
+    effectiveDate?: string | null;
+  }
+) {
   const currency = opts.currencyCode || "USD";
   const fxRate = opts.fxRateToUsd || 1;
   const amtCurrency = opts.amountCurrency || 0;
-  const amtUsd = opts.amountUsd !== undefined ? opts.amountUsd : (currency === "USD" ? amtCurrency : amtCurrency * fxRate);
+  const amtUsd =
+    opts.amountUsd !== undefined ? opts.amountUsd : currency === "USD" ? amtCurrency : amtCurrency * fxRate;
   await dbOrTx.insert(factoryDaybookEntries).values({
     companyId: opts.companyId,
     txDate: opts.txDate,
@@ -81,11 +85,13 @@ export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: str
   const [manualRate] = await db
     .select()
     .from(factoryFxRates)
-    .where(and(
-      eq(factoryFxRates.companyId, companyId),
-      eq(factoryFxRates.currencyCode, currencyCode.toUpperCase()),
-      eq(factoryFxRates.source, "manual"),
-    ))
+    .where(
+      and(
+        eq(factoryFxRates.companyId, companyId),
+        eq(factoryFxRates.currencyCode, currencyCode.toUpperCase()),
+        eq(factoryFxRates.source, "manual")
+      )
+    )
     .orderBy(desc(factoryFxRates.effectiveDate))
     .limit(1);
 
@@ -95,18 +101,20 @@ export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: str
   const [existing] = await db
     .select()
     .from(factoryFxRates)
-    .where(and(
-      eq(factoryFxRates.companyId, companyId),
-      eq(factoryFxRates.currencyCode, currencyCode.toUpperCase()),
-      eq(factoryFxRates.effectiveDate, dateISO),
-      eq(factoryFxRates.source, "auto"),
-    ))
+    .where(
+      and(
+        eq(factoryFxRates.companyId, companyId),
+        eq(factoryFxRates.currencyCode, currencyCode.toUpperCase()),
+        eq(factoryFxRates.effectiveDate, dateISO),
+        eq(factoryFxRates.source, "auto")
+      )
+    )
     .limit(1);
 
   if (existing) return existing.rateToUsd;
 
   try {
-    const response = await fetch(buildValidatedUrl('https://api.frankfurter.app', dateISO, currencyCode.toUpperCase()));
+    const response = await fetch(buildValidatedUrl("https://api.frankfurter.app", dateISO, currencyCode.toUpperCase()));
     if (!response.ok) throw new Error(`FX API returned ${response.status}`);
     const data = await response.json();
     const rate = data?.rates?.USD;
@@ -126,10 +134,7 @@ export async function getOrFetchFxRateToUsd(companyId: number, currencyCode: str
     const [fallback] = await db
       .select()
       .from(factoryFxRates)
-      .where(and(
-        eq(factoryFxRates.companyId, companyId),
-        eq(factoryFxRates.currencyCode, currencyCode.toUpperCase())
-      ))
+      .where(and(eq(factoryFxRates.companyId, companyId), eq(factoryFxRates.currencyCode, currencyCode.toUpperCase())))
       .orderBy(desc(factoryFxRates.effectiveDate))
       .limit(1);
 
@@ -151,14 +156,17 @@ export async function getOrCreateLedgerAccount(
     .where(and(eq(ledgerAccounts.companyId, companyId), eq(ledgerAccounts.code, safeCode)))
     .limit(1);
   if (existing) return existing.id;
-  const [created] = await db.insert(ledgerAccounts).values({
-    companyId,
-    code: safeCode,
-    name,
-    accountType,
-    active: true,
-    isHidden: false,
-  }).returning({ id: ledgerAccounts.id });
+  const [created] = await db
+    .insert(ledgerAccounts)
+    .values({
+      companyId,
+      code: safeCode,
+      name,
+      accountType,
+      active: true,
+      isHidden: false,
+    })
+    .returning({ id: ledgerAccounts.id });
   return created.id;
 }
 
@@ -177,19 +185,24 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
   const bales = await dbConn.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
 
   // Fetch proforma pricing mode and per-kg rate for this order (if proforma-linked)
-  const [order] = await dbConn.select({ proformaIdUsed: customerOrders.proformaIdUsed })
-    .from(customerOrders).where(eq(customerOrders.id, orderId));
+  const [order] = await dbConn
+    .select({ proformaIdUsed: customerOrders.proformaIdUsed })
+    .from(customerOrders)
+    .where(eq(customerOrders.id, orderId));
   const proformaPricing = new Map<string, { pricingMode: string; pricePerKg: string | null }>();
   if (order?.proformaIdUsed) {
-    const pLines = await dbConn.select({
-      articleCode: customerProformaLines.articleCode,
-      pricingMode: customerProformaLines.pricingMode,
-      pricePerKg: customerProformaLines.pricePerKg,
-    }).from(customerProformaLines).where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
+    const pLines = await dbConn
+      .select({
+        articleCode: customerProformaLines.articleCode,
+        pricingMode: customerProformaLines.pricingMode,
+        pricePerKg: customerProformaLines.pricePerKg,
+      })
+      .from(customerProformaLines)
+      .where(eq(customerProformaLines.proformaId, order.proformaIdUsed));
     for (const pl of pLines) {
       if (pl.articleCode) {
         proformaPricing.set(pl.articleCode.toLowerCase(), {
-          pricingMode: pl.pricingMode ?? 'per_bale',
+          pricingMode: pl.pricingMode ?? "per_bale",
           pricePerKg: pl.pricePerKg ?? null,
         });
       }
@@ -198,9 +211,12 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
 
   await dbConn.delete(customerOrderLines).where(eq(customerOrderLines.orderId, orderId));
 
-  const grouped: Record<string, { articleCode: string; baleName: string; qty: number; totalWeight: number; totalPrice: number }> = {};
+  const grouped: Record<
+    string,
+    { articleCode: string; baleName: string; qty: number; totalWeight: number; totalPrice: number }
+  > = {};
   for (const b of bales) {
-    const key = b.articleCode || 'UNKNOWN';
+    const key = b.articleCode || "UNKNOWN";
     if (!grouped[key]) {
       grouped[key] = { articleCode: key, baleName: b.baleName || key, qty: 0, totalWeight: 0, totalPrice: 0 };
     }
@@ -211,14 +227,15 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
 
   for (const line of Object.values(grouped)) {
     const pricing = proformaPricing.get(line.articleCode.toLowerCase());
-    const pricingMode = pricing?.pricingMode ?? 'per_bale';
+    const pricingMode = pricing?.pricingMode ?? "per_bale";
     const pricePerKg = pricing?.pricePerKg ?? null;
     const pkgRateInsert = pricePerKg ? parseFloat(pricePerKg) : 0;
     // For per_kg lines: totalPrice = totalWeight × pricePerKg (authoritative).
     // For per_bale lines: totalPrice = sum of priceUsed on bales.
-    const lineTotalPrice = (pricingMode === 'per_kg' && pkgRateInsert > 0 && line.totalWeight > 0)
-      ? line.totalWeight * pkgRateInsert
-      : line.totalPrice;
+    const lineTotalPrice =
+      pricingMode === "per_kg" && pkgRateInsert > 0 && line.totalWeight > 0
+        ? line.totalWeight * pkgRateInsert
+        : line.totalPrice;
     const pricePerBaleEffective = line.qty > 0 ? lineTotalPrice / line.qty : 0;
     await dbConn.insert(customerOrderLines).values({
       orderId,
@@ -235,17 +252,21 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
   }
 
   const charges = await dbConn.select().from(customerOrderCharges).where(eq(customerOrderCharges.orderId, orderId));
-  const freightAmount = charges.filter((c: any) => c.chargeType === 'FREIGHT').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
-  const otherChargesTotal = charges.filter((c: any) => c.chargeType === 'OTHER').reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+  const freightAmount = charges
+    .filter((c: any) => c.chargeType === "FREIGHT")
+    .reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
+  const otherChargesTotal = charges
+    .filter((c: any) => c.chargeType === "OTHER")
+    .reduce((sum: number, c: any) => sum + parseFloat(c.amount), 0);
 
   // For per_kg articles: always use proformaRate × totalWeight as the authoritative price.
   // This matches the totalPrice stored in the order lines above and the verify-page display.
   let subtotalBales = 0;
   for (const line of Object.values(grouped)) {
     const pricing = proformaPricing.get(line.articleCode.toLowerCase());
-    const pricingMode = pricing?.pricingMode ?? 'per_bale';
+    const pricingMode = pricing?.pricingMode ?? "per_bale";
     const pkgRate = pricing?.pricePerKg ? parseFloat(pricing.pricePerKg) : 0;
-    if (pricingMode === 'per_kg' && pkgRate > 0 && line.totalWeight > 0) {
+    if (pricingMode === "per_kg" && pkgRate > 0 && line.totalWeight > 0) {
       subtotalBales += pkgRate * line.totalWeight;
     } else {
       subtotalBales += line.totalPrice;
@@ -254,14 +275,17 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
 
   const grandTotal = subtotalBales + freightAmount + otherChargesTotal;
 
-  await dbConn.update(customerOrders).set({
-    subtotalBales: String(subtotalBales),
-    freightAmount: String(freightAmount),
-    otherChargesTotal: String(otherChargesTotal),
-    grandTotal: String(grandTotal),
-    totalQtyBales: bales.length,
-    updatedAt: new Date(),
-  }).where(eq(customerOrders.id, orderId));
+  await dbConn
+    .update(customerOrders)
+    .set({
+      subtotalBales: String(subtotalBales),
+      freightAmount: String(freightAmount),
+      otherChargesTotal: String(otherChargesTotal),
+      grandTotal: String(grandTotal),
+      totalQtyBales: bales.length,
+      updatedAt: new Date(),
+    })
+    .where(eq(customerOrders.id, orderId));
 }
 
 /**
@@ -276,7 +300,7 @@ export async function recalculateOrderTotals(dbConn: any, orderId: number) {
 export async function recalculateContainerCosts(
   tx: any,
   companyId: number,
-  containerId: number,
+  containerId: number
 ): Promise<{ totalCost: number; inclusiveCostPerKg: number; costPerKgUsd: number; rawStockId: number | null }> {
   const [container] = await tx
     .select()
@@ -297,27 +321,31 @@ export async function recalculateContainerCosts(
   // Freight — may be in a different currency; normalise to container currency
   const freightVal = parseFloat(container.freight || "0");
   const freightCcy = (container as any).freightCurrencyCode || containerCcy;
-  const freightFx = parseFloat((container as any).fxRateToUsdOffload || (container as any).freightFxRate || String(fxRate));
+  const freightFx = parseFloat(
+    (container as any).fxRateToUsdOffload || (container as any).freightFxRate || String(fxRate)
+  );
   const freightUsd = freightCcy === "USD" ? freightVal : freightVal * freightFx;
-  const freightInCcy = freightCcy === containerCcy ? freightVal : (fxRate > 0 ? freightUsd / fxRate : freightVal);
+  const freightInCcy = freightCcy === containerCcy ? freightVal : fxRate > 0 ? freightUsd / fxRate : freightVal;
 
   // Other charges (bulk field)
   const ocVal = parseFloat(container.otherCharges || "0");
   const ocCcy = (container as any).otherChargesCurrencyCode || containerCcy;
   const ocFx = parseFloat((container as any).otherChargesFxRate || String(fxRate));
   const ocUsd = ocCcy === "USD" ? ocVal : ocVal * ocFx;
-  const ocInCcy = ocCcy === containerCcy ? ocVal : (fxRate > 0 ? ocUsd / fxRate : ocVal);
+  const ocInCcy = ocCcy === containerCcy ? ocVal : fxRate > 0 ? ocUsd / fxRate : ocVal;
 
   // Commission
   const [commission] = await tx
     .select()
     .from(factoryContainerCommissions)
     .where(eq(factoryContainerCommissions.containerId, containerId));
-  const commVal = commission ? parseFloat(commission.commissionTotal || "0") : parseFloat(container.commissionAmount || "0");
-  const commCcy = commission ? (commission.currencyCode || "USD") : containerCcy;
+  const commVal = commission
+    ? parseFloat(commission.commissionTotal || "0")
+    : parseFloat(container.commissionAmount || "0");
+  const commCcy = commission ? commission.currencyCode || "USD" : containerCcy;
   const commFx = commission ? parseFloat(commission.fxRateToUsd || "1") : fxRate;
   const commUsdAmt = commCcy === "USD" ? commVal : commVal * commFx;
-  const commInCcy = commCcy === containerCcy ? commVal : (fxRate > 0 ? commUsdAmt / fxRate : commVal);
+  const commInCcy = commCcy === containerCcy ? commVal : fxRate > 0 ? commUsdAmt / fxRate : commVal;
 
   // Duty (only included when CONFIRMED)
   const dutyVal = container.dutyStatus === "CONFIRMED" ? parseFloat(container.dutyAmount || "0") : 0;
@@ -326,13 +354,18 @@ export async function recalculateContainerCosts(
   const additionalCharges = await tx
     .select()
     .from(factoryOffloadAdditionalCharges)
-    .where(and(eq(factoryOffloadAdditionalCharges.containerId, containerId), eq(factoryOffloadAdditionalCharges.companyId, companyId)));
+    .where(
+      and(
+        eq(factoryOffloadAdditionalCharges.containerId, containerId),
+        eq(factoryOffloadAdditionalCharges.companyId, companyId)
+      )
+    );
   const additionalTotal = additionalCharges.reduce((sum: number, c: any) => {
     const amt = parseFloat(c.amount || "0");
     const ccy = c.currencyCode || containerCcy;
     const cfx = parseFloat(c.fxRateToUsd || String(fxRate));
     const amtUsd = ccy === "USD" ? amt : amt * cfx;
-    return sum + (ccy === containerCcy ? amt : (fxRate > 0 ? amtUsd / fxRate : amtUsd));
+    return sum + (ccy === containerCcy ? amt : fxRate > 0 ? amtUsd / fxRate : amtUsd);
   }, 0);
 
   const totalCost = basePayable + freightInCcy + ocInCcy + commInCcy + dutyVal + additionalTotal;
@@ -384,13 +417,20 @@ export async function recalculateContainerCosts(
     // 4. Recalculate weighted-average costPerKg on affected mix batches
     const affectedBatchIds = [...new Set(mixSources.map((s: any) => s.mixBatchId as number))];
     for (const batchId of affectedBatchIds) {
-      const allSrc = await tx.select().from(factoryMixBatchSources).where(eq(factoryMixBatchSources.mixBatchId, batchId));
+      const allSrc = await tx
+        .select()
+        .from(factoryMixBatchSources)
+        .where(eq(factoryMixBatchSources.mixBatchId, batchId));
       const batchTotalCost = allSrc.reduce((s: number, r: any) => s + parseFloat(r.totalCost || "0"), 0);
       const batchTotalWeight = allSrc.reduce((s: number, r: any) => s + parseFloat(r.weightKg || "0"), 0);
       const batchCostPerKg = batchTotalWeight > 0 ? batchTotalCost / batchTotalWeight : 0;
       await tx
         .update(factoryMixBatches)
-        .set({ costPerKg: String(batchCostPerKg.toFixed(4)), totalCost: String(batchTotalCost.toFixed(2)), updatedAt: new Date() })
+        .set({
+          costPerKg: String(batchCostPerKg.toFixed(4)),
+          totalCost: String(batchTotalCost.toFixed(2)),
+          updatedAt: new Date(),
+        })
         .where(eq(factoryMixBatches.id, batchId));
     }
   }

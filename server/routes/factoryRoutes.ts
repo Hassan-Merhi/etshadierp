@@ -20,7 +20,6 @@ import { registerEndProductionRoutes } from "./factory/endProductionRoutes";
 import { registerProductionPlannerRoutes } from "./factory/factoryProductionPlannerRoutes";
 
 export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
-
   // ─────────────────────────────────────────────────────────────────────────────
   // FACTORY COMPANY RESOLUTION MIDDLEWARE
   // ─────────────────────────────────────────────────────────────────────────────
@@ -33,8 +32,10 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       const currentCompanyId = session.currentCompanyId;
 
       if (currentCompanyId) {
-        const [co] = await db.select({ id: companies.id, companyType: companies.companyType })
-          .from(companies).where(eq(companies.id, currentCompanyId));
+        const [co] = await db
+          .select({ id: companies.id, companyType: companies.companyType })
+          .from(companies)
+          .where(eq(companies.id, currentCompanyId));
         if (co?.companyType === "factory" || co?.companyType === "factory_v2") {
           session.factoryCompanyId = co.id;
           return next();
@@ -42,12 +43,15 @@ export function registerFactoryRoutes(app: Express, requireAuth: any, db: any) {
       }
 
       // Fall back to any active factory-type company
-      const [factoryComp] = await db.select({ id: companies.id })
+      const [factoryComp] = await db
+        .select({ id: companies.id })
         .from(companies)
-        .where(and(
-          or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2")),
-          eq(companies.active, true),
-        ))
+        .where(
+          and(
+            or(eq(companies.companyType, "factory"), eq(companies.companyType, "factory_v2")),
+            eq(companies.active, true)
+          )
+        )
         .limit(1);
       if (factoryComp) {
         session.factoryCompanyId = factoryComp.id;

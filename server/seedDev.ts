@@ -1,13 +1,6 @@
 import { db } from "./db";
 import { eq, and, sql } from "drizzle-orm";
-import {
-  users,
-  baleProducts,
-  baleLabelPrints,
-  productionBales,
-  baleSequences,
-  mixBatches,
-} from "@shared/schema";
+import { users, baleProducts, baleLabelPrints, productionBales, baleSequences, mixBatches } from "@shared/schema";
 
 export async function runDevSeed() {
   const COMPANY_ID = 11;
@@ -38,43 +31,51 @@ export async function runDevSeed() {
 
   const createdProducts: any[] = [];
   for (const p of productDefs) {
-    const existing = await db.select().from(baleProducts)
+    const existing = await db
+      .select()
+      .from(baleProducts)
       .where(and(eq(baleProducts.companyId, COMPANY_ID), eq(baleProducts.articleCode, p.articleCode)))
       .limit(1);
     if (existing.length > 0) {
       createdProducts.push(existing[0]);
     } else {
-      const [newP] = await db.insert(baleProducts).values({
-        companyId: COMPANY_ID,
-        code: p.code,
-        articleCode: p.articleCode,
-        name: p.name,
-        active: true,
-      }).returning();
+      const [newP] = await db
+        .insert(baleProducts)
+        .values({
+          companyId: COMPANY_ID,
+          code: p.code,
+          articleCode: p.articleCode,
+          name: p.name,
+          active: true,
+        })
+        .returning();
       createdProducts.push(newP);
     }
   }
 
-  let activeBatches = await db.select().from(mixBatches)
+  let activeBatches = await db
+    .select()
+    .from(mixBatches)
     .where(and(eq(mixBatches.companyId, COMPANY_ID), eq(mixBatches.status, "ACTIVE")));
 
   if (activeBatches.length === 0) {
-    const [newBatch] = await db.insert(mixBatches).values({
-      companyId: COMPANY_ID,
-      batchCode: "SEED-MIX-001",
-      totalWeightKg: "2000.000",
-      costPerKg: "1.50",
-      totalCost: "3000.00",
-      notes: "Seed data batch",
-      status: "ACTIVE",
-    }).returning();
+    const [newBatch] = await db
+      .insert(mixBatches)
+      .values({
+        companyId: COMPANY_ID,
+        batchCode: "SEED-MIX-001",
+        totalWeightKg: "2000.000",
+        costPerKg: "1.50",
+        totalCost: "3000.00",
+        notes: "Seed data batch",
+        status: "ACTIVE",
+      })
+      .returning();
     activeBatches = [newBatch];
   }
   const batchId = activeBatches[0].id;
 
-  const seqRow = await db.select().from(baleSequences)
-    .where(eq(baleSequences.companyId, COMPANY_ID))
-    .limit(1);
+  const seqRow = await db.select().from(baleSequences).where(eq(baleSequences.companyId, COMPANY_ID)).limit(1);
   let nextNum = 1;
   if (seqRow.length > 0) {
     nextNum = seqRow[0].nextNumber;
@@ -111,7 +112,8 @@ export async function runDevSeed() {
     }
   }
 
-  await db.update(baleSequences)
+  await db
+    .update(baleSequences)
     .set({ nextNumber: nextNum + 25 })
     .where(eq(baleSequences.companyId, COMPANY_ID));
 
@@ -129,19 +131,22 @@ export async function runDevSeed() {
       const printedAt = new Date(now - daysAgo * 86400000);
 
       try {
-        const [lp] = await db.insert(baleLabelPrints).values({
-          companyId: COMPANY_ID,
-          productionBaleId: bale.id,
-          productId: bale.product.id,
-          articleCode: bale.product.articleCode || bale.product.code,
-          referenceNumber: refNum,
-          pieces: bale.quantity || bale.pieces || 1,
-          approxWeightKg: bale.weight_kg || bale.weightKg || "25.000",
-          printedByUserId: printUser,
-          printedAt,
-          scannedByUserId: labelIdx < 10 ? userIds[(labelIdx + 1) % 2] : null,
-          scannedAt: labelIdx < 10 ? new Date(printedAt.getTime() + 3600000) : null,
-        }).returning();
+        const [lp] = await db
+          .insert(baleLabelPrints)
+          .values({
+            companyId: COMPANY_ID,
+            productionBaleId: bale.id,
+            productId: bale.product.id,
+            articleCode: bale.product.articleCode || bale.product.code,
+            referenceNumber: refNum,
+            pieces: bale.quantity || bale.pieces || 1,
+            approxWeightKg: bale.weight_kg || bale.weightKg || "25.000",
+            printedByUserId: printUser,
+            printedAt,
+            scannedByUserId: labelIdx < 10 ? userIds[(labelIdx + 1) % 2] : null,
+            scannedAt: labelIdx < 10 ? new Date(printedAt.getTime() + 3600000) : null,
+          })
+          .returning();
         createdLabels.push(lp);
 
         if (sampleRefs.length < 5) sampleRefs.push(refNum);

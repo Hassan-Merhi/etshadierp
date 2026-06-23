@@ -2,12 +2,7 @@ import { useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { 
-  EnrichedContainerRow, 
-  GitContainersResponse, 
-  AuthUser, 
-  BulkProgress 
-} from "./gitContainerTypes";
+import { EnrichedContainerRow, GitContainersResponse, AuthUser, BulkProgress } from "./gitContainerTypes";
 
 interface UseGITContainersDataProps {
   isAllowed: boolean;
@@ -47,7 +42,13 @@ export function useGITContainersData({
         const err = await res.json().catch(() => ({ message: "Import failed" }));
         throw new Error(err.message || "Import failed");
       }
-      return res.json() as Promise<{ updated: number; skipped: number; notFound: number; errors: string[]; importId: string | null }>;
+      return res.json() as Promise<{
+        updated: number;
+        skipped: number;
+        notFound: number;
+        errors: string[];
+        importId: string | null;
+      }>;
     },
     onSuccess: (result) => {
       setImportResult(result);
@@ -143,12 +144,17 @@ export function useGITContainersData({
         if (!data.running && !stopTimeoutId && !bulkTrackMutation.isPending) {
           stopTimeoutId = setTimeout(() => {
             if (!stopped) {
-              if (intervalId) { clearInterval(intervalId); intervalId = null; }
+              if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+              }
               queryClient.invalidateQueries({ queryKey: [queryUrl] });
             }
           }, 6000);
         }
-      } catch { /* ignore transient network errors */ }
+      } catch {
+        /* ignore transient network errors */
+      }
     };
 
     poll();

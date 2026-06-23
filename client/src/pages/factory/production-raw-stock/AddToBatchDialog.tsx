@@ -1,7 +1,14 @@
 import { useState, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,7 +39,8 @@ export function AddToBatchDialog({
   const [addToBatchKg, setAddToBatchKg] = useState("");
   const [addToBatchCost, setAddToBatchCost] = useState("");
 
-  const activeBatches = mixBatches?.filter((b) => b.status === "ACTIVE" || b.status === "OPEN" || b.status === "CARRY_FORWARD") ?? [];
+  const activeBatches =
+    mixBatches?.filter((b) => b.status === "ACTIVE" || b.status === "OPEN" || b.status === "CARRY_FORWARD") ?? [];
   const supplierOptions = rawStock?.filter((r) => r.supplierId && parseFloat(r.freeKg || "0") > 0.001) ?? [];
   const isNoSourcePreset = addToBatchSource === null;
 
@@ -59,7 +67,13 @@ export function AddToBatchDialog({
     });
   };
 
-  const canSubmit = !!addToBatchTargetId && addToBatchTargetId !== "__none__" && !!addToBatchKg && !!addToBatchCost && !!addToBatchSource && !addToBatchMutation.isPending;
+  const canSubmit =
+    !!addToBatchTargetId &&
+    addToBatchTargetId !== "__none__" &&
+    !!addToBatchKg &&
+    !!addToBatchCost &&
+    !!addToBatchSource &&
+    !addToBatchMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -67,7 +81,9 @@ export function AddToBatchDialog({
         <DialogHeader>
           <DialogTitle>Add to Batch</DialogTitle>
           <DialogDescription>
-            {addToBatchSource ? `Stock from ${addToBatchSource.supplierName} — ${formatNumber(parseFloat(addToBatchSource.remainingKg))} kg free` : "Choose the source supplier and target batch."}
+            {addToBatchSource
+              ? `Stock from ${addToBatchSource.supplierName} — ${formatNumber(parseFloat(addToBatchSource.remainingKg))} kg free`
+              : "Choose the source supplier and target batch."}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -85,7 +101,9 @@ export function AddToBatchDialog({
                     </SelectItem>
                   ))}
                   {supplierOptions.length === 0 && (
-                    <SelectItem value="__none__" disabled>No free stock available</SelectItem>
+                    <SelectItem value="__none__" disabled>
+                      No free stock available
+                    </SelectItem>
                   )}
                 </SelectContent>
               </Select>
@@ -100,11 +118,14 @@ export function AddToBatchDialog({
               <SelectContent>
                 {activeBatches.map((b) => (
                   <SelectItem key={b.id} value={b.id.toString()}>
-                    {b.name || b.batchCode} — {formatNumber(parseFloat(b.remainingKg))} kg @ ${parseFloat(b.costPerKg).toFixed(4)}/kg
+                    {b.name || b.batchCode} — {formatNumber(parseFloat(b.remainingKg))} kg @ $
+                    {parseFloat(b.costPerKg).toFixed(4)}/kg
                   </SelectItem>
                 ))}
                 {activeBatches.length === 0 && (
-                  <SelectItem value="__none__" disabled>No active batches</SelectItem>
+                  <SelectItem value="__none__" disabled>
+                    No active batches
+                  </SelectItem>
                 )}
               </SelectContent>
             </Select>
@@ -114,7 +135,9 @@ export function AddToBatchDialog({
             <Input
               type="number"
               step="0.001"
-              placeholder={addToBatchSource ? `Max ${formatNumber(parseFloat(addToBatchSource.remainingKg))} kg` : "Enter kg"}
+              placeholder={
+                addToBatchSource ? `Max ${formatNumber(parseFloat(addToBatchSource.remainingKg))} kg` : "Enter kg"
+              }
               value={addToBatchKg}
               onChange={(e) => setAddToBatchKg(e.target.value)}
               data-testid="input-add-to-batch-kg"
@@ -131,7 +154,9 @@ export function AddToBatchDialog({
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
             <Button
               disabled={!canSubmit}
               onClick={() => wrapAdminAction(handleSubmit, "Add to Batch")}

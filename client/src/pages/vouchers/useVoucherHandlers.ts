@@ -44,12 +44,13 @@ export function useVoucherHandlers({
         const amountInput = document.querySelector(
           `[data-testid="input-amount-${activeRowIndex}"]`
         ) as HTMLInputElement;
-        if (amountInput) { amountInput.focus(); amountInput.select(); }
+        if (amountInput) {
+          amountInput.focus();
+          amountInput.select();
+        }
       });
     } else {
-      const emptyEntryIndex = currentEntries.findIndex(
-        (e: any) => e.accountId === 0 || !e.accountName
-      );
+      const emptyEntryIndex = currentEntries.findIndex((e: any) => e.accountId === 0 || !e.accountName);
       if (emptyEntryIndex >= 0) {
         targetRowIndex = emptyEntryIndex;
         form.setValue(`entries.${emptyEntryIndex}.accountType`, account.type);
@@ -59,7 +60,10 @@ export function useVoucherHandlers({
           const amountInput = document.querySelector(
             `[data-testid="input-amount-${emptyEntryIndex}"]`
           ) as HTMLInputElement;
-          if (amountInput) { amountInput.focus(); amountInput.select(); }
+          if (amountInput) {
+            amountInput.focus();
+            amountInput.select();
+          }
         });
       } else {
         targetRowIndex = currentEntries.length;
@@ -68,7 +72,10 @@ export function useVoucherHandlers({
           const amountInput = document.querySelector(
             `[data-testid="input-amount-${targetRowIndex}"]`
           ) as HTMLInputElement;
-          if (amountInput) { amountInput.focus(); amountInput.select(); }
+          if (amountInput) {
+            amountInput.focus();
+            amountInput.select();
+          }
         });
       }
     }
@@ -86,9 +93,7 @@ export function useVoucherHandlers({
       setSidebarSearchValue("");
       setSidebarHighlightedIndex(0);
       requestAnimationFrame(() => {
-        const searchInput = document.querySelector(
-          '[data-testid="input-search-account"]'
-        ) as HTMLInputElement;
+        const searchInput = document.querySelector('[data-testid="input-search-account"]') as HTMLInputElement;
         if (searchInput) searchInput.focus();
       });
     }
@@ -99,9 +104,7 @@ export function useVoucherHandlers({
     setIsAutoCreating(true);
     try {
       const normalizedName = name.trim().toLowerCase();
-      const existingAccount = sidebarAccounts.find(
-        (acc) => acc.name.toLowerCase() === normalizedName
-      );
+      const existingAccount = sidebarAccounts.find((acc) => acc.name.toLowerCase() === normalizedName);
       if (existingAccount) return existingAccount;
 
       const payload = { name: name.trim(), accountType: "Indirect Expense", companyId: selectedCompany.id };
@@ -119,7 +122,13 @@ export function useVoucherHandlers({
       await queryClient.invalidateQueries({ queryKey: ["/api/accounts/voucher-sidebar", selectedCompany.id] });
       await queryClient.invalidateQueries({ queryKey: ["/api/ledger-accounts", selectedCompany.id] });
       toast({ title: "Account created", description: `"${newAccount.name}" created as Indirect Expense.` });
-      return { id: newAccount.id, name: newAccount.name, type: "ledger" as const, code: newAccount.code || "", balance: 0 };
+      return {
+        id: newAccount.id,
+        name: newAccount.name,
+        type: "ledger" as const,
+        code: newAccount.code || "",
+        balance: 0,
+      };
     } catch (error: any) {
       toast({ variant: "destructive", title: "Error", description: error.message || "Failed to create account" });
       return null;

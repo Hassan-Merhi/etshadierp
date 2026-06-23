@@ -58,7 +58,9 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
   });
 
   const openingBalanceMutation = useMutation({
-    mutationFn: async (data: Array<{ barcode: string; openingQty: string; openingRate: string; openingValue: string }>) => {
+    mutationFn: async (
+      data: Array<{ barcode: string; openingQty: string; openingRate: string; openingValue: string }>
+    ) => {
       return await apiRequest("POST", "/api/stock-items/import-opening-balances", { openingBalances: data });
     },
     onSuccess: (result: any) => {
@@ -85,8 +87,8 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
 
   const downloadPricesTemplate = async () => {
     const template = [
-      { "Barcode (Item Code)": "ITEM-001", "Selling Price": 100.00 },
-      { "Barcode (Item Code)": "ITEM-002", "Selling Price": 200.00 },
+      { "Barcode (Item Code)": "ITEM-001", "Selling Price": 100.0 },
+      { "Barcode (Item Code)": "ITEM-002", "Selling Price": 200.0 },
     ];
 
     const ws = utils.json_to_sheet(template);
@@ -173,8 +175,8 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
 
   const downloadOpeningTemplate = async () => {
     const template = [
-      { Barcode: "BAR001", Qty: 100, Rate: 10.50, "Total Value": 1050.00 },
-      { Barcode: "BAR002", Qty: 50, Rate: 25.00, "Total Value": 1250.00 },
+      { Barcode: "BAR001", Qty: 100, Rate: 10.5, "Total Value": 1050.0 },
+      { Barcode: "BAR002", Qty: 50, Rate: 25.0, "Total Value": 1250.0 },
     ];
 
     const ws = utils.json_to_sheet(template);
@@ -209,11 +211,11 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
       const arrayBuffer = await openingFile.arrayBuffer();
       const workbook = await read(arrayBuffer);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const data = utils.sheet_to_json(worksheet) as Array<{ 
-        Barcode?: string; 
-        Qty?: string | number; 
-        Rate?: string | number; 
-        "Total Value"?: string | number 
+      const data = utils.sheet_to_json(worksheet) as Array<{
+        Barcode?: string;
+        Qty?: string | number;
+        Rate?: string | number;
+        "Total Value"?: string | number;
       }>;
 
       if (data.length === 0) {
@@ -261,9 +263,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
       <DialogContent className="max-w-2xl" data-testid="dialog-combined-import">
         <DialogHeader>
           <DialogTitle>Import Data</DialogTitle>
-          <DialogDescription>
-            Choose what you'd like to import
-          </DialogDescription>
+          <DialogDescription>Choose what you'd like to import</DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="opening" className="w-full">
@@ -278,7 +278,8 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
               <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
                 <Package className="h-4 w-4" />
                 <AlertDescription>
-                  Import opening stock balances for P&L reports. This updates the frozen opening values in stock items - it does NOT affect current inventory.
+                  Import opening stock balances for P&L reports. This updates the frozen opening values in stock items -
+                  it does NOT affect current inventory.
                 </AlertDescription>
               </Alert>
 
@@ -290,9 +291,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
                   onChange={handleOpeningFileChange}
                   data-testid="input-import-opening-file"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Excel columns: "Barcode", "Qty", "Rate", "Total Value"
-                </p>
+                <p className="text-xs text-muted-foreground">Excel columns: "Barcode", "Qty", "Rate", "Total Value"</p>
               </div>
 
               <Button
@@ -340,9 +339,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Prices will be applied to this location
-                </p>
+                <p className="text-xs text-muted-foreground">Prices will be applied to this location</p>
               </div>
 
               <div className="space-y-2">
@@ -354,7 +351,8 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
                   data-testid="input-import-prices-file"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Excel columns: "Barcode (Item Code)" and "Selling Price". Use the item's code (e.g. ITEM-001) as the barcode.
+                  Excel columns: "Barcode (Item Code)" and "Selling Price". Use the item's code (e.g. ITEM-001) as the
+                  barcode.
                 </p>
               </div>
 
@@ -369,11 +367,7 @@ export function CombinedImportDialog({ open, onOpenChange }: CombinedImportDialo
               </Button>
 
               <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  data-testid="button-cancel-prices-import"
-                >
+                <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-prices-import">
                   Cancel
                 </Button>
                 <Button

@@ -14,9 +14,7 @@ export function UsersPermissionsHub({ userRole, appMode }: UsersPermissionsHubPr
           <Users className="h-6 w-6" />
           Users &amp; Permissions
         </h2>
-        <p className="text-muted-foreground text-sm mt-1">
-          Manage users and role assignments.
-        </p>
+        <p className="text-muted-foreground text-sm mt-1">Manage users and role assignments.</p>
       </div>
 
       <UsersSection />

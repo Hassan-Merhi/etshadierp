@@ -61,33 +61,33 @@ export function InvoiceSummaryBar({
       label: "Pending Verification",
       color: "text-yellow-700 dark:text-yellow-400",
       dotColor: "bg-yellow-400",
-      orders: orders.filter(o => o.status === "PENDING_VERIFICATION"),
+      orders: orders.filter((o) => o.status === "PENDING_VERIFICATION"),
     },
     {
       label: "Verified",
       color: "text-green-700 dark:text-green-400",
       dotColor: "bg-green-500",
-      orders: orders.filter(o => o.status === "VERIFIED"),
+      orders: orders.filter((o) => o.status === "VERIFIED"),
     },
     {
       label: "Loading",
       color: "text-blue-700 dark:text-blue-400",
       dotColor: "bg-blue-500",
-      orders: orders.filter(o => o.status === "LOADING"),
+      orders: orders.filter((o) => o.status === "LOADING"),
     },
     {
       label: "Finalized",
       color: "text-foreground",
       dotColor: "bg-primary",
-      orders: orders.filter(o => o.status === "FINALIZED"),
+      orders: orders.filter((o) => o.status === "FINALIZED"),
     },
     {
       label: "Draft",
       color: "text-muted-foreground",
       dotColor: "bg-muted-foreground",
-      orders: orders.filter(o => o.status === "DRAFT"),
+      orders: orders.filter((o) => o.status === "DRAFT"),
     },
-  ].filter(b => b.orders.length > 0);
+  ].filter((b) => b.orders.length > 0);
 
   if (buckets.length === 0) return null;
 
@@ -99,10 +99,18 @@ export function InvoiceSummaryBar({
   let loadingStats: LoadingStats | null = null;
   if (getRemainingBales && getEstimatedKg && getEstimatedPrice) {
     const stats: LoadingStats = {
-      remainingBales: 0, remainingKg: 0, remainingPrice: 0,
-      overloadedBales: 0, overloadedKg: 0, overloadedPrice: 0,
-      underLoadedBales: 0, underLoadedKg: 0, underLoadedPrice: 0,
-      notRequestedBales: 0, notRequestedKg: 0, notRequestedPrice: 0,
+      remainingBales: 0,
+      remainingKg: 0,
+      remainingPrice: 0,
+      overloadedBales: 0,
+      overloadedKg: 0,
+      overloadedPrice: 0,
+      underLoadedBales: 0,
+      underLoadedKg: 0,
+      underLoadedPrice: 0,
+      notRequestedBales: 0,
+      notRequestedKg: 0,
+      notRequestedPrice: 0,
     };
 
     for (const order of orders) {
@@ -140,8 +148,10 @@ export function InvoiceSummaryBar({
 
     // Only show if at least one stat is non-zero
     if (
-      stats.remainingBales > 0 || stats.overloadedBales > 0 ||
-      stats.underLoadedBales > 0 || stats.notRequestedBales > 0
+      stats.remainingBales > 0 ||
+      stats.overloadedBales > 0 ||
+      stats.underLoadedBales > 0 ||
+      stats.notRequestedBales > 0
     ) {
       loadingStats = stats;
     }
@@ -152,31 +162,47 @@ export function InvoiceSummaryBar({
       {/* Overall total */}
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground border-b pb-2">
         <span className="font-semibold text-foreground text-sm">{orders.length} orders total</span>
-        <span><span className="font-medium text-foreground">{totalBales.toLocaleString()}</span> bales</span>
-        <span><span className="font-medium text-foreground">{fmt(totalWeight)}</span> kg</span>
+        <span>
+          <span className="font-medium text-foreground">{totalBales.toLocaleString()}</span> bales
+        </span>
+        <span>
+          <span className="font-medium text-foreground">{fmt(totalWeight)}</span> kg
+        </span>
         {!hideTotalsUsd && (
-          <span><span className="font-medium text-foreground">${fmt(totalAmount)}</span></span>
+          <span>
+            <span className="font-medium text-foreground">${fmt(totalAmount)}</span>
+          </span>
         )}
       </div>
 
       {/* Per-status breakdown */}
       <div className="flex flex-wrap gap-x-6 gap-y-2">
-        {buckets.map(b => {
+        {buckets.map((b) => {
           const bales = sumBales(b.orders);
           const weight = sum(b.orders, "totalWeightKg");
           const amount = sum(b.orders, "grandTotal");
           return (
-            <div key={b.label} className="flex items-start gap-2 min-w-[180px]" data-testid={`summary-bucket-${b.label.replace(/\s/g, "-").toLowerCase()}`}>
+            <div
+              key={b.label}
+              className="flex items-start gap-2 min-w-[180px]"
+              data-testid={`summary-bucket-${b.label.replace(/\s/g, "-").toLowerCase()}`}
+            >
               <span className={cn("mt-0.5 h-2.5 w-2.5 rounded-full shrink-0", b.dotColor)} />
               <div className="text-xs">
                 <div className={cn("font-semibold leading-tight", b.color)}>
                   {b.label} <span className="font-normal text-muted-foreground">({b.orders.length})</span>
                 </div>
                 <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
-                  <span><span className="font-medium text-foreground">{bales.toLocaleString()}</span> bales</span>
-                  <span><span className="font-medium text-foreground">{fmt(weight)}</span> kg</span>
+                  <span>
+                    <span className="font-medium text-foreground">{bales.toLocaleString()}</span> bales
+                  </span>
+                  <span>
+                    <span className="font-medium text-foreground">{fmt(weight)}</span> kg
+                  </span>
                   {!hideTotalsUsd && (
-                    <span><span className="font-medium text-foreground">${fmt(amount)}</span></span>
+                    <span>
+                      <span className="font-medium text-foreground">${fmt(amount)}</span>
+                    </span>
                   )}
                 </div>
               </div>
@@ -190,7 +216,6 @@ export function InvoiceSummaryBar({
         <div className="border-t pt-2 mt-1">
           <p className="text-xs font-semibold text-muted-foreground mb-2">Loading Analysis</p>
           <div className="flex flex-wrap gap-x-6 gap-y-2">
-
             {loadingStats.remainingBales > 0 && (
               <div className="flex items-start gap-2" data-testid="summary-remaining-to-load">
                 <span className="mt-0.5 h-2.5 w-2.5 rounded-full shrink-0 bg-red-500" />
@@ -199,10 +224,19 @@ export function InvoiceSummaryBar({
                     Remaining to be Loaded
                   </div>
                   <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
-                    <span><span className="font-medium text-foreground">{loadingStats.remainingBales.toLocaleString()}</span> bales</span>
-                    <span><span className="font-medium text-foreground">{fmt(loadingStats.remainingKg)}</span> kg</span>
+                    <span>
+                      <span className="font-medium text-foreground">
+                        {loadingStats.remainingBales.toLocaleString()}
+                      </span>{" "}
+                      bales
+                    </span>
+                    <span>
+                      <span className="font-medium text-foreground">{fmt(loadingStats.remainingKg)}</span> kg
+                    </span>
                     {!hideTotalsUsd && (
-                      <span className="text-muted-foreground/70">est. <span className="font-medium text-foreground">${fmt(loadingStats.remainingPrice)}</span></span>
+                      <span className="text-muted-foreground/70">
+                        est. <span className="font-medium text-foreground">${fmt(loadingStats.remainingPrice)}</span>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -213,14 +247,21 @@ export function InvoiceSummaryBar({
               <div className="flex items-start gap-2" data-testid="summary-overloaded">
                 <span className="mt-0.5 h-2.5 w-2.5 rounded-full shrink-0 bg-amber-500" />
                 <div className="text-xs">
-                  <div className="font-semibold leading-tight text-amber-700 dark:text-amber-400">
-                    Overloaded
-                  </div>
+                  <div className="font-semibold leading-tight text-amber-700 dark:text-amber-400">Overloaded</div>
                   <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
-                    <span><span className="font-medium text-foreground">+{loadingStats.overloadedBales.toLocaleString()}</span> bales</span>
-                    <span><span className="font-medium text-foreground">{fmt(loadingStats.overloadedKg)}</span> kg</span>
+                    <span>
+                      <span className="font-medium text-foreground">
+                        +{loadingStats.overloadedBales.toLocaleString()}
+                      </span>{" "}
+                      bales
+                    </span>
+                    <span>
+                      <span className="font-medium text-foreground">{fmt(loadingStats.overloadedKg)}</span> kg
+                    </span>
                     {!hideTotalsUsd && (
-                      <span className="text-muted-foreground/70">est. <span className="font-medium text-foreground">${fmt(loadingStats.overloadedPrice)}</span></span>
+                      <span className="text-muted-foreground/70">
+                        est. <span className="font-medium text-foreground">${fmt(loadingStats.overloadedPrice)}</span>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -231,14 +272,21 @@ export function InvoiceSummaryBar({
               <div className="flex items-start gap-2" data-testid="summary-under-loaded">
                 <span className="mt-0.5 h-2.5 w-2.5 rounded-full shrink-0 bg-orange-400" />
                 <div className="text-xs">
-                  <div className="font-semibold leading-tight text-orange-700 dark:text-orange-400">
-                    Under Loaded
-                  </div>
+                  <div className="font-semibold leading-tight text-orange-700 dark:text-orange-400">Under Loaded</div>
                   <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
-                    <span><span className="font-medium text-foreground">{loadingStats.underLoadedBales.toLocaleString()}</span> bales</span>
-                    <span><span className="font-medium text-foreground">{fmt(loadingStats.underLoadedKg)}</span> kg</span>
+                    <span>
+                      <span className="font-medium text-foreground">
+                        {loadingStats.underLoadedBales.toLocaleString()}
+                      </span>{" "}
+                      bales
+                    </span>
+                    <span>
+                      <span className="font-medium text-foreground">{fmt(loadingStats.underLoadedKg)}</span> kg
+                    </span>
                     {!hideTotalsUsd && (
-                      <span><span className="font-medium text-foreground">${fmt(loadingStats.underLoadedPrice)}</span></span>
+                      <span>
+                        <span className="font-medium text-foreground">${fmt(loadingStats.underLoadedPrice)}</span>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -253,16 +301,24 @@ export function InvoiceSummaryBar({
                     Loaded Not Requested
                   </div>
                   <div className="text-muted-foreground mt-0.5 flex flex-wrap gap-x-3">
-                    <span><span className="font-medium text-foreground">{loadingStats.notRequestedBales.toLocaleString()}</span> bales</span>
-                    <span><span className="font-medium text-foreground">{fmt(loadingStats.notRequestedKg)}</span> kg</span>
+                    <span>
+                      <span className="font-medium text-foreground">
+                        {loadingStats.notRequestedBales.toLocaleString()}
+                      </span>{" "}
+                      bales
+                    </span>
+                    <span>
+                      <span className="font-medium text-foreground">{fmt(loadingStats.notRequestedKg)}</span> kg
+                    </span>
                     {!hideTotalsUsd && (
-                      <span className="text-muted-foreground/70">est. <span className="font-medium text-foreground">${fmt(loadingStats.notRequestedPrice)}</span></span>
+                      <span className="text-muted-foreground/70">
+                        est. <span className="font-medium text-foreground">${fmt(loadingStats.notRequestedPrice)}</span>
+                      </span>
                     )}
                   </div>
                 </div>
               </div>
             )}
-
           </div>
         </div>
       )}

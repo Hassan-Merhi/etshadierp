@@ -10,44 +10,112 @@ import { requireAuth } from "../../../auth";
 import { classifyNetPositionAccounts } from "../../../netPositionHelper";
 import { adjustInventory } from "../../../inventoryHelper";
 import {
-  writeDaybookEntry, getOrFetchFxRateToUsd, getOrCreateLedgerAccount,
-  isLegacySHA256Hash, verifySupervisorPassword, recalculateOrderTotals,
+  writeDaybookEntry,
+  getOrFetchFxRateToUsd,
+  getOrCreateLedgerAccount,
+  isLegacySHA256Hash,
+  verifySupervisorPassword,
+  recalculateOrderTotals,
 } from "../_helpers";
 import {
-  factorySuppliers, factoryCategories, factoryBaleProducts,
-  factoryContainers, factoryRawStock, factoryMixBatches,
-  factoryMixBatchSources, factoryDailyUsages, factoryPressingBatches,
-  factoryBales, factoryBaleSequences, factoryContainerCommissions,
-  baleLabelPrints, stockItems, stockGroups, users,
-  insertFactorySupplierSchema, insertFactoryCategorySchema,
-  insertFactoryBaleProductSchema, insertFactoryContainerSchema,
-  insertFactoryRawStockSchema, insertFactoryMixBatchSchema,
-  insertFactoryMixBatchSourceSchema, insertFactoryPressingBatchSchema,
-  insertFactoryBaleSchema, customerProformas, customerProformaLines,
-  customerOrders, customerOrderLines, customerOrderBales,
-  customerOrderCharges, customerInvoiceSequences, customerBalances,
-  customers, insertCustomerSchema, ledgerAccounts, voucherEntries,
-  companies, locations, userCompanyRoles, insertCustomerProformaSchema,
-  insertCustomerProformaLineSchema, insertCustomerOrderSchema,
-  factoryFxRates, insertFactoryFxRateSchema, factoryDaybookEntries,
-  containerDocumentTypes, containerDocuments, containerFreight,
-  containerFreightPayments, factoryDaybookEntryEdits,
-  containers, factoryUserProfiles, factoryUserPageAccess,
-  insertUserSchema, directMessages, insertDirectMessageSchema,
-  userPresence, factoryDutyAuditLog, factoryOffloadAdditionalCharges,
-  factoryContainerOtherCharges, companySettings, factorySettings,
-  factoryWorkers, factoryWorkerCategories, insertFactoryWorkerCategorySchema,
-  factoryRawMaterialAdjustments, factoryPayrolls, factoryWorkerDocuments,
-  factoryAlerts, employees, factoryWasteEntries, factoryBalePhotos,
-  factoryDailyKpiSnapshots, factorySupplierScoreSnapshots,
-  factoryBaleCostSnapshots, factoryContainerProfitSnapshots,
-  bankAccounts, inventory, exchangeRates, vouchers, suppliers,
-  containerSales, factorySupplierPayments, insertFactorySupplierPaymentSchema,
-  factorySupplierFxTransfers, insertFactorySupplierFxTransferSchema,
-  factoryFxAllocations, baleRecodeSessions, baleRecodeItems,
-  factoryWorkerAdvances, factoryAdvanceRepayments, factoryBaleWasteDispatches,
-  factoryPosSales, factoryPosSaleItems, proformaStockReservations,
-  customerOrderBaleRemovals, customerOrderExpectedLines,
+  factorySuppliers,
+  factoryCategories,
+  factoryBaleProducts,
+  factoryContainers,
+  factoryRawStock,
+  factoryMixBatches,
+  factoryMixBatchSources,
+  factoryDailyUsages,
+  factoryPressingBatches,
+  factoryBales,
+  factoryBaleSequences,
+  factoryContainerCommissions,
+  baleLabelPrints,
+  stockItems,
+  stockGroups,
+  users,
+  insertFactorySupplierSchema,
+  insertFactoryCategorySchema,
+  insertFactoryBaleProductSchema,
+  insertFactoryContainerSchema,
+  insertFactoryRawStockSchema,
+  insertFactoryMixBatchSchema,
+  insertFactoryMixBatchSourceSchema,
+  insertFactoryPressingBatchSchema,
+  insertFactoryBaleSchema,
+  customerProformas,
+  customerProformaLines,
+  customerOrders,
+  customerOrderLines,
+  customerOrderBales,
+  customerOrderCharges,
+  customerInvoiceSequences,
+  customerBalances,
+  customers,
+  insertCustomerSchema,
+  ledgerAccounts,
+  voucherEntries,
+  companies,
+  locations,
+  userCompanyRoles,
+  insertCustomerProformaSchema,
+  insertCustomerProformaLineSchema,
+  insertCustomerOrderSchema,
+  factoryFxRates,
+  insertFactoryFxRateSchema,
+  factoryDaybookEntries,
+  containerDocumentTypes,
+  containerDocuments,
+  containerFreight,
+  containerFreightPayments,
+  factoryDaybookEntryEdits,
+  containers,
+  factoryUserProfiles,
+  factoryUserPageAccess,
+  insertUserSchema,
+  directMessages,
+  insertDirectMessageSchema,
+  userPresence,
+  factoryDutyAuditLog,
+  factoryOffloadAdditionalCharges,
+  factoryContainerOtherCharges,
+  companySettings,
+  factorySettings,
+  factoryWorkers,
+  factoryWorkerCategories,
+  insertFactoryWorkerCategorySchema,
+  factoryRawMaterialAdjustments,
+  factoryPayrolls,
+  factoryWorkerDocuments,
+  factoryAlerts,
+  employees,
+  factoryWasteEntries,
+  factoryBalePhotos,
+  factoryDailyKpiSnapshots,
+  factorySupplierScoreSnapshots,
+  factoryBaleCostSnapshots,
+  factoryContainerProfitSnapshots,
+  bankAccounts,
+  inventory,
+  exchangeRates,
+  vouchers,
+  suppliers,
+  containerSales,
+  factorySupplierPayments,
+  insertFactorySupplierPaymentSchema,
+  factorySupplierFxTransfers,
+  insertFactorySupplierFxTransferSchema,
+  factoryFxAllocations,
+  baleRecodeSessions,
+  baleRecodeItems,
+  factoryWorkerAdvances,
+  factoryAdvanceRepayments,
+  factoryBaleWasteDispatches,
+  factoryPosSales,
+  factoryPosSaleItems,
+  proformaStockReservations,
+  customerOrderBaleRemovals,
+  customerOrderExpectedLines,
 } from "@shared/schema";
 import { eq, and, or, asc, desc, sql, inArray, ilike, ne, isNull, not, gte, lte, lt, gt } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -65,7 +133,8 @@ export function registerOrderCrudRoutes(app: Express) {
       const conditions: any[] = [eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)];
       if (req.query.customerId) conditions.push(eq(customerOrders.customerId, parseOptionalId(req.query.customerId)));
       if (req.query.status) conditions.push(eq(customerOrders.status, req.query.status));
-      if (req.query.proformaId) conditions.push(eq(customerOrders.proformaIdUsed, parseOptionalId(req.query.proformaId)));
+      if (req.query.proformaId)
+        conditions.push(eq(customerOrders.proformaIdUsed, parseOptionalId(req.query.proformaId)));
       if (req.query.showHidden !== "1") conditions.push(eq(customerOrders.isHidden, false));
 
       const orders = await db
@@ -144,38 +213,38 @@ export function registerOrderCrudRoutes(app: Express) {
             FROM customer_orders co
             LEFT JOIN customers c ON c.id = co.customer_id
             WHERE co.id = ${id} AND co.company_id = ${companyId}
-            LIMIT 1`,
+            LIMIT 1`
       );
       const rawOrderRows: any[] = (rawOrderRes as any).rows ?? (rawOrderRes as unknown as any[]);
       if (!rawOrderRows.length) return res.status(404).json({ message: "Order not found" });
       const r = rawOrderRows[0];
       const order = {
-        id:                 r.id,
-        companyId:          r.company_id,
-        customerId:         r.customer_id,
-        invoiceNumber:      r.invoice_number       ?? null,
-        orderDate:          r.order_date,
-        proformaIdUsed:     r.proforma_id_used     ?? null,
-        status:             r.status               ?? "DRAFT",
-        subtotalBales:      r.subtotal_bales       ?? "0",
-        freightAmount:      r.freight_amount       ?? "0",
-        otherChargesTotal:  r.other_charges_total  ?? "0",
-        grandTotal:         r.grand_total          ?? "0",
-        totalQtyBales:      r.total_qty_bales      ?? 0,
-        containerNumber:    r.container_number     ?? null,
-        shippingCompany:    r.shipping_company     ?? null,
-        containerNotes:     r.container_notes      ?? null,
-        destination:        r.destination          ?? null,
-        verifiedByUserId:   r.verified_by_user_id  ?? null,
-        verifiedAt:         r.verified_at          ?? null,
-        loadingStartedAt:   r.loading_started_at   ?? null,
+        id: r.id,
+        companyId: r.company_id,
+        customerId: r.customer_id,
+        invoiceNumber: r.invoice_number ?? null,
+        orderDate: r.order_date,
+        proformaIdUsed: r.proforma_id_used ?? null,
+        status: r.status ?? "DRAFT",
+        subtotalBales: r.subtotal_bales ?? "0",
+        freightAmount: r.freight_amount ?? "0",
+        otherChargesTotal: r.other_charges_total ?? "0",
+        grandTotal: r.grand_total ?? "0",
+        totalQtyBales: r.total_qty_bales ?? 0,
+        containerNumber: r.container_number ?? null,
+        shippingCompany: r.shipping_company ?? null,
+        containerNotes: r.container_notes ?? null,
+        destination: r.destination ?? null,
+        verifiedByUserId: r.verified_by_user_id ?? null,
+        verifiedAt: r.verified_at ?? null,
+        loadingStartedAt: r.loading_started_at ?? null,
         loadingFinalizedAt: r.loading_finalized_at ?? null,
-        locationId:         r.location_id          ?? null,
-        createdAt:          r.created_at,
-        updatedAt:          r.updated_at           ?? r.created_at,
-        customerName:       r.customer_name        ?? null,
-        customerCode:       r.customer_code        ?? null,
-        dispatchBatchId:    r.dispatch_batch_id    ?? null,
+        locationId: r.location_id ?? null,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at ?? r.created_at,
+        customerName: r.customer_name ?? null,
+        customerCode: r.customer_code ?? null,
+        dispatchBatchId: r.dispatch_batch_id ?? null,
       };
 
       // customer_order_lines has no known schema drift — Drizzle is fine here
@@ -183,32 +252,30 @@ export function registerOrderCrudRoutes(app: Express) {
 
       // customer_order_bales and customer_order_charges both have newer columns
       // added via migrations that may be absent in production — use raw SQL.
-      const rawBalesRes = await db.execute(
-        sql`SELECT * FROM customer_order_bales WHERE order_id = ${id} ORDER BY id`,
-      );
+      const rawBalesRes = await db.execute(sql`SELECT * FROM customer_order_bales WHERE order_id = ${id} ORDER BY id`);
       const bales = ((rawBalesRes as any).rows ?? (rawBalesRes as unknown as any[])).map((b: any) => ({
-        id:            b.id,
-        orderId:       b.order_id,
-        baleId:        b.bale_id,
+        id: b.id,
+        orderId: b.order_id,
+        baleId: b.bale_id,
         baleReference: b.bale_reference ?? "",
-        locationId:    b.location_id    ?? null,
-        weight:        b.weight         ?? "0",
-        articleCode:   b.article_code   ?? null,
-        baleName:      b.bale_name      ?? null,
-        priceUsed:     b.price_used     ?? "0",
+        locationId: b.location_id ?? null,
+        weight: b.weight ?? "0",
+        articleCode: b.article_code ?? null,
+        baleName: b.bale_name ?? null,
+        priceUsed: b.price_used ?? "0",
       }));
 
       const rawChargesRes = await db.execute(
-        sql`SELECT * FROM customer_order_charges WHERE order_id = ${id} ORDER BY id`,
+        sql`SELECT * FROM customer_order_charges WHERE order_id = ${id} ORDER BY id`
       );
       const charges = ((rawChargesRes as any).rows ?? (rawChargesRes as unknown as any[])).map((c: any) => ({
-        id:              c.id,
-        orderId:         c.order_id,
-        name:            c.name         ?? "",
-        amount:          c.amount       ?? "0",
-        chargeType:      c.charge_type  ?? "OTHER",
+        id: c.id,
+        orderId: c.order_id,
+        name: c.name ?? "",
+        amount: c.amount ?? "0",
+        chargeType: c.charge_type ?? "OTHER",
         ledgerAccountId: c.ledger_account_id ?? null,
-        voucherId:       c.voucher_id   ?? null,
+        voucherId: c.voucher_id ?? null,
       }));
 
       res.json({ ...order, lines, bales, charges });
@@ -226,7 +293,10 @@ export function registerOrderCrudRoutes(app: Express) {
       if (id === null) return res.status(400).json({ message: "Invalid id" });
       const { isHidden } = req.body;
       if (typeof isHidden !== "boolean") return res.status(400).json({ message: "isHidden must be boolean" });
-      await db.update(customerOrders).set({ isHidden }).where(and(eq(customerOrders.id, id), eq(customerOrders.companyId, companyId)));
+      await db
+        .update(customerOrders)
+        .set({ isHidden })
+        .where(and(eq(customerOrders.id, id), eq(customerOrders.companyId, companyId)));
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
@@ -246,7 +316,12 @@ export function registerOrderCrudRoutes(app: Express) {
       const hideCostData = vis.hideCost;
 
       const [order] = await db
-        .select({ id: customerOrders.id, status: customerOrders.status, invoiceNumber: customerOrders.invoiceNumber, customerName: customers.legalName })
+        .select({
+          id: customerOrders.id,
+          status: customerOrders.status,
+          invoiceNumber: customerOrders.invoiceNumber,
+          customerName: customers.legalName,
+        })
         .from(customerOrders)
         .leftJoin(customers, eq(customerOrders.customerId, customers.id))
         .where(and(eq(customerOrders.id, id), eq(customerOrders.companyId, companyId)));
@@ -255,14 +330,22 @@ export function registerOrderCrudRoutes(app: Express) {
       const lines = await db.select().from(customerOrderLines).where(eq(customerOrderLines.orderId, id));
       const articleCodes = lines.map((l: any) => l.articleCode).filter(Boolean);
 
-      const products = articleCodes.length > 0
-        ? await db.select({
-            articleCode: factoryBaleProducts.articleCode,
-            productionPrice: factoryBaleProducts.productionPrice,
-            name: factoryBaleProducts.name,
-          }).from(factoryBaleProducts)
-            .where(and(eq(factoryBaleProducts.companyId, companyId), inArray(factoryBaleProducts.articleCode, articleCodes)))
-        : [];
+      const products =
+        articleCodes.length > 0
+          ? await db
+              .select({
+                articleCode: factoryBaleProducts.articleCode,
+                productionPrice: factoryBaleProducts.productionPrice,
+                name: factoryBaleProducts.name,
+              })
+              .from(factoryBaleProducts)
+              .where(
+                and(
+                  eq(factoryBaleProducts.companyId, companyId),
+                  inArray(factoryBaleProducts.articleCode, articleCodes)
+                )
+              )
+          : [];
 
       const productMap: Record<string, { productionPrice: string | null; name: string }> = {};
       for (const p of products) {
@@ -307,8 +390,10 @@ export function registerOrderCrudRoutes(app: Express) {
       });
 
       const totalProfit = totalCostKnown ? totalSelling - totalCost : null;
-      const totalProfitPctOnCost = totalCostKnown && totalCost !== 0 ? ((totalSelling - totalCost) / totalCost) * 100 : null;
-      const totalMarginPct = totalCostKnown && totalSelling !== 0 ? ((totalSelling - totalCost) / totalSelling) * 100 : null;
+      const totalProfitPctOnCost =
+        totalCostKnown && totalCost !== 0 ? ((totalSelling - totalCost) / totalCost) * 100 : null;
+      const totalMarginPct =
+        totalCostKnown && totalSelling !== 0 ? ((totalSelling - totalCost) / totalSelling) * 100 : null;
 
       res.json({
         orderId: id,
@@ -316,7 +401,7 @@ export function registerOrderCrudRoutes(app: Express) {
         customerName: order.customerName,
         lines: profitLines,
         totalSelling,
-        totalCost: (hideCostData || !totalCostKnown) ? null : totalCost,
+        totalCost: hideCostData || !totalCostKnown ? null : totalCost,
         totalProfit: hideCostData ? null : totalProfit,
         totalProfitPctOnCost: hideCostData ? null : totalProfitPctOnCost,
         totalMarginPct: hideCostData ? null : totalMarginPct,
@@ -343,7 +428,6 @@ export function registerOrderCrudRoutes(app: Express) {
     }
   });
 
-
   app.patch("/api/factory/customer-orders/:id/link-proforma", requireAuth, async (req: any, res: any) => {
     try {
       const companyId = (req.session as any).factoryCompanyId || (req.session as any).currentCompanyId;
@@ -362,7 +446,9 @@ export function registerOrderCrudRoutes(app: Express) {
         return res.status(400).json({ message: "Invalid proformaId" });
 
       // Confirm order exists for this company
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
@@ -375,20 +461,19 @@ export function registerOrderCrudRoutes(app: Express) {
 
       if (isUnlink) {
         // Unlink: clear proformaIdUsed and expected lines (already deleted above)
-        await db.update(customerOrders)
-          .set({ proformaIdUsed: null })
-          .where(eq(customerOrders.id, orderId));
+        await db.update(customerOrders).set({ proformaIdUsed: null }).where(eq(customerOrders.id, orderId));
         return res.json({ success: true, linked: { orderId, proformaId: null, linesBackfilled: 0 } });
       }
 
       // Confirm proforma exists for this company
-      const [proforma] = await db.select().from(customerProformas)
+      const [proforma] = await db
+        .select()
+        .from(customerProformas)
         .where(and(eq(customerProformas.id, proformaIdInt!), eq(customerProformas.companyId, companyId)));
       if (!proforma) return res.status(404).json({ message: "Proforma not found" });
 
       // Proforma must be active
-      if (!proforma.isActive)
-        return res.status(400).json({ message: "Proforma is not active" });
+      if (!proforma.isActive) return res.status(400).json({ message: "Proforma is not active" });
 
       // Customer match check — reject if both sides have a customerId and they differ
       if (order.customerId && proforma.customerId && order.customerId !== proforma.customerId)
@@ -397,13 +482,13 @@ export function registerOrderCrudRoutes(app: Express) {
         });
 
       // Fetch proforma lines for expected-lines backfill
-      const proformaLines = await db.select().from(customerProformaLines)
+      const proformaLines = await db
+        .select()
+        .from(customerProformaLines)
         .where(eq(customerProformaLines.proformaId, proformaIdInt!));
 
       // Link the order → proforma (re-link allowed: replaces any previous proforma)
-      await db.update(customerOrders)
-        .set({ proformaIdUsed: proformaIdInt })
-        .where(eq(customerOrders.id, orderId));
+      await db.update(customerOrders).set({ proformaIdUsed: proformaIdInt }).where(eq(customerOrders.id, orderId));
 
       // Insert expected lines from the new proforma
       if (proformaLines.length > 0) {
@@ -414,7 +499,7 @@ export function registerOrderCrudRoutes(app: Express) {
                      cpl.article_code, cpl.product_name, cpl.quantity
               FROM customer_proforma_lines cpl
               WHERE cpl.proforma_id = ${proformaIdInt}
-              ON CONFLICT (order_id, article_code) DO NOTHING`,
+              ON CONFLICT (order_id, article_code) DO NOTHING`
         );
       }
 
@@ -441,11 +526,14 @@ export function registerOrderCrudRoutes(app: Express) {
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { note } = req.body;
 
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Loading not found" });
 
-      const [updated] = await db.update(customerOrders)
+      const [updated] = await db
+        .update(customerOrders)
         .set({ containerNotes: note?.trim() || null, updatedAt: new Date() })
         .where(eq(customerOrders.id, orderId))
         .returning();
@@ -467,8 +555,16 @@ export function registerOrderCrudRoutes(app: Express) {
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
 
       await db.transaction(async (tx: any) => {
-        const [order] = await tx.select().from(customerOrders)
-          .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId), isNull(customerOrders.deletedAt)));
+        const [order] = await tx
+          .select()
+          .from(customerOrders)
+          .where(
+            and(
+              eq(customerOrders.id, orderId),
+              eq(customerOrders.companyId, companyId),
+              isNull(customerOrders.deletedAt)
+            )
+          );
         if (!order) throw new Error("Order not found");
 
         if (order.status === "FINALIZED") {
@@ -481,10 +577,14 @@ export function registerOrderCrudRoutes(app: Express) {
         // stock will need to be re-reserved manually after restore).
         const bales = await tx.select().from(customerOrderBales).where(eq(customerOrderBales.orderId, orderId));
         for (const b of bales) {
-          await tx.update(factoryBales).set({ status: "IN_STOCK", updatedAt: new Date() }).where(eq(factoryBales.id, b.baleId));
+          await tx
+            .update(factoryBales)
+            .set({ status: "IN_STOCK", updatedAt: new Date() })
+            .where(eq(factoryBales.id, b.baleId));
         }
 
-        await tx.update(customerOrders)
+        await tx
+          .update(customerOrders)
           .set({ deletedAt: new Date(), updatedAt: new Date() })
           .where(eq(customerOrders.id, orderId));
       });
@@ -495,7 +595,6 @@ export function registerOrderCrudRoutes(app: Express) {
       res.status(500).json({ message: error.message });
     }
   });
-
 
   app.patch("/api/factory/customer-orders/:id/date", requireAuth, async (req: any, res: any) => {
     try {
@@ -508,12 +607,16 @@ export function registerOrderCrudRoutes(app: Express) {
       const { orderDate } = req.body;
       if (!orderDate) return res.status(400).json({ message: "orderDate is required" });
 
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
-      if (order.status !== "DRAFT") return res.status(400).json({ message: "Only DRAFT orders can have their date changed" });
+      if (order.status !== "DRAFT")
+        return res.status(400).json({ message: "Only DRAFT orders can have their date changed" });
 
-      const [updated] = await db.update(customerOrders)
+      const [updated] = await db
+        .update(customerOrders)
         .set({ orderDate, updatedAt: new Date() })
         .where(eq(customerOrders.id, orderId))
         .returning();
@@ -535,7 +638,9 @@ export function registerOrderCrudRoutes(app: Express) {
       if (orderId === null) return res.status(400).json({ message: "Invalid id" });
       const { containerNumber, shippingCompany, containerNotes, destination } = req.body;
 
-      const [order] = await db.select().from(customerOrders)
+      const [order] = await db
+        .select()
+        .from(customerOrders)
         .where(and(eq(customerOrders.id, orderId), eq(customerOrders.companyId, companyId)));
       if (!order) return res.status(404).json({ message: "Order not found" });
 
@@ -545,13 +650,20 @@ export function registerOrderCrudRoutes(app: Express) {
       if (containerNotes !== undefined) updateData.containerNotes = containerNotes;
       if (destination !== undefined) updateData.destination = destination || null;
 
-      const [updated] = await db.update(customerOrders).set(updateData)
-        .where(eq(customerOrders.id, orderId)).returning();
+      const [updated] = await db
+        .update(customerOrders)
+        .set(updateData)
+        .where(eq(customerOrders.id, orderId))
+        .returning();
 
       if (shippingCompany && order.customerId) {
-        await db.update(customers).set({
-          defaultShippingCompany: shippingCompany,
-        }).where(eq(customers.id, order.customerId)).catch(() => {});
+        await db
+          .update(customers)
+          .set({
+            defaultShippingCompany: shippingCompany,
+          })
+          .where(eq(customers.id, order.customerId))
+          .catch(() => {});
       }
 
       res.json(updated);
@@ -577,20 +689,20 @@ export function registerOrderCrudRoutes(app: Express) {
       const conditions: any[] = [
         eq(factoryBales.companyId, companyId),
         eq(factoryBales.status, "IN_STOCK"),
-        or(
-          eq(factoryBales.referenceNumber, code),
-          eq(factoryBales.baleCode, code),
-          eq(factoryBales.articleCode, code)
-        ),
+        or(eq(factoryBales.referenceNumber, code), eq(factoryBales.baleCode, code), eq(factoryBales.articleCode, code)),
       ];
 
       if (locationId) {
         conditions.push(eq(factoryBales.erpLocationId, locationId));
       }
 
-      const results = await db.select().from(factoryBales).where(and(...conditions));
+      const results = await db
+        .select()
+        .from(factoryBales)
+        .where(and(...conditions));
 
-      if (results.length === 0) return res.status(404).json({ message: "No available bale found with that code at this location" });
+      if (results.length === 0)
+        return res.status(404).json({ message: "No available bale found with that code at this location" });
 
       res.json(results);
     } catch (error: any) {
@@ -602,5 +714,4 @@ export function registerOrderCrudRoutes(app: Express) {
   // ───────────────────────────────────────────────
   // INVOICE EXPORT (Excel/CSV)
   // ───────────────────────────────────────────────
-
 }

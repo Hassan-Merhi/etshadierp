@@ -65,7 +65,7 @@ export async function sendExportEmail(
     };
   }
 
-  const companiesList = companyNames.map(n => `  - ${n}`).join("\n");
+  const companiesList = companyNames.map((n) => `  - ${n}`).join("\n");
   const subject = `[ERP Export] Daily Data Export — ${dateLabel}`;
   const text = `Hello,
 
@@ -85,7 +85,7 @@ Generated automatically at ${new Date().toUTCString()}.
   try {
     // Send one email per recipient to avoid group disclosure and improve deliverability
     const results = await Promise.allSettled(
-      recipients.map(recipient =>
+      recipients.map((recipient) =>
         transporter.sendMail({
           from: `"ERP Daily Export" <${settings.gmailUser}>`,
           to: recipient,
@@ -102,7 +102,7 @@ Generated automatically at ${new Date().toUTCString()}.
       )
     );
 
-    const failed = results.filter(r => r.status === "rejected");
+    const failed = results.filter((r) => r.status === "rejected");
     if (failed.length === results.length) {
       const firstError = (failed[0] as PromiseRejectedResult).reason;
       return { success: false, error: firstError?.message || "All emails failed to send." };

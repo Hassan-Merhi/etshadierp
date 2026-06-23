@@ -10,13 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/PageHeader";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -191,14 +185,21 @@ export default function FactoryOpeningBalanceEdit() {
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/factory/raw-materials")} data-testid="button-back">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate("/factory/raw-materials")}
+          data-testid="button-back"
+        >
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
           <PageHeader title="Factory Opening Balance" />
           <p className="text-sm text-muted-foreground">{record.containerNumber}</p>
         </div>
-        <Badge variant="secondary" className="ml-auto">Opening Balance</Badge>
+        <Badge variant="secondary" className="ml-auto">
+          Opening Balance
+        </Badge>
       </div>
 
       <Card>
@@ -256,7 +257,12 @@ export default function FactoryOpeningBalanceEdit() {
             </div>
             <div className="space-y-2">
               <Label>Used (kg)</Label>
-              <Input value={formatNumber(parseFloat(record.usedKg))} readOnly className="bg-muted" data-testid="text-used-kg" />
+              <Input
+                value={formatNumber(parseFloat(record.usedKg))}
+                readOnly
+                className="bg-muted"
+                data-testid="text-used-kg"
+              />
             </div>
           </div>
 
@@ -276,7 +282,9 @@ export default function FactoryOpeningBalanceEdit() {
                 </SelectTrigger>
                 <SelectContent>
                   {CURRENCIES.map((c) => (
-                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -306,7 +314,10 @@ export default function FactoryOpeningBalanceEdit() {
 
           {form.currencyCode !== "USD" && (
             <p className="text-sm text-muted-foreground">
-              Cost in USD: <span className="font-mono">${(parseFloat(form.costPerKg || "0") * parseFloat(form.fxRateToUsd || "1")).toFixed(4)}/kg</span>
+              Cost in USD:{" "}
+              <span className="font-mono">
+                ${(parseFloat(form.costPerKg || "0") * parseFloat(form.fxRateToUsd || "1")).toFixed(4)}/kg
+              </span>
             </p>
           )}
 
@@ -323,11 +334,7 @@ export default function FactoryOpeningBalanceEdit() {
       </Card>
 
       <div className="flex items-center justify-between gap-2">
-        <Button
-          variant="destructive"
-          onClick={() => setDeleteDialogOpen(true)}
-          data-testid="button-delete"
-        >
+        <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} data-testid="button-delete">
           <Trash2 className="h-4 w-4 mr-2" />
           Delete
         </Button>
@@ -335,11 +342,7 @@ export default function FactoryOpeningBalanceEdit() {
           <Button variant="outline" onClick={() => navigate("/factory/raw-materials")} data-testid="button-cancel">
             Cancel
           </Button>
-          <Button
-            onClick={() => updateMutation.mutate()}
-            disabled={updateMutation.isPending}
-            data-testid="button-save"
-          >
+          <Button onClick={() => updateMutation.mutate()} disabled={updateMutation.isPending} data-testid="button-save">
             <Save className="h-4 w-4 mr-2" />
             {updateMutation.isPending ? "Saving..." : "Save Changes"}
           </Button>

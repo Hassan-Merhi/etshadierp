@@ -5,20 +5,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -52,8 +40,10 @@ interface LedgerAccount {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === "approved") return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Approved</Badge>;
-  if (status === "dismissed") return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/30">Dismissed</Badge>;
+  if (status === "approved")
+    return <Badge className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Approved</Badge>;
+  if (status === "dismissed")
+    return <Badge className="bg-rose-500/10 text-rose-600 border-rose-500/30">Dismissed</Badge>;
   return <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/30">Pending</Badge>;
 }
 
@@ -83,7 +73,9 @@ export default function IntercompanyRequests() {
     queryKey: ["/api/ledger-accounts", approveDialogRequest?.destCompanyId],
     queryFn: async () => {
       if (!approveDialogRequest?.destCompanyId) return [];
-      const r = await fetch(`/api/ledger-accounts?companyId=${approveDialogRequest.destCompanyId}`, { credentials: "include" });
+      const r = await fetch(`/api/ledger-accounts?companyId=${approveDialogRequest.destCompanyId}`, {
+        credentials: "include",
+      });
       if (!r.ok) return [];
       return r.json();
     },
@@ -91,8 +83,19 @@ export default function IntercompanyRequests() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: async ({ id, destLedgerAccountId, description }: { id: number; destLedgerAccountId: number; description?: string }) => {
-      return apiRequest("POST", `/api/intercompany-requests/${id}/approve`, { destLedgerAccountId, description: description || undefined });
+    mutationFn: async ({
+      id,
+      destLedgerAccountId,
+      description,
+    }: {
+      id: number;
+      destLedgerAccountId: number;
+      description?: string;
+    }) => {
+      return apiRequest("POST", `/api/intercompany-requests/${id}/approve`, {
+        destLedgerAccountId,
+        description: description || undefined,
+      });
     },
     onSuccess: (data: any) => {
       toast({ title: "Approved", description: `Mirror voucher ${data.voucherNumber} created in destination company.` });
@@ -176,7 +179,7 @@ export default function IntercompanyRequests() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {requests.map(req => (
+          {requests.map((req) => (
             <Card key={req.id} data-testid={`card-ic-request-${req.id}`}>
               <CardContent className="pt-4 pb-4">
                 <div className="flex flex-wrap gap-4 items-start justify-between">
@@ -196,7 +199,15 @@ export default function IntercompanyRequests() {
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">Amount</p>
-                    <p className="font-medium">${Number.isInteger(parseFloat(req.amount)) ? parseFloat(req.amount).toLocaleString() : parseFloat(req.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="font-medium">
+                      $
+                      {Number.isInteger(parseFloat(req.amount))
+                        ? parseFloat(req.amount).toLocaleString()
+                        : parseFloat(req.amount).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground text-xs">IC Account (CR)</p>
@@ -204,9 +215,7 @@ export default function IntercompanyRequests() {
                   </div>
                 </div>
 
-                {req.description && (
-                  <p className="mt-2 text-sm text-muted-foreground">{req.description}</p>
-                )}
+                {req.description && <p className="mt-2 text-sm text-muted-foreground">{req.description}</p>}
 
                 {req.status === "approved" && (
                   <p className="mt-2 text-xs text-muted-foreground">
@@ -226,7 +235,11 @@ export default function IntercompanyRequests() {
                   <div className="mt-3 flex gap-2">
                     <Button
                       size="sm"
-                      onClick={() => { setApproveDialogRequest(req); setSelectedAccountId(""); setApproveDescription(""); }}
+                      onClick={() => {
+                        setApproveDialogRequest(req);
+                        setSelectedAccountId("");
+                        setApproveDescription("");
+                      }}
                       data-testid={`button-approve-${req.id}`}
                     >
                       <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
@@ -235,7 +248,10 @@ export default function IntercompanyRequests() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => { setDismissDialogRequest(req); setDismissNote(""); }}
+                      onClick={() => {
+                        setDismissDialogRequest(req);
+                        setDismissNote("");
+                      }}
                       data-testid={`button-dismiss-${req.id}`}
                     >
                       <XCircle className="h-3.5 w-3.5 mr-1.5" />
@@ -250,7 +266,15 @@ export default function IntercompanyRequests() {
       )}
 
       {/* Approve Dialog */}
-      <Dialog open={!!approveDialogRequest} onOpenChange={open => { if (!open) { setApproveDialogRequest(null); setApproveDescription(""); } }}>
+      <Dialog
+        open={!!approveDialogRequest}
+        onOpenChange={(open) => {
+          if (!open) {
+            setApproveDialogRequest(null);
+            setApproveDescription("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Approve Payment Request</DialogTitle>
@@ -258,9 +282,21 @@ export default function IntercompanyRequests() {
           {approveDialogRequest && (
             <div className="space-y-4 py-2">
               <div className="text-sm space-y-1">
-                <p><span className="text-muted-foreground">From:</span> {approveDialogRequest.fromCompanyName}</p>
-                <p><span className="text-muted-foreground">Amount:</span> ${Number.isInteger(parseFloat(approveDialogRequest.amount)) ? parseFloat(approveDialogRequest.amount).toLocaleString() : parseFloat(approveDialogRequest.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                <p><span className="text-muted-foreground">CR side:</span> {approveDialogRequest.linkDestLedgerName}</p>
+                <p>
+                  <span className="text-muted-foreground">From:</span> {approveDialogRequest.fromCompanyName}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">Amount:</span> $
+                  {Number.isInteger(parseFloat(approveDialogRequest.amount))
+                    ? parseFloat(approveDialogRequest.amount).toLocaleString()
+                    : parseFloat(approveDialogRequest.amount).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                </p>
+                <p>
+                  <span className="text-muted-foreground">CR side:</span> {approveDialogRequest.linkDestLedgerName}
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dest-account-select">Debit account (where money was received)</Label>
@@ -270,39 +306,45 @@ export default function IntercompanyRequests() {
                   </SelectTrigger>
                   <SelectContent>
                     {destAccounts
-                      .filter(a => a.id !== approveDialogRequest.linkDestLedgerAccountId)
-                      .map(a => (
-                        <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                      .filter((a) => a.id !== approveDialogRequest.linkDestLedgerAccountId)
+                      .map((a) => (
+                        <SelectItem key={a.id} value={String(a.id)}>
+                          {a.name}
+                        </SelectItem>
                       ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="approve-description">Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Label htmlFor="approve-description">
+                  Description <span className="text-muted-foreground font-normal">(optional)</span>
+                </Label>
                 <Textarea
                   id="approve-description"
                   rows={2}
                   placeholder={(() => {
                     const drName = selectedAccountId
-                      ? (destAccounts.find(a => a.id === parseInt(selectedAccountId))?.name ?? "selected account")
+                      ? (destAccounts.find((a) => a.id === parseInt(selectedAccountId))?.name ?? "selected account")
                       : "selected account";
                     return `Received from ${approveDialogRequest.linkDestLedgerName} into ${drName}`;
                   })()}
                   value={approveDescription}
-                  onChange={e => setApproveDescription(e.target.value)}
+                  onChange={(e) => setApproveDescription(e.target.value)}
                   data-testid="input-approve-description"
                   className="resize-none text-sm"
                 />
                 <p className="text-xs text-muted-foreground">Leave blank to use the placeholder text automatically.</p>
               </div>
               <p className="text-xs text-muted-foreground">
-                A Receipt voucher will be created in <strong>{approveDialogRequest.destCompanyName}</strong>:
-                DR selected account · CR {approveDialogRequest.linkDestLedgerName}
+                A Receipt voucher will be created in <strong>{approveDialogRequest.destCompanyName}</strong>: DR
+                selected account · CR {approveDialogRequest.linkDestLedgerName}
               </p>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveDialogRequest(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setApproveDialogRequest(null)}>
+              Cancel
+            </Button>
             <Button
               onClick={handleApprove}
               disabled={!selectedAccountId || approveMutation.isPending}
@@ -315,26 +357,35 @@ export default function IntercompanyRequests() {
       </Dialog>
 
       {/* Dismiss Dialog */}
-      <Dialog open={!!dismissDialogRequest} onOpenChange={open => { if (!open) setDismissDialogRequest(null); }}>
+      <Dialog
+        open={!!dismissDialogRequest}
+        onOpenChange={(open) => {
+          if (!open) setDismissDialogRequest(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Dismiss Request</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">This will mark the request as dismissed without posting a mirror voucher.</p>
+            <p className="text-sm text-muted-foreground">
+              This will mark the request as dismissed without posting a mirror voucher.
+            </p>
             <div className="space-y-2">
               <Label htmlFor="dismiss-note">Note (optional)</Label>
               <Textarea
                 id="dismiss-note"
                 placeholder="Reason for dismissal…"
                 value={dismissNote}
-                onChange={e => setDismissNote(e.target.value)}
+                onChange={(e) => setDismissNote(e.target.value)}
                 data-testid="input-dismiss-note"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDismissDialogRequest(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setDismissDialogRequest(null)}>
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               onClick={handleDismiss}

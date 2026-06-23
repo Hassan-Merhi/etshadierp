@@ -5,16 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { 
-  Plus, HardHat, Pencil, MinusCircle 
-} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, HardHat, Pencil, MinusCircle } from "lucide-react";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { ERPWorkerDetail } from "@/components/ERPWorkerDetail";
 import type { Employee } from "@shared/schema";
@@ -56,18 +48,19 @@ export function WorkerProfilesTab({
   const { formatAmount } = useCurrencyContext();
 
   const selectedWorkerProfile = selectedWorkerProfileId
-    ? workerStaff.find(w => w.id === selectedWorkerProfileId) ?? null
+    ? (workerStaff.find((w) => w.id === selectedWorkerProfileId) ?? null)
     : null;
 
   // Workers belonging to the selected group filter (-1 = ungrouped)
-  const allGroupedWorkerIds = workerGroups.flatMap(g => (g.members || []).map((m: any) => m.id));
-  const workerIdsInSelectedGroup = workerProfileGroupFilter === -1
-    ? workerStaff.filter(w => !allGroupedWorkerIds.includes(w.id)).map(w => w.id)
-    : workerProfileGroupFilter !== null
-      ? (workerGroups.find(g => g.id === workerProfileGroupFilter)?.members || []).map((m: any) => m.id)
-      : null;
+  const allGroupedWorkerIds = workerGroups.flatMap((g) => (g.members || []).map((m: any) => m.id));
+  const workerIdsInSelectedGroup =
+    workerProfileGroupFilter === -1
+      ? workerStaff.filter((w) => !allGroupedWorkerIds.includes(w.id)).map((w) => w.id)
+      : workerProfileGroupFilter !== null
+        ? (workerGroups.find((g) => g.id === workerProfileGroupFilter)?.members || []).map((m: any) => m.id)
+        : null;
 
-  const filteredWorkers = workerStaff.filter(w => {
+  const filteredWorkers = workerStaff.filter((w) => {
     if (w.active === false) return false;
     if (workerIdsInSelectedGroup !== null && !workerIdsInSelectedGroup.includes(w.id)) return false;
     const q = workerProfileSearch.toLowerCase();
@@ -81,7 +74,11 @@ export function WorkerProfilesTab({
 
   // Group membership lookup: workerId → group name
   const workerGroupMap: Record<number, string> = {};
-  workerGroups.forEach(g => (g.members || []).forEach((m: any) => { workerGroupMap[m.id] = g.name; }));
+  workerGroups.forEach((g) =>
+    (g.members || []).forEach((m: any) => {
+      workerGroupMap[m.id] = g.name;
+    })
+  );
 
   if (selectedWorkerProfile) {
     return (
@@ -121,8 +118,8 @@ export function WorkerProfilesTab({
           >
             All Workers ({workerStaff.length})
           </button>
-          {workerGroups.map(g => {
-            const count = workerStaff.filter(w => (g.members || []).some((m: any) => m.id === w.id)).length;
+          {workerGroups.map((g) => {
+            const count = workerStaff.filter((w) => (g.members || []).some((m: any) => m.id === w.id)).length;
             return (
               <button
                 key={g.id}
@@ -135,7 +132,9 @@ export function WorkerProfilesTab({
             );
           })}
           {(() => {
-            const ungroupedCount = workerStaff.filter(w => !workerGroups.some(g => (g.members || []).some((m: any) => m.id === w.id))).length;
+            const ungroupedCount = workerStaff.filter(
+              (w) => !workerGroups.some((g) => (g.members || []).some((m: any) => m.id === w.id))
+            ).length;
             if (ungroupedCount === 0) return null;
             return (
               <button
@@ -169,7 +168,11 @@ export function WorkerProfilesTab({
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <HardHat className="mx-auto h-8 w-8 mb-3 opacity-30" />
-            <p className="text-sm">{workerStaff.length === 0 ? "No workers found. Create workers using the New Worker button." : "No workers match your search or filter."}</p>
+            <p className="text-sm">
+              {workerStaff.length === 0
+                ? "No workers found. Create workers using the New Worker button."
+                : "No workers match your search or filter."}
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -196,11 +199,12 @@ export function WorkerProfilesTab({
                     </Badge>
                   </div>
                   <Avatar className="h-14 w-14 mt-1 mb-3">
-                    <AvatarFallback className={`text-base font-semibold ${avatarColor}`}>
-                      {initials}
-                    </AvatarFallback>
+                    <AvatarFallback className={`text-base font-semibold ${avatarColor}`}>{initials}</AvatarFallback>
                   </Avatar>
-                  <p className="font-semibold text-sm leading-tight uppercase" data-testid={`text-worker-name-${worker.id}`}>
+                  <p
+                    className="font-semibold text-sm leading-tight uppercase"
+                    data-testid={`text-worker-name-${worker.id}`}
+                  >
                     {[worker.firstName, worker.lastName].filter(Boolean).join(" ")}
                   </p>
                   {workerGroupMap[worker.id] ? (
@@ -217,12 +221,17 @@ export function WorkerProfilesTab({
                           });
                         }}
                       >
-                        <SelectTrigger className="h-7 text-xs w-full" data-testid={`select-card-move-group-${worker.id}`}>
+                        <SelectTrigger
+                          className="h-7 text-xs w-full"
+                          data-testid={`select-card-move-group-${worker.id}`}
+                        >
                           <SelectValue placeholder="Add to group…" />
                         </SelectTrigger>
                         <SelectContent>
-                          {workerGroups.map(g => (
-                            <SelectItem key={g.id} value={String(g.id)}>{g.name}</SelectItem>
+                          {workerGroups.map((g) => (
+                            <SelectItem key={g.id} value={String(g.id)}>
+                              {g.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -235,7 +244,10 @@ export function WorkerProfilesTab({
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={(e) => { e.stopPropagation(); setWorkerDeductionTarget(worker as any); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setWorkerDeductionTarget(worker as any);
+                      }}
                       data-testid={`button-deduction-worker-${worker.id}`}
                       title="Add deduction"
                     >
@@ -244,7 +256,11 @@ export function WorkerProfilesTab({
                     <Button
                       size="icon"
                       variant="ghost"
-                      onClick={(e) => { e.stopPropagation(); setSelectedWorkerForEdit(worker); setEditWorkerDialogOpen(true); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedWorkerForEdit(worker);
+                        setEditWorkerDialogOpen(true);
+                      }}
                       data-testid={`button-edit-profile-worker-${worker.id}`}
                     >
                       <Pencil className="h-3.5 w-3.5" />

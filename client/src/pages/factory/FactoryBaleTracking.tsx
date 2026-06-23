@@ -43,9 +43,17 @@ interface BaleSearchResult {
 }
 
 const STATUS_CONFIG = {
-  IN_STOCK:             { label: "In Stock",              color: "bg-muted text-muted-foreground",                          icon: Package },
-  RESERVED_FOR_DISPATCH:{ label: "Reserved for Dispatch", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", icon: Truck },
-  SOLD:                 { label: "Sold",                  color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200", icon: CheckCircle },
+  IN_STOCK: { label: "In Stock", color: "bg-muted text-muted-foreground", icon: Package },
+  RESERVED_FOR_DISPATCH: {
+    label: "Reserved for Dispatch",
+    color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    icon: Truck,
+  },
+  SOLD: {
+    label: "Sold",
+    color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    icon: CheckCircle,
+  },
 };
 
 function fmtNum(n: number | string) {
@@ -59,11 +67,11 @@ export default function FactoryBaleTracking() {
   const { data: me } = useQuery<{ role: string }>({ queryKey: ["/api/auth/me"] });
   const isDeveloper = me?.role === "Developer";
 
-  const [query, setQuery]         = useState("");
+  const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
-  const [loading, setLoading]     = useState(false);
-  const [result, setResult]       = useState<BaleSearchResult | null>(null);
-  const [error, setError]         = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<BaleSearchResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function doSearch(q: string) {
@@ -91,14 +99,18 @@ export default function FactoryBaleTracking() {
     if (e.key === "Enter") doSearch(query);
   }
 
-  const statusCfg = result ? (STATUS_CONFIG[result.status] || STATUS_CONFIG.IN_STOCK) : null;
-  const baleInfo  = result?.bale ?? (result?.dispatch ? {
-    referenceNumber: result.dispatch.batchNumber,
-    articleCode:     result.dispatch.articleCode || "",
-    productName:     result.dispatch.productName || "",
-    weightKg:        result.dispatch.weightKg,
-    status:          result.status,
-  } : null);
+  const statusCfg = result ? STATUS_CONFIG[result.status] || STATUS_CONFIG.IN_STOCK : null;
+  const baleInfo =
+    result?.bale ??
+    (result?.dispatch
+      ? {
+          referenceNumber: result.dispatch.batchNumber,
+          articleCode: result.dispatch.articleCode || "",
+          productName: result.dispatch.productName || "",
+          weightKg: result.dispatch.weightKg,
+          status: result.status,
+        }
+      : null);
 
   if (me && !isDeveloper) {
     return (
@@ -192,7 +204,9 @@ export default function FactoryBaleTracking() {
                   {baleInfo.articleCode && (
                     <div>
                       <p className="text-xs text-muted-foreground">Article Code</p>
-                      <p className="font-mono font-medium" data-testid="text-bale-article">{baleInfo.articleCode}</p>
+                      <p className="font-mono font-medium" data-testid="text-bale-article">
+                        {baleInfo.articleCode}
+                      </p>
                     </div>
                   )}
                   {baleInfo.productName && (
@@ -204,7 +218,9 @@ export default function FactoryBaleTracking() {
                   {baleInfo.weightKg && (
                     <div>
                       <p className="text-xs text-muted-foreground">Weight</p>
-                      <p className="font-mono" data-testid="text-bale-weight">{fmtNum(baleInfo.weightKg)} kg</p>
+                      <p className="font-mono" data-testid="text-bale-weight">
+                        {fmtNum(baleInfo.weightKg)} kg
+                      </p>
                     </div>
                   )}
                 </div>
@@ -255,7 +271,9 @@ export default function FactoryBaleTracking() {
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Ride Status</p>
-                    <Badge variant="outline" className="text-xs">{result.dispatch.rideStatus}</Badge>
+                    <Badge variant="outline" className="text-xs">
+                      {result.dispatch.rideStatus}
+                    </Badge>
                   </div>
                   {result.dispatch.truckPlate && (
                     <div>
@@ -272,7 +290,9 @@ export default function FactoryBaleTracking() {
                   {result.dispatch.amount && (
                     <div>
                       <p className="text-xs text-muted-foreground">Amount</p>
-                      <p className="font-mono font-medium">{result.dispatch.currency} {fmtNum(result.dispatch.amount)}</p>
+                      <p className="font-mono font-medium">
+                        {result.dispatch.currency} {fmtNum(result.dispatch.amount)}
+                      </p>
                     </div>
                   )}
                 </div>

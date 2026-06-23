@@ -36,13 +36,17 @@ function getChromiumPath(): string | null {
     try {
       const p = execSync(`which ${cmd} 2>/dev/null`, { encoding: "utf8", timeout: 3000 }).trim();
       if (p && existsSync(p)) return p;
-    } catch { /* not found */ }
+    } catch {
+      /* not found */
+    }
   }
   try {
     const puppeteer = _require("puppeteer");
     const p: string = typeof puppeteer.executablePath === "function" ? puppeteer.executablePath() : "";
     if (p && existsSync(p)) return p;
-  } catch { /* not installed */ }
+  } catch {
+    /* not installed */
+  }
   return null;
 }
 
@@ -142,10 +146,7 @@ function parseDate(raw: unknown): Date | null {
 const DEEP_ETA_KEY_RE =
   /^(eta|estimatedArrival|estimatedTimeOfArrival|plannedArrival|plannedArrivalDate|scheduledArrival|predictiveEstimatedArrival|latestEstimatedArrival|arrivalDate|vesselArrival|portArrival|destinationEstimatedArrival)$/i;
 
-export function deepScanForEta(
-  obj: unknown,
-  depth = 0,
-): { path: string; value: string } | null {
+export function deepScanForEta(obj: unknown, depth = 0): { path: string; value: string } | null {
   if (depth > 12 || !obj || typeof obj !== "object") return null;
   if (Array.isArray(obj)) {
     for (const item of obj) {
@@ -170,27 +171,20 @@ export function deepScanForEta(
 function parseEvents(rawEvents: unknown[]): TrackingEvent[] {
   if (!Array.isArray(rawEvents)) return [];
   return rawEvents
-    .map((e: any): TrackingEvent => ({
-      date: parseDate(
-        e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null,
-      ),
-      status:
-        e.transportEventTypeCode ??
-        e.activityName ??
-        e.eventCode ??
-        e.activity ??
-        e.status ??
-        null,
-      location:
-        e.location?.portName ??
-        e.location?.locationName ??
-        e.location?.city ??
-        e.portName ??
-        e.locationName ??
-        (typeof e.location === "string" ? e.location : null),
-      description:
-        e.description ?? e.eventDescription ?? e.activityName ?? null,
-    }))
+    .map(
+      (e: any): TrackingEvent => ({
+        date: parseDate(e.eventDateTime ?? e.eventDate ?? e.timestamp ?? e.date ?? null),
+        status: e.transportEventTypeCode ?? e.activityName ?? e.eventCode ?? e.activity ?? e.status ?? null,
+        location:
+          e.location?.portName ??
+          e.location?.locationName ??
+          e.location?.city ??
+          e.portName ??
+          e.locationName ??
+          (typeof e.location === "string" ? e.location : null),
+        description: e.description ?? e.eventDescription ?? e.activityName ?? null,
+      })
+    )
     .filter((e) => e.date !== null || e.status !== null)
     .sort((a, b) => {
       if (!a.date) return 1;
@@ -216,9 +210,8 @@ function extractFromJson(data: unknown): {
     if (locations.length > 0) {
       const allEvents: TrackingEvent[] = [];
       for (const loc of locations) {
-        const locLabel = [loc.terminal, loc.city, loc.country]
-          .filter(Boolean).join(", ");
-        for (const ev of (loc.events ?? [])) {
+        const locLabel = [loc.terminal, loc.city, loc.country].filter(Boolean).join(", ");
+        for (const ev of loc.events ?? []) {
           const d = parseDate(ev.event_time ?? null);
           allEvents.push({
             date: d,
@@ -238,11 +231,7 @@ function extractFromJson(data: unknown): {
         return b.date.getTime() - a.date.getTime();
       });
 
-      let etaRaw: string | null =
-        c.eta_final_delivery ??
-        c.eta ??
-        d.eta_final_delivery ??
-        null;
+      let etaRaw: string | null = c.eta_final_delivery ?? c.eta ?? d.eta_final_delivery ?? null;
       if (!etaRaw) {
         // Only look at the LAST location (final destination) for arrival/discharge
         // expected events. Do NOT fall back to earlier transit ports — those
@@ -255,7 +244,7 @@ function extractFromJson(data: unknown): {
           (ev: any) =>
             ev.event_time_type === "EXPECTED" &&
             ev.event_time &&
-            /arrived|discharged|discharge|arrival|delivered|delivery/i.test(ev.activity ?? ""),
+            /arrived|discharged|discharge|arrival|delivered|delivery/i.test(ev.activity ?? "")
         );
         if (arrivalEv?.event_time) {
           etaRaw = arrivalEv.event_time;
@@ -263,10 +252,7 @@ function extractFromJson(data: unknown): {
           // Priority 2: latest (by event_time) expected event at the last location
           const expectedAtDest = lastLocEvents
             .filter((ev: any) => ev.event_time_type === "EXPECTED" && ev.event_time)
-            .sort(
-              (a: any, b: any) =>
-                new Date(b.event_time).getTime() - new Date(a.event_time).getTime(),
-            );
+            .sort((a: any, b: any) => new Date(b.event_time).getTime() - new Date(a.event_time).getTime());
           if (expectedAtDest.length > 0) {
             // Pick the earliest future expected event as the true ETA
             const futureExpected = expectedAtDest
@@ -299,11 +285,7 @@ function extractFromJson(data: unknown): {
   }
 
   // ── Generic Maersk API format ─────────────────────────────────────────────
-  const containers: any[] =
-    d.shipment?.containers ??
-    d.data?.containers ??
-    d.trackingData?.containers ??
-    [];
+  const containers: any[] = d.shipment?.containers ?? d.data?.containers ?? d.trackingData?.containers ?? [];
 
   let rawEvents: unknown[] = [];
   let etaRaw: unknown = null;
@@ -358,8 +340,8 @@ function extractFromJson(data: unknown): {
 }
 
 const SCRAPER_TIMEOUT_MS = 90_000;
-const NAV_TIMEOUT_MS     = 30_000;
-const API_WAIT_MS        = 20_000;
+const NAV_TIMEOUT_MS = 30_000;
+const API_WAIT_MS = 20_000;
 
 const emptyResult = (containerNumber: string, error: string): CarrierTrackResult => ({
   success: false,
@@ -389,7 +371,11 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
   let page: any = null;
   const hardStop = setTimeout(() => {
     console.warn(`[MaerskDirect] ${containerNumber}: hard timeout — closing page`);
-    try { page?.close(); } catch { /* ignore */ }
+    try {
+      page?.close();
+    } catch {
+      /* ignore */
+    }
   }, SCRAPER_TIMEOUT_MS);
 
   try {
@@ -400,7 +386,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     await page.setViewport({ width: 1280, height: 800 });
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-      "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
     );
 
     // ── Intercept ALL JSON responses from maersk.com domains ─────────────────
@@ -412,10 +398,7 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     page.on("response", async (response: any) => {
       try {
         const url: string = response.url();
-        if (
-          !/maersk\.com/i.test(url) ||
-          /\.(png|jpg|gif|svg|woff|woff2|ttf|ico|css|js)(\?|$)/i.test(url)
-        ) return;
+        if (!/maersk\.com/i.test(url) || /\.(png|jpg|gif|svg|woff|woff2|ttf|ico|css|js)(\?|$)/i.test(url)) return;
 
         const status: number = response.status();
         const ct: string = response.headers()?.["content-type"] ?? "";
@@ -424,17 +407,22 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
         const json = await response.json().catch(() => null);
         if (!json || typeof json !== "object") return;
 
-        const topKeys = (typeof json === "object" && !Array.isArray(json))
-          ? Object.keys(json as object).slice(0, 10).join(",")
-          : "[array]";
+        const topKeys =
+          typeof json === "object" && !Array.isArray(json)
+            ? Object.keys(json as object)
+                .slice(0, 10)
+                .join(",")
+            : "[array]";
         const etaScan = deepScanForEta(json);
         console.log(
           `[MaerskDirect] ${containerNumber} JSON captured: ${url.slice(0, 110)}` +
-          ` status=${status} keys=[${topKeys}]` +
-          (etaScan ? ` ETA_FOUND: path=${etaScan.path} val=${etaScan.value}` : ""),
+            ` status=${status} keys=[${topKeys}]` +
+            (etaScan ? ` ETA_FOUND: path=${etaScan.path} val=${etaScan.value}` : "")
         );
         capturedPayloads.push({ url, data: json });
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     });
 
     // ── Step 1: Warm up session on Maersk homepage ────────────────────────────
@@ -493,8 +481,8 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
         const status = parsedStatus ?? latestActual?.status ?? latest?.status ?? null;
         console.log(
           `[MaerskDirect] ${containerNumber}: success from ${payload.url.slice(0, 80)} — ` +
-          `status=${status ?? "?"} events=${events.length} eta=${eta ?? "none"}` +
-          (deepEta ? ` (deep-scan path=${deepEta.path})` : ""),
+            `status=${status ?? "?"} events=${events.length} eta=${eta ?? "none"}` +
+            (deepEta ? ` (deep-scan path=${deepEta.path})` : "")
         );
         return {
           success: true,
@@ -515,11 +503,17 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     // ── Fallback A: __NEXT_DATA__ embedded in page ────────────────────────────
     // Maersk uses Next.js; the server-side render may embed tracking data in
     // the <script id="__NEXT_DATA__"> tag even when XHR capture missed it.
-    const nextDataRaw: unknown = await page.evaluate(() => {
-      const el = document.getElementById("__NEXT_DATA__");
-      if (!el) return null;
-      try { return JSON.parse(el.textContent ?? ""); } catch { return null; }
-    }).catch(() => null);
+    const nextDataRaw: unknown = await page
+      .evaluate(() => {
+        const el = document.getElementById("__NEXT_DATA__");
+        if (!el) return null;
+        try {
+          return JSON.parse(el.textContent ?? "");
+        } catch {
+          return null;
+        }
+      })
+      .catch(() => null);
 
     if (nextDataRaw && typeof nextDataRaw === "object") {
       const { events, eta: ndEta, latestStatus: ndStatus } = extractFromJson(nextDataRaw);
@@ -528,8 +522,8 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
       if (events.length > 0 || eta) {
         console.log(
           `[MaerskDirect] ${containerNumber}: __NEXT_DATA__ hit — ` +
-          `events=${events.length} eta=${eta ?? "none"}` +
-          (deepEta ? ` (deep-scan path=${deepEta.path})` : ""),
+            `events=${events.length} eta=${eta ?? "none"}` +
+            (deepEta ? ` (deep-scan path=${deepEta.path})` : "")
         );
         const latest = events[0] ?? null;
         const latestActual = events.find((e) => e.date && e.date <= new Date()) ?? latest;
@@ -553,14 +547,14 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
     }
 
     // ── Fallback B: read rendered DOM text ────────────────────────────────────
-    const bodyText: string = await page.evaluate(
-      () => document.body?.innerText?.slice(0, 8000) ?? "",
-    ).catch(() => "");
+    const bodyText: string = await page.evaluate(() => document.body?.innerText?.slice(0, 8000) ?? "").catch(() => "");
 
     console.log(`[MaerskDirect] ${containerNumber} DOM[0:400]: ${bodyText.slice(0, 400)}`);
 
     // Detect bot-challenge / error pages before attempting DOM ETA extraction
-    const isBlocked = /access denied|captcha|bot.challenge|403.forbidden|challenge.required|DataDome|Akamai/i.test(bodyText.slice(0, 1500));
+    const isBlocked = /access denied|captcha|bot.challenge|403.forbidden|challenge.required|DataDome|Akamai/i.test(
+      bodyText.slice(0, 1500)
+    );
     const isErrorPage = /something went wrong|unexpected error|we.re working to fix/i.test(bodyText.slice(0, 1500));
 
     if (isBlocked) {
@@ -568,16 +562,18 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
       return { ...emptyResult(containerNumber, "bot_challenge"), blocked: true };
     }
     if (isErrorPage) {
-      console.log(`[MaerskDirect] ${containerNumber}: Maersk error page detected — no tracking data served (bot detection or backend error)`);
+      console.log(
+        `[MaerskDirect] ${containerNumber}: Maersk error page detected — no tracking data served (bot detection or backend error)`
+      );
       return emptyResult(containerNumber, "maersk_error_page");
     }
 
     // DOM ETA labels — look for any label that explicitly means estimated arrival
     const etaMatch = bodyText.match(
-      /(?:ETA|Estimated\s+(?:time\s+of\s+)?[Aa]rrival|Expected\s+[Aa]rrival|Planned\s+[Aa]rrival|Destination\s+[Aa]rrival)[:\s]+([A-Za-z]{3}\.?\s+\d{1,2},?\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+[A-Za-z]{3}\.?\s+\d{4})/i,
+      /(?:ETA|Estimated\s+(?:time\s+of\s+)?[Aa]rrival|Expected\s+[Aa]rrival|Planned\s+[Aa]rrival|Destination\s+[Aa]rrival)[:\s]+([A-Za-z]{3}\.?\s+\d{1,2},?\s+\d{4}|\d{4}-\d{2}-\d{2}|\d{1,2}\s+[A-Za-z]{3}\.?\s+\d{4})/i
     );
     const statusMatch = bodyText.match(
-      /(In Transit|Departed|Arrived|Discharged|Loaded|Delivered|Customs|Gate Out|On Board|At Sea|Vessel Arrived)/i,
+      /(In Transit|Departed|Arrived|Discharged|Loaded|Delivered|Customs|Gate Out|On Board|At Sea|Vessel Arrived)/i
     );
 
     if (etaMatch || statusMatch) {
@@ -585,11 +581,16 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
       const etaStr = etaMatch?.[1] ?? null;
       let eta: string | null = null;
       if (etaStr) {
-        const d = new Date(etaStr.replace(/\bJan\b|\bFeb\b|\bMar\b|\bApr\b|\bMay\b|\bJun\b|\bJul\b|\bAug\b|\bSep\b|\bOct\b|\bNov\b|\bDec\b/i, (m) => m.slice(0, 3)));
+        const d = new Date(
+          etaStr.replace(
+            /\bJan\b|\bFeb\b|\bMar\b|\bApr\b|\bMay\b|\bJun\b|\bJul\b|\bAug\b|\bSep\b|\bOct\b|\bNov\b|\bDec\b/i,
+            (m) => m.slice(0, 3)
+          )
+        );
         if (!isNaN(d.getTime())) eta = d.toISOString().slice(0, 10);
       }
       console.log(
-        `[MaerskDirect] ${containerNumber}: DOM label fallback — status=${status ?? "none"} eta=${eta ?? "none"}`,
+        `[MaerskDirect] ${containerNumber}: DOM label fallback — status=${status ?? "none"} eta=${eta ?? "none"}`
       );
       const fakeEvents: TrackingEvent[] = status
         ? [{ date: eta ? new Date(eta) : null, status, location: null, description: null }]
@@ -611,7 +612,6 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
 
     console.log(`[MaerskDirect] ${containerNumber}: no tracking data found — 0 JSON captured, no ETA in DOM`);
     return emptyResult(containerNumber, "no_tracking_data_found");
-
   } catch (err: any) {
     const msg = err?.message ?? String(err) ?? "unknown error";
     console.error(`[MaerskDirect] ${containerNumber}: unexpected error —`, msg);
@@ -626,7 +626,11 @@ export async function scrapeMaerskDirect(containerNumber: string): Promise<Carri
   } finally {
     clearTimeout(hardStop);
     // Close just the tab, not the whole browser
-    try { await page?.close(); } catch { /* ignore */ }
+    try {
+      await page?.close();
+    } catch {
+      /* ignore */
+    }
     release();
     console.log(`[MaerskDirect] ${containerNumber}: Puppeteer slot released`);
   }
