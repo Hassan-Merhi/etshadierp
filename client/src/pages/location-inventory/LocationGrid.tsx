@@ -10,6 +10,7 @@ interface Location {
   country: string | null;
   createdAt?: string;
   supplierPartnerPayableDeductionPerQty?: string | null;
+  whatsappGroupChatId?: string | null;
 }
 
 interface LocationGridProps {
@@ -95,11 +96,12 @@ export function LocationGrid({
                 )}
                 {!posUser && openWaGroupDialog && (
                   <button
-                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                    className={`p-1 rounded hover:bg-muted ${loc.whatsappGroupChatId ? "text-green-500 hover:text-green-600" : "text-muted-foreground hover:text-foreground"}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       openWaGroupDialog(loc, e);
                     }}
+                    title={loc.whatsappGroupChatId ? "WhatsApp group assigned" : "Assign WhatsApp group"}
                     data-testid={`button-wa-${loc.id}`}
                   >
                     <MessageCircle className="h-3.5 w-3.5" />

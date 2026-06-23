@@ -838,8 +838,9 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                               size="icon"
                               onClick={() => openWaGroupDialog(selectedLocationLocal)}
                               data-testid="button-wa-location"
+                              title={(selectedLocationLocal as any)?.whatsappGroupChatId ? "WhatsApp group assigned" : "Assign WhatsApp group"}
                             >
-                              <MessageCircle className="h-4 w-4" />
+                              <MessageCircle className={`h-4 w-4 ${(selectedLocationLocal as any)?.whatsappGroupChatId ? "text-green-500" : ""}`} />
                             </Button>
                           </>
                         )}
