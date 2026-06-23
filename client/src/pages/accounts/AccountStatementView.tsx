@@ -1,13 +1,15 @@
+import { useMemo } from "react";
 import {
   FileText,
   TrendingUp,
   TrendingDown,
   Scale,
   Trash2,
-  Filter,
   History,
   MessageCircle,
   FileDown,
+  X,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +22,7 @@ import { AccountTransactionRows } from "./AccountTransactionRows";
 
 export function AccountStatementView({
   selectedAccount,
+  onClose,
   periodFilter,
   setPeriodFilter,
   vouchersWithBalance,
@@ -29,8 +32,6 @@ export function AccountStatementView({
   selectedVoucherIds,
   toggleSelectAll,
   setShowBulkDeleteConfirm,
-  filterCurrency,
-  setFilterCurrency,
   showDeletedVouchers,
   setShowDeletedVouchers,
   currentUser,
@@ -41,194 +42,192 @@ export function AccountStatementView({
   formatDisplayDate,
   toggleVoucherSelection,
   handleOpenVoucher,
-  waRule,
   openWaRuleDialog,
-  sendWaStatementMutation,
-  isMultiCurrency,
-  ledgerCurrencyBalances,
+  handlePrint,
   isBrokerSupplier,
   brokerStatementData,
   factorySupplierStatement,
   factoryStatementLoading,
   brokerStatementLoading,
-  handlePrint,
-  exportLang,
-  setExportLang,
-  exportLabels,
 }: AccountStatementViewProps) {
   const isFactorySupplierAccount = selectedAccount?.type === "factorySupplier";
 
+  const totalDebit = useMemo(
+    () => vouchersWithBalance.reduce((s, v) => s + (v.totalDebit || 0), 0),
+    [vouchersWithBalance]
+  );
+  const totalCredit = useMemo(
+    () => vouchersWithBalance.reduce((s, v) => s + (v.totalCredit || 0), 0),
+    [vouchersWithBalance]
+  );
+
+  const balSide = (val: number) => (val >= 0 ? "Dr" : "Cr");
+
   if (isFactorySupplierAccount) {
     return (
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            {isBrokerSupplier ? "Broker Consolidated Statement" : "Factory Supplier"}: {selectedAccount?.name}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {factoryStatementLoading || (isBrokerSupplier && brokerStatementLoading) ? (
-            <div className="space-y-2">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          ) : isBrokerSupplier && brokerStatementData ? (
-            <div className="space-y-6">
-              {brokerStatementData.currencyLedgers?.map((section: any) => {
-                const typeLabel: Record<string, string> = {
-                  container: "Container",
-                  payment: "Payment",
-                  fx_out: "FX Out",
-                  fx_in: "FX In",
-                  commission: "Commission",
-                };
-                const typeColor = (t: string) => {
-                  if (t === "payment") return "text-green-600 dark:text-green-400";
-                  if (t === "fx_out") return "text-amber-600 dark:text-amber-400";
-                  if (t === "fx_in") return "text-blue-600 dark:text-blue-400";
-                  if (t === "commission") return "text-destructive";
-                  return "";
-                };
-                const fmt = (v: any) =>
-                  parseFloat(String(v)).toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  });
-                const ccPfx = (cc: string) => (cc !== "USD" ? `${cc} ` : "$");
-                return (
-                  <div key={section.currencyCode} className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-sm px-3 py-1 font-bold">
-                        {section.currencyCode}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">{section.totalContainers} container(s)</span>
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead>Date</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {section.rows.map((row: any, idx: number) => (
-                          <TableRow key={idx} className="text-xs">
-                            <TableCell>{row.date ? formatDisplayDate(new Date(row.date)) : "-"}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{typeLabel[row.type] || row.type}</Badge>
-                            </TableCell>
-                            <TableCell>{row.description}</TableCell>
-                            <TableCell className={`text-right ${typeColor(row.type)}`}>
-                              {ccPfx(section.currencyCode)}
-                              {fmt(Math.abs(row.amount))}
-                            </TableCell>
-                            <TableCell className="text-right font-medium">
-                              {ccPfx(section.currencyCode)}
-                              {fmt(Math.abs(row.runningBalance))}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                );
-              })}
-            </div>
-          ) : factorySupplierStatement ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3 rounded-md bg-muted/50">
-                  <div className="text-xs text-muted-foreground">Containers</div>
-                  <div className="text-lg font-bold">{factorySupplierStatement.summary?.totalContainers || 0}</div>
-                </div>
-                {/* More summary fields... */}
+      <div className="space-y-3">
+        {/* Account info bar */}
+        <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs text-muted-foreground shrink-0">Account</span>
+            <span className="font-semibold truncate">{selectedAccount?.name}</span>
+            {selectedAccount?.accountId && (
+              <Badge variant="outline" className="font-mono text-[10px] shrink-0">
+                #{selectedAccount.accountId}
+              </Badge>
+            )}
+          </div>
+          <Button size="icon" variant="ghost" onClick={onClose} data-testid="button-close-ledger">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              {isBrokerSupplier ? "Broker Consolidated Statement" : "Factory Supplier"}: {selectedAccount?.name}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {factoryStatementLoading || (isBrokerSupplier && brokerStatementLoading) ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
               </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {factorySupplierStatement.ledger?.slice(0, 50).map((e: any, idx: number) => (
-                    <TableRow key={idx}>
-                      <TableCell>{e.date ? formatDisplayDate(new Date(e.date)) : "-"}</TableCell>
-                      <TableCell>{e.type}</TableCell>
-                      <TableCell className="text-right tabular-nums">{e.amount}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+            ) : (
+              <p className="text-sm text-muted-foreground">No statement data available.</p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2 flex-wrap">
-        <CardTitle className="text-base">Ledger: {selectedAccount?.name}</CardTitle>
+    <div className="space-y-3">
+      {/* Compact account info bar */}
+      <div className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          <span className="text-xs text-muted-foreground shrink-0">Account</span>
+          <span className="font-semibold truncate max-w-[240px]">{selectedAccount?.name}</span>
+          {selectedAccount?.accountId && (
+            <span className="font-mono text-xs text-muted-foreground shrink-0">
+              #{selectedAccount.accountId}
+            </span>
+          )}
+          {!hideBalances && (
+            <>
+              <span className="text-muted-foreground text-xs shrink-0">|</span>
+              <span className="text-sm font-mono tabular-nums shrink-0">
+                {formatAmount(Math.abs(selectedAccount?.balance ?? 0))}
+                <span className="ml-1 text-[10px] opacity-70">
+                  {selectedAccount?.balanceSide ?? balSide(selectedAccount?.balance ?? 0)}
+                </span>
+              </span>
+            </>
+          )}
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          {(appMode === "factory" || appMode === "erp") && (
+            <Button size="icon" variant="ghost" onClick={openWaRuleDialog} title="WhatsApp rule" data-testid="button-wa-rule">
+              <MessageCircle className="h-4 w-4" />
+            </Button>
+          )}
+          <Button size="icon" variant="ghost" onClick={handlePrint} title="Print / Export" data-testid="button-print">
+            <FileDown className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={onClose} title="Close" data-testid="button-close-ledger">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Ledger heading + filters */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <h3 className="font-semibold text-base">Ledger: {selectedAccount?.name}</h3>
         <div className="flex items-center gap-2 flex-wrap">
-          <PeriodFilter value={periodFilter} onChange={setPeriodFilter} />
           {selectedVoucherIds.size > 0 && (
-            <Button variant="destructive" size="sm" onClick={() => setShowBulkDeleteConfirm(true)}>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setShowBulkDeleteConfirm(true)}
+              data-testid="button-bulk-delete"
+            >
               <Trash2 className="h-4 w-4 mr-1" /> Delete Selected ({selectedVoucherIds.size})
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={handlePrint}>
-            <FileDown className="h-4 w-4 mr-1" /> Print
+          <PeriodFilter value={periodFilter} onChange={setPeriodFilter} />
+          <Button
+            variant={showDeletedVouchers ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setShowDeletedVouchers((p: boolean) => !p)}
+            data-testid="button-show-deleted"
+          >
+            <Clock className="h-4 w-4 mr-1" />
+            {showDeletedVouchers ? "Hide Deleted" : "Show Deleted"}
           </Button>
-          {(appMode === "factory" || appMode === "erp") && (
-            <Button variant="outline" size="sm" onClick={openWaRuleDialog}>
-              <MessageCircle className="h-4 w-4 mr-1" /> WhatsApp
-            </Button>
-          )}
         </div>
-      </CardHeader>
-      <CardContent>
-        {transactionsLoading ? (
-          <Skeleton className="h-40 w-full" />
-        ) : (
-          <>
-            {!hideBalances && vouchersWithBalance.length > 0 && (
-              <div className="flex flex-wrap gap-3 mb-4">
-                <div className="rounded-lg border bg-muted/40 px-4 py-2 flex items-center gap-3">
-                  <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <div>
-                    <p className="text-xs text-muted-foreground leading-none mb-0.5">Closing Balance</p>
-                    <p className="text-base font-semibold leading-none tabular-nums">
-                      {formatAmount(Math.abs(closingBalance))}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={printRef}>
-              <AccountTransactionRows
-                vouchersWithBalance={vouchersWithBalance}
-                selectedVoucherIds={selectedVoucherIds}
-                toggleSelectAll={toggleSelectAll}
-                toggleVoucherSelection={toggleVoucherSelection}
-                handleOpenVoucher={handleOpenVoucher}
-                formatAmount={formatAmount}
-                hideBalances={hideBalances}
-                appMode={appMode}
-                openingBalance={openingBalance}
-                selectedAccount={selectedAccount}
-                formatDisplayDate={formatDisplayDate}
-              />
+      </div>
+
+      {/* Stats row */}
+      {!hideBalances && !transactionsLoading && (
+        <div className="flex flex-wrap gap-3">
+          <div className="rounded-lg border bg-muted/30 px-4 py-2.5 flex items-center gap-3 min-w-[130px]">
+            <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+            <div>
+              <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Transactions</p>
+              <p className="text-base font-semibold leading-none tabular-nums">{vouchersWithBalance.length}</p>
             </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+          </div>
+          <div className="rounded-lg border bg-muted/30 px-4 py-2.5 flex items-center gap-3 min-w-[150px]">
+            <TrendingUp className="w-4 h-4 text-muted-foreground shrink-0" />
+            <div>
+              <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Total Debit</p>
+              <p className="text-base font-semibold leading-none tabular-nums">{formatAmount(totalDebit)}</p>
+            </div>
+          </div>
+          <div className="rounded-lg border bg-muted/30 px-4 py-2.5 flex items-center gap-3 min-w-[150px]">
+            <TrendingDown className="w-4 h-4 text-muted-foreground shrink-0" />
+            <div>
+              <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Total Credit</p>
+              <p className="text-base font-semibold leading-none tabular-nums">{formatAmount(totalCredit)}</p>
+            </div>
+          </div>
+          <div className="rounded-lg border bg-muted/30 px-4 py-2.5 flex items-center gap-3 min-w-[160px]">
+            <Scale className="w-4 h-4 text-muted-foreground shrink-0" />
+            <div>
+              <p className="text-[10px] text-muted-foreground leading-none mb-0.5">Closing Balance</p>
+              <p className="text-base font-semibold leading-none tabular-nums">
+                {formatAmount(Math.abs(closingBalance))}
+                <span className="ml-1 text-[10px] font-normal opacity-70">{balSide(closingBalance)}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      {transactionsLoading ? (
+        <Skeleton className="h-40 w-full" />
+      ) : (
+        <div ref={printRef}>
+          <AccountTransactionRows
+            vouchersWithBalance={vouchersWithBalance}
+            selectedVoucherIds={selectedVoucherIds}
+            toggleSelectAll={toggleSelectAll}
+            toggleVoucherSelection={toggleVoucherSelection}
+            handleOpenVoucher={handleOpenVoucher}
+            formatAmount={formatAmount}
+            hideBalances={hideBalances}
+            appMode={appMode}
+            openingBalance={openingBalance}
+            closingBalance={closingBalance}
+            selectedAccount={selectedAccount}
+            formatDisplayDate={formatDisplayDate}
+          />
+        </div>
+      )}
+    </div>
   );
 }

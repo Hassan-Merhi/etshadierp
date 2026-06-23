@@ -94,6 +94,7 @@ export interface AccountDialogsProps {
 
 export interface AccountStatementViewProps {
   selectedAccount: Account;
+  onClose: () => void;
   periodFilter: any;
   setPeriodFilter: (filter: any) => void;
   vouchersWithBalance: any[];

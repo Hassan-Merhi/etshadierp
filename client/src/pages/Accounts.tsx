@@ -339,6 +339,7 @@ export default function Accounts() {
           ) : (
             <AccountStatementView
               selectedAccount={selectedAccount}
+              onClose={() => setSelectedAccount(null)}
               periodFilter={periodFilter}
               setPeriodFilter={setPeriodFilter}
               vouchersWithBalance={vouchersWithBalance}
