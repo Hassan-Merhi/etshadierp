@@ -199,13 +199,13 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     enabled: !!selectedLocationLocal,
   });
 
-  const { data: openingInventoryData = [] } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationLocal && fromDate ? [`/api/locations/${selectedLocationLocal.id}/inventory`, { asOfDate: fromDate }] : [],
+  const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
+    queryKey: selectedLocationLocal && fromDate ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`] : [],
     enabled: !!selectedLocationLocal && !!fromDate,
   });
 
-  const { data: closingInventoryData = [] } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationLocal && asOfDate ? [`/api/locations/${selectedLocationLocal.id}/inventory`, { asOfDate: asOfDate }] : [],
+  const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
+    queryKey: selectedLocationLocal && asOfDate ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`] : [],
     enabled: !!selectedLocationLocal && !!asOfDate,
   });
 
@@ -297,6 +297,7 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
 
   const showMovement = !!(fromDate && asOfDate);
   const activeInventoryData = showMovement ? closingInventoryData : inventoryData;
+  const activeInventoryLoading = showMovement ? (closingInventoryLoading || openingInventoryLoading) : inventoryLoading;
   const inventory = showZeroStock ? activeInventoryData : activeInventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
 
   const stockGroups: StockGroupSummary[] = inventory
@@ -418,11 +419,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredStockGroups.map(g => (
-                  <Card key={g.groupId} className="hover-elevate cursor-pointer" onClick={() => setSelectedGroup(g)}>
-                    <CardContent className="p-4"><h3 className="font-bold">{g.groupName}</h3><p className="text-sm text-muted-foreground">{g.itemCount} Items · {Math.floor(g.totalQuantity)} BL</p></CardContent>
-                  </Card>
-                ))}
+                {activeInventoryLoading ? (
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="h-20 rounded-xl border bg-card animate-pulse" />
+                  ))
+                ) : filteredStockGroups.length === 0 ? (
+                  <div className="col-span-full py-12 text-center border-2 border-dashed rounded-xl text-muted-foreground">
+                    {showZeroStock ? "No stock items found for this location." : "No items with stock. Toggle 'Zero' to see all items."}
+                  </div>
+                ) : (
+                  filteredStockGroups.map(g => (
+                    <Card key={g.groupId} className="hover-elevate cursor-pointer" onClick={() => setSelectedGroup(g)}>
+                      <CardContent className="p-4"><h3 className="font-bold">{g.groupName}</h3><p className="text-sm text-muted-foreground">{g.itemCount} Items · {Math.floor(g.totalQuantity)} BL</p></CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             </div>
           )}
