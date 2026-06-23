@@ -30,7 +30,6 @@ import { SaleGrid } from "./pos-components/SaleGrid";
 import { InventoryPicker } from "./pos-components/InventoryPicker";
 import { InvoiceTemplate } from "./pos-components/InvoiceTemplate";
 import { POSDialogs } from "./pos-components/POSDialogs";
-import { CheckoutSidebar } from "./pos-components/CheckoutSidebar";
 import { POSHeader } from "./pos-components/POSHeader";
 import type { SaleRow, InventoryItem, APIInventoryItem, Location } from "./pos-components/posTypes";
 
@@ -305,27 +304,29 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         saveMutation={saveMutation} hasValidItems={hasValidItems} handleSaveSale={handleSaveSale}
       />
 
-      {/* Inline checkout strip — ERP (non-POS) users only */}
-      {!posUser && activeLocation && (
+      {/* Inline checkout strip */}
+      {activeLocation && (
         <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-muted/10">
-          {/* Location */}
-          <Select
-            value={activeLocation?.id?.toString()}
-            onValueChange={(val) => {
-              const loc = allLocations.find(l => l.id.toString() === val);
-              if (loc) setSelectedLocation(loc);
-            }}
-          >
-            <SelectTrigger className="w-[180px]" data-testid="select-admin-location">
-              <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
-              <SelectValue placeholder="Location" />
-            </SelectTrigger>
-            <SelectContent>
-              {allLocations.map((loc) => (
-                <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Location — admin only (POS users have location selector in header) */}
+          {!posUser && (
+            <Select
+              value={activeLocation?.id?.toString()}
+              onValueChange={(val) => {
+                const loc = allLocations.find(l => l.id.toString() === val);
+                if (loc) setSelectedLocation(loc);
+              }}
+            >
+              <SelectTrigger className="w-[180px]" data-testid="select-admin-location">
+                <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                {allLocations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id.toString()}>{loc.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           {/* Date */}
           <input
@@ -439,50 +440,27 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
               focusCell={focusCell} toast={toast}
             />
 
-            {/* Footer: totals + notes (ERP users only) */}
-            {!posUser && (
-              <div className="mt-2 flex flex-wrap items-center gap-3 px-1">
-                <span className="text-sm text-muted-foreground">
-                  <span className="font-semibold text-foreground">{validItemCount}</span> Items&nbsp;&nbsp;
-                  Qty <span className="font-semibold text-foreground font-mono">{totalQty.toFixed(2)}</span>
-                </span>
-                <span className="text-sm ml-auto font-semibold">
-                  Total&nbsp;
-                  <span className="font-mono text-primary text-base">{formatDisplayAmount(total)}</span>
-                </span>
-              </div>
-            )}
+            {/* Footer: totals row */}
+            <div className="mt-2 flex flex-wrap items-center gap-3 px-1">
+              <span className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">{validItemCount}</span> Items&nbsp;&nbsp;
+                Qty <span className="font-semibold text-foreground font-mono">{totalQty.toFixed(2)}</span>
+              </span>
+              <span className="text-sm ml-auto font-semibold">
+                Total&nbsp;
+                <span className="font-mono text-primary text-base">{formatDisplayAmount(total)}</span>
+              </span>
+            </div>
 
-            {/* Notes (ERP users only) */}
-            {!posUser && (
-              <Textarea
-                placeholder="Sale notes (optional)..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="resize-none mt-2 h-14 min-h-[56px] text-sm"
-                data-testid="input-notes"
-              />
-            )}
-          </div>
-
-          {/* POS users: checkout sidebar on the right */}
-          {posUser && (
-            <CheckoutSidebar
-              posUser={posUser}
-              paymentAccountType={paymentAccountType} setPaymentAccountType={setPaymentAccountType}
-              paymentAccountId={paymentAccountId} setPaymentAccountId={setPaymentAccountId}
-              isCreditSale={isCreditSale} setIsCreditSale={setIsCreditSale}
-              selectedCustomerId={selectedCustomerId} setSelectedCustomerId={setSelectedCustomerId}
-              customerComboOpen={customerComboOpen} setCustomerComboOpen={setCustomerComboOpen}
-              customerAccounts={customerAccounts} selectedCustomer={selectedCustomer}
-              formatAmountRaw={formatAmountRaw} bankAccounts={bankAccounts} cashLedgerAccounts={cashLedgerAccounts}
-              saveMutation={saveMutation} hasValidItems={hasValidItems} editVoucherId={editVoucherId}
-              handleSaveSale={handleSaveSale} notes={notes} setNotes={setNotes}
-              saleDate={saleDate} setSaleDate={setSaleDate}
-              total={total} totalQty={totalQty} rows={rows} activeCurrency={activeCurrency} exchangeRate={exchangeRate}
-              formatDisplayAmount={formatDisplayAmount} cn={cn}
+            {/* Notes */}
+            <Textarea
+              placeholder="Sale notes (optional)..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="resize-none mt-2 h-14 min-h-[56px] text-sm"
+              data-testid="input-notes"
             />
-          )}
+          </div>
 
           {/* Inventory picker: always on the right */}
           <InventoryPicker

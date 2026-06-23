@@ -123,7 +123,7 @@ export function POSHeader({
             </>
           )}
 
-          {!posUser && handleSaveSale && (
+          {handleSaveSale && (
             <Button
               onClick={handleSaveSale}
               disabled={saveMutation?.isPending || !hasValidItems}
