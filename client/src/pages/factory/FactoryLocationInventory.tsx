@@ -1096,7 +1096,7 @@ export default function FactoryLocationInventory() {
   // ─── View 1: Location list ────────────────────────────────────────────────
   if (!selectedLocation) {
     return (
-      <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
+      <div className="p-4 md:p-6 w-full space-y-5">
 
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -1391,7 +1391,7 @@ export default function FactoryLocationInventory() {
   };
 
   return (
-    <div className={`p-4 md:p-6 max-w-6xl mx-auto space-y-5 ${proformaMode && selections.size > 0 ? "pb-24" : ""}`}>
+    <div className={`p-4 md:p-6 w-full space-y-5 ${proformaMode && selections.size > 0 ? "pb-24" : ""}`}>
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
