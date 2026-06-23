@@ -56,7 +56,7 @@ export function SaleGrid({
             {columns.map((col) => (
               <div
                 key={col.key}
-                className={`${col.width} flex items-center px-1.5 sm:px-3 border-r border-border/50 h-9 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide`}
+                className={`${col.width} flex items-center px-1.5 sm:px-3 border-r border-border/50 h-9 text-[11px] font-semibold text-muted-foreground`}
               >
                 {col.label}
               </div>

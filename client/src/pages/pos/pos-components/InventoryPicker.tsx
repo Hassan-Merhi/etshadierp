@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ScanBarcode } from "lucide-react";
+import { Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { InventoryItem } from "./posTypes";
 
@@ -54,9 +54,9 @@ export function InventoryPicker({
     <Card className="w-full lg:w-96 flex flex-col overflow-hidden h-[300px] lg:h-auto shrink-0">
       {/* Header */}
       <div className="px-3 pt-3 pb-2 shrink-0">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Items</p>
+        <p className="text-xs font-semibold text-muted-foreground tracking-wide mb-2">Items</p>
         <div className="flex items-center gap-2 rounded-md border border-input bg-muted/30 px-2.5 h-9 focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent transition-all">
-          <ScanBarcode className="h-4 w-4 text-muted-foreground shrink-0" />
+          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
           <input
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             placeholder="Scan barcode or search..."
