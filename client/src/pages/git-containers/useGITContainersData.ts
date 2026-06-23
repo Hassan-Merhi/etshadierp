@@ -19,7 +19,6 @@ interface UseGITContainersDataProps {
   setShowProgressBanner: (v: boolean) => void;
   setBulkProgress: (v: any) => void;
   queryClient: any;
-  isBulkPending: boolean;
   showProgressBanner: boolean;
 }
 
@@ -33,7 +32,6 @@ export function useGITContainersData({
   setShowProgressBanner,
   setBulkProgress,
   queryClient,
-  isBulkPending,
   showProgressBanner,
 }: UseGITContainersDataProps) {
   const importMutation = useMutation({
@@ -126,6 +124,7 @@ export function useGITContainersData({
 
   useEffect(() => {
     if (!isAllowed) return;
+    const isBulkPending = bulkTrackMutation.isPending;
     if (!isBulkPending && !showProgressBanner) return;
 
     let stopped = false;
@@ -140,7 +139,7 @@ export function useGITContainersData({
         const data: BulkProgress = await res.json();
         setBulkProgress(data);
         if (data.running) setShowProgressBanner(true);
-        if (!data.running && !stopTimeoutId && !isBulkPending) {
+        if (!data.running && !stopTimeoutId && !bulkTrackMutation.isPending) {
           stopTimeoutId = setTimeout(() => {
             if (!stopped) {
               if (intervalId) { clearInterval(intervalId); intervalId = null; }

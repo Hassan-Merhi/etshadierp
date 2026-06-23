@@ -145,7 +145,6 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
     setShowProgressBanner,
     setBulkProgress,
     queryClient,
-    isBulkPending: bulkTrackMutation.isPending,
     showProgressBanner,
   });
 
