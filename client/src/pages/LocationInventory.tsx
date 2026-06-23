@@ -1,17 +1,28 @@
-import { useState, useEffect, useRef, useMemo } from "react";
-import { useCursorNav } from "@/contexts/CursorNavContext";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
 import { useLocation as useRoute } from "wouter";
-import { cn } from "@/lib/utils";
-import { ArrowUpDown, Package, Warehouse, Search, X, ChevronDown, Download, List, Eye, Printer, ShoppingCart, Trash2, ArrowLeft, ArrowRight, Layers, FileSpreadsheet, MessageCircle, Pencil, AlertCircle, Globe } from "lucide-react";
-import { PageHeader } from "@/components/PageHeader";
+import {
+  ArrowUpDown, Package, Warehouse, Search, X, ChevronDown, Download, List, Eye,
+  Printer, Trash2, ArrowLeft, ArrowRight, Layers, FileSpreadsheet,
+  MessageCircle, Pencil, AlertCircle, Globe, MapPin, ChevronRight, Plus,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useReactToPrint } from "react-to-print";
@@ -84,8 +95,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [allStockLocationFilter, setAllStockLocationFilter] = useState<string>("");
   const [allStockCategoryFilter, setAllStockCategoryFilter] = useState<string[]>([]);
   const [itemCategoryFilter, setItemCategoryFilter] = useState<string[]>([]);
+  const [groupCategoryFilter, setGroupCategoryFilter] = useState<string>("");
   const tableRef = useRef<HTMLDivElement>(null);
-
   const [allStockSelectedRowIndex, setAllStockSelectedRowIndex] = useState<number>(-1);
   const [stockMovementOpen, setStockMovementOpen] = useState(false);
   const [stockMovementItem, setStockMovementItem] = useState<any>(null);
@@ -93,13 +104,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [drillMonth, setDrillMonth] = useState<any>(null);
   const allStockTableRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
-  const { setSelectedLocation } = useLocation();
-  const [_route, navigate] = useRoute();
-  const { toast } = useToast();
-  const { formatAmount } = useCurrencyContext();
-  const { selectedCompany } = useCompany();
-  const isSpCompany = selectedCompany?.companyType === "supplier_partner";
 
+  // Dialogs
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
@@ -112,10 +118,18 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [waGroupLocation, setWaGroupLocation] = useState<Location | null>(null);
   const [waGroupSearch, setWaGroupSearch] = useState("");
   const [waGroupSelectedId, setWaGroupSelectedId] = useState<string>("");
+  const [createLocationOpen, setCreateLocationOpen] = useState(false);
+  const [createLocationName, setCreateLocationName] = useState("");
+
+  const { setSelectedLocation } = useLocation();
+  const [_route, navigate] = useRoute();
+  const { toast } = useToast();
+  const { formatAmount } = useCurrencyContext();
+  const { selectedCompany } = useCompany();
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `${(selectedLocationLocal?.name || "Stock").replace(/\s+/g, "_")}_STK_${new Date().toLocaleDateString('en-CA')}`,
+    documentTitle: `${(selectedLocationLocal?.name || "Stock").replace(/\s+/g, "_")}_STK_${new Date().toLocaleDateString("en-CA")}`,
   });
 
   const handlePrintWithOption = async (withCost: boolean) => {
@@ -124,12 +138,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setTimeout(() => handlePrint(), 150);
   };
 
+  // ─── Mutations ──────────────────────────────────────────────────────────────
+
   const renameLocationMutation = useMutation({
     mutationFn: async ({ id, name, supplierPartnerPayableDeductionPerQty }: { id: number; name: string; supplierPartnerPayableDeductionPerQty?: number }) => {
       const payload: Record<string, any> = { name };
-      if (supplierPartnerPayableDeductionPerQty !== undefined) {
-        payload.supplierPartnerPayableDeductionPerQty = supplierPartnerPayableDeductionPerQty;
-      }
+      if (supplierPartnerPayableDeductionPerQty !== undefined) payload.supplierPartnerPayableDeductionPerQty = supplierPartnerPayableDeductionPerQty;
       const res = await apiRequest("PATCH", `/api/locations/${id}`, payload);
       return res.json();
     },
@@ -139,23 +153,21 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       if (selectedLocationLocal?.id === updated.id) setSelectedLocationLocal(updated);
       setRenameDialogOpen(false);
     },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
+    onError: (error: Error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
   });
 
-  const openRenameDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
-    e?.stopPropagation();
-    setRenamingLocation(loc);
-    setRenameInput(loc.name);
-    setRenameDeductionInput(parseFloat(String(loc.supplierPartnerPayableDeductionPerQty ?? "0")).toString());
-    setRenameDialogOpen(true);
-  };
-
-  const { data: waChats = [], isLoading: waChatsLoading } = useQuery<{ id: string; name: string; type: string }[]>({
-    queryKey: ["/api/whatsapp/chats/pos"],
-    enabled: waGroupDialogOpen,
-    staleTime: 60_000,
+  const createLocationMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", "/api/locations", { name });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Location created" });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
+      setCreateLocationOpen(false);
+      setCreateLocationName("");
+    },
+    onError: (error: Error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
   });
 
   const waGroupMutation = useMutation({
@@ -172,6 +184,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     onError: (error: Error) => toast({ title: "Error", description: error.message, variant: "destructive" }),
   });
 
+  const openRenameDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation();
+    setRenamingLocation(loc);
+    setRenameInput(loc.name);
+    setRenameDeductionInput(parseFloat(String(loc.supplierPartnerPayableDeductionPerQty ?? "0")).toString());
+    setRenameDialogOpen(true);
+  };
+
   const openWaGroupDialog = (loc: Location, e?: { stopPropagation: () => void }) => {
     e?.stopPropagation();
     setWaGroupLocation(loc);
@@ -179,6 +199,14 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     setWaGroupSearch("");
     setWaGroupDialogOpen(true);
   };
+
+  // ─── Queries ────────────────────────────────────────────────────────────────
+
+  const { data: waChats = [], isLoading: waChatsLoading } = useQuery<{ id: string; name: string; type: string }[]>({
+    queryKey: ["/api/whatsapp/chats/pos"],
+    enabled: waGroupDialogOpen,
+    staleTime: 60_000,
+  });
 
   const { data: allLocations = [], isLoading: allLocationsLoading } = useQuery<Location[]>({
     queryKey: ["/api/locations"],
@@ -200,12 +228,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   });
 
   const { data: openingInventoryData = [], isLoading: openingInventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationLocal && fromDate ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`] : [],
+    queryKey: selectedLocationLocal && fromDate
+      ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${fromDate}`]
+      : [],
     enabled: !!selectedLocationLocal && !!fromDate,
   });
 
   const { data: closingInventoryData = [], isLoading: closingInventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationLocal && asOfDate ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`] : [],
+    queryKey: selectedLocationLocal && asOfDate
+      ? [`/api/locations/${selectedLocationLocal.id}/inventory?asOfDate=${asOfDate}`]
+      : [],
     enabled: !!selectedLocationLocal && !!asOfDate,
   });
 
@@ -219,6 +251,8 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     queryKey: ["/api/stock-categories"],
     staleTime: 5 * 60 * 1000,
   });
+
+  // ─── Derived data ────────────────────────────────────────────────────────────
 
   const allInventoryLocations = useMemo(() => {
     const locs = new Map<number, { id: number; name: string }>();
@@ -298,10 +332,16 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const showMovement = !!(fromDate && asOfDate);
   const activeInventoryData = showMovement ? closingInventoryData : inventoryData;
   const activeInventoryLoading = showMovement ? (closingInventoryLoading || openingInventoryLoading) : inventoryLoading;
-  const inventory = showZeroStock ? activeInventoryData : activeInventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
 
-  const stockGroups: StockGroupSummary[] = inventory
-    .reduce((groups, item) => {
+  // All items (respecting zero filter)
+  const inventory: InventoryItem[] = showZeroStock
+    ? activeInventoryData
+    : activeInventoryData.filter(item => parseFloat(item.quantity || "0") !== 0);
+
+  // Stock groups built from inventory
+  const stockGroups: StockGroupSummary[] = useMemo(() => {
+    const groups: StockGroupSummary[] = [];
+    inventory.forEach(item => {
       const groupId = item.stockGroupId ?? null;
       let group = groups.find(g => g.groupId === groupId);
       if (!group) {
@@ -313,12 +353,26 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       group.totalValue += parseFloat(item.totalValue || "0");
       group.itemCount += 1;
       group.items.push(item);
-      return groups;
-    }, [] as StockGroupSummary[]);
+    });
+    groups.forEach(g => { if (g.totalQuantity > 0) g.averageRate = g.totalValue / g.totalQuantity; });
+    return groups.sort((a, b) => a.groupName.localeCompare(b.groupName));
+  }, [inventory]);
 
-  stockGroups.forEach(g => { if (g.totalQuantity > 0) g.averageRate = g.totalValue / g.totalQuantity; });
-  const filteredStockGroups = stockGroups.filter(g => !groupSearchTerm || g.groupName.toLowerCase().includes(groupSearchTerm.toLowerCase())).sort((a, b) => a.groupName.localeCompare(b.groupName));
+  // Filter stock groups by search + category
+  const filteredStockGroups = useMemo(() => {
+    return stockGroups.filter(g => {
+      if (groupSearchTerm && !g.groupName.toLowerCase().includes(groupSearchTerm.toLowerCase())) return false;
+      if (groupCategoryFilter) {
+        if (!g.items.some(item => {
+          if (groupCategoryFilter === "none") return item.categoryId == null;
+          return String(item.categoryId) === groupCategoryFilter;
+        })) return false;
+      }
+      return true;
+    });
+  }, [stockGroups, groupSearchTerm, groupCategoryFilter]);
 
+  // Items within the selected group, with search + category
   const filteredStockItems = useMemo(() => {
     if (!selectedGroup) return [];
     return selectedGroup.items.filter(item => {
@@ -331,6 +385,22 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
       return (item.stockItemName || "").toLowerCase().includes(s) || (item.stockItemCode || "").toLowerCase().includes(s);
     }).sort((a, b) => a.stockItemName.localeCompare(b.stockItemName));
   }, [selectedGroup, itemSearchTerm, itemCategoryFilter]);
+
+  // All items flat list (for view-all mode)
+  const allItemsFiltered = useMemo(() => {
+    return inventory.filter(item => {
+      if (!itemSearchTerm) return true;
+      const s = itemSearchTerm.toLowerCase();
+      return (item.stockItemName || "").toLowerCase().includes(s) || (item.stockItemCode || "").toLowerCase().includes(s);
+    }).sort((a, b) => (a.stockGroupName || "").localeCompare(b.stockGroupName || "") || a.stockItemName.localeCompare(b.stockItemName));
+  }, [inventory, itemSearchTerm]);
+
+  // Totals across all stock groups
+  const totalQty = stockGroups.reduce((s, g) => s + g.totalQuantity, 0);
+  const totalValue = stockGroups.reduce((s, g) => s + g.totalValue, 0);
+  const totalItems = stockGroups.reduce((s, g) => s + g.itemCount, 0);
+
+  // ─── Handlers ────────────────────────────────────────────────────────────────
 
   const handleDeleteLocation = async () => {
     if (!selectedLocationLocal) return;
@@ -363,12 +433,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const handleExportInventory = async () => {
     if (!selectedLocationLocal) return;
     try {
-      const response = await fetch(`/api/locations/${selectedLocationLocal.id}/inventory/export`, { credentials: 'include' });
+      const response = await fetch(`/api/locations/${selectedLocationLocal.id}/inventory/export`, { credentials: "include" });
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `${selectedLocationLocal.name}_inventory_${new Date().toLocaleDateString('en-CA')}.xlsx`;
+      a.download = `${selectedLocationLocal.name}_inventory_${new Date().toLocaleDateString("en-CA")}.xlsx`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -376,79 +446,653 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     } catch (error: any) { toast({ title: "Export Failed", description: error.message, variant: "destructive" }); }
   };
 
-  const handleUseLocation = (loc: Location) => {
-    setSelectedLocation({ id: loc.id, name: loc.name });
-    navigate("/pos");
+  const goBackToLocations = () => {
+    setSelectedLocationLocal(null);
+    setSelectedGroup(null);
+    setViewAllItems(false);
+    setGroupSearchTerm("");
+    setItemSearchTerm("");
+    setGroupCategoryFilter("");
   };
 
+  // ─── Render ──────────────────────────────────────────────────────────────────
+
   return (
-    <div className="flex flex-col gap-4 md:gap-6 p-3 md:p-6 w-full min-w-0">
-      <PageHeader title="Location Inventory" subtitle="Manage inventory across all locations">
-        {!posUser && (
-          <Button variant={showAllStock ? "default" : "outline"} size="sm" onClick={() => setShowAllStock(!showAllStock)} className="gap-2">
-            <Globe className="h-4 w-4" /> All Locations View
+    <div className="flex flex-col min-h-0 h-full">
+
+      {/* ── Page header ─────────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
+        <div>
+          <h1 className="text-2xl font-bold">Location Inventory</h1>
+          <p className="text-sm text-muted-foreground">Manage inventory across all locations</p>
+        </div>
+        {!posUser && selectedLocationLocal && (
+          <Button
+            variant={showNegativeStock ? "destructive" : "outline"}
+            size="sm"
+            className="gap-2"
+            onClick={() => setShowNegativeStock(!showNegativeStock)}
+            data-testid="button-negative-stock"
+          >
+            <AlertCircle className="h-4 w-4" /> Negative Stock
           </Button>
         )}
-      </PageHeader>
-
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-md bg-muted/30 border">
-        <div className="flex items-center gap-1.5 shrink-0 mr-1"><ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" /><span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Movement</span></div>
-        <div className="h-4 w-px bg-border shrink-0" />
-        <div className="flex items-center gap-2 flex-wrap">
-          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 w-32 text-xs" />
-          <span className="text-xs text-muted-foreground">to</span>
-          <Input type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} className="h-8 w-32 text-xs" />
-          {(fromDate || asOfDate) && <Button variant="ghost" size="sm" onClick={() => { setFromDate(""); setAsOfDate(""); }} className="h-8 px-2 text-xs"><X className="h-3 w-3 mr-1" /> Clear</Button>}
-        </div>
       </div>
 
-      {!showAllStock ? (
-        <>
-          <LocationGrid locations={locations} locationsLoading={locationsLoading} selectedLocationLocal={selectedLocationLocal} setSelectedLocationLocal={(loc) => setSelectedLocationLocal(loc as Location | null)} locationSearchTerm={locationSearchTerm} setLocationSearchTerm={setLocationSearchTerm} posUser={posUser} />
-          {selectedLocationLocal && !selectedGroup && !viewAllItems && (
-            <div>
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-4">
-                <div className="flex items-center gap-2"><div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center"><Warehouse className="h-5 w-5 text-primary" /></div>
-                  <div><div className="flex items-center gap-2"><h1 className="text-xl md:text-2xl font-bold">{selectedLocationLocal.name}</h1>{!posUser && <Button variant="ghost" size="icon" onClick={() => openRenameDialog(selectedLocationLocal)}><Pencil className="h-4 w-4" /></Button>}</div><p className="text-xs text-muted-foreground uppercase">Stock Groups</p></div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap w-full md:w-auto">
-                  <Button variant="outline" onClick={handleExportInventory} className="gap-2"><Download className="w-4 h-4" /> Export</Button>
-                  <Button variant="outline" onClick={() => setViewAllItems(true)} className="gap-2"><List className="w-4 h-4" /> View All</Button>
-                  <Button variant={showZeroStock ? "default" : "outline"} onClick={() => setShowZeroStock(!showZeroStock)} className="gap-2"><Eye className="w-4 h-4" /> Zero</Button>
-                  {!posUser && <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} className="gap-2"><Trash2 className="w-4 h-4" /> Delete</Button>}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {activeInventoryLoading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="h-20 rounded-xl border bg-card animate-pulse" />
-                  ))
-                ) : filteredStockGroups.length === 0 ? (
-                  <div className="col-span-full py-12 text-center border-2 border-dashed rounded-xl text-muted-foreground">
-                    {showZeroStock ? "No stock items found for this location." : "No items with stock. Toggle 'Zero' to see all items."}
-                  </div>
-                ) : (
-                  filteredStockGroups.map(g => (
-                    <Card key={g.groupId} className="hover-elevate cursor-pointer" onClick={() => setSelectedGroup(g)}>
-                      <CardContent className="p-4"><h3 className="font-bold">{g.groupName}</h3><p className="text-sm text-muted-foreground">{g.itemCount} Items · {Math.floor(g.totalQuantity)} BL</p></CardContent>
-                    </Card>
-                  ))
-                )}
-              </div>
-            </div>
+      {/* ── Movement filter (only when a location is selected) ─────────────── */}
+      {selectedLocationLocal && !viewAllItems && (
+        <div className="flex flex-wrap items-center gap-3 px-6 py-2.5 border-b bg-muted/10 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">MOVEMENT</span>
+          </div>
+          <span className="text-xs text-muted-foreground">From</span>
+          <div className="relative">
+            <Input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="h-8 w-36 text-sm"
+              data-testid="input-from-date"
+            />
+          </div>
+          <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <span className="text-xs text-muted-foreground">To</span>
+          <div className="relative">
+            <Input
+              type="date"
+              value={asOfDate}
+              onChange={(e) => setAsOfDate(e.target.value)}
+              className="h-8 w-36 text-sm"
+              data-testid="input-to-date"
+            />
+          </div>
+          {(fromDate || asOfDate) && (
+            <Button variant="ghost" size="sm" className="h-8 px-2 text-xs gap-1" onClick={() => { setFromDate(""); setAsOfDate(""); }}>
+              <X className="h-3 w-3" /> Clear
+            </Button>
           )}
-          {selectedGroup && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between"><Button variant="ghost" onClick={() => setSelectedGroup(null)}><ArrowLeft className="mr-2 h-4 w-4" /> Back to groups</Button><h2 className="text-xl font-bold">{selectedGroup.groupName}</h2></div>
-              <InventoryTable filteredStockItems={filteredStockItems} showMovement={showMovement} openingInventoryMap={openingInventoryMap} selectedRowIndex={selectedRowIndex} setSelectedRowIndex={setSelectedRowIndex} navigate={navigate} formatAmount={formatAmount} posUser={posUser} itemSearchTerm={itemSearchTerm} inventory={inventory} selectedGroup={selectedGroup} />
-            </div>
-          )}
-        </>
-      ) : (
-        <CombinedStockView allInventoryLoading={allInventoryLoading} filteredCombinedRows={filteredCombinedRows} allInventoryData={allInventoryData} allInventoryLocations={allInventoryLocations} allInventoryGroups={allInventoryGroups} categoriesList={categoriesList} allStockSearchTerm={allStockSearchTerm} setAllStockSearchTerm={setAllStockSearchTerm} allStockGroupFilter={allStockGroupFilter} setAllStockGroupFilter={setAllStockGroupFilter} allStockLocationFilter={allStockLocationFilter} setAllStockLocationFilter={setAllStockLocationFilter} allStockCategoryFilter={allStockCategoryFilter} setAllStockCategoryFilter={setAllStockCategoryFilter} allStockSelectedRowIndex={allStockSelectedRowIndex} openMovement={(l, n, e) => { setStockMovementItem({ stockItemId: 0, stockItemName: "", locationId: l, locationName: n }); setStockMovementOpen(true); }} formatAmount={formatAmount} posUser={posUser} allStockTableRef={allStockTableRef} />
+        </div>
       )}
 
-      <LocationDialogs renameDialogOpen={renameDialogOpen} setRenameDialogOpen={setRenameDialogOpen} renamingLocation={renamingLocation} renameInput={renameInput} setRenameInput={setRenameInput} renameDeductionInput={renameDeductionInput} setRenameDeductionInput={setRenameDeductionInput} renameLocationMutation={renameLocationMutation} deleteDialogOpen={deleteDialogOpen} setDeleteDialogOpen={setDeleteDialogOpen} isDeleting={isDeleting} handleDeleteLocation={handleDeleteLocation} selectedLocationLocal={selectedLocationLocal} archiveDialogOpen={archiveDialogOpen} setArchiveDialogOpen={setArchiveDialogOpen} isArchiving={isArchiving} handleArchiveStockGroup={handleArchiveStockGroup} selectedGroup={selectedGroup} waGroupDialogOpen={waGroupDialogOpen} setWaGroupDialogOpen={setWaGroupDialogOpen} waChats={waChats} waChatsLoading={waChatsLoading} waGroupSearch={waGroupSearch} setWaGroupSearch={setWaGroupSearch} waGroupSelectedId={waGroupSelectedId} setWaGroupSelectedId={setWaGroupSelectedId} waGroupMutation={waGroupMutation} waGroupLocation={waGroupLocation} stockMovementOpen={stockMovementOpen} setStockMovementOpen={setStockMovementOpen} stockMovementItem={stockMovementItem} setStockMovementItem={setStockMovementItem} stockMovementPeriod={stockMovementPeriod} setStockMovementPeriod={setStockMovementPeriod} drillMonth={drillMonth} setDrillMonth={setDrillMonth} formatAmount={formatAmount} navigate={navigate} />
+      {/* ── Main content area ────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-auto">
+        {showAllStock ? (
+          <div className="p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Button variant="ghost" size="sm" className="gap-1" onClick={() => setShowAllStock(false)}>
+                <ArrowLeft className="h-4 w-4" /> Back
+              </Button>
+            </div>
+            <CombinedStockView
+              allInventoryLoading={allInventoryLoading}
+              filteredCombinedRows={filteredCombinedRows}
+              allInventoryData={allInventoryData}
+              allInventoryLocations={allInventoryLocations}
+              allInventoryGroups={allInventoryGroups}
+              categoriesList={categoriesList}
+              allStockSearchTerm={allStockSearchTerm}
+              setAllStockSearchTerm={setAllStockSearchTerm}
+              allStockGroupFilter={allStockGroupFilter}
+              setAllStockGroupFilter={setAllStockGroupFilter}
+              allStockLocationFilter={allStockLocationFilter}
+              setAllStockLocationFilter={setAllStockLocationFilter}
+              allStockCategoryFilter={allStockCategoryFilter}
+              setAllStockCategoryFilter={setAllStockCategoryFilter}
+              allStockSelectedRowIndex={allStockSelectedRowIndex}
+              openMovement={(l, n) => { setStockMovementItem({ stockItemId: 0, stockItemName: "", locationId: l, locationName: n }); setStockMovementOpen(true); }}
+              formatAmount={formatAmount}
+              posUser={posUser}
+              allStockTableRef={allStockTableRef}
+            />
+          </div>
+        ) : (
+          <div className="px-6 py-4 space-y-4">
+
+            {/* ── Breadcrumb ───────────────────────────────────────────────── */}
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              {!selectedLocationLocal ? (
+                <span>Select Location</span>
+              ) : (
+                <>
+                  <button
+                    className="hover:underline hover:text-foreground transition-colors"
+                    onClick={goBackToLocations}
+                  >
+                    Locations
+                  </button>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  {selectedGroup ? (
+                    <>
+                      <button
+                        className="hover:underline hover:text-foreground transition-colors"
+                        onClick={() => { setSelectedGroup(null); setViewAllItems(false); setItemSearchTerm(""); }}
+                      >
+                        {selectedLocationLocal.name}
+                      </button>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                      <span className="text-foreground font-medium">{selectedGroup.groupName}</span>
+                    </>
+                  ) : viewAllItems ? (
+                    <>
+                      <button
+                        className="hover:underline hover:text-foreground transition-colors"
+                        onClick={() => { setViewAllItems(false); setItemSearchTerm(""); }}
+                      >
+                        {selectedLocationLocal.name}
+                      </button>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                      <span className="text-foreground font-medium">All Items</span>
+                    </>
+                  ) : (
+                    <span className="text-foreground font-medium">{selectedLocationLocal.name}</span>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* ── NO LOCATION SELECTED: grid header + cards ────────────────── */}
+            {!selectedLocationLocal && (
+              <>
+                <div className="flex items-center justify-between gap-3">
+                  <h2 className="text-xl font-bold">Location Inventory</h2>
+                  {!posUser && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setShowAllStock(true)}
+                        data-testid="button-view-all-stock"
+                      >
+                        <Globe className="h-4 w-4" /> View All Stock
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setCreateLocationOpen(true)}
+                        data-testid="button-create-location"
+                      >
+                        <Plus className="h-4 w-4" /> Create Location
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <LocationGrid
+                  locations={locations}
+                  locationsLoading={locationsLoading}
+                  selectedLocationLocal={selectedLocationLocal}
+                  setSelectedLocationLocal={(loc) => {
+                    setSelectedLocationLocal(loc as Location | null);
+                    setSelectedGroup(null);
+                    setViewAllItems(false);
+                    setGroupSearchTerm("");
+                    setItemSearchTerm("");
+                    setGroupCategoryFilter("");
+                  }}
+                  locationSearchTerm={locationSearchTerm}
+                  setLocationSearchTerm={setLocationSearchTerm}
+                  posUser={posUser}
+                  openRenameDialog={openRenameDialog}
+                  openWaGroupDialog={openWaGroupDialog}
+                />
+              </>
+            )}
+
+            {/* ── LOCATION SELECTED, no group, no view-all: stock groups ───── */}
+            {selectedLocationLocal && !selectedGroup && !viewAllItems && (
+              <>
+                {/* Location title + action buttons */}
+                <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <Warehouse className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h2 className="text-2xl font-bold truncate">{selectedLocationLocal.name}</h2>
+                        {!posUser && (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => openRenameDialog(selectedLocationLocal)} data-testid="button-rename-location">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => openWaGroupDialog(selectedLocationLocal)} data-testid="button-wa-location">
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">Stock Groups</p>
+                    </div>
+                  </div>
+
+                  {/* Stats pills */}
+                  {!activeInventoryLoading && (
+                    <div className="flex items-center gap-2 flex-wrap text-sm shrink-0">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium text-xs">
+                        <Layers className="h-3 w-3" />
+                        {stockGroups.length} {stockGroups.length === 1 ? "Group" : "Groups"}
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium text-xs">
+                        <Package className="h-3 w-3" />
+                        {totalItems} Items
+                      </span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium text-xs">
+                        {Math.floor(totalQty).toLocaleString()} BL total
+                      </span>
+                      {!posUser && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-muted text-muted-foreground font-medium text-xs">
+                          {formatAmount(totalValue)} total value
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-1.5" data-testid="button-export-dropdown">
+                        <Download className="h-4 w-4" /> Export <ChevronDown className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={handleExportInventory} data-testid="menu-export-excel">
+                        <FileSpreadsheet className="h-4 w-4 mr-2" /> Export to Excel
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePrintWithOption(true)} data-testid="menu-export-pdf-cost">
+                        <Printer className="h-4 w-4 mr-2" /> Export to PDF (with cost)
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handlePrintWithOption(false)} data-testid="menu-export-pdf-nocost">
+                        <Printer className="h-4 w-4 mr-2" /> Export to PDF (without cost)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => { setViewAllItems(true); setItemSearchTerm(""); }}
+                    data-testid="button-view-all-items"
+                  >
+                    <List className="h-4 w-4" /> View All Stock Items
+                  </Button>
+
+                  <Button
+                    variant={showZeroStock ? "default" : "outline"}
+                    size="sm"
+                    className="gap-1.5"
+                    onClick={() => setShowZeroStock(!showZeroStock)}
+                    data-testid="button-show-zero"
+                  >
+                    <Eye className="h-4 w-4" /> Show zero stock
+                  </Button>
+
+                  {!posUser && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-1.5 ml-auto" data-testid="button-location-menu">
+                          Location <ChevronDown className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => openRenameDialog(selectedLocationLocal)}>
+                          <Pencil className="h-4 w-4 mr-2" /> Edit / Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openWaGroupDialog(selectedLocationLocal)}>
+                          <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp Group
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setDeleteDialogOpen(true)}
+                          data-testid="menu-delete-location"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete Location
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </div>
+
+                {/* Search + categories */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search stock groups by name..."
+                      value={groupSearchTerm}
+                      onChange={(e) => setGroupSearchTerm(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-group-search"
+                    />
+                  </div>
+                  <Select value={groupCategoryFilter || "all"} onValueChange={(v) => setGroupCategoryFilter(v === "all" ? "" : v)}>
+                    <SelectTrigger className="w-48" data-testid="select-category-filter">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="none">Uncategorized</SelectItem>
+                      {categoriesList.map(cat => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Stock groups table */}
+                {activeInventoryLoading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="h-12 rounded-lg border bg-muted animate-pulse" />
+                    ))}
+                  </div>
+                ) : filteredStockGroups.length === 0 ? (
+                  <div className="py-16 text-center border-2 border-dashed rounded-lg text-muted-foreground">
+                    {groupSearchTerm
+                      ? "No groups match your search."
+                      : showZeroStock
+                        ? "No stock items found for this location."
+                        : "No items with stock. Toggle \"Show zero stock\" to see all items."}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border overflow-hidden">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-muted/50 border-b">
+                          <th className="text-left px-4 py-3 font-medium">Name</th>
+                          <th className="text-center px-4 py-3 font-medium">Items</th>
+                          <th className="text-right px-4 py-3 font-medium">Total Qty (BL)</th>
+                          {!posUser && (
+                            <>
+                              <th className="text-right px-4 py-3 font-medium">Avg Rate</th>
+                              <th className="text-right px-4 py-3 font-medium">Total Value</th>
+                            </>
+                          )}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredStockGroups.map((g) => (
+                          <tr
+                            key={g.groupId}
+                            className="border-b hover-elevate cursor-pointer"
+                            onClick={() => { setSelectedGroup(g); setItemSearchTerm(""); setItemCategoryFilter([]); }}
+                            data-testid={`row-group-${g.groupId}`}
+                          >
+                            <td className="px-4 py-3 font-medium">{g.groupName}</td>
+                            <td className="px-4 py-3 text-center">
+                              <Badge variant="secondary">{g.itemCount}</Badge>
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono">
+                              {Math.floor(g.totalQuantity).toLocaleString()}
+                              <span className="ml-1 text-xs text-muted-foreground font-normal">BL</span>
+                            </td>
+                            {!posUser && (
+                              <>
+                                <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                                  {formatAmount(g.averageRate)}
+                                </td>
+                                <td className="px-4 py-3 text-right font-mono font-semibold">
+                                  {formatAmount(g.totalValue)}
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/50 border-t-2 font-semibold">
+                          <td className="px-4 py-3 font-bold">Total</td>
+                          <td className="px-4 py-3 text-center">
+                            <Badge variant="secondary">{filteredStockGroups.reduce((s, g) => s + g.itemCount, 0)}</Badge>
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono font-bold">
+                            {Math.floor(filteredStockGroups.reduce((s, g) => s + g.totalQuantity, 0)).toLocaleString()}
+                            <span className="ml-1 text-xs font-normal text-muted-foreground">BL</span>
+                          </td>
+                          {!posUser && (
+                            <>
+                              <td className="px-4 py-3" />
+                              <td className="px-4 py-3 text-right font-mono font-bold">
+                                {formatAmount(filteredStockGroups.reduce((s, g) => s + g.totalValue, 0))}
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+
+                {filteredStockGroups.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Showing {filteredStockGroups.length} of {stockGroups.length} stock {stockGroups.length === 1 ? "group" : "groups"}
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* ── STOCK GROUP SELECTED: items table ────────────────────────── */}
+            {selectedLocationLocal && selectedGroup && !viewAllItems && (
+              <>
+                {/* Stats bar */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Layers className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">{selectedGroup.groupName}</h2>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                      <span><span className="font-semibold text-foreground">{selectedGroup.itemCount}</span> Items</span>
+                      <span><span className="font-semibold text-foreground font-mono">{Math.floor(selectedGroup.totalQuantity).toLocaleString()}</span> BL total</span>
+                      {!posUser && (
+                        <span><span className="font-semibold text-foreground">{formatAmount(selectedGroup.totalValue)}</span> total value</span>
+                      )}
+                    </div>
+                  </div>
+                  {!posUser && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="ml-auto gap-1.5 text-destructive border-destructive/30 hover:bg-destructive/10"
+                      onClick={() => setArchiveDialogOpen(true)}
+                      data-testid="button-archive-group"
+                    >
+                      <Trash2 className="h-4 w-4" /> Archive Group
+                    </Button>
+                  )}
+                </div>
+
+                {/* Search + category */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search items by name..."
+                      value={itemSearchTerm}
+                      onChange={(e) => setItemSearchTerm(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-item-search"
+                    />
+                  </div>
+                  <Select
+                    value={itemCategoryFilter[0] || "all"}
+                    onValueChange={(v) => setItemCategoryFilter(v === "all" ? [] : [v])}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      <SelectItem value="none">Uncategorized</SelectItem>
+                      {categoriesList.map(cat => (
+                        <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <InventoryTable
+                  filteredStockItems={filteredStockItems}
+                  showMovement={showMovement}
+                  openingInventoryMap={openingInventoryMap}
+                  selectedRowIndex={selectedRowIndex}
+                  setSelectedRowIndex={setSelectedRowIndex}
+                  navigate={navigate}
+                  formatAmount={formatAmount}
+                  posUser={posUser}
+                  itemSearchTerm={itemSearchTerm}
+                  inventory={inventory}
+                  selectedGroup={selectedGroup}
+                />
+              </>
+            )}
+
+            {/* ── VIEW ALL ITEMS ────────────────────────────────────────────── */}
+            {selectedLocationLocal && viewAllItems && !selectedGroup && (
+              <>
+                {/* Stats */}
+                <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                  <span className="font-semibold text-foreground">{totalItems}</span> Items
+                  <span className="text-muted-foreground">·</span>
+                  <span className="font-semibold text-foreground font-mono">{Math.floor(totalQty).toLocaleString()}</span> BL total
+                  {!posUser && (
+                    <>
+                      <span className="text-muted-foreground">·</span>
+                      <span className="font-semibold text-foreground">{formatAmount(totalValue)}</span> total value
+                    </>
+                  )}
+                </div>
+
+                {/* Search */}
+                <div className="relative max-w-sm">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search items by name..."
+                    value={itemSearchTerm}
+                    onChange={(e) => setItemSearchTerm(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-all-item-search"
+                  />
+                </div>
+
+                <InventoryTable
+                  filteredStockItems={allItemsFiltered}
+                  showMovement={showMovement}
+                  openingInventoryMap={openingInventoryMap}
+                  selectedRowIndex={selectedRowIndex}
+                  setSelectedRowIndex={setSelectedRowIndex}
+                  navigate={navigate}
+                  formatAmount={formatAmount}
+                  posUser={posUser}
+                  itemSearchTerm={itemSearchTerm}
+                  inventory={inventory}
+                  selectedGroup={null}
+                />
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Hidden print ref */}
+      <div ref={printRef} className="hidden print:block p-6">
+        <h1 className="text-2xl font-bold mb-2">{selectedLocationLocal?.name} — Inventory</h1>
+        <p className="text-sm text-muted-foreground mb-4">Printed {new Date().toLocaleDateString()}</p>
+        <InventoryTable
+          filteredStockItems={allItemsFiltered}
+          showMovement={showMovement}
+          openingInventoryMap={openingInventoryMap}
+          selectedRowIndex={-1}
+          setSelectedRowIndex={() => {}}
+          navigate={navigate}
+          formatAmount={formatAmount}
+          posUser={printWithCost ? false : true}
+          itemSearchTerm=""
+          inventory={inventory}
+          selectedGroup={null}
+        />
+      </div>
+
+      {/* Create Location dialog */}
+      <Dialog open={createLocationOpen} onOpenChange={setCreateLocationOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Create Location</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            <Label htmlFor="create-loc-name">Location Name</Label>
+            <Input
+              id="create-loc-name"
+              value={createLocationName}
+              onChange={(e) => setCreateLocationName(e.target.value)}
+              placeholder="e.g. Warehouse A"
+              data-testid="input-create-location-name"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && createLocationName.trim()) {
+                  createLocationMutation.mutate(createLocationName.trim());
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateLocationOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => createLocationMutation.mutate(createLocationName.trim())}
+              disabled={createLocationMutation.isPending || !createLocationName.trim()}
+              data-testid="button-confirm-create-location"
+            >
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* All other dialogs */}
+      <LocationDialogs
+        renameDialogOpen={renameDialogOpen}
+        setRenameDialogOpen={setRenameDialogOpen}
+        renamingLocation={renamingLocation}
+        renameInput={renameInput}
+        setRenameInput={setRenameInput}
+        renameDeductionInput={renameDeductionInput}
+        setRenameDeductionInput={setRenameDeductionInput}
+        renameLocationMutation={renameLocationMutation}
+        deleteDialogOpen={deleteDialogOpen}
+        setDeleteDialogOpen={setDeleteDialogOpen}
+        isDeleting={isDeleting}
+        handleDeleteLocation={handleDeleteLocation}
+        selectedLocationLocal={selectedLocationLocal}
+        archiveDialogOpen={archiveDialogOpen}
+        setArchiveDialogOpen={setArchiveDialogOpen}
+        isArchiving={isArchiving}
+        handleArchiveStockGroup={handleArchiveStockGroup}
+        selectedGroup={selectedGroup}
+        waGroupDialogOpen={waGroupDialogOpen}
+        setWaGroupDialogOpen={setWaGroupDialogOpen}
+        waChats={waChats}
+        waChatsLoading={waChatsLoading}
+        waGroupSearch={waGroupSearch}
+        setWaGroupSearch={setWaGroupSearch}
+        waGroupSelectedId={waGroupSelectedId}
+        setWaGroupSelectedId={setWaGroupSelectedId}
+        waGroupMutation={waGroupMutation}
+        waGroupLocation={waGroupLocation}
+        stockMovementOpen={stockMovementOpen}
+        setStockMovementOpen={setStockMovementOpen}
+        stockMovementItem={stockMovementItem}
+        setStockMovementItem={setStockMovementItem}
+        stockMovementPeriod={stockMovementPeriod}
+        setStockMovementPeriod={setStockMovementPeriod}
+        drillMonth={drillMonth}
+        setDrillMonth={setDrillMonth}
+        formatAmount={formatAmount}
+        navigate={navigate}
+      />
     </div>
   );
 }
