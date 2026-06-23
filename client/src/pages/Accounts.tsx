@@ -243,15 +243,9 @@ export default function Accounts() {
 
   const filteredAccounts = useMemo(() => {
     const searchLower = searchTerm.toLowerCase();
-    const filtered = allAccounts.filter(
+    return allAccounts.filter(
       (a) => a.name.toLowerCase().includes(searchLower) || a.code.toLowerCase().includes(searchLower)
     );
-
-    const parents = filtered.filter((a) => a.type === "ledger" && !a.code.includes("."));
-    return parents.map((p) => ({
-      ...p,
-      children: filtered.filter((c) => c.type === "ledger" && c.code.startsWith(`${p.code}.`)),
-    }));
   }, [allAccounts, searchTerm]);
 
   // Handlers
@@ -363,14 +357,20 @@ export default function Accounts() {
                   className="pl-9"
                 />
               </div>
-              <AccountTable
-                filteredAccounts={filteredAccounts}
-                expandedParents={expandedParents}
-                toggleParent={toggleParent}
-                handleAccountChange={handleAccountChange}
-                hideBalances={hideBalances}
-                formatAmount={formatAmount}
-              />
+              {accountsLoading ? (
+                <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+                  Loading accounts…
+                </div>
+              ) : (
+                <AccountTable
+                  filteredAccounts={filteredAccounts}
+                  expandedParents={expandedParents}
+                  toggleParent={toggleParent}
+                  handleAccountChange={handleAccountChange}
+                  hideBalances={hideBalances}
+                  formatAmount={formatAmount}
+                />
+              )}
             </div>
           ) : (
             <AccountStatementView
