@@ -1,257 +1,91 @@
-import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, serial, integer, decimal, date, boolean, timestamp, uniqueIndex, index, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Companies table - represents different business entities
-export const companies = pgTable("companies", {
-  id: serial("id").primaryKey(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
-  name: text("name").notNull(),
-  companyType: text("company_type").notNull().default("erp"),
-  active: boolean("active").notNull().default(true),
-  baseCurrency: varchar("base_currency", { length: 10 }).default("USD"),
-  displayCurrency: varchar("display_currency", { length: 10 }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  transferWaGroupChatId: text("transfer_wa_group_chat_id"),
-});
+// ── Domain file imports ───────────────────────────────────────────────────────
+import {
+  companies, insertCompanySchema, exchangeRates, insertExchangeRateSchema,
+  locations, insertLocationSchema, auditLog, companySettings, insertCompanySettingsSchema,
+  systemSettings, insertSystemSettingSchema,
+  FEATURE_KEYS, FEATURE_PAGE_INFO, FEATURE_ROUTES, ROUTE_TO_FEATURE,
+} from './common';
+export type { InsertCompany, Company, InsertExchangeRate, ExchangeRate, InsertLocation, Location, AuditLog, InsertCompanySettings, CompanySettings, InsertSystemSetting, SystemSetting, FeatureKey } from './common';
 
-export const insertCompanySchema = createInsertSchema(companies).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  code: z.string().min(1, "Code is required"),
-  name: z.string().min(1, "Name is required"),
-  companyType: z.enum(["erp", "factory", "factory_v2", "properties", "supplier_partner"]).default("erp"),
-  baseCurrency: z.string().optional(),
-  displayCurrency: z.string().optional(),
-});
+import {
+  ledgerAccounts, insertLedgerAccountSchema, updateLedgerAccountSchema,
+  bankAccounts, insertBankAccountSchema, fixedAssets, insertFixedAssetSchema,
+} from './accounting';
+export type { InsertLedgerAccount, UpdateLedgerAccount, LedgerAccount, InsertBankAccount, BankAccount, InsertFixedAsset, FixedAsset } from './accounting';
 
-// Exchange rates table - stores historical exchange rates for multi-currency companies
-export const exchangeRates = pgTable("exchange_rates", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  fromCurrency: varchar("from_currency", { length: 10 }).notNull(),
-  toCurrency: varchar("to_currency", { length: 10 }).notNull(),
-  rate: decimal("rate", { precision: 20, scale: 6 }).notNull(),
-  effectiveDate: date("effective_date").notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("exchange_rates_company_idx").on(t.companyId),
-}));
+import {
+  stockGroups, insertStockGroupSchema, stockGrades, insertStockGradeSchema,
+  stockCategories, insertStockCategorySchema, stockItems, insertStockItemSchema,
+  stockItemCodeAliases, insertStockItemCodeAliasSchema, inventory, insertInventorySchema,
+  stockItemLocationPrices, insertStockItemLocationPriceSchema,
+  stockGroupLocationArchives, insertStockGroupLocationArchiveSchema,
+  stockGroupLocationArchiveItems, insertStockGroupLocationArchiveItemSchema,
+} from './inventory';
+export type { InsertStockGroup, StockGroup, InsertStockGrade, StockGrade, InsertStockCategory, StockCategory, InsertStockItem, StockItem, InsertStockItemCodeAlias, StockItemCodeAlias, InsertInventory, Inventory, InsertStockItemLocationPrice, StockItemLocationPrice, InsertStockGroupLocationArchive, StockGroupLocationArchive, InsertStockGroupLocationArchiveItem, StockGroupLocationArchiveItem } from './inventory';
 
-export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  fromCurrency: z.string().min(1, "From currency is required"),
-  toCurrency: z.string().min(1, "To currency is required"),
-  rate: z.string().min(1, "Rate is required"),
-  effectiveDate: z.string().min(1, "Effective date is required"),
-});
+import {
+  users, insertUserSchema, userNotes, userCompanyRoles, insertUserCompanyRoleSchema,
+  userLocations, insertUserLocationSchema, userLocationCashAccounts, insertUserLocationCashAccountSchema,
+  userPreferences, insertUserPreferencesSchema, userPresence, insertUserPresenceSchema, updatePresenceSchema,
+  userActivityLog, loginHistory, directMessages, insertDirectMessageSchema,
+  roleFeaturePermissions, insertRoleFeaturePermissionSchema,
+} from './users';
+export type { InsertUser, User, UserNote, InsertUserCompanyRole, UserCompanyRole, InsertUserLocation, UserLocation, InsertUserLocationCashAccount, UserLocationCashAccount, InsertUserPreferences, UserPreferences, InsertUserPresence, UserPresence, UpdatePresence, UserActivityLog, LoginHistory, InsertDirectMessage, DirectMessage, InsertRoleFeaturePermission, RoleFeaturePermission } from './users';
 
-export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
-export type ExchangeRate = typeof exchangeRates.$inferSelect;
+import {
+  draftPosSales, insertDraftPosSaleSchema, draftPosSaleItems, insertDraftPosSaleItemSchema,
+  posShifts, insertPosShiftSchema, closePosShiftSchema, posOfflineQueue, insertPosOfflineQueueSchema,
+} from './pos';
+export type { InsertDraftPosSale, DraftPosSale, InsertDraftPosSaleItem, DraftPosSaleItem, InsertPosShift, PosShift, ClosePosShift, InsertPosOfflineQueue, PosOfflineQueue } from './pos';
 
-export type InsertCompany = z.infer<typeof insertCompanySchema>;
-export type Company = typeof companies.$inferSelect;
+import {
+  propertyUnits, insertPropertyUnitSchema, propertyContracts, insertPropertyContractSchema,
+  propertyMonthlyLedger, insertPropertyMonthlyLedgerSchema, propertyPayments, insertPropertyPaymentSchema,
+  rentalAutoTransferConfigs, insertRentalAutoTransferConfigSchema,
+} from './properties';
+export type { InsertPropertyUnit, PropertyUnit, InsertPropertyContract, PropertyContract, InsertPropertyMonthlyLedger, PropertyMonthlyLedger, InsertPropertyPayment, PropertyPayment, InsertRentalAutoTransferConfig, RentalAutoTransferConfig } from './properties';
 
-// User-Company-Role junction table - allows users to have different roles in different companies
-export const userCompanyRoles = pgTable("user_company_roles", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
-  companyId: integer("company_id").notNull(),
-  role: text("role").notNull(),
-  assignedLocationId: integer("assigned_location_id").references(() => locations.id, { onDelete: "restrict" }),
-  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
-  posStation: integer("pos_station"),
-  canSellNegativeStock: boolean("can_sell_negative_stock").notNull().default(false),
-  posViewOnly: boolean("pos_view_only").notNull().default(false),
-  daybookEditDays: integer("daybook_edit_days").notNull().default(0),
-  canAccessCustomers: boolean("can_access_customers").notNull().default(false),
-  canDeleteRecords: boolean("can_delete_records").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("user_company_roles_company_idx").on(t.companyId),
-}));
+import {
+  spContainers, insertSpContainerSchema, spContainerLines, insertSpContainerLineSchema,
+  spPrepaidCharges, insertSpPrepaidChargeSchema, spOffloads, insertSpOffloadSchema,
+  spOffloadCharges, insertSpOffloadChargeSchema, spStockMovements, insertSpStockMovementSchema,
+  spSales, insertSpSaleSchema, spSaleLines, insertSpSaleLineSchema,
+  spProfitSplits, insertSpProfitSplitSchema,
+} from './sp';
+export type { InsertSpContainer, SpContainer, InsertSpContainerLine, SpContainerLine, InsertSpPrepaidCharge, SpPrepaidCharge, InsertSpOffload, SpOffload, InsertSpOffloadCharge, SpOffloadCharge, InsertSpStockMovement, SpStockMovement, InsertSpSale, SpSale, InsertSpSaleLine, SpSaleLine, InsertSpProfitSplit, SpProfitSplit } from './sp';
 
-export const insertUserCompanyRoleSchema = createInsertSchema(userCompanyRoles).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  userId: z.string().min(1, "User ID is required"),
-  companyId: z.number().min(1, "Company ID is required"),
-  role: z.enum(["Developer", "Admin", "Owner", "Manager", "POS", "Normal User", "View Only"]),
-});
-
-export type InsertUserCompanyRole = z.infer<typeof insertUserCompanyRoleSchema>;
-export type UserCompanyRole = typeof userCompanyRoles.$inferSelect;
-
-export const userLocations = pgTable("user_locations", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
-  companyId: integer("company_id").notNull(),
-  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("user_locations_company_idx").on(t.companyId),
-}));
-
-export const insertUserLocationSchema = createInsertSchema(userLocations).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertUserLocation = z.infer<typeof insertUserLocationSchema>;
-export type UserLocation = typeof userLocations.$inferSelect;
-
-export const userLocationCashAccounts = pgTable("user_location_cash_accounts", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
-  companyId: integer("company_id").notNull(),
-  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-  cashAccountId: integer("cash_account_id").notNull().references(() => ledgerAccounts.id, { onDelete: "restrict" }),
-  posStation: integer("pos_station"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqueUserCompanyLocation: uniqueIndex("ulca_user_company_location_unique").on(t.userId, t.companyId, t.locationId),
-  companyIdx: index("ulca_company_idx").on(t.companyId),
-  userIdx: index("ulca_user_idx").on(t.userId),
-}));
-
-export const insertUserLocationCashAccountSchema = createInsertSchema(userLocationCashAccounts).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertUserLocationCashAccount = z.infer<typeof insertUserLocationCashAccountSchema>;
-export type UserLocationCashAccount = typeof userLocationCashAccounts.$inferSelect;
-
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
-  active: boolean("active").notNull().default(true),
-  chatbotEnabled: boolean("chatbot_enabled").notNull().default(true),
-  hiddenErpCostFields: text("hidden_erp_cost_fields").array().notNull().default([]),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-// ── User Notes (personal, private, per-user) ──────────────────────────────────
-export const userNotes = pgTable("user_notes", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  content: text("content").notNull().default(""),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-export type UserNote = typeof userNotes.$inferSelect;
-
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  username: z.string().min(1, "Username is required"),
-  password: z.string().min(4, "Password must be at least 4 characters"),
-});
-
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-
-// Audit Log table - tracks all changes to records
-export const auditLog = pgTable("audit_log", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
-  username: text("username").notNull(),
-  companyId: integer("company_id"),
-  action: text("action").notNull(), // 'create', 'update', 'delete'
-  tableName: text("table_name").notNull(),
-  recordId: integer("record_id"),
-  recordIdentifier: text("record_identifier"), // human-readable identifier (e.g., voucher number)
-  changes: jsonb("changes"), // { field: { old: value, new: value } }
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export type AuditLog = typeof auditLog.$inferSelect;
-
-export const locations = pgTable("locations", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
-  name: text("name").notNull(),
-  city: text("city"),
-  state: text("state"),
-  country: text("country"),
-  active: boolean("active").notNull().default(true),
-  deletedAt: timestamp("deleted_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  whatsappGroupChatId: text("whatsapp_group_chat_id"),
-  transferWaGroupChatId: text("transfer_wa_group_chat_id"),
-  // For supplier_partner companies: per-qty deduction from Supplier Cash Payable.
-  // This represents an internal payable adjustment (e.g. warehouse transfer loss) —
-  // NOT income, profit, gain, or expense. Excluded from reports and Net Position.
-  supplierPartnerPayableDeductionPerQty: decimal("supplier_partner_payable_deduction_per_qty", { precision: 20, scale: 4 }).notNull().default("0"),
-}, (t) => ({
-  companyIdx: index("locations_company_idx").on(t.companyId),
-}));
-
-export const insertLocationSchema = createInsertSchema(locations).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  code: z.string().optional(),
-  name: z.string().min(1, "Name is required"),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  country: z.string().optional(),
-});
-
-export type InsertLocation = z.infer<typeof insertLocationSchema>;
-export type Location = typeof locations.$inferSelect;
-
-export const ledgerAccounts = pgTable("ledger_accounts", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull(),
-  name: text("name").notNull(),
-  accountType: text("account_type").notNull(),
-  subType: text("sub_type"),
-  parentId: integer("parent_id"),
-  openingBalance: decimal("opening_balance", { precision: 20, scale: 2 }).default("0"),
-  openingBalanceSide: text("opening_balance_side"),
-  active: boolean("active").notNull().default(true),
-  isHidden: boolean("is_hidden").notNull().default(false),
-  deletedAt: timestamp("deleted_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqueCompanyCode: uniqueIndex("ledger_accounts_company_code_unique").on(t.companyId, t.code),
-  companyDeletedCodeIdx: index("ledger_accounts_company_deleted_code_idx").on(t.companyId, t.deletedAt, t.code),
-  companyTypeIdx: index("ledger_accounts_company_type_idx").on(t.companyId, t.accountType),
-}));
-
-export const insertLedgerAccountSchema = createInsertSchema(ledgerAccounts).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  code: z.string().optional(),
-  name: z.string().min(1, "Name is required").refine(val => val.trim().length > 0, "Name cannot be only whitespace"),
-  accountType: z.enum(["Asset", "Liability", "Equity", "Income", "Expense", "Bank", "Cash", "Indirect Expense", "Direct Expense", "Government Taxes", "Loans", "Duty Agent", "Transporter Agent", "Accounts Payable", "Profit"]),
-  subType: z.string().optional(),
-  openingBalance: z.string().optional(),
-  openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
-  parentId: z.number().optional(),
-});
-
-export const updateLedgerAccountSchema = insertLedgerAccountSchema.partial().extend({
-  id: z.number().min(1, "Account ID is required"),
-}).required({ id: true });
-
-export type InsertLedgerAccount = z.infer<typeof insertLedgerAccountSchema>;
-export type UpdateLedgerAccount = z.infer<typeof updateLedgerAccountSchema>;
-export type LedgerAccount = typeof ledgerAccounts.$inferSelect;
+// Re-export domain imports for backward-compat (erp/containers/factory barrel imports from here)
+export {
+  companies, insertCompanySchema, exchangeRates, insertExchangeRateSchema,
+  locations, insertLocationSchema, auditLog, companySettings, insertCompanySettingsSchema,
+  systemSettings, insertSystemSettingSchema, FEATURE_KEYS, FEATURE_PAGE_INFO, FEATURE_ROUTES, ROUTE_TO_FEATURE,
+  ledgerAccounts, insertLedgerAccountSchema, updateLedgerAccountSchema,
+  bankAccounts, insertBankAccountSchema, fixedAssets, insertFixedAssetSchema,
+  stockGroups, insertStockGroupSchema, stockGrades, insertStockGradeSchema,
+  stockCategories, insertStockCategorySchema, stockItems, insertStockItemSchema,
+  stockItemCodeAliases, insertStockItemCodeAliasSchema, inventory, insertInventorySchema,
+  stockItemLocationPrices, insertStockItemLocationPriceSchema,
+  stockGroupLocationArchives, insertStockGroupLocationArchiveSchema,
+  stockGroupLocationArchiveItems, insertStockGroupLocationArchiveItemSchema,
+  users, insertUserSchema, userNotes, userCompanyRoles, insertUserCompanyRoleSchema,
+  userLocations, insertUserLocationSchema, userLocationCashAccounts, insertUserLocationCashAccountSchema,
+  userPreferences, insertUserPreferencesSchema, userPresence, insertUserPresenceSchema, updatePresenceSchema,
+  userActivityLog, loginHistory, directMessages, insertDirectMessageSchema,
+  roleFeaturePermissions, insertRoleFeaturePermissionSchema,
+  draftPosSales, insertDraftPosSaleSchema, draftPosSaleItems, insertDraftPosSaleItemSchema,
+  posShifts, insertPosShiftSchema, closePosShiftSchema, posOfflineQueue, insertPosOfflineQueueSchema,
+  propertyUnits, insertPropertyUnitSchema, propertyContracts, insertPropertyContractSchema,
+  propertyMonthlyLedger, insertPropertyMonthlyLedgerSchema, propertyPayments, insertPropertyPaymentSchema,
+  rentalAutoTransferConfigs, insertRentalAutoTransferConfigSchema,
+  spContainers, insertSpContainerSchema, spContainerLines, insertSpContainerLineSchema,
+  spPrepaidCharges, insertSpPrepaidChargeSchema, spOffloads, insertSpOffloadSchema,
+  spOffloadCharges, insertSpOffloadChargeSchema, spStockMovements, insertSpStockMovementSchema,
+  spSales, insertSpSaleSchema, spSaleLines, insertSpSaleLineSchema, spProfitSplits, insertSpProfitSplitSchema,
+};
 
 export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),
@@ -382,195 +216,6 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({
 
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Supplier = typeof suppliers.$inferSelect;
-
-export const stockGroups = pgTable("stock_groups", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull(),
-  name: text("name").notNull(),
-  parentId: integer("parent_id"),
-  active: boolean("active").notNull().default(true),
-  deletedAt: timestamp("deleted_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqueCompanyCode: uniqueIndex("stock_groups_company_code_unique").on(t.companyId, t.code),
-}));
-
-export const insertStockGroupSchema = createInsertSchema(stockGroups).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  code: z.string().min(1, "Code is required"),
-  name: z.string().min(1, "Name is required"),
-});
-
-export type InsertStockGroup = z.infer<typeof insertStockGroupSchema>;
-export type StockGroup = typeof stockGroups.$inferSelect;
-
-export const stockGrades = pgTable("stock_grades", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  name: text("name").notNull(),
-  active: boolean("active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertStockGradeSchema = createInsertSchema(stockGrades).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  name: z.string().min(1, "Name is required"),
-});
-
-export type InsertStockGrade = z.infer<typeof insertStockGradeSchema>;
-export type StockGrade = typeof stockGrades.$inferSelect;
-
-export const stockCategories = pgTable("stock_categories", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  name: text("name").notNull(),
-  active: boolean("active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertStockCategorySchema = createInsertSchema(stockCategories).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  name: z.string().min(1, "Name is required"),
-});
-
-export type InsertStockCategory = z.infer<typeof insertStockCategorySchema>;
-export type StockCategory = typeof stockCategories.$inferSelect;
-
-export const stockItems = pgTable("stock_items", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull(),
-  name: text("name").notNull(),
-  stockGroupId: integer("stock_group_id"),
-  gradeId: integer("grade_id"),
-  categoryId: integer("category_id"),
-  uom: text("uom").notNull(),
-  openingQty: decimal("opening_qty", { precision: 15, scale: 3 }).default("0"),
-  openingRate: decimal("opening_rate", { precision: 15, scale: 2 }).default("0"),
-  openingValue: decimal("opening_value", { precision: 15, scale: 2 }).default("0"),
-  reorderLevel: decimal("reorder_level", { precision: 15, scale: 3 }).default("0"),
-  sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).default("0"),
-  active: boolean("active").notNull().default(true),
-  deletedAt: timestamp("deleted_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqueCompanyCode: uniqueIndex("stock_items_company_code_unique").on(t.companyId, t.code),
-  companyDeletedCodeIdx: index("stock_items_company_deleted_code_idx").on(t.companyId, t.deletedAt, t.code),
-  companyGroupIdx: index("stock_items_company_group_idx").on(t.companyId, t.stockGroupId),
-}));
-
-export const insertStockItemSchema = createInsertSchema(stockItems).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  code: z.string().min(1, "Code is required"),
-  name: z.string().min(1, "Name is required"),
-  uom: z.string().min(1, "Unit of measure is required"),
-});
-
-export type InsertStockItem = z.infer<typeof insertStockItemSchema>;
-export type StockItem = typeof stockItems.$inferSelect;
-
-export const stockItemCodeAliases = pgTable("stock_item_code_aliases", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "cascade" }),
-  aliasCode: varchar("alias_code", { length: 50 }).notNull(),
-  description: text("description"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqueCompanyAlias: uniqueIndex("stock_item_code_aliases_company_alias_unique").on(t.companyId, t.aliasCode),
-}));
-
-export const insertStockItemCodeAliasSchema = createInsertSchema(stockItemCodeAliases).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  stockItemId: z.number().min(1, "Stock item is required"),
-  aliasCode: z.string().min(1, "Alias code is required"),
-  description: z.string().optional(),
-});
-
-export type InsertStockItemCodeAlias = z.infer<typeof insertStockItemCodeAliasSchema>;
-export type StockItemCodeAlias = typeof stockItemCodeAliases.$inferSelect;
-
-export const bankAccounts = pgTable("bank_accounts", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
-  name: text("name").notNull(),
-  bankName: text("bank_name").notNull(),
-  accountNumber: text("account_number").notNull(),
-  routingCode: text("routing_code"),
-  linkedLedgerId: integer("linked_ledger_id"),
-  openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }).default("0"),
-  openingBalanceSide: text("opening_balance_side"),
-  active: boolean("active").notNull().default(true),
-  deletedAt: timestamp("deleted_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("bank_accounts_company_idx").on(t.companyId),
-}));
-
-export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  code: z.string().min(1, "Code is required"),
-  name: z.string().min(1, "Name is required"),
-  bankName: z.string().min(1, "Bank name is required"),
-  accountNumber: z.string().min(1, "Account number is required"),
-  openingBalanceSide: z.enum(["Dr", "Cr"]).optional().or(z.literal("")),
-});
-
-export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
-export type BankAccount = typeof bankAccounts.$inferSelect;
-
-export const fixedAssets = pgTable("fixed_assets", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  code: varchar("code", { length: 50 }).notNull().unique(),
-  name: text("name").notNull(),
-  category: text("category").notNull(),
-  purchaseDate: date("purchase_date").notNull(),
-  purchaseAmount: decimal("purchase_amount", { precision: 15, scale: 2 }).notNull(),
-  depreciationMethod: text("depreciation_method").notNull().default("None"),
-  usefulLife: integer("useful_life"),
-  openingBalance: decimal("opening_balance", { precision: 15, scale: 2 }),
-  active: boolean("active").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("fixed_assets_company_idx").on(t.companyId),
-}));
-
-export const insertFixedAssetSchema = createInsertSchema(fixedAssets).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  code: z.string().min(1, "Code is required"),
-  name: z.string().min(1, "Name is required"),
-  category: z.string().min(1, "Category is required"),
-  purchaseDate: z.string().min(1, "Purchase date is required"),
-  purchaseAmount: z.string().min(1, "Purchase amount is required"),
-  depreciationMethod: z.enum(["None", "StraightLine", "Declining"]),
-});
-
-export type InsertFixedAsset = z.infer<typeof insertFixedAssetSchema>;
-export type FixedAsset = typeof fixedAssets.$inferSelect;
 
 export const containers = pgTable("containers", {
   id: serial("id").primaryKey(),
@@ -812,37 +457,6 @@ export const insertImportLogSchema = createInsertSchema(importLogs).omit({
 
 export type InsertImportLog = z.infer<typeof insertImportLogSchema>;
 export type ImportLog = typeof importLogs.$inferSelect;
-
-export const inventory = pgTable("inventory", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
-  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
-  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull().default("0"),
-  averageRate: decimal("average_rate", { precision: 20, scale: 2 }).notNull().default("0"),
-  totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull().default("0"),
-  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("inventory_company_idx").on(t.companyId),
-  uniqueLocationItem: uniqueIndex("inventory_location_item_unique").on(t.locationId, t.stockItemId),
-  locationIdx: index("inventory_location_idx").on(t.locationId),
-  stockItemIdx: index("inventory_stock_item_idx").on(t.stockItemId),
-  companyLocationIdx: index("inventory_company_location_idx").on(t.companyId, t.locationId),
-}));
-
-export const insertInventorySchema = createInsertSchema(inventory).omit({
-  id: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  locationId: z.number().min(1, "Location is required"),
-  stockItemId: z.number().min(1, "Stock item is required"),
-  quantity: z.string(),
-  averageRate: z.string(),
-  totalValue: z.string(),
-});
-
-export type InsertInventory = z.infer<typeof insertInventorySchema>;
-export type Inventory = typeof inventory.$inferSelect;
 
 export const containerOffloads = pgTable("container_offloads", {
   id: serial("id").primaryKey(),
@@ -1286,60 +900,6 @@ export const employeeBalePctRates = pgTable("employee_bale_pct_rates", {
 }));
 export type EmployeeBalePctRate = typeof employeeBalePctRates.$inferSelect;
 
-// Draft POS Sales - stores unsaved POS transactions for later completion
-export const draftPosSales = pgTable("draft_pos_sales", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id", { length: 255 }).notNull(),
-  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-  paymentAccountType: text("payment_account_type"), // "bank", "cash", or "credit"
-  paymentAccountId: integer("payment_account_id"),
-  isCreditSale: boolean("is_credit_sale").default(false),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const insertDraftPosSaleSchema = createInsertSchema(draftPosSales).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  userId: z.string().min(1, "User is required"),
-  locationId: z.number().min(1, "Location is required"),
-  paymentAccountType: z.enum(["bank", "cash", "credit"]).optional(),
-  paymentAccountId: z.number().optional(),
-  isCreditSale: z.boolean().optional(),
-  notes: z.string().optional(),
-});
-
-export type InsertDraftPosSale = z.infer<typeof insertDraftPosSaleSchema>;
-export type DraftPosSale = typeof draftPosSales.$inferSelect;
-
-// Draft POS Sale Items - line items for draft sales
-export const draftPosSaleItems = pgTable("draft_pos_sale_items", {
-  id: serial("id").primaryKey(),
-  draftId: integer("draft_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "cascade" }),
-  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
-  rate: decimal("rate", { precision: 15, scale: 2 }).notNull(),
-  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
-
-export const insertDraftPosSaleItemSchema = createInsertSchema(draftPosSaleItems).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  draftId: z.number().min(1, "Draft is required"),
-  stockItemId: z.number().min(1, "Stock item is required"),
-  quantity: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0, "Quantity must be positive"),
-  rate: z.string().refine((val) => !isNaN(parseFloat(val)) && parseFloat(val) >= 0, "Rate must be non-negative"),
-  amount: z.string(),
-});
-
-export type InsertDraftPosSaleItem = z.infer<typeof insertDraftPosSaleItemSchema>;
-export type DraftPosSaleItem = typeof draftPosSaleItems.$inferSelect;
-
 // Customers - similar to suppliers but for container sales
 export const customers = pgTable("customers", {
   id: serial("id").primaryKey(),
@@ -1611,44 +1171,6 @@ export const insertDashboardPayableAccountSchema = createInsertSchema(dashboardP
 
 export type InsertDashboardPayableAccount = z.infer<typeof insertDashboardPayableAccountSchema>;
 export type DashboardPayableAccount = typeof dashboardPayableAccounts.$inferSelect;
-
-// Company Settings - stores company-specific configuration like logos
-export const companySettings = pgTable("company_settings", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull().unique(),
-  logoUrl: text("logo_url"),
-  logoFileName: text("logo_file_name"),
-  logoUpdatedAt: timestamp("logo_updated_at"),
-  invoiceFooter: text("invoice_footer"),
-  parentCreditAccountId: integer("parent_credit_account_id"),
-  netPositionAdjustment: decimal("net_position_adjustment", { precision: 15, scale: 2 }).default("0"),
-  posExcelImportEnabled: boolean("pos_excel_import_enabled").default(false),
-  timezone: text("timezone"),
-  spPosPayableAccountId: integer("sp_pos_payable_account_id"),
-  spPosProfitAccountId: integer("sp_pos_profit_account_id"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const insertCompanySettingsSchema = createInsertSchema(companySettings).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  logoUrl: z.string().optional(),
-  logoFileName: z.string().optional(),
-  invoiceFooter: z.string().optional(),
-  parentCreditAccountId: z.number().nullable().optional(),
-  netPositionAdjustment: z.string().optional(),
-  posExcelImportEnabled: z.boolean().optional(),
-  timezone: z.string().optional(),
-  spPosPayableAccountId: z.number().nullable().optional(),
-  spPosProfitAccountId: z.number().nullable().optional(),
-});
-
-export type InsertCompanySettings = z.infer<typeof insertCompanySettingsSchema>;
-export type CompanySettings = typeof companySettings.$inferSelect;
 
 // Bales - tracks factory bales for clothing grading/sorting business
 export const bales = pgTable("bales", {
@@ -2053,55 +1575,6 @@ export const insertCustomerBalanceSchema = createInsertSchema(customerBalances).
 export type InsertCustomerBalance = z.infer<typeof insertCustomerBalanceSchema>;
 export type CustomerBalance = typeof customerBalances.$inferSelect;
 
-// Stock Item Location Prices - allows different selling prices per location
-export const stockItemLocationPrices = pgTable("stock_item_location_prices", {
-  id: serial("id").primaryKey(),
-  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "cascade" }),
-  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-  sellingPrice: decimal("selling_price", { precision: 15, scale: 2 }).notNull(),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqueItemLocation: uniqueIndex("stock_item_location_prices_item_location_unique").on(t.stockItemId, t.locationId),
-}));
-
-export const insertStockItemLocationPriceSchema = createInsertSchema(stockItemLocationPrices).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  stockItemId: z.number().min(1, "Stock item is required"),
-  locationId: z.number().min(1, "Location is required"),
-  sellingPrice: z.string().min(1, "Selling price is required"),
-});
-
-export type InsertStockItemLocationPrice = z.infer<typeof insertStockItemLocationPriceSchema>;
-export type StockItemLocationPrice = typeof stockItemLocationPrices.$inferSelect;
-
-// User Preferences - stores user-specific settings like date format
-export const userPreferences = pgTable("user_preferences", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
-  dateFormat: text("date_format").notNull().default("MM/DD/YYYY"),
-  preferredCurrency: varchar("preferred_currency", { length: 10 }),
-  showProfitComparisonOnPOS: boolean("show_profit_comparison_on_pos").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const insertUserPreferencesSchema = createInsertSchema(userPreferences).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  userId: z.string().min(1, "User ID is required"),
-  dateFormat: z.enum(["MM/DD/YYYY", "DD/MM/YYYY"]).default("MM/DD/YYYY"),
-  preferredCurrency: z.string().nullable().optional(),
-});
-
-export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
-export type UserPreferences = typeof userPreferences.$inferSelect;
-
 // AI Chatbot Messages (legacy)
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
@@ -2205,39 +1678,6 @@ export const insertAiCorrectionMemorySchema = createInsertSchema(aiCorrectionMem
 export type InsertAiCorrectionMemory = z.infer<typeof insertAiCorrectionMemorySchema>;
 export type AiCorrectionMemory = typeof aiCorrectionMemory.$inferSelect;
 
-// Direct Messages - user-to-user chat
-export const directMessages = pgTable("direct_messages", {
-  id: serial("id").primaryKey(),
-  senderId: varchar("sender_id").notNull(),
-  receiverId: varchar("receiver_id").notNull(),
-  message: text("message"),
-  fileUrl: text("file_url"),
-  fileName: text("file_name"),
-  fileType: text("file_type"),
-  fileSize: integer("file_size"),
-  readAt: timestamp("read_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  senderIdx: index("direct_messages_sender_idx").on(t.senderId),
-  receiverIdx: index("direct_messages_receiver_idx").on(t.receiverId),
-}));
-
-export const insertDirectMessageSchema = createInsertSchema(directMessages).omit({
-  id: true,
-  createdAt: true,
-  readAt: true,
-}).extend({
-  receiverId: z.string().min(1, "Receiver is required"),
-  message: z.string().optional(),
-  fileUrl: z.string().optional(),
-  fileName: z.string().optional(),
-  fileType: z.string().optional(),
-  fileSize: z.number().optional(),
-}).refine((d) => d.message || d.fileUrl, { message: "Message or file is required" });
-
-export type InsertDirectMessage = z.infer<typeof insertDirectMessageSchema>;
-export type DirectMessage = typeof directMessages.$inferSelect;
-
 // Dashboard Account Selections - stores user-selected accounts for dashboard widgets
 export const dashboardAccountSelections = pgTable("dashboard_account_selections", {
   id: serial("id").primaryKey(),
@@ -2262,182 +1702,6 @@ export const insertDashboardAccountSelectionSchema = createInsertSchema(dashboar
 
 export type InsertDashboardAccountSelection = z.infer<typeof insertDashboardAccountSelectionSchema>;
 export type DashboardAccountSelection = typeof dashboardAccountSelections.$inferSelect;
-
-// Role Feature Permissions - controls which features are accessible by each role per company
-export const roleFeaturePermissions = pgTable("role_feature_permissions", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  role: text("role").notNull(),
-  featureKey: text("feature_key").notNull(),
-  enabled: boolean("enabled").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqueCompanyRoleFeature: uniqueIndex("role_feature_permissions_unique").on(t.companyId, t.role, t.featureKey),
-}));
-
-export const insertRoleFeaturePermissionSchema = createInsertSchema(roleFeaturePermissions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  role: z.enum(["Developer", "Admin", "Owner", "Manager", "POS", "Normal User", "View Only"]),
-  featureKey: z.string().min(1, "Feature key is required"),
-  enabled: z.boolean().default(true),
-});
-
-export type InsertRoleFeaturePermission = z.infer<typeof insertRoleFeaturePermissionSchema>;
-export type RoleFeaturePermission = typeof roleFeaturePermissions.$inferSelect;
-
-// Stock Group Location Archives - for archiving/restoring inventory by stock group at a location
-// stockGroupId is nullable to support archiving "Uncategorized" items (items with no stock group)
-export const stockGroupLocationArchives = pgTable("stock_group_location_archives", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
-  stockGroupId: integer("stock_group_id"),
-  locationName: text("location_name").notNull(),
-  stockGroupName: text("stock_group_name").notNull(),
-  totalQuantity: decimal("total_quantity", { precision: 15, scale: 3 }).notNull().default("0"),
-  totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull().default("0"),
-  itemCount: integer("item_count").notNull().default(0),
-  archivedBy: varchar("archived_by").notNull(),
-  archivedAt: timestamp("archived_at").notNull().defaultNow(),
-  restoredAt: timestamp("restored_at"),
-  deletedAt: timestamp("deleted_at"),
-  notes: text("notes"),
-}, (t) => ({
-  companyIdx: index("stock_group_location_archives_company_idx").on(t.companyId),
-}));
-
-export const insertStockGroupLocationArchiveSchema = createInsertSchema(stockGroupLocationArchives).omit({
-  id: true,
-  archivedAt: true,
-});
-
-export type InsertStockGroupLocationArchive = z.infer<typeof insertStockGroupLocationArchiveSchema>;
-export type StockGroupLocationArchive = typeof stockGroupLocationArchives.$inferSelect;
-
-// Archive Items - individual inventory records within an archive
-export const stockGroupLocationArchiveItems = pgTable("stock_group_location_archive_items", {
-  id: serial("id").primaryKey(),
-  archiveId: integer("archive_id").notNull(),
-  stockItemId: integer("stock_item_id").notNull().references(() => stockItems.id, { onDelete: "restrict" }),
-  stockItemCode: varchar("stock_item_code", { length: 50 }).notNull(),
-  stockItemName: text("stock_item_name").notNull(),
-  quantity: decimal("quantity", { precision: 15, scale: 3 }).notNull(),
-  averageRate: decimal("average_rate", { precision: 20, scale: 2 }).notNull(),
-  totalValue: decimal("total_value", { precision: 20, scale: 2 }).notNull(),
-});
-
-export const insertStockGroupLocationArchiveItemSchema = createInsertSchema(stockGroupLocationArchiveItems).omit({
-  id: true,
-});
-
-export type InsertStockGroupLocationArchiveItem = z.infer<typeof insertStockGroupLocationArchiveItemSchema>;
-export type StockGroupLocationArchiveItem = typeof stockGroupLocationArchiveItems.$inferSelect;
-
-// System Settings - global application-wide settings
-export const systemSettings = pgTable("system_settings", {
-  id: serial("id").primaryKey(),
-  key: varchar("key", { length: 100 }).notNull().unique(),
-  value: text("value"),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({
-  id: true,
-  updatedAt: true,
-}).extend({
-  key: z.string().min(1, "Key is required"),
-  value: z.string().optional(),
-});
-
-export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
-export type SystemSetting = typeof systemSettings.$inferSelect;
-
-// List of all available features for permission control
-export const FEATURE_KEYS = [
-  "dashboard",
-  "pos",
-  "pos_daybook",
-  "stock_items",
-  "location_inventory",
-  "containers",
-  "stock_otw",
-  "factory_production",
-  "analytics",
-  "accounts",
-  "suppliers",
-  "customers",
-  "vouchers",
-  "daybook",
-  "payroll",
-  "create",
-  "stock_query",
-  "location_summary",
-  "sales_report",
-  "settings",
-  "optional_vouchers",
-] as const;
-
-export type FeatureKey = typeof FEATURE_KEYS[number];
-
-// Central source of truth: label + group for every ERP feature key
-export const FEATURE_PAGE_INFO: Record<FeatureKey, { label: string; group: string }> = {
-  dashboard:           { label: "Tracking / Overview",  group: "Overview"   },
-  factory_production:  { label: "Factory Production",   group: "Overview"   },
-  pos:                 { label: "Point of Sale",        group: "Sales & POS" },
-  pos_daybook:         { label: "POS Daybook",          group: "Sales & POS" },
-  location_inventory:  { label: "Location Inventory",   group: "Inventory"  },
-  stock_otw:           { label: "Stock OTW",            group: "Inventory"  },
-  containers:          { label: "Containers",           group: "Inventory"  },
-  stock_items:         { label: "Stock Items",          group: "Inventory"  },
-  stock_query:         { label: "Stock Query",           group: "Inventory"  },
-  location_summary:    { label: "Location Summary",     group: "Inventory"  },
-  optional_vouchers:   { label: "Optional Vouchers",    group: "Inventory"  },
-  accounts:            { label: "Accounts",             group: "Accounting" },
-  suppliers:           { label: "Suppliers",            group: "Accounting" },
-  customers:           { label: "Customers",            group: "Accounting" },
-  payroll:             { label: "Payroll",              group: "Accounting" },
-  daybook:             { label: "Daybook",              group: "Accounting" },
-  vouchers:            { label: "Vouchers",             group: "Vouchers"   },
-  create:              { label: "Create Voucher",       group: "Vouchers"   },
-  sales_report:        { label: "Sales Report",         group: "Analytics"  },
-  analytics:           { label: "Analytics",            group: "Analytics"  },
-  settings:            { label: "Settings",             group: "System"     },
-};
-
-// Map feature keys to their route paths
-export const FEATURE_ROUTES: Record<FeatureKey, string> = {
-  dashboard: "/",
-  pos: "/pos",
-  pos_daybook: "/pos-daybook",
-  stock_items: "/stock-items",
-  location_inventory: "/location-inventory",
-  containers: "/containers",
-  stock_otw: "/stock-otw",
-  factory_production: "/factory-production",
-  analytics: "/analytics",
-  accounts: "/accounts",
-  suppliers: "/suppliers",
-  customers: "/customers",
-  vouchers: "/vouchers",
-  daybook: "/daybook",
-  payroll: "/payroll",
-  create: "/create",
-  stock_query: "/stock-query",
-  location_summary: "/location-summary",
-  sales_report: "/sales-report",
-  settings: "/settings",
-  optional_vouchers: "/optional-vouchers",
-};
-
-// Map routes to feature keys (reverse lookup)
-export const ROUTE_TO_FEATURE: Record<string, FeatureKey> = Object.fromEntries(
-  Object.entries(FEATURE_ROUTES).map(([key, route]) => [route, key as FeatureKey])
-) as Record<string, FeatureKey>;
 
 // Container tracking update schema for OTW tracking
 export const updateContainerTrackingSchema = z.object({
@@ -2481,122 +1745,6 @@ export const containerTrackingImportRowSchema = z.object({
 });
 
 export type ContainerTrackingImportRow = z.infer<typeof containerTrackingImportRowSchema>;
-
-// User Presence tracking for active users monitoring
-export const userPresence = pgTable("user_presence", {
-  id: serial("id").primaryKey(),
-  sessionId: varchar("session_id", { length: 255 }).notNull(),
-  userId: varchar("user_id").notNull(),
-  username: text("username").notNull(),
-  currentRoute: text("current_route").notNull().default("/"),
-  companyId: integer("company_id"),
-  companyName: text("company_name"),
-  role: text("role"),
-  lastSeen: timestamp("last_seen").notNull().defaultNow(),
-}, (t) => ({
-  uniqueSession: uniqueIndex("user_presence_session_unique").on(t.sessionId),
-}));
-
-export const insertUserPresenceSchema = createInsertSchema(userPresence).omit({
-  id: true,
-});
-
-export type InsertUserPresence = z.infer<typeof insertUserPresenceSchema>;
-export type UserPresence = typeof userPresence.$inferSelect;
-
-export const updatePresenceSchema = z.object({
-  route: z.string(),
-  type: z.enum(["route_change", "heartbeat"]).optional().default("heartbeat"),
-});
-
-export type UpdatePresence = z.infer<typeof updatePresenceSchema>;
-
-// Tracks every route navigation per user so admins can see navigation history
-export const userActivityLog = pgTable("user_activity_log", {
-  id:          serial("id").primaryKey(),
-  userId:      varchar("user_id").notNull(),
-  username:    text("username").notNull(),
-  companyId:   integer("company_id"),
-  companyName: text("company_name"),
-  route:       text("route").notNull(),
-  occurredAt:  timestamp("occurred_at").notNull().defaultNow(),
-});
-export type UserActivityLog = typeof userActivityLog.$inferSelect;
-
-// POS Shifts table - tracks POS user work sessions
-export const posShifts = pgTable("pos_shifts", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "restrict" }),
-  userId: varchar("user_id").notNull(),
-  username: text("username").notNull(),
-  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }),
-  posStation: integer("pos_station"),
-  status: text("status").notNull().default("open"),
-  openedAt: timestamp("opened_at").notNull().defaultNow(),
-  closedAt: timestamp("closed_at"),
-  openingCash: decimal("opening_cash", { precision: 20, scale: 2 }).notNull().default("0"),
-  closingCash: decimal("closing_cash", { precision: 20, scale: 2 }),
-  expectedCash: decimal("expected_cash", { precision: 20, scale: 2 }),
-  variance: decimal("variance", { precision: 20, scale: 2 }),
-  salesCount: integer("sales_count").default(0),
-  salesTotal: decimal("sales_total", { precision: 20, scale: 2 }).default("0"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("pos_shifts_company_idx").on(t.companyId),
-}));
-
-export const insertPosShiftSchema = createInsertSchema(posShifts).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1, "Company is required"),
-  locationId: z.number().min(1, "Location is required"),
-  userId: z.string().min(1, "User ID is required"),
-  username: z.string().min(1, "Username is required"),
-  cashAccountId: z.number().optional(),
-  posStation: z.number().optional(),
-  openingCash: z.string().default("0"),
-  status: z.enum(["open", "closed"]).default("open"),
-});
-
-export type InsertPosShift = z.infer<typeof insertPosShiftSchema>;
-export type PosShift = typeof posShifts.$inferSelect;
-
-export const closePosShiftSchema = z.object({
-  closingCash: z.string().min(1, "Closing cash is required"),
-  notes: z.string().optional(),
-});
-
-export type ClosePosShift = z.infer<typeof closePosShiftSchema>;
-
-// Offline POS Queue - stores transactions for offline sync
-export const posOfflineQueue = pgTable("pos_offline_queue", {
-  id: serial("id").primaryKey(),
-  clientId: varchar("client_id", { length: 100 }).notNull(),
-  companyId: integer("company_id").notNull(),
-  locationId: integer("location_id").notNull().references(() => locations.id, { onDelete: "cascade" }),
-  userId: varchar("user_id").notNull(),
-  payload: jsonb("payload").notNull(),
-  status: text("status").notNull().default("pending"),
-  errorMessage: text("error_message"),
-  retries: integer("retries").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  processedAt: timestamp("processed_at"),
-}, (t) => ({
-  companyIdx: index("pos_offline_queue_company_idx").on(t.companyId),
-  uniqueClientId: uniqueIndex("pos_offline_queue_client_unique").on(t.clientId),
-}));
-
-export const insertPosOfflineQueueSchema = createInsertSchema(posOfflineQueue).omit({
-  id: true,
-  createdAt: true,
-  processedAt: true,
-});
-
-export type InsertPosOfflineQueue = z.infer<typeof insertPosOfflineQueueSchema>;
-export type PosOfflineQueue = typeof posOfflineQueue.$inferSelect;
 
 // Reference Sequences - tracks next reference number per company for label prints
 export const referenceSequences = pgTable("reference_sequences", {
@@ -3844,24 +2992,6 @@ export const factoryDaybookEntryEdits = pgTable("factory_daybook_entry_edits", {
 
 export type FactoryDaybookEntryEdit = typeof factoryDaybookEntryEdits.$inferSelect;
 
-export const loginHistory = pgTable("login_history", {
-  id: serial("id").primaryKey(),
-  userId: varchar("user_id").notNull(),
-  username: text("username").notNull(),
-  companyId: integer("company_id"),
-  companyName: text("company_name"),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  city: text("city"),
-  country: text("country"),
-  loginAt: timestamp("login_at").notNull().defaultNow(),
-}, (t) => ({
-  userIdx: index("login_history_user_idx").on(t.userId),
-  loginAtIdx: index("login_history_login_at_idx").on(t.loginAt),
-}));
-
-export type LoginHistory = typeof loginHistory.$inferSelect;
-
 // ─── Factory Workers ───
 export const factoryWorkers = pgTable("factory_workers", {
   id: serial("id").primaryKey(),
@@ -4930,164 +4060,6 @@ export type ProformaStockReservation = typeof proformaStockReservations.$inferSe
 // ============================================================
 
 // Property Units — catalogue of warehouses/shops that can be rented
-export const propertyUnits = pgTable("property_units", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  module: text("module").notNull().default("PROPERTIES"), // 'PROPERTIES' | 'ERP' | 'FACTORY'
-  unitType: text("unit_type").notNull(), // 'WAREHOUSE' | 'SHOP'
-  locationGroup: text("location_group").notNull(), // 'KOLWEZI' | 'LSHI' | 'KIWELE' | 'KINSAHSA' | 'MALI' | etc.
-  unitNumber: text("unit_number").notNull(), // 'KOLWEZI A1', 'HADI 1', etc.
-  size: text("size"), // free text e.g. "420" or "420 m²"
-  dimensions: text("dimensions"), // free text e.g. "35 X 12"
-  notes: text("notes"),
-  active: boolean("active").notNull().default(true),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqCompanyModuleUnit: uniqueIndex("property_units_company_module_unit_unique").on(t.companyId, t.module, t.unitNumber),
-  byCompany: index("property_units_company_idx").on(t.companyId, t.module, t.unitType),
-}));
-
-export const insertPropertyUnitSchema = createInsertSchema(propertyUnits).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  unitType: z.enum(["WAREHOUSE", "SHOP"]),
-  unitNumber: z.string().min(1, "Unit number required"),
-  locationGroup: z.string().min(1, "Location group required"),
-});
-export type InsertPropertyUnit = z.infer<typeof insertPropertyUnitSchema>;
-export type PropertyUnit = typeof propertyUnits.$inferSelect;
-
-// Property Contracts — active leases for a unit
-export const propertyContracts = pgTable("property_contracts", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  module: text("module").notNull().default("PROPERTIES"),
-  unitId: integer("unit_id").notNull(),
-  tenantName: text("tenant_name").notNull(),
-  guaranteePeriod: text("guarantee_period"), // e.g. "3 MONTHS"
-  guaranteeAmount: decimal("guarantee_amount", { precision: 20, scale: 2 }).notNull().default("0"),
-  rentalAmount: decimal("rental_amount", { precision: 20, scale: 2 }).notNull().default("0"),
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date"),
-  status: text("status").notNull().default("ACTIVE"), // 'ACTIVE' | 'ENDED'
-  notes: text("notes"),
-  statementNote: text("statement_note"),
-  guaranteePostedToStatement: boolean("guarantee_posted_to_statement").notNull().default(false),
-  guaranteePostedAmount: decimal("guarantee_posted_amount", { precision: 20, scale: 2 }).default("0"),
-  isInternal: boolean("is_internal").notNull().default(false),
-  linkedCompanyId: integer("linked_company_id"),
-  currency: text("currency").notNull().default("USD"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  byUnit: index("property_contracts_unit_idx").on(t.unitId, t.status),
-  byCompany: index("property_contracts_company_idx").on(t.companyId, t.status),
-}));
-
-export const insertPropertyContractSchema = createInsertSchema(propertyContracts).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  tenantName: z.string().min(1, "Tenant name required"),
-  rentalAmount: z.union([z.string(), z.number()]).transform(v => String(v)),
-  guaranteeAmount: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),
-  startDate: z.string().min(1, "Start date required"),
-  currency: z.string().optional(),
-});
-export type InsertPropertyContract = z.infer<typeof insertPropertyContractSchema>;
-export type PropertyContract = typeof propertyContracts.$inferSelect;
-
-// Property Monthly Ledger — auto-generated row per month per active contract
-export const propertyMonthlyLedger = pgTable("property_monthly_ledger", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  module: text("module").notNull().default("PROPERTIES"),
-  contractId: integer("contract_id").notNull(),
-  unitId: integer("unit_id").notNull(),
-  year: integer("year").notNull(),
-  month: integer("month").notNull(), // 1-12
-  expectedAmount: decimal("expected_amount", { precision: 20, scale: 2 }).notNull().default("0"),
-  paidAmount: decimal("paid_amount", { precision: 20, scale: 2 }).notNull().default("0"),
-  notes: text("notes"),
-  accrualVoucherId: integer("accrual_voucher_id"),
-  usedPrepaidAccount: boolean("used_prepaid_account").notNull().default(false),
-  usedAdvanceAccount: boolean("used_advance_account").notNull().default(false),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("property_monthly_ledger_company_idx").on(t.companyId),
-  uniqContractPeriod: uniqueIndex("property_monthly_ledger_unique").on(t.contractId, t.year, t.month),
-  byUnit: index("property_monthly_ledger_unit_idx").on(t.unitId),
-}));
-
-export const insertPropertyMonthlyLedgerSchema = createInsertSchema(propertyMonthlyLedger).omit({
-  id: true,
-  createdAt: true,
-});
-export type InsertPropertyMonthlyLedger = z.infer<typeof insertPropertyMonthlyLedgerSchema>;
-export type PropertyMonthlyLedger = typeof propertyMonthlyLedger.$inferSelect;
-
-// Property Payments — individual payment transactions (one row per payment received)
-export const propertyPayments = pgTable("property_payments", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  module: text("module").notNull().default("PROPERTIES"),
-  contractId: integer("contract_id").notNull(),
-  unitId: integer("unit_id").notNull(),
-  ledgerRowId: integer("ledger_row_id"), // FK to propertyMonthlyLedger - which month it was applied to
-  cashAccountId: integer("cash_account_id").references(() => ledgerAccounts.id, { onDelete: "restrict" }), // FK to ledgerAccounts (the cash box used)
-  voucherId: integer("voucher_id").references(() => vouchers.id, { onDelete: "restrict" }), // FK to vouchers - the Receipt voucher posted to main accounting
-  amount: decimal("amount", { precision: 20, scale: 2 }).notNull(),
-  paymentDate: date("payment_date").notNull(),
-  forYear: integer("for_year").notNull(),
-  forMonth: integer("for_month").notNull(),
-  notes: text("notes"),
-  currency: text("currency").notNull().default("USD"),
-  exchangeRate: decimal("exchange_rate", { precision: 20, scale: 6 }).notNull().default("1"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  byContract: index("property_payments_contract_idx").on(t.contractId),
-  byCompany: index("property_payments_company_idx").on(t.companyId, t.paymentDate),
-}));
-
-export const insertPropertyPaymentSchema = createInsertSchema(propertyPayments).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  amount: z.union([z.string(), z.number()]).transform(v => String(v)),
-  paymentDate: z.string().min(1, "Payment date required"),
-  currency: z.string().optional(),
-  exchangeRate: z.union([z.string(), z.number()]).transform(v => String(v)).optional(),
-});
-export type InsertPropertyPayment = z.infer<typeof insertPropertyPaymentSchema>;
-export type PropertyPayment = typeof propertyPayments.$inferSelect;
-
-// Rental Auto-Transfer Config — one row per company+module, triggers a transfer on every payment
-export const rentalAutoTransferConfigs = pgTable("rental_auto_transfer_configs", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),       // source company (where rent lands)
-  module: text("module").notNull(),                  // PROPERTIES | ERP | FACTORY
-  destCompanyId: integer("dest_company_id").notNull(),
-  destLedgerAccountId: integer("dest_ledger_account_id").notNull(),
-  sourceCashAccountIds: integer("source_cash_account_ids").array().notNull().default([]), // empty = all
-  enabled: boolean("enabled").notNull().default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  uniqueCompanyModule: uniqueIndex("rental_auto_transfer_unique").on(t.companyId, t.module),
-}));
-
-export const insertRentalAutoTransferConfigSchema = createInsertSchema(rentalAutoTransferConfigs).omit({
-  id: true,
-  createdAt: true,
-}).extend({
-  companyId: z.number().min(1),
-  destCompanyId: z.number().min(1),
-  destLedgerAccountId: z.number().min(1),
-  module: z.enum(["PROPERTIES", "ERP", "FACTORY"]),
-});
-export type InsertRentalAutoTransferConfig = z.infer<typeof insertRentalAutoTransferConfigSchema>;
-export type RentalAutoTransferConfig = typeof rentalAutoTransferConfigs.$inferSelect;
-
 // ─────────────────────────────────────────────────────────────────────────────
 // FACTORY TRANSPORTERS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -5720,194 +4692,6 @@ export const customerDispatchBaleScans = pgTable("customer_dispatch_bale_scans",
 export type CustomerDispatchBaleScan = typeof customerDispatchBaleScans.$inferSelect;
 
 // ─── Supplier Partner (SP) Tables ────────────────────────────────────────────
-
-export const spContainers = pgTable("sp_containers", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  supplierId: integer("supplier_id"),
-  supplierName: text("supplier_name").notNull(),
-  containerNumber: varchar("container_number", { length: 100 }),
-  invoiceNumber: varchar("invoice_number", { length: 100 }).notNull(),
-  invoiceDate: date("invoice_date").notNull(),
-  invoiceTotalUsd: decimal("invoice_total_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  discountPct: decimal("discount_pct", { precision: 8, scale: 4 }).default("0"),
-  freightEstimateUsd: decimal("freight_estimate_usd", { precision: 20, scale: 4 }).default("0"),
-  status: varchar("status", { length: 20 }).notNull().default("open"),
-  goodsOtwVoucherId: integer("goods_otw_voucher_id"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("sp_containers_company_idx").on(t.companyId),
-}));
-
-export const insertSpContainerSchema = createInsertSchema(spContainers).omit({ id: true, createdAt: true });
-export type InsertSpContainer = z.infer<typeof insertSpContainerSchema>;
-export type SpContainer = typeof spContainers.$inferSelect;
-
-export const spContainerLines = pgTable("sp_container_lines", {
-  id: serial("id").primaryKey(),
-  containerId: integer("container_id").notNull(),
-  companyId: integer("company_id").notNull(),
-  articleCode: varchar("article_code", { length: 100 }).notNull(),
-  description: text("description"),
-  qty: decimal("qty", { precision: 15, scale: 4 }).notNull().default("0"),
-  unitRateUsd: decimal("unit_rate_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  stockItemId: integer("stock_item_id"),
-}, (t) => ({
-  containerIdx: index("sp_container_lines_container_idx").on(t.containerId),
-}));
-
-export const insertSpContainerLineSchema = createInsertSchema(spContainerLines).omit({ id: true });
-export type InsertSpContainerLine = z.infer<typeof insertSpContainerLineSchema>;
-export type SpContainerLine = typeof spContainerLines.$inferSelect;
-
-export const spPrepaidCharges = pgTable("sp_prepaid_charges", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  containerId: integer("container_id"),
-  prepaidDate: date("prepaid_date"),
-  chargeType: varchar("charge_type", { length: 50 }).notNull(),
-  agentName: text("agent_name"),
-  amountPaidUsd: decimal("amount_paid_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  amountUsedUsd: decimal("amount_used_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  voucherId: integer("voucher_id"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  containerIdx: index("sp_prepaid_charges_container_idx").on(t.containerId),
-}));
-
-export const insertSpPrepaidChargeSchema = createInsertSchema(spPrepaidCharges).omit({ id: true, createdAt: true });
-export type InsertSpPrepaidCharge = z.infer<typeof insertSpPrepaidChargeSchema>;
-export type SpPrepaidCharge = typeof spPrepaidCharges.$inferSelect;
-
-export const spOffloads = pgTable("sp_offloads", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  containerId: integer("container_id").notNull(),
-  offloadDate: date("offload_date").notNull(),
-  totalQty: decimal("total_qty", { precision: 15, scale: 4 }).notNull().default("0"),
-  totalBaseCostUsd: decimal("total_base_cost_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  totalLandedCostUsd: decimal("total_landed_cost_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  totalFinalCostUsd: decimal("total_final_cost_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  voucherIdReversal: integer("voucher_id_reversal"),
-  voucherIdStock: integer("voucher_id_stock"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  containerIdx: index("sp_offloads_container_idx").on(t.containerId),
-  companyIdx: index("sp_offloads_company_idx").on(t.companyId),
-}));
-
-export const insertSpOffloadSchema = createInsertSchema(spOffloads).omit({ id: true, createdAt: true });
-export type InsertSpOffload = z.infer<typeof insertSpOffloadSchema>;
-export type SpOffload = typeof spOffloads.$inferSelect;
-
-export const spOffloadCharges = pgTable("sp_offload_charges", {
-  id: serial("id").primaryKey(),
-  offloadId: integer("offload_id").notNull(),
-  companyId: integer("company_id").notNull(),
-  chargeType: varchar("charge_type", { length: 50 }).notNull(),
-  description: text("description"),
-  amountUsd: decimal("amount_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  prepaidChargeId: integer("prepaid_charge_id"),
-  creditLedgerAccountId: integer("credit_ledger_account_id"),
-  creditBankAccountId: integer("credit_bank_account_id"),
-}, (t) => ({
-  offloadIdx: index("sp_offload_charges_offload_idx").on(t.offloadId),
-}));
-
-export const insertSpOffloadChargeSchema = createInsertSchema(spOffloadCharges).omit({ id: true });
-export type InsertSpOffloadCharge = z.infer<typeof insertSpOffloadChargeSchema>;
-export type SpOffloadCharge = typeof spOffloadCharges.$inferSelect;
-
-export const spStockMovements = pgTable("sp_stock_movements", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  containerId: integer("container_id"),
-  offloadId: integer("offload_id"),
-  containerLineId: integer("container_line_id"),
-  sourceType: varchar("source_type", { length: 20 }).default("offload"),
-  articleCode: varchar("article_code", { length: 100 }).notNull(),
-  description: text("description"),
-  stockItemId: integer("stock_item_id"),
-  locationId: integer("location_id"),
-  qtyIn: decimal("qty_in", { precision: 15, scale: 4 }).notNull().default("0"),
-  qtyRemaining: decimal("qty_remaining", { precision: 15, scale: 4 }).notNull().default("0"),
-  baseUnitCostUsd: decimal("base_unit_cost_usd", { precision: 20, scale: 6 }).notNull().default("0"),
-  landedUnitCostUsd: decimal("landed_unit_cost_usd", { precision: 20, scale: 6 }).notNull().default("0"),
-  finalUnitCostUsd: decimal("final_unit_cost_usd", { precision: 20, scale: 6 }).notNull().default("0"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("sp_stock_movements_company_idx").on(t.companyId),
-  containerIdx: index("sp_stock_movements_container_idx").on(t.containerId),
-}));
-
-export const insertSpStockMovementSchema = createInsertSchema(spStockMovements).omit({ id: true, createdAt: true });
-export type InsertSpStockMovement = z.infer<typeof insertSpStockMovementSchema>;
-export type SpStockMovement = typeof spStockMovements.$inferSelect;
-
-export const spSales = pgTable("sp_sales", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  saleDate: date("sale_date").notNull(),
-  customerName: text("customer_name").notNull(),
-  totalSalePriceUsd: decimal("total_sale_price_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  totalBaseCostUsd: decimal("total_base_cost_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  totalFinalCostUsd: decimal("total_final_cost_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  grossProfitUsd: decimal("gross_profit_usd", { precision: 20, scale: 4 }).notNull().default("0"),
-  voucherId: integer("voucher_id"),
-  status: varchar("status", { length: 20 }).notNull().default("posted"),
-  notes: text("notes"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyIdx: index("sp_sales_company_idx").on(t.companyId),
-}));
-
-export const insertSpSaleSchema = createInsertSchema(spSales).omit({ id: true, createdAt: true });
-export type InsertSpSale = z.infer<typeof insertSpSaleSchema>;
-export type SpSale = typeof spSales.$inferSelect;
-
-export const spSaleLines = pgTable("sp_sale_lines", {
-  id: serial("id").primaryKey(),
-  saleId: integer("sale_id").notNull(),
-  companyId: integer("company_id").notNull(),
-  movementId: integer("movement_id").notNull(),
-  articleCode: varchar("article_code", { length: 100 }).notNull(),
-  description: text("description"),
-  stockItemId: integer("stock_item_id"),
-  qtySold: decimal("qty_sold", { precision: 15, scale: 4 }).notNull().default("0"),
-  salePricePerUnit: decimal("sale_price_per_unit", { precision: 20, scale: 4 }).notNull().default("0"),
-  baseUnitCostUsd: decimal("base_unit_cost_usd", { precision: 20, scale: 6 }).notNull().default("0"),
-  landedUnitCostUsd: decimal("landed_unit_cost_usd", { precision: 20, scale: 6 }).notNull().default("0"),
-  finalUnitCostUsd: decimal("final_unit_cost_usd", { precision: 20, scale: 6 }).notNull().default("0"),
-}, (t) => ({
-  saleIdx: index("sp_sale_lines_sale_idx").on(t.saleId),
-}));
-
-export const insertSpSaleLineSchema = createInsertSchema(spSaleLines).omit({ id: true });
-export type InsertSpSaleLine = z.infer<typeof insertSpSaleLineSchema>;
-export type SpSaleLine = typeof spSaleLines.$inferSelect;
-
-export const spProfitSplits = pgTable("sp_profit_splits", {
-  id: serial("id").primaryKey(),
-  companyId: integer("company_id").notNull(),
-  periodMonth: varchar("period_month", { length: 7 }).notNull(),
-  totalRevenue: decimal("total_revenue", { precision: 20, scale: 4 }).notNull().default("0"),
-  totalCogs: decimal("total_cogs", { precision: 20, scale: 4 }).notNull().default("0"),
-  totalSharedCharges: decimal("total_shared_charges", { precision: 20, scale: 4 }).notNull().default("0"),
-  grossProfit: decimal("gross_profit", { precision: 20, scale: 4 }).notNull().default("0"),
-  splitPct: decimal("split_pct", { precision: 8, scale: 4 }).notNull().default("50"),
-  ourShare: decimal("our_share", { precision: 20, scale: 4 }).notNull().default("0"),
-  supplierShare: decimal("supplier_share", { precision: 20, scale: 4 }).notNull().default("0"),
-  finalizedAt: timestamp("finalized_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => ({
-  companyMonthIdx: uniqueIndex("sp_profit_splits_company_month_unique").on(t.companyId, t.periodMonth),
-}));
-
-export const insertSpProfitSplitSchema = createInsertSchema(spProfitSplits).omit({ id: true, createdAt: true });
-export type InsertSpProfitSplit = z.infer<typeof insertSpProfitSplitSchema>;
-export type SpProfitSplit = typeof spProfitSplits.$inferSelect;
 
 // ── AI company snapshots ──────────────────────────────────────────────────────
 // Precomputed, TTL-gated summaries served to the chatbot instead of live queries.
