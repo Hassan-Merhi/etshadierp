@@ -2,14 +2,17 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 type TabsContextValue = {
-  value?: string;
-  onValueChange?: (value: string) => void;
+  value: string | undefined;
+  onValueChange: (value: string) => void;
 };
 
-const TabsContext = React.createContext<TabsContextValue>({});
+const TabsContext = React.createContext<TabsContextValue>({
+  value: undefined,
+  onValueChange: () => {},
+});
 
 function Tabs({
-  value,
+  value: controlledValue,
   defaultValue,
   onValueChange,
   className,
@@ -20,8 +23,21 @@ function Tabs({
   defaultValue?: string;
   onValueChange?: (value: string) => void;
 }) {
+  const [internalValue, setInternalValue] = React.useState<string | undefined>(defaultValue);
+
+  const isControlled = controlledValue !== undefined;
+  const activeValue = isControlled ? controlledValue : internalValue;
+
+  const handleChange = React.useCallback(
+    (val: string) => {
+      if (!isControlled) setInternalValue(val);
+      onValueChange?.(val);
+    },
+    [isControlled, onValueChange]
+  );
+
   return (
-    <TabsContext.Provider value={{ value: value ?? defaultValue, onValueChange }}>
+    <TabsContext.Provider value={{ value: activeValue, onValueChange: handleChange }}>
       <div className={className} {...props}>
         {children}
       </div>
@@ -61,7 +77,7 @@ const TabsTrigger = React.forwardRef<
       data-state={active ? "active" : "inactive"}
       onClick={(event) => {
         onClick?.(event);
-        if (!event.defaultPrevented) ctx.onValueChange?.(value);
+        if (!event.defaultPrevented) ctx.onValueChange(value);
       }}
       className={cn(
         "inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all",
@@ -85,7 +101,7 @@ const TabsContent = React.forwardRef<
 >(({ className, value, children, ...props }, ref) => {
   const ctx = React.useContext(TabsContext);
 
-  if (ctx.value && ctx.value !== value) return null;
+  if (ctx.value !== undefined && ctx.value !== value) return null;
 
   return (
     <div
