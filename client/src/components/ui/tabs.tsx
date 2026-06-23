@@ -1,80 +1,106 @@
 import * as React from "react";
-import * as TabsPrimitive from "@radix-ui/react-tabs";
-
 import { cn } from "@/lib/utils";
 
-const Tabs = TabsPrimitive.Root;
+type TabsContextValue = {
+  value?: string;
+  onValueChange?: (value: string) => void;
+};
 
-type TabsVariant = "pill" | "underline";
+const TabsContext = React.createContext<TabsContextValue>({});
 
-const TabsVariantContext = React.createContext<TabsVariant>("pill");
+function Tabs({
+  value,
+  defaultValue,
+  onValueChange,
+  className,
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+}) {
+  return (
+    <TabsContext.Provider value={{ value: value ?? defaultValue, onValueChange }}>
+      <div className={className} {...props}>
+        {children}
+      </div>
+    </TabsContext.Provider>
+  );
+}
 
 const TabsList = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List> & { variant?: TabsVariant }
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { variant?: "pill" | "underline" }
 >(({ className, variant = "pill", ...props }, ref) => (
-  <TabsVariantContext.Provider value={variant}>
-    <TabsPrimitive.List
-      ref={ref}
-      className={cn(
-        variant === "pill" && [
-          "inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1 text-muted-foreground",
-        ],
-        variant === "underline" && [
-          "inline-flex items-center gap-1 border-b border-border bg-transparent p-0 text-muted-foreground",
-        ],
-        className
-      )}
-      {...props}
-    />
-  </TabsVariantContext.Provider>
-));
-TabsList.displayName = TabsPrimitive.List.displayName;
-
-const TabsTrigger = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => {
-  const variant = React.useContext(TabsVariantContext);
-  return (
-    <TabsPrimitive.Trigger
-      ref={ref}
-      className={cn(
-        "inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-        "disabled:pointer-events-none disabled:opacity-40",
-        variant === "pill" && [
-          "rounded-full px-4 py-1.5",
-          "text-muted-foreground hover:text-foreground",
-          "data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm data-[state=active]:font-semibold",
-        ],
-        variant === "underline" && [
-          "px-4 py-2.5 rounded-none",
-          "text-muted-foreground hover:text-foreground",
-          "border-b-2 border-transparent -mb-px",
-          "data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:font-semibold",
-        ],
-        className
-      )}
-      {...props}
-    />
-  );
-});
-TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
-
-const TabsContent = React.forwardRef<
-  React.ElementRef<typeof TabsPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content
+  <div
     ref={ref}
     className={cn(
-      "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      variant === "pill" &&
+        "inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 p-1 text-muted-foreground",
+      variant === "underline" &&
+        "inline-flex items-center gap-1 border-b border-border bg-transparent p-0 text-muted-foreground",
       className
     )}
     {...props}
   />
 ));
-TabsContent.displayName = TabsPrimitive.Content.displayName;
+TabsList.displayName = "TabsList";
+
+const TabsTrigger = React.forwardRef<
+  HTMLButtonElement,
+  React.ButtonHTMLAttributes<HTMLButtonElement> & { value: string }
+>(({ className, value, onClick, children, ...props }, ref) => {
+  const ctx = React.useContext(TabsContext);
+  const active = ctx.value === value;
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      data-state={active ? "active" : "inactive"}
+      onClick={(event) => {
+        onClick?.(event);
+        if (!event.defaultPrevented) ctx.onValueChange?.(value);
+      }}
+      className={cn(
+        "inline-flex items-center justify-center gap-1.5 whitespace-nowrap text-sm font-medium transition-all",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "disabled:pointer-events-none disabled:opacity-40",
+        "rounded-full px-4 py-1.5 text-muted-foreground hover:text-foreground",
+        active && "bg-background text-foreground shadow-sm font-semibold",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+});
+TabsTrigger.displayName = "TabsTrigger";
+
+const TabsContent = React.forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement> & { value: string }
+>(({ className, value, children, ...props }, ref) => {
+  const ctx = React.useContext(TabsContext);
+
+  if (ctx.value && ctx.value !== value) return null;
+
+  return (
+    <div
+      ref={ref}
+      data-state={ctx.value === value ? "active" : "inactive"}
+      className={cn(
+        "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+});
+TabsContent.displayName = "TabsContent";
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };
