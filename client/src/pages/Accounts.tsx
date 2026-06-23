@@ -31,6 +31,17 @@ import {
 } from "@shared/schema";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { apiRequest } from "@/lib/queryClient";
 
 export default function Accounts() {
   const { selectedCompany } = useCompany();
@@ -111,6 +122,25 @@ export default function Accounts() {
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<number>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
   const [showDeletedVouchers, setShowDeletedVouchers] = useState(false);
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: number[]) =>
+      apiRequest("POST", "/api/vouchers/bulk-delete", { voucherIds: ids }),
+    onSuccess: (_, ids) => {
+      toast({ title: `Deleted ${ids.length} voucher(s)` });
+      setSelectedVoucherIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["/api/vouchers"] });
+      if (selectedAccount) {
+        const accountType = (selectedAccount.type || "").toLowerCase().replace(" ", "-");
+        queryClient.invalidateQueries({
+          queryKey: [`/api/accounts/${accountType}/${selectedAccount.accountId}/transactions`],
+        });
+      }
+    },
+    onError: (err: any) => {
+      toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
   const [filterCurrency, setFilterCurrency] = useState<"all" | "CFA">("all");
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
@@ -347,6 +377,27 @@ export default function Accounts() {
           )}
         </TabsContent>
       </Tabs>
+
+      <AlertDialog open={showBulkDeleteConfirm} onOpenChange={setShowBulkDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedVoucherIds.size} voucher(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected vouchers and reverse any associated inventory or balance changes. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-bulk-delete"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => bulkDeleteMutation.mutate(Array.from(selectedVoucherIds))}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
