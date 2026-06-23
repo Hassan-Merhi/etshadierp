@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface InventoryItem {
-  inventoryId: number;
+  inventoryId: number | null;
   locationId: number;
   stockItemId: number;
   quantity: string;
@@ -92,7 +92,7 @@ export function InventoryTable({
                 const isMovementNeg = movement < 0;
                 return (
                   <tr
-                    key={item.inventoryId}
+                    key={item.inventoryId ?? `si-${item.stockItemId}`}
                     data-testid={`row-item-desktop-${item.stockItemId}`}
                     className={`border-t h-12 ${
                       index === selectedRowIndex 

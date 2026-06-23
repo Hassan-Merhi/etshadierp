@@ -46,7 +46,7 @@ interface Location {
 }
 
 interface InventoryItem {
-  inventoryId: number;
+  inventoryId: number | null;
   locationId: number;
   stockItemId: number;
   quantity: string;
