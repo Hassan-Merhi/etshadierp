@@ -567,7 +567,7 @@ export default function FactoryInvoiceCreate() {
           <Card className="p-4 space-y-3">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <h3 className="font-semibold text-sm">Charges</h3>
-              {orderDetail?.status === "FINALIZED" && charges.some(c => !c.voucherId && c.ledgerAccountId) && (
+              {orderDetail?.status === "FINALIZED" && charges.some(c => !c.voucherId) && (
                 <Button
                   variant="outline"
                   size="sm"

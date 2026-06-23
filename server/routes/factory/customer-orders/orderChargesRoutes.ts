@@ -284,22 +284,59 @@ export function registerOrderChargesRoutes(app: Express) {
           .where(eq(customers.id, order.customerId));
       }
 
-      // Find all charges missing a voucher that have a ledger account linked
+      // Find all charges missing a voucher
       const unlinkedCharges = await db.select().from(customerOrderCharges)
         .where(and(
           eq(customerOrderCharges.orderId, orderId),
           isNull(customerOrderCharges.voucherId),
         ));
 
-      const chargesWithLedger = unlinkedCharges.filter(c => c.ledgerAccountId && parseFloat(c.amount || "0") > 0);
-      if (chargesWithLedger.length === 0) {
+      const actionableCharges = unlinkedCharges.filter(c => parseFloat(c.amount || "0") > 0);
+      if (actionableCharges.length === 0) {
         return res.json({ linked: 0, message: "All charges already have ledger entries — nothing to relink." });
+      }
+
+      // For charges without a ledgerAccountId, attempt to auto-match by name
+      // (e.g. a charge named "Surcharge" matches a ledger account named "Surcharge")
+      const allLedgerAccounts = await db.select({ id: ledgerAccounts.id, name: ledgerAccounts.name })
+        .from(ledgerAccounts)
+        .where(eq(ledgerAccounts.companyId, companyId));
+
+      const resolvedCharges: Array<typeof actionableCharges[0] & { resolvedLedgerAccountId: number }> = [];
+      const skipped: string[] = [];
+
+      for (const charge of actionableCharges) {
+        let resolvedId = charge.ledgerAccountId ?? null;
+        if (!resolvedId && charge.name) {
+          const match = allLedgerAccounts.find(
+            a => a.name.trim().toLowerCase() === charge.name!.trim().toLowerCase()
+          );
+          if (match) {
+            resolvedId = match.id;
+            // Persist the resolved account so future relinks don't need to re-match
+            await db.update(customerOrderCharges)
+              .set({ ledgerAccountId: resolvedId })
+              .where(eq(customerOrderCharges.id, charge.id));
+          }
+        }
+        if (resolvedId) {
+          resolvedCharges.push({ ...charge, resolvedLedgerAccountId: resolvedId });
+        } else {
+          skipped.push(charge.name || `#${charge.id}`);
+        }
+      }
+
+      if (resolvedCharges.length === 0) {
+        const skippedMsg = skipped.length
+          ? ` Could not auto-match: ${skipped.join(", ")}. Link a ledger account to each charge first.`
+          : "";
+        return res.json({ linked: 0, message: `No charges could be linked.${skippedMsg}` });
       }
 
       const voucherRef = order.invoiceNumber || `ORD-${orderId}`;
       let linked = 0;
 
-      for (const charge of chargesWithLedger) {
+      for (const charge of resolvedCharges) {
         const chargeAmt = parseFloat(charge.amount || "0");
         const chargeVoucherNumber = `CHARGE-${voucherRef}-${charge.id}-${Date.now()}`;
         const chargeDesc = order.containerNumber
@@ -326,7 +363,7 @@ export function registerOrderChargesRoutes(app: Express) {
           });
           await tx.insert(voucherEntries).values({
             voucherId: chargeVoucher.id,
-            ledgerAccountId: charge.ledgerAccountId,
+            ledgerAccountId: charge.resolvedLedgerAccountId,
             debitAmount: "0",
             creditAmount: String(chargeAmt),
             narration: chargeDesc,
@@ -338,7 +375,8 @@ export function registerOrderChargesRoutes(app: Express) {
         linked++;
       }
 
-      res.json({ linked, message: `${linked} charge${linked !== 1 ? "s" : ""} successfully linked to the ledger.` });
+      const skippedMsg = skipped.length ? ` ${skipped.length} skipped (no matching account): ${skipped.join(", ")}.` : "";
+      res.json({ linked, message: `${linked} charge${linked !== 1 ? "s" : ""} successfully linked to the ledger.${skippedMsg}` });
     } catch (error: any) {
       console.error("Error relinking charge vouchers:", error);
       res.status(500).json({ message: error.message });

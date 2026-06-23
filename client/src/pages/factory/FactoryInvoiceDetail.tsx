@@ -956,7 +956,7 @@ export default function FactoryInvoiceDetail() {
         <Card className={`p-4 mb-6${hideExportSelling ? " print:hidden" : ""}`}>
           <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
             <h3 className="font-semibold" data-testid="text-charges-header">Freight &amp; Charges</h3>
-            {isFinalized && [...freightCharges, ...otherCharges].some(c => !c.voucherId && c.ledgerAccountId) && (
+            {isFinalized && [...freightCharges, ...otherCharges].some(c => !c.voucherId) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -1055,7 +1055,7 @@ export default function FactoryInvoiceDetail() {
                       {linkedAccount ? (
                         <Badge variant="secondary" className="text-xs">{linkedAccount.name}</Badge>
                       ) : (
-                        <span className="text-xs text-muted-foreground">No ledger account</span>
+                        <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">No ledger account — not posted</span>
                       )}
                       <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setEditingChargeLedger(charge.id)} data-testid={`button-edit-charge-ledger-${charge.id}`}>
                         <Pencil className="h-3 w-3 mr-1" />Link
