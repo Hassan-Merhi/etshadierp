@@ -1,4 +1,4 @@
-const CACHE_VERSION = "erp-v5";
+const CACHE_VERSION = "erp-v6";
 const APP_SHELL = ["/", "/manifest.json"];
 
 // ── Install: cache app shell ──────────────────────────────────────────────────
@@ -9,18 +9,19 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// ── Activate: prune old caches ────────────────────────────────────────────────
-// NOTE: No clients.claim() here. Claiming all clients immediately when the SW
-// updates disrupts every open tab at once (cache cleared mid-session → all
-// in-flight requests re-routed → connectivity blip → all queries refetch).
-// Instead we let existing pages finish their session under the old SW.
-// New navigations / new tabs automatically pick up this SW straight away.
+// ── Activate: prune old caches and take control of all tabs ───────────────────
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
         Promise.all(keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k)))
+      )
+      .then(() => self.clients.claim())
+      .then(() =>
+        self.clients.matchAll({ type: "window" }).then((clients) =>
+          clients.forEach((client) => client.postMessage({ type: "SW_UPDATED" }))
+        )
       )
   );
 });
@@ -40,8 +41,14 @@ self.addEventListener("fetch", (event) => {
   } else if (request.mode === "navigate") {
     // Navigation requests: network first, fall back to cached shell (SPA)
     event.respondWith(navigationHandler(request));
-  } else if (url.pathname.startsWith("/assets/")) {
-    // Vite hashed bundles: always network-first so stale caches never poison JS/CSS
+  } else if (
+    url.pathname.startsWith("/assets/") ||
+    url.pathname.startsWith("/node_modules/.vite/") ||
+    url.pathname.startsWith("/src/")
+  ) {
+    // Vite bundles + pre-bundled deps + source files: always network-first
+    // so a stale service-worker cache never poisons JS/CSS and causes React
+    // hook crashes (duplicate-React / null-dispatcher errors).
     event.respondWith(networkFirstAsset(request));
   } else {
     // Other static assets (fonts, images, sw.js itself): stale-while-revalidate

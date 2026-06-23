@@ -71,16 +71,21 @@ window.addEventListener("unhandledrejection", (event) => {
   }
 });
 
-// Listen for service-worker messages (e.g. background sync trigger)
-// Only active when offline mode is enabled.
-import("./lib/featureFlags").then(({ OFFLINE_MODE_ENABLED }) => {
-  if (OFFLINE_MODE_ENABLED && "serviceWorker" in navigator) {
-    navigator.serviceWorker.addEventListener("message", (event) => {
-      if (event?.data?.type === "TRIGGER_SYNC") {
-        import("./lib/syncEngine").then(({ runSync }) => runSync()).catch(() => {});
-      }
-    });
-  }
-});
+// Listen for service-worker messages
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event?.data?.type === "SW_UPDATED") {
+      // New SW has activated and claimed this tab — reload so the fresh
+      // JS bundles are used (prevents null-React / stale-chunk crashes).
+      window.location.reload();
+    } else if (event?.data?.type === "TRIGGER_SYNC") {
+      import("./lib/featureFlags").then(({ OFFLINE_MODE_ENABLED }) => {
+        if (OFFLINE_MODE_ENABLED) {
+          import("./lib/syncEngine").then(({ runSync }) => runSync()).catch(() => {});
+        }
+      });
+    }
+  });
+}
 
 createRoot(document.getElementById("root")!).render(<App />);
