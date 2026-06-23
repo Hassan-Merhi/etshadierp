@@ -1,6 +1,6 @@
 import React from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { EnrichedContainerRow, OtwColId, STATUS_META, FREIGHT_META, fmtDate } from "./gitContainerTypes";
+import { EnrichedContainerRow, OtwColId, fmtDate } from "./gitContainerTypes";
 import {
   EtaCell,
   InlineTextCell,
@@ -31,7 +31,6 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                 {colVis.supplier && <TableHead className="w-[100px] font-bold h-9">Supplier</TableHead>}
                 {colVis.company && <TableHead className="w-[120px] font-bold h-9">Company</TableHead>}
                 {colVis.shopName && <TableHead className="w-[100px] font-bold h-9">Shop Name</TableHead>}
-                <TableHead className="w-[80px] font-bold h-9">Status</TableHead>
                 {colVis.eta && <TableHead className="w-[100px] font-bold h-9">ETA DAS</TableHead>}
                 {colVis.cost && <TableHead className="w-[85px] font-bold text-right h-9">Cost ($)</TableHead>}
                 {colVis.freight && <TableHead className="w-[70px] font-bold text-center h-9">Freight</TableHead>}
@@ -59,9 +58,7 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                 </TableRow>
               ) : (
                 containers.map((c) => {
-                  const meta = STATUS_META[c.status] || STATUS_META.OTW;
-                  const freight = parseFloat(c.poFreight ?? "0") > 0 ? "Yes" : "No";
-                  const fMeta = FREIGHT_META[freight];
+                  const freight = parseFloat(c.poFreight ?? "0");
                   const canEditRow = sessionCompanyId === null || c.companyId === sessionCompanyId;
 
                   const transUpper = (c.transporter ?? "").toUpperCase();
@@ -109,17 +106,6 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                           </span>
                         </TableCell>
                       )}
-                      <TableCell className="h-10">
-                        <div
-                          className={cn(
-                            "px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1 w-fit",
-                            meta.color
-                          )}
-                        >
-                          {meta.icon}
-                          <span className="whitespace-nowrap uppercase">{c.status}</span>
-                        </div>
-                      </TableCell>
                       {colVis.eta && (
                         <TableCell className="h-10">
                           {canEditRow ? <EtaCell container={c} /> : fmtDate(c.eta)}
@@ -131,12 +117,8 @@ export function ContainerTable({ containers, colVis, sessionCompanyId, onOpenDra
                         </TableCell>
                       )}
                       {colVis.freight && (
-                        <TableCell className="h-10">
-                          <div className="flex justify-center">
-                            <div className={cn("px-1.5 py-0.5 rounded-md text-[10px] font-bold", fMeta?.color)}>
-                              {freight}
-                            </div>
-                          </div>
+                        <TableCell className="text-right font-mono text-muted-foreground h-10">
+                          {freight > 0 ? freight.toLocaleString() : "—"}
                         </TableCell>
                       )}
                       {colVis.truckNo && (

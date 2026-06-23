@@ -223,7 +223,7 @@ export function InlineNumberCell({
       title="Click to edit"
       className="cursor-text underline decoration-dashed underline-offset-2 decoration-muted-foreground/40"
     >
-      {num > 0 ? `\${prefix}\${fmt(num)}` : <span className="text-muted-foreground/50 text-xs">—</span>}
+      {num > 0 ? `${prefix}${fmt(num)}` : <span className="text-muted-foreground/50 text-xs">—</span>}
     </span>
   );
 }
