@@ -232,12 +232,34 @@ export async function removeEmployeeFromGroup(groupId: number, employeeId: numbe
 
 // Salary Advances
 
-export async function getAllSalaryAdvances(companyId: number): Promise<schema.SalaryAdvance[]> {
-  return await db
-    .select()
+export async function getAllSalaryAdvances(companyId: number): Promise<any[]> {
+  const rows = await db
+    .select({
+      id: schema.salaryAdvances.id,
+      companyId: schema.salaryAdvances.companyId,
+      employeeId: schema.salaryAdvances.employeeId,
+      advanceDate: schema.salaryAdvances.advanceDate,
+      amount: schema.salaryAdvances.amount,
+      remainingBalance: schema.salaryAdvances.remainingBalance,
+      voucherId: schema.salaryAdvances.voucherId,
+      notes: schema.salaryAdvances.notes,
+      fullyPaid: schema.salaryAdvances.fullyPaid,
+      isOpeningBalance: schema.salaryAdvances.isOpeningBalance,
+      createdAt: schema.salaryAdvances.createdAt,
+      employeeCode: schema.employees.code,
+      employeeFirstName: schema.employees.firstName,
+      employeeLastName: schema.employees.lastName,
+    })
     .from(schema.salaryAdvances)
+    .leftJoin(schema.employees, eq(schema.salaryAdvances.employeeId, schema.employees.id))
     .where(eq(schema.salaryAdvances.companyId, companyId))
     .orderBy(sql`${schema.salaryAdvances.advanceDate} DESC`);
+
+  return rows.map((r) => ({
+    ...r,
+    employeeName: `${r.employeeFirstName ?? ""} ${r.employeeLastName ?? ""}`.trim() || `Employee #${r.employeeId}`,
+    employeeCode: r.employeeCode ?? "",
+  }));
 }
 
 export async function getSalaryAdvanceById(id: number): Promise<schema.SalaryAdvance | undefined> {

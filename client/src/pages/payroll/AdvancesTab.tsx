@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Banknote, ArrowDownCircle, MinusCircle, Loader2 } from "lucide-react";
+import { Plus, Trash2, ArrowDownCircle, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -40,6 +40,7 @@ export function AdvancesTab() {
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [deductionDialogOpen, setDeductionDialogOpen] = useState(false);
   const [selectedAdvance, setSelectedAdvance] = useState<SalaryAdvance | null>(null);
+  const [showPaid, setShowPaid] = useState(false);
 
   const { data: workerStaff = [] } = useQuery<Employee[]>({
     queryKey: ["/api/payroll/employees-with-balances", selectedCompany?.id],
@@ -150,86 +151,127 @@ export function AdvancesTab() {
         </Button>
       </div>
 
-      <div className="border rounded-md">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Worker</TableHead>
-              <TableHead className="text-right">Amount</TableHead>
-              <TableHead className="text-right">Remaining</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+      {(() => {
+        const outstanding = salaryAdvances.filter((a) => !a.fullyPaid);
+        const paid = salaryAdvances.filter((a) => a.fullyPaid);
+
+        const renderRows = (rows: SalaryAdvance[]) =>
+          rows.map((advance) => (
+            <TableRow key={advance.id}>
+              <TableCell>{formatDisplayDate(advance.advanceDate)}</TableCell>
+              <TableCell>
+                <div className="flex flex-col">
+                  <span className="font-medium">{advance.employeeName}</span>
+                  <span className="text-xs text-muted-foreground">{advance.employeeCode}</span>
+                </div>
+              </TableCell>
+              <TableCell className="text-right font-mono">{formatAmount(parseFloat(advance.amount))}</TableCell>
+              <TableCell className="text-right font-mono font-bold text-amber-600 dark:text-amber-400">
+                {formatAmount(parseFloat(advance.remainingBalance))}
+              </TableCell>
+              <TableCell>
+                {advance.fullyPaid ? (
+                  <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
+                ) : (
+                  <Badge variant="outline" className="border-amber-500 text-amber-500">Outstanding</Badge>
+                )}
+              </TableCell>
+              <TableCell className="text-right">
+                <div className="flex justify-end gap-1">
+                  {!advance.fullyPaid && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        setSelectedAdvance(advance);
+                        deductionForm.setValue("deductionAmount", advance.remainingBalance);
+                        setDeductionDialogOpen(true);
+                      }}
+                      title="Record Repayment"
+                    >
+                      <ArrowDownCircle className="h-4 w-4 text-green-600" />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-destructive"
+                    onClick={() => {
+                      if (confirm("Are you sure you want to delete this advance?")) {
+                        deleteAdvanceMutation.mutate(advance.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {salaryAdvances.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  No salary advances found
-                </TableCell>
-              </TableRow>
-            ) : (
-              salaryAdvances.map((advance) => (
-                <TableRow key={advance.id}>
-                  <TableCell>{formatDisplayDate(advance.advanceDate)}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{advance.employeeName}</span>
-                      <span className="text-xs text-muted-foreground">{advance.employeeCode}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-mono">{formatAmount(parseFloat(advance.amount))}</TableCell>
-                  <TableCell className="text-right font-mono font-bold text-amber-600 dark:text-amber-400">
-                    {formatAmount(parseFloat(advance.remainingBalance))}
-                  </TableCell>
-                  <TableCell>
-                    {advance.fullyPaid ? (
-                      <Badge variant="default" className="bg-green-500 hover:bg-green-600">
-                        Fully Paid
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="border-amber-500 text-amber-500">
-                        Outstanding
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      {!advance.fullyPaid && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            setSelectedAdvance(advance);
-                            deductionForm.setValue("deductionAmount", advance.remainingBalance);
-                            setDeductionDialogOpen(true);
-                          }}
-                          title="Record Repayment"
-                        >
-                          <ArrowDownCircle className="h-4 w-4 text-green-600" />
-                        </Button>
-                      )}
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive"
-                        onClick={() => {
-                          if (confirm("Are you sure you want to delete this advance?")) {
-                            deleteAdvanceMutation.mutate(advance.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+          ));
+
+        return (
+          <>
+            {/* Outstanding advances */}
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Worker</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead className="text-right">Remaining</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {outstanding.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                        No outstanding advances
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    renderRows(outstanding)
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* Fully paid — collapsible */}
+            {paid.length > 0 && (
+              <div className="border rounded-md overflow-hidden">
+                <button
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/40 transition-colors"
+                  onClick={() => setShowPaid((v) => !v)}
+                  data-testid="button-toggle-paid-advances"
+                >
+                  <span className="flex items-center gap-2">
+                    <Badge variant="default" className="bg-green-500">Fully Paid</Badge>
+                    <span className="text-muted-foreground">{paid.length} advance{paid.length !== 1 ? "s" : ""}</span>
+                  </span>
+                  {showPaid ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                </button>
+                {showPaid && (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Worker</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Remaining</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>{renderRows(paid)}</TableBody>
+                  </Table>
+                )}
+              </div>
             )}
-          </TableBody>
-        </Table>
-      </div>
+          </>
+        );
+      })()}
 
       <Dialog open={advanceDialogOpen} onOpenChange={setAdvanceDialogOpen}>
         <DialogContent className="max-w-md">
