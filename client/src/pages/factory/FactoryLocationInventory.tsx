@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
@@ -19,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   MapPin, Layers, Package, Search, Printer, ArrowUpDown,
   FileText, ClipboardList, X, Download, FileSpreadsheet, Plus, Check, Trash2, Pencil, Tag, Zap, Eye,
-  AlertTriangle, ArrowLeft, TrendingUp, Weight, DollarSign,
+  AlertTriangle, ArrowLeft, TrendingUp, Weight, DollarSign, SlidersHorizontal,
 } from "lucide-react";
 import { useReactToPrint } from "react-to-print";
 import { useEscapeBack } from "@/hooks/use-escape-back";
@@ -149,6 +150,7 @@ export default function FactoryLocationInventory() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [locationSearch, setLocationSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
   const [productSearch, setProductSearch] = useState("");
   const [prodSortField, setProdSortField] = useState<SortField>("name");
   const [prodSortDir, setProdSortDir] = useState<SortDir>("asc");
@@ -1252,7 +1254,26 @@ export default function FactoryLocationInventory() {
   const spTotalSellValue = specialProducts.reduce((s, p) => s + (p.baleCount - (p.loadingCount ?? 0)) * parseFloat(p.sellingPrice || "0"), 0);
   const spTotalProdValue = specialProducts.reduce((s, p) => s + (p.baleCount - (p.loadingCount ?? 0)) * p.productionPrice, 0);
 
-  const colSpan = 2 + (proformaMode ? 2 : 0) + (hideSellingPrice ? 0 : 4) + (proformaMode ? 0 : 1);
+  const col = (key: string) => !hiddenColumns.has(key);
+  const toggleCol = (key: string) => setHiddenColumns(prev => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+
+  const colSpan =
+    (proformaMode ? 1 : 0) +
+    1 + // product
+    (col("category") ? 1 : 0) +
+    1 + // bales
+    (proformaMode ? 2 : 0) +
+    (col("avg_kg") ? 1 : 0) +
+    (!hideSellingPrice && col("sell_price") ? 1 : 0) +
+    (!hideSellingPrice && col("sell_value") ? 1 : 0) +
+    (!hideSellingPrice && col("cost_price") ? 1 : 0) +
+    (!hideSellingPrice && col("cost_value") ? 1 : 0) +
+    (col("total_kg") ? 1 : 0) +
+    (!proformaMode && col("actions") ? 1 : 0);
 
   const renderProductRow = (prod: FactoryBaleProduct, testIdSuffix = "") => {
     const weightPerBale = prod.baleCount > 0 ? prod.totalWeight / prod.baleCount : 0;
@@ -1282,14 +1303,16 @@ export default function FactoryLocationInventory() {
           </div>
           {prod.articleCode && <div className="text-xs text-muted-foreground font-mono mt-0.5">{prod.articleCode}</div>}
         </td>
-        <td className="px-3">
-          <Badge
-            variant="outline"
-            className={`text-xs font-medium no-default-active-elevate whitespace-nowrap ${catColor(prod.category)}`}
-          >
-            {prod.category || "Uncategorized"}
-          </Badge>
-        </td>
+        {col("category") && (
+          <td className="px-3">
+            <Badge
+              variant="outline"
+              className={`text-xs font-medium no-default-active-elevate whitespace-nowrap ${catColor(prod.category)}`}
+            >
+              {prod.category || "Uncategorized"}
+            </Badge>
+          </td>
+        )}
         <td className="text-right px-3 font-mono whitespace-nowrap">
           <span>{prod.baleCount - (prod.loadingCount ?? 0)}</span>
         </td>
@@ -1307,13 +1330,13 @@ export default function FactoryLocationInventory() {
             ) : <span className="text-muted-foreground">-</span>}
           </td>
         )}
-        <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>
-        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
-        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount((prod.baleCount - (prod.loadingCount ?? 0)) * parseFloat(prod.sellingPrice || "0"))}</td>}
-        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(prod.productionPrice)}</td>}
-        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount((prod.baleCount - (prod.loadingCount ?? 0)) * prod.productionPrice)}</td>}
-        <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>
-        {!proformaMode && (
+        {col("avg_kg") && <td className="text-right px-3 font-mono">{fmt(weightPerBale)}</td>}
+        {!hideSellingPrice && col("sell_price") && <td className="text-right px-3 font-mono">{formatAmount(parseFloat(prod.sellingPrice || "0"))}</td>}
+        {!hideSellingPrice && col("sell_value") && <td className="text-right px-3 font-mono">{formatAmount((prod.baleCount - (prod.loadingCount ?? 0)) * parseFloat(prod.sellingPrice || "0"))}</td>}
+        {!hideSellingPrice && col("cost_price") && <td className="text-right px-3 font-mono">{formatAmount(prod.productionPrice)}</td>}
+        {!hideSellingPrice && col("cost_value") && <td className="text-right px-3 font-mono">{formatAmount((prod.baleCount - (prod.loadingCount ?? 0)) * prod.productionPrice)}</td>}
+        {col("total_kg") && <td className="text-right px-3 font-mono">{fmt(prod.totalWeight)}</td>}
+        {!proformaMode && col("actions") && (
           <td className="px-1 text-center">
             <div className="flex items-center justify-center gap-0.5">
               <Button size="icon" variant="ghost" className="h-7 w-7" title="View details" onClick={() => navigate(`/factory/bale-product-history/${prod.productId}/${selectedLocation.id}`)} data-testid={`button-view-details${testIdSuffix}-${prod.productId}`}>
@@ -1617,18 +1640,19 @@ export default function FactoryLocationInventory() {
                 </Badge>
               ))}
             </div>
-            <Select value={prodSortField} onValueChange={(v) => setProdSortField(v as SortField)} data-testid="select-sort-field">
-              <SelectTrigger className="w-[120px]" data-testid="select-sort-trigger">
-                <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="name">Name</SelectItem>
-                <SelectItem value="bales">Bales</SelectItem>
-                <SelectItem value="kg">KG</SelectItem>
-                <SelectItem value="value">Value</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-1">
+              {(["name", "bales", "kg", "value"] as SortField[]).map((field) => (
+                <Badge
+                  key={field}
+                  variant={prodSortField === field ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setProdSortField(field)}
+                  data-testid={`badge-sort-${field}`}
+                >
+                  {field === "name" ? "Name" : field === "bales" ? "Bales" : field === "kg" ? "KG" : "Value"}
+                </Badge>
+              ))}
+            </div>
             <Button variant="outline" size="icon" onClick={() => setProdSortDir((d) => d === "asc" ? "desc" : "asc")} data-testid="button-sort-dir">
               {prodSortDir === "asc" ? "↑" : "↓"}
             </Button>
@@ -1644,6 +1668,43 @@ export default function FactoryLocationInventory() {
                 {showZeroStock ? "Hide zero" : "Show zero"}
               </Button>
             )}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 ml-auto" data-testid="button-columns">
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Columns
+                  {hiddenColumns.size > 0 && (
+                    <Badge variant="secondary" className="ml-1 text-xs px-1 py-0">{hiddenColumns.size}</Badge>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-3" align="end">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Show / Hide Columns</p>
+                <div className="space-y-1">
+                  {[
+                    { key: "category", label: "Category" },
+                    { key: "avg_kg", label: "Avg KG/Bale" },
+                    ...(!hideSellingPrice ? [
+                      { key: "sell_price", label: "Sell Price" },
+                      { key: "sell_value", label: "Sell Value" },
+                      { key: "cost_price", label: "Cost Price" },
+                      { key: "cost_value", label: "Cost Value" },
+                    ] : []),
+                    { key: "total_kg", label: "Total KG" },
+                    ...(!proformaMode ? [{ key: "actions", label: "Actions" }] : []),
+                  ].map(({ key, label }) => (
+                    <label key={key} className="flex items-center gap-2 py-0.5 cursor-pointer">
+                      <Checkbox
+                        checked={!hiddenColumns.has(key)}
+                        onCheckedChange={() => toggleCol(key)}
+                        data-testid={`checkbox-col-${key}`}
+                      />
+                      <span className="text-sm">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -1706,33 +1767,33 @@ export default function FactoryLocationInventory() {
                 <colgroup>
                   {proformaMode && <col style={{ width: "36px" }} />}
                   <col style={{ minWidth: "200px" }} />
-                  <col style={{ width: "110px" }} />
+                  {col("category") && <col style={{ width: "110px" }} />}
                   <col style={{ width: "70px" }} />
                   {proformaMode && <col style={{ width: "80px" }} />}
                   {proformaMode && <col style={{ width: "110px" }} />}
-                  <col style={{ width: "110px" }} />
-                  {!hideSellingPrice && <col style={{ width: "110px" }} />}
-                  {!hideSellingPrice && <col style={{ width: "130px" }} />}
-                  {!hideSellingPrice && <col style={{ width: "110px" }} />}
-                  {!hideSellingPrice && <col style={{ width: "130px" }} />}
-                  <col style={{ width: "100px" }} />
-                  {!proformaMode && <col style={{ width: "100px" }} />}
+                  {col("avg_kg") && <col style={{ width: "110px" }} />}
+                  {!hideSellingPrice && col("sell_price") && <col style={{ width: "110px" }} />}
+                  {!hideSellingPrice && col("sell_value") && <col style={{ width: "130px" }} />}
+                  {!hideSellingPrice && col("cost_price") && <col style={{ width: "110px" }} />}
+                  {!hideSellingPrice && col("cost_value") && <col style={{ width: "130px" }} />}
+                  {col("total_kg") && <col style={{ width: "100px" }} />}
+                  {!proformaMode && col("actions") && <col style={{ width: "100px" }} />}
                 </colgroup>
                 <thead className="bg-muted border-b-2 border-border/60 sticky top-0 z-30">
                   <tr className="h-10">
                     {proformaMode && <th className="px-2"></th>}
                     <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Product</th>
-                    <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</th>
+                    {col("category") && <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</th>}
                     <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
                     {proformaMode && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Qty</th>}
                     {proformaMode && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Price/Bale</th>}
-                    <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Avg KG/Bale</th>
-                    {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Price</th>}
-                    {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Value</th>}
-                    {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Price</th>}
-                    {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Value</th>}
-                    <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total KG</th>
-                    {!proformaMode && <th className="text-center px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>}
+                    {col("avg_kg") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Avg KG/Bale</th>}
+                    {!hideSellingPrice && col("sell_price") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Price</th>}
+                    {!hideSellingPrice && col("sell_value") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Value</th>}
+                    {!hideSellingPrice && col("cost_price") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Price</th>}
+                    {!hideSellingPrice && col("cost_value") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Value</th>}
+                    {col("total_kg") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total KG</th>}
+                    {!proformaMode && col("actions") && <th className="text-center px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -1748,17 +1809,17 @@ export default function FactoryLocationInventory() {
                       {regularProducts.length > 0 && (
                         <tr className="border-t bg-muted/50 h-12 font-bold">
                           {proformaMode && <td></td>}
-                          <td className="px-3" colSpan={2}>Total ({regularProducts.length} products)</td>
+                          <td className="px-3" colSpan={col("category") ? 2 : 1}>Total ({regularProducts.length} products)</td>
                           <td className="text-right px-3 font-mono">{totalBales.toLocaleString()}</td>
                           {proformaMode && <td></td>}
                           {proformaMode && <td></td>}
-                          <td className="text-right px-3 font-mono">{proformaMode ? fmt(totalKg) : ""}</td>
-                          {!hideSellingPrice && <td></td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(totalSellValue)}</td>}
-                          {!hideSellingPrice && <td></td>}
-                          {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(totalProdValue)}</td>}
-                          <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>
-                          {!proformaMode && <td></td>}
+                          {col("avg_kg") && <td className="text-right px-3 font-mono">{proformaMode ? fmt(totalKg) : ""}</td>}
+                          {!hideSellingPrice && col("sell_price") && <td></td>}
+                          {!hideSellingPrice && col("sell_value") && <td className="text-right px-3 font-mono">{formatAmount(totalSellValue)}</td>}
+                          {!hideSellingPrice && col("cost_price") && <td></td>}
+                          {!hideSellingPrice && col("cost_value") && <td className="text-right px-3 font-mono">{formatAmount(totalProdValue)}</td>}
+                          {col("total_kg") && <td className="text-right px-3 font-mono">{fmt(totalKg)}</td>}
+                          {!proformaMode && col("actions") && <td></td>}
                         </tr>
                       )}
                     </>
@@ -1775,50 +1836,50 @@ export default function FactoryLocationInventory() {
                     <colgroup>
                       {proformaMode && <col style={{ width: "36px" }} />}
                       <col style={{ minWidth: "200px" }} />
-                      <col style={{ width: "110px" }} />
+                      {col("category") && <col style={{ width: "110px" }} />}
                       <col style={{ width: "70px" }} />
                       {proformaMode && <col style={{ width: "80px" }} />}
                       {proformaMode && <col style={{ width: "110px" }} />}
-                      <col style={{ width: "110px" }} />
-                      {!hideSellingPrice && <col style={{ width: "110px" }} />}
-                      {!hideSellingPrice && <col style={{ width: "130px" }} />}
-                      {!hideSellingPrice && <col style={{ width: "110px" }} />}
-                      {!hideSellingPrice && <col style={{ width: "130px" }} />}
-                      <col style={{ width: "100px" }} />
-                      {!proformaMode && <col style={{ width: "100px" }} />}
+                      {col("avg_kg") && <col style={{ width: "110px" }} />}
+                      {!hideSellingPrice && col("sell_price") && <col style={{ width: "110px" }} />}
+                      {!hideSellingPrice && col("sell_value") && <col style={{ width: "130px" }} />}
+                      {!hideSellingPrice && col("cost_price") && <col style={{ width: "110px" }} />}
+                      {!hideSellingPrice && col("cost_value") && <col style={{ width: "130px" }} />}
+                      {col("total_kg") && <col style={{ width: "100px" }} />}
+                      {!proformaMode && col("actions") && <col style={{ width: "100px" }} />}
                     </colgroup>
                     <thead className="bg-muted border-b-2 border-border/60 sticky top-0 z-30">
                       <tr className="h-10">
                         {proformaMode && <th className="px-2"></th>}
                         <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Product</th>
-                        <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</th>
+                        {col("category") && <th className="text-left px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Category</th>}
                         <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{proformaMode ? "Available" : "Bales"}</th>
                         {proformaMode && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Qty</th>}
                         {proformaMode && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Price/Bale</th>}
-                        <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Avg KG/Bale</th>
-                        {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Price</th>}
-                        {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Value</th>}
-                        {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Price</th>}
-                        {!hideSellingPrice && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Value</th>}
-                        <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total KG</th>
-                        {!proformaMode && <th className="text-center px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>}
+                        {col("avg_kg") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Avg KG/Bale</th>}
+                        {!hideSellingPrice && col("sell_price") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Price</th>}
+                        {!hideSellingPrice && col("sell_value") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Sell Value</th>}
+                        {!hideSellingPrice && col("cost_price") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Price</th>}
+                        {!hideSellingPrice && col("cost_value") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Cost Value</th>}
+                        {col("total_kg") && <th className="text-right px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">Total KG</th>}
+                        {!proformaMode && col("actions") && <th className="text-center px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {specialProducts.map((prod) => renderProductRow(prod, "-sp"))}
                       <tr className="border-t bg-muted/50 h-12 font-bold">
                         {proformaMode && <td></td>}
-                        <td className="px-3" colSpan={2}>Total ({specialProducts.length} products)</td>
+                        <td className="px-3" colSpan={col("category") ? 2 : 1}>Total ({specialProducts.length} products)</td>
                         <td className="text-right px-3 font-mono">{spTotalBales.toLocaleString()}</td>
                         {proformaMode && <td></td>}
                         {proformaMode && <td></td>}
-                        <td className="text-right px-3 font-mono">{proformaMode ? fmt(spTotalKg) : ""}</td>
-                        {!hideSellingPrice && <td></td>}
-                        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(spTotalSellValue)}</td>}
-                        {!hideSellingPrice && <td></td>}
-                        {!hideSellingPrice && <td className="text-right px-3 font-mono">{formatAmount(spTotalProdValue)}</td>}
-                        <td className="text-right px-3 font-mono">{fmt(spTotalKg)}</td>
-                        {!proformaMode && <td></td>}
+                        {col("avg_kg") && <td className="text-right px-3 font-mono">{proformaMode ? fmt(spTotalKg) : ""}</td>}
+                        {!hideSellingPrice && col("sell_price") && <td></td>}
+                        {!hideSellingPrice && col("sell_value") && <td className="text-right px-3 font-mono">{formatAmount(spTotalSellValue)}</td>}
+                        {!hideSellingPrice && col("cost_price") && <td></td>}
+                        {!hideSellingPrice && col("cost_value") && <td className="text-right px-3 font-mono">{formatAmount(spTotalProdValue)}</td>}
+                        {col("total_kg") && <td className="text-right px-3 font-mono">{fmt(spTotalKg)}</td>}
+                        {!proformaMode && col("actions") && <td></td>}
                       </tr>
                     </tbody>
                   </table>
