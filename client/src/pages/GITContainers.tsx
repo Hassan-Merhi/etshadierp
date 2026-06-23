@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, ChangeEvent } from "react";
 import { Redirect } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -190,6 +190,13 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
   function openDrawer(c: EnrichedContainerRow) {
     setDrawerContainer(c);
     setDrawerOpen(true);
+  }
+
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    importMutation.mutate(file);
+    e.target.value = "";
   }
 
   function clearFilters() {
@@ -443,12 +450,10 @@ export default function GITContainers({ embedded = false }: { embedded?: boolean
 
       <ContainerDrawer
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+        onClose={() => setDrawerOpen(false)}
         container={drawerContainer}
-        onContainerChange={(updated) => {
-          setDrawerContainer(updated);
-          refetch();
-        }}
+        queryKey={queryUrl}
+        sessionCompanyId={sessionCompanyId}
       />
     </div>
   );
