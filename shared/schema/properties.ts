@@ -192,9 +192,7 @@ export const rentalAutoTransferConfigs = pgTable(
     enabled: boolean("enabled").notNull().default(true),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (t) => ({
-    uniqueCompanyModule: uniqueIndex("rental_auto_transfer_unique").on(t.companyId, t.module),
-  })
+  () => ({})
 );
 
 export const insertRentalAutoTransferConfigSchema = createInsertSchema(rentalAutoTransferConfigs)

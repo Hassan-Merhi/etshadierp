@@ -1776,6 +1776,8 @@ let migrationsDone = false;
       created_at timestamp NOT NULL DEFAULT now()
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS rental_auto_transfer_unique ON rental_auto_transfer_configs (company_id, module)`,
+    // Multiple rules per company+module are supported — drop the unique constraint
+    `DROP INDEX IF EXISTS rental_auto_transfer_unique`,
     `CREATE TABLE IF NOT EXISTS factory_transporters (
       id serial PRIMARY KEY,
       company_id integer NOT NULL,
