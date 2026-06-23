@@ -1,4 +1,5 @@
 import { getClientDate } from "../lib/dateUtils";
+import { generateStockPdf } from "../helpers/generateStockPdf";
 import type { Express } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -476,6 +477,39 @@ export function registerLocationRoutes(app: Express) {
         `attachment; filename="${location.name}_inventory_${getClientDate(req)}.xlsx"`
       );
       res.send(excelBuffer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  // Location Inventory PDF — Godown Summary (with or without cost)
+  app.get("/api/locations/:locationId/inventory/pdf", requireAuth, async (req, res) => {
+    try {
+      const locationId = parseInt(req.params.locationId);
+      if (isNaN(locationId)) return res.status(400).json({ message: "Invalid location ID" });
+
+      const location = await storage.getLocationById(locationId);
+      if (!location) return res.status(404).json({ message: "Location not found" });
+      if (location.companyId !== req.session.currentCompanyId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const companyId = req.session.currentCompanyId!;
+      const [co] = await db.select({ name: companies.name }).from(companies).where(eq(companies.id, companyId)).limit(1);
+      const companyName = co?.name || "Company";
+
+      const includeCost = req.query.includeCost !== "0" && req.query.includeCost !== "false";
+
+      const { buffer } = await generateStockPdf(companyId, companyName, locationId, location.name, includeCost);
+
+      const safeDate = getClientDate(req).replace(/-/g, "");
+      const safeName = location.name.replace(/[^\w\s.\-]/g, "_").replace(/\s+/g, "_");
+      const suffix = includeCost ? "with_cost" : "no_cost";
+      const fileName = `${safeName}_Godown_${safeDate}_${suffix}.pdf`;
+
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+      res.send(buffer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }

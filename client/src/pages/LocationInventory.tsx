@@ -43,7 +43,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { useReactToPrint } from "react-to-print";
 import { format } from "date-fns";
 import { getDefaultPeriodValue } from "@/components/ui/period-filter";
 
@@ -97,7 +96,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [selectedGroup, setSelectedGroup] = useState<StockGroupSummary | null>(null);
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
   const [viewAllItems, setViewAllItems] = useState<boolean>(false);
-  const [printWithCost, setPrintWithCost] = useState<boolean>(false);
   const [locationSearchTerm, setLocationSearchTerm] = useState("");
   const [groupSearchTerm, setGroupSearchTerm] = useState("");
   const [itemSearchTerm, setItemSearchTerm] = useState("");
@@ -120,7 +118,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const [stockMovementPeriod, setStockMovementPeriod] = useState<any>(() => getDefaultPeriodValue("this_month"));
   const [drillMonth, setDrillMonth] = useState<any>(null);
   const allStockTableRef = useRef<HTMLDivElement>(null);
-  const printRef = useRef<HTMLDivElement>(null);
 
   // Dialogs
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -158,15 +155,34 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
     queryClient.invalidateQueries({ queryKey: ["/api/stock-categories"] });
   }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handlePrint = useReactToPrint({
-    contentRef: printRef,
-    documentTitle: `${(selectedLocationLocal?.name || "Stock").replace(/\s+/g, "_")}_STK_${new Date().toLocaleDateString("en-CA")}`,
-  });
-
   const handlePrintWithOption = async (withCost: boolean) => {
-    setPrintWithCost(withCost);
-    setViewAllItems(true);
-    setTimeout(() => handlePrint(), 150);
+    if (!selectedLocationLocal) return;
+    try {
+      const includeCost = withCost ? "1" : "0";
+      const response = await fetch(
+        `/api/locations/${selectedLocationLocal.id}/inventory/pdf?includeCost=${includeCost}`,
+        { credentials: "include" }
+      );
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ message: "PDF generation failed" }));
+        toast({ title: "Export Failed", description: err.message, variant: "destructive" });
+        return;
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const safeName = selectedLocationLocal.name.replace(/\s+/g, "_");
+      const date = new Date().toLocaleDateString("en-CA");
+      a.download = `${safeName}_Godown_${date}${withCost ? "_with_cost" : "_no_cost"}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast({ title: "PDF Downloaded" });
+    } catch (error: any) {
+      toast({ title: "Export Failed", description: error.message, variant: "destructive" });
+    }
   };
 
   // ─── Mutations ──────────────────────────────────────────────────────────────
@@ -1202,25 +1218,6 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
             )}
           </div>
         )}
-      </div>
-
-      {/* Hidden print ref */}
-      <div ref={printRef} className="hidden print:block p-6">
-        <h1 className="text-2xl font-bold mb-2">{selectedLocationLocal?.name} — Inventory</h1>
-        <p className="text-sm text-muted-foreground mb-4">Printed {new Date().toLocaleDateString()}</p>
-        <InventoryTable
-          filteredStockItems={allItemsFiltered}
-          showMovement={showMovement}
-          openingInventoryMap={openingInventoryMap}
-          selectedRowIndex={-1}
-          setSelectedRowIndex={() => {}}
-          navigate={navigate}
-          formatAmount={formatAmount}
-          posUser={printWithCost ? false : true}
-          itemSearchTerm=""
-          inventory={inventory}
-          selectedGroup={null}
-        />
       </div>
 
       {/* Create Location dialog */}
