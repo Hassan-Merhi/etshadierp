@@ -16,7 +16,7 @@ import { getApiRequest } from "@/lib/factoryApi";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useLocation, useParams } from "wouter";
 import { useEscapeToParent } from "@/hooks/use-escape-to-parent";
-import { ArrowLeft, Check, ChevronsUpDown, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, DollarSign, RefreshCw } from "lucide-react";
+import { ArrowLeft, Check, ChevronsUpDown, RotateCcw, Ship, Truck, AlertTriangle, CheckCircle, Package, Trash2, Plus, Wrench, DollarSign, RefreshCw, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -152,6 +152,7 @@ export default function FactoryPendingInvoiceVerify() {
   const [invoiceDate, setInvoiceDate] = useState(new Date().toLocaleDateString("en-CA"));
 
   const [showProformaDialog, setShowProformaDialog] = useState(false);
+  const [showViewProformaDialog, setShowViewProformaDialog] = useState(false);
   const [selectedProformaId, setSelectedProformaId] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
   const [showRecoverDialog, setShowRecoverDialog] = useState(false);
@@ -1142,6 +1143,14 @@ export default function FactoryPendingInvoiceVerify() {
           </Button>
           <Button
             variant="outline"
+            onClick={() => setShowViewProformaDialog(true)}
+            data-testid="button-view-proforma"
+          >
+            <FileText className="mr-2 h-4 w-4" />
+            View Proforma
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => {
               setSelectedProformaId("");
               setShowProformaDialog(true);
@@ -1477,6 +1486,69 @@ export default function FactoryPendingInvoiceVerify() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* View Proforma dialog */}
+      {(() => {
+        const activeProformaId = verification?.order?.proformaIdUsed ?? null;
+        const activeProformaName =
+          proformas.find((p) => p.id === activeProformaId)?.name ??
+          (activeProformaId ? `Proforma #${activeProformaId}` : null);
+        const proformaLines = verification?.proformaLines ?? [];
+        return (
+          <Dialog open={showViewProformaDialog} onOpenChange={setShowViewProformaDialog}>
+            <DialogContent className="max-w-lg" data-testid="dialog-view-proforma">
+              <DialogHeader>
+                <DialogTitle>
+                  {activeProformaName ? `Proforma: ${activeProformaName}` : "Linked Proforma"}
+                </DialogTitle>
+              </DialogHeader>
+              {!activeProformaId ? (
+                <p className="text-sm text-muted-foreground italic" data-testid="text-no-proforma-linked">
+                  No proforma is linked to this order.
+                </p>
+              ) : proformaLines.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic" data-testid="text-proforma-no-lines">
+                  This proforma has no lines.
+                </p>
+              ) : (
+                <div className="overflow-auto max-h-[60vh]">
+                  <Table data-testid="table-view-proforma">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Article</TableHead>
+                        <TableHead>Product</TableHead>
+                        <TableHead className="text-right">Expected Qty</TableHead>
+                        <TableHead className="text-right">Price / Bale</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {proformaLines.map((line, idx) => (
+                        <TableRow key={idx} data-testid={`row-view-proforma-${line.articleCode}`}>
+                          <TableCell className="font-mono text-sm">{line.articleCode}</TableCell>
+                          <TableCell className="text-sm">{line.productName}</TableCell>
+                          <TableCell className="text-right text-sm">{line.expectedQty}</TableCell>
+                          <TableCell className="text-right text-sm font-medium">
+                            ${fmtNum(parseFloat(line.pricePerBale) || 0)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowViewProformaDialog(false)}
+                  data-testid="button-close-view-proforma"
+                >
+                  Close
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       <AlertDialog open={showFixBalesDialog} onOpenChange={setShowFixBalesDialog}>
         <AlertDialogContent>
