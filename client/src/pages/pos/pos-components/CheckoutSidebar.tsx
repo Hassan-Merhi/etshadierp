@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { User, ChevronDown, Check, Save } from "lucide-react";
 
 export interface CheckoutSidebarProps {
+  posUser?: any;
   paymentAccountType: "bank" | "cash" | "credit";
   setPaymentAccountType: (value: "bank" | "cash") => void;
   paymentAccountId: string | null;
@@ -29,6 +30,8 @@ export interface CheckoutSidebarProps {
   handleSaveSale: () => void;
   notes: string;
   setNotes: (notes: string) => void;
+  saleDate: string;
+  setSaleDate: (date: string) => void;
   total: number;
   totalQty: number;
   rows: any[];
@@ -39,6 +42,7 @@ export interface CheckoutSidebarProps {
 }
 
 export function CheckoutSidebar({
+  posUser,
   paymentAccountType,
   setPaymentAccountType,
   paymentAccountId,
@@ -60,6 +64,8 @@ export function CheckoutSidebar({
   handleSaveSale,
   notes,
   setNotes,
+  saleDate,
+  setSaleDate,
   total,
   totalQty,
   rows,
@@ -68,6 +74,9 @@ export function CheckoutSidebar({
   formatDisplayAmount,
   cn,
 }: CheckoutSidebarProps) {
+  const lockedCashAccount = posUser && paymentAccountId
+    ? cashLedgerAccounts.find(a => String(a.id) === paymentAccountId)
+    : null;
   return (
     <div className="w-full lg:w-80 flex flex-col gap-4">
       <div className="bg-muted/10 p-4 rounded-lg border border-muted/50 space-y-4">
@@ -110,8 +119,34 @@ export function CheckoutSidebar({
 
       <div className="flex flex-col gap-4 p-1">
         <div className="flex flex-col gap-2">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Date</Label>
+          {posUser ? (
+            <div className="h-9 flex items-center px-3 rounded-md border border-muted bg-muted/30 text-sm font-mono text-muted-foreground" data-testid="text-sale-date">
+              {saleDate}
+            </div>
+          ) : (
+            <input
+              type="date"
+              value={saleDate}
+              onChange={(e) => setSaleDate(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-background text-sm font-mono w-full focus:outline-none focus:ring-2 focus:ring-ring"
+              data-testid="input-sale-date"
+            />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
           <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Payment Account</Label>
-          {!isCreditSale && (
+          {posUser ? (
+            <div className="flex items-center gap-2">
+              <div className="h-9 flex items-center px-3 rounded-md border border-muted bg-muted/30 text-sm text-muted-foreground w-24" data-testid="text-payment-type">
+                Cash
+              </div>
+              <div className="h-9 flex items-center px-3 rounded-md border border-muted bg-muted/30 text-sm text-muted-foreground flex-1 truncate" data-testid="text-payment-account">
+                {lockedCashAccount ? lockedCashAccount.name : "—"}
+              </div>
+            </div>
+          ) : !isCreditSale && (
             <div className="flex gap-2">
               <Select value={paymentAccountType} onValueChange={(value: "bank" | "cash") => setPaymentAccountType(value)}>
                 <SelectTrigger className="w-24 h-9" data-testid="select-account-type">
@@ -145,6 +180,7 @@ export function CheckoutSidebar({
             </div>
           )}
 
+          {!posUser && (
           <div className="flex items-center gap-2 mt-1">
             <Switch 
               id="credit-sale" 
@@ -156,6 +192,7 @@ export function CheckoutSidebar({
               Credit Sale
             </Label>
           </div>
+          )}
 
           {isCreditSale && (
             <div className="flex flex-col gap-2 mt-1">

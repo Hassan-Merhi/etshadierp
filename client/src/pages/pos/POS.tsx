@@ -252,6 +252,24 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
 
   const handlePrint = useReactToPrint({ contentRef: printRef });
 
+  if (posUser && posLocationsLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 gap-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        <p className="text-muted-foreground text-sm">Loading location...</p>
+      </div>
+    );
+  }
+
+  if (posUser && !posLocationsLoading && posAssignedLocations.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-8 gap-2">
+        <p className="font-semibold">No location assigned</p>
+        <p className="text-muted-foreground text-sm">Contact your administrator to be assigned to a location.</p>
+      </div>
+    );
+  }
+
   if (!activeLocation && !posUser && !editVoucherId) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8 gap-6">
@@ -301,6 +319,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
           </div>
 
           <CheckoutSidebar
+            posUser={posUser}
             paymentAccountType={paymentAccountType} setPaymentAccountType={setPaymentAccountType}
             paymentAccountId={paymentAccountId} setPaymentAccountId={setPaymentAccountId}
             isCreditSale={isCreditSale} setIsCreditSale={setIsCreditSale}
@@ -310,6 +329,7 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
             formatAmountRaw={formatAmountRaw} bankAccounts={bankAccounts} cashLedgerAccounts={cashLedgerAccounts}
             saveMutation={saveMutation} hasValidItems={hasValidItems} editVoucherId={editVoucherId}
             handleSaveSale={handleSaveSale} notes={notes} setNotes={setNotes}
+            saleDate={saleDate} setSaleDate={setSaleDate}
             total={total} totalQty={totalQty} rows={rows} activeCurrency={activeCurrency} exchangeRate={exchangeRate}
             formatDisplayAmount={(v) => activeCurrency === "CFA" ? `CFA ${Math.round(v).toLocaleString()}` : `$ ${v.toLocaleString()}`} cn={cn}
           />
