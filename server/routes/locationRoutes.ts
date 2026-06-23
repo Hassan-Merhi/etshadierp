@@ -362,12 +362,14 @@ if (rawAsOfDate) {
   }
 }
 
+const includeZero = req.query.includeZero === "true";
+
 let inventory;
 if (asOfDate) {
   const companyId = req.session.currentCompanyId!;
   inventory = await calculateHistoricalLocationInventory(locationId, companyId, asOfDate);
 } else {
-  inventory = await storage.getLocationInventory(req.session.currentCompanyId!, locationId);
+  inventory = await storage.getLocationInventory(req.session.currentCompanyId!, locationId, includeZero);
 }
 
         // Filter sensitive data for POS users (they should only see quantity)

@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useCursorNav } from "@/contexts/CursorNavContext";
 import { useLocation } from "@/contexts/LocationContext";
 import { useCompany } from "@/contexts/CompanyContext";
 import { useCurrencyContext } from "@/contexts/CurrencyContext";
@@ -222,8 +223,12 @@ export default function LocationInventory({ posUser }: { posUser?: any } = {}) {
   const locations = posUser ? posAssignedLocations : allLocations;
   const locationsLoading = posUser ? posLocationsLoading : allLocationsLoading;
 
+  const inventoryQueryKey = selectedLocationLocal
+    ? [`/api/locations/${selectedLocationLocal.id}/inventory${showZeroStock ? "?includeZero=true" : ""}`]
+    : [];
+
   const { data: inventoryData = [], isLoading: inventoryLoading } = useQuery<InventoryItem[]>({
-    queryKey: selectedLocationLocal ? [`/api/locations/${selectedLocationLocal.id}/inventory`] : [],
+    queryKey: inventoryQueryKey,
     enabled: !!selectedLocationLocal,
   });
 

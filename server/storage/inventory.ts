@@ -217,38 +217,75 @@ export async function deleteLocationPrice(priceId: number): Promise<void> {
 // Location Inventory
 // ---------------------------------------------------------------------------
 
-export async function getLocationInventory(companyId: number, locationId: number): Promise<any[]> {
-  return await db
-    .select({
-      inventoryId: schema.inventory.id,
-      locationId: schema.inventory.locationId,
-      stockItemId: schema.inventory.stockItemId,
-      quantity: schema.inventory.quantity,
-      averageRate: schema.inventory.averageRate,
-      totalValue: schema.inventory.totalValue,
-      lastUpdated: schema.inventory.lastUpdated,
-      stockItemName: schema.stockItems.name,
-      stockItemCode: schema.stockItems.code,
-      stockItemUom: schema.stockItems.uom,
-      stockGroupId: schema.stockItems.stockGroupId,
-      stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
-      stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
-      stockItemActive: schema.stockItems.active,
-      barcode: schema.stockItems.barcode,
-      categoryId: schema.stockItems.categoryId,
-      categoryName: schema.stockCategories.name,
-    })
-    .from(schema.inventory)
-    .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
-    .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
-    .leftJoin(schema.stockCategories, eq(schema.stockItems.categoryId, schema.stockCategories.id))
-    .where(and(
-      eq(schema.inventory.companyId, companyId),
-      eq(schema.inventory.locationId, locationId),
-      isNotNull(schema.stockItems.id),
-      isNull(schema.stockItems.deletedAt)
-    ))
-    .orderBy(asc(schema.stockItems.code));
+export async function getLocationInventory(companyId: number, locationId: number, includeZero = false): Promise<any[]> {
+  if (!includeZero) {
+    // Default: only rows that have an inventory record for this location
+    return await db
+      .select({
+        inventoryId: schema.inventory.id,
+        locationId: schema.inventory.locationId,
+        stockItemId: schema.inventory.stockItemId,
+        quantity: schema.inventory.quantity,
+        averageRate: schema.inventory.averageRate,
+        totalValue: schema.inventory.totalValue,
+        lastUpdated: schema.inventory.lastUpdated,
+        stockItemName: schema.stockItems.name,
+        stockItemCode: schema.stockItems.code,
+        stockItemUom: schema.stockItems.uom,
+        stockGroupId: schema.stockItems.stockGroupId,
+        stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
+        stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
+        stockItemActive: schema.stockItems.active,
+        barcode: schema.stockItems.barcode,
+        categoryId: schema.stockItems.categoryId,
+        categoryName: schema.stockCategories.name,
+      })
+      .from(schema.inventory)
+      .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
+      .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
+      .leftJoin(schema.stockCategories, eq(schema.stockItems.categoryId, schema.stockCategories.id))
+      .where(and(
+        eq(schema.inventory.companyId, companyId),
+        eq(schema.inventory.locationId, locationId),
+        isNotNull(schema.stockItems.id),
+        isNull(schema.stockItems.deletedAt)
+      ))
+      .orderBy(asc(schema.stockItems.code));
+  }
+
+  // includeZero=true: start from stock_items, left-join inventory for this location only
+  const rows = await db.execute(sql`
+    SELECT
+      inv.id            AS "inventoryId",
+      ${locationId}     AS "locationId",
+      si.id             AS "stockItemId",
+      COALESCE(inv.quantity,     '0') AS quantity,
+      COALESCE(inv.average_rate, '0') AS "averageRate",
+      COALESCE(inv.total_value,  '0') AS "totalValue",
+      inv.last_updated  AS "lastUpdated",
+      si.name           AS "stockItemName",
+      si.code           AS "stockItemCode",
+      si.uom            AS "stockItemUom",
+      si.stock_group_id AS "stockGroupId",
+      COALESCE(sg.name, '') AS "stockGroupName",
+      COALESCE(sg.code, '') AS "stockGroupCode",
+      si.active         AS "stockItemActive",
+      si.barcode,
+      si.category_id    AS "categoryId",
+      sc.name           AS "categoryName"
+    FROM stock_items si
+    LEFT JOIN inventory inv
+      ON inv.stock_item_id = si.id
+      AND inv.company_id   = ${companyId}
+      AND inv.location_id  = ${locationId}
+    LEFT JOIN stock_groups sg  ON sg.id = si.stock_group_id
+    LEFT JOIN stock_categories sc ON sc.id = si.category_id
+    WHERE si.company_id  = ${companyId}
+      AND si.deleted_at IS NULL
+      AND si.active = true
+    ORDER BY si.code ASC
+  `);
+  return rows.rows as any[];
 }
 
 export async function getCompanyInventory(companyId: number): Promise<any[]> {
