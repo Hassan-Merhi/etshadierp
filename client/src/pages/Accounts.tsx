@@ -2,9 +2,15 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Edit } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PageHeader } from "@/components/PageHeader";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
@@ -97,6 +103,8 @@ export default function Accounts() {
   const [employeeToEdit, setEmployeeToEdit] = useState<Account | null>(null);
   const [bankToEdit, setBankToEdit] = useState<BankAccount | null>(null);
   const [pendingDelete, setPendingDelete] = useState<(() => void) | null>(null);
+  const [alterSearchTerm, setAlterSearchTerm] = useState("");
+  const [alterSelectedAccount, setAlterSelectedAccount] = useState<Account | null>(null);
 
   const updateUrlParams = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(window.location.search);
@@ -141,6 +149,20 @@ export default function Accounts() {
       toast({ title: "Delete failed", description: err?.message ?? "Unknown error", variant: "destructive" });
     },
   });
+  const updateLedgerMutation = useMutation({
+    mutationFn: async (data: { id: number; name?: string; accountType?: string; openingBalance?: string; openingBalanceSide?: string; active?: boolean }) => {
+      const { id, ...rest } = data;
+      return apiRequest("PUT", `/api/ledger-accounts/${id}`, rest);
+    },
+    onSuccess: () => {
+      toast({ title: "Account updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts/all"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Update failed", description: err?.message ?? "Unknown error", variant: "destructive" });
+    },
+  });
+
   const [filterCurrency, setFilterCurrency] = useState<"all" | "CFA">("all");
   const { data: currentUser } = useQuery<{ role?: string }>({ queryKey: ["/api/auth/me"] });
   const [exportLang, setExportLang] = useState<"en" | "fr" | "ar">("en");
@@ -376,6 +398,201 @@ export default function Accounts() {
               exportLabels={exportLabels}
             />
           )}
+        </TabsContent>
+
+        <TabsContent value="alter">
+          <div className="flex gap-4 h-[600px]">
+            {/* Left: account list */}
+            <div className="w-72 shrink-0 flex flex-col gap-2">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search accounts..."
+                  value={alterSearchTerm}
+                  onChange={(e) => setAlterSearchTerm(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-alter-search"
+                />
+              </div>
+              <div className="flex-1 overflow-y-auto rounded-md border divide-y">
+                {allAccounts
+                  .filter(
+                    (a) =>
+                      a.type === "ledger" &&
+                      (!alterSearchTerm ||
+                        a.name.toLowerCase().includes(alterSearchTerm.toLowerCase()) ||
+                        a.code.toLowerCase().includes(alterSearchTerm.toLowerCase()))
+                  )
+                  .map((a) => (
+                    <button
+                      key={a.id}
+                      data-testid={`button-alter-account-${a.accountId}`}
+                      className={`w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors hover:bg-muted/40 ${
+                        alterSelectedAccount?.id === a.id ? "bg-muted/60" : ""
+                      }`}
+                      onClick={() => {
+                        setAlterSelectedAccount(a);
+                        editForm.reset({
+                          code: a.code,
+                          name: a.name,
+                          openingBalance: String(Math.abs(a.openingBalance || 0)),
+                          openingBalanceSide: (a.openingBalanceSide as "Dr" | "Cr") || "Dr",
+                          active: a.active !== false,
+                        });
+                      }}
+                    >
+                      <span className="text-sm truncate">{a.name}</span>
+                      <Badge variant="outline" className="text-[10px] shrink-0 ml-2">
+                        Ledger
+                      </Badge>
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            {/* Right: edit form or placeholder */}
+            <div className="flex-1">
+              {!alterSelectedAccount ? (
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground rounded-md border">
+                  <Edit className="w-10 h-10 mb-3 opacity-30" />
+                  <p className="font-medium text-sm">Select an account</p>
+                  <p className="text-xs mt-1">Choose an account from the list to edit it</p>
+                </div>
+              ) : (
+                <Card className="h-full overflow-y-auto">
+                  <CardContent className="pt-5">
+                    <h3 className="font-semibold mb-4">{alterSelectedAccount.name}</h3>
+                    <Form {...editForm}>
+                      <form
+                        onSubmit={editForm.handleSubmit((data) => {
+                          updateLedgerMutation.mutate({
+                            id: alterSelectedAccount.accountId,
+                            ...data,
+                          } as any);
+                        })}
+                        className="space-y-4"
+                        noValidate
+                      >
+                        {/* Code — read only */}
+                        <div className="space-y-1.5">
+                          <Label>Account Code</Label>
+                          <Input
+                            value={alterSelectedAccount.code}
+                            readOnly
+                            className="bg-muted font-mono text-sm"
+                            data-testid="input-alter-code"
+                          />
+                        </div>
+
+                        {/* Name */}
+                        <FormField
+                          control={editForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Account Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-alter-name" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        {/* Opening Balance */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={editForm.control}
+                            name="openingBalance"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Opening Balance</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    step="0.01"
+                                    {...field}
+                                    value={field.value ?? "0"}
+                                    data-testid="input-alter-balance"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={editForm.control}
+                            name="openingBalanceSide"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Balance Side</FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value || "Dr"}>
+                                  <FormControl>
+                                    <SelectTrigger data-testid="select-alter-balance-side">
+                                      <SelectValue placeholder="Dr/Cr" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="Dr">Dr (Debit)</SelectItem>
+                                    <SelectItem value="Cr">Cr (Credit)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        {/* Active toggle */}
+                        <FormField
+                          control={editForm.control}
+                          name="active"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <div>
+                                <FormLabel>Active Status</FormLabel>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Account is available for new entries
+                                </p>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={!!field.value}
+                                  onCheckedChange={field.onChange}
+                                  data-testid="switch-alter-active"
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex justify-end gap-2 pt-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              setAlterSelectedAccount(null);
+                              editForm.reset();
+                            }}
+                            data-testid="button-alter-cancel"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={updateLedgerMutation.isPending}
+                            data-testid="button-alter-save"
+                          >
+                            {updateLedgerMutation.isPending ? "Saving…" : "Save Changes"}
+                          </Button>
+                        </div>
+                      </form>
+                    </Form>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 
