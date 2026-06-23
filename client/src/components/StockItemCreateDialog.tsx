@@ -322,51 +322,7 @@ export function StockItemCreateDialog({
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="sellingPrice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Selling Price</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        data-testid="input-selling-price"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="reorderLevel"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Reorder Level</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        type="number"
-                        step="0.001"
-                        placeholder="0"
-                        data-testid="input-reorder-level"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-4" style={{display:"none"}}>
               <FormField
                 control={form.control}
                 name="openingQty"
@@ -374,20 +330,12 @@ export function StockItemCreateDialog({
                   <FormItem>
                     <FormLabel>Opening Qty</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        type="number"
-                        step="0.001"
-                        placeholder="0"
-                        data-testid="input-opening-qty"
-                      />
+                      <Input {...field} value={field.value ?? ""} type="number" step="0.001" placeholder="0" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="openingRate"
@@ -395,20 +343,12 @@ export function StockItemCreateDialog({
                   <FormItem>
                     <FormLabel>Opening Rate</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        data-testid="input-opening-rate"
-                      />
+                      <Input {...field} value={field.value ?? ""} type="number" step="0.01" placeholder="0.00" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-
               <FormField
                 control={form.control}
                 name="openingValue"
@@ -416,14 +356,7 @@ export function StockItemCreateDialog({
                   <FormItem>
                     <FormLabel>Opening Value</FormLabel>
                     <FormControl>
-                      <Input
-                        {...field}
-                        value={field.value ?? ""}
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
-                        data-testid="input-opening-value"
-                      />
+                      <Input {...field} value={field.value ?? ""} type="number" step="0.01" placeholder="0.00" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
