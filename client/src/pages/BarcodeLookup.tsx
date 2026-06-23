@@ -473,19 +473,18 @@ export default function BarcodeLookup() {
         <div className="p-4">
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Scan or type a reference (REF…) or article code…"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 onKeyDown={handleKeyDown}
-                className="pl-9 pr-24"
+                className="pr-24"
                 autoFocus
                 data-testid="input-lookup-search"
               />
               <button
                 type="button"
-                className="absolute right-2 top-0 bottom-0 my-auto h-7 flex items-center gap-1 px-2 rounded-md bg-muted text-xs font-medium text-muted-foreground hover-elevate"
+                className="absolute right-2 top-1/2 -translate-y-1/2 h-7 flex items-center gap-1 px-2 rounded-md bg-muted text-xs font-medium text-muted-foreground hover-elevate"
                 onClick={() => setSearchMode(searchMode === "reference" ? "article" : "reference")}
                 data-testid="button-toggle-search-mode"
                 title="Click to switch between Ref # and Article Code mode"
