@@ -204,6 +204,37 @@ export async function getLocationInventory(companyId: number, locationId: number
     ));
 }
 
+export async function getCompanyInventory(companyId: number): Promise<any[]> {
+  return await db
+    .select({
+      inventoryId: schema.inventory.id,
+      locationId: schema.inventory.locationId,
+      locationName: schema.locations.name,
+      locationCode: schema.locations.code,
+      stockItemId: schema.inventory.stockItemId,
+      quantity: schema.inventory.quantity,
+      averageRate: schema.inventory.averageRate,
+      totalValue: schema.inventory.totalValue,
+      lastUpdated: schema.inventory.lastUpdated,
+      stockItemCode: schema.stockItems.code,
+      stockItemName: schema.stockItems.name,
+      stockItemUom: schema.stockItems.uom,
+      stockGroupId: schema.stockItems.stockGroupId,
+      stockGroupName: sql<string>`COALESCE(${schema.stockGroups.name}, '')`,
+      stockGroupCode: sql<string>`COALESCE(${schema.stockGroups.code}, '')`,
+    })
+    .from(schema.inventory)
+    .leftJoin(schema.stockItems, eq(schema.inventory.stockItemId, schema.stockItems.id))
+    .leftJoin(schema.stockGroups, eq(schema.stockItems.stockGroupId, schema.stockGroups.id))
+    .innerJoin(schema.locations, eq(schema.inventory.locationId, schema.locations.id))
+    .where(and(
+      eq(schema.inventory.companyId, companyId),
+      isNull(schema.locations.deletedAt),
+      isNull(schema.stockItems.deletedAt),
+    ))
+    .orderBy(asc(schema.stockItems.code), asc(schema.locations.name));
+}
+
 // ---------------------------------------------------------------------------
 // Stock Queries
 // ---------------------------------------------------------------------------
