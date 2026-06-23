@@ -1019,13 +1019,6 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
         posUser={posUser}
         editVoucherId={editVoucherId}
         activeLocation={activeLocation}
-        posAssignedLocations={posAssignedLocations}
-        posSelectedLocation={posSelectedLocation}
-        setPosSelectedLocation={setPosSelectedLocation}
-        allLocations={allLocations}
-        setSelectedLocation={setSelectedLocation}
-        hasOpenShift={!posUser || (!!currentShift && currentShift.status === "open")}
-        currentShift={currentShift}
         showPosImport={!posUser || companySettings?.posExcelImportEnabled}
         onExportInventory={handleExportInventory}
         onImportClick={() => navigate("/pos-import")}
@@ -1039,7 +1032,8 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
       {/* Inline checkout strip */}
       {activeLocation && (
         <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-muted/10">
-          {!posUser && (
+          {/* Location — admin: full select; POS user: name badge or select if multiple */}
+          {!posUser ? (
             <Select
               value={activeLocation?.id?.toString()}
               onValueChange={(val) => {
@@ -1059,19 +1053,49 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 ))}
               </SelectContent>
             </Select>
+          ) : posAssignedLocations.length > 1 ? (
+            <Select
+              value={posSelectedLocation?.id?.toString()}
+              onValueChange={(val) => {
+                const loc = posAssignedLocations.find((l) => l.id.toString() === val);
+                if (loc) setPosSelectedLocation(loc);
+              }}
+            >
+              <SelectTrigger className="w-[180px]" data-testid="select-pos-location-strip">
+                <MapPin className="h-3.5 w-3.5 mr-1 text-muted-foreground shrink-0" />
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                {posAssignedLocations.map((loc) => (
+                  <SelectItem key={loc.id} value={loc.id.toString()}>
+                    {loc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center gap-1.5 h-9 px-3 rounded-md border border-input bg-muted/30 text-sm">
+              <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="font-medium">{activeLocation.name}</span>
+            </div>
           )}
 
           <input
             type="date"
             value={saleDate}
-            onChange={(e) => setSaleDate(e.target.value)}
-            className="h-9 px-3 rounded-md border border-input bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+            onChange={posUser ? undefined : (e) => setSaleDate(e.target.value)}
+            readOnly={!!posUser}
+            className={`h-9 px-3 rounded-md border border-input bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring ${posUser ? "opacity-60 cursor-not-allowed" : ""}`}
             data-testid="input-sale-date"
           />
 
           {!isCreditSale && (
             <>
-              <Select value={paymentAccountType} onValueChange={(v: "bank" | "cash") => setPaymentAccountType(v)}>
+              <Select
+                value={paymentAccountType}
+                onValueChange={posUser ? undefined : (v: "bank" | "cash") => setPaymentAccountType(v)}
+                disabled={!!posUser}
+              >
                 <SelectTrigger className="w-24" data-testid="select-account-type">
                   <SelectValue />
                 </SelectTrigger>
@@ -1081,7 +1105,11 @@ export default function POS({ posUser, editVoucherId }: { posUser?: any; editVou
                 </SelectContent>
               </Select>
 
-              <Select value={paymentAccountId || ""} onValueChange={setPaymentAccountId}>
+              <Select
+                value={paymentAccountId || ""}
+                onValueChange={posUser ? undefined : setPaymentAccountId}
+                disabled={!!posUser}
+              >
                 <SelectTrigger className="w-[180px]" data-testid="select-payment-account">
                   <SelectValue placeholder={paymentAccountType === "bank" ? "Select Bank" : "Select Cash"} />
                 </SelectTrigger>
